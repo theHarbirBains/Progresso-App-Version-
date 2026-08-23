@@ -4,6 +4,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import expoConfig from 'eslint-config-expo/flat.js';
+import globals from 'globals';
 
 export default defineConfig([
   {
@@ -23,5 +24,11 @@ export default defineConfig([
   {
     files: ['apps/mobile/**/*.{js,jsx,ts,tsx}'],
     extends: [expoConfig],
+  },
+  {
+    files: ['**/*.mjs', '**/*.cjs'],
+    languageOptions: {
+      globals: globals.node,
+    },
   },
 ]);

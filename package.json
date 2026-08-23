@@ -18,13 +18,17 @@
     "dev:mobile": "npm run start --workspace apps/mobile",
     "dev:api": "npm run start:dev --workspace apps/api",
     "build:api": "npm run build --workspace apps/api",
-    "test:api": "npm run test --workspace apps/api"
+    "test:api": "npm run test --workspace apps/api",
+    "db:test": "node supabase/tests/run.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "embedded-postgres": "^18.4.0-beta.17",
     "eslint": "^9.0.0",
     "eslint-config-expo": "^10.0.0",
     "eslint-config-prettier": "^9.0.0",
+    "globals": "^17.11.0",
+    "pg": "^8.23.0",
     "prettier": "^3.0.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.0.0"
