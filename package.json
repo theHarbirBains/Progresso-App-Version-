@@ -13,11 +13,14 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --check .",
-    "format:write": "prettier --write ."
+    "format:write": "prettier --write .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:mobile": "npm run start --workspace apps/mobile"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "eslint": "^9.0.0",
+    "eslint-config-expo": "^10.0.0",
     "eslint-config-prettier": "^9.0.0",
     "prettier": "^3.0.0",
     "typescript": "^5.5.0",
