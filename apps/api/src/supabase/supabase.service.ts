@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { Role } from '../common/enums/role.enum';
 import type { EnvironmentVariables } from '../config/env.validation';
 
 /**
@@ -22,5 +23,24 @@ export class SupabaseService {
 
   getClient(): SupabaseClient {
     return this.client;
+  }
+
+  /**
+   * The only trusted source for a user's elevated role: a row in
+   * admin_users, writable exclusively by service-role. Returns null for a
+   * regular user (no row).
+   */
+  async getAdminRole(userId: string): Promise<Role | null> {
+    const { data, error } = await this.client
+      .from('admin_users')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      throw new InternalServerErrorException('Failed to resolve admin role');
+    }
+
+    return (data?.role as Role | undefined) ?? null;
   }
 }

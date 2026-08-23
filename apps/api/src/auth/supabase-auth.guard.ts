@@ -38,10 +38,14 @@ export class SupabaseAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
+    // Role always starts as the default here — never trust a JWT claim for
+    // it. RolesGuard resolves the real role from admin_users (the only
+    // trusted source, writable exclusively by service-role) when a route
+    // actually requires one.
     const user: AuthenticatedUser = {
       id: payload.sub,
       email: payload.email,
-      role: (payload.app_metadata?.role as Role) ?? Role.USER,
+      role: Role.USER,
     };
     request.user = user;
 

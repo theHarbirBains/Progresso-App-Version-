@@ -1,3 +1,7 @@
+// Must be imported before any code that uses fetch/URL (Supabase client
+// included) — React Native's URL implementation is incomplete otherwise.
+import 'react-native-url-polyfill/auto';
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';

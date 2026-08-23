@@ -15,7 +15,7 @@ Currently in **Phase 0 — Foundation**. No application features are implemented
 ├── apps/               # Application packages (npm workspaces) — added incrementally
 │   ├── mobile/         # React Native + Expo + TypeScript (Expo SDK 54)
 │   └── api/            # NestJS + Fastify + TypeScript backend
-├── supabase/           # Database migrations and config (not yet created)
+├── supabase/           # Database migrations, seed data, and local DB tests
 ├── docs/               # Project documentation
 ├── CLAUDE.md           # Permanent working rules for coding agents
 └── tsconfig.base.json  # Shared TypeScript base config for all apps
@@ -32,6 +32,8 @@ Currently in **Phase 0 — Foundation**. No application features are implemented
 ## Mobile App
 
 `apps/mobile` is pinned to **Expo SDK 54** — the version currently shipped by the Expo Go app on the App Store / Play Store. Do not upgrade the Expo SDK without first checking which SDK version Expo Go on the stores supports, or the app will fail to load in Expo Go.
+
+Copy `apps/mobile/.env.example` to `apps/mobile/.env` and fill in your Supabase project URL and **anon** key (never the service-role key — that stays backend-only). The app supports email/password sign in, sign up, and sign out; there's no dashboard yet, just a placeholder shell once signed in.
 
 From the repository root:
 
@@ -53,7 +55,7 @@ npm run build:api    # production build
 npm run test:api     # unit tests
 ```
 
-`GET /health` is public and unversioned. All other routes require a valid Supabase-issued JWT (`Authorization: Bearer <token>`) by default.
+`GET /health` is public and unversioned. All other routes require a valid Supabase-issued JWT (`Authorization: Bearer <token>`) by default; routes marked `@Roles(...)` additionally require a matching row in `admin_users`. `GET /api/v1/users/me` and `GET /api/v1/admin/ping` are foundation endpoints proving this chain end to end — not product features.
 
 ## Tech Stack
 

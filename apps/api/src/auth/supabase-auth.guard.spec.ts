@@ -52,13 +52,9 @@ describe('SupabaseAuthGuard', () => {
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it('attaches the authenticated user to the request on a valid token', async () => {
+  it('attaches the authenticated user to the request on a valid token, identified strictly by JWT sub', async () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
-    jwtService.verify.mockResolvedValue({
-      sub: 'user-123',
-      email: 'athlete@example.com',
-      app_metadata: { role: Role.SUPPORT_ADMIN },
-    });
+    jwtService.verify.mockResolvedValue({ sub: 'user-123', email: 'athlete@example.com' });
     const guard = new SupabaseAuthGuard(reflector, jwtService as unknown as SupabaseJwtService);
     const { context, request } = createContext({ authorization: 'Bearer good-token' });
 
@@ -66,13 +62,21 @@ describe('SupabaseAuthGuard', () => {
     expect(request.user).toEqual({
       id: 'user-123',
       email: 'athlete@example.com',
-      role: Role.SUPPORT_ADMIN,
+      role: Role.USER,
     });
   });
 
-  it('defaults to the user role when no role claim is present', async () => {
+  it('never trusts a role claim from the token itself — always the default here', async () => {
+    // Even if a token payload carried a role-like claim, this guard must
+    // ignore it: the only trusted source for elevated roles is the
+    // admin_users table, resolved later by RolesGuard.
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
-    jwtService.verify.mockResolvedValue({ sub: 'user-456' });
+    jwtService.verify.mockResolvedValue({
+      sub: 'user-456',
+      email: 'attacker@example.com',
+      app_metadata: { role: 'full_admin' },
+      role: 'full_admin',
+    });
     const guard = new SupabaseAuthGuard(reflector, jwtService as unknown as SupabaseJwtService);
     const { context, request } = createContext({ authorization: 'Bearer good-token' });
 

@@ -6,8 +6,6 @@ import type { EnvironmentVariables } from '../config/env.validation';
 export interface SupabaseJwtPayload extends JWTPayload {
   sub: string;
   email?: string;
-  /** Custom claim carrying the app-level role (see Role enum). Absent for legacy users. */
-  app_metadata?: { role?: string; [key: string]: unknown };
 }
 
 /**
