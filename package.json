@@ -15,7 +15,10 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "dev:mobile": "npm run start --workspace apps/mobile"
+    "dev:mobile": "npm run start --workspace apps/mobile",
+    "dev:api": "npm run start:dev --workspace apps/api",
+    "build:api": "npm run build --workspace apps/api",
+    "test:api": "npm run test --workspace apps/api"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

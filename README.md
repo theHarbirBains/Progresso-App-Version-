@@ -14,7 +14,7 @@ Currently in **Phase 0 — Foundation**. No application features are implemented
 .
 ├── apps/               # Application packages (npm workspaces) — added incrementally
 │   ├── mobile/         # React Native + Expo + TypeScript (Expo SDK 54)
-│   └── backend/        # NestJS + Fastify + TypeScript (not yet created)
+│   └── api/            # NestJS + Fastify + TypeScript backend
 ├── supabase/           # Database migrations and config (not yet created)
 ├── docs/               # Project documentation
 ├── CLAUDE.md           # Permanent working rules for coding agents
@@ -40,6 +40,20 @@ npm run dev:mobile
 ```
 
 Then scan the QR code with the Expo Go app on your phone.
+
+## Backend API
+
+`apps/api` is a NestJS + Fastify service. Copy `apps/api/.env.example` to `apps/api/.env` and fill in your Supabase project URL and service role key before starting it.
+
+From the repository root:
+
+```
+npm run dev:api      # start in watch mode
+npm run build:api    # production build
+npm run test:api     # unit tests
+```
+
+`GET /health` is public and unversioned. All other routes require a valid Supabase-issued JWT (`Authorization: Bearer <token>`) by default.
 
 ## Tech Stack
 
