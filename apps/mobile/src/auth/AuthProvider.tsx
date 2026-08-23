@@ -8,6 +8,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 import { supabase } from '../lib/supabase';
+import { clearSentryUser, setSentryUser } from '../lib/sentry';
 
 export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
 
@@ -39,6 +40,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (!mounted) return;
       setSession(data.session);
       setStatus(data.session ? 'signedIn' : 'signedOut');
+      if (data.session?.user) {
+        setSentryUser(data.session.user.id);
+      }
     });
 
     const {
@@ -47,6 +51,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (!mounted) return;
       setSession(newSession);
       setStatus(newSession ? 'signedIn' : 'signedOut');
+      if (newSession?.user) {
+        setSentryUser(newSession.user.id);
+      } else {
+        clearSentryUser();
+      }
     });
 
     return () => {

@@ -8,6 +8,16 @@ interface MockAuthHandles {
   reset: () => void;
 }
 
+// No native SDK involved in tests: wrapApp is the identity function, and
+// setUser/clearUser calls are asserted directly instead of going through
+// the real @sentry/react-native module.
+jest.mock('./src/lib/sentry', () => ({
+  initSentry: jest.fn(),
+  wrapApp: (component: unknown) => component,
+  setSentryUser: jest.fn(),
+  clearSentryUser: jest.fn(),
+}));
+
 // babel-plugin-jest-hoist's out-of-scope check for jest.mock() factories
 // misfires on TS `type`/`interface` declarations placed inside the factory
 // (even local ones), so this stays untyped/`any` rather than referencing a
@@ -74,9 +84,15 @@ jest.mock('./src/lib/supabase', () => {
 const { __mockAuth: mockAuth } = jest.requireMock('./src/lib/supabase') as {
   __mockAuth: MockAuthHandles;
 };
+const mockSentry = jest.requireMock('./src/lib/sentry') as {
+  setSentryUser: jest.Mock;
+  clearSentryUser: jest.Mock;
+};
 
 beforeEach(() => {
   mockAuth.reset();
+  mockSentry.setSentryUser.mockClear();
+  mockSentry.clearSentryUser.mockClear();
 });
 
 describe('Authentication flow', () => {
@@ -100,6 +116,16 @@ describe('Authentication flow', () => {
       email: 'athlete@example.com',
       password: 'correct-password',
     });
+
+    // Sentry gets the user id only — never the email or the password.
+    expect(mockSentry.setSentryUser).toHaveBeenCalledWith('user-1');
+    expect(mockSentry.setSentryUser).not.toHaveBeenCalledWith(
+      expect.objectContaining({ email: expect.anything() }),
+    );
+    for (const call of mockSentry.setSentryUser.mock.calls) {
+      expect(JSON.stringify(call)).not.toContain('correct-password');
+      expect(JSON.stringify(call)).not.toContain('athlete@example.com');
+    }
   });
 
   it('shows an error message on invalid credentials and does not sign in', async () => {
@@ -142,5 +168,6 @@ describe('Authentication flow', () => {
 
     expect(await screen.findByTestId('sign-in-email')).toBeTruthy();
     expect(mockAuth.signOut).toHaveBeenCalled();
+    expect(mockSentry.clearSentryUser).toHaveBeenCalled();
   });
 });

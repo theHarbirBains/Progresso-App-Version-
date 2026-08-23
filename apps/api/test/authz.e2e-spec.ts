@@ -3,6 +3,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { Test } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { SupabaseJwtService } from '../src/auth/supabase-jwt.service';
+import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { Role } from '../src/common/enums/role.enum';
 import { SupabaseService } from '../src/supabase/supabase.service';
 
@@ -27,6 +28,7 @@ describe('Authorization (e2e)', () => {
     app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+    app.useGlobalFilters(new AllExceptionsFilter());
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
   });

@@ -6,8 +6,12 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import type { EnvironmentVariables } from './config/env.validation';
+import { initSentry } from './observability/sentry';
 
 async function bootstrap(): Promise<void> {
+  // As early as possible, before the Nest app itself is created.
+  initSentry();
+
   const isProduction = process.env.NODE_ENV === 'production';
 
   const adapter = new FastifyAdapter({

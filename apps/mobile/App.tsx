@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
+import { wrapApp } from './src/lib/sentry';
 import { AppShellScreen } from './src/screens/AppShellScreen';
 import { AuthLoadingScreen } from './src/screens/AuthLoadingScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
@@ -27,7 +28,7 @@ function Root() {
   );
 }
 
-export default function App() {
+function App() {
   return (
     <AuthProvider>
       <Root />
@@ -35,3 +36,5 @@ export default function App() {
     </AuthProvider>
   );
 }
+
+export default wrapApp(App);
