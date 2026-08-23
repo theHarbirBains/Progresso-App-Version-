@@ -13,7 +13,7 @@ Currently in **Phase 0 — Foundation**. No application features are implemented
 ```
 .
 ├── apps/               # Application packages (npm workspaces) — added incrementally
-│   ├── mobile/         # React Native + Expo + TypeScript (not yet created)
+│   ├── mobile/         # React Native + Expo + TypeScript (Expo SDK 54)
 │   └── backend/        # NestJS + Fastify + TypeScript (not yet created)
 ├── supabase/           # Database migrations and config (not yet created)
 ├── docs/               # Project documentation
@@ -27,6 +27,19 @@ Currently in **Phase 0 — Foundation**. No application features are implemented
 - **Node version:** see `.nvmrc`
 - **Linting:** ESLint (flat config) — `npm run lint`
 - **Formatting:** Prettier — `npm run format`
+- **Typecheck:** `npm run typecheck`
+
+## Mobile App
+
+`apps/mobile` is pinned to **Expo SDK 54** — the version currently shipped by the Expo Go app on the App Store / Play Store. Do not upgrade the Expo SDK without first checking which SDK version Expo Go on the stores supports, or the app will fail to load in Expo Go.
+
+From the repository root:
+
+```
+npm run dev:mobile
+```
+
+Then scan the QR code with the Expo Go app on your phone.
 
 ## Tech Stack
 
