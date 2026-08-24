@@ -1,9 +1,5 @@
 -- Local/dev seed data only. Never applied to the production database by
--- `supabase db push`. A handful of built-in exercises across muscle groups,
--- enough to exercise the schema; the real exercise library is Phase 2 work.
-insert into public.exercises (name, muscle_group) values
-  ('Barbell Bench Press', 'chest'),
-  ('Barbell Back Squat', 'quadriceps'),
-  ('Deadlift', 'back'),
-  ('Overhead Press', 'shoulders'),
-  ('Barbell Row', 'back');
+-- `supabase db push`. The real built-in exercise catalog now lives in
+-- migration 20260826100001_builtin_exercises.sql (applied here too, since
+-- db:test/local dev apply every migration) -- nothing exercise-related
+-- needs to be seeded separately any more.

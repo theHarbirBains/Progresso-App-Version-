@@ -11,10 +11,14 @@ import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile } from '../lib/api';
 import { authStyles as styles } from './authStyles';
 
-// The authenticated home for Phase 0/1 — there's no dashboard yet, so this
-// screen doubles as both "you're signed in" proof and real account
+interface Props {
+  onOpenExerciseLibrary: () => void;
+}
+
+// The authenticated home for Phase 0/1/2 — there's no dashboard yet, so
+// this screen doubles as both "you're signed in" proof and real account
 // management. Not the final Progresso visual design.
-export function AccountSettingsScreen() {
+export function AccountSettingsScreen({ onOpenExerciseLibrary }: Props) {
   const { user, session, signOut } = useAuth();
   const accessToken = session?.access_token;
 
@@ -164,6 +168,14 @@ export function AccountSettingsScreen() {
         ) : (
           <Text style={styles.buttonText}>Save</Text>
         )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        testID="open-exercise-library"
+        style={styles.oauthButton}
+        onPress={onOpenExerciseLibrary}
+      >
+        <Text style={styles.oauthButtonText}>Exercise Library</Text>
       </TouchableOpacity>
 
       <TouchableOpacity

@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { SupabaseAuthGuard } from './auth/supabase-auth.guard';
 import { validate } from './config/env.validation';
 import { RolesGuard } from './common/guards/roles.guard';
+import { ExercisesModule } from './exercises/exercises.module';
 import { HealthModule } from './health/health.module';
 import { RevenueCatModule } from './revenuecat/revenuecat.module';
 import { SupabaseModule } from './supabase/supabase.module';
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     HealthModule,
     UsersModule,
+    ExercisesModule,
     AdminModule,
     RevenueCatModule,
   ],

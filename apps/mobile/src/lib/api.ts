@@ -1,3 +1,5 @@
+import type { MuscleGroup } from '../exercises/muscleGroups';
+
 // Thin client for the backend API — the only place profile writes go
 // through (see PATCH /users/me), never a direct Supabase client update,
 // so username uniqueness/validation stays centrally enforced server-side.
@@ -65,5 +67,51 @@ export function updateMyProfile(
   return request<ProfileResponse>('/api/v1/users/me', accessToken, {
     method: 'PATCH',
     body: JSON.stringify(updates),
+  });
+}
+
+// Exercise writes (create/edit/deactivate) go through the backend for the
+// same reason profile writes do: centralized validation and a clean 409 on
+// a duplicate custom-exercise name instead of a raw Postgres error. Reads
+// (search/list/filter) go direct to Supabase instead — see exerciseQueries.
+export interface ExerciseResponse {
+  id: string;
+  name: string;
+  muscleGroup: MuscleGroup;
+  isActive: boolean;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateExerciseInput {
+  name: string;
+  muscleGroup: MuscleGroup;
+}
+
+export interface UpdateExerciseInput {
+  name?: string;
+  muscleGroup?: MuscleGroup;
+  isActive?: boolean;
+}
+
+export function createExercise(
+  accessToken: string,
+  input: CreateExerciseInput,
+): Promise<ExerciseResponse> {
+  return request<ExerciseResponse>('/api/v1/exercises', accessToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateExercise(
+  accessToken: string,
+  id: string,
+  input: UpdateExerciseInput,
+): Promise<ExerciseResponse> {
+  return request<ExerciseResponse>(`/api/v1/exercises/${id}`, accessToken, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
   });
 }

@@ -248,6 +248,108 @@ async function main() {
   // later tests start from a clean, username-less state.
   await admin.query('update public.users set username = null where id = $1', [userA]);
 
+  console.log('\nRunning exercise library tests...\n');
+
+  const customExerciseId = await asUserCommitted(userA, async (client) => {
+    const res = await client.query(
+      "insert into public.exercises (name, muscle_group, created_by) values ('My Curl Variation', 'biceps', $1) returning id",
+      [userA],
+    );
+    return res.rows[0].id;
+  });
+
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      "update public.exercises set name = 'My Curl Variation v2' where id = $1",
+      [customExerciseId],
+    );
+    const passed = res.rowCount === 1;
+    record(
+      'User A can update their own custom exercise via the existing RLS policy',
+      passed,
+      passed ? undefined : `rowCount=${res.rowCount}`,
+    );
+  });
+
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      "update public.exercises set name = 'Hacked Bench Press' where id = $1",
+      [benchPress],
+    );
+    const passed = res.rowCount === 0;
+    record(
+      'User A cannot modify a built-in exercise via UPDATE',
+      passed,
+      passed ? undefined : `rowCount=${res.rowCount}`,
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const res = await client.query(
+      "update public.exercises set name = 'Stolen Curl' where id = $1",
+      [customExerciseId],
+    );
+    const passed = res.rowCount === 0;
+    record(
+      "User B cannot modify User A's custom exercise via UPDATE",
+      passed,
+      passed ? undefined : `rowCount=${res.rowCount}`,
+    );
+  });
+
+  await expectThrows(
+    asUser(userA, (client) =>
+      client.query(
+        "insert into public.exercises (name, muscle_group, created_by) values ('Spoofed Builtin', 'chest', null)",
+      ),
+    ),
+    'User A cannot create a built-in exercise by spoofing created_by to null',
+    RLS_ERROR,
+  );
+
+  await expectThrows(
+    asUser(userA, (client) =>
+      client.query(
+        "insert into public.exercises (name, muscle_group, created_by) values ('Spoofed Owner', 'chest', $1)",
+        [userB],
+      ),
+    ),
+    'User A cannot create a custom exercise spoofing User B as the owner',
+    RLS_ERROR,
+  );
+
+  await asUser(userB, async (client) => {
+    expectRowCount(
+      await client.query('select id from public.exercises where id = $1', [customExerciseId]),
+      0,
+      "User B cannot see User A's custom exercise",
+    );
+  });
+
+  await asUser(userA, async (client) => {
+    expectRowCount(
+      await client.query('select id from public.exercises where id = $1', [benchPress]),
+      1,
+      'User A can see built-in exercises',
+    );
+  });
+
+  await admin.query('begin');
+  try {
+    await admin.query('update public.exercises set is_active = false where id = $1', [
+      customExerciseId,
+    ]);
+    await asClaims(admin, userA);
+    expectRowCount(
+      await admin.query('select id from public.exercises where id = $1', [customExerciseId]),
+      1,
+      'A deactivated custom exercise remains visible by id (historical integrity)',
+    );
+  } finally {
+    await admin.query('reset role').catch(() => {});
+    await admin.query('rollback').catch(() => {});
+  }
+
   console.log('\nRunning ownership/isolation tests...\n');
 
   await asUser(userA, async (client) => {
@@ -544,8 +646,15 @@ try {
   exitCode = 1;
 } finally {
   await pgInstance.stop().catch(() => {});
-  // Windows can briefly hold file locks after the server process exits.
-  rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  // Windows can briefly hold file locks after the server process exits --
+  // occasionally longer than rmSync's own retries cover. This is best-effort
+  // temp-directory cleanup, not a test result, so a leftover temp dir here
+  // must never mask the actual pass/fail tally below.
+  try {
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  } catch (err) {
+    console.error(`\nWarning: failed to remove temp data dir ${dataDir}:`, err);
+  }
 }
 
 console.log('\n---');
