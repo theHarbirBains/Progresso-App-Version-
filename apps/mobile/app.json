@@ -3,6 +3,7 @@
     "name": "Progresso",
     "slug": "progresso",
     "version": "1.0.0",
+    "scheme": "progresso",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -26,6 +27,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["@sentry/react-native"]
+    "plugins": ["@sentry/react-native", "expo-web-browser"]
   }
 }

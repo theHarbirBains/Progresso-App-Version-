@@ -55,4 +55,64 @@ export const authStyles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
+  label: {
+    color: '#9A9AA5',
+    fontSize: 13,
+    marginTop: 8,
+  },
+  divider: {
+    color: '#6B6B75',
+    fontSize: 13,
+    textAlign: 'center',
+    marginVertical: 4,
+  },
+  oauthButton: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2A2A32',
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  oauthButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  unitToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  unitOption: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2A2A32',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  unitOptionSelected: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+  },
+  unitOptionText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  unitOptionTextSelected: {
+    color: '#0B0B0F',
+  },
+  signOutButton: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3A2A2A',
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  signOutButtonText: {
+    color: '#FF6B6B',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

@@ -199,6 +199,55 @@ async function main() {
   const fixtureA = await buildFixture(userA, 'A');
   const fixtureB = await buildFixture(userB, 'B');
 
+  console.log('\nRunning profile/username tests...\n');
+
+  await asUserCommitted(userA, async (client) => {
+    await client.query("update public.users set username = 'harbir_b' where id = $1", [userA]);
+  });
+  await asUser(userA, async (client) => {
+    const res = await client.query('select username from public.users where id = $1', [userA]);
+    record(
+      'User A can set their own username via the existing self-update RLS policy',
+      res.rows[0]?.username === 'harbir_b',
+      `got ${res.rows[0]?.username}`,
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const res = await client.query("update public.users set username = 'stolen' where id = $1", [
+      userA,
+    ]);
+    const passed = res.rowCount === 0;
+    record(
+      "User B cannot modify User A's username via UPDATE",
+      passed,
+      passed ? undefined : `rowCount=${res.rowCount}`,
+    );
+  });
+
+  await expectThrows(
+    admin.query("update public.users set username = 'Has-Dash' where id = $1", [userA]),
+    'Uppercase/invalid-character usernames are rejected by the format constraint',
+    /violates check constraint/i,
+  );
+
+  await admin.query('begin');
+  try {
+    await admin.query("update public.users set username = 'dup_name' where id = $1", [userA]);
+    await expectThrows(
+      admin.query("update public.users set username = 'dup_name' where id = $1", [userB]),
+      'Duplicate usernames are rejected by the unique constraint',
+      /duplicate key|unique constraint/i,
+    );
+  } finally {
+    await admin.query('rollback').catch(() => {});
+  }
+
+  // Only userA's username change was actually committed above (userB's was
+  // rolled back with the duplicate-username transaction); reset it so
+  // later tests start from a clean, username-less state.
+  await admin.query('update public.users set username = null where id = $1', [userA]);
+
   console.log('\nRunning ownership/isolation tests...\n');
 
   await asUser(userA, async (client) => {

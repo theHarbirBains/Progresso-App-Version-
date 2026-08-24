@@ -108,9 +108,10 @@ describe('Authorization (e2e)', () => {
   it('returns the authenticated user profile from /users/me', async () => {
     verify.mockResolvedValue({ sub: 'user-7', email: 'athlete@example.com' });
     getAdminRole.mockResolvedValue(null);
-    const maybeSingle = jest
-      .fn()
-      .mockResolvedValue({ data: { weight_unit: 'kg', display_name: 'Athlete' }, error: null });
+    const maybeSingle = jest.fn().mockResolvedValue({
+      data: { weight_unit: 'kg', display_name: 'Athlete', username: 'athlete1' },
+      error: null,
+    });
     const eq = jest.fn().mockReturnValue({ maybeSingle });
     const select = jest.fn().mockReturnValue({ eq });
     getClient.mockReturnValue({ from: jest.fn().mockReturnValue({ select }) });
@@ -128,6 +129,7 @@ describe('Authorization (e2e)', () => {
       role: Role.USER,
       weightUnit: 'kg',
       displayName: 'Athlete',
+      username: 'athlete1',
     });
   });
 });

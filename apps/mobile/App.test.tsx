@@ -1,10 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import App from './App';
 
 interface MockAuthHandles {
   signInWithPassword: jest.Mock;
   signUp: jest.Mock;
   signOut: jest.Mock;
+  resetPasswordForEmail: jest.Mock;
+  updateUser: jest.Mock;
+  signInWithOAuth: jest.Mock;
+  triggerUrl: (url: string) => void;
   reset: () => void;
 }
 
@@ -16,6 +20,38 @@ jest.mock('./src/lib/sentry', () => ({
   wrapApp: (component: unknown) => component,
   setSentryUser: jest.fn(),
   clearSentryUser: jest.fn(),
+}));
+
+// AccountSettingsScreen's own profile fetch/save is covered by its own
+// dedicated test file — mocked here purely so the sign-in/sign-out flow
+// tests don't depend on it.
+jest.mock('./src/lib/api', () => ({
+  getMyProfile: jest.fn().mockResolvedValue({
+    id: 'user-1',
+    email: 'athlete@example.com',
+    role: 'user',
+    displayName: null,
+    username: null,
+    weightUnit: 'kg',
+  }),
+  updateMyProfile: jest.fn(),
+}));
+
+jest.mock('expo-linking', () => ({
+  getInitialURL: jest.fn().mockResolvedValue(null),
+  addEventListener: jest.fn().mockReturnValue({ remove: jest.fn() }),
+  createURL: jest.fn((path: string) => `progresso://${path}`),
+}));
+
+// oauth.ts calls maybeCompleteAuthSession() at module load time, so this
+// must be mocked before anything imports it (transitively, via
+// AuthProvider) or every test in this file fails at import time.
+jest.mock('expo-web-browser', () => ({
+  maybeCompleteAuthSession: jest.fn(),
+  openAuthSessionAsync: jest.fn().mockResolvedValue({
+    type: 'success',
+    url: 'progresso://auth-callback#access_token=a&refresh_token=b',
+  }),
 }));
 
 // babel-plugin-jest-hoist's out-of-scope check for jest.mock() factories
@@ -34,7 +70,7 @@ jest.mock('./src/lib/supabase', () => {
         error: { message: 'Invalid login credentials' },
       };
     }
-    currentSession = { user: { id: 'user-1', email } };
+    currentSession = { user: { id: 'user-1', email }, access_token: 'access-token-1' };
     if (authChangeCallback) authChangeCallback('SIGNED_IN', currentSession);
     return { data: { session: currentSession, user: currentSession.user }, error: null };
   });
@@ -50,16 +86,52 @@ jest.mock('./src/lib/supabase', () => {
     return { error: null };
   });
 
+  const mockResetPasswordForEmail = jest.fn(async (email: string) => {
+    if (email === 'errors@example.com') {
+      return { data: null, error: { message: 'Something went wrong' } };
+    }
+    return { data: {}, error: null };
+  });
+
+  const mockUpdateUser = jest.fn(async ({ password }: { password: string }) => {
+    if (password === 'rejected-password') {
+      return { data: null, error: { message: 'Password is too weak' } };
+    }
+    return { data: { user: currentSession?.user }, error: null };
+  });
+
+  const mockSignInWithOAuth = jest.fn(async () => ({
+    data: { url: 'https://provider.example.com/authorize', provider: 'google' },
+    error: null,
+  }));
+
+  const mockSetSession = jest.fn(async ({ access_token }: { access_token: string }) => {
+    currentSession = { user: { id: 'oauth-user', email: 'oauth@example.com' }, access_token };
+    if (authChangeCallback) authChangeCallback('SIGNED_IN', currentSession);
+    return { data: { session: currentSession }, error: null };
+  });
+
   const handles = {
     signInWithPassword: mockSignInWithPassword,
     signUp: mockSignUp,
     signOut: mockSignOut,
+    resetPasswordForEmail: mockResetPasswordForEmail,
+    updateUser: mockUpdateUser,
+    signInWithOAuth: mockSignInWithOAuth,
+    triggerUrl: (url: string) => {
+      authChangeCallback?.('PASSWORD_RECOVERY', currentSession);
+      void url;
+    },
     reset: () => {
       currentSession = null;
       authChangeCallback = undefined;
       mockSignInWithPassword.mockClear();
       mockSignUp.mockClear();
       mockSignOut.mockClear();
+      mockResetPasswordForEmail.mockClear();
+      mockUpdateUser.mockClear();
+      mockSignInWithOAuth.mockClear();
+      mockSetSession.mockClear();
     },
   };
 
@@ -74,6 +146,10 @@ jest.mock('./src/lib/supabase', () => {
         signInWithPassword: mockSignInWithPassword,
         signUp: mockSignUp,
         signOut: mockSignOut,
+        resetPasswordForEmail: mockResetPasswordForEmail,
+        updateUser: mockUpdateUser,
+        signInWithOAuth: mockSignInWithOAuth,
+        setSession: mockSetSession,
       },
     },
     __mockAuth: handles,
@@ -103,7 +179,7 @@ describe('Authentication flow', () => {
     expect(await screen.findByTestId('sign-in-email', {}, { timeout: 5000 })).toBeTruthy();
   });
 
-  it('signs in and shows the authenticated app shell', async () => {
+  it('signs in and shows the account settings screen', async () => {
     render(<App />);
     await screen.findByTestId('sign-in-email');
 
@@ -137,7 +213,7 @@ describe('Authentication flow', () => {
     fireEvent.press(screen.getByTestId('sign-in-submit'));
 
     expect(await screen.findByTestId('sign-in-error')).toBeTruthy();
-    expect(screen.queryByTestId('app-shell-email')).toBeNull();
+    expect(screen.queryByTestId('account-email')).toBeNull();
   });
 
   it('switches to sign-up and shows the email-confirmation message', async () => {
@@ -169,5 +245,129 @@ describe('Authentication flow', () => {
     expect(await screen.findByTestId('sign-in-email')).toBeTruthy();
     expect(mockAuth.signOut).toHaveBeenCalled();
     expect(mockSentry.clearSentryUser).toHaveBeenCalled();
+  });
+});
+
+describe('Password recovery flow', () => {
+  it('requests a reset email and shows the confirmation message', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+
+    fireEvent.press(screen.getByTestId('sign-in-forgot-password'));
+    fireEvent.changeText(await screen.findByTestId('forgot-password-email'), 'athlete@example.com');
+    fireEvent.press(screen.getByTestId('forgot-password-submit'));
+
+    expect(await screen.findByTestId('forgot-password-confirmation')).toBeTruthy();
+    expect(mockAuth.resetPasswordForEmail).toHaveBeenCalledWith(
+      'athlete@example.com',
+      expect.objectContaining({ redirectTo: expect.any(String) }),
+    );
+  });
+
+  it('shows an error when the reset request fails', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+
+    fireEvent.press(screen.getByTestId('sign-in-forgot-password'));
+    fireEvent.changeText(await screen.findByTestId('forgot-password-email'), 'errors@example.com');
+    fireEvent.press(screen.getByTestId('forgot-password-submit'));
+
+    expect(await screen.findByTestId('forgot-password-error')).toBeTruthy();
+  });
+
+  it('can navigate back to sign in from the forgot-password screen', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+
+    fireEvent.press(screen.getByTestId('sign-in-forgot-password'));
+    fireEvent.press(await screen.findByTestId('forgot-password-back'));
+
+    expect(await screen.findByTestId('sign-in-email')).toBeTruthy();
+  });
+
+  it('shows the reset-password screen once a recovery session is established', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+
+    // Simulates the app receiving the password-reset deep link.
+    await act(async () => {
+      mockAuth.triggerUrl(
+        'progresso://reset-password#access_token=a&refresh_token=b&type=recovery',
+      );
+    });
+
+    expect(await screen.findByTestId('reset-password-new')).toBeTruthy();
+  });
+
+  it('updates the password and shows a success message', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+    await act(async () => {
+      mockAuth.triggerUrl(
+        'progresso://reset-password#access_token=a&refresh_token=b&type=recovery',
+      );
+    });
+    await screen.findByTestId('reset-password-new');
+
+    fireEvent.changeText(screen.getByTestId('reset-password-new'), 'new-password-123');
+    fireEvent.changeText(screen.getByTestId('reset-password-confirm'), 'new-password-123');
+    fireEvent.press(screen.getByTestId('reset-password-submit'));
+
+    expect(await screen.findByTestId('reset-password-success')).toBeTruthy();
+    expect(mockAuth.updateUser).toHaveBeenCalledWith({ password: 'new-password-123' });
+  });
+
+  it('rejects mismatched password confirmation without calling the API', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+    await act(async () => {
+      mockAuth.triggerUrl(
+        'progresso://reset-password#access_token=a&refresh_token=b&type=recovery',
+      );
+    });
+    await screen.findByTestId('reset-password-new');
+
+    fireEvent.changeText(screen.getByTestId('reset-password-new'), 'new-password-123');
+    fireEvent.changeText(screen.getByTestId('reset-password-confirm'), 'different-password');
+    fireEvent.press(screen.getByTestId('reset-password-submit'));
+
+    expect(await screen.findByTestId('reset-password-error')).toBeTruthy();
+    expect(mockAuth.updateUser).not.toHaveBeenCalled();
+  });
+});
+
+describe('OAuth sign-in', () => {
+  it('tapping "Continue with Google" starts the Supabase OAuth flow and completes sign-in', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('sign-in-google'));
+    });
+
+    await waitFor(() => {
+      expect(mockAuth.signInWithOAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'google', options: expect.any(Object) }),
+      );
+    });
+
+    // The mocked browser session resolves with a redirect URL carrying
+    // tokens, which should establish a real session and sign the user in.
+    expect(await screen.findByText(/oauth@example\.com/)).toBeTruthy();
+  });
+
+  it('tapping "Continue with Apple" starts the Supabase OAuth flow', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('sign-in-apple'));
+    });
+
+    await waitFor(() => {
+      expect(mockAuth.signInWithOAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'apple', options: expect.any(Object) }),
+      );
+    });
   });
 });

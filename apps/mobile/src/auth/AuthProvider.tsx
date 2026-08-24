@@ -1,4 +1,5 @@
 import type { Session, User } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 import {
   createContext,
   useContext,
@@ -9,8 +10,10 @@ import {
 } from 'react';
 import { supabase } from '../lib/supabase';
 import { clearSentryUser, setSentryUser } from '../lib/sentry';
+import { signInWithOAuthProvider, type OAuthProvider } from './oauth';
+import { parseTokensFromUrl } from './parseSessionUrl';
 
-export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
+export type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'passwordRecovery';
 
 export interface SignUpResult {
   error: string | null;
@@ -25,6 +28,9 @@ export interface AuthContextValue {
   signInWithPassword: (email: string, password: string) => Promise<string | null>;
   signUpWithPassword: (email: string, password: string) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<string | null>;
+  updatePassword: (newPassword: string) => Promise<string | null>;
+  signInWithProvider: (provider: OAuthProvider) => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -35,6 +41,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let mounted = true;
+
+    // A password-recovery email link lands here (cold start or already
+    // running). OAuth's own redirect is handled inline by
+    // signInWithOAuthProvider instead, since it can wait synchronously on
+    // the browser session's result rather than needing this listener —
+    // but if the OS also delivers that same URL here, re-establishing the
+    // same session is harmless.
+    async function handleIncomingUrl(url: string | null) {
+      if (!url) return;
+      const tokens = parseTokensFromUrl(url);
+      if (!tokens) return;
+      await supabase.auth.setSession({
+        access_token: tokens.accessToken,
+        refresh_token: tokens.refreshToken,
+      });
+    }
+
+    Linking.getInitialURL().then(handleIncomingUrl);
+    const urlSubscription = Linking.addEventListener('url', ({ url }) => {
+      void handleIncomingUrl(url);
+    });
 
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
@@ -47,10 +74,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return;
       setSession(newSession);
-      setStatus(newSession ? 'signedIn' : 'signedOut');
+
+      if (event === 'PASSWORD_RECOVERY') {
+        setStatus('passwordRecovery');
+      } else {
+        setStatus(newSession ? 'signedIn' : 'signedOut');
+      }
+
       if (newSession?.user) {
         setSentryUser(newSession.user.id);
       } else {
@@ -61,6 +94,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      urlSubscription.remove();
     };
   }, []);
 
@@ -83,6 +117,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
       signOut: async () => {
         await supabase.auth.signOut();
       },
+      requestPasswordReset: async (email) => {
+        const redirectTo = Linking.createURL('reset-password');
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+        return error?.message ?? null;
+      },
+      updatePassword: async (newPassword) => {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        return error?.message ?? null;
+      },
+      signInWithProvider: signInWithOAuthProvider,
     }),
     [status, session],
   );

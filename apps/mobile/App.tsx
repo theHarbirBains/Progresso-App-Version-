@@ -2,12 +2,14 @@ import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 import { wrapApp } from './src/lib/sentry';
-import { AppShellScreen } from './src/screens/AppShellScreen';
+import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
 import { AuthLoadingScreen } from './src/screens/AuthLoadingScreen';
+import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
+import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { SignUpScreen } from './src/screens/SignUpScreen';
 
-type AuthMode = 'signIn' | 'signUp';
+type AuthMode = 'signIn' | 'signUp' | 'forgotPassword';
 
 function Root() {
   const { status } = useAuth();
@@ -17,15 +19,28 @@ function Root() {
     return <AuthLoadingScreen />;
   }
 
-  if (status === 'signedIn') {
-    return <AppShellScreen />;
+  if (status === 'passwordRecovery') {
+    return <ResetPasswordScreen />;
   }
 
-  return mode === 'signIn' ? (
-    <SignInScreen onSwitchToSignUp={() => setMode('signUp')} />
-  ) : (
-    <SignUpScreen onSwitchToSignIn={() => setMode('signIn')} />
-  );
+  if (status === 'signedIn') {
+    return <AccountSettingsScreen />;
+  }
+
+  switch (mode) {
+    case 'signUp':
+      return <SignUpScreen onSwitchToSignIn={() => setMode('signIn')} />;
+    case 'forgotPassword':
+      return <ForgotPasswordScreen onBackToSignIn={() => setMode('signIn')} />;
+    case 'signIn':
+    default:
+      return (
+        <SignInScreen
+          onSwitchToSignUp={() => setMode('signUp')}
+          onForgotPassword={() => setMode('forgotPassword')}
+        />
+      );
+  }
 }
 
 function App() {
