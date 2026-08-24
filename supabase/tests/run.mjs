@@ -307,6 +307,25 @@ async function main() {
     RLS_ERROR,
   );
 
+  await asUser(userA, async (client) => {
+    expectRowCount(
+      await client.query('select * from public.subscription_events'),
+      0,
+      'Normal users cannot read subscription_events',
+    );
+  });
+
+  await expectThrows(
+    asUser(userA, (client) =>
+      client.query(
+        "insert into public.subscription_events (id, event_type, app_user_id, occurred_at, payload) values ('evt_fake', 'INITIAL_PURCHASE', $1, now(), '{}'::jsonb)",
+        [userA],
+      ),
+    ),
+    'User A cannot fabricate a subscription_events row (audit log integrity)',
+    RLS_ERROR,
+  );
+
   console.log('\nRunning historical-integrity tests...\n');
 
   await admin.query('begin');

@@ -9,9 +9,6 @@ import type { EnvironmentVariables } from './config/env.validation';
 import { initSentry } from './observability/sentry';
 
 async function bootstrap(): Promise<void> {
-  // As early as possible, before the Nest app itself is created.
-  initSentry();
-
   const isProduction = process.env.NODE_ENV === 'production';
 
   const adapter = new FastifyAdapter({
@@ -25,8 +22,20 @@ async function bootstrap(): Promise<void> {
         },
   });
 
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter);
+  // rawBody: true preserves request.rawBody (a Buffer) alongside normal
+  // JSON parsing — needed to verify the RevenueCat webhook's HMAC
+  // signature, which is computed over the exact raw bytes received.
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, {
+    rawBody: true,
+  });
   const configService = app.get(ConfigService<EnvironmentVariables, true>);
+
+  // As early as possible after ConfigModule has actually resolved — see
+  // initSentry's own doc comment for why this can't run any earlier.
+  initSentry(
+    configService.get('SENTRY_DSN', { infer: true }),
+    configService.get('NODE_ENV', { infer: true }),
+  );
 
   app.setGlobalPrefix('api', { exclude: ['health'] });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });

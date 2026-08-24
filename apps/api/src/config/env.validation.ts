@@ -5,6 +5,10 @@ export interface EnvironmentVariables {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   CORS_ORIGIN: string;
+  /** Optional. Empty string means the integration stays disabled. */
+  SENTRY_DSN: string;
+  /** Optional. Empty string means the webhook route rejects everything. */
+  REVENUECAT_WEBHOOK_SECRET: string;
 }
 
 const NODE_ENVS: EnvironmentVariables['NODE_ENV'][] = ['development', 'production', 'test'];
@@ -33,5 +37,7 @@ export function validate(config: Record<string, unknown>): EnvironmentVariables 
     SUPABASE_URL: config.SUPABASE_URL as string,
     SUPABASE_SERVICE_ROLE_KEY: config.SUPABASE_SERVICE_ROLE_KEY as string,
     CORS_ORIGIN: (config.CORS_ORIGIN as string) || '*',
+    SENTRY_DSN: (config.SENTRY_DSN as string) || '',
+    REVENUECAT_WEBHOOK_SECRET: (config.REVENUECAT_WEBHOOK_SECRET as string) || '',
   };
 }

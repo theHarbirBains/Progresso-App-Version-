@@ -25,18 +25,23 @@ const REDACTED = '[Redacted]';
 
 /**
  * Error tracking only — no performance tracing, no session capture beyond
- * user id. Inert until SENTRY_DSN is set, so local dev/CI never send
- * anything unless explicitly configured.
+ * user id. A no-op when dsn is empty, so local dev/CI never send anything
+ * unless explicitly configured.
+ *
+ * Takes its config as explicit parameters rather than reading process.env
+ * itself: @nestjs/config only assigns *validated* keys onto process.env
+ * (see ConfigModule's `validate` option), which doesn't happen until
+ * NestFactory.create() resolves ConfigModule — so this must be called
+ * after that, using values read from ConfigService, not before it.
  */
-export function initSentry(): void {
-  const dsn = process.env.SENTRY_DSN;
+export function initSentry(dsn: string, environment: string): void {
   if (!dsn) {
     return;
   }
 
   Sentry.init({
     dsn,
-    environment: process.env.NODE_ENV ?? 'development',
+    environment,
     tracesSampleRate: 0,
     beforeSend: scrubSentryEvent,
   });
