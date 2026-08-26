@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
+import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import { fetchWorkoutDetail, type SetRecord, type WorkoutDetail } from '../workouts/workoutQueries';
 import { workoutStyles as styles } from './workoutStyles';
 
@@ -29,11 +30,14 @@ function formatDateTime(iso: string): string {
 // foundation (no separate storage or query).
 export function WorkoutDetailScreen({ route, navigation }: Props) {
   const { workoutId } = route.params;
-  const { session } = useAuth();
+  const { user, session } = useAuth();
+  const userId = user?.id ?? '';
   const accessToken = session?.access_token;
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
+  const [repPRs, setRepPRs] = useState<Record<string, RepPR[]>>({});
+  const [oneRepMaxes, setOneRepMaxes] = useState<Record<string, OneRepMax | null>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,9 +52,25 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           fetchWorkoutDetail(workoutId),
           getMyProfile(accessToken),
         ]);
+        if (cancelled) return;
+        setWorkout(detail);
+        setWeightUnit(profile.weightUnit);
+
+        // Whether each historical set is *still* the live PR/1RM record, not
+        // whether it was one at the time it was logged -- always re-read
+        // against the database's current, authoritative state.
+        const prEntries = await Promise.all(
+          detail.exercises.map(async (exercise) => {
+            const [prs, orm] = await Promise.all([
+              fetchRepPRs(userId, exercise.exerciseId),
+              fetchOneRepMax(userId, exercise.exerciseId),
+            ]);
+            return [exercise.id, prs, orm] as const;
+          }),
+        );
         if (!cancelled) {
-          setWorkout(detail);
-          setWeightUnit(profile.weightUnit);
+          setRepPRs(Object.fromEntries(prEntries.map(([id, prs]) => [id, prs])));
+          setOneRepMaxes(Object.fromEntries(prEntries.map(([id, , orm]) => [id, orm])));
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load workout');
@@ -62,7 +82,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [workoutId, accessToken]);
+  }, [workoutId, userId, accessToken]);
 
   if (loading || !workout) {
     return (
@@ -95,7 +115,17 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         );
         return (
           <View key={exercise.id} testID={`exercise-card-${exercise.id}`} style={styles.card}>
-            <Text style={styles.cardTitle}>{exercise.exerciseName}</Text>
+            <TouchableOpacity
+              testID={`exercise-title-${exercise.id}`}
+              onPress={() =>
+                navigation.navigate('PRHistory', {
+                  exerciseId: exercise.exerciseId,
+                  exerciseName: exercise.exerciseName,
+                })
+              }
+            >
+              <Text style={styles.cardTitle}>{exercise.exerciseName}</Text>
+            </TouchableOpacity>
             {topSet ? (
               <Text testID={`top-set-${exercise.id}`} style={styles.cardMetaHighlight}>
                 Top set: {formatWeight(topSet.weightKg, weightUnit)}
@@ -104,12 +134,21 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                 {topSet.reps}
               </Text>
             ) : null}
-            {exercise.sets.map((set) => (
-              <Text key={set.id} style={styles.cardMeta}>
-                Set {set.setIndex}: {formatWeight(set.weightKg, weightUnit)}
-                {weightUnit} × {set.reps}
-              </Text>
-            ))}
+            {exercise.sets.map((set) => {
+              const isCurrentRepPR = repPRs[exercise.id]?.some(
+                (pr) => pr.reps === set.reps && pr.sourceSetId === set.id,
+              );
+              const isCurrentOneRepMax = oneRepMaxes[exercise.id]?.sourceSetId === set.id;
+              return (
+                <Text key={set.id} style={styles.cardMeta}>
+                  Set {set.setIndex}: {formatWeight(set.weightKg, weightUnit)}
+                  {weightUnit} × {set.reps}
+                  {isCurrentOneRepMax || isCurrentRepPR ? (
+                    <Text testID={`pr-tag-${set.id}`}> · {isCurrentOneRepMax ? '1RM' : 'PR'}</Text>
+                  ) : null}
+                </Text>
+              );
+            })}
           </View>
         );
       })}

@@ -145,6 +145,14 @@ async function main() {
   const squat = (
     await admin.query("select id from public.exercises where name = 'Barbell Back Squat'")
   ).rows[0].id;
+  // Used only by the additional PR edge-case tests below, kept separate from
+  // squat/benchPress for the same reason: no cross-contamination between
+  // assertions that all read global per-user-per-exercise PR state.
+  const deadlift = (await admin.query("select id from public.exercises where name = 'Deadlift'"))
+    .rows[0].id;
+  const overheadPress = (
+    await admin.query("select id from public.exercises where name = 'Overhead Press'")
+  ).rows[0].id;
   const testFood = (
     await admin.query(
       `insert into public.foods (name, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g)
@@ -757,6 +765,257 @@ async function main() {
       pr.rows[0]?.best_weight_kg === '110.00',
       `got ${pr.rows[0]?.best_weight_kg}`,
     );
+
+    // completed_at set at creation, same reasoning as the "PR Test Workout"
+    // above -- avoids colliding with the one-active-workout-per-user index.
+    const wD = (
+      await admin.query(
+        "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'PR Edge Case Workout', now(), now()) returning id",
+        [userA],
+      )
+    ).rows[0];
+    const weD = (
+      await admin.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+        [wD.id, deadlift],
+      )
+    ).rows[0];
+
+    const set8a = (
+      await admin.query(
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 150, 8) returning id',
+        [weD.id],
+      )
+    ).rows[0];
+
+    let pr8 = await admin.query(
+      'select best_weight_kg, source_set_id from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 8',
+      [userA, deadlift],
+    );
+    record(
+      '8-rep PR is created from the first qualifying 8-rep set (150kg)',
+      pr8.rows[0]?.best_weight_kg === '150.00',
+      `got ${pr8.rows[0]?.best_weight_kg}`,
+    );
+
+    await admin.query(
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 2, 140, 8)',
+      [weD.id],
+    );
+    pr8 = await admin.query(
+      'select best_weight_kg, source_set_id from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 8',
+      [userA, deadlift],
+    );
+    record(
+      'A lighter set at the same rep count does not replace the PR',
+      pr8.rows[0]?.best_weight_kg === '150.00' && pr8.rows[0]?.source_set_id === set8a.id,
+      `weight=${pr8.rows[0]?.best_weight_kg}, source=${pr8.rows[0]?.source_set_id}`,
+    );
+
+    await admin.query(
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 3, 160, 6)',
+      [weD.id],
+    );
+    const pr6 = await admin.query(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 6',
+      [userA, deadlift],
+    );
+    const pr8Still = await admin.query(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 8',
+      [userA, deadlift],
+    );
+    record(
+      'A different rep count maintains an independent PR (6-rep and 8-rep coexist)',
+      pr6.rows[0]?.best_weight_kg === '160.00' && pr8Still.rows[0]?.best_weight_kg === '150.00',
+      `6-rep=${pr6.rows[0]?.best_weight_kg}, 8-rep=${pr8Still.rows[0]?.best_weight_kg}`,
+    );
+
+    expectRowCount(
+      await admin.query(
+        'select 1 from public.one_rep_maxes where user_id = $1 and exercise_id = $2',
+        [userA, deadlift],
+      ),
+      0,
+      'A set above 1 rep never creates a true 1RM',
+    );
+
+    await admin.query('update public.sets set weight_kg = 170 where id = $1', [set8a.id]);
+    pr8 = await admin.query(
+      'select best_weight_kg, source_set_id from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 8',
+      [userA, deadlift],
+    );
+    record(
+      "Editing a set's weight recomputes its rep-count PR",
+      pr8.rows[0]?.best_weight_kg === '170.00' && pr8.rows[0]?.source_set_id === set8a.id,
+      `got ${pr8.rows[0]?.best_weight_kg}`,
+    );
+
+    // set8a (currently the 8-rep PR at 170kg) moves to 6 reps. The other
+    // 8-rep set inserted earlier (140kg) is still qualifying, so the 8-rep
+    // PR must fall back to it rather than disappear -- and the 6-rep PR
+    // must pick up set8a's new 170kg, since that beats the existing 160kg
+    // 6-rep set.
+    await admin.query('update public.sets set reps = 6 where id = $1', [set8a.id]);
+    const pr8AfterMove = await admin.query(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 8',
+      [userA, deadlift],
+    );
+    const pr6Moved = await admin.query(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 6',
+      [userA, deadlift],
+    );
+    record(
+      "Editing a set's reps moves it out of its old rep-count PR slot and into the new one",
+      pr8AfterMove.rows[0]?.best_weight_kg === '140.00' &&
+        pr6Moved.rows[0]?.best_weight_kg === '170.00',
+      `8-rep=${pr8AfterMove.rows[0]?.best_weight_kg}, 6-rep=${pr6Moved.rows[0]?.best_weight_kg}`,
+    );
+
+    // Workout date (performed_at) changes and tie-break ordering.
+    const dateEarly = (
+      await admin.query(
+        "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'Date Early', '2024-01-01T00:00:00Z', now()) returning id",
+        [userA],
+      )
+    ).rows[0];
+    const weEarly = (
+      await admin.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+        [dateEarly.id, overheadPress],
+      )
+    ).rows[0];
+    const setEarly = (
+      await admin.query(
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 100, 5) returning id',
+        [weEarly.id],
+      )
+    ).rows[0];
+
+    const dateLate = (
+      await admin.query(
+        "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'Date Late', '2024-06-01T00:00:00Z', now()) returning id",
+        [userA],
+      )
+    ).rows[0];
+    const weLate = (
+      await admin.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+        [dateLate.id, overheadPress],
+      )
+    ).rows[0];
+    const setLate = (
+      await admin.query(
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 100, 5) returning id',
+        [weLate.id],
+      )
+    ).rows[0];
+
+    let ohp = await admin.query(
+      'select source_set_id from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 5',
+      [userA, overheadPress],
+    );
+    record(
+      'A tie in weight keeps the earliest-performed set as the PR source',
+      ohp.rows[0]?.source_set_id === setEarly.id,
+      `source=${ohp.rows[0]?.source_set_id}, expected=${setEarly.id}`,
+    );
+
+    await admin.query('update public.workouts set performed_at = $2 where id = $1', [
+      dateEarly.id,
+      '2024-12-01T00:00:00Z',
+    ]);
+    ohp = await admin.query(
+      'select source_set_id from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 5',
+      [userA, overheadPress],
+    );
+    record(
+      "Changing a workout's date re-derives which tied set is the PR source",
+      ohp.rows[0]?.source_set_id === setLate.id,
+      `source=${ohp.rows[0]?.source_set_id}, expected=${setLate.id}`,
+    );
+
+    // Isolation and manufacture-prevention on rep_prs/one_rep_maxes.
+    await asUser(userA, async (client) => {
+      expectRowCount(
+        await client.query('select * from public.rep_prs where user_id = $1', [userB]),
+        0,
+        "User A cannot select User B's rep_prs rows",
+      );
+    });
+
+    await asUser(userA, async (client) => {
+      expectRowCount(
+        await client.query('select * from public.one_rep_maxes where user_id = $1', [userB]),
+        0,
+        "User A cannot select User B's one_rep_maxes rows",
+      );
+    });
+
+    await expectThrows(
+      asUser(userA, (client) =>
+        client.query(
+          'insert into public.rep_prs (user_id, exercise_id, reps, best_weight_kg, source_set_id, achieved_at) values ($1, $2, 5, 999, $3, now())',
+          [userA, deadlift, set8a.id],
+        ),
+      ),
+      'User cannot manufacture a rep_prs record via INSERT',
+      RLS_ERROR,
+    );
+
+    await expectThrows(
+      asUser(userA, (client) =>
+        client.query(
+          'insert into public.one_rep_maxes (user_id, exercise_id, weight_kg, source_set_id, achieved_at) values ($1, $2, 999, $3, now())',
+          [userA, deadlift, set8a.id],
+        ),
+      ),
+      'User cannot manufacture a one_rep_maxes record via INSERT',
+      RLS_ERROR,
+    );
+
+    await asUser(userA, async (client) => {
+      const upd = await client.query(
+        'update public.rep_prs set best_weight_kg = 999 where user_id = $1',
+        [userA],
+      );
+      record(
+        'User cannot modify their own rep_prs record via UPDATE',
+        upd.rowCount === 0,
+        `rowCount=${upd.rowCount}`,
+      );
+    });
+
+    await asUser(userA, async (client) => {
+      const upd = await client.query(
+        'update public.one_rep_maxes set weight_kg = 999 where user_id = $1',
+        [userA],
+      );
+      record(
+        'User cannot modify their own one_rep_maxes record via UPDATE',
+        upd.rowCount === 0,
+        `rowCount=${upd.rowCount}`,
+      );
+    });
+
+    await asUser(userA, async (client) => {
+      const del = await client.query('delete from public.rep_prs where user_id = $1', [userA]);
+      record(
+        'User cannot delete their own rep_prs record via DELETE',
+        del.rowCount === 0,
+        `rowCount=${del.rowCount}`,
+      );
+    });
+
+    await asUser(userA, async (client) => {
+      const del = await client.query('delete from public.one_rep_maxes where user_id = $1', [
+        userA,
+      ]);
+      record(
+        'User cannot delete their own one_rep_maxes record via DELETE',
+        del.rowCount === 0,
+        `rowCount=${del.rowCount}`,
+      );
+    });
   } finally {
     await admin.query('reset role').catch(() => {});
     await admin.query('rollback').catch(() => {});

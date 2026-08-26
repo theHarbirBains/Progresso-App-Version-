@@ -11,6 +11,7 @@ import { AuthLoadingScreen } from './src/screens/AuthLoadingScreen';
 import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
+import { PRHistoryScreen } from './src/screens/PRHistoryScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { SignUpScreen } from './src/screens/SignUpScreen';
@@ -47,6 +48,7 @@ function Root() {
           <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
           <Stack.Screen name="NewWorkout" component={NewWorkoutScreen} />
           <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
+          <Stack.Screen name="PRHistory" component={PRHistoryScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     );
