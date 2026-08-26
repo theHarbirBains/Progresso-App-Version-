@@ -45,6 +45,9 @@ jest.mock('./ExerciseFormScreen', () => {
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchExercises = fetchExercises as jest.Mock;
+const mockGoBack = jest.fn();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const navigation = { goBack: mockGoBack } as any;
 
 const builtinRow = {
   id: 'ex-builtin',
@@ -65,6 +68,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
   mockFetchExercises.mockReset();
   mockFetchExercises.mockResolvedValue({ rows: [builtinRow, mineRow], hasMore: false });
+  mockGoBack.mockClear();
 });
 
 // FlatList/VirtualizedList schedules a deferred internal setState (cell
@@ -82,7 +86,7 @@ async function settle() {
 
 describe('ExerciseLibraryScreen', () => {
   it('loads and displays exercises on mount', async () => {
-    render(<ExerciseLibraryScreen onBack={jest.fn()} />);
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
 
     expect(await screen.findByTestId('exercise-item-ex-builtin')).toHaveTextContent(
       /Barbell Bench Press/,
@@ -100,19 +104,18 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
-  it('calls onBack when Back is pressed', async () => {
-    const onBack = jest.fn();
-    render(<ExerciseLibraryScreen onBack={onBack} />);
+  it('calls navigation.goBack() when Back is pressed', async () => {
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('exercise-item-ex-builtin');
 
     fireEvent.press(screen.getByTestId('exercise-library-back'));
 
-    expect(onBack).toHaveBeenCalled();
+    expect(mockGoBack).toHaveBeenCalled();
     await settle();
   });
 
   it('debounces search input before querying', async () => {
-    render(<ExerciseLibraryScreen onBack={jest.fn()} />);
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('exercise-item-ex-builtin');
     mockFetchExercises.mockClear();
 
@@ -125,7 +128,7 @@ describe('ExerciseLibraryScreen', () => {
   });
 
   it('filters by muscle group when a chip is pressed', async () => {
-    render(<ExerciseLibraryScreen onBack={jest.fn()} />);
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('exercise-item-ex-builtin');
     mockFetchExercises.mockClear();
 
@@ -140,7 +143,7 @@ describe('ExerciseLibraryScreen', () => {
   });
 
   it('filters by source when a tab is pressed', async () => {
-    render(<ExerciseLibraryScreen onBack={jest.fn()} />);
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('exercise-item-ex-builtin');
     mockFetchExercises.mockClear();
 
@@ -153,7 +156,7 @@ describe('ExerciseLibraryScreen', () => {
   });
 
   it('opens the create form when "New Exercise" is pressed', async () => {
-    render(<ExerciseLibraryScreen onBack={jest.fn()} />);
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('exercise-item-ex-builtin');
 
     fireEvent.press(screen.getByTestId('exercise-create-button'));
@@ -163,7 +166,7 @@ describe('ExerciseLibraryScreen', () => {
   });
 
   it("opens the edit form for the user's own exercise", async () => {
-    render(<ExerciseLibraryScreen onBack={jest.fn()} />);
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('exercise-item-ex-builtin');
 
     fireEvent.press(screen.getByTestId('exercise-item-ex-mine'));
@@ -174,7 +177,7 @@ describe('ExerciseLibraryScreen', () => {
   });
 
   it('does not open a form when a built-in exercise is pressed', async () => {
-    render(<ExerciseLibraryScreen onBack={jest.fn()} />);
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('exercise-item-ex-builtin');
 
     fireEvent.press(screen.getByTestId('exercise-item-ex-builtin'));
@@ -184,7 +187,7 @@ describe('ExerciseLibraryScreen', () => {
   });
 
   it('returns to the list and refetches when the form reports done', async () => {
-    render(<ExerciseLibraryScreen onBack={jest.fn()} />);
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('exercise-item-ex-builtin');
     fireEvent.press(screen.getByTestId('exercise-create-button'));
     await screen.findByTestId('mock-exercise-form-mode');
@@ -202,7 +205,7 @@ describe('ExerciseLibraryScreen', () => {
       .mockResolvedValueOnce({ rows: [builtinRow], hasMore: true })
       .mockResolvedValueOnce({ rows: [mineRow], hasMore: false });
 
-    render(<ExerciseLibraryScreen onBack={jest.fn()} />);
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('exercise-item-ex-builtin');
     expect(screen.getByTestId('exercise-load-more')).toBeTruthy();
 
@@ -217,7 +220,7 @@ describe('ExerciseLibraryScreen', () => {
   it('shows an error message when the query fails', async () => {
     mockFetchExercises.mockReset().mockRejectedValue(new Error('network error'));
 
-    render(<ExerciseLibraryScreen onBack={jest.fn()} />);
+    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
 
     expect(await screen.findByTestId('exercise-library-error')).toHaveTextContent('network error');
     await settle();

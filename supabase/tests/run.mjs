@@ -477,6 +477,129 @@ async function main() {
     RLS_ERROR,
   );
 
+  console.log('\nRunning workout logging tests (Phase 3)...\n');
+
+  await asUser(userB, async (client) => {
+    expectRowCount(
+      await client.query('select id from public.workout_exercises where id = $1', [
+        fixtureA.workoutExerciseId,
+      ]),
+      0,
+      "User B cannot access User A's workout_exercises",
+    );
+  });
+
+  // One-active-workout-per-user: fixtureA/fixtureB's fixture workouts are
+  // already active (completed_at is null), so a second active workout for
+  // the same user should be rejected by the partial unique index.
+  await expectThrows(
+    asUserCommitted(userA, (client) =>
+      client.query("insert into public.workouts (user_id, name) values ($1, 'Second Active')", [
+        userA,
+      ]),
+    ),
+    'User A cannot have two simultaneous active (incomplete) workouts',
+    /duplicate key|unique constraint/i,
+  );
+
+  await asUserCommitted(userA, async (client) => {
+    await client.query('update public.workouts set completed_at = now() where id = $1', [
+      fixtureA.workoutId,
+    ]);
+    const res = await client.query(
+      "insert into public.workouts (user_id, name) values ($1, 'New Active Workout') returning id",
+      [userA],
+    );
+    record(
+      'Completing the active workout frees the slot for a new one',
+      res.rowCount === 1,
+      `rowCount=${res.rowCount}`,
+    );
+    // Regular users have no DELETE policy on workouts (soft-delete only via
+    // UPDATE, matching the schema's design) -- so cleanup here completes the
+    // extra workout too, freeing the slot back for fixtureA, rather than
+    // trying to hard-delete it.
+    await client.query('update public.workouts set completed_at = now() where id = $1', [
+      res.rows[0].id,
+    ]);
+    await client.query('update public.workouts set completed_at = null where id = $1', [
+      fixtureA.workoutId,
+    ]);
+  });
+
+  // Reordering exercises: the mobile app sends a single bulk upsert (one
+  // PostgREST request = one transaction) covering every reordered row. Since
+  // the (workout_id, order_index) uniqueness constraint is
+  // "deferrable initially deferred", it's only checked at commit -- not
+  // after each row within the statement -- so a same-statement swap of two
+  // rows' order_index values should succeed even though an intermediate
+  // state would otherwise collide. This test exists specifically to verify
+  // that assumption against a real database before the mobile app relies on
+  // it.
+  await asUserCommitted(userA, async (client) => {
+    const squatWe = (
+      await client.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 2) returning id',
+        [fixtureA.workoutId, squat],
+      )
+    ).rows[0];
+
+    // Single statement, single request: swap order_index 1<->2 for the two
+    // rows via one multi-row INSERT ... ON CONFLICT (id) DO UPDATE, exactly
+    // mirroring what a bulk supabase-js .upsert() call sends.
+    await client.query(
+      `insert into public.workout_exercises (id, workout_id, exercise_id, order_index)
+       values ($1, $2, $3, 2), ($4, $2, $5, 1)
+       on conflict (id) do update set order_index = excluded.order_index`,
+      [fixtureA.workoutExerciseId, fixtureA.workoutId, benchPress, squatWe.id, squat],
+    );
+
+    const rows = (
+      await client.query(
+        'select id, order_index from public.workout_exercises where workout_id = $1 order by order_index',
+        [fixtureA.workoutId],
+      )
+    ).rows;
+    const passed =
+      rows.length === 2 && rows[0].id === squatWe.id && rows[1].id === fixtureA.workoutExerciseId;
+    record(
+      'Bulk single-statement upsert can swap order_index values without tripping the deferred unique constraint',
+      passed,
+      passed ? undefined : `got ${JSON.stringify(rows)}`,
+    );
+
+    // Restore original ordering for later tests/fixtures.
+    await client.query(
+      `insert into public.workout_exercises (id, workout_id, exercise_id, order_index)
+       values ($1, $2, $3, 1), ($4, $2, $5, 2)
+       on conflict (id) do update set order_index = excluded.order_index`,
+      [fixtureA.workoutExerciseId, fixtureA.workoutId, benchPress, squatWe.id, squat],
+    );
+    await client.query('delete from public.workout_exercises where id = $1', [squatWe.id]);
+  });
+
+  await expectThrows(
+    asUser(userA, (client) =>
+      client.query(
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 99, -10, 5)',
+        [fixtureA.workoutExerciseId],
+      ),
+    ),
+    'A non-positive weight is rejected by the check constraint',
+    /violates check constraint/i,
+  );
+
+  await expectThrows(
+    asUser(userA, (client) =>
+      client.query(
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 99, 100, 0)',
+        [fixtureA.workoutExerciseId],
+      ),
+    ),
+    'A non-positive rep count is rejected by the check constraint',
+    /violates check constraint/i,
+  );
+
   console.log('\nRunning historical-integrity tests...\n');
 
   await admin.query('begin');
@@ -530,9 +653,13 @@ async function main() {
   try {
     await asClaims(admin, userA);
 
+    // completed_at is set at creation (rather than left active) purely so
+    // this doesn't collide with fixtureA's own already-active workout under
+    // the one-active-workout-per-user constraint -- PR recomputation itself
+    // doesn't care about completed_at at all, only deleted_at/performed_at.
     const w = (
       await admin.query(
-        "insert into public.workouts (user_id, name, performed_at) values ($1, 'PR Test Workout', now()) returning id",
+        "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'PR Test Workout', now(), now()) returning id",
         [userA],
       )
     ).rows[0];

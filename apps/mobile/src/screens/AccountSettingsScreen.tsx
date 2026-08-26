@@ -9,16 +9,15 @@ import {
 } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile } from '../lib/api';
+import type { RootStackScreenProps } from '../navigation/types';
 import { authStyles as styles } from './authStyles';
 
-interface Props {
-  onOpenExerciseLibrary: () => void;
-}
+type Props = RootStackScreenProps<'AccountSettings'>;
 
-// The authenticated home for Phase 0/1/2 — there's no dashboard yet, so
+// The authenticated home for Phase 0/1/2/3 — there's no dashboard yet, so
 // this screen doubles as both "you're signed in" proof and real account
 // management. Not the final Progresso visual design.
-export function AccountSettingsScreen({ onOpenExerciseLibrary }: Props) {
+export function AccountSettingsScreen({ navigation }: Props) {
   const { user, session, signOut } = useAuth();
   const accessToken = session?.access_token;
 
@@ -171,9 +170,17 @@ export function AccountSettingsScreen({ onOpenExerciseLibrary }: Props) {
       </TouchableOpacity>
 
       <TouchableOpacity
+        testID="open-workouts"
+        style={styles.oauthButton}
+        onPress={() => navigation.navigate('WorkoutHistory')}
+      >
+        <Text style={styles.oauthButtonText}>Workouts</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         testID="open-exercise-library"
         style={styles.oauthButton}
-        onPress={onOpenExerciseLibrary}
+        onPress={() => navigation.navigate('ExerciseLibrary')}
       >
         <Text style={styles.oauthButtonText}>Exercise Library</Text>
       </TouchableOpacity>

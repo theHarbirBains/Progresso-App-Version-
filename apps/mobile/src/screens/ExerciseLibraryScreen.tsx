@@ -8,15 +8,14 @@ import {
 } from '../exercises/exerciseQueries';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
+import type { RootStackScreenProps } from '../navigation/types';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
 import { exerciseStyles as styles } from './exerciseStyles';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
 
-interface Props {
-  onBack: () => void;
-}
+type Props = RootStackScreenProps<'ExerciseLibrary'>;
 
 type Mode = { type: 'list' } | { type: 'create' } | { type: 'edit'; exercise: ExerciseRow };
 
@@ -26,7 +25,7 @@ const SOURCE_OPTIONS: { value: ExerciseSource; label: string }[] = [
   { value: 'mine', label: 'Mine' },
 ];
 
-export function ExerciseLibraryScreen({ onBack }: Props) {
+export function ExerciseLibraryScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
 
@@ -122,7 +121,7 @@ export function ExerciseLibraryScreen({ onBack }: Props) {
           <View>
             <View style={styles.header}>
               <Text style={styles.title}>Exercise Library</Text>
-              <TouchableOpacity testID="exercise-library-back" onPress={onBack}>
+              <TouchableOpacity testID="exercise-library-back" onPress={() => navigation.goBack()}>
                 <Text style={styles.backLink}>Back</Text>
               </TouchableOpacity>
             </View>

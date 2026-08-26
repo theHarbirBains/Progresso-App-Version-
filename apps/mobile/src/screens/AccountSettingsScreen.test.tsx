@@ -25,6 +25,10 @@ const baseProfile = {
   weightUnit: 'kg' as const,
 };
 
+const mockNavigate = jest.fn();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const navigation = { navigate: mockNavigate } as any;
+
 beforeEach(() => {
   mockUseAuth.mockReturnValue({
     user: { id: 'user-1', email: 'athlete@example.com' },
@@ -33,11 +37,12 @@ beforeEach(() => {
   });
   mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset();
+  mockNavigate.mockClear();
 });
 
 describe('AccountSettingsScreen', () => {
   it('loads and displays the profile', async () => {
-    render(<AccountSettingsScreen onOpenExerciseLibrary={jest.fn()} />);
+    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
 
     expect(await screen.findByTestId('account-email')).toHaveTextContent('athlete@example.com');
     expect(screen.getByTestId('account-display-name').props.value).toBe('Athlete');
@@ -48,7 +53,7 @@ describe('AccountSettingsScreen', () => {
   it('shows a load error when the profile fetch fails', async () => {
     mockGetMyProfile.mockRejectedValue(new Error('Failed to load profile'));
 
-    render(<AccountSettingsScreen onOpenExerciseLibrary={jest.fn()} />);
+    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
 
     expect(await screen.findByTestId('account-load-error')).toHaveTextContent(
       'Failed to load profile',
@@ -56,7 +61,7 @@ describe('AccountSettingsScreen', () => {
   });
 
   it('lowercases username input as the user types', async () => {
-    render(<AccountSettingsScreen onOpenExerciseLibrary={jest.fn()} />);
+    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('account-email');
 
     fireEvent.changeText(screen.getByTestId('account-username'), 'NewHandle');
@@ -67,7 +72,7 @@ describe('AccountSettingsScreen', () => {
   it('saves the profile and shows a confirmation', async () => {
     mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, displayName: 'New Name' });
 
-    render(<AccountSettingsScreen onOpenExerciseLibrary={jest.fn()} />);
+    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('account-email');
 
     fireEvent.changeText(screen.getByTestId('account-display-name'), 'New Name');
@@ -85,7 +90,7 @@ describe('AccountSettingsScreen', () => {
   it('shows a save error and does not show the saved confirmation on failure', async () => {
     mockUpdateMyProfile.mockRejectedValue(new Error('Username is already taken'));
 
-    render(<AccountSettingsScreen onOpenExerciseLibrary={jest.fn()} />);
+    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('account-email');
 
     fireEvent.press(screen.getByTestId('account-save'));
@@ -96,14 +101,22 @@ describe('AccountSettingsScreen', () => {
     expect(screen.queryByTestId('account-saved')).toBeNull();
   });
 
-  it('calls onOpenExerciseLibrary when the Exercise Library button is pressed', async () => {
-    const onOpenExerciseLibrary = jest.fn();
-    render(<AccountSettingsScreen onOpenExerciseLibrary={onOpenExerciseLibrary} />);
+  it('navigates to the Exercise Library when its button is pressed', async () => {
+    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('account-email');
 
     fireEvent.press(screen.getByTestId('open-exercise-library'));
 
-    expect(onOpenExerciseLibrary).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith('ExerciseLibrary');
+  });
+
+  it('navigates to Workouts when its button is pressed', async () => {
+    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    await screen.findByTestId('account-email');
+
+    fireEvent.press(screen.getByTestId('open-workouts'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('WorkoutHistory');
   });
 
   it('calls signOut when the sign-out button is pressed', async () => {
@@ -114,7 +127,7 @@ describe('AccountSettingsScreen', () => {
       signOut,
     });
 
-    render(<AccountSettingsScreen onOpenExerciseLibrary={jest.fn()} />);
+    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
     await screen.findByTestId('account-email');
 
     fireEvent.press(screen.getByTestId('sign-out-button'));
