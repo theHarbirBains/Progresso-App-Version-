@@ -12,6 +12,7 @@ export type RootStackParamList = {
   NewWorkout: undefined;
   ActiveWorkout: { workoutId: string };
   PRHistory: { exerciseId: string; exerciseName: string };
+  ExerciseProgress: { exerciseId: string; exerciseName: string };
 };
 
 export type RootStackScreenProps<Screen extends keyof RootStackParamList> = NativeStackScreenProps<

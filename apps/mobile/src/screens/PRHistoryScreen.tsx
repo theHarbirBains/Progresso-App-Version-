@@ -85,6 +85,14 @@ export function PRHistoryScreen({ route, navigation }: Props) {
         <ActivityIndicator testID="pr-history-loading" size="large" color="#FFFFFF" />
       ) : (
         <>
+          <TouchableOpacity
+            testID="view-trend"
+            style={styles.secondaryButton}
+            onPress={() => navigation.navigate('ExerciseProgress', { exerciseId, exerciseName })}
+          >
+            <Text style={styles.secondaryButtonText}>View Trend</Text>
+          </TouchableOpacity>
+
           <View style={styles.banner}>
             <Text style={styles.bannerTitle}>1RM</Text>
             {oneRepMax ? (

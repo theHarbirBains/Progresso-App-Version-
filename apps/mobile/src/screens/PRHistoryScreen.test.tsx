@@ -23,8 +23,9 @@ const mockFetchRepPRs = fetchRepPRs as jest.Mock;
 const mockFetchOneRepMax = fetchOneRepMax as jest.Mock;
 
 const mockGoBack = jest.fn();
+const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { goBack: mockGoBack };
+const navigation: any = { goBack: mockGoBack, navigate: mockNavigate };
 const route = { params: { exerciseId: 'ex-1', exerciseName: 'Bench Press' } } as never;
 
 beforeEach(() => {
@@ -43,6 +44,7 @@ beforeEach(() => {
   mockFetchRepPRs.mockReset().mockResolvedValue([]);
   mockFetchOneRepMax.mockReset().mockResolvedValue(null);
   mockGoBack.mockClear();
+  mockNavigate.mockClear();
 });
 
 describe('PRHistoryScreen', () => {
@@ -137,5 +139,17 @@ describe('PRHistoryScreen', () => {
     fireEvent.press(screen.getByTestId('pr-history-back'));
 
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('navigates to ExerciseProgress when View Trend is pressed', async () => {
+    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('view-trend');
+
+    fireEvent.press(screen.getByTestId('view-trend'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('ExerciseProgress', {
+      exerciseId: 'ex-1',
+      exerciseName: 'Bench Press',
+    });
   });
 });

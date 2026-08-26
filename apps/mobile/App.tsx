@@ -9,6 +9,7 @@ import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
 import { ActiveWorkoutScreen } from './src/screens/ActiveWorkoutScreen';
 import { AuthLoadingScreen } from './src/screens/AuthLoadingScreen';
 import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
+import { ExerciseProgressScreen } from './src/screens/ExerciseProgressScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
 import { PRHistoryScreen } from './src/screens/PRHistoryScreen';
@@ -49,6 +50,7 @@ function Root() {
           <Stack.Screen name="NewWorkout" component={NewWorkoutScreen} />
           <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
           <Stack.Screen name="PRHistory" component={PRHistoryScreen} />
+          <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     );
