@@ -7,7 +7,7 @@
     "apps/*"
   ],
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.0.0"
   },
   "overrides": {
     "react": "19.1.0",
