@@ -69,6 +69,25 @@ describe('getMyProfile', () => {
     );
   });
 
+  it("extracts the nested message from the backend's exception-filter wrapper shape", async () => {
+    const { getMyProfile } = api;
+    mockFetchOnce(401, {
+      statusCode: 401,
+      path: '/api/v1/users/me',
+      timestamp: '2026-08-26T00:00:00Z',
+      message: { message: 'Missing bearer token', error: 'Unauthorized', statusCode: 401 },
+    });
+
+    await expect(getMyProfile('token-123')).rejects.toThrow('Missing bearer token');
+  });
+
+  it('falls back to a generic message for an unknown/malformed nested shape', async () => {
+    const { getMyProfile } = api;
+    mockFetchOnce(401, { message: { error: 'Unauthorized', statusCode: 401 } });
+
+    await expect(getMyProfile('token-123')).rejects.toThrow('Request failed');
+  });
+
   it('falls back to a generic message when the error body has no message', async () => {
     const { getMyProfile } = api;
     mockFetchOnce(500, {});

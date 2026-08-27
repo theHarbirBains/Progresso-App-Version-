@@ -33,6 +33,14 @@ function extractErrorMessage(body: unknown): string {
     const message = (body as { message: unknown }).message;
     if (typeof message === 'string') return message;
     if (Array.isArray(message)) return message.join(', ');
+    // The backend's global exception filter wraps NestJS's own exception
+    // response (e.g. { message: 'Missing bearer token', error, statusCode })
+    // under this outer message field, so a real error surfaces one level
+    // deeper than a plain HttpException response would.
+    if (message && typeof message === 'object' && 'message' in message) {
+      const nested = (message as { message: unknown }).message;
+      if (typeof nested === 'string') return nested;
+    }
   }
   return 'Request failed';
 }
