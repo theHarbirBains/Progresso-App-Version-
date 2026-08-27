@@ -10,8 +10,11 @@ import { ActiveWorkoutScreen } from './src/screens/ActiveWorkoutScreen';
 import { AuthLoadingScreen } from './src/screens/AuthLoadingScreen';
 import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
 import { ExerciseProgressScreen } from './src/screens/ExerciseProgressScreen';
+import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
+import { NutritionGoalsScreen } from './src/screens/NutritionGoalsScreen';
+import { NutritionTodayScreen } from './src/screens/NutritionTodayScreen';
 import { PRHistoryScreen } from './src/screens/PRHistoryScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
@@ -51,6 +54,9 @@ function Root() {
           <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
           <Stack.Screen name="PRHistory" component={PRHistoryScreen} />
           <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
+          <Stack.Screen name="Nutrition" component={NutritionTodayScreen} />
+          <Stack.Screen name="FoodLibrary" component={FoodLibraryScreen} />
+          <Stack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     );

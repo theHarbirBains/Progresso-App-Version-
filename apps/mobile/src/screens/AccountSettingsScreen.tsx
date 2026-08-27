@@ -186,6 +186,14 @@ export function AccountSettingsScreen({ navigation }: Props) {
       </TouchableOpacity>
 
       <TouchableOpacity
+        testID="open-nutrition"
+        style={styles.oauthButton}
+        onPress={() => navigation.navigate('Nutrition')}
+      >
+        <Text style={styles.oauthButtonText}>Nutrition</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         testID="sign-out-button"
         style={styles.signOutButton}
         onPress={() => signOut()}

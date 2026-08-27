@@ -1021,6 +1021,180 @@ async function main() {
     await admin.query('rollback').catch(() => {});
   }
 
+  console.log('\nRunning nutrition tests (Phase 6)...\n');
+
+  // Built via asUserCommitted (a real committed transaction on its own
+  // connection), same as fixtureA/fixtureB above -- this is what makes the
+  // isolation checks below meaningful. If these rows only existed inside an
+  // uncommitted transaction, a different session's queries wouldn't see
+  // them regardless of RLS (plain MVCC snapshot isolation), which would
+  // make "User B cannot select User A's X" trivially true for the wrong
+  // reason instead of actually exercising the policy.
+  const userAFood = (
+    await asUserCommitted(userA, (client) =>
+      client.query(
+        `insert into public.foods (created_by, name, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g)
+         values ($1, 'Nutrition Test Food', 100, 'g', 100, 10, 10, 2) returning id`,
+        [userA],
+      ),
+    )
+  ).rows[0];
+
+  const userAFoodLog = (
+    await asUserCommitted(userA, (client) =>
+      client.query(
+        `insert into public.food_logs (user_id, food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g)
+         values ($1, $2, 'Nutrition Test Food', 100, 'g', 1, 100, 10, 10, 2) returning id`,
+        [userA, userAFood.id],
+      ),
+    )
+  ).rows[0];
+
+  await asUserCommitted(userA, (client) =>
+    client.query(
+      `insert into public.nutrition_goals (user_id, calories, protein_g, carbs_g, fat_g)
+       values ($1, 2000, 180, 200, 60)`,
+      [userA],
+    ),
+  );
+
+  await asUser(userB, async (client) => {
+    expectRowCount(
+      await client.query('select * from public.foods where id = $1', [userAFood.id]),
+      0,
+      "User B cannot select User A's custom food",
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const upd = await client.query("update public.foods set name = 'hacked' where id = $1", [
+      userAFood.id,
+    ]);
+    record(
+      "User B cannot modify User A's custom food via UPDATE",
+      upd.rowCount === 0,
+      `rowCount=${upd.rowCount}`,
+    );
+  });
+
+  await expectThrows(
+    asUser(userB, (client) =>
+      client.query(
+        `insert into public.foods (created_by, name, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g)
+         values ($1, 'spoofed', 100, 'g', 0, 0, 0, 0)`,
+        [userA],
+      ),
+    ),
+    'User B cannot create a food claiming created_by = User A',
+    RLS_ERROR,
+  );
+
+  await expectThrows(
+    asUser(userA, (client) =>
+      client.query(
+        `insert into public.foods (created_by, name, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g)
+         values ($1, 'Bad Food', -5, 'g', 100, 10, 10, 2)`,
+        [userA],
+      ),
+    ),
+    'A non-positive serving size is rejected by the check constraint',
+    /check constraint/i,
+  );
+
+  await asUser(userB, async (client) => {
+    expectRowCount(
+      await client.query('select * from public.food_logs where id = $1', [userAFoodLog.id]),
+      0,
+      "User B cannot select User A's food log",
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const upd = await client.query('update public.food_logs set quantity = 99 where id = $1', [
+      userAFoodLog.id,
+    ]);
+    record(
+      "User B cannot modify User A's food log via UPDATE",
+      upd.rowCount === 0,
+      `rowCount=${upd.rowCount}`,
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const del = await client.query('delete from public.food_logs where id = $1', [userAFoodLog.id]);
+    record(
+      "User B cannot delete User A's food log via DELETE",
+      del.rowCount === 0,
+      `rowCount=${del.rowCount}`,
+    );
+  });
+
+  await expectThrows(
+    asUser(userB, (client) =>
+      client.query(
+        `insert into public.food_logs (user_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g)
+         values ($1, 'spoofed', 1, 'serving', 1, 0, 0, 0, 0)`,
+        [userA],
+      ),
+    ),
+    'User B cannot create a food log claiming user_id = User A',
+    RLS_ERROR,
+  );
+
+  await asUser(userB, async (client) => {
+    expectRowCount(
+      await client.query('select * from public.nutrition_goals where user_id = $1', [userA]),
+      0,
+      "User B cannot select User A's nutrition goals",
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const upd = await client.query(
+      'update public.nutrition_goals set calories = 1 where user_id = $1',
+      [userA],
+    );
+    record(
+      "User B cannot modify User A's nutrition goals via UPDATE",
+      upd.rowCount === 0,
+      `rowCount=${upd.rowCount}`,
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const del = await client.query('delete from public.nutrition_goals where user_id = $1', [
+      userA,
+    ]);
+    record(
+      "User B cannot delete User A's nutrition goals via DELETE",
+      del.rowCount === 0,
+      `rowCount=${del.rowCount}`,
+    );
+  });
+
+  await expectThrows(
+    asUser(userB, (client) =>
+      client.query('insert into public.nutrition_goals (user_id, calories) values ($1, 999)', [
+        userA,
+      ]),
+    ),
+    'User B cannot create nutrition goals claiming user_id = User A',
+    RLS_ERROR,
+  );
+
+  // userA's goals row is already committed (via asUserCommitted above), so
+  // this correctly surfaces an immediate unique-constraint error rather
+  // than blocking on another session's uncommitted work.
+  await expectThrows(
+    asUser(userA, (client) =>
+      client.query('insert into public.nutrition_goals (user_id, calories) values ($1, 1500)', [
+        userA,
+      ]),
+    ),
+    'A user cannot have two nutrition_goals rows (unique per user)',
+    /duplicate key|unique/i,
+  );
+
   await admin.end();
 }
 

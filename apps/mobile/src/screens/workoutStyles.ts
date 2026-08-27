@@ -163,6 +163,9 @@ export const workoutStyles = StyleSheet.create({
     fontSize: 14,
     width: 20,
   },
+  foodLogInfo: {
+    flex: 1,
+  },
   setUnitText: {
     color: '#9A9AA5',
     fontSize: 13,

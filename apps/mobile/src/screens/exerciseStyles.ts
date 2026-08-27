@@ -97,6 +97,9 @@ export const exerciseStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#1D1D23',
   },
+  foodItemTouchable: {
+    flex: 1,
+  },
   listItemName: {
     color: '#FFFFFF',
     fontSize: 16,

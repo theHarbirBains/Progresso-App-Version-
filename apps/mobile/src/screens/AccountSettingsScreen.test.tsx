@@ -119,6 +119,15 @@ describe('AccountSettingsScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('WorkoutHistory');
   });
 
+  it('navigates to Nutrition when its button is pressed', async () => {
+    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    await screen.findByTestId('account-email');
+
+    fireEvent.press(screen.getByTestId('open-nutrition'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
+  });
+
   it('calls signOut when the sign-out button is pressed', async () => {
     const signOut = jest.fn();
     mockUseAuth.mockReturnValue({
