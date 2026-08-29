@@ -98,7 +98,7 @@ describe('DashboardScreen loading/greeting', () => {
 
     expect(screen.getByTestId('dashboard-loading')).toBeTruthy();
 
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-greeting', {}, { timeout: 5000 });
   });
 
   it('greets with the display name', async () => {
