@@ -26,8 +26,9 @@ const baseProfile = {
 };
 
 const mockNavigate = jest.fn();
+const mockGoBack = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation = { navigate: mockNavigate } as any;
+const navigation = { navigate: mockNavigate, goBack: mockGoBack } as any;
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({
@@ -38,6 +39,7 @@ beforeEach(() => {
   mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset();
   mockNavigate.mockClear();
+  mockGoBack.mockClear();
 });
 
 describe('AccountSettingsScreen', () => {
@@ -142,5 +144,14 @@ describe('AccountSettingsScreen', () => {
     fireEvent.press(screen.getByTestId('sign-out-button'));
 
     expect(signOut).toHaveBeenCalled();
+  });
+
+  it('goes back when Back is pressed', async () => {
+    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    await screen.findByTestId('account-email');
+
+    fireEvent.press(screen.getByTestId('account-settings-back'));
+
+    expect(mockGoBack).toHaveBeenCalled();
   });
 });

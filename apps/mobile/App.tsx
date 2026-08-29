@@ -8,6 +8,7 @@ import type { RootStackParamList } from './src/navigation/types';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
 import { ActiveWorkoutScreen } from './src/screens/ActiveWorkoutScreen';
 import { AuthLoadingScreen } from './src/screens/AuthLoadingScreen';
+import { DashboardScreen } from './src/screens/DashboardScreen';
 import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
 import { ExerciseProgressScreen } from './src/screens/ExerciseProgressScreen';
 import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
@@ -45,7 +46,8 @@ function Root() {
   if (status === 'signedIn') {
     return (
       <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator initialRouteName="Dashboard" screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
           <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
           <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />

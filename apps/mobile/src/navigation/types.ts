@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 // Phase 3) since they're a separate, already-working flow with nothing to
 // gain from a stack navigator.
 export type RootStackParamList = {
+  Dashboard: undefined;
   AccountSettings: undefined;
   ExerciseLibrary: undefined;
   WorkoutHistory: undefined;

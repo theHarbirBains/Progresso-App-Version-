@@ -16,6 +16,15 @@ export const authStyles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 16,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backLink: {
+    color: '#9A9AA5',
+    fontSize: 14,
+  },
   input: {
     backgroundColor: '#17171C',
     borderRadius: 8,

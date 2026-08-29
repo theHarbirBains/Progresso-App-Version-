@@ -37,6 +37,28 @@ jest.mock('./src/lib/api', () => ({
   updateMyProfile: jest.fn(),
 }));
 
+// DashboardScreen is now the post-sign-in landing screen. Its own data
+// behavior is covered by DashboardScreen.test.tsx -- mocked here purely so
+// the auth-flow tests aren't exercising (or failing on) direct Supabase
+// reads that have nothing to do with authentication.
+jest.mock('./src/workouts/workoutQueries', () => ({
+  fetchActiveWorkout: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('./src/dashboard/recentWorkoutInfo', () => ({
+  fetchRecentWorkoutInfo: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('./src/nutrition/foodLogQueries', () => ({
+  fetchTodaysFoodLogs: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('./src/nutrition/nutritionGoalQueries', () => ({
+  fetchNutritionGoals: jest.fn().mockResolvedValue({
+    calories: null,
+    proteinG: null,
+    carbsG: null,
+    fatG: null,
+  }),
+}));
+
 jest.mock('expo-linking', () => ({
   getInitialURL: jest.fn().mockResolvedValue(null),
   addEventListener: jest.fn().mockReturnValue({ remove: jest.fn() }),
@@ -179,7 +201,7 @@ describe('Authentication flow', () => {
     expect(await screen.findByTestId('sign-in-email', {}, { timeout: 5000 })).toBeTruthy();
   });
 
-  it('signs in and shows the account settings screen', async () => {
+  it('signs in and shows the dashboard', async () => {
     render(<App />);
     await screen.findByTestId('sign-in-email');
 
@@ -187,7 +209,7 @@ describe('Authentication flow', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
 
-    expect(await screen.findByText(/athlete@example\.com/)).toBeTruthy();
+    expect(await screen.findByTestId('dashboard-greeting')).toBeTruthy();
     expect(mockAuth.signInWithPassword).toHaveBeenCalledWith({
       email: 'athlete@example.com',
       password: 'correct-password',
@@ -213,7 +235,7 @@ describe('Authentication flow', () => {
     fireEvent.press(screen.getByTestId('sign-in-submit'));
 
     expect(await screen.findByTestId('sign-in-error')).toBeTruthy();
-    expect(screen.queryByTestId('account-email')).toBeNull();
+    expect(screen.queryByTestId('dashboard-greeting')).toBeNull();
   });
 
   it('switches to sign-up and shows the email-confirmation message', async () => {
@@ -238,8 +260,13 @@ describe('Authentication flow', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
-    await screen.findByTestId('sign-out-button');
+    await screen.findByTestId('dashboard-greeting');
 
+    // Sign out lives on AccountSettingsScreen, reached from the dashboard's
+    // settings affordance now that AccountSettingsScreen is no longer the
+    // initial route.
+    fireEvent.press(screen.getByTestId('open-account-settings'));
+    await screen.findByTestId('sign-out-button');
     fireEvent.press(screen.getByTestId('sign-out-button'));
 
     expect(await screen.findByTestId('sign-in-email')).toBeTruthy();
@@ -353,7 +380,7 @@ describe('OAuth sign-in', () => {
 
     // The mocked browser session resolves with a redirect URL carrying
     // tokens, which should establish a real session and sign the user in.
-    expect(await screen.findByText(/oauth@example\.com/)).toBeTruthy();
+    expect(await screen.findByTestId('dashboard-greeting')).toBeTruthy();
   });
 
   it('tapping "Continue with Apple" starts the Supabase OAuth flow', async () => {

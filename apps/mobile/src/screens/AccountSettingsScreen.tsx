@@ -87,7 +87,12 @@ export function AccountSettingsScreen({ navigation }: Props) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Account Settings</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Account Settings</Text>
+        <TouchableOpacity testID="account-settings-back" onPress={() => navigation.goBack()}>
+          <Text style={styles.backLink}>Back</Text>
+        </TouchableOpacity>
+      </View>
       <Text testID="account-email" style={styles.info}>
         {user?.email}
       </Text>
