@@ -10,6 +10,7 @@ export type RootStackParamList = {
   ExerciseLibrary: undefined;
   WorkoutHistory: undefined;
   WorkoutDetail: { workoutId: string };
+  ShareWorkout: { workoutId: string };
   NewWorkout: undefined;
   ActiveWorkout: { workoutId: string };
   PRHistory: { exerciseId: string; exerciseName: string };

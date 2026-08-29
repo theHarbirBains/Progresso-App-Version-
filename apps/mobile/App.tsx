@@ -18,6 +18,7 @@ import { NutritionGoalsScreen } from './src/screens/NutritionGoalsScreen';
 import { NutritionTodayScreen } from './src/screens/NutritionTodayScreen';
 import { PRHistoryScreen } from './src/screens/PRHistoryScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
+import { ShareWorkoutScreen } from './src/screens/ShareWorkoutScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { SignUpScreen } from './src/screens/SignUpScreen';
 import { WorkoutDetailScreen } from './src/screens/WorkoutDetailScreen';
@@ -52,6 +53,7 @@ function Root() {
           <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
           <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
           <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
+          <Stack.Screen name="ShareWorkout" component={ShareWorkoutScreen} />
           <Stack.Screen name="NewWorkout" component={NewWorkoutScreen} />
           <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
           <Stack.Screen name="PRHistory" component={PRHistoryScreen} />

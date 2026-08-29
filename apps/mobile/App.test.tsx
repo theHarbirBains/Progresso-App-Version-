@@ -59,6 +59,24 @@ jest.mock('./src/nutrition/nutritionGoalQueries', () => ({
   }),
 }));
 
+// ShareWorkoutScreen's native capture/share/save modules have no jest-expo
+// auto-mock and are irrelevant to the auth-flow tests below -- mocked here
+// purely so importing App.tsx (which statically imports every screen for
+// the navigator) doesn't attempt to load real native modules. Their actual
+// behavior is covered by ShareWorkoutScreen.test.tsx.
+jest.mock('react-native-view-shot', () => ({
+  captureRef: jest.fn(),
+}));
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: jest.fn(),
+  shareAsync: jest.fn(),
+}));
+jest.mock('expo-media-library', () => ({
+  getPermissionsAsync: jest.fn(),
+  requestPermissionsAsync: jest.fn(),
+  saveToLibraryAsync: jest.fn(),
+}));
+
 jest.mock('expo-linking', () => ({
   getInitialURL: jest.fn().mockResolvedValue(null),
   addEventListener: jest.fn().mockReturnValue({ remove: jest.fn() }),

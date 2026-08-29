@@ -108,6 +108,16 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
       </View>
       <Text style={styles.info}>{formatDateTime(workout.performedAt)}</Text>
 
+      {workout.completedAt ? (
+        <TouchableOpacity
+          testID="workout-detail-share"
+          style={styles.secondaryButton}
+          onPress={() => navigation.navigate('ShareWorkout', { workoutId })}
+        >
+          <Text style={styles.secondaryButtonText}>Share Workout</Text>
+        </TouchableOpacity>
+      ) : null}
+
       {workout.exercises.map((exercise) => {
         const topSet = exercise.sets.reduce<SetRecord | null>(
           (max, s) => (!max || s.weightKg > max.weightKg ? s : max),

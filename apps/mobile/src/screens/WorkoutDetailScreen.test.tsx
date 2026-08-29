@@ -121,6 +121,24 @@ describe('WorkoutDetailScreen', () => {
 
     expect(mockGoBack).toHaveBeenCalled();
   });
+
+  it('shows a Share action for a completed workout and navigates to ShareWorkout', async () => {
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+    await screen.findByText('Push Day');
+
+    fireEvent.press(screen.getByTestId('workout-detail-share'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('ShareWorkout', { workoutId: 'w1' });
+  });
+
+  it('hides the Share action for an incomplete (active) workout', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({ ...workout, completedAt: null });
+
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+    await screen.findByText('Push Day');
+
+    expect(screen.queryByTestId('workout-detail-share')).toBeNull();
+  });
 });
 
 describe('WorkoutDetailScreen current PR/1RM indicators', () => {
