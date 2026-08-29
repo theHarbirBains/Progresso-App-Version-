@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
+import { Badge } from '../design/Badge';
+import { PrimaryButton, TextButton } from '../design/Button';
+import { EmptyState } from '../design/EmptyState';
+import { LoadingState } from '../design/LoadingState';
+import { ScreenContainer } from '../design/ScreenContainer';
+import { SectionHeader } from '../design/SectionHeader';
+import { colors } from '../design/theme';
 import { fetchRecentWorkoutInfo, type RecentWorkoutInfo } from '../dashboard/recentWorkoutInfo';
 import { getGreeting, greetingName } from '../dashboard/greeting';
 import { getMyProfile, type ProfileResponse } from '../lib/api';
@@ -11,7 +20,7 @@ import { sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { fetchNutritionGoals, type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { compareToPrevious } from '../workouts/progressiveOverload';
 import { fetchActiveWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
-import { workoutStyles as styles } from './workoutStyles';
+import { dashboardStyles as styles } from './dashboardStyles';
 
 type Props = RootStackScreenProps<'Dashboard'>;
 
@@ -26,11 +35,12 @@ function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : 'Something went wrong';
 }
 
-// The new post-sign-in landing screen (replacing AccountSettingsScreen in
-// that role). Pure aggregation over data Phases 1-6 already produce --
-// every section reuses an existing query/derivation function, and each
-// section fails independently (Promise.allSettled) so one bad network call
-// can't blank out sections that loaded fine.
+// The post-sign-in landing screen. Pure aggregation over data Phases 1-6
+// already produce -- every section reuses an existing query/derivation
+// function, and each section fails independently (Promise.allSettled) so
+// one bad network call can't blank out sections that loaded fine. Visual
+// presentation only was reworked for the Design & Product Polish phase
+// (Concept B -- Dark + Electric); the data/state logic below is unchanged.
 export function DashboardScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -102,11 +112,7 @@ export function DashboardScreen({ navigation }: Props) {
   }, [navigation, load]);
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator testID="dashboard-loading" size="large" color="#FFFFFF" />
-      </View>
-    );
+    return <LoadingState testID="dashboard-loading" />;
   }
 
   const weightUnit = profile?.weightUnit ?? 'kg';
@@ -129,132 +135,146 @@ export function DashboardScreen({ navigation }: Props) {
     : null;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScreenContainer testID="dashboard-screen">
       <View style={styles.header}>
-        <Text testID="dashboard-greeting" style={styles.title}>
+        <Text testID="dashboard-greeting" style={styles.greeting}>
           {greeting}
         </Text>
         <TouchableOpacity
           testID="open-account-settings"
+          style={styles.settingsButton}
           onPress={() => navigation.navigate('AccountSettings')}
+          accessibilityLabel="Settings"
+          accessibilityRole="button"
         >
-          <Text style={styles.backLink}>Settings</Text>
+          <Feather name="settings" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
       {profileError ? (
-        <Text testID="dashboard-profile-error" style={styles.error}>
+        <Text testID="dashboard-profile-error" style={styles.errorText}>
           {profileError}
         </Text>
       ) : null}
 
-      {activeWorkoutError ? (
-        <Text testID="dashboard-active-workout-error" style={styles.error}>
-          {activeWorkoutError}
-        </Text>
-      ) : activeWorkout ? (
-        <TouchableOpacity
-          testID="dashboard-resume-workout"
-          style={styles.button}
-          onPress={() => navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id })}
-        >
-          <Text style={styles.buttonText}>Resume &quot;{activeWorkout.name}&quot;</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          testID="dashboard-start-workout"
-          style={styles.button}
-          onPress={() => navigation.navigate('NewWorkout')}
-        >
-          <Text style={styles.buttonText}>Start Workout</Text>
-        </TouchableOpacity>
-      )}
+      <View style={styles.primaryAction}>
+        {activeWorkoutError ? (
+          <Text testID="dashboard-active-workout-error" style={styles.errorText}>
+            {activeWorkoutError}
+          </Text>
+        ) : activeWorkout ? (
+          <PrimaryButton
+            testID="dashboard-resume-workout"
+            label={`Resume "${activeWorkout.name}"`}
+            onPress={() => navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id })}
+          />
+        ) : (
+          <PrimaryButton
+            testID="dashboard-start-workout"
+            label="Start Workout"
+            onPress={() => navigation.navigate('NewWorkout')}
+          />
+        )}
+      </View>
 
-      <Text style={styles.bannerTitle}>Recent Workout</Text>
-      {recentWorkoutError ? (
-        <Text testID="dashboard-recent-workout-error" style={styles.error}>
-          {recentWorkoutError}
-        </Text>
-      ) : recentWorkout ? (
-        <TouchableOpacity
-          testID="dashboard-recent-workout"
-          style={styles.card}
-          onPress={() =>
-            navigation.navigate('WorkoutDetail', { workoutId: recentWorkout.workout.id })
-          }
-        >
-          <Text style={styles.cardTitle}>{recentWorkout.workout.name}</Text>
-          <Text style={styles.cardMeta}>{recentWorkout.musclesTrained}</Text>
-          {recentWorkout.durationMinutes !== null ? (
-            <Text style={styles.cardMeta}>{recentWorkout.durationMinutes} min</Text>
-          ) : null}
-          {recentWorkout.topSet && recentWorkout.topExerciseName ? (
-            <Text testID="dashboard-top-set" style={styles.cardMetaHighlight}>
-              {recentWorkout.topExerciseName}:{' '}
-              {formatWeight(recentWorkout.topSet.weightKg, weightUnit)}
-              {weightUnit}×{recentWorkout.topSet.reps}
-              {recentWorkout.prLabel ? ` · ${recentWorkout.prLabel}` : ''}
-            </Text>
-          ) : null}
-          {insight ? (
-            <Text testID="dashboard-insight" style={styles.cardMeta}>
-              {insight.message}
-            </Text>
-          ) : null}
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          testID="dashboard-start-first-workout"
-          style={styles.card}
-          onPress={() => navigation.navigate('NewWorkout')}
-        >
-          <Text testID="dashboard-recent-workout-empty" style={styles.emptyText}>
-            Start your first workout
+      <View style={styles.section}>
+        <SectionHeader label="Recent Workout" />
+        {recentWorkoutError ? (
+          <Text testID="dashboard-recent-workout-error" style={styles.errorText}>
+            {recentWorkoutError}
           </Text>
-        </TouchableOpacity>
-      )}
+        ) : recentWorkout ? (
+          <AppCard
+            hero
+            testID="dashboard-recent-workout"
+            onPress={() =>
+              navigation.navigate('WorkoutDetail', { workoutId: recentWorkout.workout.id })
+            }
+          >
+            <Text style={styles.cardTitle}>{recentWorkout.workout.name}</Text>
+            <Text style={styles.cardMeta}>
+              {recentWorkout.musclesTrained}
+              {recentWorkout.durationMinutes !== null
+                ? ` · ${recentWorkout.durationMinutes} min`
+                : ''}
+            </Text>
 
-      <Text style={styles.bannerTitle}>Nutrition Today</Text>
-      {nutritionError ? (
-        <Text testID="dashboard-nutrition-error" style={styles.error}>
-          {nutritionError}
-        </Text>
-      ) : (
-        <TouchableOpacity
-          testID="dashboard-nutrition"
-          style={styles.card}
-          onPress={() => navigation.navigate('Nutrition')}
-        >
-          <Text testID="dashboard-calories" style={styles.cardMetaHighlight}>
-            Calories: {consumed.calories}
-            {nutritionGoals.calories !== null ? ` / ${nutritionGoals.calories}` : ''}
-          </Text>
-          <Text testID="dashboard-protein" style={styles.cardMeta}>
-            Protein: {consumed.proteinG}g
-            {nutritionGoals.proteinG !== null ? ` / ${nutritionGoals.proteinG}g` : ''}
-          </Text>
-          <Text testID="dashboard-carbs" style={styles.cardMeta}>
-            Carbs: {consumed.carbsG}g
-            {nutritionGoals.carbsG !== null ? ` / ${nutritionGoals.carbsG}g` : ''}
-          </Text>
-          <Text testID="dashboard-fat" style={styles.cardMeta}>
-            Fat: {consumed.fatG}g{nutritionGoals.fatG !== null ? ` / ${nutritionGoals.fatG}g` : ''}
-          </Text>
-          {!hasAnyNutritionGoal ? (
-            <Text testID="dashboard-nutrition-no-goals" style={styles.cardMeta}>
-              Set your nutrition goals
-            </Text>
-          ) : null}
-        </TouchableOpacity>
-      )}
+            {recentWorkout.topSet && recentWorkout.topExerciseName ? (
+              <View testID="dashboard-top-set" style={styles.topSetRow}>
+                <Text style={styles.topSetText}>
+                  {recentWorkout.topExerciseName}:{' '}
+                  <Text style={styles.topSetValue}>
+                    {formatWeight(recentWorkout.topSet.weightKg, weightUnit)}
+                    {weightUnit}×{recentWorkout.topSet.reps}
+                  </Text>
+                </Text>
+                {recentWorkout.prLabel ? <Badge label={recentWorkout.prLabel} /> : null}
+              </View>
+            ) : null}
 
-      <TouchableOpacity
-        testID="dashboard-view-workouts"
-        style={styles.secondaryButton}
-        onPress={() => navigation.navigate('WorkoutHistory')}
-      >
-        <Text style={styles.secondaryButtonText}>View All Workouts</Text>
-      </TouchableOpacity>
-    </ScrollView>
+            {insight ? (
+              <Text testID="dashboard-insight" style={styles.insight}>
+                {insight.message}
+              </Text>
+            ) : null}
+          </AppCard>
+        ) : (
+          <AppCard
+            testID="dashboard-start-first-workout"
+            onPress={() => navigation.navigate('NewWorkout')}
+          >
+            <EmptyState
+              testID="dashboard-recent-workout-empty"
+              icon={<Feather name="activity" size={24} color={colors.textMuted} />}
+              title="Start your first workout"
+            />
+          </AppCard>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <SectionHeader label="Nutrition Today" />
+        {nutritionError ? (
+          <Text testID="dashboard-nutrition-error" style={styles.errorText}>
+            {nutritionError}
+          </Text>
+        ) : (
+          <AppCard testID="dashboard-nutrition" onPress={() => navigation.navigate('Nutrition')}>
+            <Text testID="dashboard-calories" style={styles.calorieText}>
+              Calories:{' '}
+              <Text style={styles.calorieValue}>
+                {consumed.calories}
+                {nutritionGoals.calories !== null ? ` / ${nutritionGoals.calories}` : ''}
+              </Text>
+            </Text>
+            <Text testID="dashboard-protein" style={styles.macroText}>
+              Protein: {consumed.proteinG}g
+              {nutritionGoals.proteinG !== null ? ` / ${nutritionGoals.proteinG}g` : ''}
+            </Text>
+            <Text testID="dashboard-carbs" style={styles.macroText}>
+              Carbs: {consumed.carbsG}g
+              {nutritionGoals.carbsG !== null ? ` / ${nutritionGoals.carbsG}g` : ''}
+            </Text>
+            <Text testID="dashboard-fat" style={styles.macroText}>
+              Fat: {consumed.fatG}g
+              {nutritionGoals.fatG !== null ? ` / ${nutritionGoals.fatG}g` : ''}
+            </Text>
+            {!hasAnyNutritionGoal ? (
+              <Text testID="dashboard-nutrition-no-goals" style={styles.noGoalsText}>
+                Set your nutrition goals
+              </Text>
+            ) : null}
+          </AppCard>
+        )}
+      </View>
+
+      <View style={styles.footer}>
+        <TextButton
+          testID="dashboard-view-workouts"
+          label="View All Workouts"
+          onPress={() => navigation.navigate('WorkoutHistory')}
+        />
+      </View>
+    </ScreenContainer>
   );
 }

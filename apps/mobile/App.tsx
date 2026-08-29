@@ -1,8 +1,17 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { JetBrainsMono_500Medium, JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
+import {
+  Manrope_500Medium,
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+} from '@expo-google-fonts/manrope';
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
+import { LoadingState } from './src/design/LoadingState';
 import { wrapApp } from './src/lib/sentry';
 import type { RootStackParamList } from './src/navigation/types';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
@@ -82,12 +91,25 @@ function Root() {
   }
 }
 
+// Fonts are gated here, before Root ever renders, so no screen has to
+// account for a "fonts not loaded yet" state -- by the time any screen
+// mounts, Manrope_* / JetBrainsMono_* are guaranteed available.
 function App() {
+  const [fontsLoaded] = useFonts({
+    Manrope_500Medium,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_700Bold,
+  });
+
   return (
-    <AuthProvider>
-      <Root />
-      <StatusBar style="light" />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        {fontsLoaded ? <Root /> : <LoadingState testID="font-loading" />}
+        <StatusBar style="light" />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

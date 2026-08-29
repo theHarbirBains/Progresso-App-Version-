@@ -31,4 +31,13 @@ export default defineConfig([
       globals: globals.node,
     },
   },
+  {
+    files: ['apps/mobile/jest.setup.js'],
+    languageOptions: {
+      globals: globals.jest,
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
 ]);

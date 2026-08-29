@@ -27,6 +27,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["@sentry/react-native", "expo-web-browser"]
+    "plugins": ["@sentry/react-native", "expo-web-browser", "expo-font"]
   }
 }
