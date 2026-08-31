@@ -9,19 +9,19 @@ import {
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
-import { LoadingState } from './src/design/LoadingState';
 import { wrapApp } from './src/lib/sentry';
 import type { RootStackParamList } from './src/navigation/types';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
 import { ActiveWorkoutScreen } from './src/screens/ActiveWorkoutScreen';
-import { AuthLoadingScreen } from './src/screens/AuthLoadingScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
 import { ExerciseProgressScreen } from './src/screens/ExerciseProgressScreen';
 import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
+import { LaunchScreen } from './src/screens/LaunchScreen';
 import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
 import { NutritionGoalsScreen } from './src/screens/NutritionGoalsScreen';
 import { NutritionTodayScreen } from './src/screens/NutritionTodayScreen';
@@ -40,14 +40,12 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // Sign-in/up/forgot-password/reset-password stay on the pre-existing local
 // screen-state pattern (untouched by Phase 3) -- only the signed-in app
 // graduates to a real navigator, since that's the part that actually needs
-// back-stack semantics now.
+// back-stack semantics now. Root only ever mounts once AppShell's `ready`
+// is true, so status is guaranteed resolved -- there is no 'loading' branch
+// to handle here.
 function Root() {
   const { status } = useAuth();
   const [mode, setMode] = useState<AuthMode>('signIn');
-
-  if (status === 'loading') {
-    return <AuthLoadingScreen />;
-  }
 
   if (status === 'passwordRecovery') {
     return <ResetPasswordScreen />;
@@ -91,9 +89,24 @@ function Root() {
   }
 }
 
-// Fonts are gated here, before Root ever renders, so no screen has to
-// account for a "fonts not loaded yet" state -- by the time any screen
-// mounts, Manrope_* / JetBrainsMono_* are guaranteed available.
+// Fonts loading and the auth session check happen in parallel; the branded
+// LaunchScreen covers both under one screen instead of two separate
+// unbranded spinners. Root mounts underneath as soon as `ready` is true --
+// in parallel with LaunchScreen's own exit fade, not after it -- so a fast
+// resolve isn't padded by animation time, and a slow one just keeps the
+// logo up for as long as it actually takes.
+function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
+  const { status } = useAuth();
+  const ready = fontsLoaded && status !== 'loading';
+
+  return (
+    <View style={styles.shell}>
+      {ready ? <Root /> : null}
+      <LaunchScreen ready={ready} />
+    </View>
+  );
+}
+
 function App() {
   const [fontsLoaded] = useFonts({
     Manrope_500Medium,
@@ -106,11 +119,17 @@ function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        {fontsLoaded ? <Root /> : <LoadingState testID="font-loading" />}
+        <AppShell fontsLoaded={fontsLoaded} />
         <StatusBar style="light" />
       </AuthProvider>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  shell: {
+    flex: 1,
+  },
+});
 
 export default wrapApp(App);
