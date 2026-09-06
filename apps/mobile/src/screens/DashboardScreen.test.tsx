@@ -281,7 +281,7 @@ describe('DashboardScreen recent workout', () => {
     expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
   });
 
-  it('shows a recent-workout error without hiding the nutrition section', async () => {
+  it('shows a recent-workout error, and switching to Nutrition mode still works fine', async () => {
     mockFetchRecentWorkoutInfo.mockRejectedValue(new Error('workout fetch failed'));
 
     render(<DashboardScreen navigation={navigation} route={route} />);
@@ -289,7 +289,33 @@ describe('DashboardScreen recent workout', () => {
     expect(await screen.findByTestId('dashboard-recent-workout-error')).toHaveTextContent(
       'workout fetch failed',
     );
-    expect(screen.getByTestId('dashboard-nutrition')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
+
+    expect(await screen.findByTestId('dashboard-nutrition')).toBeTruthy();
+  });
+});
+
+describe('DashboardScreen mode toggle', () => {
+  it('defaults to Workout mode', async () => {
+    render(<DashboardScreen navigation={navigation} route={route} />);
+
+    expect(await screen.findByTestId('dashboard-start-workout')).toBeTruthy();
+    expect(screen.queryByTestId('dashboard-nutrition')).toBeNull();
+  });
+
+  it('switches to Nutrition mode and back without losing loaded data', async () => {
+    mockFetchRecentWorkoutInfo.mockResolvedValue(recentWorkoutInfo);
+
+    render(<DashboardScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('dashboard-recent-workout');
+
+    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
+    expect(await screen.findByTestId('dashboard-nutrition')).toBeTruthy();
+    expect(screen.queryByTestId('dashboard-recent-workout')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('dashboard-mode-workout'));
+    expect(await screen.findByTestId('dashboard-recent-workout')).toBeTruthy();
   });
 });
 
@@ -312,6 +338,7 @@ describe('DashboardScreen nutrition snapshot', () => {
     ]);
 
     render(<DashboardScreen navigation={navigation} route={route} />);
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
 
     expect(await screen.findByTestId('dashboard-calories')).toHaveTextContent('Calories: 165');
     expect(screen.getByTestId('dashboard-nutrition-no-goals')).toBeTruthy();
@@ -341,6 +368,7 @@ describe('DashboardScreen nutrition snapshot', () => {
     ]);
 
     render(<DashboardScreen navigation={navigation} route={route} />);
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
 
     expect(await screen.findByTestId('dashboard-calories')).toHaveTextContent(
       'Calories: 165 / 2000',
@@ -350,12 +378,14 @@ describe('DashboardScreen nutrition snapshot', () => {
 
   it('shows an empty (zeroed) snapshot when nothing has been logged today', async () => {
     render(<DashboardScreen navigation={navigation} route={route} />);
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
 
     expect(await screen.findByTestId('dashboard-calories')).toHaveTextContent('Calories: 0');
   });
 
-  it('navigates to Nutrition when the snapshot is pressed', async () => {
+  it('navigates to Nutrition when the calories card is pressed', async () => {
     render(<DashboardScreen navigation={navigation} route={route} />);
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
     await screen.findByTestId('dashboard-nutrition');
 
     fireEvent.press(screen.getByTestId('dashboard-nutrition'));
@@ -363,15 +393,62 @@ describe('DashboardScreen nutrition snapshot', () => {
     expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
   });
 
-  it('shows a nutrition error without hiding workout information', async () => {
+  it('shows a nutrition error, and switching back to Workout mode still works fine', async () => {
     mockFetchTodaysFoodLogs.mockRejectedValue(new Error('nutrition down'));
 
     render(<DashboardScreen navigation={navigation} route={route} />);
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
 
     expect(await screen.findByTestId('dashboard-nutrition-error')).toHaveTextContent(
       'nutrition down',
     );
-    expect(screen.getByTestId('dashboard-start-workout')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('dashboard-mode-workout'));
+
+    expect(await screen.findByTestId('dashboard-start-workout')).toBeTruthy();
+  });
+
+  it('shows real logged meals in the Recent Meals list', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([
+      {
+        id: 'l1',
+        foodId: 'f1',
+        foodNameSnapshot: 'Chicken Breast',
+        servingSize: 100,
+        servingUnit: 'g',
+        quantity: 1,
+        calories: 165,
+        proteinG: 31,
+        carbsG: 0,
+        fatG: 3.6,
+        loggedAt: '2026-01-01T12:00:00Z',
+      },
+    ]);
+
+    render(<DashboardScreen navigation={navigation} route={route} />);
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
+
+    expect(await screen.findByText('Chicken Breast')).toBeTruthy();
+    expect(screen.queryByTestId('dashboard-meals-empty')).toBeNull();
+  });
+
+  it('shows an empty state when no meals have been logged today', async () => {
+    render(<DashboardScreen navigation={navigation} route={route} />);
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
+
+    expect(await screen.findByTestId('dashboard-meals-empty')).toHaveTextContent(
+      'No meals logged today',
+    );
+  });
+
+  it('navigates to NutritionGoals via the Nutrition Goals card', async () => {
+    render(<DashboardScreen navigation={navigation} route={route} />);
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
+    await screen.findByTestId('dashboard-nutrition-goals-card');
+
+    fireEvent.press(screen.getByTestId('dashboard-nutrition-goals-card'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('NutritionGoals');
   });
 });
 
@@ -410,13 +487,16 @@ describe('DashboardScreen partial failure', () => {
 
     await waitFor(() => expect(screen.getByTestId('dashboard-profile-error')).toBeTruthy());
     expect(screen.getByTestId('dashboard-recent-workout')).toBeTruthy();
-    expect(screen.getByTestId('dashboard-nutrition')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
+    expect(await screen.findByTestId('dashboard-nutrition')).toBeTruthy();
   });
 
   it('recovers on the next focus after a failed section', async () => {
     mockFetchTodaysFoodLogs.mockRejectedValueOnce(new Error('nutrition down'));
 
     render(<DashboardScreen navigation={navigation} route={route} />);
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
     await screen.findByTestId('dashboard-nutrition-error');
 
     mockFetchTodaysFoodLogs.mockResolvedValue([]);
