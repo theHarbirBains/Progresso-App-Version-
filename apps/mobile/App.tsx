@@ -30,6 +30,7 @@ import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { ShareWorkoutScreen } from './src/screens/ShareWorkoutScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { SignUpScreen } from './src/screens/SignUpScreen';
+import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { WorkoutDetailScreen } from './src/screens/WorkoutDetailScreen';
 import { WorkoutHistoryScreen } from './src/screens/WorkoutHistoryScreen';
 
@@ -43,15 +44,27 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // back-stack semantics now. Root only ever mounts once AppShell's `ready`
 // is true, so status is guaranteed resolved -- there is no 'loading' branch
 // to handle here.
+//
+// `justCreatedAccount` is deliberately plain in-memory state, never
+// persisted: it's set true only by SignUpScreen's own success callback in
+// this same app session, and cleared the moment Welcome's Get Started is
+// pressed. A returning user's status flips straight to 'signedIn' without
+// this flag ever being set, so they never see Welcome -- no new database
+// field or profile-completion mechanism required.
 function Root() {
   const { status } = useAuth();
   const [mode, setMode] = useState<AuthMode>('signIn');
+  const [justCreatedAccount, setJustCreatedAccount] = useState(false);
 
   if (status === 'passwordRecovery') {
     return <ResetPasswordScreen />;
   }
 
   if (status === 'signedIn') {
+    if (justCreatedAccount) {
+      return <WelcomeScreen onGetStarted={() => setJustCreatedAccount(false)} />;
+    }
+
     return (
       <NavigationContainer>
         <Stack.Navigator initialRouteName="Dashboard" screenOptions={{ headerShown: false }}>
@@ -75,7 +88,12 @@ function Root() {
 
   switch (mode) {
     case 'signUp':
-      return <SignUpScreen onSwitchToSignIn={() => setMode('signIn')} />;
+      return (
+        <SignUpScreen
+          onSwitchToSignIn={() => setMode('signIn')}
+          onAccountCreated={() => setJustCreatedAccount(true)}
+        />
+      );
     case 'forgotPassword':
       return <ForgotPasswordScreen onBackToSignIn={() => setMode('signIn')} />;
     case 'signIn':

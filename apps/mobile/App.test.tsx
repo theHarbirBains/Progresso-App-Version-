@@ -263,6 +263,7 @@ describe('Authentication flow', () => {
     fireEvent.press(screen.getByTestId('sign-in-switch'));
     fireEvent.changeText(await screen.findByTestId('sign-up-email'), 'new@example.com');
     fireEvent.changeText(screen.getByTestId('sign-up-password'), 'password123');
+    fireEvent.changeText(screen.getByTestId('sign-up-confirm-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-up-submit'));
 
     expect(await screen.findByTestId('sign-up-confirmation')).toBeTruthy();
@@ -270,6 +271,36 @@ describe('Authentication flow', () => {
       email: 'new@example.com',
       password: 'password123',
     });
+  });
+
+  it('shows Welcome after creating an account, then proceeds to Dashboard on Get Started', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+
+    // Create the account (this mock always requires email confirmation).
+    fireEvent.press(screen.getByTestId('sign-in-switch'));
+    fireEvent.changeText(await screen.findByTestId('sign-up-email'), 'new@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'password123');
+    fireEvent.changeText(screen.getByTestId('sign-up-confirm-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-up-submit'));
+    await screen.findByTestId('sign-up-confirmation');
+
+    // Simulates confirming via email out-of-band, then returning to sign in
+    // normally -- the realistic path for a project that requires email
+    // confirmation.
+    fireEvent.press(screen.getByTestId('sign-up-switch'));
+    fireEvent.changeText(await screen.findByTestId('sign-in-email'), 'new@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
+    fireEvent.press(screen.getByTestId('sign-in-submit'));
+
+    // Welcome, not Dashboard, immediately after this fresh account's first
+    // sign-in -- and Dashboard must not be reachable underneath it yet.
+    expect(await screen.findByTestId('welcome-get-started')).toBeTruthy();
+    expect(screen.queryByTestId('dashboard-greeting')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('welcome-get-started'));
+
+    expect(await screen.findByTestId('dashboard-greeting')).toBeTruthy();
   });
 
   it('signs out and returns to the sign-in screen', async () => {
