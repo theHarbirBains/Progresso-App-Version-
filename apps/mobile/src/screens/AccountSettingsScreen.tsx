@@ -1,60 +1,80 @@
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { AppHeader } from '../design/AppHeader';
+import { LoadingState } from '../design/LoadingState';
 import { getMyProfile, updateMyProfile } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
-import { authStyles as styles } from './authStyles';
+import { useProgressTheme } from '../progress/useProgressTheme';
+import { AccountCategory } from '../settings/AccountCategory';
+import { AppCategory } from '../settings/AppCategory';
+import { AppearanceCategory } from '../settings/AppearanceCategory';
+import { CategoryTabs } from '../settings/CategoryTabs';
+import { HelpCategory } from '../settings/HelpCategory';
+import { NotificationsCategory } from '../settings/NotificationsCategory';
+import { PrivacyCategory } from '../settings/PrivacyCategory';
+import { SETTINGS_CATEGORIES, type SettingsCategory } from '../settings/settingsCategories';
+import { settingsStyles as styles } from '../settings/settingsStyles';
+import { DEFAULT_NUTRITION_COLOR, DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 
 type Props = RootStackScreenProps<'AccountSettings'>;
 
-// The authenticated home for Phase 0/1/2/3 — there's no dashboard yet, so
-// this screen doubles as both "you're signed in" proof and real account
-// management. Not the final Progresso visual design.
+// The app's global Settings hub, reached from the existing gear/menu
+// affordances (Dashboard's avatar button, the side menu's "Settings" item --
+// see appMenuSections.ts). Reorganizes the same account/appearance/app-link
+// functionality that used to live on one long scroll into six categories;
+// no account behavior, API integration, or navigation target changed, only
+// how it's grouped and presented. Route name stays `AccountSettings` (an
+// internal identifier only) so nothing elsewhere in the navigation needs to
+// change.
 export function AccountSettingsScreen({ navigation }: Props) {
   const { user, session, signOut } = useAuth();
   const accessToken = session?.access_token;
+  const { theme, themeLoading } = useProgressTheme();
+
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('Account');
 
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
+  const [workoutAccentColor, setWorkoutAccentColor] = useState<string | null>(null);
+  const [nutritionAccentColor, setNutritionAccentColor] = useState<string | null>(null);
+  const [pushNotificationsOptIn, setPushNotificationsOptIn] = useState(false);
+  const [emailOptIn, setEmailOptIn] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [notifSaving, setNotifSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const profile = await getMyProfile(accessToken);
+      setDisplayName(profile.displayName ?? '');
+      setUsername(profile.username ?? '');
+      setWeightUnit(profile.weightUnit);
+      setWorkoutAccentColor(profile.workoutAccentColor);
+      setNutritionAccentColor(profile.nutritionAccentColor);
+      setPushNotificationsOptIn(profile.pushNotificationsOptIn ?? false);
+      setEmailOptIn(profile.emailOptIn ?? false);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function load() {
-      if (!accessToken) return;
-      try {
-        const profile = await getMyProfile(accessToken);
-        if (!mounted) return;
-        setDisplayName(profile.displayName ?? '');
-        setUsername(profile.username ?? '');
-        setWeightUnit(profile.weightUnit);
-      } catch (err) {
-        if (mounted) {
-          setLoadError(err instanceof Error ? err.message : 'Failed to load profile');
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
     load();
-    return () => {
-      mounted = false;
-    };
-  }, [accessToken]);
+    // Re-load on every focus (not just mount) so Appearance reflects a color
+    // just saved from WorkoutColorScreen/NutritionColorScreen.
+    const unsubscribe = navigation.addListener('focus', load);
+    return unsubscribe;
+  }, [navigation, load]);
 
   async function handleSave() {
     if (!accessToken) return;
@@ -77,134 +97,151 @@ export function AccountSettingsScreen({ navigation }: Props) {
     }
   }
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator testID="account-loading" size="large" color="#FFFFFF" />
-      </View>
+  async function handleResetThemeColors() {
+    if (!accessToken) return;
+    Alert.alert(
+      'Reset Theme Colors',
+      'This will restore Workout to Electric Blue and Nutrition to Emerald.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            setResetting(true);
+            try {
+              const profile = await updateMyProfile(accessToken, {
+                workoutAccentColor: DEFAULT_WORKOUT_COLOR,
+                nutritionAccentColor: DEFAULT_NUTRITION_COLOR,
+              });
+              setWorkoutAccentColor(profile.workoutAccentColor);
+              setNutritionAccentColor(profile.nutritionAccentColor);
+            } catch (err) {
+              setSaveError(err instanceof Error ? err.message : 'Failed to reset theme colors');
+            } finally {
+              setResetting(false);
+            }
+          },
+        },
+      ],
     );
   }
 
+  async function handleTogglePush(value: boolean) {
+    if (!accessToken) return;
+    const previous = pushNotificationsOptIn;
+    setPushNotificationsOptIn(value);
+    setNotifSaving(true);
+    try {
+      await updateMyProfile(accessToken, { pushNotificationsOptIn: value });
+    } catch {
+      setPushNotificationsOptIn(previous);
+    } finally {
+      setNotifSaving(false);
+    }
+  }
+
+  async function handleToggleEmail(value: boolean) {
+    if (!accessToken) return;
+    const previous = emailOptIn;
+    setEmailOptIn(value);
+    setNotifSaving(true);
+    try {
+      await updateMyProfile(accessToken, { emailOptIn: value });
+    } catch {
+      setEmailOptIn(previous);
+    } finally {
+      setNotifSaving(false);
+    }
+  }
+
+  if (loading || themeLoading) {
+    return <LoadingState testID="account-loading" />;
+  }
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Account Settings</Text>
-        <TouchableOpacity testID="account-settings-back" onPress={() => navigation.goBack()}>
-          <Text style={styles.backLink}>Back</Text>
-        </TouchableOpacity>
-      </View>
-      <Text testID="account-email" style={styles.info}>
-        {user?.email}
-      </Text>
-
-      {loadError ? (
-        <Text testID="account-load-error" style={styles.error}>
-          {loadError}
-        </Text>
-      ) : null}
-
-      <Text style={styles.label}>Display name</Text>
-      <TextInput
-        testID="account-display-name"
-        style={styles.input}
-        placeholder="Display name"
-        placeholderTextColor="#6B6B75"
-        value={displayName}
-        onChangeText={setDisplayName}
+    <View style={styles.screen} testID="settings-screen">
+      <AppHeader
+        testID="settings-header"
+        title="Settings"
+        subtitle="Customize your experience."
+        onBack={() => navigation.goBack()}
       />
 
-      <Text style={styles.label}>Username</Text>
-      <TextInput
-        testID="account-username"
-        style={styles.input}
-        placeholder="username"
-        placeholderTextColor="#6B6B75"
-        autoCapitalize="none"
-        value={username}
-        onChangeText={(text) => setUsername(text.toLowerCase())}
+      <CategoryTabs
+        testID="settings-tabs"
+        categories={[...SETTINGS_CATEGORIES]}
+        active={activeCategory}
+        onSelect={setActiveCategory}
+        accentColor={theme.accent}
       />
 
-      <Text style={styles.label}>Weight unit</Text>
-      <View style={styles.unitToggleRow}>
-        <TouchableOpacity
-          testID="account-unit-kg"
-          style={[styles.unitOption, weightUnit === 'kg' && styles.unitOptionSelected]}
-          onPress={() => setWeightUnit('kg')}
-        >
-          <Text
-            style={[styles.unitOptionText, weightUnit === 'kg' && styles.unitOptionTextSelected]}
-          >
-            kg
+      <ScrollView
+        style={styles.contentScroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        testID="settings-scroll"
+      >
+        {loadError ? (
+          <Text testID="account-load-error" style={styles.errorText}>
+            {loadError}
           </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          testID="account-unit-lb"
-          style={[styles.unitOption, weightUnit === 'lb' && styles.unitOptionSelected]}
-          onPress={() => setWeightUnit('lb')}
-        >
-          <Text
-            style={[styles.unitOptionText, weightUnit === 'lb' && styles.unitOptionTextSelected]}
-          >
-            lb
-          </Text>
-        </TouchableOpacity>
-      </View>
+        ) : null}
 
-      {saveError ? (
-        <Text testID="account-save-error" style={styles.error}>
-          {saveError}
-        </Text>
-      ) : null}
-      {savedMessage ? (
-        <Text testID="account-saved" style={styles.info}>
-          {savedMessage}
-        </Text>
-      ) : null}
+        {activeCategory === 'Account' ? (
+          <AccountCategory
+            email={user?.email ?? ''}
+            displayName={displayName}
+            onChangeDisplayName={setDisplayName}
+            username={username}
+            onChangeUsername={setUsername}
+            weightUnit={weightUnit}
+            onChangeWeightUnit={setWeightUnit}
+            saving={saving}
+            saveError={saveError}
+            savedMessage={savedMessage}
+            onSave={handleSave}
+            onSignOut={() => signOut()}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+        ) : null}
 
-      <TouchableOpacity
-        testID="account-save"
-        style={styles.button}
-        onPress={handleSave}
-        disabled={saving}
-      >
-        {saving ? (
-          <ActivityIndicator color="#0B0B0F" />
-        ) : (
-          <Text style={styles.buttonText}>Save</Text>
-        )}
-      </TouchableOpacity>
+        {activeCategory === 'Appearance' ? (
+          <AppearanceCategory
+            workoutAccentColor={workoutAccentColor}
+            nutritionAccentColor={nutritionAccentColor}
+            resetting={resetting}
+            onNavigateWorkoutColor={() => navigation.navigate('WorkoutColorSettings')}
+            onNavigateNutritionColor={() => navigation.navigate('NutritionColorSettings')}
+            onResetThemeColors={handleResetThemeColors}
+          />
+        ) : null}
 
-      <TouchableOpacity
-        testID="open-workouts"
-        style={styles.oauthButton}
-        onPress={() => navigation.navigate('WorkoutHistory')}
-      >
-        <Text style={styles.oauthButtonText}>Workouts</Text>
-      </TouchableOpacity>
+        {activeCategory === 'App' ? (
+          <AppCategory
+            onNavigateWorkoutSplits={() => navigation.navigate('WorkoutSplits')}
+            onNavigateWorkoutHistory={() => navigation.navigate('WorkoutHistory')}
+            onNavigateExerciseLibrary={() => navigation.navigate('ExerciseLibrary')}
+            onNavigateNutrition={() => navigation.navigate('Nutrition')}
+          />
+        ) : null}
 
-      <TouchableOpacity
-        testID="open-exercise-library"
-        style={styles.oauthButton}
-        onPress={() => navigation.navigate('ExerciseLibrary')}
-      >
-        <Text style={styles.oauthButtonText}>Exercise Library</Text>
-      </TouchableOpacity>
+        {activeCategory === 'Notifications' ? (
+          <NotificationsCategory
+            pushNotificationsOptIn={pushNotificationsOptIn}
+            onTogglePush={handleTogglePush}
+            emailOptIn={emailOptIn}
+            onToggleEmail={handleToggleEmail}
+            saving={notifSaving}
+            accentColor={theme.accent}
+          />
+        ) : null}
 
-      <TouchableOpacity
-        testID="open-nutrition"
-        style={styles.oauthButton}
-        onPress={() => navigation.navigate('Nutrition')}
-      >
-        <Text style={styles.oauthButtonText}>Nutrition</Text>
-      </TouchableOpacity>
+        {activeCategory === 'Privacy' ? <PrivacyCategory /> : null}
 
-      <TouchableOpacity
-        testID="sign-out-button"
-        style={styles.signOutButton}
-        onPress={() => signOut()}
-      >
-        <Text style={styles.signOutButtonText}>Sign Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {activeCategory === 'Help' ? <HelpCategory /> : null}
+      </ScrollView>
+    </View>
   );
 }
