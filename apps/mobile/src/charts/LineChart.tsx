@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
+import { colors } from '../design/theme';
 
 export interface LineChartPoint {
   x: number;
@@ -21,7 +22,7 @@ interface Props {
  * Phase 5 progress screens, per the approved react-native-svg-only
  * (no charting library) decision.
  */
-export function LineChart({ points, width, height, color = '#FFFFFF', testID }: Props) {
+export function LineChart({ points, width, height, color = colors.textPrimary, testID }: Props) {
   if (points.length === 0) {
     return <View testID={testID} style={{ width, height }} />;
   }

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import App from './App';
 
 interface MockAuthHandles {
@@ -24,7 +24,11 @@ jest.mock('./src/lib/sentry', () => ({
 
 // AccountSettingsScreen's own profile fetch/save is covered by its own
 // dedicated test file — mocked here purely so the sign-in/sign-out flow
-// tests don't depend on it.
+// tests don't depend on it. onboardingCompletedAt is set (non-null) so
+// these established test users land straight on Dashboard, matching a real
+// pre-existing account that finished onboarding before this feature
+// existed; the fresh-signup path (which DOES need onboarding) is covered
+// separately below and in OnboardingScreen.test.tsx.
 jest.mock('./src/lib/api', () => ({
   getMyProfile: jest.fn().mockResolvedValue({
     id: 'user-1',
@@ -33,6 +37,7 @@ jest.mock('./src/lib/api', () => ({
     displayName: null,
     username: null,
     weightUnit: 'kg',
+    onboardingCompletedAt: '2020-01-01T00:00:00.000Z',
   }),
   updateMyProfile: jest.fn(),
 }));
@@ -261,7 +266,11 @@ describe('Authentication flow', () => {
     await screen.findByTestId('sign-in-email');
 
     fireEvent.press(screen.getByTestId('sign-in-switch'));
-    fireEvent.changeText(await screen.findByTestId('sign-up-email'), 'new@example.com');
+    fireEvent.changeText(await screen.findByTestId('sign-up-first-name'), 'Harbir');
+    fireEvent.changeText(screen.getByTestId('sign-up-last-name'), 'Bains');
+    fireEvent.changeText(screen.getByTestId('sign-up-display-name'), 'Harbir Bains');
+    fireEvent.changeText(screen.getByTestId('sign-up-username'), 'harbirb');
+    fireEvent.changeText(screen.getByTestId('sign-up-email'), 'new@example.com');
     fireEvent.changeText(screen.getByTestId('sign-up-password'), 'password123');
     fireEvent.changeText(screen.getByTestId('sign-up-confirm-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-up-submit'));
@@ -273,13 +282,17 @@ describe('Authentication flow', () => {
     });
   });
 
-  it('shows Welcome after creating an account, then proceeds to Dashboard on Get Started', async () => {
+  it('shows Welcome after creating an account, then proceeds to Onboarding on Get Started', async () => {
     render(<App />);
     await screen.findByTestId('sign-in-email');
 
     // Create the account (this mock always requires email confirmation).
     fireEvent.press(screen.getByTestId('sign-in-switch'));
-    fireEvent.changeText(await screen.findByTestId('sign-up-email'), 'new@example.com');
+    fireEvent.changeText(await screen.findByTestId('sign-up-first-name'), 'Harbir');
+    fireEvent.changeText(screen.getByTestId('sign-up-last-name'), 'Bains');
+    fireEvent.changeText(screen.getByTestId('sign-up-display-name'), 'Harbir Bains');
+    fireEvent.changeText(screen.getByTestId('sign-up-username'), 'harbirb');
+    fireEvent.changeText(screen.getByTestId('sign-up-email'), 'new@example.com');
     fireEvent.changeText(screen.getByTestId('sign-up-password'), 'password123');
     fireEvent.changeText(screen.getByTestId('sign-up-confirm-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-up-submit'));
@@ -300,7 +313,10 @@ describe('Authentication flow', () => {
 
     fireEvent.press(screen.getByTestId('welcome-get-started'));
 
-    expect(await screen.findByTestId('dashboard-greeting')).toBeTruthy();
+    // A fresh account goes into onboarding next, not straight to Dashboard --
+    // the full step-by-step flow is covered by OnboardingScreen.test.tsx.
+    expect(await screen.findByTestId('onboarding-step-apple-health')).toBeTruthy();
+    expect(screen.queryByTestId('dashboard-greeting')).toBeNull();
   });
 
   it('signs out and returns to the sign-in screen', async () => {
@@ -445,5 +461,61 @@ describe('OAuth sign-in', () => {
         expect.objectContaining({ provider: 'apple', options: expect.any(Object) }),
       );
     });
+  });
+});
+
+describe('App-level side menu', () => {
+  async function signIn() {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+    fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
+    fireEvent.press(screen.getByTestId('sign-in-submit'));
+    await screen.findByTestId('dashboard-greeting');
+  }
+
+  it('renders as a sibling of the screen stack, not clipped inside Dashboard', async () => {
+    await signIn();
+
+    // The panel is always mounted (only its position animates), so it must
+    // be findable even before it's opened -- and, critically, it must NOT
+    // be a descendant of dashboard-screen, unlike before this fix, so that
+    // it can render above the Dashboard's own header/content/bottom nav
+    // rather than being clipped and z-index-fought by them.
+    const dashboardScreen = screen.getByTestId('dashboard-screen');
+    expect(within(dashboardScreen).queryByTestId('app-menu-panel')).toBeNull();
+    expect(screen.getByTestId('app-menu-panel')).toBeTruthy();
+  });
+
+  it('opens over the whole screen when the Dashboard hamburger button is pressed', async () => {
+    await signIn();
+
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+
+    expect(screen.getByTestId('app-menu-backdrop')).toBeTruthy();
+    expect(screen.getByTestId('app-menu-item-Dashboard').props.accessibilityState.selected).toBe(
+      true,
+    );
+  });
+
+  it('navigates to the pressed destination and closes the menu', async () => {
+    await signIn();
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+
+    fireEvent.press(screen.getByTestId('app-menu-item-Social'));
+
+    expect(await screen.findByTestId('social-scroll')).toBeTruthy();
+    expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
+  });
+
+  it('closes when the overlay/backdrop is pressed', async () => {
+    await signIn();
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+    expect(screen.getByTestId('app-menu-backdrop')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('app-menu-backdrop'));
+
+    expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
+    expect(screen.getByTestId('dashboard-greeting')).toBeTruthy();
   });
 });

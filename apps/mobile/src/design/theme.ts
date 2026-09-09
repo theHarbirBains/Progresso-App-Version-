@@ -63,6 +63,10 @@ export const fonts = {
 } as const;
 
 export const typeScale = {
+  // Largest tier, above screenTitle -- for the rare hero/large-heading
+  // moment the reference design language calls for (e.g. a completion
+  // screen), not a general replacement for screenTitle.
+  display: { fontFamily: fonts.displayHeavy, fontSize: 32 },
   screenTitle: { fontFamily: fonts.displayHeavy, fontSize: 24 },
   sectionHeading: {
     fontFamily: fonts.display,
@@ -74,6 +78,11 @@ export const typeScale = {
   statLarge: { fontFamily: fonts.monoBold, fontSize: 30 },
   statMedium: { fontFamily: fonts.mono, fontSize: 19 },
   body: { fontSize: 15 },
+  // `secondary` already covers the "bodySmall" role (fontSize 13, muted
+  // supporting text) -- intentionally not duplicated under a second name.
   secondary: { fontSize: 13 },
+  // Form-field label above an input -- distinct from sectionHeading, which
+  // is uppercase/letter-spaced for section dividers, not per-field labels.
+  label: { fontFamily: fonts.displayMedium, fontSize: 13 },
   caption: { fontFamily: fonts.displayMedium, fontSize: 11 },
 } as const;
