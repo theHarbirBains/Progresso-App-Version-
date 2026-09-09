@@ -21,6 +21,8 @@ export type RootStackParamList = {
   NutritionGoals: undefined;
   WorkoutColorSettings: undefined;
   NutritionColorSettings: undefined;
+  ProgressOverview: undefined;
+  ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
   WorkoutSplits: undefined;
   WorkoutSplitView: { splitId: string };
   WorkoutSplitForm: { splitId?: string; activateOnCreate?: boolean };
