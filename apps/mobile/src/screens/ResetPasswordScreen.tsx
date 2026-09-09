@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import { authStyles as styles } from './authStyles';
 
 // Shown when AuthProvider's status is 'passwordRecovery' — reached only via
@@ -51,7 +52,7 @@ export function ResetPasswordScreen() {
         testID="reset-password-new"
         style={styles.input}
         placeholder="New password"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         secureTextEntry
         autoComplete="password-new"
         value={password}
@@ -61,7 +62,7 @@ export function ResetPasswordScreen() {
         testID="reset-password-confirm"
         style={styles.input}
         placeholder="Confirm new password"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         secureTextEntry
         autoComplete="password-new"
         value={confirmPassword}
@@ -81,7 +82,7 @@ export function ResetPasswordScreen() {
         disabled={!canSubmit}
       >
         {submitting ? (
-          <ActivityIndicator color="#0B0B0F" />
+          <ActivityIndicator color={colors.background} />
         ) : (
           <Text style={styles.buttonText}>Update Password</Text>
         )}

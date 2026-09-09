@@ -1,6 +1,10 @@
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
-import { fetchWorkoutDetail, type SetRecord } from '../workouts/workoutQueries';
+import {
+  completedSetsOnly,
+  fetchWorkoutDetail,
+  type CompletedSetRecord,
+} from '../workouts/workoutQueries';
 
 // Pure data assembly for the workout share card. Every value here comes from
 // an existing query/definition (workoutQueries.ts, prQueries.ts,
@@ -29,8 +33,8 @@ export interface ShareCardData {
 
 const MAX_EXERCISES = 5;
 
-function heaviestSet(sets: SetRecord[]): SetRecord | null {
-  return sets.reduce<SetRecord | null>(
+function heaviestSet(sets: CompletedSetRecord[]): CompletedSetRecord | null {
+  return sets.reduce<CompletedSetRecord | null>(
     (max, s) => (!max || s.weightKg > max.weightKg ? s : max),
     null,
   );
@@ -67,7 +71,7 @@ export async function fetchShareCardData(
   const topSets = (
     await Promise.all(
       shownExercises.map(async (exercise): Promise<ShareTopSet | null> => {
-        const topSet = heaviestSet(exercise.sets);
+        const topSet = heaviestSet(completedSetsOnly(exercise.sets));
         if (!topSet) return null;
 
         const [repPRs, oneRepMax] = await Promise.all([

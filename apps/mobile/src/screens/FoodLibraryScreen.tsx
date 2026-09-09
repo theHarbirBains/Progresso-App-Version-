@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 import { logFood } from '../nutrition/foodLogQueries';
 import { calculateLogTotals } from '../nutrition/nutritionCalculations';
@@ -124,7 +125,7 @@ export function FoodLibraryScreen({ navigation }: Props) {
               testID="food-search"
               style={styles.input}
               placeholder="Search your foods"
-              placeholderTextColor="#6B6B75"
+              placeholderTextColor={colors.textMuted}
               value={searchInput}
               onChangeText={setSearchInput}
             />
@@ -144,7 +145,11 @@ export function FoodLibraryScreen({ navigation }: Props) {
             ) : null}
 
             {loading ? (
-              <ActivityIndicator testID="food-library-loading" size="large" color="#FFFFFF" />
+              <ActivityIndicator
+                testID="food-library-loading"
+                size="large"
+                color={colors.textPrimary}
+              />
             ) : null}
           </View>
         }
@@ -194,7 +199,7 @@ export function FoodLibraryScreen({ navigation }: Props) {
               disabled={loadingMore}
             >
               {loadingMore ? (
-                <ActivityIndicator color="#0B0B0F" />
+                <ActivityIndicator color={colors.background} />
               ) : (
                 <Text style={styles.createButtonText}>Load More</Text>
               )}
@@ -280,7 +285,7 @@ function LogFoodStep({ food, userId, onDone, onCancel }: LogFoodStepProps) {
         disabled={!canLog}
       >
         {saving ? (
-          <ActivityIndicator color="#0B0B0F" />
+          <ActivityIndicator color={colors.background} />
         ) : (
           <Text style={styles.buttonText}>Log Food</Text>
         )}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import { createFood, updateFood, type FoodRow } from '../nutrition/foodQueries';
 import { exerciseStyles as styles } from './exerciseStyles';
 
@@ -112,7 +113,7 @@ export function FoodFormScreen(props: Props) {
         testID="food-form-name"
         style={styles.input}
         placeholder="Food name"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         value={name}
         onChangeText={setName}
       />
@@ -122,7 +123,7 @@ export function FoodFormScreen(props: Props) {
         testID="food-form-serving-size"
         style={styles.input}
         placeholder="100"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         keyboardType="decimal-pad"
         value={servingSize}
         onChangeText={setServingSize}
@@ -133,7 +134,7 @@ export function FoodFormScreen(props: Props) {
         testID="food-form-serving-unit"
         style={styles.input}
         placeholder="g"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         value={servingUnit}
         onChangeText={setServingUnit}
       />
@@ -143,7 +144,7 @@ export function FoodFormScreen(props: Props) {
         testID="food-form-calories"
         style={styles.input}
         placeholder="0"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         keyboardType="decimal-pad"
         value={calories}
         onChangeText={setCalories}
@@ -154,7 +155,7 @@ export function FoodFormScreen(props: Props) {
         testID="food-form-protein"
         style={styles.input}
         placeholder="0"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         keyboardType="decimal-pad"
         value={proteinG}
         onChangeText={setProteinG}
@@ -165,7 +166,7 @@ export function FoodFormScreen(props: Props) {
         testID="food-form-carbs"
         style={styles.input}
         placeholder="0"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         keyboardType="decimal-pad"
         value={carbsG}
         onChangeText={setCarbsG}
@@ -176,7 +177,7 @@ export function FoodFormScreen(props: Props) {
         testID="food-form-fat"
         style={styles.input}
         placeholder="0"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         keyboardType="decimal-pad"
         value={fatG}
         onChangeText={setFatG}
@@ -195,7 +196,7 @@ export function FoodFormScreen(props: Props) {
         disabled={!canSave}
       >
         {saving ? (
-          <ActivityIndicator color="#0B0B0F" />
+          <ActivityIndicator color={colors.background} />
         ) : (
           <Text style={styles.buttonText}>Save</Text>
         )}

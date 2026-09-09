@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
 import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -82,7 +83,7 @@ export function PRHistoryScreen({ route, navigation }: Props) {
       ) : null}
 
       {loading ? (
-        <ActivityIndicator testID="pr-history-loading" size="large" color="#FFFFFF" />
+        <ActivityIndicator testID="pr-history-loading" size="large" color={colors.textPrimary} />
       ) : (
         <>
           <TouchableOpacity

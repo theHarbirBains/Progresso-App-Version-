@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import { authStyles as styles } from './authStyles';
 
 interface Props {
@@ -53,7 +54,7 @@ export function ForgotPasswordScreen({ onBackToSignIn }: Props) {
         testID="forgot-password-email"
         style={styles.input}
         placeholder="Email"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -74,7 +75,7 @@ export function ForgotPasswordScreen({ onBackToSignIn }: Props) {
         disabled={!canSubmit}
       >
         {submitting ? (
-          <ActivityIndicator color="#0B0B0F" />
+          <ActivityIndicator color={colors.background} />
         ) : (
           <Text style={styles.buttonText}>Send Reset Link</Text>
         )}

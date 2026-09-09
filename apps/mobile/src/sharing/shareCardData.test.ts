@@ -4,6 +4,8 @@ import { fetchShareCardData } from './shareCardData';
 
 jest.mock('../workouts/workoutQueries', () => ({
   fetchWorkoutDetail: jest.fn(),
+  // Real (pure, no supabase dependency) implementation.
+  ...jest.requireActual('../workouts/setCompletion'),
 }));
 
 jest.mock('../workouts/prQueries', () => ({

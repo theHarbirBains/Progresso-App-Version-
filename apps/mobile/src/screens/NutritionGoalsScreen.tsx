@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 import {
   fetchNutritionGoals,
@@ -96,7 +97,11 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator testID="nutrition-goals-loading" size="large" color="#FFFFFF" />
+        <ActivityIndicator
+          testID="nutrition-goals-loading"
+          size="large"
+          color={colors.textPrimary}
+        />
       </View>
     );
   }
@@ -115,7 +120,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         testID="goal-calories"
         style={styles.input}
         placeholder="Optional"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         keyboardType="number-pad"
         value={caloriesInput}
         onChangeText={setCaloriesInput}
@@ -126,7 +131,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         testID="goal-protein"
         style={styles.input}
         placeholder="Optional"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         keyboardType="decimal-pad"
         value={proteinInput}
         onChangeText={setProteinInput}
@@ -137,7 +142,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         testID="goal-carbs"
         style={styles.input}
         placeholder="Optional"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         keyboardType="decimal-pad"
         value={carbsInput}
         onChangeText={setCarbsInput}
@@ -148,7 +153,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         testID="goal-fat"
         style={styles.input}
         placeholder="Optional"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         keyboardType="decimal-pad"
         value={fatInput}
         onChangeText={setFatInput}
@@ -172,7 +177,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         disabled={saving}
       >
         {saving ? (
-          <ActivityIndicator color="#0B0B0F" />
+          <ActivityIndicator color={colors.background} />
         ) : (
           <Text style={styles.buttonText}>Save</Text>
         )}

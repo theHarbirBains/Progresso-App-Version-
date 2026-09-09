@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { LineChart } from '../charts/LineChart';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
 import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -120,7 +121,11 @@ export function ExerciseProgressScreen({ route, navigation }: Props) {
       ) : null}
 
       {loading ? (
-        <ActivityIndicator testID="exercise-progress-loading" size="large" color="#FFFFFF" />
+        <ActivityIndicator
+          testID="exercise-progress-loading"
+          size="large"
+          color={colors.textPrimary}
+        />
       ) : (
         <>
           <View style={styles.chipRow}>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import { authStyles as styles } from './authStyles';
 
 interface Props {
@@ -49,7 +50,7 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
         testID="sign-in-email"
         style={styles.input}
         placeholder="Email"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -60,7 +61,7 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
         testID="sign-in-password"
         style={styles.input}
         placeholder="Password"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         secureTextEntry
         autoComplete="password"
         value={password}
@@ -80,7 +81,7 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
         disabled={!canSubmit}
       >
         {submitting ? (
-          <ActivityIndicator color="#0B0B0F" />
+          <ActivityIndicator color={colors.background} />
         ) : (
           <Text style={styles.buttonText}>Sign In</Text>
         )}
@@ -99,7 +100,7 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
         disabled={oauthDisabled}
       >
         {oauthSubmitting === 'google' ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color={colors.textPrimary} />
         ) : (
           <Text style={styles.oauthButtonText}>Continue with Google</Text>
         )}
@@ -112,7 +113,7 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
         disabled={oauthDisabled}
       >
         {oauthSubmitting === 'apple' ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color={colors.textPrimary} />
         ) : (
           <Text style={styles.oauthButtonText}>Continue with Apple</Text>
         )}

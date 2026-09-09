@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors } from '../design/theme';
 import { welcomeStyles as styles } from './welcomeStyles';
 
 const logo = require('../../assets/progresso-mark.png');
@@ -74,7 +75,7 @@ export function WelcomeScreen({ onGetStarted }: Props) {
           {FEATURES.map((feature) => (
             <View key={feature.icon} style={styles.featureRow}>
               <View style={styles.featureIcon}>
-                <Feather name={feature.icon} size={18} color="#FFFFFF" />
+                <Feather name={feature.icon} size={18} color={colors.textPrimary} />
               </View>
               <Text style={styles.featureText}>{feature.text}</Text>
             </View>

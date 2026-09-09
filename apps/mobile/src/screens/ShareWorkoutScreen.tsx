@@ -4,6 +4,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
 import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -136,7 +137,7 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={[styles.screen, styles.centered]}>
-        <ActivityIndicator testID="share-workout-loading" size="large" color="#FFFFFF" />
+        <ActivityIndicator testID="share-workout-loading" size="large" color={colors.textPrimary} />
       </View>
     );
   }

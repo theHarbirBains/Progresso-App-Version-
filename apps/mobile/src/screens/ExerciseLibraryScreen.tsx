@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import {
   fetchExercises,
   type ExerciseRow,
@@ -130,7 +131,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
               testID="exercise-search"
               style={styles.input}
               placeholder="Search exercises"
-              placeholderTextColor="#6B6B75"
+              placeholderTextColor={colors.textMuted}
               value={searchInput}
               onChangeText={setSearchInput}
             />
@@ -172,7 +173,11 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
             ) : null}
 
             {loading ? (
-              <ActivityIndicator testID="exercise-library-loading" size="large" color="#FFFFFF" />
+              <ActivityIndicator
+                testID="exercise-library-loading"
+                size="large"
+                color={colors.textPrimary}
+              />
             ) : null}
           </View>
         }
@@ -205,7 +210,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
               disabled={loadingMore}
             >
               {loadingMore ? (
-                <ActivityIndicator color="#0B0B0F" />
+                <ActivityIndicator color={colors.background} />
               ) : (
                 <Text style={styles.createButtonText}>Load More</Text>
               )}

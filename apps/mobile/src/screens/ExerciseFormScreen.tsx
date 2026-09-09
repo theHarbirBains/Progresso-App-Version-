@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
 import type { MuscleGroup } from '../exercises/muscleGroups';
@@ -81,7 +82,7 @@ export function ExerciseFormScreen(props: Props) {
         testID="exercise-form-name"
         style={styles.input}
         placeholder="Exercise name"
-        placeholderTextColor="#6B6B75"
+        placeholderTextColor={colors.textMuted}
         value={name}
         onChangeText={setName}
       />
@@ -102,7 +103,7 @@ export function ExerciseFormScreen(props: Props) {
         disabled={!canSave}
       >
         {saving ? (
-          <ActivityIndicator color="#0B0B0F" />
+          <ActivityIndicator color={colors.background} />
         ) : (
           <Text style={styles.buttonText}>Save</Text>
         )}

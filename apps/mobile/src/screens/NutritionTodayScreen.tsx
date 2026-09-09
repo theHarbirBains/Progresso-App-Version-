@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 import {
   deleteFoodLog,
@@ -91,7 +92,11 @@ export function NutritionTodayScreen({ navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator testID="nutrition-today-loading" size="large" color="#FFFFFF" />
+        <ActivityIndicator
+          testID="nutrition-today-loading"
+          size="large"
+          color={colors.textPrimary}
+        />
       </View>
     );
   }
