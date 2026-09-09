@@ -17,3 +17,13 @@ jest.mock('expo-font', () => ({
   loadAsync: jest.fn().mockResolvedValue(undefined),
   isLoaded: () => true,
 }));
+
+// Expo's SDK 57 "winter" runtime installs global.fetch as a lazy getter
+// that, on first access, requires a real native module (ExpoFetchModule)
+// with no jest-expo auto-mock -- so merely *reading* global.fetch (e.g.
+// api.test.ts capturing it to restore later) crashes. Assigning a plain
+// function here -- never reading the getter first -- replaces it with an
+// ordinary property so nothing ever tries to reach the native module.
+// Nothing in this suite relies on a real network fetch; every test that
+// cares mocks global.fetch itself.
+global.fetch = jest.fn();

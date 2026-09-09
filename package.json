@@ -10,16 +10,8 @@
     "node": ">=22.0.0"
   },
   "overrides": {
-    "react": "19.1.0",
-    "react-test-renderer": "19.1.0",
-    "jest@30.4.0": {
-      "jest-mock": "30.4.0",
-      "jest-runtime": "30.4.0",
-      "jest-resolve": "30.4.0",
-      "@jest/environment": "30.4.0",
-      "@jest/fake-timers": "30.4.0",
-      "@jest/globals": "30.4.0"
-    }
+    "react": "19.2.3",
+    "react-test-renderer": "19.2.3"
   },
   "scripts": {
     "lint": "eslint .",
@@ -45,5 +37,8 @@
     "supabase": "^2.115.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.0.0"
+  },
+  "dependencies": {
+    "expo-dev-client": "~6.0.21"
   }
 }

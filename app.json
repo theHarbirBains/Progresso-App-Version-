@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "6bf7f35b-5df8-4348-8d93-ebb1d81cb759"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.harbirbains.progresso",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
