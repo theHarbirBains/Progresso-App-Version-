@@ -6,6 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 // gain from a stack navigator.
 export type RootStackParamList = {
   Dashboard: undefined;
+  Onboarding: undefined;
   AccountSettings: undefined;
   ExerciseLibrary: undefined;
   WorkoutHistory: undefined;

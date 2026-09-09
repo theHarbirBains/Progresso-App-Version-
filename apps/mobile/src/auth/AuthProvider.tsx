@@ -19,6 +19,8 @@ export interface SignUpResult {
   error: string | null;
   /** True when the project requires email confirmation before a session is issued. */
   requiresEmailConfirmation: boolean;
+  /** Null whenever requiresEmailConfirmation is true (or signup failed) -- there is no session yet to get a token from. */
+  accessToken: string | null;
 }
 
 export interface AuthContextValue {
@@ -112,6 +114,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return {
           error: error?.message ?? null,
           requiresEmailConfirmation: !error && !data.session,
+          // Returned directly from this call's own response rather than
+          // read back from context's `session` state, which updates via a
+          // separate onAuthStateChange listener and isn't guaranteed to
+          // have landed yet by the time this promise resolves -- a caller
+          // that needs to write profile fields immediately after signup
+          // (e.g. SignUpScreen) needs a token it can trust is current,
+          // not a possibly-stale read.
+          accessToken: data.session?.access_token ?? null,
         };
       },
       signOut: async () => {
