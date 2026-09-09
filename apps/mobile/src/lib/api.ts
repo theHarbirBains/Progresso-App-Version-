@@ -27,6 +27,7 @@ export interface ProfileResponse {
   weightUnit: 'kg' | 'lb';
   workoutAccentColor: string | null;
   nutritionAccentColor: string | null;
+  activeWorkoutSplitId: string | null;
   gender: Gender | null;
   birthday: string | null;
   weightValue: number | null;
@@ -48,6 +49,7 @@ export interface UpdateProfileInput {
   weightUnit?: 'kg' | 'lb';
   workoutAccentColor?: string;
   nutritionAccentColor?: string;
+  activeWorkoutSplitId?: string;
   gender?: Gender;
   birthday?: string;
   weightValue?: number;

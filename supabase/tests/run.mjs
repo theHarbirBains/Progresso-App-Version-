@@ -796,6 +796,269 @@ async function main() {
     /violates check constraint/i,
   );
 
+  console.log('\nRunning workout split tests...\n');
+
+  const splitA = await asUserCommitted(userA, async (client) => {
+    const res = await client.query(
+      "insert into public.workout_splits (user_id, name) values ($1, 'PPL - Hypertrophy') returning id",
+      [userA],
+    );
+    return res.rows[0];
+  });
+
+  const pushDay = await asUserCommitted(userA, async (client) => {
+    const res = await client.query(
+      'insert into public.workout_split_days (workout_split_id, name, order_index) values ($1, $2, 1) returning id',
+      [splitA.id, 'Push'],
+    );
+    return res.rows[0];
+  });
+
+  await asUserCommitted(userA, (client) =>
+    client.query(
+      "insert into public.workout_split_day_muscle_groups (workout_split_day_id, muscle_group) values ($1, 'chest'), ($1, 'shoulders'), ($1, 'triceps')",
+      [pushDay.id],
+    ),
+  );
+
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      'select muscle_group from public.workout_split_day_muscle_groups where workout_split_day_id = $1 order by muscle_group',
+      [pushDay.id],
+    );
+    const passed = res.rows.map((r) => r.muscle_group).join(',') === 'chest,shoulders,triceps';
+    record(
+      "User A can create a split with a day and that day's muscle groups",
+      passed,
+      passed ? undefined : `got ${JSON.stringify(res.rows)}`,
+    );
+  });
+
+  // split_muscle_group is deliberately a small, general vocabulary (Chest/
+  // Back/Shoulders/Biceps/Triceps/Forearms/Abs/Quads/Hamstrings/Glutes/
+  // Calves -- legs deliberately split into 4 specific categories rather
+  // than one general "legs") -- prove both that every remaining value is
+  // accepted and that an old, no-longer-valid value (a finer-grained value
+  // from before the general-vocabulary migration, and the interim general
+  // "legs" value from before it was split back out) is rejected.
+  await asUserCommitted(userA, (client) =>
+    client.query(
+      `insert into public.workout_split_day_muscle_groups (workout_split_day_id, muscle_group)
+       values ($1, 'back'), ($1, 'biceps'), ($1, 'forearms'), ($1, 'abs'),
+              ($1, 'quads'), ($1, 'hamstrings'), ($1, 'glutes'), ($1, 'calves')`,
+      [pushDay.id],
+    ),
+  );
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      'select count(*)::int as count from public.workout_split_day_muscle_groups where workout_split_day_id = $1',
+      [pushDay.id],
+    );
+    record(
+      'Every general split_muscle_group value is accepted (full 11-value enum coverage)',
+      res.rows[0]?.count === 11,
+      `got ${res.rows[0]?.count}`,
+    );
+  });
+
+  await expectThrows(
+    asUser(userA, (client) =>
+      client.query(
+        "insert into public.workout_split_day_muscle_groups (workout_split_day_id, muscle_group) values ($1, 'front_delts')",
+        [pushDay.id],
+      ),
+    ),
+    "The old, finer-grained 'front_delts' value is no longer valid for split_muscle_group",
+    /invalid input value for enum/i,
+  );
+
+  await expectThrows(
+    asUser(userA, (client) =>
+      client.query(
+        "insert into public.workout_split_day_muscle_groups (workout_split_day_id, muscle_group) values ($1, 'legs')",
+        [pushDay.id],
+      ),
+    ),
+    "The interim general 'legs' value is no longer valid now that it's split into specific categories",
+    /invalid input value for enum/i,
+  );
+
+  await asUser(userA, async (client) => {
+    const res = await client.query('select user_id from public.workout_split_days where id = $1', [
+      pushDay.id,
+    ]);
+    record(
+      "A split day's user_id is auto-derived from its parent split, not left null",
+      res.rows[0]?.user_id === userA,
+      `got ${res.rows[0]?.user_id}`,
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    expectRowCount(
+      await client.query('select id from public.workout_splits where id = $1', [splitA.id]),
+      0,
+      "User B cannot see User A's workout split",
+    );
+    expectRowCount(
+      await client.query('select id from public.workout_split_days where id = $1', [pushDay.id]),
+      0,
+      "User B cannot see User A's split day",
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const upd = await client.query(
+      "update public.workout_splits set name = 'hacked' where id = $1",
+      [splitA.id],
+    );
+    record(
+      "User B cannot rename User A's workout split via UPDATE",
+      upd.rowCount === 0,
+      `rowCount=${upd.rowCount}`,
+    );
+  });
+
+  await expectThrows(
+    asUser(userB, (client) =>
+      client.query(
+        'insert into public.workout_split_days (workout_split_id, name, order_index) values ($1, $2, 99)',
+        [splitA.id, 'Hacked Day'],
+      ),
+    ),
+    "User B cannot attach a day to User A's split",
+    RLS_ERROR,
+  );
+
+  await asUserCommitted(userA, (client) =>
+    client.query('update public.users set active_workout_split_id = $1 where id = $2', [
+      splitA.id,
+      userA,
+    ]),
+  );
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      'select active_workout_split_id from public.users where id = $1',
+      [userA],
+    );
+    record(
+      'User A can set their own active workout split',
+      res.rows[0]?.active_workout_split_id === splitA.id,
+      `got ${res.rows[0]?.active_workout_split_id}`,
+    );
+  });
+
+  // User B can update their own users row (RLS allows id = auth.uid()), but
+  // cannot point active_workout_split_id at User A's split -- the
+  // owner-mismatch guard trigger nulls the spoofed reference out.
+  await asUserCommitted(userB, (client) =>
+    client.query('update public.users set active_workout_split_id = $1 where id = $2', [
+      splitA.id,
+      userB,
+    ]),
+  );
+  await asUser(userB, async (client) => {
+    const res = await client.query(
+      'select active_workout_split_id from public.users where id = $1',
+      [userB],
+    );
+    record(
+      "User B cannot set their active split to User A's split (owner-mismatch guard nulls it)",
+      res.rows[0]?.active_workout_split_id === null,
+      `got ${res.rows[0]?.active_workout_split_id}`,
+    );
+  });
+
+  // Tag fixtureA's own workout with pushDay -- a legitimate same-user tag.
+  await asUserCommitted(userA, (client) =>
+    client.query('update public.workouts set workout_split_day_id = $1 where id = $2', [
+      pushDay.id,
+      fixtureA.workoutId,
+    ]),
+  );
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      'select workout_split_day_id from public.workouts where id = $1',
+      [fixtureA.workoutId],
+    );
+    record(
+      'User A can tag their own workout with their own split day',
+      res.rows[0]?.workout_split_day_id === pushDay.id,
+      `got ${res.rows[0]?.workout_split_day_id}`,
+    );
+  });
+
+  // User B cannot tag their own workout with User A's split day -- even
+  // though B owns the workout row (so RLS alone would allow the UPDATE),
+  // the owner-mismatch guard trigger nulls the spoofed reference out.
+  await asUserCommitted(userB, (client) =>
+    client.query('update public.workouts set workout_split_day_id = $1 where id = $2', [
+      pushDay.id,
+      fixtureB.workoutId,
+    ]),
+  );
+  await asUser(userB, async (client) => {
+    const res = await client.query(
+      'select workout_split_day_id from public.workouts where id = $1',
+      [fixtureB.workoutId],
+    );
+    record(
+      "User B cannot tag their workout with User A's split day (owner-mismatch guard nulls it)",
+      res.rows[0]?.workout_split_day_id === null,
+      `got ${res.rows[0]?.workout_split_day_id}`,
+    );
+  });
+
+  await expectThrows(
+    asUser(userA, (client) =>
+      client.query(
+        "insert into public.workout_split_day_muscle_groups (workout_split_day_id, muscle_group) values ($1, 'not_a_real_group')",
+        [pushDay.id],
+      ),
+    ),
+    'An invalid muscle group is rejected by the enum type',
+    /invalid input value for enum/i,
+  );
+
+  // Deleting the split cascades to its days/muscle groups and clears
+  // dependent references rather than blocking the delete.
+  await asUserCommitted(userA, (client) =>
+    client.query('delete from public.workout_splits where id = $1', [splitA.id]),
+  );
+  await asUser(userA, async (client) => {
+    expectRowCount(
+      await client.query('select id from public.workout_split_days where id = $1', [pushDay.id]),
+      0,
+      'Deleting a split cascades to its days',
+    );
+    expectRowCount(
+      await client.query(
+        'select id from public.workout_split_day_muscle_groups where workout_split_day_id = $1',
+        [pushDay.id],
+      ),
+      0,
+      "Deleting a split cascades to its days' muscle groups",
+    );
+    const userRow = await client.query(
+      'select active_workout_split_id from public.users where id = $1',
+      [userA],
+    );
+    record(
+      "Deleting the active split clears the user's active_workout_split_id rather than blocking",
+      userRow.rows[0]?.active_workout_split_id === null,
+      `got ${userRow.rows[0]?.active_workout_split_id}`,
+    );
+    const workoutRow = await client.query(
+      'select workout_split_day_id from public.workouts where id = $1',
+      [fixtureA.workoutId],
+    );
+    record(
+      "Deleting the split day clears the workout's workout_split_day_id rather than blocking",
+      workoutRow.rows[0]?.workout_split_day_id === null,
+      `got ${workoutRow.rows[0]?.workout_split_day_id}`,
+    );
+  });
+
   console.log('\nRunning historical-integrity tests...\n');
 
   await admin.query('begin');

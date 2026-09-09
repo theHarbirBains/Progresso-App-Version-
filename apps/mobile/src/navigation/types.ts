@@ -21,6 +21,10 @@ export type RootStackParamList = {
   NutritionGoals: undefined;
   WorkoutColorSettings: undefined;
   NutritionColorSettings: undefined;
+  WorkoutSplits: undefined;
+  WorkoutSplitView: { splitId: string };
+  WorkoutSplitForm: { splitId?: string; activateOnCreate?: boolean };
+  ChooseWorkoutSplit: undefined;
 };
 
 export type RootStackScreenProps<Screen extends keyof RootStackParamList> = NativeStackScreenProps<
