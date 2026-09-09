@@ -10,6 +10,9 @@ jest.mock('../workouts/workoutQueries', () => ({
   fetchWorkoutHistory: jest.fn(),
   fetchWorkoutDetail: jest.fn(),
   fetchPreviousPerformance: jest.fn(),
+  // Real (pure, no supabase dependency) implementation -- not itself under
+  // test here, just needed so recentWorkoutInfo.ts's own filtering works.
+  ...jest.requireActual('../workouts/setCompletion'),
 }));
 
 jest.mock('../workouts/prQueries', () => ({

@@ -1,9 +1,11 @@
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import {
+  completedSetsOnly,
   fetchPreviousPerformance,
   fetchWorkoutDetail,
   fetchWorkoutHistory,
+  type CompletedSetRecord,
   type SetRecord,
   type WorkoutSummary,
 } from '../workouts/workoutQueries';
@@ -30,8 +32,8 @@ export interface RecentWorkoutInfo {
   prLabel: string | null;
 }
 
-function heaviestSet(sets: SetRecord[]): SetRecord | null {
-  return sets.reduce<SetRecord | null>(
+function heaviestSet(sets: CompletedSetRecord[]): CompletedSetRecord | null {
+  return sets.reduce<CompletedSetRecord | null>(
     (max, s) => (!max || s.weightKg > max.weightKg ? s : max),
     null,
   );
@@ -57,9 +59,9 @@ export async function fetchRecentWorkoutInfo(userId: string): Promise<RecentWork
 
   let topExerciseId: string | null = null;
   let topExerciseName: string | null = null;
-  let topSet: SetRecord | null = null;
+  let topSet: CompletedSetRecord | null = null;
   for (const exercise of detail.exercises) {
-    const candidate = heaviestSet(exercise.sets);
+    const candidate = heaviestSet(completedSetsOnly(exercise.sets));
     if (candidate && (!topSet || candidate.weightKg > topSet.weightKg)) {
       topSet = candidate;
       topExerciseId = exercise.exerciseId;

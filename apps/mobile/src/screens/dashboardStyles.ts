@@ -8,11 +8,46 @@ import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 // segmented layout, still on the existing "Dark + Electric" tokens below --
 // no new palette introduced.
 export const dashboardStyles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+
+  // Fixed header: the brand row + mode toggle, pinned above the scrolling
+  // content. Same background as the screen so it reads as part of the
+  // Dashboard rather than a floating overlay (per the approved requirement).
+  fixedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.xxl,
+    paddingBottom: spacing.md,
+    zIndex: 10,
+    elevation: 10,
+  },
+
+  // The ScrollView itself fills the screen; scrollContent's paddingTop/
+  // paddingBottom (set from measured fixedHeader/bottomBar heights in
+  // DashboardScreen) keep real content from ever landing underneath them.
+  scrollArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: spacing.xxl,
+  },
+
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
+  },
+  topBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   brandRow: {
     flexDirection: 'row',
@@ -58,16 +93,21 @@ export const dashboardStyles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: radii.md,
   },
-  modeSegmentActive: {
-    backgroundColor: colors.accent,
+  // Absolute-filled behind the segment's icon/text; its opacity is animated
+  // between 0 and 1 (per mode theme) to crossfade the active highlight
+  // smoothly instead of snapping between modes. See DashboardScreen.tsx.
+  modeSegmentFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: radii.md,
   },
   modeSegmentText: {
     color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '700',
-  },
-  modeSegmentTextActive: {
-    color: colors.onAccent,
   },
 
   greetingRow: {
@@ -83,11 +123,6 @@ export const dashboardStyles = StyleSheet.create({
   greeting: {
     ...typeScale.screenTitle,
     color: colors.textPrimary,
-  },
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginTop: 2,
   },
   avatar: {
     width: 44,
@@ -118,8 +153,9 @@ export const dashboardStyles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
+  // color is supplied per-render by the active mode theme (see
+  // DashboardScreen.tsx).
   viewAllText: {
-    color: colors.accent,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -159,6 +195,54 @@ export const dashboardStyles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
+  },
+
+  // Dynamic Next Workout card -- driven by the user's active workout split
+  // and history (see workouts/nextWorkout.ts), never a hardcoded day.
+  nextWorkoutEyebrow: {
+    ...typeScale.sectionHeading,
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+  },
+  nextWorkoutDayName: {
+    ...typeScale.screenTitle,
+    color: colors.textPrimary,
+  },
+  nextWorkoutSplitName: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: 2,
+    marginBottom: spacing.sm,
+  },
+  nextWorkoutMessage: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginBottom: spacing.lg,
+  },
+  nextWorkoutVisualization: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  nextWorkoutButton: {
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md + 2,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  nextWorkoutButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  nextWorkoutSecondaryButton: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  nextWorkoutSecondaryButtonText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 
   // 2-column stat grid -- empty-state placeholders only (no aggregation
@@ -233,9 +317,10 @@ export const dashboardStyles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 4,
   },
+  // color is supplied per-render by the active mode theme (see
+  // DashboardScreen.tsx).
   listRowValue: {
     fontFamily: fonts.monoBold,
-    color: colors.accent,
     fontSize: 15,
   },
 
@@ -250,9 +335,10 @@ export const dashboardStyles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 15,
   },
+  // color is supplied per-render by the active mode theme (see
+  // DashboardScreen.tsx).
   topSetValue: {
     fontFamily: fonts.monoBold,
-    color: colors.accent,
     fontSize: 17,
   },
   insight: {
@@ -330,10 +416,11 @@ export const dashboardStyles = StyleSheet.create({
     backgroundColor: colors.surfaceRaised,
     overflow: 'hidden',
   },
+  // backgroundColor is supplied per-render by the active mode theme (see
+  // MacroCard in DashboardScreen.tsx), not set here.
   macroBarFill: {
     height: '100%',
     borderRadius: 3,
-    backgroundColor: colors.accent,
   },
 
   // Quick actions -- visual only, no functionality this task.
@@ -384,10 +471,11 @@ export const dashboardStyles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: spacing.md,
   },
+  // backgroundColor is supplied per-render by the active mode theme (see
+  // DashboardScreen.tsx).
   goalsProgressFill: {
     height: '100%',
     borderRadius: 4,
-    backgroundColor: colors.accent,
   },
 
   footer: {
@@ -397,8 +485,14 @@ export const dashboardStyles = StyleSheet.create({
 
   // Decorative bottom bar -- Progresso has no real tab navigator today, so
   // this is a purely visual row local to this screen, not new navigation
-  // architecture. See DashboardScreen.tsx's own note for detail.
+  // architecture. See DashboardScreen.tsx's own note for detail. Fixed to
+  // the bottom of the screen (position/zIndex below) so it stays visible
+  // through scrolling, same as the fixed header above.
   bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
@@ -406,6 +500,8 @@ export const dashboardStyles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingTop: spacing.sm,
+    zIndex: 10,
+    elevation: 10,
   },
   bottomBarItem: {
     alignItems: 'center',
@@ -421,9 +517,19 @@ export const dashboardStyles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: radii.pill,
-    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -20,
+  },
+  // Two of these are stacked behind bottomBarCenter's icon, one per mode
+  // theme; their opacity crossfades on mode switch (see DashboardScreen.tsx)
+  // so the accent transitions smoothly instead of snapping.
+  bottomBarCenterFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: radii.pill,
   },
 });
