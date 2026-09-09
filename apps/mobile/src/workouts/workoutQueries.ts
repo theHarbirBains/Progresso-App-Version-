@@ -13,6 +13,7 @@ export interface WorkoutSummary {
   name: string;
   performedAt: string;
   completedAt: string | null;
+  workoutSplitDayId: string | null;
 }
 
 export interface SetRecord {
@@ -42,19 +43,21 @@ function toWorkoutSummary(row: {
   name: string;
   performed_at: string;
   completed_at: string | null;
+  workout_split_day_id: string | null;
 }): WorkoutSummary {
   return {
     id: row.id,
     name: row.name,
     performedAt: row.performed_at,
     completedAt: row.completed_at,
+    workoutSplitDayId: row.workout_split_day_id,
   };
 }
 
 export async function fetchActiveWorkout(userId: string): Promise<WorkoutSummary | null> {
   const { data, error } = await supabase
     .from('workouts')
-    .select('id, name, performed_at, completed_at')
+    .select('id, name, performed_at, completed_at, workout_split_day_id')
     .eq('user_id', userId)
     .is('completed_at', null)
     .is('deleted_at', null)
@@ -79,7 +82,7 @@ export async function fetchWorkoutHistory(
 
   const { data, error } = await supabase
     .from('workouts')
-    .select('id, name, performed_at, completed_at')
+    .select('id, name, performed_at, completed_at, workout_split_day_id')
     .eq('user_id', userId)
     .not('completed_at', 'is', null)
     .is('deleted_at', null)
@@ -94,7 +97,7 @@ export async function fetchWorkoutHistory(
 export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDetail> {
   const { data: workout, error: workoutError } = await supabase
     .from('workouts')
-    .select('id, name, performed_at, completed_at')
+    .select('id, name, performed_at, completed_at, workout_split_day_id')
     .eq('id', workoutId)
     .single();
   if (workoutError) throw new Error(workoutError.message);
@@ -154,11 +157,20 @@ export type CreateWorkoutResult =
  * the caller is expected to offer to resume it instead of surfacing a raw
  * database error.
  */
-export async function createWorkout(userId: string, name: string): Promise<CreateWorkoutResult> {
+export async function createWorkout(
+  userId: string,
+  name: string,
+  workoutSplitDayId?: string,
+): Promise<CreateWorkoutResult> {
+  const insertPayload: Record<string, unknown> = { user_id: userId, name };
+  if (workoutSplitDayId !== undefined) {
+    insertPayload.workout_split_day_id = workoutSplitDayId;
+  }
+
   const { data, error } = await supabase
     .from('workouts')
-    .insert({ user_id: userId, name })
-    .select('id, name, performed_at, completed_at')
+    .insert(insertPayload)
+    .select('id, name, performed_at, completed_at, workout_split_day_id')
     .single();
 
   if (!error) {

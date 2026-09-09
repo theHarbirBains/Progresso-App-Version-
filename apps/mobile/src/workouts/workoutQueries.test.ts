@@ -253,6 +253,46 @@ describe('createWorkout', () => {
     });
   });
 
+  it('includes workout_split_day_id in the insert when a split day is given', async () => {
+    const tables = mockTables({
+      workouts: {
+        data: {
+          id: 'w1',
+          name: 'Push Day',
+          performed_at: '2026-01-01T00:00:00Z',
+          completed_at: null,
+        },
+        error: null,
+      },
+    });
+
+    await createWorkout('user-1', 'Push Day', 'day-push');
+
+    expect(tables.workouts.calls.insert[0][0]).toEqual({
+      user_id: 'user-1',
+      name: 'Push Day',
+      workout_split_day_id: 'day-push',
+    });
+  });
+
+  it('omits workout_split_day_id from the insert when no split day is given', async () => {
+    const tables = mockTables({
+      workouts: {
+        data: {
+          id: 'w1',
+          name: 'Push Day',
+          performed_at: '2026-01-01T00:00:00Z',
+          completed_at: null,
+        },
+        error: null,
+      },
+    });
+
+    await createWorkout('user-1', 'Push Day');
+
+    expect(tables.workouts.calls.insert[0][0]).toEqual({ user_id: 'user-1', name: 'Push Day' });
+  });
+
   it('returns a conflict result (not a throw) when the one-active-workout constraint is hit', async () => {
     let call = 0;
     mockFrom.mockImplementation(() => {

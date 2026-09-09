@@ -796,6 +796,77 @@ async function main() {
     /violates check constraint/i,
   );
 
+  console.log('\nRunning set completion-state tests...\n');
+
+  // Own isolated exercise, not shared with any other test's PR expectations
+  // (PRs are global per user+exercise across every workout) -- added as a
+  // second exercise onto fixtureA's existing workout rather than creating a
+  // new one, since a user can only have one active (incomplete) workout at
+  // a time (workouts_one_active_per_user) and fixtureA's is already active.
+  const pullUp = (await admin.query("select id from public.exercises where name = 'Pull-Up'"))
+    .rows[0].id;
+
+  const setCompletionFixture = await asUserCommitted(userA, async (client) => {
+    const we = (
+      await client.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 99) returning id',
+        [fixtureA.workoutId, pullUp],
+      )
+    ).rows[0];
+    return { workoutExerciseId: we.id };
+  });
+
+  let blankSetId;
+  await asUserCommitted(userA, async (client) => {
+    const blank = (
+      await client.query(
+        'insert into public.sets (workout_exercise_id, set_index) values ($1, 1) returning id, weight_kg, reps, completed_at',
+        [setCompletionFixture.workoutExerciseId],
+      )
+    ).rows[0];
+    record(
+      'A blank (planned) set can be created with no weight/reps/completed_at',
+      blank.weight_kg === null && blank.reps === null && blank.completed_at === null,
+      `got weight_kg=${blank.weight_kg} reps=${blank.reps} completed_at=${blank.completed_at}`,
+    );
+    blankSetId = blank.id;
+  });
+
+  const prBeforeCompletion = await admin.query(
+    'select 1 from public.rep_prs where user_id = $1 and exercise_id = $2',
+    [userA, pullUp],
+  );
+  record(
+    'A blank set does not create a rep PR',
+    prBeforeCompletion.rowCount === 0,
+    `got ${prBeforeCompletion.rowCount} rows`,
+  );
+
+  await asUserCommitted(userA, async (client) => {
+    const completed = (
+      await client.query(
+        `update public.sets set weight_kg = 50, reps = 8, completed_at = now()
+         where id = $1 returning weight_kg, reps, completed_at`,
+        [blankSetId],
+      )
+    ).rows[0];
+    record(
+      'Filling in weight/reps and completing a previously-blank set succeeds',
+      completed.weight_kg === '50.00' && completed.reps === 8 && completed.completed_at !== null,
+      `got weight_kg=${completed.weight_kg} reps=${completed.reps} completed_at=${completed.completed_at}`,
+    );
+  });
+
+  const prAfterCompletion = await admin.query(
+    'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 8',
+    [userA, pullUp],
+  );
+  record(
+    'Completing a set with real values now creates its rep PR',
+    prAfterCompletion.rows[0]?.best_weight_kg === '50.00',
+    `got ${prAfterCompletion.rows[0]?.best_weight_kg}`,
+  );
+
   console.log('\nRunning workout split tests...\n');
 
   const splitA = await asUserCommitted(userA, async (client) => {
