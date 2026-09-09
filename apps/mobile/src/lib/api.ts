@@ -10,12 +10,16 @@ export interface ProfileResponse {
   displayName: string | null;
   username: string | null;
   weightUnit: 'kg' | 'lb';
+  workoutAccentColor: string | null;
+  nutritionAccentColor: string | null;
 }
 
 export interface UpdateProfileInput {
   displayName?: string;
   username?: string;
   weightUnit?: 'kg' | 'lb';
+  workoutAccentColor?: string;
+  nutritionAccentColor?: string;
 }
 
 function getApiBaseUrl(): string {

@@ -18,6 +18,8 @@ export type RootStackParamList = {
   Nutrition: undefined;
   FoodLibrary: undefined;
   NutritionGoals: undefined;
+  WorkoutColorSettings: undefined;
+  NutritionColorSettings: undefined;
 };
 
 export type RootStackScreenProps<Screen extends keyof RootStackParamList> = NativeStackScreenProps<

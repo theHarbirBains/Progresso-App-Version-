@@ -256,6 +256,71 @@ async function main() {
   // later tests start from a clean, username-less state.
   await admin.query('update public.users set username = null where id = $1', [userA]);
 
+  console.log('\nRunning theme color tests...\n');
+
+  await asUserCommitted(userA, async (client) => {
+    await client.query(
+      "update public.users set workout_accent_color = '#2F80FF', nutrition_accent_color = '#10B981' where id = $1",
+      [userA],
+    );
+  });
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      'select workout_accent_color, nutrition_accent_color from public.users where id = $1',
+      [userA],
+    );
+    record(
+      'User A can set their own workout/nutrition accent colors via the existing self-update RLS policy',
+      res.rows[0]?.workout_accent_color === '#2F80FF' &&
+        res.rows[0]?.nutrition_accent_color === '#10B981',
+      `got ${JSON.stringify(res.rows[0])}`,
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const res = await client.query(
+      "update public.users set workout_accent_color = '#000000' where id = $1",
+      [userA],
+    );
+    const passed = res.rowCount === 0;
+    record(
+      "User B cannot modify User A's theme colors via UPDATE",
+      passed,
+      passed ? undefined : `rowCount=${res.rowCount}`,
+    );
+  });
+
+  await expectThrows(
+    admin.query("update public.users set workout_accent_color = 'not-a-hex' where id = $1", [
+      userA,
+    ]),
+    'An invalid workout_accent_color is rejected by the format constraint',
+    /violates check constraint/i,
+  );
+
+  await expectThrows(
+    admin.query("update public.users set nutrition_accent_color = 'blue' where id = $1", [userA]),
+    'An invalid nutrition_accent_color is rejected by the format constraint',
+    /violates check constraint/i,
+  );
+
+  await admin.query('update public.users set workout_accent_color = null where id = $1', [userA]);
+  const nullCheck = await admin.query(
+    'select workout_accent_color from public.users where id = $1',
+    [userA],
+  );
+  record(
+    'workout_accent_color can be cleared back to null (no value chosen yet)',
+    nullCheck.rows[0]?.workout_accent_color === null,
+    `got ${nullCheck.rows[0]?.workout_accent_color}`,
+  );
+
+  // Reset both to a clean, uncustomized state so later tests aren't affected.
+  await admin.query(
+    'update public.users set workout_accent_color = null, nutrition_accent_color = null where id = $1',
+    [userA],
+  );
+
   console.log('\nRunning exercise library tests...\n');
 
   const customExerciseId = await asUserCommitted(userA, async (client) => {
