@@ -4,7 +4,9 @@ This file contains the **permanent** working rules for any coding agent (Claude 
 
 ## Current Phase
 
-**Phase 0 — Foundation.** Do not implement full workout logging, nutrition logging, the final dashboard, social features, or AI features until their respective phases are reached and explicitly approved. See the roadmap in the master spec.
+**Actively developed, past Foundation.** The core loop is implemented and working end to end: accounts/onboarding, workout splits (create/edit/view/duplicate/delete + presets), live workout tracking, workout history, and Progress/PR/1RM analytics, plus a working (if simpler) nutrition-logging feature and an app-wide Settings hub. See [README.md](README.md) for the current feature list and [docs/PROGRESSO_MASTER_SPEC.md](docs/PROGRESSO_MASTER_SPEC.md) for the roadmap.
+
+Some areas remain intentionally incomplete rather than hidden — do not treat these as done: real notification delivery (only opt-in preferences exist), Change Password/Delete Account (visible but "Coming Soon"), Apple Health (preference placeholder, no HealthKit integration), Social (front-end-only shell, no backend), and the admin surface (authorization is real and tested; the admin dashboard itself is still a placeholder route). Do not implement these, AI features, or anything else beyond the current feature set until explicitly approved.
 
 ## Working Process (required for every non-trivial change)
 
