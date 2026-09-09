@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import {
   addExerciseToWorkout,
+  completedSetsOnly,
   completeWorkout,
   createSet,
   createWorkout,
@@ -9,8 +10,10 @@ import {
   fetchPreviousPerformance,
   fetchWorkoutDetail,
   fetchWorkoutHistory,
+  fetchWorkoutsForMonth,
   removeExerciseFromWorkout,
   reorderExercises,
+  type SetRecord,
   updateSet,
 } from './workoutQueries';
 
@@ -37,6 +40,8 @@ function createQueryBuilder(result: Result) {
     'not',
     'neq',
     'in',
+    'gte',
+    'lt',
     'order',
     'range',
     'limit',
@@ -149,6 +154,58 @@ describe('fetchWorkoutHistory', () => {
   });
 });
 
+describe('fetchWorkoutsForMonth', () => {
+  it('maps rows and carries through the tagged split day id', async () => {
+    const { workouts } = mockTables({
+      workouts: {
+        data: [
+          {
+            id: 'w1',
+            name: 'Push Day',
+            performed_at: '2026-09-05T00:00:00Z',
+            completed_at: '2026-09-05T01:00:00Z',
+            workout_split_day_id: 'day-push',
+          },
+        ],
+        error: null,
+      },
+    });
+
+    const result = await fetchWorkoutsForMonth('user-1', 2026, 9);
+
+    expect(result).toEqual([
+      {
+        id: 'w1',
+        name: 'Push Day',
+        performedAt: '2026-09-05T00:00:00Z',
+        completedAt: '2026-09-05T01:00:00Z',
+        workoutSplitDayId: 'day-push',
+      },
+    ]);
+    expect(workouts.calls.eq).toEqual([['user_id', 'user-1']]);
+  });
+
+  it('filters to only completed, non-deleted workouts within the given local month', async () => {
+    const { workouts } = mockTables({ workouts: { data: [], error: null } });
+
+    await fetchWorkoutsForMonth('user-1', 2026, 9);
+
+    expect(workouts.calls.not).toEqual([['completed_at', 'is', null]]);
+    expect(workouts.calls.is).toEqual([['deleted_at', null]]);
+    expect(workouts.calls.gte[0][0]).toBe('performed_at');
+    expect(workouts.calls.lt[0][0]).toBe('performed_at');
+    // The upper bound is the first instant of the following month.
+    expect(new Date(workouts.calls.gte[0][1] as string).getMonth()).toBe(8); // September, 0-indexed
+    expect(new Date(workouts.calls.lt[0][1] as string).getMonth()).toBe(9); // October
+  });
+
+  it('returns an empty array for a month with no workouts', async () => {
+    mockTables({ workouts: { data: [], error: null } });
+
+    await expect(fetchWorkoutsForMonth('user-1', 2026, 9)).resolves.toEqual([]);
+  });
+});
+
 describe('fetchWorkoutDetail', () => {
   it('assembles workout + exercises + sets into one detail object', async () => {
     mockTables({
@@ -174,8 +231,22 @@ describe('fetchWorkoutDetail', () => {
       },
       sets: {
         data: [
-          { id: 's1', workout_exercise_id: 'we1', set_index: 1, weight_kg: '100.00', reps: 5 },
-          { id: 's2', workout_exercise_id: 'we1', set_index: 2, weight_kg: '110.00', reps: 3 },
+          {
+            id: 's1',
+            workout_exercise_id: 'we1',
+            set_index: 1,
+            weight_kg: '100.00',
+            reps: 5,
+            completed_at: '2026-01-01T00:05:00Z',
+          },
+          {
+            id: 's2',
+            workout_exercise_id: 'we1',
+            set_index: 2,
+            weight_kg: null,
+            reps: null,
+            completed_at: null,
+          },
         ],
         error: null,
       },
@@ -196,8 +267,8 @@ describe('fetchWorkoutDetail', () => {
           muscleGroup: 'chest',
           orderIndex: 1,
           sets: [
-            { id: 's1', setIndex: 1, weightKg: 100, reps: 5 },
-            { id: 's2', setIndex: 2, weightKg: 110, reps: 3 },
+            { id: 's1', setIndex: 1, weightKg: 100, reps: 5, completedAt: '2026-01-01T00:05:00Z' },
+            { id: 's2', setIndex: 2, weightKg: null, reps: null, completedAt: null },
           ],
         },
       ],
@@ -395,24 +466,65 @@ describe('reorderExercises', () => {
 });
 
 describe('createSet/updateSet/deleteSet', () => {
-  it('createSet inserts and maps the result', async () => {
-    mockTables({
-      sets: { data: { id: 's1', set_index: 1, weight_kg: '100.00', reps: 5 }, error: null },
+  it('createSet inserts a blank set (no weight/reps/completed_at) and maps the result', async () => {
+    const { sets } = mockTables({
+      sets: {
+        data: { id: 's1', set_index: 1, weight_kg: null, reps: null, completed_at: null },
+        error: null,
+      },
     });
 
-    const result = await createSet('we1', 1, 100, 5);
+    const result = await createSet('we1', 1);
 
-    expect(result).toEqual({ id: 's1', setIndex: 1, weightKg: 100, reps: 5 });
+    expect(result).toEqual({
+      id: 's1',
+      setIndex: 1,
+      weightKg: null,
+      reps: null,
+      completedAt: null,
+    });
+    expect(sets.builder.insert).toHaveBeenCalledWith({ workout_exercise_id: 'we1', set_index: 1 });
   });
 
   it('updateSet only sends the provided fields', async () => {
     const { sets } = mockTables({
-      sets: { data: { id: 's1', set_index: 1, weight_kg: '105.00', reps: 5 }, error: null },
+      sets: {
+        data: { id: 's1', set_index: 1, weight_kg: '105.00', reps: 5, completed_at: null },
+        error: null,
+      },
     });
 
     await updateSet('s1', { weightKg: 105 });
 
     expect(sets.builder.update).toHaveBeenCalledWith({ weight_kg: 105 });
+  });
+
+  it('updateSet can mark a set complete by setting completedAt', async () => {
+    const { sets } = mockTables({
+      sets: {
+        data: {
+          id: 's1',
+          set_index: 1,
+          weight_kg: '100.00',
+          reps: 8,
+          completed_at: '2026-01-01T00:05:00Z',
+        },
+        error: null,
+      },
+    });
+
+    const result = await updateSet('s1', {
+      weightKg: 100,
+      reps: 8,
+      completedAt: '2026-01-01T00:05:00Z',
+    });
+
+    expect(sets.builder.update).toHaveBeenCalledWith({
+      weight_kg: 100,
+      reps: 8,
+      completed_at: '2026-01-01T00:05:00Z',
+    });
+    expect(result.completedAt).toBe('2026-01-01T00:05:00Z');
   });
 
   it('deleteSet soft-deletes via deleted_at', async () => {
@@ -445,7 +557,15 @@ describe('fetchPreviousPerformance', () => {
         error: null,
       },
       sets: {
-        data: [{ id: 's1', set_index: 1, weight_kg: '135.00', reps: 10 }],
+        data: [
+          {
+            id: 's1',
+            set_index: 1,
+            weight_kg: '135.00',
+            reps: 10,
+            completed_at: '2026-01-10T00:05:00Z',
+          },
+        ],
         error: null,
       },
     });
@@ -454,8 +574,30 @@ describe('fetchPreviousPerformance', () => {
 
     expect(result).toEqual({
       performedAt: '2026-01-10T00:00:00Z',
-      sets: [{ id: 's1', setIndex: 1, weightKg: 135, reps: 10 }],
+      sets: [
+        { id: 's1', setIndex: 1, weightKg: 135, reps: 10, completedAt: '2026-01-10T00:05:00Z' },
+      ],
     });
+  });
+
+  it('only selects already-completed sets from the previous occurrence', async () => {
+    const tables = mockTables({
+      workout_exercises: {
+        data: [
+          {
+            id: 'we1',
+            workout_id: 'w1',
+            workouts: { performed_at: '2026-01-01T00:00:00Z', deleted_at: null },
+          },
+        ],
+        error: null,
+      },
+      sets: { data: [], error: null },
+    });
+
+    await fetchPreviousPerformance('user-1', 'ex1', 'w-current');
+
+    expect(tables.sets.calls.not).toEqual([['completed_at', 'is', null]]);
   });
 
   it('ignores candidates whose workout is soft-deleted', async () => {
@@ -484,5 +626,33 @@ describe('fetchPreviousPerformance', () => {
     const result = await fetchPreviousPerformance('user-1', 'ex1', 'w-current');
 
     expect(result).toBeNull();
+  });
+});
+
+describe('completedSetsOnly', () => {
+  function makeSet(overrides: Partial<SetRecord>): SetRecord {
+    return {
+      id: 's1',
+      setIndex: 1,
+      weightKg: 100,
+      reps: 5,
+      completedAt: '2026-01-01T00:00:00Z',
+      ...overrides,
+    };
+  }
+
+  it('keeps a set with weight, reps, and completedAt all set', () => {
+    const result = completedSetsOnly([makeSet({})]);
+    expect(result).toHaveLength(1);
+  });
+
+  it('excludes a set with completedAt null', () => {
+    const result = completedSetsOnly([makeSet({ completedAt: null })]);
+    expect(result).toHaveLength(0);
+  });
+
+  it('excludes a set with null weight or reps even if completedAt is set', () => {
+    expect(completedSetsOnly([makeSet({ weightKg: null })])).toHaveLength(0);
+    expect(completedSetsOnly([makeSet({ reps: null })])).toHaveLength(0);
   });
 });

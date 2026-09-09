@@ -19,7 +19,11 @@ export interface HistoricalSet {
 /**
  * Every set ever logged for this exercise across the user's completed,
  * non-deleted workout history, chronological ascending. Excludes the
- * currently in-progress workout (if any) since it isn't finished yet.
+ * currently in-progress workout (if any) since it isn't finished yet, and
+ * excludes any individual set row that was added but never filled in/marked
+ * complete (weight_kg/reps/completed_at all null -- a "planned but not yet
+ * performed" row, see 20260907100001_set_completion_state.sql) even if the
+ * workout it belongs to was otherwise completed.
  */
 export async function fetchExerciseSetHistory(
   userId: string,
@@ -55,7 +59,8 @@ export async function fetchExerciseSetHistory(
     .from('sets')
     .select('workout_exercise_id, weight_kg, reps')
     .in('workout_exercise_id', workoutExerciseIds)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .not('completed_at', 'is', null);
   if (setsError) throw new Error(setsError.message);
 
   return (sets ?? [])

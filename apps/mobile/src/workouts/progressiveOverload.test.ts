@@ -7,7 +7,11 @@ import type { SetRecord } from './workoutQueries';
 const fmt = (kg: number) => `${kg}kg`;
 
 function set(id: string, weightKg: number, reps: number): SetRecord {
-  return { id, setIndex: 1, weightKg, reps };
+  return { id, setIndex: 1, weightKg, reps, completedAt: '2026-01-01T00:00:00Z' };
+}
+
+function blankSet(id: string): SetRecord {
+  return { id, setIndex: 2, weightKg: null, reps: null, completedAt: null };
 }
 
 describe('compareToPrevious', () => {
@@ -55,5 +59,15 @@ describe('compareToPrevious', () => {
     const current = [set('c1', 90, 10), set('c2', 120, 5)];
     const result = compareToPrevious(current, [set('p1', 100, 5)], fmt);
     expect(result).toEqual({ message: '+20kg at 5 reps' });
+  });
+
+  it('ignores a blank/incomplete set when picking the current top set', () => {
+    const current = [set('c1', 100, 8), blankSet('c2')];
+    const result = compareToPrevious(current, [set('p1', 90, 8)], fmt);
+    expect(result).toEqual({ message: '+10kg at 8 reps' });
+  });
+
+  it('returns null when every current set is blank/incomplete', () => {
+    expect(compareToPrevious([blankSet('c1')], [set('p1', 100, 8)], fmt)).toBeNull();
   });
 });

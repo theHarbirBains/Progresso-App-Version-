@@ -1,3 +1,4 @@
+import { completedSetsOnly, type CompletedSetRecord } from './setCompletion';
 import type { SetRecord } from './workoutQueries';
 
 // Deterministic, explainable comparisons only -- no estimated 1RM formulas,
@@ -10,8 +11,8 @@ export interface ProgressiveOverloadInsight {
   message: string;
 }
 
-function heaviestSet(sets: SetRecord[]): SetRecord | null {
-  return sets.reduce<SetRecord | null>(
+function heaviestSet(sets: CompletedSetRecord[]): CompletedSetRecord | null {
+  return sets.reduce<CompletedSetRecord | null>(
     (max, s) => (!max || s.weightKg > max.weightKg ? s : max),
     null,
   );
@@ -30,8 +31,8 @@ export function compareToPrevious(
   previousSets: SetRecord[],
   formatWeight: (kg: number) => string,
 ): ProgressiveOverloadInsight | null {
-  const currentTop = heaviestSet(currentSets);
-  const previousTop = heaviestSet(previousSets);
+  const currentTop = heaviestSet(completedSetsOnly(currentSets));
+  const previousTop = heaviestSet(completedSetsOnly(previousSets));
   if (!currentTop || !previousTop) return null;
 
   if (currentTop.weightKg > previousTop.weightKg) {

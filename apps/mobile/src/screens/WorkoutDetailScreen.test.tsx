@@ -15,6 +15,8 @@ jest.mock('../lib/api', () => ({
 
 jest.mock('../workouts/workoutQueries', () => ({
   fetchWorkoutDetail: jest.fn(),
+  // Real (pure, no supabase dependency) implementation.
+  ...jest.requireActual('../workouts/setCompletion'),
 }));
 
 jest.mock('../workouts/prQueries', () => ({
@@ -47,8 +49,8 @@ const workout = {
       muscleGroup: 'chest' as const,
       orderIndex: 1,
       sets: [
-        { id: 's1', setIndex: 1, weightKg: 100, reps: 10 },
-        { id: 's2', setIndex: 2, weightKg: 110, reps: 8 },
+        { id: 's1', setIndex: 1, weightKg: 100, reps: 10, completedAt: '2026-01-01T12:05:00Z' },
+        { id: 's2', setIndex: 2, weightKg: 110, reps: 8, completedAt: '2026-01-01T12:10:00Z' },
       ],
     },
   ],
@@ -88,6 +90,26 @@ describe('WorkoutDetailScreen', () => {
     render(<WorkoutDetailScreen navigation={navigation} route={route} />);
 
     expect(await screen.findByTestId('top-set-we1')).toHaveTextContent('Top set: 110kg×8');
+  });
+
+  it('excludes a blank/incomplete set from the top set and the set list', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...workout,
+      exercises: [
+        {
+          ...workout.exercises[0],
+          sets: [
+            ...workout.exercises[0].sets,
+            { id: 's3', setIndex: 3, weightKg: 999, reps: 99, completedAt: null },
+          ],
+        },
+      ],
+    });
+
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+
+    expect(await screen.findByTestId('top-set-we1')).toHaveTextContent('Top set: 110kg×8');
+    expect(screen.queryByText(/999/)).toBeNull();
   });
 
   it("displays weights converted to the user's preferred unit", async () => {

@@ -12,7 +12,7 @@ interface Result {
 
 // Same chainable-and-thenable mock builder pattern as workoutQueries.test.ts.
 function createQueryBuilder(result: Result) {
-  const methods = ['select', 'eq', 'is', 'in'] as const;
+  const methods = ['select', 'eq', 'is', 'in', 'not'] as const;
   const builder: Record<string, unknown> = {};
   for (const m of methods) {
     builder[m] = jest.fn(() => builder);
@@ -141,6 +141,29 @@ describe('fetchExerciseSetHistory', () => {
     });
 
     await expect(fetchExerciseSetHistory('user-1', 'ex-1')).rejects.toThrow('boom');
+  });
+
+  it('excludes planned-but-not-yet-performed sets (completed_at null) from the sets query', async () => {
+    const tables = mockTables({
+      workout_exercises: {
+        data: [
+          {
+            id: 'we1',
+            workouts: {
+              performed_at: '2026-01-01T00:00:00Z',
+              completed_at: '2026-01-01T01:00:00Z',
+              deleted_at: null,
+            },
+          },
+        ],
+        error: null,
+      },
+      sets: { data: [], error: null },
+    });
+
+    await fetchExerciseSetHistory('user-1', 'ex-1');
+
+    expect(tables.sets.not).toHaveBeenCalledWith('completed_at', 'is', null);
   });
 
   it('throws on a sets query error', async () => {

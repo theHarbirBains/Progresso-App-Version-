@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
 import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
-import { fetchWorkoutDetail, type SetRecord, type WorkoutDetail } from '../workouts/workoutQueries';
+import {
+  completedSetsOnly,
+  fetchWorkoutDetail,
+  type CompletedSetRecord,
+  type WorkoutDetail,
+} from '../workouts/workoutQueries';
 import { workoutStyles as styles } from './workoutStyles';
 
 type Props = RootStackScreenProps<'WorkoutDetail'>;
@@ -92,7 +98,11 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
             {error}
           </Text>
         ) : (
-          <ActivityIndicator testID="workout-detail-loading" size="large" color="#FFFFFF" />
+          <ActivityIndicator
+            testID="workout-detail-loading"
+            size="large"
+            color={colors.textPrimary}
+          />
         )}
       </View>
     );
@@ -119,7 +129,11 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
       ) : null}
 
       {workout.exercises.map((exercise) => {
-        const topSet = exercise.sets.reduce<SetRecord | null>(
+        // A workout's history view only ever shows sets that were actually
+        // logged -- a blank/incomplete set left over from a live session
+        // that was completed anyway is not real performance data.
+        const loggedSets = completedSetsOnly(exercise.sets);
+        const topSet = loggedSets.reduce<CompletedSetRecord | null>(
           (max, s) => (!max || s.weightKg > max.weightKg ? s : max),
           null,
         );
@@ -144,7 +158,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                 {topSet.reps}
               </Text>
             ) : null}
-            {exercise.sets.map((set) => {
+            {loggedSets.map((set) => {
               const isCurrentRepPR = repPRs[exercise.id]?.some(
                 (pr) => pr.reps === set.reps && pr.sourceSetId === set.id,
               );

@@ -37,12 +37,8 @@ export function filterByTimeRange(
   return sets.filter((s) => new Date(s.performedAt).getTime() >= cutoffMs);
 }
 
-/**
- * One point per workout occurrence of this exercise, plotting that
- * session's heaviest set. Input does not need to be pre-sorted; output is
- * chronological ascending.
- */
-export function topSetProgression(sets: HistoricalSet[]): ChartPoint[] {
+/** One heaviest set per workout occurrence, chronologically ascending. */
+function bestSetPerOccurrence(sets: HistoricalSet[]): HistoricalSet[] {
   const bestByOccurrence = new Map<string, HistoricalSet>();
   for (const s of sets) {
     const current = bestByOccurrence.get(s.workoutExerciseId);
@@ -50,9 +46,58 @@ export function topSetProgression(sets: HistoricalSet[]): ChartPoint[] {
       bestByOccurrence.set(s.workoutExerciseId, s);
     }
   }
-  return Array.from(bestByOccurrence.values())
-    .sort((a, b) => new Date(a.performedAt).getTime() - new Date(b.performedAt).getTime())
-    .map((s) => ({ performedAt: s.performedAt, weightKg: s.weightKg }));
+  return Array.from(bestByOccurrence.values()).sort(
+    (a, b) => new Date(a.performedAt).getTime() - new Date(b.performedAt).getTime(),
+  );
+}
+
+/**
+ * One point per workout occurrence of this exercise, plotting that
+ * session's heaviest set. Input does not need to be pre-sorted; output is
+ * chronological ascending.
+ */
+export function topSetProgression(sets: HistoricalSet[]): ChartPoint[] {
+  return bestSetPerOccurrence(sets).map((s) => ({
+    performedAt: s.performedAt,
+    weightKg: s.weightKg,
+  }));
+}
+
+/** Same as topSetProgression, but keeps reps/workoutExerciseId for the Progress feature's interactive chart (point-detail panel needs "225 lb x 5", not just the weight). */
+export interface DetailedChartPoint extends ChartPoint {
+  reps: number;
+  workoutExerciseId: string;
+}
+
+export function topSetProgressionDetailed(sets: HistoricalSet[]): DetailedChartPoint[] {
+  return bestSetPerOccurrence(sets).map((s) => ({
+    performedAt: s.performedAt,
+    weightKg: s.weightKg,
+    reps: s.reps,
+    workoutExerciseId: s.workoutExerciseId,
+  }));
+}
+
+/**
+ * Total change from the first recorded point to the last -- the
+ * "progressive overload story" (starting point / current point / total
+ * improvement / percentage improvement), computed only from real logged
+ * points. Returns null when there's fewer than 2 points (nothing to compare).
+ */
+export interface ProgressSummary {
+  startKg: number;
+  currentKg: number;
+  deltaKg: number;
+  percent: number;
+}
+
+export function summarizeProgress(points: { weightKg: number }[]): ProgressSummary | null {
+  if (points.length < 2) return null;
+  const startKg = points[0].weightKg;
+  const currentKg = points[points.length - 1].weightKg;
+  const deltaKg = currentKg - startKg;
+  const percent = startKg > 0 ? (deltaKg / startKg) * 100 : 0;
+  return { startKg, currentKg, deltaKg, percent };
 }
 
 /**

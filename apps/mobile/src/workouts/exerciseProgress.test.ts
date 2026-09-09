@@ -4,7 +4,9 @@ import {
   mostCommonRepCount,
   repCountPRProgression,
   runningMax,
+  summarizeProgress,
   topSetProgression,
+  topSetProgressionDetailed,
   trueOneRepMaxProgression,
   workoutFrequency,
 } from './exerciseProgress';
@@ -152,6 +154,46 @@ describe('mostCommonRepCount', () => {
   it('returns null when there are no sets with reps >= 2', () => {
     expect(mostCommonRepCount([hs(200, 1, '2026-01-01T00:00:00Z', 'we1')])).toBeNull();
     expect(mostCommonRepCount([])).toBeNull();
+  });
+});
+
+describe('topSetProgressionDetailed', () => {
+  it('matches topSetProgression but keeps reps and workoutExerciseId', () => {
+    const sets = [
+      hs(100, 10, '2026-01-01T00:00:00Z', 'we1'),
+      hs(110, 8, '2026-01-01T00:00:00Z', 'we1'),
+      hs(120, 5, '2025-12-01T00:00:00Z', 'we0'),
+    ];
+
+    const result = topSetProgressionDetailed(sets);
+
+    expect(result).toEqual([
+      { performedAt: '2025-12-01T00:00:00Z', weightKg: 120, reps: 5, workoutExerciseId: 'we0' },
+      { performedAt: '2026-01-01T00:00:00Z', weightKg: 110, reps: 8, workoutExerciseId: 'we1' },
+    ]);
+  });
+
+  it('returns an empty array for no sets', () => {
+    expect(topSetProgressionDetailed([])).toEqual([]);
+  });
+});
+
+describe('summarizeProgress', () => {
+  it('computes start, current, delta, and percent change', () => {
+    const result = summarizeProgress([{ weightKg: 100 }, { weightKg: 120 }, { weightKg: 140 }]);
+
+    expect(result).toEqual({ startKg: 100, currentKg: 140, deltaKg: 40, percent: 40 });
+  });
+
+  it('returns null with fewer than 2 points', () => {
+    expect(summarizeProgress([{ weightKg: 100 }])).toBeNull();
+    expect(summarizeProgress([])).toBeNull();
+  });
+
+  it('handles a regression (negative delta) truthfully rather than hiding it', () => {
+    const result = summarizeProgress([{ weightKg: 100 }, { weightKg: 90 }]);
+
+    expect(result).toEqual({ startKg: 100, currentKg: 90, deltaKg: -10, percent: -10 });
   });
 });
 
