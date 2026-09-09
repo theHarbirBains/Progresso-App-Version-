@@ -321,6 +321,129 @@ async function main() {
     [userA],
   );
 
+  console.log('\nRunning onboarding profile field tests...\n');
+
+  await asUserCommitted(userA, async (client) => {
+    await client.query(
+      `update public.users set
+         gender = 'other',
+         birthday = '2001-09-14',
+         weight_value = 79.2,
+         height_value = 174,
+         height_unit = 'cm',
+         fitness_goal = 'build_muscle',
+         training_experience = 'intermediate',
+         workout_frequency_days = 4,
+         training_style_preference = 'build_your_own',
+         email_opt_in = true,
+         push_notifications_opt_in = false,
+         apple_health_preference = 'not_now',
+         onboarding_completed_at = now()
+       where id = $1`,
+      [userA],
+    );
+  });
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      `select gender, birthday, weight_value, height_value, height_unit, fitness_goal,
+              training_experience, workout_frequency_days, training_style_preference,
+              email_opt_in, push_notifications_opt_in, apple_health_preference,
+              onboarding_completed_at
+       from public.users where id = $1`,
+      [userA],
+    );
+    const row = res.rows[0];
+    const passed =
+      row?.gender === 'other' &&
+      row?.fitness_goal === 'build_muscle' &&
+      row?.training_experience === 'intermediate' &&
+      row?.workout_frequency_days === 4 &&
+      row?.training_style_preference === 'build_your_own' &&
+      row?.email_opt_in === true &&
+      row?.push_notifications_opt_in === false &&
+      row?.apple_health_preference === 'not_now' &&
+      row?.onboarding_completed_at !== null;
+    record(
+      'User A can set their own onboarding profile fields via the existing self-update RLS policy',
+      passed,
+      passed ? undefined : `got ${JSON.stringify(row)}`,
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const res = await client.query("update public.users set gender = 'male' where id = $1", [
+      userA,
+    ]);
+    const passed = res.rowCount === 0;
+    record(
+      "User B cannot modify User A's onboarding profile fields via UPDATE",
+      passed,
+      passed ? undefined : `rowCount=${res.rowCount}`,
+    );
+  });
+
+  await expectThrows(
+    admin.query("update public.users set gender = 'robot' where id = $1", [userA]),
+    'An invalid gender is rejected by the format constraint',
+    /violates check constraint/i,
+  );
+
+  await expectThrows(
+    admin.query("update public.users set height_unit = 'inches' where id = $1", [userA]),
+    'An invalid height_unit is rejected by the format constraint',
+    /violates check constraint/i,
+  );
+
+  await expectThrows(
+    admin.query("update public.users set fitness_goal = 'get_ripped' where id = $1", [userA]),
+    'An invalid fitness_goal is rejected by the format constraint',
+    /violates check constraint/i,
+  );
+
+  await expectThrows(
+    admin.query('update public.users set workout_frequency_days = 9 where id = $1', [userA]),
+    'An out-of-range workout_frequency_days is rejected by the format constraint',
+    /violates check constraint/i,
+  );
+
+  await expectThrows(
+    admin.query(
+      "update public.users set training_style_preference = 'ai_generated' where id = $1",
+      [userA],
+    ),
+    'An invalid training_style_preference is rejected by the format constraint',
+    /violates check constraint/i,
+  );
+
+  await expectThrows(
+    admin.query("update public.users set apple_health_preference = 'maybe' where id = $1", [
+      userA,
+    ]),
+    'An invalid apple_health_preference is rejected by the format constraint',
+    /violates check constraint/i,
+  );
+
+  await expectThrows(
+    admin.query(
+      `update public.users set birthday = (current_date + interval '1 day') where id = $1`,
+      [userA],
+    ),
+    'A future birthday is rejected by the format constraint',
+    /violates check constraint/i,
+  );
+
+  // Reset to a clean, unanswered state so later tests aren't affected.
+  await admin.query(
+    `update public.users set
+       gender = null, birthday = null, weight_value = null, height_value = null,
+       height_unit = 'cm', fitness_goal = null, training_experience = null,
+       workout_frequency_days = null, training_style_preference = null,
+       email_opt_in = null, push_notifications_opt_in = null,
+       apple_health_preference = null, onboarding_completed_at = null
+     where id = $1`,
+    [userA],
+  );
+
   console.log('\nRunning exercise library tests...\n');
 
   const customExerciseId = await asUserCommitted(userA, async (client) => {

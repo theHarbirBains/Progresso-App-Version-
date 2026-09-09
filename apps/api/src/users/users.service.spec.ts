@@ -34,7 +34,14 @@ describe('UsersService', () => {
   describe('getProfile', () => {
     it('returns the profile when found', async () => {
       const client = createMockClient({
-        selectData: { weight_unit: 'kg', display_name: 'Harbir', username: 'harbir' },
+        selectData: {
+          weight_unit: 'kg',
+          display_name: 'Harbir',
+          username: 'harbir',
+          workout_accent_color: '#2F80FF',
+          nutrition_accent_color: '#10B981',
+          active_workout_split_id: 'split-1',
+        },
       });
       const service = serviceWith(client);
 
@@ -42,6 +49,9 @@ describe('UsersService', () => {
         weightUnit: 'kg',
         displayName: 'Harbir',
         username: 'harbir',
+        workoutAccentColor: '#2F80FF',
+        nutritionAccentColor: '#10B981',
+        activeWorkoutSplitId: 'split-1',
       });
     });
 
@@ -56,7 +66,14 @@ describe('UsersService', () => {
   describe('updateProfile', () => {
     it('updates only the provided fields', async () => {
       const client = createMockClient({
-        updateData: { weight_unit: 'lb', display_name: 'Harbir', username: null },
+        updateData: {
+          weight_unit: 'lb',
+          display_name: 'Harbir',
+          username: null,
+          workout_accent_color: null,
+          nutrition_accent_color: null,
+          active_workout_split_id: null,
+        },
       });
       const service = serviceWith(client);
 
@@ -66,16 +83,149 @@ describe('UsersService', () => {
       expect(client.updateEq).toHaveBeenCalledWith('id', 'user-1');
     });
 
+    it('updates the workout and nutrition accent colors independently', async () => {
+      const client = createMockClient({
+        updateData: {
+          weight_unit: 'kg',
+          display_name: null,
+          username: null,
+          workout_accent_color: '#EF4444',
+          nutrition_accent_color: null,
+          active_workout_split_id: null,
+        },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateProfile('user-1', { workoutAccentColor: '#EF4444' });
+
+      expect(client.update).toHaveBeenCalledWith({ workout_accent_color: '#EF4444' });
+      expect(result.workoutAccentColor).toBe('#EF4444');
+      expect(result.nutritionAccentColor).toBeNull();
+    });
+
+    it('updates the active workout split', async () => {
+      const client = createMockClient({
+        updateData: {
+          weight_unit: 'kg',
+          display_name: null,
+          username: null,
+          workout_accent_color: null,
+          nutrition_accent_color: null,
+          active_workout_split_id: 'split-1',
+        },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateProfile('user-1', { activeWorkoutSplitId: 'split-1' });
+
+      expect(client.update).toHaveBeenCalledWith({ active_workout_split_id: 'split-1' });
+      expect(result.activeWorkoutSplitId).toBe('split-1');
+    });
+
+    it('updates onboarding profile fields', async () => {
+      const client = createMockClient({
+        updateData: {
+          weight_unit: 'kg',
+          display_name: null,
+          username: null,
+          workout_accent_color: null,
+          nutrition_accent_color: null,
+          active_workout_split_id: null,
+          gender: 'other',
+          birthday: '2001-09-14',
+          weight_value: 79.2,
+          height_value: 174,
+          height_unit: 'cm',
+          fitness_goal: 'build_muscle',
+          training_experience: 'intermediate',
+          workout_frequency_days: 4,
+          training_style_preference: 'build_your_own',
+          email_opt_in: true,
+          push_notifications_opt_in: false,
+          apple_health_preference: 'not_now',
+          onboarding_completed_at: null,
+        },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateProfile('user-1', {
+        gender: 'other',
+        birthday: '2001-09-14',
+        weightValue: 79.2,
+        heightValue: 174,
+        heightUnit: 'cm',
+        fitnessGoal: 'build_muscle',
+        trainingExperience: 'intermediate',
+        workoutFrequencyDays: 4,
+        trainingStylePreference: 'build_your_own',
+        emailOptIn: true,
+        pushNotificationsOptIn: false,
+        appleHealthPreference: 'not_now',
+      });
+
+      expect(client.update).toHaveBeenCalledWith({
+        gender: 'other',
+        birthday: '2001-09-14',
+        weight_value: 79.2,
+        height_value: 174,
+        height_unit: 'cm',
+        fitness_goal: 'build_muscle',
+        training_experience: 'intermediate',
+        workout_frequency_days: 4,
+        training_style_preference: 'build_your_own',
+        email_opt_in: true,
+        push_notifications_opt_in: false,
+        apple_health_preference: 'not_now',
+      });
+      expect(result.fitnessGoal).toBe('build_muscle');
+      expect(result.pushNotificationsOptIn).toBe(false);
+    });
+
+    it('marks onboarding complete as a server-set timestamp, not a client-supplied value', async () => {
+      const client = createMockClient({
+        updateData: {
+          weight_unit: 'kg',
+          display_name: null,
+          username: null,
+          workout_accent_color: null,
+          nutrition_accent_color: null,
+          active_workout_split_id: null,
+          onboarding_completed_at: '2026-09-08T00:00:00.000Z',
+        },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateProfile('user-1', { onboardingCompleted: true });
+
+      const updateArg = client.update.mock.calls[0][0] as { onboarding_completed_at: string };
+      expect(typeof updateArg.onboarding_completed_at).toBe('string');
+      expect(result.onboardingCompletedAt).toBe('2026-09-08T00:00:00.000Z');
+    });
+
     it('is a no-op read when the dto is empty (no fields to update)', async () => {
       const client = createMockClient({
-        selectData: { weight_unit: 'kg', display_name: null, username: null },
+        selectData: {
+          weight_unit: 'kg',
+          display_name: null,
+          username: null,
+          workout_accent_color: null,
+          nutrition_accent_color: null,
+          active_workout_split_id: null,
+        },
       });
       const service = serviceWith(client);
 
       const result = await service.updateProfile('user-1', {});
 
       expect(client.update).not.toHaveBeenCalled();
-      expect(result).toEqual({ weightUnit: 'kg', displayName: null, username: null });
+      expect(result).toEqual({
+        weightUnit: 'kg',
+        displayName: null,
+        username: null,
+        workoutAccentColor: null,
+        nutritionAccentColor: null,
+        activeWorkoutSplitId: null,
+      });
     });
 
     it('translates a unique-violation into ConflictException', async () => {
