@@ -27,6 +27,7 @@ export type RootStackParamList = {
   WorkoutSplitView: { splitId: string };
   WorkoutSplitForm: { splitId?: string; activateOnCreate?: boolean };
   ChooseWorkoutSplit: undefined;
+  Social: undefined;
 };
 
 export type RootStackScreenProps<Screen extends keyof RootStackParamList> = NativeStackScreenProps<
