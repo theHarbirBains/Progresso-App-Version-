@@ -8,16 +8,29 @@ interface ButtonProps {
   testID?: string;
 }
 
-export function PrimaryButton({ label, onPress, disabled, testID }: ButtonProps) {
+interface PrimaryButtonProps extends ButtonProps {
+  /** Defaults to colors.accent -- pass a contextual Workout/Nutrition accent where the button should follow the user's chosen theme color rather than the static brand accent (same override pattern as SegmentedControl/Toggle). */
+  accentColor?: string;
+  onAccentColor?: string;
+}
+
+export function PrimaryButton({
+  label,
+  onPress,
+  disabled,
+  testID,
+  accentColor = colors.accent,
+  onAccentColor = colors.onAccent,
+}: PrimaryButtonProps) {
   return (
     <TouchableOpacity
       testID={testID}
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.85}
-      style={[styles.primary, disabled && styles.disabled]}
+      style={[styles.primary, { backgroundColor: accentColor }, disabled && styles.disabled]}
     >
-      <Text style={styles.primaryText}>{label}</Text>
+      <Text style={[styles.primaryText, { color: onAccentColor }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -60,13 +73,15 @@ export function TextButton({ label, onPress, disabled, testID }: ButtonProps) {
 
 const styles = StyleSheet.create({
   primary: {
-    backgroundColor: colors.accent,
+    // backgroundColor is always supplied inline (accentColor prop, default
+    // colors.accent) -- not set here, so there is no stale value to fall out
+    // of sync with the actual default.
     borderRadius: radii.lg,
     paddingVertical: spacing.md + 2,
     alignItems: 'center',
   },
   primaryText: {
-    color: colors.onAccent,
+    // color likewise always supplied inline (onAccentColor prop).
     fontSize: 16,
     fontWeight: '700',
   },
