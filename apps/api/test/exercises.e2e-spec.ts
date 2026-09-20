@@ -46,6 +46,8 @@ describe('Exercises (e2e)', () => {
     id: 'ex-mine',
     name: 'My Curl Variation',
     muscle_group: 'biceps',
+    movement_type: 'bilateral',
+    logging_style: null,
     is_active: true,
     created_by: 'user-1',
     created_at: '2026-01-02T00:00:00.000Z',
@@ -99,7 +101,7 @@ describe('Exercises (e2e)', () => {
         method: 'POST',
         url: '/api/v1/exercises',
         headers: { authorization: 'Bearer good-token' },
-        payload: { name: 'My Curl Variation', muscleGroup: 'biceps' },
+        payload: { name: 'My Curl Variation', muscleGroup: 'biceps', movementType: 'bilateral' },
       });
 
       expect(response.statusCode).toBe(201);
@@ -107,6 +109,8 @@ describe('Exercises (e2e)', () => {
         id: 'ex-mine',
         name: 'My Curl Variation',
         muscleGroup: 'biceps',
+        movementType: 'bilateral',
+        loggingStyle: null,
         isActive: true,
         createdBy: 'user-1',
         createdAt: '2026-01-02T00:00:00.000Z',
@@ -119,7 +123,7 @@ describe('Exercises (e2e)', () => {
         method: 'POST',
         url: '/api/v1/exercises',
         headers: { authorization: 'Bearer good-token' },
-        payload: { name: '', muscleGroup: 'biceps' },
+        payload: { name: '', muscleGroup: 'biceps', movementType: 'bilateral' },
       });
 
       expect(response.statusCode).toBe(400);
@@ -130,7 +134,7 @@ describe('Exercises (e2e)', () => {
         method: 'POST',
         url: '/api/v1/exercises',
         headers: { authorization: 'Bearer good-token' },
-        payload: { name: 'X', muscleGroup: 'not-a-real-group' },
+        payload: { name: 'X', muscleGroup: 'not-a-real-group', movementType: 'bilateral' },
       });
 
       expect(response.statusCode).toBe(400);
@@ -141,10 +145,72 @@ describe('Exercises (e2e)', () => {
         method: 'POST',
         url: '/api/v1/exercises',
         headers: { authorization: 'Bearer good-token' },
-        payload: { name: 'X', muscleGroup: 'chest', createdBy: 'someone-else', isActive: true },
+        payload: {
+          name: 'X',
+          muscleGroup: 'chest',
+          movementType: 'bilateral',
+          createdBy: 'someone-else',
+          isActive: true,
+        },
       });
 
       expect(response.statusCode).toBe(400);
+    });
+
+    it('rejects a missing or invalid movementType', async () => {
+      const missing = await app.inject({
+        method: 'POST',
+        url: '/api/v1/exercises',
+        headers: { authorization: 'Bearer good-token' },
+        payload: { name: 'X', muscleGroup: 'chest' },
+      });
+      const invalid = await app.inject({
+        method: 'POST',
+        url: '/api/v1/exercises',
+        headers: { authorization: 'Bearer good-token' },
+        payload: { name: 'X', muscleGroup: 'chest', movementType: 'sideways' },
+      });
+
+      expect(missing.statusCode).toBe(400);
+      expect(invalid.statusCode).toBe(400);
+    });
+
+    it('rejects a unilateral exercise without a loggingStyle', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/v1/exercises',
+        headers: { authorization: 'Bearer good-token' },
+        payload: { name: 'X', muscleGroup: 'chest', movementType: 'unilateral' },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('creates a unilateral exercise with its loggingStyle', async () => {
+      const { insert } = mockInsertChain({
+        data: { ...customExerciseRow, movement_type: 'unilateral', logging_style: 'alternating' },
+      });
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/v1/exercises',
+        headers: { authorization: 'Bearer good-token' },
+        payload: {
+          name: 'My Curl Variation',
+          muscleGroup: 'biceps',
+          movementType: 'unilateral',
+          loggingStyle: 'alternating',
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(insert).toHaveBeenCalledWith(
+        expect.objectContaining({ movement_type: 'unilateral', logging_style: 'alternating' }),
+      );
+      expect(JSON.parse(response.payload)).toMatchObject({
+        movementType: 'unilateral',
+        loggingStyle: 'alternating',
+      });
     });
 
     it('returns 409 when the custom exercise name is already taken by this user', async () => {
@@ -156,7 +222,7 @@ describe('Exercises (e2e)', () => {
         method: 'POST',
         url: '/api/v1/exercises',
         headers: { authorization: 'Bearer good-token' },
-        payload: { name: 'Dupe', muscleGroup: 'chest' },
+        payload: { name: 'Dupe', muscleGroup: 'chest', movementType: 'bilateral' },
       });
 
       expect(response.statusCode).toBe(409);
@@ -167,7 +233,7 @@ describe('Exercises (e2e)', () => {
       const response = await app.inject({
         method: 'POST',
         url: '/api/v1/exercises',
-        payload: { name: 'X', muscleGroup: 'chest' },
+        payload: { name: 'X', muscleGroup: 'chest', movementType: 'bilateral' },
       });
 
       expect(response.statusCode).toBe(401);
