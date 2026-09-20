@@ -1,5 +1,7 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { getMyProfile } from '../lib/api';
 import { fetchWorkoutSplitDetail } from '../workouts/workoutSplitQueries';
 import { WorkoutSplitViewScreen } from './WorkoutSplitViewScreen';
@@ -168,5 +170,47 @@ describe('WorkoutSplitViewScreen background refresh on focus', () => {
       refresh.resolve(detail);
       await refresh.promise;
     });
+  });
+});
+
+describe('WorkoutSplitViewScreen -- plain days and muscle text, no chips', () => {
+  it('shows days as plain blocks in no cards', async () => {
+    render(<WorkoutSplitViewScreen navigation={navigation} route={route} />);
+    await screen.findByText('PPL - Hypertrophy');
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+  });
+
+  it("shows a day's muscle groups as one line of plain text separated by dots, not filled chips", async () => {
+    render(<WorkoutSplitViewScreen navigation={navigation} route={route} />);
+    const day = within(await screen.findByTestId('workout-split-view-day-day-1'));
+
+    expect(day.getAllByText('·')).toHaveLength(2);
+    for (const group of ['chest', 'shoulders', 'triceps']) {
+      const style = StyleSheet.flatten(
+        screen.getByTestId(`workout-split-view-day-day-1-muscle-${group}`).props.style,
+      );
+      expect(style.backgroundColor).toBeUndefined();
+      expect(style.borderWidth).toBeUndefined();
+    }
+  });
+
+  it('separates days with a hairline, none above the first', async () => {
+    render(<WorkoutSplitViewScreen navigation={navigation} route={route} />);
+    const first = await screen.findByTestId('workout-split-view-day-day-1');
+    const second = screen.getByTestId('workout-split-view-day-day-2');
+
+    expect(StyleSheet.flatten(first.props.style).borderTopWidth).toBeUndefined();
+    expect(StyleSheet.flatten(second.props.style).borderTopWidth).toBe(StyleSheet.hairlineWidth);
+  });
+
+  it('puts Back and Edit in the shared header, each named for assistive tech', async () => {
+    render(<WorkoutSplitViewScreen navigation={navigation} route={route} />);
+    await screen.findByText('PPL - Hypertrophy');
+
+    expect(screen.getByTestId('workout-split-view-back').props.accessibilityLabel).toBe('Back');
+    expect(screen.getByTestId('workout-split-view-edit').props.accessibilityLabel).toBe(
+      'Edit split',
+    );
   });
 });

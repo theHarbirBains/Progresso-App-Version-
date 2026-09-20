@@ -2,7 +2,9 @@ import { NavigationContainer, useNavigationContainerRef } from '@react-navigatio
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { JetBrainsMono_500Medium, JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
 import {
+  Manrope_400Regular,
   Manrope_500Medium,
+  Manrope_600SemiBold,
   Manrope_700Bold,
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
@@ -97,9 +99,11 @@ const MODE_AGNOSTIC_ROUTES = new Set(['Dashboard', 'ProgressOverview', 'Profile'
 interface RootProps {
   /** Reports the currently-effective Workout/Nutrition mode up to AppShell, so AppBackgroundLayer (mounted outside the navigator) can follow it. */
   onBackgroundModeChange: (mode: 'workout' | 'nutrition') => void;
+  /** Reports whether the photographic background should show -- true only while Dashboard is the current route (every other screen sits on the flat theme fill). */
+  onBackgroundPhotoChange: (visible: boolean) => void;
 }
 
-function Root({ onBackgroundModeChange }: RootProps) {
+function Root({ onBackgroundModeChange, onBackgroundPhotoChange }: RootProps) {
   const { status, session } = useAuth();
   const accessToken = session?.access_token;
   const [mode, setMode] = useState<AuthMode>('signIn');
@@ -179,6 +183,16 @@ function Root({ onBackgroundModeChange }: RootProps) {
   useEffect(() => {
     onBackgroundModeChange(backgroundMode);
   }, [backgroundMode, onBackgroundModeChange]);
+  // The photo is a Dashboard-only atmosphere: it is the one screen designed
+  // around it. Every other screen -- including sign-in, onboarding and the
+  // Workout/Nutrition sub-screens -- sits on the flat Background Theme fill,
+  // so dense, data-heavy content never competes with a photograph.
+  // Auth screens render outside the navigator, so currentRouteName is
+  // undefined for them and the photo stays off.
+  const showBackgroundPhoto = status === 'signedIn' && currentRouteName === 'Dashboard';
+  useEffect(() => {
+    onBackgroundPhotoChange(showBackgroundPhoto);
+  }, [showBackgroundPhoto, onBackgroundPhotoChange]);
   // Set right before clearing justCreatedAccount (a fresh account obviously
   // needs onboarding, no fetch required) so the generic profile-check effect
   // below -- which also re-runs on that same justCreatedAccount transition --
@@ -227,15 +241,12 @@ function Root({ onBackgroundModeChange }: RootProps) {
       return <LoadingState testID="onboarding-status-loading" />;
     }
 
-    // Dashboard renders its own bottom bar (mode-crossfading, see
-    // routeToBottomNavTab's comment) and Onboarding shows no bottom nav at
-    // all -- every other screen gets this persistent one for free, with no
-    // per-screen wiring, since it's a sibling of the navigator rather than
-    // owned by any individual screen.
-    const showGlobalBottomNav =
-      currentRouteName !== undefined &&
-      currentRouteName !== 'Dashboard' &&
-      currentRouteName !== 'Onboarding';
+    // Onboarding shows no bottom nav at all -- every other screen, Dashboard
+    // included, gets this one persistent bar for free, with no per-screen
+    // wiring, since it's a sibling of the navigator rather than owned by any
+    // individual screen. (Dashboard used to render its own second copy; there
+    // is now exactly one bottom navigation in the app.)
+    const showGlobalBottomNav = currentRouteName !== undefined && currentRouteName !== 'Onboarding';
 
     return (
       <AppMenuContext.Provider
@@ -372,7 +383,9 @@ function Root({ onBackgroundModeChange }: RootProps) {
               setQuickActionsOpen(false);
               navigationRef.current?.navigate('Nutrition');
             }}
-            accentColor={menuTheme.accent}
+            accentColor={
+              backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
+            }
           />
         </View>
       </AppMenuContext.Provider>
@@ -419,11 +432,18 @@ function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
   // during sign-in/sign-up, which render outside the Stack.Navigator
   // entirely and so never report a mode of their own.
   const [backgroundMode, setBackgroundMode] = useState<'workout' | 'nutrition'>('workout');
+  // Off until Dashboard reports itself as the current route -- see Root.
+  const [showBackgroundPhoto, setShowBackgroundPhoto] = useState(false);
 
   return (
     <View style={styles.shell}>
-      <AppBackgroundLayer mode={backgroundMode} />
-      {ready ? <Root onBackgroundModeChange={setBackgroundMode} /> : null}
+      <AppBackgroundLayer mode={backgroundMode} showImage={showBackgroundPhoto} />
+      {ready ? (
+        <Root
+          onBackgroundModeChange={setBackgroundMode}
+          onBackgroundPhotoChange={setShowBackgroundPhoto}
+        />
+      ) : null}
       <LaunchScreen ready={ready} />
     </View>
   );
@@ -431,7 +451,9 @@ function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
 
 function App() {
   const [fontsLoaded] = useFonts({
+    Manrope_400Regular,
     Manrope_500Medium,
+    Manrope_600SemiBold,
     Manrope_700Bold,
     Manrope_800ExtraBold,
     JetBrainsMono_500Medium,

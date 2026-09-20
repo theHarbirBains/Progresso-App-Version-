@@ -1,3 +1,4 @@
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { MonthCalendar } from './MonthCalendar';
 
@@ -85,5 +86,33 @@ describe('MonthCalendar', () => {
     expect(dot.props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ backgroundColor: '#8B5CF6' })]),
     );
+  });
+});
+
+describe('MonthCalendar -- named days, 44pt month arrows', () => {
+  it('makes each month arrow a 44pt target, named for assistive tech', () => {
+    render(<MonthCalendar {...baseProps} />);
+
+    for (const [id, label] of [
+      ['calendar-prev-month', 'Previous month'],
+      ['calendar-next-month', 'Next month'],
+    ] as const) {
+      const arrow = screen.getByTestId(id);
+      expect(arrow.props.accessibilityLabel).toBe(label);
+      const style = StyleSheet.flatten(arrow.props.style);
+      expect(style.width).toBeGreaterThanOrEqual(44);
+      expect(style.height).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  it('names each day by its date, and says when a workout was completed', () => {
+    render(<MonthCalendar {...baseProps} completedDateKeys={new Set(['2026-09-05'])} />);
+
+    expect(screen.getByTestId('calendar-day-2026-09-05').props.accessibilityLabel).toMatch(
+      /5, workout completed$/,
+    );
+    const plain = screen.getByTestId('calendar-day-2026-09-06').props.accessibilityLabel;
+    expect(plain).toMatch(/6$/);
+    expect(plain).not.toMatch(/completed/);
   });
 });

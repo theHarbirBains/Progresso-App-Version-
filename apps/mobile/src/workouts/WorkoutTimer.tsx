@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Text, type StyleProp, type TextStyle } from 'react-native';
+import { type StyleProp, type TextStyle } from 'react-native';
+import { Text } from '../design/Text';
 import { computeElapsedSeconds, formatElapsed } from './workoutDuration';
 
 interface Props {

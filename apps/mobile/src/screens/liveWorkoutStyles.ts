@@ -1,174 +1,83 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
 
-// Shared styles for the Start Workout / Live Workout experience
-// (NewWorkoutScreen + ActiveWorkoutScreen and their shared components).
-// Built on the same design/theme.ts tokens as the rest of the app -- no
-// hardcoded colors, no second style system. Accent color is always passed
-// in as a prop by the screen (the user's Workout Mode color), never
-// hardcoded here.
+// Shared styles for the Live Workout experience: ActiveWorkoutScreen, its
+// stats strip, exercise blocks and set rows, and the Add Exercise picker.
+// Token-only -- no hardcoded colors or font sizes. The user's Workout accent
+// is always passed in by the screen as a prop, never referenced here.
+//
+// Design intent: this is the screen used mid-set, one-handed, between sets.
+// So: big numeric inputs (48pt tall, mono readout), a 44pt complete button
+// per set, the previous session's numbers printed right above the sets they
+// are meant to be compared with, and exactly one filled button (Finish
+// Workout). Exercises are plain blocks separated by hairlines, not cards.
 export const liveWorkoutStyles = StyleSheet.create({
-  screen: {
+  // ---- Frame ---------------------------------------------------------------
+  // The scrolling body: exercise blocks, then the add-exercise actions.
+  flex: {
     flex: 1,
-    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
-    // paints the selected Background Theme; screens no longer hardcode it.
-    backgroundColor: 'transparent',
   },
-  scrollContent: {
+  content: {
     paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxxl,
+    paddingBottom: spacing.xxl,
   },
-  // ActiveWorkoutScreen only: makes short content (or the empty state) sit
-  // vertically centered in the space between the header and the Cancel
-  // Workout footer, instead of collapsing to the top -- a plain ScrollView
-  // contentContainerStyle has no height of its own beyond its children, so
-  // flexGrow: 1 lets it claim the full available height first, and
-  // justifyContent: 'center' only takes effect on the leftover space,
-  // exactly like React Native's standard "centered-if-short,
-  // scrolls-normally-if-long" pattern (has no effect once content already
-  // exceeds the available height).
-  activeWorkoutContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
+  errorText: {
+    ...typeScale.callout,
+    color: colors.destructive,
+    marginTop: spacing.md,
   },
-  cancelWorkoutFooter: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.md,
+  emptyWrap: {
+    paddingTop: spacing.xl,
   },
-  footerButtonGap: {
-    marginBottom: spacing.sm,
+  // Add Exercise / Create Custom / Cancel Workout, after the last exercise.
+  endActions: {
+    paddingTop: spacing.xl,
+    gap: spacing.xs,
   },
-
-  // WorkoutHeader (ActiveWorkoutScreen's own header row -- title + close/back
-  // + options). Also reused as-is by ExercisePickerModal and
-  // ExerciseFormScreen's sheet presentation for their own title+close-button
-  // rows, so this stays a plain row; ActiveWorkoutScreen's now-buttonless
-  // header uses workoutHeaderCentered below instead of this one.
-  header: {
+  // Pinned under the header so the timer, set count and volume stay in view
+  // while the list scrolls.
+  statsBar: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.lg,
-  },
-  // ActiveWorkoutScreen only: no back arrow or options button anymore, just
-  // a centered title. paddingTop is supplied by the caller (insets.top +
-  // spacing.sm) since the safe-area inset isn't known here.
-  workoutHeaderCentered: {
-    alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
   },
-  headerIconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-  },
-
-  // WorkoutSummaryCard
-  summaryTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  summaryName: {
-    ...typeScale.screenTitle,
-    fontSize: 20,
-    color: colors.textPrimary,
-  },
-  summaryMuscles: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  summaryChangeLink: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  summaryStatsRow: {
-    flexDirection: 'row',
-    marginTop: spacing.lg,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  summaryStat: {
+  statCell: {
     flex: 1,
     alignItems: 'center',
   },
-  summaryStatValue: {
+  statValue: {
     ...typeScale.statMedium,
     color: colors.textPrimary,
   },
-  summaryStatLabel: {
+  statLabel: {
     ...typeScale.caption,
     color: colors.textMuted,
     marginTop: 2,
   },
-
-  // Start Workout CTA
-  startButton: {
-    borderRadius: radii.lg,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginTop: spacing.xl,
-  },
-  startButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  startButtonDisabled: {
-    opacity: 0.5,
+  // Pinned above the bottom navigation: the one primary action. The bottom
+  // navigation pads for the device inset itself, so this adds none.
+  footer: {
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
   },
 
-  // Add Exercise / Create Custom row
-  addExerciseRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.xl,
-    marginBottom: spacing.lg,
+  // ---- Exercise block --------------------------------------------------------
+  exerciseBlock: {
+    paddingVertical: spacing.xl,
   },
-  addExerciseButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+  exerciseDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
   },
-  addExerciseButtonText: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // ExerciseCard
-  exerciseCard: {
-    marginBottom: spacing.lg,
-  },
-  exerciseCardHeader: {
+  exerciseHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-  },
-  exerciseIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm,
   },
   exerciseTitleBlock: {
     flex: 1,
@@ -177,117 +86,89 @@ export const liveWorkoutStyles = StyleSheet.create({
     ...typeScale.cardTitle,
     color: colors.textPrimary,
   },
-  exerciseHeaderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+  exerciseMuscle: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
-  exerciseIconAction: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exerciseMuscleBadge: {
-    marginTop: spacing.sm,
-  },
-  // Explicit "weight is per side" note for a unilateral exercise (see
-  // ExerciseCard.tsx) -- makes the per-side convention obvious rather than
-  // relying on the reader to infer it from the Left/Right labels alone.
+  // Explicit "weight is per side" note for a unilateral exercise -- makes the
+  // per-side convention obvious rather than leaving it to the Left/Right
+  // labels alone.
   perSideNote: {
     ...typeScale.caption,
     color: colors.textMuted,
-    marginTop: spacing.xs,
+    marginTop: 2,
+  },
+  exerciseActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // Reorder / remove: a bare glyph, but a full 44pt target.
+  exerciseAction: {
+    width: 40,
+    height: minTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  // "Last Workout" -- every set from the user's last completed session with
-  // this exercise, shown only when it's being logged again in the current
-  // workout (see ActiveWorkoutScreen's previousPerformance).
+  // ---- Last Workout ----------------------------------------------------------
+  // Every set from the user's last completed session with this exercise, as a
+  // wrapping list of plain numbers directly above today's sets -- all visible
+  // at once (nothing hides behind a horizontal scroll) so they can be read
+  // while typing.
   previousSession: {
     marginTop: spacing.md,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
   },
-  previousSessionHeaderRow: {
+  previousHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  previousSessionTitleRow: {
+  previousTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
   },
-  previousSessionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
+  previousTitle: {
+    ...typeScale.label,
+    color: colors.textSecondary,
   },
-  previousSessionDate: {
+  previousDate: {
     ...typeScale.caption,
     color: colors.textMuted,
     marginTop: 2,
   },
-  previousSessionViewHistory: {
+  viewHistory: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },
-  previousSessionViewHistoryText: {
+  viewHistoryText: {
     ...typeScale.secondary,
-    fontWeight: '600',
+    fontFamily: typeScale.label.fontFamily,
   },
-  previousSessionCardsScroll: {
-    flexGrow: 0,
+  previousSets: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: spacing.lg,
+    rowGap: spacing.xs,
     marginTop: spacing.sm,
   },
-  previousSessionCardsRow: {
+  previousSet: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    paddingRight: spacing.xxl,
+    alignItems: 'baseline',
+    gap: spacing.xs,
   },
-  previousSessionCard: {
-    minWidth: 128,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radii.md,
-    padding: spacing.md,
-  },
-  previousSessionBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  previousSessionBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  previousSessionCardWeight: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  previousSessionCardReps: {
+  previousSetNumber: {
     ...typeScale.caption,
     color: colors.textMuted,
-    marginTop: 2,
-    marginBottom: spacing.sm,
   },
-  previousSessionBarTrack: {
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.divider,
-    overflow: 'hidden',
-  },
-  previousSessionBarFill: {
-    height: '100%',
-    borderRadius: 2,
+  previousSetValue: {
+    ...typeScale.statSmall,
+    color: colors.textSecondary,
   },
 
-  // Set rows
+  // ---- Set rows --------------------------------------------------------------
   setHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -306,7 +187,7 @@ export const liveWorkoutStyles = StyleSheet.create({
     textAlign: 'center',
   },
   setHeaderComplete: {
-    width: 44,
+    width: minTouchTarget,
   },
   setRow: {
     flexDirection: 'row',
@@ -315,20 +196,21 @@ export const liveWorkoutStyles = StyleSheet.create({
   },
   setIndex: {
     width: 28,
+    ...typeScale.statSmall,
     color: colors.textSecondary,
-    fontSize: 15,
-    fontWeight: '700',
   },
+  // The number being logged is the hero of the row: a 48pt-tall field with a
+  // large mono readout.
   setInput: {
     flex: 1,
     marginHorizontal: spacing.xs,
-    height: 44,
-    borderRadius: radii.sm,
+    height: minTouchTarget + spacing.xs,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceRaised,
     color: colors.textPrimary,
-    fontSize: 16,
+    ...typeScale.statMedium,
     textAlign: 'center',
   },
   setInputCompleted: {
@@ -336,29 +218,21 @@ export const liveWorkoutStyles = StyleSheet.create({
     backgroundColor: colors.surfaceHero,
   },
   setCompleteButton: {
-    width: 44,
-    height: 44,
+    width: minTouchTarget,
+    height: minTouchTarget,
     borderRadius: radii.pill,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // UnilateralSetRow -- a logical set with a Left and a Right row (each
-  // reusing setInput/setInputCompleted above) plus one shared complete
-  // button, rather than SetRow's single weight/reps pair. See
-  // UnilateralSetRow.tsx.
+  // A logical unilateral set: a Left and a Right row sharing one set number
+  // and one complete button.
   unilateralSetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.xs,
     gap: spacing.xs,
-  },
-  unilateralSetIndex: {
-    width: 28,
-    color: colors.textSecondary,
-    fontSize: 15,
-    fontWeight: '700',
   },
   unilateralSideRows: {
     flex: 1,
@@ -368,115 +242,34 @@ export const liveWorkoutStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  // "L"/"R" -- makes explicit that each row's weight is that side's own
-  // weight, never a combined total (see UnilateralSetRow.tsx's own comment).
+  // "L"/"R" -- each row's weight is that side's own, never a combined total.
   unilateralSideLabel: {
-    width: 20,
+    width: 24,
     textAlign: 'center',
-    ...typeScale.caption,
-    color: colors.textMuted,
-  },
-
-  // Add Set
-  addSetButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-  },
-  addSetButtonText: {
+    ...typeScale.label,
     color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
+  },
+  addSet: {
+    marginTop: spacing.sm,
   },
 
-  errorText: {
-    color: colors.destructive,
-    fontSize: 14,
-    marginBottom: spacing.md,
+  // ---- Add Exercise picker ---------------------------------------------------
+  pickerBody: {
+    flex: 1,
+    paddingHorizontal: spacing.xxl,
   },
-  sectionTitle: {
-    marginTop: spacing.xl,
-  },
-  emptyExercisesWrap: {
-    marginTop: spacing.lg,
-  },
-
-  // ExercisePickerModal
-  searchInput: {
-    height: 44,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
-  // Extra vertical breathing room around the muscle-group filter row --
-  // without this it sits flush against the search input above and the
-  // "Create Custom Exercise" card below (their own margins only add space on
-  // one side each, not both), reading as visually cramped top-to-bottom.
+  // Vertical breathing room around the muscle-group filter row, so it does
+  // not sit flush against the search field or the first row.
   muscleGroupChipsWrap: {
     marginVertical: spacing.sm,
   },
-  pickerItem: {
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
-  },
-  pickerItemTitle: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  pickerItemMeta: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
+  pickerLoading: {
+    paddingVertical: spacing.lg,
   },
   pickerEmptyText: {
+    ...typeScale.callout,
     color: colors.textMuted,
-    fontSize: 14,
     textAlign: 'center',
     marginTop: spacing.xl,
-  },
-
-  // ExercisePickerModal's "Create Custom Exercise" row -- prominent (accent
-  // border) but a single plain row like everything else here, not a second
-  // visual language.
-  createCustomCard: {
-    borderWidth: 1.5,
-    marginBottom: spacing.md,
-  },
-  createCustomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  createCustomIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createCustomTextBlock: {
-    flex: 1,
-  },
-  createCustomTitle: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-  },
-  createCustomSubtitle: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: 2,
   },
 });

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from './Text';
 import { Feather } from '@expo/vector-icons';
 import { GlassBackground } from './GlassBackground';
 import { colors, radii, spacing } from './theme';

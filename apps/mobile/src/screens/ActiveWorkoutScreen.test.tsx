@@ -1,7 +1,10 @@
-import { Alert, StyleSheet } from 'react-native';
+import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
+import { PrimaryButton, SecondaryButton } from '../design/Button';
+import { colors, fonts } from '../design/theme';
 import { createExercise, getMyProfile } from '../lib/api';
 import { fetchExercises } from '../exercises/exerciseQueries';
 import {
@@ -15,6 +18,7 @@ import {
   reorderExercises,
   updateSet,
 } from '../workouts/workoutQueries';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ActiveWorkoutScreen } from './ActiveWorkoutScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -389,10 +393,9 @@ describe('ActiveWorkoutScreen', () => {
       </BackgroundThemeProvider>,
     );
 
-    const badge = await screen.findByTestId('exercise-card-we1-muscle-group');
-    const text = badge.props.children;
-    const merged = Object.assign({}, ...[text.props.style].flat());
-    expect(merged.color).toBe('#8B5CF6');
+    // A completed set's check button is filled with the mode accent.
+    const complete = await screen.findByTestId('exercise-card-we1-set-s1-complete');
+    expect(StyleSheet.flatten(complete.props.style).backgroundColor).toBe('#8B5CF6');
   });
 
   it('has no back arrow or "..." options menu -- Finish Workout/Cancel Workout are the only exits', async () => {
@@ -692,7 +695,6 @@ describe('Last Time You Did This', () => {
     expect(screen.queryByTestId('active-workout-last-time')).toBeNull();
     expect(screen.queryByText('Last Time You Did This')).toBeNull();
     expect(screen.queryByText('Shown are your top sets from last time.')).toBeNull();
-    expect(screen.getByText("Today's Workout")).toBeTruthy();
   });
 });
 
@@ -923,5 +925,159 @@ describe('Last Workout', () => {
       exerciseId: 'ex1',
       exerciseName: 'Barbell Bench Press',
     });
+  });
+});
+
+describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
+  const twoExercises = {
+    ...baseWorkout,
+    exercises: [
+      ...baseWorkout.exercises,
+      {
+        id: 'we2',
+        exerciseId: 'ex2',
+        exerciseName: 'Overhead Press',
+        muscleGroup: 'shoulders' as const,
+        orderIndex: 2,
+        sets: [{ id: 's9', setIndex: 1, weightKg: null, reps: null, completedAt: null }],
+      },
+    ],
+  };
+
+  async function renderReady() {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+  }
+
+  it('shows exercises as plain blocks, in no cards', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(twoExercises);
+    await renderReady();
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+  });
+
+  it('separates exercises with a hairline, none above the first', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(twoExercises);
+    await renderReady();
+
+    const first = StyleSheet.flatten(screen.getByTestId('exercise-card-we1').props.style);
+    const second = StyleSheet.flatten(screen.getByTestId('exercise-card-we2').props.style);
+    expect(first.borderTopWidth).toBeUndefined();
+    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+  });
+
+  it('shows the workout name and its muscles in the header', async () => {
+    await renderReady();
+
+    const header = within(screen.getByTestId('active-workout-header'));
+    expect(header.getByText('Push Day')).toBeTruthy();
+    expect(header.getByText('Chest')).toBeTruthy();
+  });
+
+  it('pins duration, sets and volume outside the scrolling list so they stay in view', async () => {
+    await renderReady();
+
+    const scroll = within(screen.UNSAFE_getByType(ScrollView));
+    expect(scroll.queryByTestId('active-workout-summary')).toBeNull();
+    expect(screen.getByTestId('workout-summary-duration')).toBeTruthy();
+    expect(screen.getByTestId('workout-summary-total-sets')).toBeTruthy();
+    expect(screen.getByTestId('workout-summary-total-volume')).toBeTruthy();
+  });
+
+  it('has exactly one filled button -- Finish Workout -- pinned outside the scrolling list', async () => {
+    await renderReady();
+
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    const scroll = within(screen.UNSAFE_getByType(ScrollView));
+    expect(scroll.queryByTestId('complete-workout')).toBeNull();
+    expect(screen.getByTestId('complete-workout')).toHaveTextContent('Finish Workout');
+  });
+
+  it('keeps Cancel Workout quiet: destructive text at the end of the list, away from Finish', async () => {
+    await renderReady();
+
+    const cancel = screen.getByTestId('cancel-workout');
+    expect(within(screen.UNSAFE_getByType(ScrollView)).getByTestId('cancel-workout')).toBe(cancel);
+    expect(StyleSheet.flatten(cancel.props.style).borderWidth).toBeUndefined();
+    expect(StyleSheet.flatten(within(cancel).getByText('Cancel Workout').props.style).color).toBe(
+      colors.destructive,
+    );
+  });
+
+  it('offers Add Exercise as a full-width secondary button and Create Custom as quiet text', async () => {
+    await renderReady();
+
+    const add = screen.getByTestId('active-workout-add-exercise');
+    expect(screen.UNSAFE_queryAllByType(SecondaryButton).length).toBeGreaterThan(0);
+    expect(StyleSheet.flatten(add.props.style).borderWidth).toBe(1);
+    expect(add).toHaveTextContent('Add Exercise');
+    const custom = screen.getByTestId('active-workout-create-custom');
+    expect(StyleSheet.flatten(custom.props.style).borderWidth).toBeUndefined();
+    expect(custom).toHaveTextContent('Create Custom Exercise');
+  });
+
+  it('makes each set input a large, named, mono readout and each complete button a 44pt target', async () => {
+    await renderReady();
+
+    const weight = screen.getByTestId('exercise-card-we1-set-s2-weight');
+    const flat = StyleSheet.flatten(weight.props.style);
+    expect(flat.height).toBeGreaterThanOrEqual(48);
+    expect(flat.fontFamily).toBe(fonts.mono);
+    expect(weight.props.accessibilityLabel).toBe('Set 2 weight');
+    expect(screen.getByTestId('exercise-card-we1-set-s2-reps').props.accessibilityLabel).toBe(
+      'Set 2 reps',
+    );
+    const complete = StyleSheet.flatten(
+      screen.getByTestId('exercise-card-we1-set-s2-complete').props.style,
+    );
+    expect(complete.width).toBeGreaterThanOrEqual(44);
+    expect(complete.height).toBeGreaterThanOrEqual(44);
+  });
+
+  it('avoids the on-screen keyboard so the set being typed stays visible', async () => {
+    await renderReady();
+
+    expect(screen.UNSAFE_getAllByType(KeyboardAvoidingView).length).toBeGreaterThan(0);
+  });
+
+  it('shows the last session as plain text beside the sets -- all of it visible, none behind a horizontal scroll', async () => {
+    mockFetchPreviousPerformance.mockResolvedValue({
+      performedAt: '2026-01-05T00:00:00Z',
+      sets: [
+        { id: 'p1', setIndex: 1, weightKg: 100, reps: 5, completedAt: '...', side: null },
+        { id: 'p2', setIndex: 2, weightKg: 97.5, reps: 5, completedAt: '...', side: null },
+      ],
+    });
+    await renderReady();
+
+    await screen.findByTestId('exercise-card-we1-previous-session');
+    expect(screen.getByTestId('exercise-card-we1-previous-set-1')).toHaveTextContent(/100 kg × 5$/);
+    expect(screen.getByTestId('exercise-card-we1-previous-set-2')).toHaveTextContent(
+      /97.5 kg × 5$/,
+    );
+    expect(
+      screen.UNSAFE_queryAllByType(ScrollView).filter((node) => node.props.horizontal),
+    ).toHaveLength(0);
+  });
+});
+
+describe('ActiveWorkoutScreen renders no bare text outside <Text>', () => {
+  it('has no string directly inside a View, with a previous session shown', async () => {
+    mockFetchPreviousPerformance.mockResolvedValue({
+      performedAt: '2026-01-05T00:00:00Z',
+      sets: [{ id: 'p1', setIndex: 1, weightKg: 100, reps: 5, completedAt: '...', side: 'left' }],
+    });
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1-previous-session');
+
+    expectNoBareText();
   });
 });

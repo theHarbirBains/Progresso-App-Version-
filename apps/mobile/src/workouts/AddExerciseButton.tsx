@@ -1,18 +1,12 @@
-import { Text, TouchableOpacity } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { colors } from '../design/theme';
-import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { SecondaryButton } from '../design/Button';
 
 interface Props {
   onPress: () => void;
   testID?: string;
 }
 
+// The one way to add an exercise mid-workout: a full-width secondary button
+// (the filled button on this screen is reserved for Finish Workout).
 export function AddExerciseButton({ onPress, testID }: Props) {
-  return (
-    <TouchableOpacity testID={testID} style={styles.addExerciseButton} onPress={onPress}>
-      <Feather name="plus" size={16} color={colors.textPrimary} />
-      <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
-    </TouchableOpacity>
-  );
+  return <SecondaryButton testID={testID} label="Add Exercise" onPress={onPress} />;
 }

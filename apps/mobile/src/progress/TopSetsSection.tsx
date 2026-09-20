@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { FlatList, Text, TextInput, View } from 'react-native';
+import { FlatList, TextInput, View } from 'react-native';
+import { Text } from '../design/Text';
 import { colors, spacing } from '../design/theme';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';

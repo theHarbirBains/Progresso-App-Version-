@@ -51,7 +51,7 @@ These are three distinct concepts — do not conflate them.
 
 ## 6. Dashboard
 
-Personalized, opens with a greeting (e.g., "Good morning, Harbir"). Visually clean, not overloaded.
+Data-focused: no greeting or welcome header -- the widgets themselves lead. Visually clean, not overloaded.
 
 - **Nutrition section (one only):** calories, protein, carbs, fat — concise.
 - **Workout section:** current workout/split — name, muscles trained, athletic/premium visual muscle representation.

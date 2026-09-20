@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { fromKg, roundWeight } from '../lib/units';

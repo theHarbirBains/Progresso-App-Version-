@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { colors } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';

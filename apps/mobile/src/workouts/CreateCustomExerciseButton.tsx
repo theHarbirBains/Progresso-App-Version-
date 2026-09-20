@@ -1,18 +1,12 @@
-import { Text, TouchableOpacity } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { colors } from '../design/theme';
-import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { TextButton } from '../design/Button';
 
 interface Props {
   onPress: () => void;
   testID?: string;
 }
 
+// Creating a custom exercise is the less common path (the picker also offers
+// it), so it is a quiet text action under Add Exercise, not a second button.
 export function CreateCustomExerciseButton({ onPress, testID }: Props) {
-  return (
-    <TouchableOpacity testID={testID} style={styles.addExerciseButton} onPress={onPress}>
-      <Feather name="edit-3" size={16} color={colors.textPrimary} />
-      <Text style={styles.addExerciseButtonText}>Create Custom</Text>
-    </TouchableOpacity>
-  );
+  return <TextButton testID={testID} label="Create Custom Exercise" onPress={onPress} />;
 }

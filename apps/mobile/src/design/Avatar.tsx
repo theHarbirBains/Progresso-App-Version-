@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Image, Text, type StyleProp, type TextStyle } from 'react-native';
+import { Image, type StyleProp, type TextStyle } from 'react-native';
+import { Text } from './Text';
 import { Feather } from '@expo/vector-icons';
 
 interface Props {

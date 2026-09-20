@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '../design/Badge';
 import { colors } from '../design/theme';

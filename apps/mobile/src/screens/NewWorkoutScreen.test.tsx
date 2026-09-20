@@ -1,5 +1,8 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { getMyProfile } from '../lib/api';
 import { createWorkout } from '../workouts/workoutQueries';
@@ -322,5 +325,96 @@ describe('NewWorkoutScreen background refresh on focus', () => {
       refresh.resolve(baseProfile('split-1'));
       await refresh.promise;
     });
+  });
+});
+
+describe('NewWorkoutScreen -- one primary action, everything else plain rows', () => {
+  function renderScreen() {
+    return render(
+      <BackgroundThemeProvider>
+        <NewWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+  }
+
+  it('has exactly one card -- the Next Workout hero -- and no card per day or per option', async () => {
+    renderScreen();
+    await screen.findByTestId('start-workout-next');
+
+    expect(screen.UNSAFE_getAllByType(AppCard)).toHaveLength(1);
+  });
+
+  it('shows the primary "Start Workout" action inside the hero, as a real button that the card itself triggers', async () => {
+    renderScreen();
+    const hero = await screen.findByTestId('start-workout-next');
+
+    // The button is decorative inside the card (the card is the tap target and
+    // announces itself), so it is hidden from assistive tech -- look it up anyway.
+    expect(within(hero).getByText('Start Workout', { includeHiddenElements: true })).toBeTruthy();
+    // The card is the one tap target, and it is announced as one button.
+    expect(hero.props.accessibilityRole).toBe('button');
+    expect(hero.props.accessibilityLabel).toBe('Start Full Body workout, Chest • Back');
+
+    fireEvent.press(hero);
+    await waitFor(() =>
+      expect(mockCreateWorkout).toHaveBeenCalledWith('user-1', 'Full Body', 'day-1'),
+    );
+  });
+
+  it('shows the hero button as loading, and the card as disabled, while the workout is being created', async () => {
+    mockCreateWorkout.mockReturnValue(new Promise(() => undefined));
+    renderScreen();
+    const hero = await screen.findByTestId('start-workout-next');
+
+    fireEvent.press(hero);
+
+    await waitFor(() => expect(hero.props.accessibilityState.disabled).toBe(true));
+    expect(within(hero).UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(1);
+    expect(within(hero).queryByText('Start Workout')).toBeNull();
+  });
+
+  it('lists the other days as plain rows: one tap starts that day, described by its muscles', async () => {
+    renderScreen();
+    const row = await screen.findByTestId('start-workout-day-day-2');
+
+    expect(row.props.accessibilityRole).toBe('button');
+    expect(row.props.accessibilityLabel).toBe('Start Recovery workout, Abs');
+    expect(within(row).getByText('Recovery')).toBeTruthy();
+    const conditioning = screen.getByTestId('start-workout-day-day-3');
+    expect(conditioning.props.accessibilityLabel).toBe('Start Conditioning workout');
+  });
+
+  it('separates the day rows with hairlines, and never draws one above the first', async () => {
+    renderScreen();
+    const first = await screen.findByTestId('start-workout-day-day-2');
+    const second = screen.getByTestId('start-workout-day-day-3');
+
+    expect(StyleSheet.flatten(first.props.style).borderTopWidth).toBeUndefined();
+    expect(StyleSheet.flatten(second.props.style).borderTopWidth).toBe(StyleSheet.hairlineWidth);
+  });
+
+  it("draws no decorative icons -- the only glyph is each row's chevron", async () => {
+    renderScreen();
+    await screen.findByTestId('start-workout-next');
+
+    const names = screen.UNSAFE_getAllByType(Feather).map((icon) => icon.props.name);
+    expect(names.length).toBeGreaterThan(0);
+    expect(new Set(names)).toEqual(new Set(['chevron-right']));
+  });
+
+  it('keeps "Do a Different Workout" as one quiet row, not a card', async () => {
+    renderScreen();
+    const row = await screen.findByTestId('start-workout-custom');
+
+    expect(row.props.accessibilityRole).toBe('button');
+    expect(within(row).getByText('Not part of your split')).toBeTruthy();
+  });
+
+  it('gives every row at least a 44pt target', async () => {
+    renderScreen();
+    for (const id of ['start-workout-day-day-2', 'start-workout-custom']) {
+      const row = await screen.findByTestId(id);
+      expect(StyleSheet.flatten(row.props.style).minHeight).toBeGreaterThanOrEqual(44);
+    }
   });
 });

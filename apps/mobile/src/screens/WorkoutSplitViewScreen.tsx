@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppCard } from '../design/AppCard';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
+import { Text } from '../design/Text';
+import { AppHeader } from '../design/AppHeader';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
-import { colors } from '../design/theme';
+import { Screen } from '../design/Screen';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
@@ -19,10 +18,13 @@ type Props = RootStackScreenProps<'WorkoutSplitView'>;
 // as WorkoutSplitFormScreen: that screen auto-saves every change
 // immediately, so simply wanting to look at a split's structure shouldn't
 // risk editing it. Editing is one explicit tap away via the header button.
+//
+// Layout: the days are plain blocks (name, then its muscle groups as one
+// line of text) separated by hairlines. Muscle groups here are information,
+// not controls, so they are not chips or badges.
 export function WorkoutSplitViewScreen({ navigation, route }: Props) {
   const { splitId } = route.params;
-  const { theme, themeLoading } = useProgressTheme();
-  const insets = useSafeAreaInsets();
+  const { themeLoading } = useProgressTheme();
 
   const [detail, setDetail] = useState<WorkoutSplitDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,76 +61,68 @@ export function WorkoutSplitViewScreen({ navigation, route }: Props) {
   }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} testID="workout-split-view-scroll">
-        <View style={styles.header}>
-          <TouchableOpacity
-            testID="workout-split-view-back"
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Back"
-            accessibilityRole="button"
-          >
-            <Feather name="arrow-left" size={18} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.title} numberOfLines={1}>
-            {detail?.name ?? 'Workout Split'}
-          </Text>
-          {detail ? (
-            <TouchableOpacity
-              testID="workout-split-view-edit"
-              style={styles.backButton}
-              onPress={() => navigation.navigate('WorkoutSplitForm', { splitId: detail.id })}
-              accessibilityLabel="Edit split"
-              accessibilityRole="button"
-            >
-              <Feather name="edit-2" size={16} color={colors.textPrimary} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
+    <Screen
+      scrollTestID="workout-split-view-scroll"
+      header={
+        <AppHeader
+          title={detail?.name ?? 'Workout Split'}
+          leftAction={{
+            icon: 'arrow-left',
+            onPress: () => navigation.goBack(),
+            accessibilityLabel: 'Back',
+            testID: 'workout-split-view-back',
+          }}
+          rightAction={
+            detail
+              ? {
+                  icon: 'edit-2',
+                  onPress: () => navigation.navigate('WorkoutSplitForm', { splitId: detail.id }),
+                  accessibilityLabel: 'Edit split',
+                  testID: 'workout-split-view-edit',
+                }
+              : undefined
+          }
+        />
+      }
+    >
+      {error ? (
+        <Text testID="workout-split-view-error" style={styles.errorText}>
+          {error}
+        </Text>
+      ) : null}
 
-        {error ? (
-          <Text testID="workout-split-view-error" style={styles.errorText}>
-            {error}
-          </Text>
-        ) : null}
+      {detail && detail.days.length === 0 ? (
+        <EmptyState testID="workout-split-view-empty" title="This split has no days yet." />
+      ) : null}
 
-        {detail && detail.days.length === 0 ? (
-          <EmptyState
-            testID="workout-split-view-empty"
-            title="This split has no days yet."
-            icon={<Feather name="calendar" size={24} color={colors.textMuted} />}
-          />
-        ) : null}
-
-        {detail?.days.map((day) => (
-          <AppCard key={day.id} testID={`workout-split-view-day-${day.id}`} style={styles.dayCard}>
-            <Text style={styles.dayName}>{day.name}</Text>
-            {day.muscleGroups.length > 0 ? (
-              <View style={styles.muscleChipRow}>
-                {day.muscleGroups.map((group) => (
-                  <View
-                    key={group}
+      {detail?.days.map((day, index) => (
+        <View
+          key={day.id}
+          testID={`workout-split-view-day-${day.id}`}
+          style={[styles.dayBlock, index > 0 && styles.dayDivider]}
+        >
+          <Text style={styles.dayName}>{day.name}</Text>
+          {day.muscleGroups.length > 0 ? (
+            <View style={styles.muscleLine}>
+              {day.muscleGroups.map((group, groupIndex) => (
+                <Fragment key={group}>
+                  {groupIndex > 0 ? <Text style={styles.muscleSeparator}>·</Text> : null}
+                  <Text
                     testID={`workout-split-view-day-${day.id}-muscle-${group}`}
-                    style={[
-                      styles.muscleChip,
-                      { backgroundColor: theme.accent, borderColor: theme.accent },
-                    ]}
+                    style={styles.muscleLabel}
                   >
-                    <Text style={[styles.muscleChipText, { color: theme.onAccent }]}>
-                      {SPLIT_MUSCLE_GROUP_LABELS[group]}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text testID={`workout-split-view-day-${day.id}-no-groups`} style={styles.splitMeta}>
-                No muscle groups set
-              </Text>
-            )}
-          </AppCard>
-        ))}
-      </ScrollView>
-    </View>
+                    {SPLIT_MUSCLE_GROUP_LABELS[group]}
+                  </Text>
+                </Fragment>
+              ))}
+            </View>
+          ) : (
+            <Text testID={`workout-split-view-day-${day.id}-no-groups`} style={styles.noGroups}>
+              No muscle groups set
+            </Text>
+          )}
+        </View>
+      ))}
+    </Screen>
   );
 }

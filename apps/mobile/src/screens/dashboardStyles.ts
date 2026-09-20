@@ -1,12 +1,17 @@
 import { StyleSheet } from 'react-native';
-import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
+import { colors, fonts, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
 // Dashboard-specific layout only -- everything reusable (cards, buttons,
-// section headers, stat values, badges) comes from src/design/. This file
-// exists for the handful of things unique to this screen's composition.
-// Visual-restructure pass: reference-image-inspired Workout/Nutrition
-// segmented layout, still on the existing "Dark + Electric" tokens below --
-// no new palette introduced.
+// section headers, list rows, stat values, badges) comes from src/design/.
+// This file holds the handful of things unique to this screen's composition,
+// and every type size here is a `typeScale` token (no literal font sizes).
+//
+// Composition principle: Dashboard is the one screen with a photograph
+// behind it, so its content needs glass surfaces to stay readable -- but not
+// a surface per fact. Each mode is a few purposeful surfaces:
+//   Workout   : Next Workout (hero) . Activity (this week + stats) . Recent Workout
+//   Nutrition : Calories (hero) . Quick actions . Today's Meals . Weekly Calories
+// Inside a surface, groups are separated by hairlines, never by nested cards.
 export const dashboardStyles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -18,12 +23,8 @@ export const dashboardStyles = StyleSheet.create({
   // Fixed header: the brand row + mode toggle, pinned above the scrolling
   // content. A glass `surface` tint (GlassBackground, rendered as this
   // View's first child in DashboardScreen.tsx) -- tint + hairline border,
-  // deliberately no blur (no BlurView, unlike `chrome`), so the forest
-  // background never gets softened, just given enough contrast for the
-  // hamburger/wordmark/bell/mode-toggle to read clearly against it. See the
-  // Workout Mode readability refinement's own reasoning: the earlier
-  // "no fill at all" version traded too much legibility for background
-  // visibility.
+  // deliberately no blur, so the photo behind it stays sharp while the
+  // hamburger/wordmark/mode-toggle still read clearly against it.
   fixedHeader: {
     position: 'absolute',
     top: 0,
@@ -38,14 +39,11 @@ export const dashboardStyles = StyleSheet.create({
     elevation: 10,
   },
 
-  // The ScrollView itself fills the screen; scrollContent's paddingTop/
-  // paddingBottom (set from measured fixedHeader/bottomBar heights in
-  // DashboardScreen) keep real content from ever landing underneath them.
-  // Split into an outer (`scrollArea`, on the Animated.View wrapper that
-  // carries Workout mode's "swipe up to reveal the background" transform)
-  // and inner (`scrollAreaInner`, on the ScrollView itself) layer so the
-  // transform has its own view to animate without fighting the
-  // ScrollView's own layout.
+  // The ScrollView itself fills the screen; scrollContent's paddingTop
+  // (set from the measured fixedHeader height in DashboardScreen) keeps real
+  // content from ever landing underneath the header. There is no bottom
+  // inset to reserve: the bottom navigation is an in-flow sibling of the
+  // navigator (App.tsx), so this screen's area already ends above it.
   scrollArea: {
     flex: 1,
   },
@@ -55,48 +53,42 @@ export const dashboardStyles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.xxl,
   },
-  // Workout mode only -- see DashboardScreen.tsx's contentContainerStyle
-  // comment. Lets the greeting + three widgets fill whatever vertical
-  // space the device actually has (responsive, not a fixed-height guess),
-  // rather than leaving a large empty gap below This Week.
-  workoutModeFillContent: {
+  // The widget stack, shared by Workout and Nutrition mode. Every direct child
+  // is a widget, and the gap between two of them is exactly `widgetGap` (6px)
+  // -- never more. This deliberately does NOT stretch or distribute leftover
+  // viewport height, and does NOT squeeze widgets to fit a fixed height (which
+  // clips at larger Dynamic Type sizes). Widgets keep their natural size;
+  // spare height is a trailing gap below the last widget, and a stack that
+  // exceeds the viewport scrolls.
+  widgetStack: {
+    gap: widgetGap,
+  },
+  // Workout Home only (Nutrition keeps the natural-height stack above). The
+  // stack is at least as tall as the scroll area, and the WIDGETS share any
+  // spare height (see the `grow*` styles), so they run from the mode switcher
+  // down to the bottom navigation with no empty band at either end. Spare
+  // height is never handed to the gaps -- those stay exactly `widgetGap` -- and
+  // when the widgets are taller than the screen there is no spare height and
+  // the stack simply scrolls at natural size. The bottom padding is the same
+  // `widgetGap` rhythm as between widgets; it needs no safe-area term because
+  // the bottom navigation is an in-flow sibling that already owns the bottom
+  // inset.
+  workoutStackFill: {
     flexGrow: 1,
-    justifyContent: 'space-between',
+    paddingBottom: widgetGap,
   },
-  // Nutrition mode has no ScrollView at all (see DashboardScreen.tsx) --
-  // this is the plain, non-scrolling View that fills the fixed space
-  // between the header/footer overlays directly, so scrolling is
-  // structurally impossible rather than merely undesired. It's the Weekly
-  // Calories card specifically that absorbs any leftover space (see
-  // weeklyCaloriesSectionFill/weeklyCaloriesCardFill below), not evenly
-  // distributed gaps between every widget -- the other Nutrition cards
-  // keep their natural, compact height.
-  nutritionScreenArea: {
-    flex: 1,
-    paddingHorizontal: spacing.xxl,
+  // How spare height is shared, in proportion to each widget's natural height
+  // (roughly 250 : 275 : 100) so proportions hold at any screen size. Only a
+  // real Next Workout card grows; the one-line resume / "no upcoming workout"
+  // rows stay compact.
+  growHero: {
+    flexGrow: 5,
   },
-  // Compact variants of greetingRow/greetingBlock, used only in Nutrition
-  // mode's non-scrolling layout -- kept separate from the shared
-  // greetingRow/greetingBlock (still used by Workout mode's ScrollView)
-  // rather than trimming those, since Workout mode's own layout must stay
-  // untouched.
-  // flexShrink/minHeight: last-resort compression safety net (see
-  // nutritionQuickActionsSectionShrink's comment) -- the greeting is the
-  // least critical thing on this screen, so it's allowed to give first and
-  // most; minHeight only guarantees the name line itself stays readable.
-  nutritionGreetingRow: {
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-    flexShrink: 1,
-    minHeight: 28,
+  growActivity: {
+    flexGrow: 5,
   },
-  // No glass pill/background here (unlike Workout mode's shared
-  // greetingBlock) -- Nutrition mode's background is now a flat, generic
-  // dark backdrop (see backgroundThemes.ts), not a busy photo, so there's
-  // no separation problem for a translucent pill to solve.
-  nutritionGreetingBlock: {
-    alignItems: 'center',
-    alignSelf: 'center',
+  growRecent: {
+    flexGrow: 2,
   },
 
   topBar: {
@@ -120,176 +112,34 @@ export const dashboardStyles = StyleSheet.create({
     height: 22,
   },
   wordmark: {
+    ...typeScale.label,
+    fontFamily: fonts.display,
     color: colors.textSecondaryBright,
-    fontSize: 13,
-    fontWeight: '700',
     letterSpacing: 2,
   },
-  // Wraps the shared ModeToggle (see design/ModeToggle.tsx) -- preserves
-  // Dashboard's original spacing before the greeting row now that the
-  // toggle itself is a reusable component with no baked-in margin of its
-  // own (other screens want different spacing around it). Trimmed
-  // aggressively, alongside every other margin/padding in this file's
-  // Workout-mode section, so the full stack (greeting + Next Workout + the
-  // 2x2 stat grid + This Week) fits one screen without scrolling on
-  // typical phones -- this widget stack grew across several passes and
-  // needed a real second condensing pass, not just a touch-up.
+  // Wraps the shared ModeToggle (see design/ModeToggle.tsx) -- the toggle
+  // itself is a reusable component with no baked-in margin of its own
+  // (other screens want different spacing around it).
   modeToggleWrap: {
     marginBottom: spacing.sm,
   },
 
-  // Centered -- no longer a left-aligned row balanced against a
-  // right-side avatar (that was removed; see the note on greeting below).
-  greetingRow: {
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  // Two-line greeting -- a small time-of-day eyebrow ("GOOD MORNING") above
-  // the user's first name, replacing the earlier single-line "Good
-  // morning, Harbir" plus avatar. No avatar/initials render on this screen
-  // any more (see DashboardScreen.tsx's own note on this). Sits on the same
-  // dark glass fill as every other widget (GlassBackground, rendered as
-  // this View's first child in DashboardScreen.tsx) -- a text-shadow alone
-  // wasn't reliably dark/legible enough against a busy or lighter patch of
-  // the background photo, since this block has no card of its own.
-  greetingBlock: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    borderRadius: radii.lg,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    overflow: 'hidden',
-  },
-  greetingEyebrow: {
-    ...typeScale.sectionHeading,
-    color: colors.textSecondaryBright,
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.65)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  greeting: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.65)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-
   errorText: {
+    ...typeScale.callout,
     color: colors.destructive,
-    fontSize: 14,
     marginBottom: spacing.md,
   },
-  // Workout mode's stack grew with the 2x2 stat grid (see
-  // DashboardStatCard usage), so this stays tighter than nutritionSection
-  // below to keep the whole thing fitting one screen without scrolling.
-  section: {
-    marginBottom: spacing.xs,
-  },
-  // Trimmed to spacing.xs (from spacing.sm) now that Nutrition mode has no
-  // ScrollView fallback -- every widget's natural size has to fit the
-  // fixed space between the header/footer, so this stack needed the same
-  // kind of condensing pass Workout mode's `section` already went through.
-  nutritionSection: {
-    marginBottom: spacing.xs,
-  },
-  // Applied (merged with each card's own `style`) to every Nutrition-mode
-  // card. spacing.sm rather than AppCard's own default spacing.lg, since
-  // four compact cards still need to be tighter than a single full-size
-  // card -- but not as thin as an earlier spacing.xs pass, which read as
-  // text sitting too close to the card edges. Now that Weekly Calories no
-  // longer stretches to fill leftover space (see weeklyCaloriesSectionFill),
-  // there's real headroom for this without reintroducing clipping.
+  // Tighter card padding for the Nutrition-mode cards, which hold dense
+  // content (a ring + macros, a row of actions, a list).
   compactCard: {
     padding: spacing.sm,
-  },
-  // Real-device testing kept showing Weekly Calories itself clipped even
-  // after repeated rounds of trimming the OTHER widgets' spacing --
-  // guessing exact pixel budgets for "a typical phone" without being able
-  // to test on the actual device kept being wrong by a real margin each
-  // time. This card (the Calorie/Macro ring+macros widget) is deliberately
-  // NOT part of that shrink pool: CalorieRing draws a fixed-size SVG
-  // circle, which flexShrink cannot compress without literally clipping
-  // the ring -- a broken ring is worse than the problem this is meant to
-  // solve, so this card's own natural size (already trimmed -- see
-  // CalorieRing's `size` in DashboardScreen.tsx) is a second hard floor,
-  // same as Weekly Calories itself, and the *other* three widgets below
-  // (Quick Actions, Recent Meals, Greeting) absorb the shortfall instead.
-  // Their own minHeight floors are set low enough to guarantee they can
-  // give real room even in a worst-case estimate: Quick Actions can lose
-  // its subtitle line, Recent Meals can lose its logged rows down to just
-  // its header + "View All", the greeting can compress to a single line.
-  nutritionQuickActionsSectionShrink: {
-    flexShrink: 1,
-    minHeight: 40,
-  },
-  // Recent Meals additionally varies with real data (0-4 logged meals)
-  // rather than just being compressible chrome -- same flexShrink
-  // treatment as its siblings.
-  nutritionMealsSection: {
-    flexShrink: 1,
-    minHeight: 44,
-  },
-  // The last Nutrition-mode section (Weekly Calories). Deliberately NOT
-  // flexGrow anymore -- an earlier version stretched this card to fill
-  // whatever leftover vertical space the cards above it didn't use, which
-  // is exactly what produced a large, awkward empty area inside the card
-  // (the actual root cause of that complaint, not a spacing/padding
-  // problem). This card is now sized purely by its own content, same as
-  // every other Nutrition widget: "content, with balanced internal
-  // spacing," per the approved direction. If the stack above happens to be
-  // shorter than the available screen height, the leftover space is just a
-  // natural trailing gap below this card, above the bottom nav -- that's
-  // the expected, intentional look ("ends naturally above the
-  // BottomNavBar"), not something to be filled by stretching a card.
-  // flexShrink: 0 is the one thing that stays: this card must never be
-  // compressed below its own content and clipped -- see
-  // nutritionQuickActionsSectionShrink's comment for which widgets *do*
-  // absorb a too-tall stack instead.
-  weeklyCaloriesSectionFill: {
-    flexShrink: 0,
-    // Overrides nutritionSection's own marginBottom -- as the last widget,
-    // there's nothing below it to separate from.
-    marginBottom: 0,
-  },
-  weeklyCaloriesCardFill: {
-    flexShrink: 0,
-  },
-  // Wraps everything below the card's own header row (icon + "Weekly
-  // Calories" title, which stays at the top like every other card) -- just
-  // a deliberate gap below the header, no longer a flex-fill region (see
-  // weeklyCaloriesSectionFill's comment above).
-  weeklyCaloriesContentFill: {
-    marginTop: spacing.sm,
-  },
-  // color is supplied per-render by the active mode theme (see
-  // DashboardScreen.tsx).
-  viewAllText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  // Vertical padding for the Workout-mode widgets (Next Workout / This
-  // Week) -- deliberately tighter than AppCard's own default
-  // (spacing.lg), since these need to be as compact as possible for the
-  // whole Workout-mode stack to fit one screen without scrolling.
-  condensedCard: {
-    paddingVertical: spacing.sm,
   },
   cardTitle: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  cardMeta: {
-    color: colors.textSecondary,
-    fontSize: 13,
   },
 
-  // Dynamic Next Workout card -- driven by the user's active workout split
-  // and history (see workouts/nextWorkout.ts), never a hardcoded day.
+  // ---- Workout: Next Workout (the hero) ------------------------------------
   nextWorkoutHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -300,116 +150,37 @@ export const dashboardStyles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
-  // Small accent-colored badge (e.g. "PPL") derived from the split's own
-  // real name -- see workouts/splitBadge.ts. Uses the active mode theme's
-  // own accentBg/accentBorder tokens, not a hardcoded tint.
-  splitBadge: {
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  splitBadgeText: {
-    fontFamily: fonts.monoBold,
-    fontSize: 11,
-    letterSpacing: 1,
-  },
   nextWorkoutDayName: {
     ...typeScale.screenTitle,
     color: colors.textPrimary,
   },
-  nextWorkoutSplitName: {
+  nextWorkoutMeta: {
+    ...typeScale.secondary,
     color: colors.textSecondaryBright,
-    fontSize: 13,
-    marginTop: 2,
-    marginBottom: spacing.xs,
-  },
-  nextWorkoutButton: {
-    borderRadius: radii.lg,
-    paddingVertical: spacing.sm + 2,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  nextWorkoutButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  // A darker glass pill (surfaceRaised, the same token used for other
-  // secondary/inset chrome, e.g. quickActionIcon below) -- distinct from
-  // the plain-text button this replaced, so it reads as a real secondary
-  // action next to the primary accent-filled Start Workout button.
-  nextWorkoutSecondaryButton: {
-    alignItems: 'center',
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radii.lg,
-    marginTop: spacing.xs,
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  nextWorkoutSecondaryButtonText: {
-    color: colors.textSecondaryBright,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // 2x2 lifetime/weekly stat grid (Sets Done / Workouts This Month / Day
-  // Streak / Weekly Goal) -- see dashboard/DashboardStatCard.tsx. Each tile
-  // is a shared AppCard, not a hand-rolled background. Deliberately compact
-  // (smaller icon/value than a standalone stat card would use elsewhere)
-  // since this is one of four tiles inside an already-tall Workout-mode
-  // stack that needs to fit one screen without scrolling.
-  statGridRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  statGridCard: {
-    flex: 1,
-    padding: spacing.sm,
-  },
-  statGridIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: radii.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  statGridValue: {
-    ...typeScale.statMedium,
-    color: colors.textPrimary,
-  },
-  statGridTitle: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  statGridFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     marginTop: 2,
   },
-  statGridSubtitle: {
-    color: colors.textSecondary,
-    fontSize: 11,
+  // The card absorbs spare height by keeping its text block at the top and
+  // anchoring the actions to the bottom (the usual hero-card pattern), rather
+  // than stretching the gaps between individual lines. At natural height this
+  // is identical to before.
+  nextWorkoutCard: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+  },
+  // The primary action, then a quiet text action beneath it.
+  nextWorkoutActions: {
+    marginTop: spacing.lg,
+    gap: spacing.xs,
   },
 
-  // Weekly Process widget.
-  weeklyCountText: {
-    fontFamily: fonts.monoBold,
-    color: colors.textPrimary,
-    fontSize: 14,
-  },
-  weeklyHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
+  // ---- Workout: Activity (this week + the four stats) ----------------------
+  // One card holds the week strip and the stat grid: a set of facts that
+  // belong together, rather than five separate cards. The week strip stays its
+  // natural height; spare height goes to the stat grid below it (its two rows
+  // grow, each block centring its content).
+  activityCard: {
+    flexGrow: 1,
+    paddingVertical: spacing.md,
   },
   weeklyDaysRow: {
     flexDirection: 'row',
@@ -417,11 +188,11 @@ export const dashboardStyles = StyleSheet.create({
   },
   weeklyDay: {
     alignItems: 'center',
-    gap: 2,
+    gap: spacing.xs,
   },
   weeklyDayCircle: {
-    width: 26,
-    height: 26,
+    width: 30,
+    height: 30,
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.border,
@@ -429,86 +200,103 @@ export const dashboardStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   weeklyDayLabel: {
+    ...typeScale.caption,
     color: colors.textSecondary,
-    fontSize: 10,
   },
-
-  statMeta: {
-    color: colors.textMuted,
-    fontSize: 11,
+  // The 2x2 stat grid: four individual blocks separated by exactly `widgetGap`
+  // (6px) -- between the two rows AND between the two blocks in a row -- so
+  // each reads as its own block while the group stays one cohesive section.
+  // The space between them is a real gap (no borders, dividers or margins).
+  statGrid: {
+    flexGrow: 1,
+    gap: widgetGap,
+    marginTop: spacing.md,
+  },
+  statRow: {
+    flexDirection: 'row',
+    flexGrow: 1,
+    gap: widgetGap,
+  },
+  // A block: the raised surface token (a quiet step above the card), the
+  // control radius, no border. Its radius sits inside the card's (`lg`) with
+  // room to spare, so the two stay concentric.
+  statCell: {
+    flex: 1,
+    minHeight: 76,
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radii.md,
+  },
+  statValue: {
+    ...typeScale.statMedium,
+  },
+  // A word or name (Last Workout's workout name) in the regular UI face.
+  statValueText: {
+    ...typeScale.cardTitle,
+  },
+  statTitle: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
     marginTop: 2,
   },
+  statSubtitle: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
 
-  // Shared list-row language (Recent Top Sets / Recent Meals).
-  listRow: {
+  // ---- Workout: Recent Workout card ----------------------------------------
+  // Built from the same eyebrow/title/meta tokens as the Next Workout card so
+  // the two read as one family. `recentWorkoutTopSetRow` is a divider-topped
+  // row (the same hairline the macro columns use) holding the top set and,
+  // when the set is currently a record, its PR badge.
+  // The card fills whatever height it is given and keeps its content centred,
+  // so any spare height is even breathing room above and below.
+  recentWorkoutCard: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+  },
+  recentWorkoutHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.md,
+    justifyContent: 'space-between',
   },
-  listRowDivider: {
+  recentWorkoutDate: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+  },
+  recentWorkoutName: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+  },
+  recentWorkoutMeta: {
+    ...typeScale.secondary,
+    color: colors.textSecondaryBright,
+    marginTop: 2,
+  },
+  recentWorkoutTopSetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
     borderTopWidth: 1,
     borderTopColor: colors.divider,
   },
-  listThumb: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listRowBody: {
+  recentWorkoutTopSetText: {
+    ...typeScale.secondary,
+    color: colors.textPrimary,
     flex: 1,
   },
-  listRowTitle: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  listRowMeta: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  listRowTrailing: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  // color is supplied per-render by the active mode theme (see
-  // DashboardScreen.tsx).
-  listRowValue: {
-    fontFamily: fonts.monoBold,
-    fontSize: 15,
-  },
 
-  topSetRow: {
-    marginTop: spacing.xs,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  topSetText: {
-    color: colors.textPrimary,
-    fontSize: 15,
-  },
-  // color is supplied per-render by the active mode theme (see
-  // DashboardScreen.tsx).
-  topSetValue: {
-    fontFamily: fonts.monoBold,
-    fontSize: 17,
-  },
-  insight: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: spacing.xs,
-  },
-
-  // Calories Today ring card. Hierarchy per the reference design: a small
-  // icon+label row ("Calories"), then one big bold readout ("0 / 2,100") --
-  // the ring itself carries no text of its own (see CalorieRing's own
-  // comment), so this is the single place the number lives.
+  // ---- Nutrition: Calories (the hero) --------------------------------------
+  // Hierarchy: a small label ("Calories"), then one big readout ("0 / 2,100")
+  // -- the ring itself carries no text of its own (see CalorieRing), so this
+  // is the single place the number lives.
   ringCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -527,104 +315,36 @@ export const dashboardStyles = StyleSheet.create({
     ...typeScale.secondary,
     color: colors.textSecondary,
   },
-  // fontSize 26 vs macroAmount's 14 -- a deliberate ~2x gap so the calorie
-  // readout reads as the card's primary number and the macros clearly
-  // secondary, not three roughly-equal numbers competing for attention.
+  // The card's primary number, clearly larger than the macro amounts below.
   calorieBigValue: {
-    fontFamily: fonts.monoBold,
+    ...typeScale.statLarge,
     color: colors.textPrimary,
-    fontSize: 26,
   },
   calorieBigGoal: {
+    ...typeScale.statSmall,
     fontFamily: fonts.mono,
     color: colors.textSecondary,
-    fontSize: 15,
+  },
+  // "1,850 kcal left" / "150 kcal over" under the big readout -- the goal
+  // minus what's been logged. Color is supplied per render (theme.accent
+  // while under goal, textSecondary once over).
+  calorieRemaining: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
   },
   noGoalsText: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 12,
     marginTop: spacing.sm,
   },
-  noGoalsSubtitle: {
-    color: colors.textMuted,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  // Deliberate separation between the ring/calorie row and the macro row
-  // below it -- a clean section break (per the reference) rather than
-  // spacing alone trying to do that job.
+  // A clean break between the ring/calorie row and the macro row below it.
   heroDivider: {
     borderTopWidth: 1,
     borderTopColor: colors.divider,
     marginTop: spacing.xs,
     paddingTop: spacing.xs,
   },
-
-  // Weekly Calories card -- the daily target x7, with a game-style progress
-  // bar toward it (see computeWeeklyCalorieSummary). This card is the one
-  // widget that never shrinks (flexShrink: 0 on weeklyCaloriesCardFill), so
-  // ITS OWN natural size is the hard floor the rest of the Nutrition stack
-  // has to fit around -- sized down a third time (original 40/26 -> 30/20
-  // -> 26/17 here) since real-device testing kept showing this exact card
-  // clipped even after trimming every other widget. Still the biggest,
-  // boldest numbers on the card (per the approved "game-style" design),
-  // just no longer sized for a screen with room to spare.
-  weeklyCaloriesValue: {
-    fontFamily: fonts.monoBold,
-    color: colors.textPrimary,
-    fontSize: 26,
-  },
-  weeklyCaloriesUnit: {
-    fontFamily: fonts.displayMedium,
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-  weeklyCaloriesBarTrack: {
-    height: 10,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceRaised,
-    overflow: 'hidden',
-    marginTop: spacing.xs,
-  },
-  weeklyCaloriesBarFill: {
-    height: '100%',
-    borderRadius: radii.pill,
-  },
-  // Just the two real numbers (Consumed / Remaining, both from
-  // computeWeeklyCalorieSummary) -- deliberately no sentence/explanatory
-  // text here, per the approved design.
-  weeklyCaloriesStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    marginTop: spacing.xs,
-  },
-  weeklyCaloriesStatBlock: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  // Visual separator between Consumed/Remaining, matching the reference --
-  // the same hairline `divider` token used for macro columns above.
-  weeklyCaloriesStatDivider: {
-    width: 1,
-    alignSelf: 'stretch',
-    backgroundColor: colors.divider,
-  },
-  weeklyCaloriesStatLabel: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  weeklyCaloriesStatValue: {
-    fontFamily: fonts.monoBold,
-    color: colors.textPrimary,
-    fontSize: 17,
-  },
-
-  // Macro cards -- three equal columns separated by a hairline divider
-  // (colors.divider, the same "row dividers within a card" token used
-  // elsewhere) rather than gap/spacing alone, matching the reference's
-  // clear column separation.
+  // Three equal columns separated by the hairline `divider` token.
   macroRow: {
     flexDirection: 'row',
     marginTop: spacing.sm,
@@ -644,14 +364,13 @@ export const dashboardStyles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   macroName: {
+    ...typeScale.secondary,
+    fontFamily: fonts.semibold,
     color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
   },
   macroAmount: {
-    fontFamily: fonts.monoBold,
+    ...typeScale.statSmall,
     color: colors.textPrimary,
-    fontSize: 14,
     marginBottom: spacing.xs,
   },
   macroBarTrack: {
@@ -667,64 +386,41 @@ export const dashboardStyles = StyleSheet.create({
     borderRadius: 3,
   },
 
-  // Quick actions -- visual only, no functionality this task.
+  // ---- Nutrition: Quick actions --------------------------------------------
+  // One card, three equal actions separated by hairlines -- not three cards.
   quickActionsRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    alignItems: 'stretch',
   },
-  quickActionCard: {
+  quickAction: {
     flex: 1,
-    alignItems: 'flex-start',
-  },
-  // backgroundColor is supplied per-render (theme.accentBg) so the badge
-  // follows the active mode's accent -- see DashboardScreen.tsx.
-  quickActionIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: radii.pill,
+    minHeight: 72,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  quickActionDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+    backgroundColor: colors.divider,
+    marginVertical: spacing.xs,
   },
   quickActionTitle: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  quickActionSubtitle: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 2,
+    textAlign: 'center',
   },
 
-  // Shared "icon + title" row header used inside a card (Weekly Calories).
-  goalsHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  goalsTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  // Today's Meals' own header row -- icon badge + title + trailing chevron,
-  // the whole row tappable (navigates to Nutrition), replacing an earlier
-  // small top-right-only "View All" link with a clearer title treatment
-  // matching the reference design's icon-wrap + title + chevron row
-  // convention (DESIGN.md's own settingsStyles row pattern).
+  // ---- Nutrition: Today's Meals --------------------------------------------
+  // The whole header row is the tap target for the full list (title + chevron),
+  // like a ListRow. The meals themselves are ListRows.
   mealsHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  mealsHeaderIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
+    minHeight: 44,
   },
   mealsHeaderTitle: {
     ...typeScale.cardTitle,
@@ -732,68 +428,66 @@ export const dashboardStyles = StyleSheet.create({
     flex: 1,
   },
   mealsEmptyText: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
+    paddingBottom: spacing.xs,
   },
 
-  footer: {
-    alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-
-  // Decorative bottom bar -- Progresso has no real tab navigator today, so
-  // this is a purely visual row local to this screen, not new navigation
-  // architecture. See DashboardScreen.tsx's own note for detail. Fixed to
-  // the bottom of the screen (position/zIndex below) so it stays visible
-  // through scrolling, same as the fixed header above. A glass `chrome`
-  // surface (GlassBackground, rendered as this View's first child) -- the
-  // same real-blur treatment as the shared BottomNavBar used on every other
-  // screen, so Dashboard's own copy of the bar looks consistent with it.
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  // ---- Nutrition: Weekly Calories ------------------------------------------
+  goalsHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    borderTopWidth: 1,
-    borderTopColor: colors.glassBorderStrong,
-    paddingTop: spacing.sm,
+    justifyContent: 'space-between',
+  },
+  // A deliberate gap below the card's own title.
+  weeklyCaloriesContentFill: {
+    marginTop: spacing.sm,
+  },
+  // The daily target x7, with a progress bar toward it (see
+  // computeWeeklyCalorieSummary). The biggest, boldest number on the card.
+  weeklyCaloriesValue: {
+    ...typeScale.statLarge,
+    color: colors.textPrimary,
+  },
+  weeklyCaloriesUnit: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
+  weeklyCaloriesBarTrack: {
+    height: 10,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceRaised,
     overflow: 'hidden',
-    zIndex: 10,
-    elevation: 10,
+    marginTop: spacing.xs,
   },
-  bottomBarItem: {
-    alignItems: 'center',
-    gap: 2,
-    minWidth: 48,
-    paddingVertical: 4,
-  },
-  bottomBarLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  // Raised less than before (was -20) -- `bottomBar`'s own overflow:'hidden'
-  // (needed to clip its chrome blur/pill corners) was clipping the top of
-  // this circle whenever it poked that far above the bar's own bounds.
-  bottomBarCenter: {
-    width: 46,
-    height: 46,
+  weeklyCaloriesBarFill: {
+    height: '100%',
     borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -8,
   },
-  // Two of these are stacked behind bottomBarCenter's icon, one per mode
-  // theme; their opacity crossfades on mode switch (see DashboardScreen.tsx)
-  // so the accent transitions smoothly instead of snapping.
-  bottomBarCenterFill: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: radii.pill,
+  // Just the two real numbers (Consumed / Remaining, both from
+  // computeWeeklyCalorieSummary) -- deliberately no explanatory sentence.
+  weeklyCaloriesStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  weeklyCaloriesStatBlock: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  weeklyCaloriesStatDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+    backgroundColor: colors.divider,
+  },
+  weeklyCaloriesStatLabel: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  weeklyCaloriesStatValue: {
+    ...typeScale.statMedium,
+    color: colors.textPrimary,
   },
 });

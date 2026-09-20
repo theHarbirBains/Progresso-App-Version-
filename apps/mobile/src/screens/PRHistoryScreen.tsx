@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
+import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
+import { AppHeader } from '../design/AppHeader';
+import { ListRow } from '../design/ListRow';
+import { Screen } from '../design/Screen';
+import { Section } from '../design/Section';
 import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
 import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
-import { workoutStyles as styles } from './workoutStyles';
+import { exerciseProgressStyles as styles } from './exerciseProgressStyles';
 
 type Props = RootStackScreenProps<'PRHistory'>;
 
@@ -27,11 +33,16 @@ function formatDate(iso: string): string {
 // (see supabase/migrations/20260823100008_pr_infrastructure.sql) -- nothing
 // here is calculated client-side, it's a direct display of what the
 // database has already recomputed.
+//
+// Layout: the true 1RM as the one large accent readout (never estimated --
+// only a logged single-rep set makes one), then each rep-count PR as a plain
+// row (rep count, date, heaviest weight). "View Trend" is a row at the top.
 export function PRHistoryScreen({ route, navigation }: Props) {
   const { exerciseId, exerciseName } = route.params;
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
+  const { theme } = useProgressTheme();
 
   const [repPRs, setRepPRs] = useState<RepPR[]>([]);
   const [oneRepMax, setOneRepMax] = useState<OneRepMax | null>(null);
@@ -68,64 +79,80 @@ export function PRHistoryScreen({ route, navigation }: Props) {
   }, [userId, accessToken, exerciseId]);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{exerciseName}</Text>
-        <TouchableOpacity testID="pr-history-back" onPress={() => navigation.goBack()}>
-          <Text style={styles.backLink}>Back</Text>
-        </TouchableOpacity>
-      </View>
-
+    <Screen
+      scrollTestID="pr-history-scroll"
+      contentContainerStyle={styles.content}
+      header={
+        <AppHeader
+          title={exerciseName}
+          leftAction={{
+            icon: 'arrow-left',
+            onPress: () => navigation.goBack(),
+            accessibilityLabel: 'Back',
+            testID: 'pr-history-back',
+          }}
+        />
+      }
+    >
       {error ? (
-        <Text testID="pr-history-error" style={styles.error}>
+        <Text testID="pr-history-error" style={styles.errorText}>
           {error}
         </Text>
       ) : null}
 
       {loading ? (
-        <ActivityIndicator testID="pr-history-loading" size="large" color={colors.textPrimary} />
+        <View style={styles.loading}>
+          <ActivityIndicator testID="pr-history-loading" size="large" color={colors.textPrimary} />
+        </View>
       ) : (
         <>
-          <TouchableOpacity
+          <ListRow
             testID="view-trend"
-            style={styles.secondaryButton}
+            icon="trending-up"
+            title="View Trend"
+            subtitle="See how this lift has progressed over time"
             onPress={() => navigation.navigate('ExerciseProgress', { exerciseId, exerciseName })}
-          >
-            <Text style={styles.secondaryButtonText}>View Trend</Text>
-          </TouchableOpacity>
+          />
 
-          <View style={styles.banner}>
-            <Text style={styles.bannerTitle}>1RM</Text>
+          <Section title="1RM">
             {oneRepMax ? (
-              <Text testID="one-rep-max-value" style={styles.cardMetaHighlight}>
-                {formatWeight(oneRepMax.weightKg, weightUnit)}
-                {weightUnit} · {formatDate(oneRepMax.achievedAt)}
-              </Text>
+              <View>
+                <Text
+                  testID="one-rep-max-value"
+                  style={[styles.oneRepMaxValue, { color: theme.accent }]}
+                >
+                  {formatWeight(oneRepMax.weightKg, weightUnit)}
+                  {weightUnit}
+                </Text>
+                <Text style={styles.oneRepMaxDate}>{formatDate(oneRepMax.achievedAt)}</Text>
+              </View>
             ) : (
               <Text testID="one-rep-max-empty" style={styles.emptyText}>
                 No 1RM recorded yet — log a single-rep set to set one.
               </Text>
             )}
-          </View>
+          </Section>
 
-          <Text style={styles.bannerTitle}>Rep PRs</Text>
-          {repPRs.length === 0 ? (
-            <Text testID="rep-prs-empty" style={styles.emptyText}>
-              No rep PRs recorded yet
-            </Text>
-          ) : (
-            repPRs.map((pr) => (
-              <View key={pr.reps} testID={`pr-row-${pr.reps}`} style={styles.listItem}>
-                <Text style={styles.listItemTitle}>
-                  {pr.reps} Rep — {formatWeight(pr.bestWeightKg, weightUnit)}
-                  {weightUnit}
-                </Text>
-                <Text style={styles.listItemMeta}>{formatDate(pr.achievedAt)}</Text>
-              </View>
-            ))
-          )}
+          <Section title="Rep PRs">
+            {repPRs.length === 0 ? (
+              <Text testID="rep-prs-empty" style={styles.emptyText}>
+                No rep PRs recorded yet
+              </Text>
+            ) : (
+              repPRs.map((pr, index) => (
+                <ListRow
+                  key={pr.reps}
+                  testID={`pr-row-${pr.reps}`}
+                  divider={index > 0}
+                  title={`${pr.reps} Rep`}
+                  subtitle={formatDate(pr.achievedAt)}
+                  value={`${formatWeight(pr.bestWeightKg, weightUnit)}${weightUnit}`}
+                />
+              ))
+            )}
+          </Section>
         </>
       )}
-    </ScrollView>
+    </Screen>
   );
 }

@@ -2,12 +2,12 @@ import { useCallback, useRef } from 'react';
 import {
   FlatList,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
+import { Text } from './Text';
 import { colors, fonts, radii, spacing } from '../design/theme';
 
 const ITEM_HEIGHT = 44;

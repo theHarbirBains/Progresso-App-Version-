@@ -1,4 +1,9 @@
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { AppCard } from '../design/AppCard';
+import { fonts } from '../design/theme';
+import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
@@ -62,8 +67,12 @@ describe('PRHistoryScreen', () => {
 
     render(<PRHistoryScreen navigation={navigation} route={route} />);
 
-    expect(await screen.findByTestId('pr-row-5')).toHaveTextContent(/5 Rep — 110kg/);
-    expect(screen.getByTestId('pr-row-8')).toHaveTextContent(/8 Rep — 100kg/);
+    const five = await screen.findByTestId('pr-row-5');
+    expect(five).toHaveTextContent(/5 Rep/);
+    expect(five).toHaveTextContent(/110kg/);
+    const eight = screen.getByTestId('pr-row-8');
+    expect(eight).toHaveTextContent(/8 Rep/);
+    expect(eight).toHaveTextContent(/100kg/);
   });
 
   it('shows an empty state when there are no rep PRs yet', async () => {
@@ -151,5 +160,81 @@ describe('PRHistoryScreen', () => {
       exerciseId: 'ex-1',
       exerciseName: 'Bench Press',
     });
+  });
+});
+
+describe('PRHistoryScreen -- plain rows, one large 1RM readout', () => {
+  const twoPRs = [
+    { reps: 5, bestWeightKg: 110, sourceSetId: 's5', achievedAt: '2026-01-01T00:00:00Z' },
+    { reps: 8, bestWeightKg: 100, sourceSetId: 's8', achievedAt: '2026-01-02T00:00:00Z' },
+  ];
+
+  it('draws no cards', async () => {
+    mockFetchRepPRs.mockResolvedValue(twoPRs);
+    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('pr-row-5');
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+  });
+
+  it('shows the true 1RM as the one large accent-coloured mono readout, with its date beneath', async () => {
+    mockFetchOneRepMax.mockResolvedValue({
+      weightKg: 225,
+      sourceSetId: 's1',
+      achievedAt: '2026-01-01T00:00:00Z',
+    });
+    render(<PRHistoryScreen navigation={navigation} route={route} />);
+
+    const value = StyleSheet.flatten((await screen.findByTestId('one-rep-max-value')).props.style);
+    expect(value.color).toBe(DEFAULT_WORKOUT_THEME.accent);
+    expect(value.fontFamily).toBe(fonts.monoBold);
+    expect(value.fontSize).toBe(30);
+    expect(screen.getByText(/\d{4}/)).toBeTruthy();
+  });
+
+  it('shows each rep PR as a row: rep count and date on the left, the weight on the right', async () => {
+    mockFetchRepPRs.mockResolvedValue(twoPRs);
+    render(<PRHistoryScreen navigation={navigation} route={route} />);
+
+    const row = await screen.findByTestId('pr-row-5');
+    expect(row).toHaveTextContent(/^5 Rep.*110kg$/);
+  });
+
+  it('separates rep PR rows with a hairline, none above the first', async () => {
+    mockFetchRepPRs.mockResolvedValue(twoPRs);
+    render(<PRHistoryScreen navigation={navigation} route={route} />);
+
+    const first = StyleSheet.flatten((await screen.findByTestId('pr-row-5')).props.style);
+    const second = StyleSheet.flatten(screen.getByTestId('pr-row-8').props.style);
+    expect(first.borderTopWidth).toBeUndefined();
+    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+  });
+
+  it('offers View Trend as a plain, named row -- not a button styled as a card', async () => {
+    render(<PRHistoryScreen navigation={navigation} route={route} />);
+
+    const trend = await screen.findByTestId('view-trend');
+    expect(trend.props.accessibilityRole).toBe('button');
+    expect(trend.props.accessibilityLabel).toMatch(/^View Trend/);
+  });
+
+  it('names the back control for assistive tech', async () => {
+    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('view-trend');
+
+    expect(screen.getByTestId('pr-history-back').props.accessibilityLabel).toBe('Back');
+  });
+
+  it('renders no bare text outside <Text>', async () => {
+    mockFetchRepPRs.mockResolvedValue(twoPRs);
+    mockFetchOneRepMax.mockResolvedValue({
+      weightKg: 225,
+      sourceSetId: 's1',
+      achievedAt: '2026-01-01T00:00:00Z',
+    });
+    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('pr-row-5');
+
+    expectNoBareText();
   });
 });

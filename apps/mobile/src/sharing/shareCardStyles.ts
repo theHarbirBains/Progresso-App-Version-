@@ -1,184 +1,120 @@
 import { StyleSheet } from 'react-native';
+import { colors, radii, spacing, typeScale } from '../design/theme';
 
-// Deliberately simple -- functional sharing infrastructure, not the final
-// Progresso visual design. Reuses the same dark palette as workoutStyles.ts
-// (#0B0B0F background, #17171C surface, #FFD166 highlight accent) so the
-// card doesn't look out of place next to the rest of the app. The later
-// design phase is expected to replace this file's contents wholesale.
+// The Share Workout screen and the card it captures. Token-only.
+//
+// The card is deliberately brand-coloured rather than following the user's
+// accent or Background Theme: it becomes a PNG shared outside the app, so it
+// always uses the static Progresso palette (`colors.background`, the brand
+// `colors.accent` for PRs) and the same typography as the app. The screen
+// around it (frame, header, buttons) is the shared design system.
 export const shareCardStyles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#0B0B0F',
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 24,
+  content: {
+    alignItems: 'stretch',
+    gap: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  backLink: {
-    color: '#9A9AA5',
-    fontSize: 14,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  error: {
-    color: '#FF6B6B',
-    fontSize: 14,
-    marginBottom: 12,
+  errorText: {
+    ...typeScale.callout,
+    color: colors.destructive,
     textAlign: 'center',
+    marginBottom: spacing.md,
   },
-  retryButton: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A32',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+  loading: {
+    paddingVertical: spacing.xxl,
   },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cardWrapper: {
-    alignItems: 'center',
-    marginVertical: 12,
-  },
+
   // 9:16 -- the same aspect ratio the card is captured at (1080x1920), just
   // rendered at a screen-friendly width. The preview IS the captured view,
   // not a separate representation of it.
+  cardWrapper: {
+    alignItems: 'center',
+  },
   card: {
     width: 320,
     aspectRatio: 1080 / 1920,
-    backgroundColor: '#0B0B0F',
-    borderRadius: 16,
+    backgroundColor: colors.background,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: '#2A2A32',
-    padding: 20,
+    borderColor: colors.border,
+    padding: spacing.xl,
     justifyContent: 'space-between',
   },
   wordmark: {
-    color: '#9A9AA5',
-    fontSize: 13,
-    fontWeight: '700',
+    ...typeScale.label,
+    color: colors.textSecondary,
     letterSpacing: 3,
   },
   cardTop: {
-    gap: 4,
+    gap: spacing.xs,
   },
   workoutName: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '700',
-    marginTop: 12,
+    ...typeScale.screenTitle,
+    color: colors.textPrimary,
+    marginTop: spacing.md,
   },
   workoutDate: {
-    color: '#9A9AA5',
-    fontSize: 13,
+    ...typeScale.label,
+    color: colors.textSecondary,
   },
   musclesTrained: {
-    color: '#9A9AA5',
-    fontSize: 13,
+    ...typeScale.label,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   topSetsSection: {
-    marginTop: 18,
-    gap: 8,
+    marginTop: spacing.xl,
+    gap: spacing.sm,
   },
   sectionLabel: {
-    color: '#6B6B75',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    ...typeScale.sectionHeading,
+    color: colors.textMuted,
     marginBottom: 2,
   },
   topSetRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'baseline',
   },
   topSetExercise: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
+    ...typeScale.callout,
+    fontFamily: typeScale.cardTitle.fontFamily,
+    color: colors.textPrimary,
     flexShrink: 1,
-    paddingRight: 8,
+    paddingRight: spacing.sm,
   },
   topSetValue: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
   },
   prSection: {
-    marginTop: 16,
-    gap: 4,
+    marginTop: spacing.lg,
+    gap: spacing.xs,
   },
   prLine: {
-    color: '#FFD166',
-    fontSize: 13,
-    fontWeight: '700',
+    ...typeScale.label,
+    fontFamily: typeScale.cardTitle.fontFamily,
+    color: colors.accent,
   },
   footer: {
-    color: '#9A9AA5',
-    fontSize: 12,
-    marginTop: 16,
+    ...typeScale.statSmall,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
   },
+
+  // Below the card: Share is the one filled button, Save to Photos the quiet
+  // secondary.
   actions: {
-    marginTop: 20,
-    gap: 12,
-  },
-  actionButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  actionButtonDisabled: {
-    opacity: 0.5,
-  },
-  actionButtonText: {
-    color: '#0B0B0F',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryActionButton: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A32',
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  secondaryActionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  statusText: {
-    color: '#9A9AA5',
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 8,
+    gap: spacing.md,
   },
   savedText: {
-    color: '#7CE0A6',
-    fontSize: 13,
+    ...typeScale.callout,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginTop: 8,
   },
   actionError: {
-    color: '#FF6B6B',
-    fontSize: 13,
+    ...typeScale.callout,
+    color: colors.destructive,
     textAlign: 'center',
-    marginTop: 8,
   },
 });

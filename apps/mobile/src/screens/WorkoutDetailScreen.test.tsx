@@ -1,4 +1,9 @@
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { AppCard } from '../design/AppCard';
+import { fonts } from '../design/theme';
+import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
@@ -82,8 +87,10 @@ describe('WorkoutDetailScreen', () => {
 
     expect(await screen.findByText('Push Day')).toBeTruthy();
     expect(screen.getByTestId('exercise-card-we1')).toHaveTextContent(/Bench Press/);
-    expect(screen.getByText(/Set 1: 100kg × 10/)).toBeTruthy();
-    expect(screen.getByText(/Set 2: 110kg × 8/)).toBeTruthy();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText(/100kg × 10/)).toBeTruthy();
+    expect(screen.getByText('Set 2')).toBeTruthy();
+    expect(screen.getByText(/110kg × 8/)).toBeTruthy();
   });
 
   it('shows the computed top set', async () => {
@@ -210,5 +217,97 @@ describe('WorkoutDetailScreen current PR/1RM indicators', () => {
       exerciseId: 'ex1',
       exerciseName: 'Bench Press',
     });
+  });
+});
+
+describe('WorkoutDetailScreen -- plain blocks, quiet PR words', () => {
+  const twoExercises = {
+    ...workout,
+    exercises: [
+      ...workout.exercises,
+      {
+        id: 'we2',
+        exerciseId: 'ex2',
+        exerciseName: 'Overhead Press',
+        muscleGroup: 'shoulders' as const,
+        orderIndex: 2,
+        sets: [
+          { id: 's9', setIndex: 1, weightKg: 60, reps: 8, completedAt: '2026-01-01T12:30:00Z' },
+        ],
+      },
+    ],
+  };
+
+  it('draws no cards', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(twoExercises);
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('exercise-card-we2');
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+  });
+
+  it('separates exercises with a hairline, none above the first', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(twoExercises);
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+
+    const first = StyleSheet.flatten((await screen.findByTestId('exercise-card-we1')).props.style);
+    const second = StyleSheet.flatten(screen.getByTestId('exercise-card-we2').props.style);
+    expect(first.borderTopWidth).toBeUndefined();
+    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+  });
+
+  it('puts the workout name and its date in the header, with a named Back', async () => {
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+
+    expect(await screen.findByText('Push Day')).toBeTruthy();
+    expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeTruthy();
+    expect(screen.getByTestId('workout-detail-back').props.accessibilityLabel).toBe('Back');
+  });
+
+  it('offers Share as a named header action, only for a completed workout', async () => {
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+
+    const share = await screen.findByTestId('workout-detail-share');
+    expect(share.props.accessibilityLabel).toBe('Share workout');
+  });
+
+  it('makes each exercise title a named 44pt row that opens its PR history', async () => {
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+
+    const title = await screen.findByTestId('exercise-title-we1');
+    expect(title.props.accessibilityLabel).toBe('Bench Press, view PR history');
+    expect(StyleSheet.flatten(title.props.style).minHeight).toBeGreaterThanOrEqual(44);
+  });
+
+  it('shows each logged set as a row: its label, then the weight × reps as a mono readout', async () => {
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+
+    const value = await screen.findByText(/100kg × 10/);
+    expect(StyleSheet.flatten(value.props.style).fontFamily).toBe(fonts.monoBold);
+  });
+
+  it('marks a live PR with a quiet accent word, not a filled badge', async () => {
+    mockFetchRepPRs.mockResolvedValue([
+      { reps: 8, bestWeightKg: 110, sourceSetId: 's2', achievedAt: '2026-01-01T00:00:00Z' },
+    ]);
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+
+    const tag = StyleSheet.flatten((await screen.findByTestId('pr-tag-s2')).props.style);
+    expect(tag.color).toBe(DEFAULT_WORKOUT_THEME.accent);
+    expect(tag.backgroundColor).toBeUndefined();
+    expect(tag.borderWidth).toBeUndefined();
+  });
+
+  it('renders no bare text outside <Text>', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(twoExercises);
+    mockFetchOneRepMax.mockResolvedValue({
+      weightKg: 110,
+      sourceSetId: 's2',
+      achievedAt: '2026-01-01T00:00:00Z',
+    });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('pr-tag-s2');
+
+    expectNoBareText();
   });
 });

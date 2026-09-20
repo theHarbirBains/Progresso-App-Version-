@@ -4,10 +4,10 @@ import {
   Animated,
   Image,
   ScrollView,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../design/theme';

@@ -1,4 +1,5 @@
-import { TextInput, TouchableOpacity, View, Text } from 'react-native';
+import { TextInput, TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../design/theme';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
@@ -21,7 +22,9 @@ interface Props {
 
 // Every exercise's set list. Weight/reps lock once a set is marked complete
 // (un-completing it re-enables editing) -- keeps the common case (glance,
-// tap complete, move on) free of accidental edits mid-workout.
+// tap complete, move on) free of accidental edits mid-workout. Built for
+// one-handed use: 48pt-tall numeric fields with a large mono readout and a
+// 44pt complete button, each field named for assistive tech.
 export function SetRow({
   setIndex,
   weight,
@@ -43,6 +46,7 @@ export function SetRow({
       <TextInput
         testID={testID ? `${testID}-weight` : undefined}
         style={[styles.setInput, completed && styles.setInputCompleted]}
+        accessibilityLabel={`Set ${setIndex} weight`}
         keyboardType="decimal-pad"
         value={weight}
         onChangeText={onChangeWeight}
@@ -53,6 +57,7 @@ export function SetRow({
       <TextInput
         testID={testID ? `${testID}-reps` : undefined}
         style={[styles.setInput, completed && styles.setInputCompleted]}
+        accessibilityLabel={`Set ${setIndex} reps`}
         keyboardType="number-pad"
         value={reps}
         onChangeText={onChangeReps}

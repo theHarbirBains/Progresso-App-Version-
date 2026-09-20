@@ -1,8 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile } from '../lib/api';
+import { AppCard } from '../design/AppCard';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import {
   deleteWorkoutSplit,
   duplicateWorkoutSplit,
@@ -230,5 +232,77 @@ describe('WorkoutSplitsScreen background refresh on focus', () => {
       refresh.resolve([]);
       await refresh.promise;
     });
+  });
+});
+
+describe('WorkoutSplitsScreen -- rows, not cards', () => {
+  it('shows each split as a row with its actions beneath it, in no cards', async () => {
+    renderScreen();
+    await screen.findByTestId('workout-split-split-1');
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    const block = within(screen.getByTestId('workout-split-split-1'));
+    expect(block.getByTestId('workout-split-view-split-1')).toHaveTextContent(/PPL - Hypertrophy/);
+    for (const action of ['edit', 'duplicate', 'delete']) {
+      expect(block.getByTestId(`workout-split-${action}-split-1`)).toBeTruthy();
+    }
+  });
+
+  it('separates the splits with a hairline, none above the first', async () => {
+    renderScreen();
+    const first = await screen.findByTestId('workout-split-split-1');
+    const second = screen.getByTestId('workout-split-split-2');
+
+    expect(StyleSheet.flatten(first.props.style).borderTopWidth).toBeUndefined();
+    expect(StyleSheet.flatten(second.props.style).borderTopWidth).toBe(StyleSheet.hairlineWidth);
+  });
+
+  it('marks the active split with a quiet ACTIVE label in the mode accent, not a badge', async () => {
+    renderScreen();
+    const block = within(await screen.findByTestId('workout-split-split-1'));
+
+    const label = block.getByText('ACTIVE');
+    expect(StyleSheet.flatten(label.props.style).color).toBe(DEFAULT_WORKOUT_THEME.accent);
+    expect(StyleSheet.flatten(label.props.style).backgroundColor).toBeUndefined();
+  });
+
+  it('shows Delete in the destructive color and Edit/Duplicate neutral, all with 44pt targets', async () => {
+    renderScreen();
+    await screen.findByTestId('workout-split-split-1');
+
+    const color = (id: string) =>
+      StyleSheet.flatten(
+        within(screen.getByTestId(id)).getByText(
+          id.includes('delete') ? 'Delete' : id.includes('edit') ? 'Edit' : 'Duplicate',
+        ).props.style,
+      ).color;
+    expect(color('workout-split-delete-split-1')).toBe('#F0555C');
+    expect(color('workout-split-edit-split-1')).not.toBe('#F0555C');
+    for (const id of [
+      'workout-split-edit-split-1',
+      'workout-split-duplicate-split-1',
+      'workout-split-delete-split-1',
+      'workout-split-activate-split-2',
+    ]) {
+      expect(
+        StyleSheet.flatten(screen.getByTestId(id).props.style).minHeight,
+      ).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  it('has one clear primary action: a filled Create Workout Split button in the mode accent', async () => {
+    renderScreen();
+    const create = await screen.findByTestId('workout-splits-create');
+
+    const style = StyleSheet.flatten(create.props.style);
+    expect(style.backgroundColor).toBe(DEFAULT_WORKOUT_THEME.accent);
+    expect(create).toHaveTextContent('Create Workout Split');
+  });
+
+  it('keeps the primary action available on the empty state too', async () => {
+    mockFetchWorkoutSplits.mockResolvedValue([]);
+    renderScreen();
+
+    expect(await screen.findByTestId('workout-splits-create')).toBeTruthy();
   });
 });

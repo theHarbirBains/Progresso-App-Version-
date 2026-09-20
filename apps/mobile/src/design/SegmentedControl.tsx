@@ -1,10 +1,13 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from './Text';
 import { GlassBackground } from './GlassBackground';
-import { colors, radii, spacing } from './theme';
+import { colors, fonts, radii, spacing, typeScale } from './theme';
 
 interface Option<T extends string> {
   label: string;
   value: T;
+  /** Read by assistive tech instead of `label` -- for an abbreviated visible label ("4W"). */
+  accessibilityLabel?: string;
 }
 
 interface Props<T extends string> {
@@ -47,7 +50,7 @@ export function SegmentedControl<T extends string>({
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityState={{ selected, disabled: Boolean(disabled) }}
-            accessibilityLabel={option.label}
+            accessibilityLabel={option.accessibilityLabel ?? option.label}
           >
             <Text style={[styles.label, selected && { color: onAccentColor }]}>{option.label}</Text>
           </TouchableOpacity>
@@ -68,14 +71,18 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
+  // 36 + the track's own 4pt padding top and bottom = the 44pt minimum touch
+  // target (theme.minTouchTarget), so a segment is comfortable to hit without
+  // the control looking any taller than it did.
   segment: {
-    paddingVertical: spacing.xs,
+    minHeight: 36,
+    justifyContent: 'center',
     paddingHorizontal: spacing.xl,
     borderRadius: radii.pill,
   },
   label: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
     color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

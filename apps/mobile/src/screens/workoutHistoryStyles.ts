@@ -1,42 +1,31 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, spacing, typeScale } from '../design/theme';
 
-// Local to WorkoutHistoryScreen only -- deliberately not merged into
-// workoutStyles.ts, which several other screens (ExerciseProgress,
-// NutritionGoals/Today, PRHistory, WorkoutDetail) also depend on and are
-// out of scope for this migration.
+// WorkoutHistoryScreen ("Workouts"). Token-only. The frame (safe area, fixed
+// header, transparent root) is the shared `Screen`; workouts are `ListRow`s,
+// so this holds only the blocks that make up the page.
 export const workoutHistoryStyles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
-    // paints the selected Background Theme; screens no longer hardcode it.
-    backgroundColor: 'transparent',
-  },
-  // Mode toggle, below the shared AppHeader (hamburger + title). Condensed
-  // spacing throughout this file (this and the styles below) so the page's
-  // widgets sit closer together, without the subtitle line that used to
-  // separate the toggle from the header.
-  header: {
+  listContent: {
     paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.xxl,
   },
-  // Wraps the shared ModeToggle (design/ModeToggle.tsx) -- Workouts is one
-  // of the app's primary/root screens, so it keeps this the same way
-  // Dashboard does; deeper screens reached from here don't.
+  // Every group on the page (mode toggle, primary action, calendar, summary,
+  // day/recent lists) is separated by the same vertical step.
+  block: {
+    marginBottom: spacing.xl,
+  },
+  // Wraps the shared ModeToggle -- Workouts is one of the app's primary/root
+  // screens, so it keeps this the same way Dashboard does; deeper screens
+  // reached from here don't.
   modeToggleWrap: {
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
-  section: {
-    paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.md,
-  },
-  banner: {
-    marginBottom: spacing.sm,
-  },
-  bannerTitle: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
+
+  // "You have a workout in progress" -- a plain line above the one primary
+  // button, not a card.
+  resumeText: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
 
@@ -62,86 +51,29 @@ export const workoutHistoryStyles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Monthly summary
+  // Monthly summary: three neutral mono readouts separated from the calendar
+  // by a hairline.
   summaryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
   },
   summaryStat: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-  },
-  summaryIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   summaryLabel: {
     ...typeScale.caption,
     color: colors.textMuted,
-  },
-  summaryError: {
-    color: colors.destructive,
-    fontSize: 13,
-  },
-
-  // Selected-day / recent workout cards
-  card: {
-    borderLeftWidth: 3,
-    marginBottom: spacing.md,
-  },
-  cardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cardBody: {
-    flex: 1,
-  },
-  cardTitle: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-  },
-  cardMuscles: {
-    ...typeScale.secondary,
-    color: colors.textMuted,
     marginTop: 2,
   },
-  cardMetaRow: {
-    flexDirection: 'row',
+  errorText: {
+    ...typeScale.callout,
+    color: colors.destructive,
+  },
+  loading: {
+    paddingVertical: spacing.xl,
     alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.sm,
-  },
-  cardMetaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  cardMetaText: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-  },
-
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-
-  loadMoreButton: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    marginHorizontal: spacing.xxl,
-    marginBottom: spacing.md,
-  },
-  loadMoreText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

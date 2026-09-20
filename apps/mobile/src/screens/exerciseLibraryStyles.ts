@@ -1,60 +1,50 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, minTouchTarget, spacing, typeScale } from '../design/theme';
 
-// Local to ExerciseLibraryScreen's list/browse view only -- deliberately not
-// the legacy exerciseStyles.ts, which ExerciseFormScreen (create/edit, out
-// of scope for this pass) still relies on unchanged. Every color here comes
-// from the shared theme tokens, not the old hardcoded hex palette.
+// ExerciseLibraryScreen's list/browse view. Token-only; the screen frame
+// (safe area, header, transparent root) is the shared `Screen`, and each
+// exercise is a `ListRow`, so this file only holds what those don't cover:
+// the filter block above the list and the source tabs.
 export const exerciseLibraryStyles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
-    // paints the selected Workout background; this screen never hardcodes
-    // its own.
-    backgroundColor: 'transparent',
-  },
   listContent: {
     paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.md,
-    // Generous bottom padding so the last row clears the persistent global
-    // BottomNavBar (mounted in App.tsx, outside this screen) -- same
-    // convention as ProfileScreen's own scroll content.
-    paddingBottom: spacing.xxxl,
+    paddingBottom: spacing.xxl,
   },
 
   searchWrap: {
     marginBottom: spacing.md,
   },
-
-  // Extra vertical breathing room around the muscle-group filter row --
-  // matches the existing regression guard (ExerciseLibraryScreen.test.tsx)
-  // that this must stay positive.
+  // Vertical breathing room around the muscle-group filter row -- guarded by
+  // a regression test (must stay positive).
   chipsWrap: {
     marginVertical: spacing.sm,
   },
 
-  // "All / Built-in / Mine" category cards.
-  categoryRow: {
+  // "All / Built-in / Mine": three equal tabs sharing one hairline; the
+  // selected one is underlined and coloured with the mode accent. Plain
+  // pressable text, not cards -- there is nothing to group.
+  sourceTabs: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
+    marginTop: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
   },
-  categoryCard: {
+  sourceTab: {
     flex: 1,
+    minHeight: minTouchTarget + spacing.sm,
     alignItems: 'center',
-    padding: spacing.sm,
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  categoryCardIcon: {
-    marginBottom: spacing.xs,
-  },
-  categoryCardLabel: {
-    ...typeScale.secondary,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  categoryCardCount: {
+  sourceTabLabel: {
+    ...typeScale.callout,
+    fontFamily: typeScale.label.fontFamily,
     color: colors.textSecondary,
-    fontSize: 11,
+  },
+  sourceTabCount: {
+    ...typeScale.statSmall,
+    color: colors.textMuted,
     marginTop: 2,
   },
 
@@ -62,89 +52,29 @@ export const exerciseLibraryStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.sm,
   },
   countText: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
-  },
-  sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  sortButtonText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
   },
 
-  // Exercise rows -- each its own dark glass card (AppCard), not a plain
-  // divided list, matching the reference's clearly-separated row treatment.
-  exerciseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  exerciseRowLeft: {
-    flex: 1,
-    paddingRight: spacing.sm,
-  },
-  exerciseName: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  exerciseTagsRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  exerciseTag: {
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  exerciseTagText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  exerciseRowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  sourceBadge: {
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  sourceBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+  // Ownership marker on the right of a row: a quiet uppercase caption, the
+  // user's own exercises in the mode accent. (Colour supplied per render.)
+  sourceLabel: {
+    ...typeScale.caption,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 
-  emptyText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: spacing.xxxl,
+  emptyWrap: {
+    paddingTop: spacing.xxl,
   },
   errorText: {
+    ...typeScale.callout,
     color: colors.destructive,
-    fontSize: 14,
     marginBottom: spacing.md,
   },
-  loadMoreButton: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  loadMoreText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
+  loading: {
+    paddingVertical: spacing.lg,
   },
 });

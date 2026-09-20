@@ -1,6 +1,8 @@
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { AppCard } from './AppCard';
+import { AppCard, resetNestedCardWarning } from './AppCard';
+import { GlassBackground } from './GlassBackground';
+import { radii } from './theme';
 
 describe('AppCard', () => {
   it('renders as a plain view when no onPress is given', () => {
@@ -43,5 +45,99 @@ describe('AppCard', () => {
     expect(card.props.accessibilityRole).toBe('button');
     expect(card.props.accessibilityLabel).toBe('Start Push workout');
     expect(card.props.accessibilityState).toEqual({ disabled: true });
+  });
+});
+
+describe('AppCard variants and nesting', () => {
+  it('draws a glass surface by default, and none for the outline variant', () => {
+    const { rerender } = render(
+      <AppCard testID="card">
+        <Text>Content</Text>
+      </AppCard>,
+    );
+    expect(screen.UNSAFE_queryAllByType(GlassBackground)).toHaveLength(1);
+
+    rerender(
+      <AppCard testID="card" variant="outline">
+        <Text>Content</Text>
+      </AppCard>,
+    );
+    expect(screen.UNSAFE_queryAllByType(GlassBackground)).toHaveLength(0);
+    const style = StyleSheet.flatten(screen.getByTestId('card').props.style);
+    expect(style.borderWidth).toBe(1);
+  });
+
+  it('uses the surface radius, above the control radius, so buttons nested inside stay concentric', () => {
+    render(
+      <AppCard testID="card">
+        <Text>Content</Text>
+      </AppCard>,
+    );
+
+    expect(StyleSheet.flatten(screen.getByTestId('card').props.style).borderRadius).toBe(radii.lg);
+    expect(radii.lg).toBeGreaterThan(radii.md);
+  });
+
+  describe('nested-card warning', () => {
+    const originalEnv = process.env.NODE_ENV;
+    afterEach(() => {
+      process.env.NODE_ENV = originalEnv;
+      jest.restoreAllMocks();
+    });
+
+    it('warns once, in development, when a card is rendered inside another card', () => {
+      process.env.NODE_ENV = 'development';
+      resetNestedCardWarning();
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      render(
+        <AppCard>
+          <AppCard>
+            <Text>Nested</Text>
+          </AppCard>
+          <AppCard>
+            <Text>Nested again</Text>
+          </AppCard>
+        </AppCard>,
+      );
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toMatch(/inside another AppCard/);
+    });
+
+    it('never warns for sibling cards', () => {
+      process.env.NODE_ENV = 'development';
+      resetNestedCardWarning();
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      render(
+        <>
+          <AppCard>
+            <Text>A</Text>
+          </AppCard>
+          <AppCard>
+            <Text>B</Text>
+          </AppCard>
+        </>,
+      );
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('stays silent under test, and still renders the nested card normally', () => {
+      resetNestedCardWarning();
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      render(
+        <AppCard>
+          <AppCard testID="inner">
+            <Text>Nested</Text>
+          </AppCard>
+        </AppCard>,
+      );
+
+      expect(warn).not.toHaveBeenCalled();
+      expect(screen.getByTestId('inner')).toBeTruthy();
+    });
   });
 });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../design/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';

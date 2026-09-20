@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import * as navigationTransitions from '../navigation/navigationTransitions';
 import { AppBackgroundLayer } from './AppBackgroundLayer';
-import { BACKGROUND_THEME_ORDER } from './backgroundThemes';
+import { BACKGROUND_THEME_ORDER, BACKGROUND_THEMES } from './backgroundThemes';
 import { useBackgroundTheme } from './backgroundThemeStore';
 
 jest.mock('./backgroundThemeStore', () => ({
@@ -142,5 +142,46 @@ describe('AppBackgroundLayer', () => {
 
     const image = screen.getByTestId('app-background-image-workout');
     expect(image.props.blurRadius).toBeFalsy();
+  });
+});
+
+describe('AppBackgroundLayer photo visibility', () => {
+  beforeEach(() => {
+    mockUseBackgroundTheme.mockReturnValue({ theme: BACKGROUND_THEMES.obsidian });
+    jest.spyOn(navigationTransitions, 'useReduceMotionPreference').mockReturnValue(false);
+  });
+
+  const opacity = (testID: string) =>
+    StyleSheet.flatten(screen.getByTestId(testID).props.style).opacity;
+
+  it('shows the photo for the current mode by default (unchanged for callers that say nothing)', () => {
+    render(<AppBackgroundLayer mode="workout" />);
+
+    expect(opacity('app-background-image-workout')).toBe(1);
+    expect(opacity('app-background-image-nutrition')).toBe(0);
+    expect(opacity('app-background-depth-overlay')).toBe(1);
+  });
+
+  it('hides both photos and the vignette when showImage is false, leaving the flat theme fill', () => {
+    render(<AppBackgroundLayer mode="nutrition" showImage={false} />);
+
+    expect(opacity('app-background-image-workout')).toBe(0);
+    expect(opacity('app-background-image-nutrition')).toBe(0);
+    expect(opacity('app-background-depth-overlay')).toBe(0);
+  });
+
+  it('keeps both photos mounted while hidden, so returning to them is an instant opacity flip', () => {
+    render(<AppBackgroundLayer showImage={false} />);
+
+    expect(screen.getByTestId('app-background-image-workout')).toBeTruthy();
+    expect(screen.getByTestId('app-background-image-nutrition')).toBeTruthy();
+  });
+
+  it('brings the correct photo back when showImage turns on again', () => {
+    const { rerender } = render(<AppBackgroundLayer mode="nutrition" showImage={false} />);
+    rerender(<AppBackgroundLayer mode="nutrition" showImage />);
+
+    expect(opacity('app-background-image-nutrition')).toBe(1);
+    expect(opacity('app-background-image-workout')).toBe(0);
   });
 });

@@ -10,6 +10,8 @@ Progresso's internal design direction is **"Dark Glass"** — a premium-fitness 
 
 A deliberate simplicity rule still threads through the whole system: one accent color per context (not a rainbow of semantic colors), one card treatment (plus a rare "hero" variant), one radius scale, one spacing scale, and now one glass-surface treatment (§3b) reused everywhere rather than each screen inventing its own translucency. New UI should extend that consistency, not introduce a parallel one.
 
+Where each part applies: the **photographic background and depth vignette are Dashboard-only** (§3a); every other screen is a flat theme fill. **Glass is reserved** for grouped or actionable surfaces (`AppCard`) and structural chrome (bottom nav, side menu, sheets). A screen's content is **sections, rows and numbers by default — a card only where it earns its place** (§10, §17). The interface is one typeface plus mono readouts (§5), one bottom navigation (§11), and one set of shared primitives (`Screen`, `Section`, `ListRow`, `Stat`, `Button`, `Skeleton`) that every screen composes from.
+
 The relationship that gives every screen its depth, and that any new UI should preserve:
 
 ```
@@ -30,6 +32,8 @@ ACCENT (restrained — selected states, primary actions, key numbers — §4)
 
 Mounted **once**, behind the whole app (`App.tsx`'s `AppShell`) — no screen paints its own background; every screen's root `View`/`ScreenContainer`-equivalent is `backgroundColor: 'transparent'` so this shows through. Never hardcode a background color on a screen; if a screen needs to look different, that's a Background Theme concern (below), not a per-screen style.
 
+**The photograph is Dashboard-only.** It is the one screen designed around it; every other screen — including sign-in, onboarding and every Workout/Nutrition sub-screen — sits on the flat Background Theme fill (plus that theme's own restrained treatment), so dense, data-heavy content never competes with a photograph. `App.tsx`'s `Root` reports `showBackgroundPhoto` (true only while `Dashboard` is the current route) and `AppBackgroundLayer` takes it as `showImage` (default `true`). Layers 2 and 4 below follow it: the photo pair and the depth vignette both fade to `opacity: 0` when it is off. They stay mounted either way — the same instant-flip rule as `mode` — so returning to Dashboard never re-decodes a multi-megabyte image. Screen roots stay transparent everywhere; only what shows behind them changes.
+
 Layered bottom-to-top, for every theme, every screen:
 
 1. **Flat fill** — the active Background Theme's `colors.background` (one of 9 themes: Obsidian/Midnight/Forest/Plum/Starlight/Aurora/Topographic/Carbon/Particles, user-selected in Appearance settings, persisted via `BackgroundThemeContext`/`backgroundThemeStore`).
@@ -40,8 +44,6 @@ Layered bottom-to-top, for every theme, every screen:
 Glass surfaces (§3b) sit **above** all four of these layers — they are a foreground concern, never part of this background stack.
 
 **Reading the current theme**: components that only need to _read_ the active theme (any glass surface) call `useBackgroundTheme()` from `apps/mobile/src/design/backgroundThemeStore.ts` directly — it falls back to the Obsidian default with no Provider needed, which is what keeps every existing component-level test working unmodified. Only `BackgroundThemeProvider` (mounted once at the app root) and anything that needs to _change_ the theme (Appearance settings) imports from `BackgroundThemeContext.tsx`, which re-exports the same hook for convenience. Don't introduce a second background/theme system — extend `backgroundThemes.ts` (a new `BackgroundTreatment` variant, or a theme's `workoutImageSource`/`nutritionImageSource`) if a new environment is needed.
-
-**Swipe up to reveal the background (Workout mode only)**: Dashboard's Workout-mode widget stack (the Animated.View wrapping its ScrollView, `testID="dashboard-reveal-content"`) responds to an upward drag by translating itself down and off-screen, fully revealing this background stack underneath — a plain `PanResponder`/`Animated.Value` gesture (no gesture library; see `RgbSliderPicker`'s own precedent for the same choice), gated to a clear, mostly-vertical drag via `onMoveShouldSetPanResponderCapture` so ordinary taps on cards/buttons are never intercepted. On release, `shouldRevealBackground` (`apps/mobile/src/dashboard/revealGesture.ts`) decides whether to commit to fully hidden or spring back to visible, based on drag distance/velocity. Once hidden, a screen-covering, otherwise-invisible/pass-through overlay (`testID="dashboard-reveal-restore-overlay"`, `pointerEvents: 'none'` until revealed) shows a small "Swipe down to return" glass pill and restores the content on any tap or swipe. The fixed header and bottom bar are separate, always-on-top views (zIndex 10) untouched by this transform, so navigation stays reachable throughout. Nutrition mode has no equivalent gesture.
 
 ## 3b. Glass Surface System (`GlassBackground.tsx`)
 
@@ -124,12 +126,14 @@ glassBorderStrong: rgba(255, 255, 255, 0.14)   // glass-surface hairline, chrome
 
 ## 5. Typography
 
-Two font families, loaded via `useFonts()` before anything renders (`App.tsx`'s `FontGate`):
+**One typeface, plus mono for numbers.** Fonts are loaded via `useFonts()` before anything renders (`App.tsx`'s `FontGate`):
 
-- **Manrope** (`displayMedium` 500, `display` 700, `displayHeavy` 800) — every heading, label, and UI string.
+- **Manrope** — _all_ text: `body` 400, `displayMedium` 500, `semibold` 600, `display` 700, `displayHeavy` 800. There is no system-font text anywhere; body copy is Manrope Regular, so the app has one typeface rather than two competing sans-serifs.
 - **JetBrains Mono** (`mono` 500, `monoBold` 700) — **numeric "readout" values only** (stat values, PRs, calorie counts, wheel-picker numbers). Never used for prose, labels, or headings. This mono/sans split is a deliberate, approved direction — don't blur it.
 
-Type scale (`typeScale` in `theme.ts`) — use these, don't hand-pick `fontSize`:
+**`Text`** (`design/Text.tsx`) is the only `Text` the app uses — a drop-in for react-native's, never imported from `react-native` directly. React Native has no global default font, so without it any string that doesn't name a `fontFamily` falls back to the system font. `Text` resolves in order: an explicit `fontFamily` is left alone (mono readouts, the `typeScale` tokens); otherwise a written `fontWeight` picks the matching Manrope face and is then dropped (keeping it would ask the OS to synthesise bold on top of a face that is already bold); otherwise it is body text, Manrope Regular. A `Text` nested inside another with no family/weight of its own is left alone so it keeps inheriting the parent's face.
+
+Type scale (`typeScale` in `theme.ts`) — use these, don't hand-pick `fontSize`. Every token names its font family. Eight text tokens and three numeric readouts replace the 16 distinct literal sizes (10–30px) the app had drifted into:
 
 | Token            | Font          | Size                         | Use                                                                                                 |
 | ---------------- | ------------- | ---------------------------- | --------------------------------------------------------------------------------------------------- |
@@ -137,12 +141,14 @@ Type scale (`typeScale` in `theme.ts`) — use these, don't hand-pick `fontSize`
 | `screenTitle`    | displayHeavy  | 24                           | Standard screen title (`AppHeader`'s `title`)                                                       |
 | `sectionHeading` | display       | 12, uppercase, letter-spaced | `SectionHeader` labels                                                                              |
 | `cardTitle`      | display       | 16                           | Card/row titles, `ErrorState` title                                                                 |
-| `statLarge`      | monoBold      | 30                           | `StatValue` default size                                                                            |
-| `statMedium`     | mono          | 19                           | `StatValue` compact size                                                                            |
-| `body`           | (system)      | 15                           | Standard body text, input text                                                                      |
-| `secondary`      | (system)      | 13                           | Supporting/muted text (also covers "bodySmall" — not duplicated under a second name)                |
+| `statLarge`      | monoBold      | 30                           | `StatValue`/`Stat` large                                                                            |
+| `statMedium`     | mono          | 19                           | `StatValue`/`Stat` medium                                                                           |
+| `statSmall`      | monoBold      | 15                           | `Stat` small, a `ListRow`'s trailing value                                                          |
+| `body`           | body          | 15                           | Standard body text, input text                                                                      |
+| `callout`        | body          | 14                           | Dense row text: row titles, button labels, compact meta (14 was already the most-used size)         |
+| `secondary`      | body          | 13                           | Supporting/muted text (also covers "bodySmall" — not duplicated under a second name)                |
 | `label`          | displayMedium | 13                           | Form-field label above an input — distinct from `sectionHeading`                                    |
-| `caption`        | displayMedium | 11                           | Smallest supporting text, error/helper text under inputs                                            |
+| `caption`        | displayMedium | 11                           | Smallest supporting text, error/helper text under inputs, tab-bar labels                            |
 
 ## 6. Spacing
 
@@ -150,29 +156,41 @@ Type scale (`typeScale` in `theme.ts`) — use these, don't hand-pick `fontSize`
 xs: 4   sm: 8   md: 12   lg: 16   xl: 20   xxl: 24   xxxl: 32
 ```
 
-`spacing.xxl` is the standard screen horizontal padding (`ScreenContainer`, `AppHeader`, `BottomSheet`). Always reference `spacing.*` — no raw pixel margins/padding for values this scale already covers.
+`spacing.xxl` is the standard screen horizontal padding (`Screen`, `AppHeader`, `BottomSheet`). Always reference `spacing.*` — no raw pixel margins/padding for values this scale already covers.
+
+**`widgetGap` (6)** — a separate token exported from `theme.ts`, deliberately _not_ a step on the scale above. It is the **maximum** gap between two adjacent Dashboard widgets (cards, stat tiles, and the rows of tiles that hold them), in both Workout and Nutrition mode. It is applied once, as `gap` on each widget stack (`dashboardStyles.ts`'s `widgetStack`, `statGrid`, `statGridRow`, `quickActionsRow`) — individual widgets carry no outer margin of their own, and a stack never distributes leftover viewport height between its widgets (no `justifyContent: 'space-between'`, no `flexGrow` spreading) nor squeezes them to fit a fixed height. It governs only widget-to-widget separation; a card's internal padding, header spacing and text spacing still use `spacing.*`.
+
+**`minTouchTarget` (44)** — also exported from `theme.ts`: the smallest comfortable touch target. Controls are at least this size, either visibly or through `hitSlop` (§19).
 
 ## 7. Border Radii
 
 ```
-sm: 8   md: 10   lg: 14   pill: 999
+sm: 8   md: 12   lg: 16   pill: 999
 ```
 
-- `sm` — small elements (wheel-picker highlight)
-- `md` — the default for cards, inputs, icon-wrap boxes
-- `lg` — buttons, bottom-sheet top corners
+Each radius has one role, so nested surfaces stay optically concentric (the outer radius is at least the inner radius plus the gap between them):
+
+- `sm` — small inset elements (a wheel-picker highlight, a progress-bar track)
+- `md` — **controls**: buttons, inputs, chips, icon wells
+- `lg` — **surfaces that contain controls**: cards, bottom-sheet top corners
 - `pill` — fully-rounded: segmented controls, badges, tab pills, the bottom-nav's center "+" button, avatar circles
+
+(Controls used to sit _above_ their card — buttons 14 vs cards 10 — which reads as inverted once a button is inside a card.)
 
 ## 8. Buttons (`apps/mobile/src/design/Button.tsx`)
 
-Four variants, one file, no others:
+Four variants, three sizes, one file, no others. All four share one implementation of the pressable frame, sizing, disabled/loading rules and accessibility contract (role `button`, name = label unless `accessibilityLabel` overrides it, `{ disabled, busy }` state):
 
-- **`PrimaryButton`** — filled, `radii.lg`, accepts `accentColor`/`onAccentColor` (default `colors.accent`/`colors.onAccent`) so it can follow a screen's mode theme (mirrors `SegmentedControl`/`Toggle`'s override pattern). Background/text color are always supplied inline from these props — never hardcoded in the stylesheet, so there's no stale default to fall out of sync.
-- **`SecondaryButton`** — outlined (`colors.border`), `textPrimary` label, `radii.lg`.
+- **`PrimaryButton`** — filled, `radii.md`, accepts `accentColor`/`onAccentColor` (default `colors.accent`/`colors.onAccent`) so it can follow a screen's mode theme (mirrors `SegmentedControl`/`Toggle`'s override pattern). Background/text color are always supplied inline from these props — never hardcoded in the stylesheet, so there's no stale default to fall out of sync.
+- **`SecondaryButton`** — outlined (`colors.border`), `textPrimary` label.
 - **`DestructiveButton`** — outlined in `destructiveBorder`, `destructive`-colored label. For destructive actions only.
-- **`TextButton`** — plain text link, `textSecondary`, no container.
+- **`TextButton`** — plain text link, `textSecondary`, no container, but a full 44pt tall target.
 
-All four: `disabled` → `opacity: 0.5` (the app-wide disabled convention, §14). No fifth button variant should be introduced without updating this file.
+**Sizes** (`size` prop): `lg` (default, 52pt — the full-width primary action), `md` (44pt — a standard inline action), `sm` (36pt visible with an extended touch area so the target is still 44pt — compact contexts).
+
+**`loading`** replaces the label with a spinner (in the label's own colour), blocks presses and reports `busy` — the one place a "saving…" state lives, instead of each screen hand-rolling its own.
+
+`disabled` → `opacity: 0.5` (the app-wide disabled convention, §16). No fifth variant should be introduced without updating this file.
 
 ## 9. Inputs (`apps/mobile/src/design/TextInput.tsx`)
 
@@ -180,10 +198,15 @@ One bordered row: optional `label` above, the input itself (with optional left/r
 
 ## 10. Cards (`apps/mobile/src/design/AppCard.tsx`)
 
-One card component, two visual states, both now a glass surface (§3b — `GlassBackground`'s `surface` variant, tint + hairline border, no blur):
+Use a card where it **earns its place**: something the user taps, or a set of facts that genuinely belong together. Do not make it the default wrapper for every block of content — a screen of floating rectangles is exactly what this system avoids. Default to sections and rows (§17).
 
-- **Default** — translucent tint of the active Background Theme's `surface`, `glassBorder` hairline, `radii.md`, `spacing.lg` padding.
-- **`hero`** — same treatment, tinted toward `surfaceHero`/bordered in `borderHero` (§4) instead of following the per-theme environment, so it still reads as "the important one." Reserved for one card per screen.
+One card component, two variants plus the rare hero. The default is a glass surface (§3b — `GlassBackground`'s `surface` variant, tint + hairline border, no blur):
+
+- **`variant="surface"`** (default) — translucent tint of the active Background Theme's `surface`, `glassBorder` hairline, `radii.lg`, `spacing.lg` padding.
+- **`variant="outline"`** — the same frame with no fill, only the `glassBorder` hairline: for grouped content that shouldn't read as a raised, floating object.
+- **`hero`** — same treatment as `surface`, tinted toward `surfaceHero`/bordered in `borderHero` (§4) instead of following the per-theme environment, so it still reads as "the important one." Reserved for one card per screen.
+
+**A card never contains another card.** `AppCard` tracks nesting and warns once in development if one is rendered inside another (it never changes rendering, and is silent under test/production). Group with spacing, a hairline or a `ListRow` instead. The card's radius (`lg`) sits above the control radius (`md`), so a button or input inside a card stays optically concentric.
 
 `AppCard` renders as a `TouchableOpacity` when given `onPress`, otherwise a plain `View` — never wrap it in an extra pressable yourself.
 
@@ -195,7 +218,7 @@ Nutrition mode additionally layers a `NutritionForegroundLayer` (`apps/mobile/sr
 
 Three distinct, non-overlapping navigation surfaces — don't conflate them:
 
-1. **`BottomNavBar`** — the persistent 5-item bar (Home / Workouts / center "+" / Progress / Social) shown on Workouts and Social (Dashboard keeps its own copy since it additionally crossfades between the Workout/Nutrition accent — a static bar doesn't need that animation). A glass `chrome` surface (§3b — real blur + `glassBorderStrong` top edge only, no side/bottom border since it's flush with the screen edges). Active item uses the mode accent; inactive uses `textSecondary`. The center "+" is a filled, raised pill button opening `QuickActionMenu`. **Dashboard's own copy of this bar** is likewise a `chrome` glass surface, for the same reason, and uses the same `textSecondary` inactive color. Dashboard's fixed top header (brand row + hamburger/bell + the Workout/Nutrition mode toggle) keeps a glass `surface` tint of its own (§3b — tint + hairline border, deliberately **no** blur, so the forest/gym photo behind it stays sharp) — an earlier version removed the header's fill entirely to maximize background visibility, but the Workout Mode readability pass reintroduced it: with no fill at all, the header's brand row and icons blended into a busy photo behind them. The hamburger `IconButton`, bell icon, and wordmark use `textSecondaryBright` (not the darker default `textSecondary`) for the same reason, and the mode toggle keeps its own small `surface` glass treatment underneath the header's.
+1. **`BottomNavBar`** — the **one** bottom navigation in the app: Home / Workouts (Food in Nutrition mode) / center "+" / Progress (Goals in Nutrition mode) / Profile. It is mounted once in `App.tsx` as an in-flow sibling of the navigator, so it persists across every push/pop and appears on **Dashboard too** — Dashboard used to render a second, hand-maintained copy; that duplicate has been removed. It is hidden only on Onboarding and the pre-sign-in screens (which render outside the navigator). A glass `chrome` surface (§3b — real blur + `glassBorderStrong` top edge only, no side/bottom border since it's flush with the screen edges). Each tab is at least 56×48pt, an accessible `tab` named by its label (§19). Active item uses the mode accent; inactive uses `textSecondary`. The center "+" is a flush 44pt filled circle (no negative-margin lift) opening `QuickActionMenu`; when the mode accent changes (the Workout ↔ Nutrition switch) it crossfades between the two colours over 260ms — instantly under Reduce Motion. `mode` and `accentColor` come from `App.tsx`, which derives them from the current route or Dashboard's toggle. Dashboard's Progress/Goals tab is now always tappable (Dashboard's old copy disabled it in Nutrition mode); Progress shows its own "Nutrition progress is coming soon" state there. Dashboard's fixed top header (brand row + hamburger/bell + the Workout/Nutrition mode toggle) keeps a glass `surface` tint of its own (§3b — tint + hairline border, deliberately **no** blur, so the forest/gym photo behind it stays sharp) — with no fill at all, the header's brand row and icons blended into a busy photo behind them. The hamburger `IconButton`, bell icon, and wordmark use `textSecondaryBright` (not the darker default `textSecondary`) for the same reason, and the mode toggle keeps its own small `surface` glass treatment underneath the header's.
 2. **`AppSideMenu`** — the app-level global drawer (hamburger → full destination list, grouped under `SectionHeader`s), animated via `Animated`/`Pressable` (no drawer-navigator dependency), 280px wide, slides from the left, dismissible via backdrop tap or Android back button. Also a glass `chrome` surface (blur + `glassBorderStrong` right edge only) — the backdrop behind it stays the existing opaque `rgba(0,0,0,0.6)` scrim. Its two section lists (`APP_MENU_SECTIONS`, `apps/mobile/src/navigation/appMenuSections.ts`, and `NUTRITION_MENU_SECTIONS`, `nutritionMenuSections.ts`) are strictly mode-scoped — Workout mode's menu never lists a Nutrition destination and vice versa; Profile isn't in either (it's already one tap away via the bottom nav). The hamburger itself is reachable the same way from every main Workout-mode screen, not just Dashboard: Workout History, Progress, Workout Splits, and Exercise Library all open it from their own header (replacing what would otherwise be a back button, since these are bottom-nav/side-menu-reachable screens, not deep task screens) — mirroring how Nutrition mode already does this on Food Library/Nutrition Goals. Screens reached by pushing forward from one of those (a workout's detail, an active session, starting a new workout, etc.) keep a plain back arrow instead, same as Nutrition mode's own Food Search/Nutrition Goals sub-screens.
 3. **`CategoryTabs`** (`apps/mobile/src/settings/CategoryTabs.tsx`) — a screen-local horizontal pill-tab row for a screen's own internal sections (Settings' categories, Progress's sections). Generic over its key type so it's reused verbatim rather than re-implemented per screen — reach for this, don't build a new tab bar. Unselected pills are a glass `surface` (§3b, no blur — there can be several per row); the selected pill keeps its existing accent-tinted fill (`withAlpha(accentColor, 0.14)`) rather than glass, since a selected state should read as accent-forward, not translucent-neutral.
 4. **`ModeToggle`** (`apps/mobile/src/design/ModeToggle.tsx`) — the single Workout/Nutrition segmented switch, extracted from Dashboard's original implementation (identical visuals, identical 260ms crossfade). Shown **only** on the app's primary/root screens — Dashboard (Home), Workouts/Food, Progress, and Profile — never on a screen reached by pushing forward from one of those (Active Workout, Add Exercise, Workout/Exercise/PR/1RM detail, Log Food, Calorie Estimation, etc.): the principle is that a deep task screen already makes the current mode obvious, so a mode switch there would only be clutter, not a real choice. Settings is a further exception on its own terms — a global app-level area, independent of mode, so it never shows this toggle either. On every non-Dashboard root screen, tapping the _other_ mode's segment always navigates to `Dashboard` (each mode's one true landing page/Home) — never to that screen's own "mirror" in the other mode (e.g. Workouts' toggle does not go straight to Food, nor Food's to Workouts) — and reports the change via `reportMode` first so Dashboard opens already in the right mode; tapping the _already-selected_ segment is a no-op (no navigation, no report). Dashboard's own toggle never navigates (it already **is** Home for both modes) and instead flips its local `mode` state, exactly as before. The app's `sharedMode` flag (`App.tsx`'s `Root`, reported via `AppMenuContext`'s `reportMode`, read via `currentMode`) is what Progress/Profile fall back to for which segment shows selected, since neither screen's own route carries a mode identity (see `isNutritionRoute`/`MODE_AGNOSTIC_ROUTES`) — this matters for the case where the user reaches Progress or Profile via the bottom nav/side menu while already in Nutrition mode (not via this toggle): Progress has no Nutrition-side content yet, so it shows a single `ProgressEmptyState` ("Nutrition progress is coming soon") instead of its Workout-only tabs/sections in that case; Profile's own content doesn't depend on mode at all yet, so it looks the same either way.
@@ -226,18 +249,43 @@ One badge style. Default: brand-accent text on a 14%-alpha accent-tinted pill ba
 
 ## 16. States
 
-- **Loading**: `LoadingState` — full-bleed centered `ActivityIndicator` (`size="large"`, `colors.accent`) on `colors.background`. Inline/header-level loading (e.g. a save in progress) uses a small `ActivityIndicator` in place of the action icon (see `AppHeader`'s `loading` prop, `IconButton`'s `loading` prop).
-- **Empty**: `EmptyState` — optional icon slot + centered muted title (`textMuted`), nothing more. Replaces ad hoc "no data" gray text.
+- **Loading**: `LoadingState` — full-bleed centered `ActivityIndicator` (`size="large"`, `colors.accent`) on `colors.background`. Prefer `Skeleton`/`SkeletonRows` (`design/Skeleton.tsx`) where a screen can keep its own layout while data arrives: a `raised`-surface placeholder that pulses slowly on the native driver and is a static block under Reduce Motion, sized like a `ListRow` so nothing jumps when the real content lands. Inline/header-level loading (e.g. a save in progress) uses a small `ActivityIndicator` in place of the action icon (see `AppHeader`'s `loading` prop, `IconButton`'s `loading` prop) or a `Button`'s own `loading` prop.
+- **Empty**: `EmptyState` — optional icon slot + centered muted title (`textMuted`), an optional one-sentence `description`, and an optional single `action` (a small `SecondaryButton`) for the obvious next step. Replaces ad hoc "no data" gray text.
 - **Error**: `ErrorState` — icon slot + `cardTitle`-styled heading ("Something went wrong" by default) + muted message + optional plain-text "Retry" action (not a filled button — retrying isn't a destructive action, so it stays visually calm).
 - **Disabled**: `opacity: 0.5`, uniformly, across every interactive component (`Button`, `TextInput`'s row, `SegmentedControl`, `Toggle` via native `Switch`, `IconButton`). Don't invent a second disabled treatment.
 - **"Coming Soon" (visible-but-not-yet-functional)**: `ComingSoonRow` — a real row with a muted "Coming Soon" `Badge`, never a toggle or button that silently does nothing when pressed. Use this pattern whenever UI is intentionally ahead of its backend.
 
 ## 17. Layout Principles
 
-- Screens compose from the shared primitives (`ScreenContainer` or `AppHeader` for the frame, `AppCard` for content blocks, `SectionHeader` above each section) rather than each screen hand-rolling padding/scroll/safe-area handling.
-- `ScreenContainer` handles the device's real safe-area top inset (`useSafeAreaInsets`) + `spacing.lg`, plus `spacing.xxl` horizontal content padding — never hardcode a `paddingTop` guess.
-- List rows within a card follow the `settingsStyles` row convention: `rowIconWrap` (36×36 `surfaceRaised` circle/box) + `rowBody` (title + optional subtitle) + trailing chevron/badge/control, separated by `rowDivider` between rows in the same card.
-- One `SectionHeader` per logical group; don't nest section headers.
+- **`Screen`** (`design/Screen.tsx`) is the one screen frame: a transparent root (so `AppBackgroundLayer` shows through — a screen never paints its own background), the device's real top safe-area inset when there is no header (an `AppHeader` pads for it itself), an optional header slot, a scrolling or static body, standard `spacing.xxl` horizontal padding, and opt-in keyboard avoidance. It reserves no space for the bottom navigation — `BottomNavBar` is an in-flow sibling of the navigator, so the content area already ends above it. `ScreenContainer` predates it and remains only for the launch screen.
+- **Sections, not stacks of cards.** A screen is organised as `Section`s (`design/Section.tsx`: a `SectionHeader` plus an optional quiet header action) separated by whitespace. Do not nest section headers.
+- **`ListRow`** (`design/ListRow.tsx`) is the one list-row pattern, generalised from the Settings row: an optional 36pt neutral icon well, a title and optional subtitle, and a trailing chevron, mono value or custom control, with an optional hairline `divider` above. A group of rows on the screen replaces "a card per item" for history entries, exercises, meals, splits and settings alike.
+- **`Stat`** (`design/Stat.tsx`) is the labelled numeric readout (a mono `StatValue` plus a quiet caption). It is neutral by default — accent-colour only the one number that matters most — and it is never a card of its own.
+- **Dashboard composition.** Dashboard is the one screen with a photograph behind it, so its content keeps glass surfaces for legibility -- but a surface per group, not per fact. Workout Home is three: Next Workout (the hero), one Activity card (this week's strip plus four stat blocks -- Sets Done, Workouts, Steps, Last Workout -- each a quiet raised block separated from its neighbours by exactly `widgetGap`, 6px, with no dividers or borders), and Recent Workout. Nutrition is four: Calories (the hero), one Quick-actions card of three hairline-separated actions, Today's Meals (header row plus `ListRow`s), and Weekly Calories. Groups inside a surface are separated by hairlines or, for the stat blocks, by the 6px gap -- never nested cards; surfaces are separated by `widgetGap` (6px). Secondary actions are `TextButton`s, not a second bordered button; decorative icon tiles are dropped; only the one number that matters most per group wears the accent.
+
+- **Starting a workout & splits (Phase 3b).** These are flat screens (no photo), so they use rows, not cards, with exactly one primary action each:
+  - _Start Workout_: one hero `AppCard` (the suggested next day; the whole card is the tap target and announces itself as one button, with a decorative, screen-reader-hidden "Start Workout" `PrimaryButton` inside it), then "All Workout Days" as `ListRow`s, then "Do a Different Workout" as a plain row that opens a `BottomSheet`. Nothing else is a card.
+  - _Choose Split_: "Presets" as `ListRow`s (name, one-line description, the day names as a third `detail` line); the selected preset is marked by a Feather check in the mode accent, never a badge; the other rows disable while one is being applied. "Create Custom Split" is the single `SecondaryButton`.
+  - _Splits list / Split view_: each split or day is a plain block separated by a hairline (none above the first). The active split is a quiet uppercase "ACTIVE" label in the mode accent (not a `Badge`); Edit / Duplicate / Delete are `TextButton`s beneath the row (Delete uses `destructive`). A day's muscle groups are one wrapping line of muted text separated by `·` -- read-only information is never a chip. "Create Workout Split" is the one `PrimaryButton`.
+  - _Split form_: the shared `TextInput` for names (the split's name saves on `onBlur` when editing), days as hairline blocks with `IconButton` reorder/remove controls (each named, each a 44pt target), and muscle-group toggles as chips -- these ARE controls, so they are 36pt pills with a 44pt hit area, filled with the mode accent when on. "+ Add Workout Day" is the quiet `SecondaryButton`; Done / Create Split is the one primary.
+  - Shared-component additions that support this: `ListRow` `detail` (a third muted single line) and `titleTestID`; `TextButton` `destructive`; `TextInput` `onBlur`; `Screen` `scrollTestID`.
+- **Live workout (Phase 3c).** The screen used mid-set, one-handed, so speed and legibility beat decoration. Flat, no photo, no cards, exactly one filled button:
+  - _Active Workout_: the shared `Screen` frame with the workout name and its muscles in the header, then a pinned stats strip (`WorkoutStats`: duration, total sets, total volume as neutral mono readouts) that stays in view while the list scrolls. Exercises are plain blocks separated by hairlines (name, muscle group as muted text -- never a badge -- and bare 44pt reorder/remove glyphs). **Finish Workout** is the one filled button, pinned above the bottom navigation (which pads for the device inset itself, so the footer adds none). After the last exercise: **Add Exercise** (full-width `SecondaryButton`), **Create Custom Exercise** (`TextButton`) and **Cancel Workout** (destructive `TextButton`, still confirmed by an alert) -- Cancel is deliberately at the end of the list, away from Finish. The body avoids the keyboard.
+  - _Set rows_: 48pt-tall numeric fields with a large mono readout (`statMedium`), a 44pt complete button, each field named for assistive tech ("Set 2 weight"). A completed set locks its inputs and fills its check with the mode accent. A unilateral set is a Left and a Right row (labelled L/R) sharing one set number and one complete button; weight is always per side.
+  - _Last Workout_: every set of the last completed session, as a wrapping list of plain "weight unit × reps" readouts directly above the sets being logged -- all visible at once (nothing behind a horizontal scroll), no proportion bars or cards; View History is a small accent text link.
+  - _Add Exercise_ (`ExercisePickerModal`): a search field (the shared `TextInput`), the muscle-group filter, then one list of `ListRow`s whose first row is Create Custom Exercise. Already-added exercises are disabled and say so. The modal paints the current Background Theme itself because it has no `AppBackgroundLayer` behind it.
+  - _Create Custom Exercise_ (`ExerciseFormScreen`): the shared `Screen` with a Cancel (X) in the header, labelled shared inputs, the muscle-group chips, the Exercise Type / Logging Style segmented controls, an optional Machine / Equipment section (create only; the photo action is a `SecondaryButton`, the explanation is plain muted text, not info cards) and one filled Save Exercise. Deactivate is a destructive outline and Reactivate a neutral one, beneath Save.
+
+- **Exercises (Phase 3d).** Flat screens, no cards: sections, rows and one accent readout.
+  - _Exercise Library_: the shared `Screen` with the menu on the left and a New Exercise "+" on the right of the header. Search, the muscle-group filter, then an **All / Built-in / Mine** tab row (each tab is a label over its real total as a mono number; the selected tab is underlined and coloured in the mode accent; each is at least 44pt tall). Below it, the count and a quiet `TextButton` sort toggle, then the exercises as `ListRow`s: name, one muted "Muscle · Movement" line, and a plain uppercase Built-in / Mine word on the right (Mine in the mode accent -- a word, not a badge). Only the user's own exercises show a chevron and open for editing; built-ins are read-only.
+  - _Exercise Progress_: the shared `Screen` with a Back arrow, one `SegmentedControl` for the time range (short labels 4W / 3M / 6M / 1Y / All, each read out in full via the option's `accessibilityLabel`), then `Section`s -- Top Set, Rep PR and True 1RM progression (a chart in the Workout accent with its range as a mono readout underneath, or a plain empty sentence), Best Performances as two `ListRow`s, and Consistency. Charts follow the selected range; Best Performances are all-time. Nothing is estimated.
+  - _PR History_: a View Trend `ListRow`, then the true 1RM as the one large accent mono readout (`statLarge`) with its date beneath, then each rep-count PR as a `ListRow` (rep count, date, and the heaviest weight as the row's value) separated by hairlines.
+  - Shared-component addition: `SegmentedControl` options accept an optional `accessibilityLabel`.
+
+- **History & sharing (Phase 3e).** Flat, no cards; one primary action per screen.
+  - _Workouts (history)_: the shared `Screen` with a fixed header (menu), then in the scrolling list: the Workout/Nutrition toggle, the one primary action -- **Start New Workout**, or **Resume** under a plain "You have a workout in progress" line -- the month calendar with its legend, the month summary (Workouts / Total Time / Total Sets as three neutral mono readouts under a hairline, no icon circles), the selected day's workouts, and Recent Workouts. A workout is a `ListRow`: split day (or the workout's name), the muscles trained, and one muted "date · duration · sets" line; rows are separated by hairlines, with no accent stripe. Load More is a `TextButton`. The calendar's month arrows are 44pt targets and each day is named ("September 5, workout completed").
+  - _Workout Detail_: the workout's name and date in the header (Back on the left, a Share icon on the right once completed). Each exercise is a plain block separated by hairlines: its name as a 44pt row that opens PR History, the top set, then a row per logged set ("Set 1" label, weight × reps as a mono readout). A set that is still the live record carries a quiet accent **PR** or **1RM** word -- never a badge. Blank sets are not shown.
+  - _Share Workout_: the shared frame with Back, the share card, then **Share** (the one filled button, showing busy while it captures) and **Save to Photos** (outlined). The card is the image that gets shared, so it always uses the static brand palette (`colors.background`, brand `colors.accent` for PRs) with the app's typography (Manrope, mono numerals) rather than the user's accent or Background Theme.
 
 ## 18. Responsive Behavior
 
@@ -250,6 +298,9 @@ The app is phone-only (no tablet-specific layout exists). Within that: `Category
 - Custom accent colors are contrast-checked, not assumed: `buildAccentTheme` computes WCAG relative luminance/contrast against both ink colors and picks whichever wins (§3) — this is the one place in the app doing real contrast math, and any new accent-driven text-on-fill combination should reuse it rather than guessing.
 - Reduce Motion is respected everywhere an animation exists (`AppSideMenu`, `BottomSheet`, screen transitions) — a new animated component must check `useReduceMotionPreference()` too. `AppBackgroundLayer`'s depth overlay (§3a) is a static gradient, never animated, so it needs no such check.
 - Glass surfaces (§3b) are translucent, not indistinct: `GlassBackground`'s tint opacity (`surface` 86%, `chrome` 80%) was chosen so `textPrimary`/`textSecondary` keep their existing contrast against the darkest theme — raising `surface`'s alpha only ever improves this (a darker foundation behind light text), never regresses it. Never reduce a glass surface's fill opacity below what `AppCard`/`BottomNavBar` already use without re-checking text contrast on top of it — the background must never overpower foreground content.
+- **Touch targets are at least 44pt** (`minTouchTarget` in `theme.ts`). `Button` sizes, `ListRow`, `SegmentedControl` segments, `ErrorState`'s retry and every bottom-nav tab meet it visibly; `IconButton` (36pt visible), the compact `sm` button and `Section`'s header action keep their small appearance and extend the touch area with `hitSlop`.
+- The bottom navigation is exposed as a `tablist` of `tab`s, each named by its visible label, with `{ selected }` state; a `Button` reports `{ disabled, busy }` and is named by its label unless overridden; `SkeletonRows` announces a single "Loading" state rather than one stop per block.
+- Text scales with the user's Dynamic Type setting, so no screen may depend on a fixed height (§20). Dashboard's Nutrition mode was the last fixed-height, non-scrolling layout and now scrolls, exactly like Workout mode, so larger text can never clip a widget.
 
 ## 20. UI Do's and Don'ts
 
@@ -261,6 +312,8 @@ The app is phone-only (no tablet-specific layout exists). Within that: `Category
 - Reuse `GlassBackground` (§3b) for any new "major surface" (a card, a persistent chrome bar, a modal) instead of hand-rolling translucency/blur — render it as the surface's first child and keep the consumer's own border-radius/`overflow: 'hidden'`.
 - Use `ComingSoonRow` for real-but-not-yet-functional UI instead of a control that does nothing.
 - Check `useReduceMotionPreference()` before adding any new animation.
+- Compose a screen from `Screen`, then `Section`s of `ListRow`s and `Stat`s; reach for an `AppCard` only for something the user taps or a set of facts that belong together (§10, §17).
+- Import `Text` from `design/Text` for every string, so it renders in Manrope (§5).
 
 **Don't:**
 
@@ -276,3 +329,9 @@ The app is phone-only (no tablet-specific layout exists). Within that: `Category
 - Don't give every element a glass treatment — buttons, inputs, badges, and chart components stay as documented in their own sections (§3b). Glass is for major/structural surfaces, not small or simple content.
 - Don't use the `chrome` (blurred) glass variant for anything that can appear more than once on screen at a time — reserve real blur for the single persistent nav/drawer/sheet instance; everything else uses the unblurred `surface` variant (§3b).
 - Don't introduce a second background/theme system — extend `backgroundThemes.ts` (§3a) if a new environment is needed.
+- Don't give a card another card: never nest an `AppCard` inside an `AppCard` (§10). Group with spacing, a hairline or a `ListRow` instead.
+- Don't write a `fontFamily`/`fontWeight` pair by hand for ordinary text — use a `typeScale` token, or a bare `fontWeight` and let `Text` resolve it (§5). Never import `Text` from `react-native`.
+- Don't add a second bottom navigation, or a screen-owned copy of the tab bar (§11).
+- Don't hand-roll a button, list row, screen frame, section heading or loading placeholder — use `Button`, `ListRow`, `Screen`, `Section` and `Skeleton` (§8, §17).
+- Don't make an interactive element smaller than 44pt to hit (§19) — extend its `hitSlop` if the visible size must stay small.
+- Don't size a layout to fit its text at one font size (a fixed height, a `flexShrink` squeeze pool) — text scales with the user's Dynamic Type setting, so a layout that can't grow will clip.

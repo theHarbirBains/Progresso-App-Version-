@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, Text, TextInput, View } from 'react-native';
+import { ScrollView, TextInput, View } from 'react-native';
+import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
 import { colors } from '../design/theme';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../design/theme';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';

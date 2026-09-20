@@ -1,4 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { PrimaryButton } from '../design/Button';
+import { colors, fonts } from '../design/theme';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
@@ -316,6 +320,75 @@ describe('ShareWorkoutScreen save action', () => {
 
     await screen.findByTestId('share-workout-save-error');
     expect(mockRequestPermissionsAsync).not.toHaveBeenCalled();
+    await settle();
+  });
+});
+
+describe('ShareWorkoutScreen -- the card, then one primary action', () => {
+  it('has one filled button -- Share -- with Save to Photos as the outlined secondary', async () => {
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('share-card');
+
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    expect(screen.getByTestId('share-workout-share')).toHaveTextContent('Share');
+    const save = StyleSheet.flatten(screen.getByTestId('share-workout-save').props.style);
+    expect(save.backgroundColor).toBeUndefined();
+    expect(save.borderWidth).toBe(1);
+    await settle();
+  });
+
+  it('draws the card from the brand palette and app typography, not hardcoded colours', async () => {
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />);
+    const card = StyleSheet.flatten((await screen.findByTestId('share-card')).props.style);
+
+    expect(card.backgroundColor).toBe(colors.background);
+    expect(card.borderColor).toBe(colors.border);
+    const set = StyleSheet.flatten(screen.getByTestId('share-card-top-set-0').props.style);
+    expect(set.fontFamily).toBe(fonts.monoBold);
+    const pr = within(screen.getByTestId('share-card-pr-section')).getByText(/8 Rep PR/);
+    expect(StyleSheet.flatten(pr.props.style).color).toBe(colors.accent);
+    await settle();
+  });
+
+  it('names the back control for assistive tech', async () => {
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('share-card');
+
+    expect(screen.getByTestId('share-workout-back').props.accessibilityLabel).toBe('Back');
+    await settle();
+  });
+
+  it('shows Share as busy while the card is being captured', async () => {
+    mockCaptureRef.mockReturnValue(new Promise(() => undefined));
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('share-card');
+
+    fireEvent.press(screen.getByTestId('share-workout-share'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('share-workout-share').props.accessibilityState).toEqual({
+        disabled: true,
+        busy: true,
+      }),
+    );
+  });
+
+  it('shows the load error with a Retry button that reloads', async () => {
+    mockFetchShareCardData.mockRejectedValueOnce(new Error('boom'));
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />);
+
+    expect(await screen.findByTestId('share-workout-load-error')).toHaveTextContent('boom');
+    fireEvent.press(screen.getByTestId('share-workout-retry'));
+
+    expect(await screen.findByTestId('share-card')).toBeTruthy();
+    await settle();
+  });
+
+  it('renders no bare text outside <Text>', async () => {
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('share-card');
+
+    expectNoBareText();
     await settle();
   });
 });

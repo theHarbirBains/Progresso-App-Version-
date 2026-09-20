@@ -1,17 +1,10 @@
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppCard } from '../design/AppCard';
+import { ActivityIndicator, FlatList, Modal, View } from 'react-native';
+import { Text } from '../design/Text';
+import { AppHeader } from '../design/AppHeader';
 import { useBackgroundTheme } from '../design/BackgroundThemeContext';
+import { ListRow } from '../design/ListRow';
+import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import { fetchExercises, type ExerciseRow } from '../exercises/exerciseQueries';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
@@ -41,7 +34,8 @@ interface Props {
 /**
  * The existing search/select flow (fetchExercises, MuscleGroupChips),
  * reused as a modal so it works mid-workout (ActiveWorkoutScreen) without
- * duplicating the search UI.
+ * duplicating the search UI. A search field and muscle filter over one list
+ * of plain rows; "Create Custom Exercise" is the first row, not a card.
  */
 export function ExercisePickerModal({
   visible,
@@ -53,7 +47,6 @@ export function ExercisePickerModal({
   accentColor = colors.accent,
   onAccentColor = colors.onAccent,
 }: Props) {
-  const insets = useSafeAreaInsets();
   const { theme: backgroundTheme } = useBackgroundTheme();
   const reduceMotion = useReduceMotionPreference();
   const [searchInput, setSearchInput] = useState('');
@@ -96,30 +89,23 @@ export function ExercisePickerModal({
           that needs the current Background Theme's color applied directly. */}
       <View
         testID="exercise-picker-root"
-        style={[
-          styles.screen,
-          { backgroundColor: backgroundTheme.colors.background, paddingTop: insets.top },
-        ]}
+        style={[styles.flex, { backgroundColor: backgroundTheme.colors.background }]}
       >
-        <View style={[styles.scrollContent, { flex: 1 }]}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Add Exercise</Text>
-            <TouchableOpacity
-              testID="exercise-picker-close"
-              style={styles.headerIconButton}
-              onPress={onClose}
-              accessibilityLabel="Close"
-              accessibilityRole="button"
-            >
-              <Feather name="x" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
+        <AppHeader
+          title="Add Exercise"
+          rightAction={{
+            icon: 'x',
+            onPress: onClose,
+            accessibilityLabel: 'Close',
+            testID: 'exercise-picker-close',
+          }}
+        />
 
+        <View style={styles.pickerBody}>
           <TextInput
             testID="exercise-picker-search"
-            style={styles.searchInput}
             placeholder="Search exercises"
-            placeholderTextColor={colors.textMuted}
+            accessibilityLabel="Search exercises"
             value={searchInput}
             onChangeText={setSearchInput}
           />
@@ -136,56 +122,45 @@ export function ExercisePickerModal({
             />
           </View>
 
-          <AppCard
-            testID="exercise-picker-create-custom"
-            onPress={onCreateCustom}
-            style={[styles.createCustomCard, { borderColor: accentColor }]}
-            accessibilityLabel="Create Custom Exercise. Can't find the exercise? Create your own."
-          >
-            <View style={styles.createCustomRow}>
-              <View style={[styles.createCustomIconCircle, { backgroundColor: accentColor }]}>
-                <Feather name="plus" size={18} color={onAccentColor} />
-              </View>
-              <View style={styles.createCustomTextBlock}>
-                <Text style={styles.createCustomTitle}>Create Custom Exercise</Text>
-                <Text style={styles.createCustomSubtitle}>
-                  Can&apos;t find the exercise? Create your own.
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={colors.textMuted} />
-            </View>
-          </AppCard>
-
-          {loading ? (
-            <ActivityIndicator
-              testID="exercise-picker-loading"
-              size="large"
-              color={colors.textPrimary}
-            />
-          ) : null}
-
           <FlatList
             data={rows}
             keyExtractor={(item) => item.id}
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <>
+                <ListRow
+                  testID="exercise-picker-create-custom"
+                  icon="plus"
+                  title="Create Custom Exercise"
+                  subtitle="Can't find the exercise? Create your own."
+                  onPress={onCreateCustom}
+                  accessibilityLabel="Create Custom Exercise. Can't find the exercise? Create your own."
+                />
+                {loading ? (
+                  <View style={styles.pickerLoading}>
+                    <ActivityIndicator
+                      testID="exercise-picker-loading"
+                      size="large"
+                      color={colors.textPrimary}
+                    />
+                  </View>
+                ) : null}
+              </>
+            }
             renderItem={({ item }) => {
               const added = alreadyAddedIds.includes(item.id);
               return (
-                <TouchableOpacity
+                <ListRow
                   testID={`exercise-picker-item-${item.id}`}
-                  style={styles.pickerItem}
+                  title={`${item.name}${added ? ' (added)' : ''}`}
+                  subtitle={MUSCLE_GROUP_LABELS[item.muscleGroup]}
+                  chevron={false}
+                  divider
                   disabled={added}
                   onPress={() => onSelect(item)}
-                  accessibilityRole="button"
                   accessibilityLabel={`${item.name}, ${MUSCLE_GROUP_LABELS[item.muscleGroup]}${added ? ', already added' : ''}`}
-                  accessibilityState={{ disabled: added }}
-                >
-                  <Text style={styles.pickerItemTitle}>
-                    {item.name}
-                    {added ? ' (added)' : ''}
-                  </Text>
-                  <Text style={styles.pickerItemMeta}>{MUSCLE_GROUP_LABELS[item.muscleGroup]}</Text>
-                </TouchableOpacity>
+                />
               );
             }}
             ListEmptyComponent={

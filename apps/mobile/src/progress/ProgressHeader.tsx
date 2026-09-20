@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../design/Text';
 import { IconButton } from '../design/IconButton';
 import { colors } from '../design/theme';
 import { progressStyles as styles } from './progressStyles';

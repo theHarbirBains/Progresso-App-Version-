@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
-import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { TextButton } from '../design/Button';
+import { EmptyState } from '../design/EmptyState';
+import { ListRow } from '../design/ListRow';
+import { Screen } from '../design/Screen';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import {
@@ -29,24 +33,21 @@ type Props = RootStackScreenProps<'ExerciseLibrary'>;
 
 type Mode = { type: 'list' } | { type: 'create' } | { type: 'edit'; exercise: ExerciseRow };
 
-const SOURCE_OPTIONS: {
-  value: ExerciseSource;
-  label: string;
-  icon: keyof typeof Feather.glyphMap;
-}[] = [
-  { value: 'all', label: 'All', icon: 'grid' },
-  { value: 'builtin', label: 'Built-in', icon: 'award' },
-  { value: 'mine', label: 'Mine', icon: 'star' },
+const SOURCE_OPTIONS: { value: ExerciseSource; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'builtin', label: 'Built-in' },
+  { value: 'mine', label: 'Mine' },
 ];
 
 // The Workout Mode "browse every exercise" screen -- built-ins plus the
 // user's own custom exercises, searchable/filterable/sortable, text-only
 // (no exercise artwork -- Progresso has none, and none is added here).
-// Business logic (search/filter/pagination/create/edit) is unchanged from
-// before this pass; only presentation and the two additions called out in
-// their own comments below (ascending toggle, real per-source counts) are
-// new, both minimal read-layer extensions of the existing query rather than
-// new business logic.
+//
+// Layout: search, muscle filter, then an All / Built-in / Mine tab row with
+// the real per-source totals; below it the exercises as plain rows (name,
+// "Muscle · Movement", and a quiet Built-in/Mine marker). New Exercise is the
+// header's "+". Your own exercises open for editing; built-ins are read-only.
+// Search/filter/pagination/create/edit logic is unchanged.
 export function ExerciseLibraryScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
@@ -172,21 +173,34 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={styles.screen} testID="exercise-library-screen">
-      <AppHeader
-        testID="exercise-library-header"
-        title="Exercise Library"
-        leftAction={{
-          icon: 'menu',
-          onPress: () => openMenu('workout'),
-          accessibilityLabel: 'Open menu',
-          testID: 'exercise-library-open-menu',
-        }}
-      />
+    <Screen
+      scroll={false}
+      padded={false}
+      testID="exercise-library-screen"
+      header={
+        <AppHeader
+          testID="exercise-library-header"
+          title="Exercise Library"
+          leftAction={{
+            icon: 'menu',
+            onPress: () => openMenu('workout'),
+            accessibilityLabel: 'Open menu',
+            testID: 'exercise-library-open-menu',
+          }}
+          rightAction={{
+            icon: 'plus',
+            onPress: () => setMode({ type: 'create' }),
+            accessibilityLabel: 'New Exercise',
+            testID: 'exercise-create-button',
+          }}
+        />
+      }
+    >
       <FlatList
         data={rows}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
@@ -211,39 +225,38 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
               />
             </View>
 
-            <View style={styles.categoryRow}>
+            <View style={styles.sourceTabs}>
               {SOURCE_OPTIONS.map((option) => {
                 const selected = option.value === source;
-                const count = sourceCounts?.[option.value === 'all' ? 'all' : option.value] ?? null;
+                const count = sourceCounts?.[option.value] ?? null;
                 return (
-                  <AppCard
+                  <TouchableOpacity
                     key={option.value}
                     testID={`exercise-source-${option.value}`}
-                    onPress={() => setSource(option.value)}
                     style={[
-                      styles.categoryCard,
-                      selected ? { borderWidth: 1, borderColor: theme.accent } : null,
+                      styles.sourceTab,
+                      selected ? { borderBottomColor: theme.accent } : null,
                     ]}
+                    onPress={() => setSource(option.value)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      count !== null ? `${option.label}, ${count} exercises` : option.label
+                    }
                     accessibilityState={{ selected }}
                   >
-                    <Feather
-                      name={option.icon}
-                      size={18}
-                      color={selected ? theme.accent : colors.textSecondary}
-                      style={styles.categoryCardIcon}
-                    />
                     <Text
-                      style={[styles.categoryCardLabel, selected ? { color: theme.accent } : null]}
+                      style={[styles.sourceTabLabel, selected ? { color: theme.accent } : null]}
                     >
                       {option.label}
                     </Text>
                     <Text
                       testID={`exercise-source-${option.value}-count`}
-                      style={styles.categoryCardCount}
+                      style={styles.sourceTabCount}
                     >
-                      {count !== null ? `${count} exercises` : ' '}
+                      {count !== null ? String(count) : ' '}
                     </Text>
-                  </AppCard>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -252,25 +265,13 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
               <Text testID="exercise-library-count" style={styles.countText}>
                 {totalCount} {totalCount === 1 ? 'exercise' : 'exercises'}
               </Text>
-              <TouchableOpacity
+              <TextButton
                 testID="exercise-library-sort"
-                style={styles.sortButton}
-                onPress={() => setAscending((prev) => !prev)}
-                accessibilityRole="button"
+                label={`Sort: ${ascending ? 'A → Z' : 'Z → A'}`}
                 accessibilityLabel="Toggle sort order"
-              >
-                <Text style={styles.sortButtonText}>Sort: {ascending ? 'A → Z' : 'Z → A'}</Text>
-                <Feather name="chevron-down" size={14} color={colors.textSecondary} />
-              </TouchableOpacity>
+                onPress={() => setAscending((prev) => !prev)}
+              />
             </View>
-
-            <TouchableOpacity
-              testID="exercise-create-button"
-              style={styles.loadMoreButton}
-              onPress={() => setMode({ type: 'create' })}
-            >
-              <Text style={[styles.loadMoreText, { color: theme.accent }]}>+ New Exercise</Text>
-            </TouchableOpacity>
 
             {error ? (
               <Text testID="exercise-library-error" style={styles.errorText}>
@@ -279,82 +280,61 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
             ) : null}
 
             {loading ? (
-              <ActivityIndicator
-                testID="exercise-library-loading"
-                size="large"
-                color={colors.textPrimary}
-              />
+              <View style={styles.loading}>
+                <ActivityIndicator
+                  testID="exercise-library-loading"
+                  size="large"
+                  color={colors.textPrimary}
+                />
+              </View>
             ) : null}
           </View>
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const isMine = item.createdBy != null;
           return (
-            <AppCard
+            <ListRow
               testID={`exercise-item-${item.id}`}
-              style={styles.exerciseRow}
+              title={item.name}
+              subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
+              divider={index > 0}
               onPress={isMine ? () => setMode({ type: 'edit', exercise: item }) : undefined}
-            >
-              <View style={styles.exerciseRowLeft}>
-                <Text style={styles.exerciseName}>{item.name}</Text>
-                <View style={styles.exerciseTagsRow}>
-                  <View style={styles.exerciseTag}>
-                    <Text style={styles.exerciseTagText}>
-                      {MUSCLE_GROUP_LABELS[item.muscleGroup]}
-                    </Text>
-                  </View>
-                  <View style={styles.exerciseTag}>
-                    <Text style={styles.exerciseTagText}>
-                      {MOVEMENT_TYPE_LABELS[item.movementType]}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.exerciseRowRight}>
-                <View
-                  style={[
-                    styles.sourceBadge,
-                    { borderColor: isMine ? theme.accent : colors.border },
-                  ]}
-                >
+              trailing={
+                <>
                   <Text
                     style={[
-                      styles.sourceBadgeText,
-                      { color: isMine ? theme.accent : colors.textSecondary },
+                      styles.sourceLabel,
+                      { color: isMine ? theme.accent : colors.textMuted },
                     ]}
                   >
                     {isMine ? 'Mine' : 'Built-in'}
                   </Text>
-                </View>
-                <Feather name="chevron-right" size={16} color={colors.textMuted} />
-              </View>
-            </AppCard>
+                  {isMine ? (
+                    <Feather name="chevron-right" size={18} color={colors.textMuted} />
+                  ) : null}
+                </>
+              }
+            />
           );
         }}
         ListEmptyComponent={
           !loading ? (
-            <Text testID="exercise-library-empty" style={styles.emptyText}>
-              No exercises found
-            </Text>
+            <View style={styles.emptyWrap}>
+              <EmptyState testID="exercise-library-empty" title="No exercises found" />
+            </View>
           ) : null
         }
         ListFooterComponent={
           hasMore ? (
-            <TouchableOpacity
+            <TextButton
               testID="exercise-load-more"
-              style={styles.loadMoreButton}
+              label="Load More"
+              loading={loadingMore}
               onPress={() => void loadPage(page + 1, false)}
-              disabled={loadingMore}
-            >
-              {loadingMore ? (
-                <ActivityIndicator color={colors.textSecondary} />
-              ) : (
-                <Text style={styles.loadMoreText}>Load More</Text>
-              )}
-            </TouchableOpacity>
+            />
           ) : null
         }
       />
-    </View>
+    </Screen>
   );
 }

@@ -54,3 +54,23 @@ describe('TextInput', () => {
     expect(screen.getByTestId('field').props.editable).toBe(false);
   });
 });
+
+describe('TextInput -- onBlur', () => {
+  it('calls onBlur when focus leaves the field, and still clears its focused styling', () => {
+    const onBlur = jest.fn();
+    render(
+      <TextInput testID="field" label="Name" value="" onChangeText={jest.fn()} onBlur={onBlur} />,
+    );
+
+    fireEvent(screen.getByTestId('field'), 'focus');
+    fireEvent(screen.getByTestId('field'), 'blur');
+
+    expect(onBlur).toHaveBeenCalledTimes(1);
+  });
+
+  it('blurs without error when no onBlur is supplied', () => {
+    render(<TextInput testID="field" label="Name" value="" onChangeText={jest.fn()} />);
+
+    expect(() => fireEvent(screen.getByTestId('field'), 'blur')).not.toThrow();
+  });
+});

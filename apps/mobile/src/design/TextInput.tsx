@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from 'react';
 import {
   StyleSheet,
-  Text,
   TextInput as RNTextInput,
   View,
   type KeyboardTypeOptions,
   type TextInputProps as RNTextInputProps,
 } from 'react-native';
+import { Text } from './Text';
 import { colors, radii, spacing, typeScale } from './theme';
 
 interface Props {
@@ -20,6 +20,8 @@ interface Props {
   autoComplete?: RNTextInputProps['autoComplete'];
   returnKeyType?: RNTextInputProps['returnKeyType'];
   onSubmitEditing?: () => void;
+  /** Called when the field loses focus, after its own focus styling has been cleared. */
+  onBlur?: () => void;
   /** Presence shows this message in the destructive color and switches the border to the error state. */
   error?: string;
   /** Shown in the muted color when there is no `error`. */
@@ -47,6 +49,7 @@ export function TextInput({
   autoComplete,
   returnKeyType,
   onSubmitEditing,
+  onBlur,
   error,
   helperText,
   disabled,
@@ -79,7 +82,10 @@ export function TextInput({
           onSubmitEditing={onSubmitEditing}
           editable={!disabled}
           onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onBlur={() => {
+            setFocused(false);
+            onBlur?.();
+          }}
           accessibilityLabel={accessibilityLabel ?? label}
         />
         {rightAccessory}

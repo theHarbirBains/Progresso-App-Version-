@@ -1,7 +1,7 @@
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { AppCard } from '../design/AppCard';
-import { Badge } from '../design/Badge';
+import { SecondaryButton } from '../design/Button';
 import { colors } from '../design/theme';
 import type { MovementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
@@ -19,9 +19,6 @@ export interface PreviousSessionSet {
   reps: number;
   /** Only present for a unilateral exercise's set -- shown as a small "L"/"R" tag so two same-numbered-look rows aren't ambiguous. */
   side: 'left' | 'right' | null;
-  /** This set's weight as a fraction (0-1) of the heaviest set in the same
-   * session -- purely a visual proportion bar, never a stored/derived stat. */
-  relativeWeight: number;
 }
 
 export interface PreviousSessionDisplay {
@@ -73,15 +70,19 @@ interface Props {
   onRemoveExercise: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  /** A hairline above this block -- every exercise but the first. */
+  divider?: boolean;
   accentColor: string;
   onAccentColor: string;
   testID?: string;
 }
 
-// No exercise image anywhere -- a plain icon box stands in for it, per the
-// approved design direction. Every exercise uses the same "activity" icon
-// (already the app's established generic workout icon, e.g. the bottom nav
-// Workouts tab) rather than inventing a whole per-muscle-group icon set.
+// One exercise in the live workout: its name and quiet controls, the last
+// session's numbers to compare against, then the sets to log. Despite the
+// legacy name it is a plain block on the screen, not a card -- consecutive
+// exercises are separated by a hairline, so a long workout reads as one
+// list rather than a stack of boxes. No exercise image: every exercise is
+// text.
 export function ExerciseCard({
   exerciseName,
   muscleGroup,
@@ -100,6 +101,7 @@ export function ExerciseCard({
   onRemoveExercise,
   onMoveUp,
   onMoveDown,
+  divider,
   accentColor,
   onAccentColor,
   testID,
@@ -107,18 +109,16 @@ export function ExerciseCard({
   const isUnilateral = movementType === 'unilateral';
   const hasRows = isUnilateral ? unilateralSets.length > 0 : sets.length > 0;
   return (
-    <AppCard testID={testID} style={styles.exerciseCard}>
-      <View style={styles.exerciseCardHeader}>
-        <View style={styles.exerciseIconBox}>
-          <Feather name="activity" size={18} color={accentColor} />
-        </View>
+    <View testID={testID} style={[styles.exerciseBlock, divider && styles.exerciseDivider]}>
+      <View style={styles.exerciseHeader}>
         <View style={styles.exerciseTitleBlock}>
           <Text style={styles.exerciseName}>{exerciseName}</Text>
-          <Badge
-            label={MUSCLE_GROUP_LABELS[muscleGroup]}
-            color={accentColor}
+          <Text
             testID={testID ? `${testID}-muscle-group` : undefined}
-          />
+            style={styles.exerciseMuscle}
+          >
+            {MUSCLE_GROUP_LABELS[muscleGroup]}
+          </Text>
           {isUnilateral ? (
             <Text
               testID={testID ? `${testID}-per-side-note` : undefined}
@@ -128,11 +128,11 @@ export function ExerciseCard({
             </Text>
           ) : null}
         </View>
-        <View style={styles.exerciseHeaderActions}>
+        <View style={styles.exerciseActions}>
           {onMoveUp ? (
             <TouchableOpacity
               testID={testID ? `${testID}-move-up` : undefined}
-              style={styles.exerciseIconAction}
+              style={styles.exerciseAction}
               onPress={onMoveUp}
               accessibilityLabel="Move exercise up"
               accessibilityRole="button"
@@ -143,7 +143,7 @@ export function ExerciseCard({
           {onMoveDown ? (
             <TouchableOpacity
               testID={testID ? `${testID}-move-down` : undefined}
-              style={styles.exerciseIconAction}
+              style={styles.exerciseAction}
               onPress={onMoveDown}
               accessibilityLabel="Move exercise down"
               accessibilityRole="button"
@@ -153,7 +153,7 @@ export function ExerciseCard({
           ) : null}
           <TouchableOpacity
             testID={testID ? `${testID}-remove` : undefined}
-            style={styles.exerciseIconAction}
+            style={styles.exerciseAction}
             onPress={onRemoveExercise}
             accessibilityLabel="Remove exercise"
             accessibilityRole="button"
@@ -168,9 +168,9 @@ export function ExerciseCard({
           testID={testID ? `${testID}-previous-session` : undefined}
           style={styles.previousSession}
         >
-          <View style={styles.previousSessionHeaderRow}>
-            <View style={styles.previousSessionTitleRow}>
-              <Text style={styles.previousSessionTitle}>Last Workout</Text>
+          <View style={styles.previousHeaderRow}>
+            <View style={styles.previousTitleRow}>
+              <Text style={styles.previousTitle}>Last Workout</Text>
               <TouchableOpacity
                 testID={testID ? `${testID}-previous-session-info` : undefined}
                 onPress={() =>
@@ -181,7 +181,7 @@ export function ExerciseCard({
                 }
                 accessibilityRole="button"
                 accessibilityLabel="About Last Workout"
-                hitSlop={8}
+                hitSlop={12}
               >
                 <Feather name="info" size={14} color={colors.textMuted} />
               </TouchableOpacity>
@@ -192,55 +192,32 @@ export function ExerciseCard({
                 onPress={onViewHistory}
                 accessibilityRole="button"
                 accessibilityLabel="View History"
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 0 }}
               >
-                <View style={styles.previousSessionViewHistory}>
-                  <Text style={[styles.previousSessionViewHistoryText, { color: accentColor }]}>
-                    View History
-                  </Text>
+                <View style={styles.viewHistory}>
+                  <Text style={[styles.viewHistoryText, { color: accentColor }]}>View History</Text>
                   <Feather name="chevron-right" size={14} color={accentColor} />
                 </View>
               </TouchableOpacity>
             ) : null}
           </View>
-          <Text style={styles.previousSessionDate}>{previousSession.dateDisplay}</Text>
+          <Text style={styles.previousDate}>{previousSession.dateDisplay}</Text>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.previousSessionCardsScroll}
-            contentContainerStyle={styles.previousSessionCardsRow}
-          >
+          <View style={styles.previousSets}>
             {previousSession.sets.map((set) => (
               <View
                 key={`${set.setNumber}-${set.side ?? 'none'}`}
                 testID={testID ? `${testID}-previous-set-${set.setNumber}` : undefined}
-                style={styles.previousSessionCard}
+                style={styles.previousSet}
               >
-                <View style={[styles.previousSessionBadge, { backgroundColor: accentColor }]}>
-                  <Text style={[styles.previousSessionBadgeText, { color: onAccentColor }]}>
-                    {set.setNumber}
-                  </Text>
-                </View>
-                <Text style={styles.previousSessionCardWeight}>
-                  {set.weightDisplay} {set.unit}
+                <Text style={styles.previousSetNumber}>{set.setNumber}</Text>
+                <Text style={styles.previousSetValue}>
+                  {set.weightDisplay} {set.unit} × {set.reps}
+                  {set.side ? ` (${set.side === 'left' ? 'L' : 'R'})` : ''}
                 </Text>
-                <Text style={styles.previousSessionCardReps}>
-                  x {set.reps} reps{set.side ? ` (${set.side === 'left' ? 'L' : 'R'})` : ''}
-                </Text>
-                <View style={styles.previousSessionBarTrack}>
-                  <View
-                    style={[
-                      styles.previousSessionBarFill,
-                      {
-                        backgroundColor: accentColor,
-                        width: `${Math.max(0, Math.min(1, set.relativeWeight)) * 100}%`,
-                      },
-                    ]}
-                  />
-                </View>
               </View>
             ))}
-          </ScrollView>
+          </View>
         </View>
       ) : null}
 
@@ -287,14 +264,15 @@ export function ExerciseCard({
             />
           ))}
 
-      <TouchableOpacity
-        testID={testID ? `${testID}-add-set` : undefined}
-        style={styles.addSetButton}
-        onPress={onAddSet}
-      >
-        <Feather name="plus" size={16} color={colors.textSecondary} />
-        <Text style={styles.addSetButtonText}>Add Set</Text>
-      </TouchableOpacity>
-    </AppCard>
+      <View style={styles.addSet}>
+        <SecondaryButton
+          testID={testID ? `${testID}-add-set` : undefined}
+          size="md"
+          label="+ Add Set"
+          accessibilityLabel="Add Set"
+          onPress={onAddSet}
+        />
+      </View>
+    </View>
   );
 }

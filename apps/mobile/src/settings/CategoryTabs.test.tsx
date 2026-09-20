@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
+import { resolveTextStyle } from '../design/Text';
 import { CategoryTabs } from './CategoryTabs';
 import { SETTINGS_CATEGORIES } from './settingsCategories';
 import { settingsStyles } from './settingsStyles';
@@ -11,10 +12,19 @@ const LAYOUT_KEYS = [
   'borderRadius',
   'borderWidth',
 ] as const;
-const TEXT_LAYOUT_KEYS = ['fontSize', 'fontWeight'] as const;
+// `fontFamily` is included since Text now expresses weight through the font
+// family (see design/Text.tsx) -- a selected pill switching to a bolder
+// family would widen it exactly like the old fontWeight change did.
+const TEXT_LAYOUT_KEYS = ['fontSize', 'fontWeight', 'fontFamily'] as const;
 
 const baselinePillStyle = StyleSheet.flatten(settingsStyles.tab) as Record<string, unknown>;
-const baselineLabelStyle = StyleSheet.flatten(settingsStyles.tabLabel) as Record<string, unknown>;
+// The label's baseline is its style *as Text resolves it* (weight -> family),
+// which is what actually renders -- comparing against the raw style would
+// only re-test Text's own font resolution, not selection stability.
+const baselineLabelStyle = StyleSheet.flatten(resolveTextStyle(settingsStyles.tabLabel)) as Record<
+  string,
+  unknown
+>;
 
 describe('CategoryTabs', () => {
   it('renders every category as its own touch target', () => {

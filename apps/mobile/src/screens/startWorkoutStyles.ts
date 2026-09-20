@@ -1,50 +1,30 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, spacing, typeScale } from '../design/theme';
 
-// Local to the new Start Workout screen (day-selection only -- see
-// NewWorkoutScreen.tsx). Deliberately not merged into liveWorkoutStyles.ts,
-// which ActiveWorkoutScreen still depends on for its own, unrelated
-// exercise/set-tracking styles.
+// Local to the Start Workout screen (day-selection only -- see
+// NewWorkoutScreen.tsx). The frame (safe area, scroll, horizontal padding) is
+// the shared `Screen`; only what is unique to this screen lives here.
 export const startWorkoutStyles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
-    // paints the selected Background Theme; screens no longer hardcode it.
-    backgroundColor: 'transparent',
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxxl,
-  },
-  section: {
-    marginBottom: spacing.xxl,
+  // Vertical rhythm between the screen's groups (next workout, day list,
+  // "do a different workout") -- larger than the 6px dashboard widget gap,
+  // since these are sections of a list screen, not adjacent widgets.
+  content: {
+    gap: spacing.xxl,
   },
   errorText: {
+    ...typeScale.callout,
     color: colors.destructive,
-    fontSize: 14,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  conflictBlock: {
+    gap: spacing.sm,
   },
 
-  // Next Workout hero
-  heroTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  heroIconChip: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroTextBlock: {
-    flex: 1,
-  },
+  // Next Workout: the one card on this screen -- the actionable hero.
   heroEyebrow: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    marginBottom: 2,
+    ...typeScale.sectionHeading,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
   heroDayName: {
     ...typeScale.screenTitle,
@@ -52,58 +32,21 @@ export const startWorkoutStyles = StyleSheet.create({
   },
   heroMuscles: {
     ...typeScale.secondary,
-    color: colors.textSecondary,
+    color: colors.textSecondaryBright,
     marginTop: 2,
   },
-  heroChevronCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginTop: spacing.md,
-  },
-  heroMetaText: {
+  heroMeta: {
     ...typeScale.secondary,
     color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
-
-  // Plain day rows (All Workout Days / Do a Different Workout)
-  dayRow: {
-    marginBottom: spacing.sm,
-  },
-  dayRowInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  dayIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayTextBlock: {
-    flex: 1,
-  },
-  dayName: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-  },
-  dayMuscles: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  dayRowDisabled: {
-    opacity: 0.5,
+  // The visible "Start Workout" button. The whole card is the tap target (it
+  // has to stay one tappable element carrying the day's text), so this wrapper
+  // turns the real PrimaryButton's own touches off and lets the card take the
+  // press -- the button is what the eye reads as the primary action, and it
+  // shows the loading state.
+  heroAction: {
+    marginTop: spacing.lg,
   },
 
   // "Do a Different Workout" naming sheet
@@ -124,5 +67,7 @@ export const startWorkoutStyles = StyleSheet.create({
 
   emptyWrap: {
     paddingVertical: spacing.xxxl,
+    paddingHorizontal: spacing.xxl,
+    gap: spacing.lg,
   },
 });

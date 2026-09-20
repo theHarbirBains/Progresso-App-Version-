@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
+import { Text } from '../design/Text';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { useAuth } from '../auth/AuthProvider';
+import { AppHeader } from '../design/AppHeader';
+import { PrimaryButton, SecondaryButton } from '../design/Button';
+import { Screen } from '../design/Screen';
 import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
 import { fromKg, roundWeight } from '../lib/units';
@@ -36,6 +40,7 @@ function formatWeight(kg: number, unit: 'kg' | 'lb'): string {
 
 // The on-screen card below IS the view that gets captured (via cardRef) --
 // there is no separate image drawn for sharing than what the user previews.
+// Around it: Share (the one filled button) and Save to Photos (secondary).
 export function ShareWorkoutScreen({ route, navigation }: Props) {
   const { workoutId } = route.params;
   const { user, session } = useAuth();
@@ -134,38 +139,47 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
     }
   }
 
+  const header = (
+    <AppHeader
+      title="Share Workout"
+      leftAction={{
+        icon: 'arrow-left',
+        onPress: () => navigation.goBack(),
+        accessibilityLabel: 'Back',
+        testID: 'share-workout-back',
+      }}
+    />
+  );
+
   if (loading) {
     return (
-      <View style={[styles.screen, styles.centered]}>
-        <ActivityIndicator testID="share-workout-loading" size="large" color={colors.textPrimary} />
-      </View>
+      <Screen scroll={false} header={header}>
+        <View style={styles.loading}>
+          <ActivityIndicator
+            testID="share-workout-loading"
+            size="large"
+            color={colors.textPrimary}
+          />
+        </View>
+      </Screen>
     );
   }
 
   if (loadError || !cardData) {
     return (
-      <View style={[styles.screen, styles.centered]}>
-        <Text testID="share-workout-load-error" style={styles.error}>
+      <Screen scroll={false} header={header}>
+        <Text testID="share-workout-load-error" style={styles.errorText}>
           {loadError ?? 'Failed to load workout'}
         </Text>
-        <TouchableOpacity testID="share-workout-retry" style={styles.retryButton} onPress={load}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
+        <SecondaryButton testID="share-workout-retry" label="Retry" onPress={load} />
+      </Screen>
     );
   }
 
   const prTopSets = cardData.topSets.filter((s) => s.prLabel !== null);
 
   return (
-    <ScrollView contentContainerStyle={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Share Workout</Text>
-        <TouchableOpacity testID="share-workout-back" onPress={() => navigation.goBack()}>
-          <Text style={styles.backLink}>Back</Text>
-        </TouchableOpacity>
-      </View>
-
+    <Screen contentContainerStyle={styles.content} header={header}>
       <View style={styles.cardWrapper}>
         <View ref={cardRef} collapsable={false} testID="share-card" style={styles.card}>
           <View style={styles.cardTop}>
@@ -220,30 +234,24 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity
+        <PrimaryButton
           testID="share-workout-share"
-          style={[styles.actionButton, sharing && styles.actionButtonDisabled]}
-          disabled={sharing}
+          label="Share"
+          loading={sharing}
           onPress={handleShare}
-        >
-          <Text style={styles.actionButtonText}>{sharing ? 'Preparing…' : 'Share'}</Text>
-        </TouchableOpacity>
+        />
         {shareError ? (
           <Text testID="share-workout-share-error" style={styles.actionError}>
             {shareError}
           </Text>
         ) : null}
 
-        <TouchableOpacity
+        <SecondaryButton
           testID="share-workout-save"
-          style={[styles.secondaryActionButton, saving && styles.actionButtonDisabled]}
-          disabled={saving}
+          label="Save to Photos"
+          loading={saving}
           onPress={handleSave}
-        >
-          <Text style={styles.secondaryActionButtonText}>
-            {saving ? 'Saving…' : 'Save to Photos'}
-          </Text>
-        </TouchableOpacity>
+        />
         {saveError ? (
           <Text testID="share-workout-save-error" style={styles.actionError}>
             {saveError}
@@ -255,6 +263,6 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
           </Text>
         ) : null}
       </View>
-    </ScrollView>
+    </Screen>
   );
 }

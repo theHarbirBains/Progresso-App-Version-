@@ -1,8 +1,13 @@
 import { StyleSheet } from 'react-native';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchExerciseSourceCounts, fetchExercises } from '../exercises/exerciseQueries';
+import { Feather } from '@expo/vector-icons';
+import { AppCard } from '../design/AppCard';
+import { colors } from '../design/theme';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ExerciseLibraryScreen } from './ExerciseLibraryScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -337,6 +342,132 @@ describe('ExerciseLibraryScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('exercise-library-empty')).toBeTruthy();
+    await settle();
+  });
+});
+
+describe('ExerciseLibraryScreen -- plain rows, tabs for the source, New Exercise in the header', () => {
+  it('draws no cards', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    await settle();
+  });
+
+  it('puts a named New Exercise "+" in the header, next to the menu', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    expect(screen.getByTestId('exercise-create-button').props.accessibilityLabel).toBe(
+      'New Exercise',
+    );
+    expect(screen.getByTestId('exercise-library-open-menu').props.accessibilityLabel).toBe(
+      'Open menu',
+    );
+    await settle();
+  });
+
+  it('separates rows with a hairline, none above the first', async () => {
+    renderScreen();
+    const first = StyleSheet.flatten(
+      (await screen.findByTestId('exercise-item-ex-builtin')).props.style,
+    );
+    const second = StyleSheet.flatten(screen.getByTestId('exercise-item-ex-mine').props.style);
+
+    expect(first.borderTopWidth).toBeUndefined();
+    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+    await settle();
+  });
+
+  it('shows the muscle group and movement type as one muted line, not tag chips', async () => {
+    renderScreen();
+    const row = await screen.findByTestId('exercise-item-ex-builtin');
+
+    expect(row).toHaveTextContent(/Chest · Bilateral/);
+    await settle();
+  });
+
+  it("marks the user's own exercises in the mode accent and built-ins in muted text, as plain words", async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    const mine = StyleSheet.flatten(
+      within(screen.getByTestId('exercise-item-ex-mine')).getByText('Mine').props.style,
+    );
+    expect(mine.color).toBe(DEFAULT_WORKOUT_THEME.accent);
+    expect(mine.backgroundColor).toBeUndefined();
+    expect(mine.borderWidth).toBeUndefined();
+    const builtin = StyleSheet.flatten(
+      within(screen.getByTestId('exercise-item-ex-builtin')).getByText('Built-in').props.style,
+    );
+    expect(builtin.color).toBe(colors.textMuted);
+    await settle();
+  });
+
+  it('only shows a chevron on rows that open (the built-in is read-only)', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    const chevrons = screen
+      .UNSAFE_queryAllByType(Feather)
+      .filter((icon) => icon.props.name === 'chevron-right');
+    expect(chevrons).toHaveLength(1);
+    await settle();
+  });
+
+  it('shows All / Built-in / Mine as tabs with their real totals, the selected one in the accent', async () => {
+    renderScreen();
+    const all = await screen.findByTestId('exercise-source-all');
+
+    expect(all.props.accessibilityLabel).toBe('All, 328 exercises');
+    expect(all.props.accessibilityState.selected).toBe(true);
+    expect(StyleSheet.flatten(all.props.style).borderBottomColor).toBe(
+      DEFAULT_WORKOUT_THEME.accent,
+    );
+    const mine = screen.getByTestId('exercise-source-mine');
+    expect(mine.props.accessibilityState.selected).toBe(false);
+    expect(StyleSheet.flatten(mine.props.style).borderBottomColor).toBe('transparent');
+    await settle();
+  });
+
+  it('moves the selected tab when another source is pressed', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    fireEvent.press(screen.getByTestId('exercise-source-mine'));
+
+    expect(screen.getByTestId('exercise-source-mine').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('exercise-source-all').props.accessibilityState.selected).toBe(false);
+    await settle();
+  });
+
+  it('gives each source tab and the sort control a comfortable touch target', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    expect(
+      StyleSheet.flatten(screen.getByTestId('exercise-source-all').props.style).minHeight,
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('exercise-library-sort').props.style).minHeight,
+    ).toBeGreaterThanOrEqual(44);
+    expect(screen.getByTestId('exercise-library-sort').props.accessibilityLabel).toBe(
+      'Toggle sort order',
+    );
+    await settle();
+  });
+
+  it('renders no bare text outside <Text>', async () => {
+    mockFetchExercises.mockResolvedValue({
+      rows: [builtinRow, mineRow],
+      hasMore: true,
+      totalCount: 40,
+    });
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    expectNoBareText();
     await settle();
   });
 });

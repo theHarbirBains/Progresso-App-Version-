@@ -1,24 +1,16 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Alert, Image, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../design/Text';
 import * as ImagePicker from 'expo-image-picker';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
-import { AppCard } from '../design/AppCard';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { AppHeader } from '../design/AppHeader';
+import { DestructiveButton, PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
+import { IconButton } from '../design/IconButton';
+import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
+import { Section } from '../design/Section';
+import { TextInput } from '../design/TextInput';
+import { colors, radii, spacing, typeScale } from '../design/theme';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
 import type { MuscleGroup } from '../exercises/muscleGroups';
@@ -34,8 +26,6 @@ import {
 } from '../exercises/movementTypes';
 import { createEquipmentProfile, createExercise, updateExercise } from '../lib/api';
 import { uploadEquipmentPhoto } from '../lib/equipmentPhotoUpload';
-import { liveWorkoutStyles } from './liveWorkoutStyles';
-import { exerciseFormStyles } from './exerciseFormStyles';
 
 const MOVEMENT_TYPE_OPTIONS = MOVEMENT_TYPES.map((value) => ({
   label: MOVEMENT_TYPE_LABELS[value],
@@ -49,10 +39,8 @@ const LOGGING_STYLE_OPTIONS = LOGGING_STYLES.map((value) => ({
 type CommonProps = {
   onDone: () => void;
   onCancel: () => void;
-  /** Defaults to 'screen' (ExerciseLibraryScreen's existing full-screen
-   * swap, unchanged). 'sheet' drops the full-screen container and scrolls,
-   * for use inside a BottomSheet (e.g. Create Custom Exercise from an
-   * active workout). */
+  /** Defaults to 'screen' (the full-screen swap). 'sheet' drops the
+   * screen frame and scrolls, for use inside a BottomSheet. */
   presentation?: 'screen' | 'sheet';
   /** The user's current Workout accent -- omit to fall back to the shared
    * default accent token. */
@@ -63,9 +51,15 @@ type CommonProps = {
 type Props =
   ({ mode: 'create' } & CommonProps) | ({ mode: 'edit'; exercise: ExerciseRow } & CommonProps);
 
-// Only reachable from ExerciseLibraryScreen for the user's own custom
-// exercises (built-ins never open in edit mode) — the backend enforces
-// this too, but the UI never offers the path in the first place.
+// Create Custom Exercise (from an active workout or the Exercise Library) and
+// edit for the user's own custom exercises (built-ins never open in edit mode --
+// the backend enforces this too, but the UI never offers the path in the
+// first place).
+//
+// Layout: the shared Screen frame with a Cancel (X) in the header, the fields
+// as labelled controls, an optional Machine / Equipment section (create only),
+// then one filled Save button -- no cards. The 'sheet' presentation shares
+// the same fields and actions inside a BottomSheet.
 export function ExerciseFormScreen(props: Props) {
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
@@ -73,7 +67,6 @@ export function ExerciseFormScreen(props: Props) {
   const presentation = props.presentation ?? 'screen';
   const accentColor = props.accentColor ?? colors.accent;
   const onAccentColor = props.onAccentColor ?? colors.onAccent;
-  const insets = useSafeAreaInsets();
 
   const [name, setName] = useState(props.mode === 'edit' ? props.exercise.name : '');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(
@@ -245,41 +238,24 @@ export function ExerciseFormScreen(props: Props) {
     }
   }
 
-  if (presentation === 'sheet') {
-    return (
-      // Keyboard avoidance for this presentation lives one level up, in
-      // BottomSheet.tsx -- it wraps the whole sheet in a KeyboardAvoidingView
-      // and caps the sheet's height, which is what gives this ScrollView an
-      // actual bounded box to scroll a focused field into view within. A
-      // second KeyboardAvoidingView here would double up on the same push/
-      // shrink behavior for no benefit.
-      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={liveWorkoutStyles.header}>
-          <Text style={liveWorkoutStyles.headerTitle}>
-            {props.mode === 'create' ? 'Create Custom Exercise' : 'Edit Exercise'}
-          </Text>
-          <TouchableOpacity
-            testID="exercise-form-cancel"
-            style={liveWorkoutStyles.headerIconButton}
-            onPress={props.onCancel}
-            accessibilityLabel="Close"
-            accessibilityRole="button"
-          >
-            <Feather name="x" size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
-        </View>
+  const title = props.mode === 'create' ? 'New Exercise' : 'Edit Exercise';
 
-        <Text style={sheetStyles.label}>Exercise Name</Text>
-        <TextInput
-          testID="exercise-form-name"
-          style={liveWorkoutStyles.searchInput}
-          placeholder="e.g. Smith Machine Shoulder Press"
-          placeholderTextColor={colors.textMuted}
-          value={name}
-          onChangeText={setName}
-        />
+  // The fields shared by both presentations. Selecting a muscle group, the
+  // exercise type and (for unilateral) the logging style is unchanged.
+  const fields = (
+    <View style={styles.fields}>
+      <TextInput
+        testID="exercise-form-name"
+        label="Exercise Name"
+        placeholder={
+          presentation === 'sheet' ? 'e.g. Smith Machine Shoulder Press' : 'Exercise name'
+        }
+        value={name}
+        onChangeText={setName}
+      />
 
-        <Text style={sheetStyles.label}>Muscle Group</Text>
+      <View>
+        <Text style={styles.fieldLabel}>Muscle Group</Text>
         <MuscleGroupChips
           value={muscleGroup}
           onChange={setMuscleGroup}
@@ -288,139 +264,10 @@ export function ExerciseFormScreen(props: Props) {
           chipBorderColor={colors.border}
           chipTextColor={colors.textSecondary}
         />
+      </View>
 
-        <Text style={sheetStyles.label}>Exercise Type</Text>
-        <SegmentedControl
-          testID="exercise-form-movement-type"
-          options={MOVEMENT_TYPE_OPTIONS}
-          value={movementType}
-          onChange={handleChangeMovementType}
-          accentColor={accentColor}
-          onAccentColor={onAccentColor}
-        />
-        <Text style={formHelperStyles.helperText}>{MOVEMENT_TYPE_DESCRIPTIONS[movementType]}</Text>
-
-        {movementType === 'unilateral' ? (
-          <>
-            <Text style={sheetStyles.label}>Logging Style</Text>
-            <SegmentedControl
-              testID="exercise-form-logging-style"
-              options={LOGGING_STYLE_OPTIONS}
-              value={loggingStyle ?? 'single_side'}
-              onChange={setLoggingStyle}
-              accentColor={accentColor}
-              onAccentColor={onAccentColor}
-            />
-            <Text style={formHelperStyles.helperText}>
-              {LOGGING_STYLE_DESCRIPTIONS[loggingStyle ?? 'single_side']}
-            </Text>
-          </>
-        ) : null}
-
-        {error ? (
-          <Text testID="exercise-form-error" style={sheetStyles.error}>
-            {error}
-          </Text>
-        ) : null}
-
-        <TouchableOpacity
-          testID="exercise-form-save"
-          style={[
-            sheetStyles.saveButton,
-            { backgroundColor: accentColor },
-            !canSave && sheetStyles.saveButtonDisabled,
-          ]}
-          onPress={handleSave}
-          disabled={!canSave}
-          accessibilityRole="button"
-          accessibilityLabel="Save Exercise"
-          accessibilityState={{ disabled: !canSave }}
-        >
-          {saving ? (
-            <ActivityIndicator color={onAccentColor} />
-          ) : (
-            <Text style={[sheetStyles.saveButtonText, { color: onAccentColor }]}>
-              Save Exercise
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        {props.mode === 'edit' ? (
-          <TouchableOpacity
-            testID="exercise-form-toggle-active"
-            style={isActive ? sheetStyles.deactivateButton : sheetStyles.reactivateButton}
-            onPress={handleToggleActive}
-            disabled={saving}
-            accessibilityRole="button"
-            accessibilityLabel={isActive ? 'Deactivate exercise' : 'Reactivate exercise'}
-            accessibilityState={{ disabled: saving }}
-          >
-            <Text
-              style={isActive ? sheetStyles.deactivateButtonText : sheetStyles.reactivateButtonText}
-            >
-              {isActive ? 'Deactivate' : 'Reactivate'}
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-      </ScrollView>
-    );
-  }
-
-  const styles = exerciseFormStyles;
-
-  return (
-    <KeyboardAvoidingView
-      style={[styles.screen, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top}
-    >
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        testID="exercise-form-scroll"
-      >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {props.mode === 'create' ? 'New Exercise' : 'Edit Exercise'}
-          </Text>
-          {props.mode === 'create' ? (
-            <Text style={styles.headerSubtitle}>
-              Add exercise details to track your progress accurately.
-            </Text>
-          ) : null}
-          <TouchableOpacity
-            testID="exercise-form-cancel"
-            style={styles.headerCancel}
-            onPress={props.onCancel}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel"
-          >
-            <Text style={styles.headerCancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.label}>Exercise Name</Text>
-        <TextInput
-          testID="exercise-form-name"
-          style={styles.input}
-          placeholder="Exercise name"
-          placeholderTextColor={colors.textMuted}
-          value={name}
-          onChangeText={setName}
-        />
-
-        <Text style={styles.label}>Muscle Group</Text>
-        <MuscleGroupChips
-          value={muscleGroup}
-          onChange={setMuscleGroup}
-          accentColor={accentColor}
-          onAccentColor={onAccentColor}
-          chipBorderColor={colors.border}
-          chipTextColor={colors.textSecondary}
-        />
-
-        <Text style={styles.label}>Exercise Type</Text>
+      <View>
+        <Text style={styles.fieldLabel}>Exercise Type</Text>
         <SegmentedControl
           testID="exercise-form-movement-type"
           options={MOVEMENT_TYPE_OPTIONS}
@@ -430,28 +277,123 @@ export function ExerciseFormScreen(props: Props) {
           onAccentColor={onAccentColor}
         />
         <Text style={styles.helperText}>{MOVEMENT_TYPE_DESCRIPTIONS[movementType]}</Text>
+      </View>
 
-        {movementType === 'unilateral' ? (
-          <>
-            <Text style={styles.label}>Logging Style</Text>
-            <SegmentedControl
-              testID="exercise-form-logging-style"
-              options={LOGGING_STYLE_OPTIONS}
-              value={loggingStyle ?? 'single_side'}
-              onChange={setLoggingStyle}
-              accentColor={accentColor}
-              onAccentColor={onAccentColor}
-            />
+      {movementType === 'unilateral' ? (
+        <View>
+          <Text style={styles.fieldLabel}>Logging Style</Text>
+          <SegmentedControl
+            testID="exercise-form-logging-style"
+            options={LOGGING_STYLE_OPTIONS}
+            value={loggingStyle ?? 'single_side'}
+            onChange={setLoggingStyle}
+            accentColor={accentColor}
+            onAccentColor={onAccentColor}
+          />
+          <Text style={styles.helperText}>
+            {LOGGING_STYLE_DESCRIPTIONS[loggingStyle ?? 'single_side']}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  // One filled Save; Deactivate/Reactivate (edit only) is a quiet second
+  // action beneath it.
+  const actions = (
+    <View style={styles.actions}>
+      {error ? (
+        <Text testID="exercise-form-error" style={styles.errorText}>
+          {error}
+        </Text>
+      ) : null}
+
+      <PrimaryButton
+        testID="exercise-form-save"
+        label="Save Exercise"
+        onPress={handleSave}
+        loading={saving}
+        disabled={!canSave && !saving}
+        accentColor={accentColor}
+        onAccentColor={onAccentColor}
+      />
+
+      {props.mode === 'edit' ? (
+        isActive ? (
+          <DestructiveButton
+            testID="exercise-form-toggle-active"
+            label="Deactivate"
+            accessibilityLabel="Deactivate exercise"
+            onPress={handleToggleActive}
+            disabled={saving}
+          />
+        ) : (
+          <SecondaryButton
+            testID="exercise-form-toggle-active"
+            label="Reactivate"
+            accessibilityLabel="Reactivate exercise"
+            onPress={handleToggleActive}
+            disabled={saving}
+          />
+        )
+      ) : null}
+    </View>
+  );
+
+  if (presentation === 'sheet') {
+    return (
+      // Keyboard avoidance for this presentation lives one level up, in
+      // BottomSheet.tsx -- it wraps the whole sheet in a KeyboardAvoidingView
+      // and caps the sheet's height, which is what gives this ScrollView an
+      // actual bounded box to scroll a focused field into view within. A
+      // second KeyboardAvoidingView here would double up on the same push/
+      // shrink behavior for no benefit.
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>
+            {props.mode === 'create' ? 'Create Custom Exercise' : 'Edit Exercise'}
+          </Text>
+          <IconButton
+            testID="exercise-form-cancel"
+            icon="x"
+            onPress={props.onCancel}
+            accessibilityLabel="Close"
+          />
+        </View>
+        {fields}
+        {actions}
+      </ScrollView>
+    );
+  }
+
+  return (
+    <Screen
+      keyboardAvoiding
+      scrollTestID="exercise-form-scroll"
+      contentContainerStyle={styles.content}
+      header={
+        <AppHeader
+          title={title}
+          subtitle={
+            props.mode === 'create'
+              ? 'Add exercise details to track your progress accurately.'
+              : undefined
+          }
+          leftAction={{
+            icon: 'x',
+            onPress: props.onCancel,
+            accessibilityLabel: 'Cancel',
+            testID: 'exercise-form-cancel',
+          }}
+        />
+      }
+    >
+      {fields}
+
+      {props.mode === 'create' ? (
+        <Section title="Machine / Equipment">
+          <View style={styles.machine}>
             <Text style={styles.helperText}>
-              {LOGGING_STYLE_DESCRIPTIONS[loggingStyle ?? 'single_side']}
-            </Text>
-          </>
-        ) : null}
-
-        {props.mode === 'create' ? (
-          <View style={styles.sectionDivider}>
-            <Text style={styles.sectionTitle}>Machine / Equipment</Text>
-            <Text style={styles.sectionSubtitle}>
               Optional — add this if you train on a specific machine you want to identify later.
             </Text>
 
@@ -462,190 +404,122 @@ export function ExerciseFormScreen(props: Props) {
                   source={{ uri: machinePhotoUri }}
                   style={styles.photoPreviewImage}
                 />
-                <TouchableOpacity
+                <TextButton
                   testID="exercise-form-machine-photo-remove"
-                  onPress={() => setMachinePhotoUri(null)}
-                  accessibilityRole="button"
+                  label="Remove Photo"
                   accessibilityLabel="Remove machine photo"
-                >
-                  <Text style={styles.photoPreviewRemove}>Remove Photo</Text>
-                </TouchableOpacity>
+                  destructive
+                  onPress={() => setMachinePhotoUri(null)}
+                />
               </View>
             ) : (
-              <TouchableOpacity
+              <SecondaryButton
                 testID="exercise-form-machine-photo-add"
-                style={styles.photoButton}
-                onPress={handlePickMachinePhoto}
-                accessibilityRole="button"
+                label="Add Machine Photo"
                 accessibilityLabel="Add machine photo"
-              >
-                <Feather name="camera" size={22} color={colors.textSecondary} />
-                <Text style={styles.photoButtonTitle}>Add Machine Photo</Text>
-                <Text style={styles.photoButtonSubtitle}>
-                  Take a photo or choose from your gallery
-                </Text>
-              </TouchableOpacity>
+                onPress={handlePickMachinePhoto}
+              />
             )}
             {machinePhotoError ? (
-              <Text testID="exercise-form-machine-photo-error" style={styles.photoError}>
+              <Text testID="exercise-form-machine-photo-error" style={styles.errorText}>
                 {machinePhotoError}
               </Text>
             ) : null}
 
-            <AppCard style={styles.infoCard}>
-              <View style={styles.infoCardHeaderRow}>
-                <Feather name="info" size={16} color={colors.textSecondary} />
-                <Text style={styles.infoCardTitle}>Why add a machine photo?</Text>
-              </View>
-              <Text style={styles.infoCardBody}>
+            <View>
+              <Text style={styles.noteTitle}>Why add a machine photo?</Text>
+              <Text style={styles.helperText}>
                 Different machines and equipment can have different resistance characteristics, even
                 for the same exercise. A photo helps you identify and compare the specific equipment
                 you used — it does not change how this exercise is logged.
               </Text>
-            </AppCard>
-
-            <AppCard style={styles.proTipCard}>
-              <Feather name="zap" size={14} color={colors.textSecondary} />
-              <Text style={styles.proTipText}>
-                <Text style={styles.proTipBold}>Pro Tip: </Text>
+              <Text style={[styles.helperText, styles.noteTip]}>
+                <Text style={styles.noteTipLead}>Pro Tip: </Text>
                 For cable or pulley machines, capture both the pulley and the weight stack so the
                 setup is easy to recognize later.
               </Text>
-            </AppCard>
+            </View>
 
-            <Text style={styles.label}>
-              Machine Name{machineProfileEngaged ? '' : ' (Optional)'}
-            </Text>
             <TextInput
               testID="exercise-form-machine-name"
-              style={styles.input}
+              label={`Machine Name${machineProfileEngaged ? '' : ' (Optional)'}`}
               placeholder="e.g. Cable Machine 3"
-              placeholderTextColor={colors.textMuted}
               value={machineName}
               onChangeText={setMachineName}
             />
-
-            <Text style={styles.label}>Gym (Optional)</Text>
             <TextInput
               testID="exercise-form-gym"
-              style={styles.input}
+              label="Gym (Optional)"
               placeholder="e.g. Downtown Gym"
-              placeholderTextColor={colors.textMuted}
               value={gym}
               onChangeText={setGym}
             />
           </View>
-        ) : null}
+        </Section>
+      ) : null}
 
-        {error ? (
-          <Text testID="exercise-form-error" style={styles.error}>
-            {error}
-          </Text>
-        ) : null}
-
-        <TouchableOpacity
-          testID="exercise-form-save"
-          style={[
-            styles.button,
-            { backgroundColor: accentColor },
-            !canSave && styles.buttonDisabled,
-          ]}
-          onPress={handleSave}
-          disabled={!canSave}
-          accessibilityRole="button"
-          accessibilityLabel="Save Exercise"
-          accessibilityState={{ disabled: !canSave }}
-        >
-          {saving ? (
-            <ActivityIndicator color={onAccentColor} />
-          ) : (
-            <Text style={[styles.buttonText, { color: onAccentColor }]}>Save Exercise</Text>
-          )}
-        </TouchableOpacity>
-
-        {props.mode === 'edit' ? (
-          <TouchableOpacity
-            testID="exercise-form-toggle-active"
-            style={isActive ? styles.deactivateButton : styles.reactivateButton}
-            onPress={handleToggleActive}
-            disabled={saving}
-          >
-            <Text style={isActive ? styles.deactivateButtonText : styles.reactivateButtonText}>
-              {isActive ? 'Deactivate' : 'Reactivate'}
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-      </ScrollView>
-    </KeyboardAvoidingView>
+      {actions}
+    </Screen>
   );
 }
 
-// Shared by the sheet presentation -- the brief "what does this mean"
-// caption under Exercise Type/Logging Style. The screen presentation now
-// has its own equivalent (exerciseFormStyles.helperText) since it moved off
-// the legacy exerciseStyles.
-const formHelperStyles = StyleSheet.create({
-  helperText: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
+const styles = StyleSheet.create({
+  content: {
+    gap: spacing.xxl,
   },
-});
-
-// Sheet-presentation-only styles (Create Custom Exercise from Active
-// Workout) -- layout/typography here, on the same theme.ts tokens the rest
-// of Progresso uses. Reuses liveWorkoutStyles' header/input shapes directly
-// (same Add Exercise flow, same visual language) rather than redefining
-// them here.
-const sheetStyles = StyleSheet.create({
-  label: {
+  fields: {
+    gap: spacing.xl,
+  },
+  fieldLabel: {
     ...typeScale.label,
     color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
-  error: {
+  helperText: {
     ...typeScale.caption,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
+  actions: {
+    gap: spacing.sm,
+  },
+  errorText: {
+    ...typeScale.callout,
     color: colors.destructive,
-    marginBottom: spacing.md,
   },
-  saveButton: {
-    borderRadius: radii.lg,
-    paddingVertical: spacing.md + 2,
+  machine: {
+    gap: spacing.lg,
+  },
+  photoPreviewRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.lg,
+    gap: spacing.md,
   },
-  saveButtonDisabled: {
-    opacity: 0.5,
+  photoPreviewImage: {
+    width: 64,
+    height: 64,
+    borderRadius: radii.md,
   },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  deactivateButton: {
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.destructiveBorder,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  deactivateButtonText: {
-    color: colors.destructive,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  reactivateButton: {
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  reactivateButtonText: {
+  noteTitle: {
+    ...typeScale.callout,
+    fontFamily: typeScale.cardTitle.fontFamily,
     color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
+  },
+  noteTip: {
+    marginTop: spacing.sm,
+  },
+  noteTipLead: {
+    fontFamily: typeScale.cardTitle.fontFamily,
+    color: colors.textSecondary,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: spacing.lg,
+  },
+  sheetTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
   },
 });

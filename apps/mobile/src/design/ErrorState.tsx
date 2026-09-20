@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors, spacing, typeScale } from './theme';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from './Text';
+import { colors, fonts, minTouchTarget, spacing, typeScale } from './theme';
 
 interface Props {
   title?: string;
@@ -65,18 +66,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   message: {
+    ...typeScale.callout,
     color: colors.textMuted,
-    fontSize: 14,
     textAlign: 'center',
   },
   retry: {
     marginTop: spacing.sm,
-    paddingVertical: spacing.sm,
+    minHeight: minTouchTarget,
+    justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
   retryText: {
+    ...typeScale.callout,
+    fontFamily: fonts.display,
     color: colors.accent,
-    fontSize: 14,
-    fontWeight: '700',
   },
 });

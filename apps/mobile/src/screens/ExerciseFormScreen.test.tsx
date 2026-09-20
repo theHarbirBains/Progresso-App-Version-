@@ -1,10 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { Alert, StyleSheet } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { colors } from '../design/theme';
 import { createEquipmentProfile, createExercise, updateExercise } from '../lib/api';
 import { uploadEquipmentPhoto } from '../lib/equipmentPhotoUpload';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -554,5 +556,121 @@ describe('ExerciseFormScreen (sheet presentation)', () => {
     fireEvent.press(screen.getByTestId('exercise-form-cancel'));
 
     expect(onCancel).toHaveBeenCalled();
+  });
+});
+
+describe('ExerciseFormScreen -- shared controls, one primary action', () => {
+  it('draws no cards, even with the Machine / Equipment section open', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+  });
+
+  it('puts a named Cancel in the header', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    expect(screen.getByTestId('exercise-form-cancel').props.accessibilityLabel).toBe('Cancel');
+  });
+
+  it('uses the labelled shared input for the name, machine name and gym', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    expect(screen.getByTestId('exercise-form-name').props.accessibilityLabel).toBe('Exercise Name');
+    expect(screen.getByTestId('exercise-form-machine-name').props.accessibilityLabel).toBe(
+      'Machine Name (Optional)',
+    );
+    expect(screen.getByTestId('exercise-form-gym').props.accessibilityLabel).toBe('Gym (Optional)');
+  });
+
+  it('has one filled button, Save Exercise, in the mode accent -- and Add Machine Photo is only outlined', () => {
+    render(
+      <ExerciseFormScreen
+        mode="create"
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+        accentColor="#8B5CF6"
+        onAccentColor="#0A0A0A"
+      />,
+    );
+
+    expect(
+      StyleSheet.flatten(screen.getByTestId('exercise-form-save').props.style).backgroundColor,
+    ).toBe('#8B5CF6');
+    const photo = StyleSheet.flatten(
+      screen.getByTestId('exercise-form-machine-photo-add').props.style,
+    );
+    expect(photo.backgroundColor).toBeUndefined();
+    expect(photo.borderWidth).toBe(1);
+  });
+
+  it('shows Save as busy, not just dimmed, while saving', async () => {
+    mockCreateExercise.mockReturnValue(new Promise(() => undefined));
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Cable Preacher Curl');
+    fireEvent.press(screen.getByTestId('muscle-group-chip-biceps'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('exercise-form-save').props.accessibilityState).toEqual({
+        disabled: true,
+        busy: true,
+      }),
+    );
+    expect(
+      within(screen.getByTestId('exercise-form-save')).queryByText('Save Exercise'),
+    ).toBeNull();
+  });
+
+  it('shows Deactivate as a destructive outline and Reactivate as a neutral one, beneath Save', () => {
+    const { unmount } = render(
+      <ExerciseFormScreen
+        mode="edit"
+        exercise={ownedExercise}
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+    expect(
+      StyleSheet.flatten(screen.getByTestId('exercise-form-toggle-active').props.style).borderColor,
+    ).toBe(colors.destructiveBorder);
+    unmount();
+
+    render(
+      <ExerciseFormScreen
+        mode="edit"
+        exercise={{ ...ownedExercise, isActive: false }}
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+    expect(
+      StyleSheet.flatten(screen.getByTestId('exercise-form-toggle-active').props.style).borderColor,
+    ).toBe(colors.border);
+  });
+
+  it('shows a picked machine photo with a destructive Remove Photo text action', async () => {
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file://photo.jpg' }],
+    });
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _msg, buttons) => {
+      buttons?.find((b) => b.text === 'Choose from Library')?.onPress?.();
+    });
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fireEvent.press(screen.getByTestId('exercise-form-machine-photo-add'));
+
+    const remove = await screen.findByTestId('exercise-form-machine-photo-remove');
+    expect(remove.props.accessibilityLabel).toBe('Remove machine photo');
+    expect(StyleSheet.flatten(remove.props.style).borderWidth).toBeUndefined();
+  });
+});
+
+describe('ExerciseFormScreen renders no bare text outside <Text>', () => {
+  it('has no string directly inside a View in create mode', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    expectNoBareText();
   });
 });

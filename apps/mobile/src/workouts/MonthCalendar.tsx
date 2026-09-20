@@ -1,6 +1,7 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, fonts, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
 import { buildMonthGrid, MONTH_LABELS, WEEKDAY_LABELS } from './calendarGrid';
 
 interface Props {
@@ -20,7 +21,18 @@ interface Props {
 // Component Logic: one 7-column grid of fixed-size day cells, each deriving
 // its visual state (today/selected/completed/dimmed) from three plain
 // booleans rather than a combinatorial style-variant prop -- no per-cell
-// wrapper beyond the single TouchableOpacity + its dot.
+// wrapper beyond the single TouchableOpacity + its dot. Each day is named for
+// assistive tech ("September 5, workout completed"), and the month arrows are
+// full 44pt targets.
+function describeDay(dateKey: string, completed: boolean): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const label = new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+  });
+  return completed ? `${label}, workout completed` : label;
+}
+
 export function MonthCalendar({
   testID,
   year,
@@ -84,6 +96,7 @@ export function MonthCalendar({
               onPress={() => onSelectDate(day.dateKey)}
               activeOpacity={0.7}
               accessibilityRole="button"
+              accessibilityLabel={describeDay(day.dateKey, isCompleted)}
               accessibilityState={{ selected: isSelected }}
             >
               <View
@@ -97,7 +110,7 @@ export function MonthCalendar({
                   style={[
                     styles.dayText,
                     !day.inCurrentMonth && styles.dayTextDim,
-                    isToday && { color: onAccentColor, fontWeight: '700' },
+                    isToday && { color: onAccentColor, fontFamily: fonts.display },
                   ]}
                 >
                   {day.day}
@@ -125,10 +138,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
   navButton: {
-    padding: spacing.xs,
+    width: minTouchTarget,
+    height: minTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   monthLabel: {
     ...typeScale.cardTitle,
@@ -161,8 +177,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dayText: {
+    ...typeScale.callout,
     color: colors.textPrimary,
-    fontSize: 14,
   },
   dayTextDim: {
     color: colors.textMuted,

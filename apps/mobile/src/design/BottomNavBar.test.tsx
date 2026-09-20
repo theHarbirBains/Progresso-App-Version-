@@ -93,3 +93,63 @@ describe('BottomNavBar', () => {
     expect(StyleSheet.flatten(bar.props.style).position).not.toBe('absolute');
   });
 });
+
+describe('BottomNavBar accessibility and touch targets', () => {
+  it('is exposed as a tab list whose destinations are tabs with clear names', () => {
+    render(<BottomNavBar {...baseProps} active="workouts" />);
+
+    expect(screen.getByTestId('bottom-nav-bar').props.accessibilityRole).toBe('tablist');
+    for (const [id, name] of [
+      ['bottom-nav-home', 'Home'],
+      ['bottom-nav-workouts', 'Workouts'],
+      ['bottom-nav-progress', 'Progress'],
+      ['bottom-nav-profile', 'Profile'],
+    ] as const) {
+      const tab = screen.getByTestId(id);
+      expect(tab.props.accessibilityRole).toBe('tab');
+      expect(tab.props.accessibilityLabel).toBe(name);
+    }
+  });
+
+  it("names the Nutrition-mode tabs by what they are now ('Food', 'Goals')", () => {
+    render(<BottomNavBar {...baseProps} active="home" mode="nutrition" />);
+
+    expect(screen.getByTestId('bottom-nav-workouts').props.accessibilityLabel).toBe('Food');
+    expect(screen.getByTestId('bottom-nav-progress').props.accessibilityLabel).toBe('Goals');
+  });
+
+  it('gives every tab at least the 44pt minimum touch height and a 56pt width', () => {
+    render(<BottomNavBar {...baseProps} active="home" />);
+
+    for (const id of [
+      'bottom-nav-home',
+      'bottom-nav-workouts',
+      'bottom-nav-progress',
+      'bottom-nav-profile',
+    ]) {
+      const style = StyleSheet.flatten(screen.getByTestId(id).props.style);
+      expect(style.minHeight).toBeGreaterThanOrEqual(44);
+      expect(style.minWidth).toBeGreaterThanOrEqual(56);
+    }
+  });
+
+  it('makes the centre "+" a 44pt circle that sits flush in the row, with no negative-margin hack', () => {
+    render(<BottomNavBar {...baseProps} active="home" />);
+
+    const style = StyleSheet.flatten(screen.getByTestId('bottom-nav-plus').props.style);
+    expect(style.width).toBe(44);
+    expect(style.height).toBe(44);
+    expect(style.marginTop).toBeUndefined();
+    expect(screen.getByTestId('bottom-nav-plus').props.accessibilityLabel).toBe('Quick actions');
+  });
+
+  it('accepts an accent change (the Workout <-> Nutrition switch) without remounting or crashing', () => {
+    const { rerender } = render(<BottomNavBar {...baseProps} active="home" />);
+
+    rerender(<BottomNavBar {...baseProps} active="home" mode="nutrition" accentColor="#10B981" />);
+
+    const label = within(screen.getByTestId('bottom-nav-home')).getByText('Home');
+    expect(StyleSheet.flatten(label.props.style).color).toBe('#10B981');
+    expect(screen.getByTestId('bottom-nav-plus')).toBeTruthy();
+  });
+});

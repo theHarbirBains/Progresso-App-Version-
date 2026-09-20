@@ -51,10 +51,18 @@ export const colors = {
   glassBorderStrong: 'rgba(255, 255, 255, 0.14)',
 } as const;
 
+// Three working radii plus the pill, each with one role so nested surfaces
+// stay optically concentric (outer radius >= inner radius + padding gap):
+//   sm   -- small inset elements (a wheel-picker highlight, a bar track)
+//   md   -- controls: buttons, inputs, chips, icon wells
+//   lg   -- surfaces that contain controls: cards, sheets
+//   pill -- fully rounded: segmented controls, tabs, badges, avatars
+// (Controls previously sat *above* their card in radius -- buttons 14 vs
+// cards 10 -- which reads as inverted once a button sits inside a card.)
 export const radii = {
   sm: 8,
-  md: 10,
-  lg: 14,
+  md: 12,
+  lg: 16,
   pill: 999,
 } as const;
 
@@ -68,18 +76,36 @@ export const spacing = {
   xxxl: 32,
 } as const;
 
+// The maximum gap between two adjacent Dashboard widgets (cards, stat tiles,
+// the rows of tiles that hold them). A deliberate one-off rather than a step
+// on the spacing scale above -- 6 sits between xs (4) and sm (8), and
+// widget-to-widget separation is its own concept, distinct from a card's
+// internal padding. Applied once, as `gap` on each widget stack, so no
+// individual widget carries its own outer margin.
+export const widgetGap = 6;
+
 // Loaded via useFonts() in App.tsx before anything renders -- see
-// FontGate in App.tsx. Manrope carries headings/UI text; JetBrains Mono is
-// reserved for numeric stat values only (the "readout" feel), never for
-// prose, matching the approved Concept B typography direction.
+// FontGate in App.tsx. Manrope carries ALL text (headings, body, labels);
+// JetBrains Mono is reserved for numeric readouts only (the "readout" feel),
+// never for prose. There is deliberately no system-font text anywhere: body
+// copy uses Manrope Regular, so the app has one typeface, not two competing
+// sans-serifs. The weights below are the only ones loaded -- see `Text` for
+// how a `fontWeight` written in a style resolves to one of them.
 export const fonts = {
+  body: 'Manrope_400Regular',
   displayMedium: 'Manrope_500Medium',
+  semibold: 'Manrope_600SemiBold',
   display: 'Manrope_700Bold',
   displayHeavy: 'Manrope_800ExtraBold',
   mono: 'JetBrainsMono_500Medium',
   monoBold: 'JetBrainsMono_700Bold',
 } as const;
 
+// The complete type scale. Use these; do not hand-pick a `fontSize`. Eight
+// text tokens plus three numeric readouts replace the 16 distinct literal
+// sizes the app had drifted into (10-30px) -- in particular `callout` (14)
+// exists because 14 was already the single most-used size, just without a
+// token.
 export const typeScale = {
   // Largest tier, above screenTitle -- for the rare hero/large-heading
   // moment the reference design language calls for (e.g. a completion
@@ -93,14 +119,23 @@ export const typeScale = {
     textTransform: 'uppercase' as const,
   },
   cardTitle: { fontFamily: fonts.display, fontSize: 16 },
+  // Numeric readouts -- JetBrains Mono, the only place it is used.
   statLarge: { fontFamily: fonts.monoBold, fontSize: 30 },
   statMedium: { fontFamily: fonts.mono, fontSize: 19 },
-  body: { fontSize: 15 },
+  statSmall: { fontFamily: fonts.monoBold, fontSize: 15 },
+  body: { fontFamily: fonts.body, fontSize: 15 },
+  // Dense list/row text: titles inside a row, button labels, compact meta.
+  callout: { fontFamily: fonts.body, fontSize: 14 },
   // `secondary` already covers the "bodySmall" role (fontSize 13, muted
   // supporting text) -- intentionally not duplicated under a second name.
-  secondary: { fontSize: 13 },
+  secondary: { fontFamily: fonts.body, fontSize: 13 },
   // Form-field label above an input -- distinct from sectionHeading, which
   // is uppercase/letter-spaced for section dividers, not per-field labels.
   label: { fontFamily: fonts.displayMedium, fontSize: 13 },
   caption: { fontFamily: fonts.displayMedium, fontSize: 11 },
 } as const;
+
+// Minimum comfortable touch target (Apple HIG / WCAG 2.2 native guidance).
+// Interactive controls are at least this tall/wide -- either visibly, or via
+// `hitSlop` when the visible glyph is smaller (icon buttons).
+export const minTouchTarget = 44;

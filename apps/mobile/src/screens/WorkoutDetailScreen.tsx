@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
+import { AppHeader } from '../design/AppHeader';
+import { Screen } from '../design/Screen';
 import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
 import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import {
   completedSetsOnly,
@@ -12,7 +17,7 @@ import {
   type CompletedSetRecord,
   type WorkoutDetail,
 } from '../workouts/workoutQueries';
-import { workoutStyles as styles } from './workoutStyles';
+import { workoutDetailStyles as styles } from './workoutDetailStyles';
 
 type Props = RootStackScreenProps<'WorkoutDetail'>;
 
@@ -34,11 +39,18 @@ function formatDateTime(iso: string): string {
 // Read-only history view -- top set is a pure client-side derivation over
 // the sets already fetched for display, matching the Phase 3 top-set
 // foundation (no separate storage or query).
+//
+// Layout: the workout's name and date in the header (Back on the left, Share
+// on the right once it is completed), then each exercise as a plain block
+// separated by hairlines -- name (opens its PR history), top set, and a row
+// per logged set with a quiet PR / 1RM word while that set is still the live
+// record.
 export function WorkoutDetailScreen({ route, navigation }: Props) {
   const { workoutId } = route.params;
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
+  const { theme } = useProgressTheme();
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
@@ -92,43 +104,63 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
 
   if (loading || !workout) {
     return (
-      <View style={styles.container}>
+      <Screen
+        scroll={false}
+        header={
+          <AppHeader
+            leftAction={{
+              icon: 'arrow-left',
+              onPress: () => navigation.goBack(),
+              accessibilityLabel: 'Back',
+              testID: 'workout-detail-back',
+            }}
+          />
+        }
+      >
         {error ? (
-          <Text testID="workout-detail-error" style={styles.error}>
+          <Text testID="workout-detail-error" style={styles.errorText}>
             {error}
           </Text>
         ) : (
-          <ActivityIndicator
-            testID="workout-detail-loading"
-            size="large"
-            color={colors.textPrimary}
-          />
+          <View style={styles.loading}>
+            <ActivityIndicator
+              testID="workout-detail-loading"
+              size="large"
+              color={colors.textPrimary}
+            />
+          </View>
         )}
-      </View>
+      </Screen>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{workout.name}</Text>
-        <TouchableOpacity testID="workout-detail-back" onPress={() => navigation.goBack()}>
-          <Text style={styles.backLink}>Back</Text>
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.info}>{formatDateTime(workout.performedAt)}</Text>
-
-      {workout.completedAt ? (
-        <TouchableOpacity
-          testID="workout-detail-share"
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('ShareWorkout', { workoutId })}
-        >
-          <Text style={styles.secondaryButtonText}>Share Workout</Text>
-        </TouchableOpacity>
-      ) : null}
-
-      {workout.exercises.map((exercise) => {
+    <Screen
+      contentContainerStyle={styles.content}
+      header={
+        <AppHeader
+          title={workout.name}
+          subtitle={formatDateTime(workout.performedAt)}
+          leftAction={{
+            icon: 'arrow-left',
+            onPress: () => navigation.goBack(),
+            accessibilityLabel: 'Back',
+            testID: 'workout-detail-back',
+          }}
+          rightAction={
+            workout.completedAt
+              ? {
+                  icon: 'share',
+                  onPress: () => navigation.navigate('ShareWorkout', { workoutId }),
+                  accessibilityLabel: 'Share workout',
+                  testID: 'workout-detail-share',
+                }
+              : undefined
+          }
+        />
+      }
+    >
+      {workout.exercises.map((exercise, index) => {
         // A workout's history view only ever shows sets that were actually
         // logged -- a blank/incomplete set left over from a live session
         // that was completed anyway is not real performance data.
@@ -138,20 +170,28 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           null,
         );
         return (
-          <View key={exercise.id} testID={`exercise-card-${exercise.id}`} style={styles.card}>
+          <View
+            key={exercise.id}
+            testID={`exercise-card-${exercise.id}`}
+            style={[styles.exerciseBlock, index > 0 && styles.exerciseDivider]}
+          >
             <TouchableOpacity
               testID={`exercise-title-${exercise.id}`}
+              style={styles.exerciseTitleRow}
               onPress={() =>
                 navigation.navigate('PRHistory', {
                   exerciseId: exercise.exerciseId,
                   exerciseName: exercise.exerciseName,
                 })
               }
+              accessibilityRole="button"
+              accessibilityLabel={`${exercise.exerciseName}, view PR history`}
             >
-              <Text style={styles.cardTitle}>{exercise.exerciseName}</Text>
+              <Text style={styles.exerciseTitle}>{exercise.exerciseName}</Text>
+              <Feather name="chevron-right" size={18} color={colors.textMuted} />
             </TouchableOpacity>
             {topSet ? (
-              <Text testID={`top-set-${exercise.id}`} style={styles.cardMetaHighlight}>
+              <Text testID={`top-set-${exercise.id}`} style={styles.topSet}>
                 Top set: {formatWeight(topSet.weightKg, weightUnit)}
                 {weightUnit}
                 {'×'}
@@ -164,18 +204,26 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
               );
               const isCurrentOneRepMax = oneRepMaxes[exercise.id]?.sourceSetId === set.id;
               return (
-                <Text key={set.id} style={styles.cardMeta}>
-                  Set {set.setIndex}: {formatWeight(set.weightKg, weightUnit)}
-                  {weightUnit} × {set.reps}
+                <View key={set.id} style={styles.setRow}>
+                  <Text style={styles.setLabel}>Set {set.setIndex}</Text>
+                  <Text style={styles.setValue}>
+                    {formatWeight(set.weightKg, weightUnit)}
+                    {weightUnit} × {set.reps}
+                  </Text>
                   {isCurrentOneRepMax || isCurrentRepPR ? (
-                    <Text testID={`pr-tag-${set.id}`}> · {isCurrentOneRepMax ? '1RM' : 'PR'}</Text>
+                    <Text
+                      testID={`pr-tag-${set.id}`}
+                      style={[styles.prTag, { color: theme.accent }]}
+                    >
+                      {isCurrentOneRepMax ? '1RM' : 'PR'}
+                    </Text>
                   ) : null}
-                </Text>
+                </View>
               );
             })}
           </View>
         );
       })}
-    </ScrollView>
+    </Screen>
   );
 }

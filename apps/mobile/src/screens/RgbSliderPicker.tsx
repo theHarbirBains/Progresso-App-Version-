@@ -2,11 +2,11 @@ import { useCallback, useRef, useState } from 'react';
 import {
   PanResponder,
   StyleSheet,
-  Text,
   TextInput,
   View,
   type GestureResponderEvent,
 } from 'react-native';
+import { Text } from '../design/Text';
 import { colors, radii, spacing } from '../design/theme';
 import { hexToRgb, normalizeHex, rgbToHex } from '../theme/accentColor';
 

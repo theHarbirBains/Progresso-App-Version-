@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Text } from '../design/Text';
 import { LineChart } from '../charts/LineChart';
 import { SectionHeader } from '../design/SectionHeader';
 import { colors, spacing, typeScale } from '../design/theme';

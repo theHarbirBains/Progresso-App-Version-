@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, ScrollView, View } from 'react-native';
+import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
-import { DestructiveButton, PrimaryButton } from '../design/Button';
-import { colors } from '../design/theme';
+import { AppHeader } from '../design/AppHeader';
+import { PrimaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
-import { SectionHeader } from '../design/SectionHeader';
+import { Screen } from '../design/Screen';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { fromKg, isValidWeightIncrement, roundWeight, toKg } from '../lib/units';
@@ -36,8 +35,7 @@ import {
   type WorkoutExerciseWithSets,
 } from '../workouts/workoutQueries';
 import { computeTotalSets, computeTotalVolumeKg } from '../workouts/workoutSummary';
-import { WorkoutHeader } from '../workouts/WorkoutHeader';
-import { WorkoutSummaryCard } from '../workouts/WorkoutSummaryCard';
+import { WorkoutStats } from '../workouts/WorkoutStats';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
 import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
 
@@ -62,15 +60,12 @@ function formatSessionDate(iso: string): string {
 }
 
 /** Every set from the user's last completed session with this exercise, in
- * the order they were logged -- never just the heaviest one. The relative-
- * weight fraction on each row is purely a same-session visual proportion
- * (this set's weight / that session's own heaviest), not a stored stat. */
+ * the order they were logged -- never just the heaviest one. */
 function buildPreviousSessionDisplay(
   previous: { performedAt: string; sets: SetRecord[] } | undefined,
   unit: 'kg' | 'lb',
 ): PreviousSessionDisplay | null {
   if (!previous || previous.sets.length === 0) return null;
-  const maxWeightKg = Math.max(...previous.sets.map((s) => s.weightKg ?? 0));
   return {
     dateDisplay: formatSessionDate(previous.performedAt),
     sets: previous.sets.map((s, i) => ({
@@ -79,7 +74,6 @@ function buildPreviousSessionDisplay(
       unit,
       reps: s.reps ?? 0,
       side: s.side,
-      relativeWeight: maxWeightKg > 0 ? (s.weightKg ?? 0) / maxWeightKg : 1,
     })),
   };
 }
@@ -137,9 +131,16 @@ function computeUnilateralSets(
 }
 
 // The live-tracking half of the Start Workout experience (see
-// NewWorkoutScreen.tsx for the pre-start planning half) -- both share the
-// same WorkoutHeader/WorkoutSummaryCard/ExerciseCard/SetRow component
-// library and the same "exactly one blank set per new exercise" rule.
+// NewWorkoutScreen.tsx for the pre-start planning half), sharing the same
+// "exactly one blank set per new exercise" rule.
+//
+// Layout, built for one-handed use between sets: the header carries the
+// workout's name and muscles; under it a pinned strip keeps duration, total
+// sets and volume in view; the exercises scroll as plain blocks (each with
+// the last session's numbers right above the sets to log); and the one
+// filled button, Finish Workout, is pinned at the bottom. Add Exercise /
+// Create Custom / Cancel Workout come after the last exercise -- Cancel is
+// deliberately out of thumb range of Finish, and still asks for confirmation.
 // Every set write (create/update/reorder/remove) reuses the existing
 // direct-to-Supabase workoutQueries functions; nothing here talks to a new
 // endpoint.
@@ -148,7 +149,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
-  const insets = useSafeAreaInsets();
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -499,11 +499,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
 
   if (!loading && error && !workout) {
     return (
-      <View style={styles.screen}>
+      <Screen scroll={false} header={<AppHeader title="Workout" />}>
         <Text testID="active-workout-error" style={styles.errorText}>
           {error}
         </Text>
-      </View>
+      </Screen>
     );
   }
 
@@ -539,143 +539,157 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const totalVolumeDisplay = `${formatWeight(totalVolumeKg, weightUnit)} ${weightUnit}`;
 
   return (
-    <View style={styles.screen}>
-      <WorkoutHeader testID="active-workout-header" title={workout.name} />
-
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, styles.activeWorkoutContent]}
-        showsVerticalScrollIndicator={false}
-      >
-        {error ? (
-          <Text testID="active-workout-error" style={styles.errorText}>
-            {error}
-          </Text>
-        ) : null}
-
-        <WorkoutSummaryCard
-          testID="active-workout-summary"
-          workoutName={workout.name}
-          muscleGroupsLabel={muscleGroupsLabel}
-          performedAt={workout.performedAt}
-          active={!workout.completedAt}
-          totalSets={totalSets}
-          totalVolumeDisplay={totalVolumeDisplay}
-          accentColor={theme.accent}
-        />
-
-        <View style={styles.sectionTitle}>
-          <SectionHeader label="Today's Workout" />
-        </View>
-
-        <View style={styles.addExerciseRow}>
-          <AddExerciseButton
-            testID="active-workout-add-exercise"
-            onPress={() => setPickerOpen(true)}
-          />
-          <CreateCustomExerciseButton
-            testID="active-workout-create-custom"
-            onPress={() => setCustomExerciseOpen(true)}
-          />
-        </View>
-
-        {workout.exercises.length === 0 ? (
-          <View style={styles.emptyExercisesWrap}>
-            <EmptyState
-              testID="active-workout-empty"
-              icon={<Feather name="activity" size={24} color={colors.textMuted} />}
-              title="Add your first exercise to get started."
+    <>
+      <Screen
+        scroll={false}
+        padded={false}
+        keyboardAvoiding
+        header={
+          <View>
+            <AppHeader
+              testID="active-workout-header"
+              title={workout.name}
+              subtitle={muscleGroupsLabel || undefined}
+            />
+            <WorkoutStats
+              testID="active-workout-summary"
+              performedAt={workout.performedAt}
+              active={!workout.completedAt}
+              totalSets={totalSets}
+              totalVolumeDisplay={totalVolumeDisplay}
             />
           </View>
-        ) : null}
+        }
+      >
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {error ? (
+            <Text testID="active-workout-error" style={styles.errorText}>
+              {error}
+            </Text>
+          ) : null}
 
-        {workout.exercises.map((exercise, index) => (
-          <ExerciseCard
-            key={exercise.id}
-            testID={`exercise-card-${exercise.id}`}
-            exerciseName={exercise.exerciseName}
-            muscleGroup={exercise.muscleGroup}
-            movementType={exercise.movementType}
-            previousSession={buildPreviousSessionDisplay(
-              previousPerformance[exercise.exerciseId],
-              weightUnit,
-            )}
-            onViewHistory={
-              previousPerformance[exercise.exerciseId]
-                ? () =>
-                    navigation.navigate('ProgressExerciseDetail', {
-                      exerciseId: exercise.exerciseId,
-                      exerciseName: exercise.exerciseName,
-                    })
-                : undefined
-            }
-            sets={
-              exercise.movementType === 'unilateral'
-                ? []
-                : exercise.sets.map((set) => ({
-                    id: set.id,
-                    setIndex: set.setIndex,
-                    weight: setInputs[set.id]?.weight ?? '',
-                    reps: setInputs[set.id]?.reps ?? '',
-                    completed: set.completedAt !== null,
-                    canComplete: isValidDraft(setInputs[set.id]),
-                  }))
-            }
-            unilateralSets={
-              exercise.movementType === 'unilateral'
-                ? computeUnilateralSets(exercise.sets, setInputs)
-                : []
-            }
-            onChangeWeight={(setId, text) =>
-              setSetInputs((prev) => ({
-                ...prev,
-                [setId]: { weight: text, reps: prev[setId]?.reps ?? '' },
-              }))
-            }
-            onChangeReps={(setId, text) =>
-              setSetInputs((prev) => ({
-                ...prev,
-                [setId]: { weight: prev[setId]?.weight ?? '', reps: text },
-              }))
-            }
-            onToggleComplete={(setId) => {
-              const set = exercise.sets.find((s) => s.id === setId);
-              if (set) handleToggleComplete(exercise, set);
-            }}
-            onToggleUnilateralComplete={(setIndex) =>
-              handleToggleUnilateralComplete(exercise, setIndex)
-            }
-            onChangeUnilateralWeight={(setIndex, side, text) => {
-              const set = exercise.sets.find((s) => s.setIndex === setIndex && s.side === side);
-              if (set) {
+          {workout.exercises.length === 0 ? (
+            <View style={styles.emptyWrap}>
+              <EmptyState
+                testID="active-workout-empty"
+                title="Add your first exercise to get started."
+              />
+            </View>
+          ) : null}
+
+          {workout.exercises.map((exercise, index) => (
+            <ExerciseCard
+              key={exercise.id}
+              testID={`exercise-card-${exercise.id}`}
+              exerciseName={exercise.exerciseName}
+              muscleGroup={exercise.muscleGroup}
+              movementType={exercise.movementType}
+              previousSession={buildPreviousSessionDisplay(
+                previousPerformance[exercise.exerciseId],
+                weightUnit,
+              )}
+              onViewHistory={
+                previousPerformance[exercise.exerciseId]
+                  ? () =>
+                      navigation.navigate('ProgressExerciseDetail', {
+                        exerciseId: exercise.exerciseId,
+                        exerciseName: exercise.exerciseName,
+                      })
+                  : undefined
+              }
+              sets={
+                exercise.movementType === 'unilateral'
+                  ? []
+                  : exercise.sets.map((set) => ({
+                      id: set.id,
+                      setIndex: set.setIndex,
+                      weight: setInputs[set.id]?.weight ?? '',
+                      reps: setInputs[set.id]?.reps ?? '',
+                      completed: set.completedAt !== null,
+                      canComplete: isValidDraft(setInputs[set.id]),
+                    }))
+              }
+              unilateralSets={
+                exercise.movementType === 'unilateral'
+                  ? computeUnilateralSets(exercise.sets, setInputs)
+                  : []
+              }
+              onChangeWeight={(setId, text) =>
                 setSetInputs((prev) => ({
                   ...prev,
-                  [set.id]: { weight: text, reps: prev[set.id]?.reps ?? '' },
-                }));
+                  [setId]: { weight: text, reps: prev[setId]?.reps ?? '' },
+                }))
               }
-            }}
-            onChangeUnilateralReps={(setIndex, side, text) => {
-              const set = exercise.sets.find((s) => s.setIndex === setIndex && s.side === side);
-              if (set) {
+              onChangeReps={(setId, text) =>
                 setSetInputs((prev) => ({
                   ...prev,
-                  [set.id]: { weight: prev[set.id]?.weight ?? '', reps: text },
-                }));
+                  [setId]: { weight: prev[setId]?.weight ?? '', reps: text },
+                }))
               }
-            }}
-            onAddSet={() => handleAddSet(exercise)}
-            onRemoveExercise={() => handleRemoveExercise(exercise.id)}
-            onMoveUp={index > 0 ? () => handleMoveExercise(index, -1) : undefined}
-            onMoveDown={
-              index < workout.exercises.length - 1 ? () => handleMoveExercise(index, 1) : undefined
-            }
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
-          />
-        ))}
-      </ScrollView>
+              onToggleComplete={(setId) => {
+                const set = exercise.sets.find((s) => s.id === setId);
+                if (set) handleToggleComplete(exercise, set);
+              }}
+              onToggleUnilateralComplete={(setIndex) =>
+                handleToggleUnilateralComplete(exercise, setIndex)
+              }
+              onChangeUnilateralWeight={(setIndex, side, text) => {
+                const set = exercise.sets.find((s) => s.setIndex === setIndex && s.side === side);
+                if (set) {
+                  setSetInputs((prev) => ({
+                    ...prev,
+                    [set.id]: { weight: text, reps: prev[set.id]?.reps ?? '' },
+                  }));
+                }
+              }}
+              onChangeUnilateralReps={(setIndex, side, text) => {
+                const set = exercise.sets.find((s) => s.setIndex === setIndex && s.side === side);
+                if (set) {
+                  setSetInputs((prev) => ({
+                    ...prev,
+                    [set.id]: { weight: prev[set.id]?.weight ?? '', reps: text },
+                  }));
+                }
+              }}
+              onAddSet={() => handleAddSet(exercise)}
+              onRemoveExercise={() => handleRemoveExercise(exercise.id)}
+              onMoveUp={index > 0 ? () => handleMoveExercise(index, -1) : undefined}
+              onMoveDown={
+                index < workout.exercises.length - 1
+                  ? () => handleMoveExercise(index, 1)
+                  : undefined
+              }
+              divider={index > 0}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+            />
+          ))}
 
-      <View style={[styles.cancelWorkoutFooter, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={styles.footerButtonGap}>
+          <View style={styles.endActions}>
+            <AddExerciseButton
+              testID="active-workout-add-exercise"
+              onPress={() => setPickerOpen(true)}
+            />
+            <CreateCustomExerciseButton
+              testID="active-workout-create-custom"
+              onPress={() => setCustomExerciseOpen(true)}
+            />
+            <TextButton
+              testID="cancel-workout"
+              label={cancelling ? 'Cancelling…' : 'Cancel Workout'}
+              destructive
+              onPress={handleCancelWorkout}
+              disabled={cancelling || completing}
+            />
+          </View>
+        </ScrollView>
+
+        <View style={styles.footer}>
           <PrimaryButton
             testID="complete-workout"
             label={completing ? 'Completing…' : 'Finish Workout'}
@@ -685,13 +699,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
             onAccentColor={theme.onAccent}
           />
         </View>
-        <DestructiveButton
-          testID="cancel-workout"
-          label={cancelling ? 'Cancelling…' : 'Cancel Workout'}
-          onPress={handleCancelWorkout}
-          disabled={cancelling || completing}
-        />
-      </View>
+      </Screen>
 
       <ExercisePickerModal
         visible={pickerOpen}
@@ -706,6 +714,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
       />
-    </View>
+    </>
   );
 }

@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text } from '../design/Text';
 import { GlassBackground } from '../design/GlassBackground';
 import { spacing } from '../design/theme';
 import { exerciseStyles as styles } from '../screens/exerciseStyles';

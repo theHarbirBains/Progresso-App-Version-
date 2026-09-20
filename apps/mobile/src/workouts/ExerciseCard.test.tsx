@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet, View } from 'react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { fonts } from '../design/theme';
 import { ExerciseCard } from './ExerciseCard';
 
 const baseProps = {
@@ -112,7 +114,6 @@ describe('ExerciseCard', () => {
               unit: 'lb',
               reps: 5,
               side: null,
-              relativeWeight: 1,
             },
             {
               setNumber: 2,
@@ -120,7 +121,6 @@ describe('ExerciseCard', () => {
               unit: 'lb',
               reps: 5,
               side: null,
-              relativeWeight: 0.98,
             },
             {
               setNumber: 3,
@@ -128,7 +128,6 @@ describe('ExerciseCard', () => {
               unit: 'lb',
               reps: 6,
               side: null,
-              relativeWeight: 0.96,
             },
           ],
         }}
@@ -156,7 +155,6 @@ describe('ExerciseCard', () => {
               unit: 'lb',
               reps: 10,
               side: 'left',
-              relativeWeight: 1,
             },
           ],
         }}
@@ -180,7 +178,6 @@ describe('ExerciseCard', () => {
               unit: 'lb',
               reps: 5,
               side: null,
-              relativeWeight: 1,
             },
           ],
         }}
@@ -306,5 +303,117 @@ describe('ExerciseCard (unilateral exercise)', () => {
 
     expect(onChangeUnilateralWeight).toHaveBeenCalledWith(1, 'left', '45');
     expect(onChangeUnilateralReps).toHaveBeenCalledWith(1, 'right', '8');
+  });
+});
+
+describe('ExerciseCard -- a plain block, quiet controls, previous numbers beside the sets', () => {
+  const previousSession = {
+    dateDisplay: 'Sep 1, 2026',
+    sets: [
+      { setNumber: 1, weightDisplay: '225', unit: 'lb' as const, reps: 5, side: null },
+      {
+        setNumber: 2,
+        weightDisplay: '42.5',
+        unit: 'lb' as const,
+        reps: 10,
+        side: 'right' as const,
+      },
+    ],
+  };
+
+  it('shows the muscle group as plain text, not a badge, and draws no card', () => {
+    render(<ExerciseCard {...baseProps} />);
+
+    const muscle = screen.getByTestId('exercise-card-muscle-group');
+    expect(StyleSheet.flatten(muscle.props.style).backgroundColor).toBeUndefined();
+    const root = StyleSheet.flatten(screen.getByTestId('exercise-card').props.style);
+    expect(root.backgroundColor).toBeUndefined();
+    expect(root.borderWidth).toBeUndefined();
+  });
+
+  it('draws a hairline above the block only when asked (every exercise but the first)', () => {
+    const { rerender } = render(<ExerciseCard {...baseProps} />);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('exercise-card').props.style).borderTopWidth,
+    ).toBeUndefined();
+
+    rerender(<ExerciseCard {...baseProps} divider />);
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-card').props.style).borderTopWidth).toBe(
+      StyleSheet.hairlineWidth,
+    );
+  });
+
+  it('gives reorder and remove a 44pt-tall target each, named for assistive tech', () => {
+    render(<ExerciseCard {...baseProps} onMoveUp={jest.fn()} onMoveDown={jest.fn()} />);
+
+    for (const [id, label] of [
+      ['exercise-card-move-up', 'Move exercise up'],
+      ['exercise-card-move-down', 'Move exercise down'],
+      ['exercise-card-remove', 'Remove exercise'],
+    ] as const) {
+      const control = screen.getByTestId(id);
+      expect(control.props.accessibilityLabel).toBe(label);
+      expect(StyleSheet.flatten(control.props.style).height).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  it('prints each previous set as "weight unit × reps", numbered, with the side for unilateral sets', () => {
+    render(<ExerciseCard {...baseProps} previousSession={previousSession} />);
+
+    const first = within(screen.getByTestId('exercise-card-previous-set-1'));
+    expect(first.getByText('1')).toBeTruthy();
+    expect(first.getByText('225 lb × 5')).toBeTruthy();
+    expect(screen.getByTestId('exercise-card-previous-set-2')).toHaveTextContent(
+      /^2\s*42\.5 lb × 10 \(R\)$/,
+    );
+  });
+
+  it('lets the previous sets wrap onto more lines instead of scrolling sideways, in a mono readout', () => {
+    render(<ExerciseCard {...baseProps} previousSession={previousSession} />);
+
+    expect(
+      screen
+        .UNSAFE_getAllByType(View)
+        .some((node) => StyleSheet.flatten(node.props.style)?.flexWrap === 'wrap'),
+    ).toBe(true);
+    const value = within(screen.getByTestId('exercise-card-previous-set-1')).getByText(
+      '225 lb × 5',
+    );
+    expect(StyleSheet.flatten(value.props.style).fontFamily).toBe(fonts.monoBold);
+  });
+
+  it('shows no per-set proportion bars or cards for the previous session', () => {
+    render(<ExerciseCard {...baseProps} previousSession={previousSession} />);
+
+    const set = StyleSheet.flatten(screen.getByTestId('exercise-card-previous-set-1').props.style);
+    expect(set.backgroundColor).toBeUndefined();
+    expect(set.minWidth).toBeUndefined();
+  });
+
+  it('gives Add Set a full-width 44pt secondary button', () => {
+    render(<ExerciseCard {...baseProps} />);
+
+    const add = screen.getByTestId('exercise-card-add-set');
+    expect(add).toHaveTextContent('+ Add Set');
+    expect(add.props.accessibilityLabel).toBe('Add Set');
+    expect(StyleSheet.flatten(add.props.style).minHeight).toBeGreaterThanOrEqual(44);
+  });
+
+  it('labels each unilateral side L and R', () => {
+    render(
+      <ExerciseCard
+        {...baseProps}
+        movementType="unilateral"
+        sets={[]}
+        unilateralSets={oneUnilateralSet}
+      />,
+    );
+
+    const set = within(screen.getByTestId('exercise-card-set-1'));
+    expect(set.getByText('L')).toBeTruthy();
+    expect(set.getByText('R')).toBeTruthy();
+    expect(screen.getByTestId('exercise-card-set-1-left-weight').props.accessibilityLabel).toBe(
+      'Set 1 left weight',
+    );
   });
 });

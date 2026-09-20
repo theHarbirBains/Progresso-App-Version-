@@ -1,29 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-  type LayoutChangeEvent,
-} from 'react-native';
+import { Image, ScrollView, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { Circle, Svg } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
+import { Badge } from '../design/Badge';
+import { PrimaryButton, TextButton } from '../design/Button';
 import { GlassBackground } from '../design/GlassBackground';
 import { IconButton } from '../design/IconButton';
 import { LoadingState } from '../design/LoadingState';
+import { ListRow } from '../design/ListRow';
 import { ModeToggle } from '../design/ModeToggle';
-import { QuickActionMenu } from '../design/QuickActionMenu';
+import { Section } from '../design/Section';
 import { colors, spacing } from '../design/theme';
-import { DashboardStatCard } from '../dashboard/DashboardStatCard';
+import { DashboardStat } from '../dashboard/DashboardStat';
+import { formatWorkoutDate } from '../dashboard/formatWorkoutDate';
 import { NutritionForegroundLayer } from '../dashboard/NutritionForegroundLayer';
+import { fetchRecentWorkoutInfo, type RecentWorkoutInfo } from '../dashboard/recentWorkoutInfo';
+import { RecentWorkoutCard } from '../dashboard/RecentWorkoutCard';
 import { computeWeeklyProgress, getCurrentWeekRange } from '../dashboard/weeklyProgress';
-import { firstName, getGreeting, greetingName } from '../dashboard/greeting';
 import { getMyProfile, type ProfileResponse } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -32,7 +29,11 @@ import {
   fetchWeeklyFoodLogs,
   type FoodLogRow,
 } from '../nutrition/foodLogQueries';
-import { computeWeeklyCalorieSummary, sumDailyTotals } from '../nutrition/nutritionCalculations';
+import {
+  calculateRemaining,
+  computeWeeklyCalorieSummary,
+  sumDailyTotals,
+} from '../nutrition/nutritionCalculations';
 import { fetchNutritionGoals, type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
@@ -208,7 +209,6 @@ export function DashboardScreen({ navigation }: Props) {
   // the fixed regression test below.
   const mode: Mode = currentMode;
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
-  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
 
   // Each user's own chosen accent color per mode (Settings > Appearance),
   // falling back to the app defaults (Electric Blue / Emerald) until they've
@@ -222,38 +222,20 @@ export function DashboardScreen({ navigation }: Props) {
     : DEFAULT_NUTRITION_THEME;
   const theme = mode === 'workout' ? workoutTheme : nutritionTheme;
 
-  // Drives the Workout<->Nutrition accent crossfade. Only elements that
-  // persist across a mode switch (the mode toggle's fill, the bottom bar's
-  // accent) can meaningfully animate -- content inside the Workout/Nutrition
-  // branches below unmounts and remounts on toggle, so it simply renders
-  // with the new mode's theme already applied. Each theme's own accent is a
-  // static, always-mounted layer whose *opacity* crossfades (rather than
-  // interpolating a single color value) so the whole transition can run on
-  // the native driver.
-  const themeAnim = useRef(new Animated.Value(mode === 'workout' ? 0 : 1)).current;
-  useEffect(() => {
-    Animated.timing(themeAnim, {
-      toValue: mode === 'workout' ? 0 : 1,
-      duration: 260,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-  }, [mode, themeAnim]);
-  const workoutFillOpacity = themeAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const nutritionFillOpacity = themeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  // The Workout<->Nutrition accent crossfade for the bottom navigation now
+  // lives in the shared BottomNavBar (see design/BottomNavBar.tsx); the mode
+  // toggle animates itself. Nothing on this screen needs to drive it.
 
-  // Measured (not hardcoded) heights of the fixed header/footer, so the
-  // scrollable content's own top/bottom padding always matches whatever
-  // actually renders on this device -- safe-area inset, font scaling, etc.
-  // The fallback values only cover the first frame or two before onLayout
-  // reports a real measurement.
+  // Measured (not hardcoded) height of the fixed header, so the scrollable
+  // content's own top padding always matches whatever actually renders on
+  // this device -- safe-area inset, font scaling, etc. The fallback value
+  // only covers the first frame or two before onLayout reports a real
+  // measurement. There is no footer to measure: the bottom navigation is an
+  // in-flow sibling of the navigator (App.tsx), so this screen's content
+  // area already ends above it.
   const [headerHeight, setHeaderHeight] = useState(160);
-  const [footerHeight, setFooterHeight] = useState(90);
   const onHeaderLayout = useCallback((event: LayoutChangeEvent) => {
     setHeaderHeight(event.nativeEvent.layout.height);
-  }, []);
-  const onFooterLayout = useCallback((event: LayoutChangeEvent) => {
-    setFooterHeight(event.nativeEvent.layout.height);
   }, []);
 
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -269,6 +251,9 @@ export function DashboardScreen({ navigation }: Props) {
 
   const [weekWorkouts, setWeekWorkouts] = useState<WorkoutSummary[]>([]);
   const [weekWorkoutsError, setWeekWorkoutsError] = useState<string | null>(null);
+
+  const [recentWorkout, setRecentWorkout] = useState<RecentWorkoutInfo | null>(null);
+  const [recentWorkoutError, setRecentWorkoutError] = useState<string | null>(null);
 
   const [nutritionLogs, setNutritionLogs] = useState<FoodLogRow[]>([]);
   const [weeklyNutritionLogs, setWeeklyNutritionLogs] = useState<FoodLogRow[]>([]);
@@ -293,22 +278,30 @@ export function DashboardScreen({ navigation }: Props) {
     setActiveWorkoutError(null);
     setStatsError(null);
     setWeekWorkoutsError(null);
+    setRecentWorkoutError(null);
     setNutritionError(null);
 
     const { start: weekStart, end: weekEnd } = getCurrentWeekRange();
 
-    const [profileResult, activeResult, statsResult, weekWorkoutsResult, nutritionResult] =
-      await Promise.allSettled([
-        getMyProfile(accessToken),
-        fetchActiveWorkout(userId),
-        Promise.all([fetchAllCompletedWorkouts(userId), fetchAllExerciseHistory(userId)]),
-        fetchWorkoutsForDateRange(userId, weekStart, weekEnd),
-        Promise.all([
-          fetchTodaysFoodLogs(userId),
-          fetchWeeklyFoodLogs(userId),
-          fetchNutritionGoals(userId),
-        ]),
-      ]);
+    const [
+      profileResult,
+      activeResult,
+      statsResult,
+      weekWorkoutsResult,
+      recentWorkoutResult,
+      nutritionResult,
+    ] = await Promise.allSettled([
+      getMyProfile(accessToken),
+      fetchActiveWorkout(userId),
+      Promise.all([fetchAllCompletedWorkouts(userId), fetchAllExerciseHistory(userId)]),
+      fetchWorkoutsForDateRange(userId, weekStart, weekEnd),
+      fetchRecentWorkoutInfo(userId),
+      Promise.all([
+        fetchTodaysFoodLogs(userId),
+        fetchWeeklyFoodLogs(userId),
+        fetchNutritionGoals(userId),
+      ]),
+    ]);
 
     if (profileResult.status === 'fulfilled') {
       setProfile(profileResult.value);
@@ -333,6 +326,12 @@ export function DashboardScreen({ navigation }: Props) {
       setWeekWorkouts(weekWorkoutsResult.value);
     } else {
       setWeekWorkoutsError(errorMessage(weekWorkoutsResult.reason));
+    }
+
+    if (recentWorkoutResult.status === 'fulfilled') {
+      setRecentWorkout(recentWorkoutResult.value);
+    } else {
+      setRecentWorkoutError(errorMessage(recentWorkoutResult.reason));
     }
 
     // Depends on profileResult (need activeWorkoutSplitId first), so this
@@ -378,10 +377,6 @@ export function DashboardScreen({ navigation }: Props) {
     return <LoadingState testID="dashboard-loading" />;
   }
 
-  const name = greetingName(profile?.displayName, profile?.username);
-  const greetingEyebrow = `${getGreeting()},`.toUpperCase();
-  const greetingDisplayName = name ? firstName(name) : '';
-
   const consumed = sumDailyTotals(nutritionLogs);
   const hasAnyNutritionGoal =
     nutritionGoals.calories !== null ||
@@ -389,6 +384,7 @@ export function DashboardScreen({ navigation }: Props) {
     nutritionGoals.carbsG !== null ||
     nutritionGoals.fatG !== null;
   const caloriePercent = ratio(consumed.calories, nutritionGoals.calories);
+  const caloriesRemaining = calculateRemaining(consumed, nutritionGoals).calories;
   const weeklyConsumedCalories = sumDailyTotals(weeklyNutritionLogs).calories;
   const weeklyCalorieSummary = computeWeeklyCalorieSummary(
     weeklyConsumedCalories,
@@ -400,10 +396,6 @@ export function DashboardScreen({ navigation }: Props) {
     weekWorkouts.map((w) => new Date(w.performedAt)),
     profile?.workoutFrequencyDays ?? null,
   );
-  const weeklyGoalValue =
-    weeklyProgress.goalCount !== null
-      ? `${weeklyProgress.completedCount}/${weeklyProgress.goalCount}`
-      : String(weeklyProgress.completedCount);
 
   return (
     <View style={styles.screen} testID="dashboard-screen">
@@ -447,42 +439,26 @@ export function DashboardScreen({ navigation }: Props) {
             style={styles.scrollAreaInner}
             contentContainerStyle={[
               styles.scrollContent,
-              { paddingTop: headerHeight + spacing.md, paddingBottom: footerHeight + spacing.lg },
-              // Workout mode's content (greeting + the three widgets) is
-              // short enough on most phones to leave a large empty gap
-              // below This Week -- flexGrow: 1 lets the content container
-              // claim the ScrollView's full available height (standard RN
-              // pattern for "fill the viewport, but still scroll if content
-              // ever exceeds it" -- e.g. large accessibility text sizes),
-              // and justifyContent: 'space-between' then distributes that
-              // leftover space evenly between the greeting and the three
-              // widgets, so gaps grow or shrink to whatever the device's
-              // actual height allows rather than a fixed guess. This
-              // ScrollView is Workout-mode only -- see the plain,
-              // non-scrolling View in the Nutrition-mode branch below for
-              // why Nutrition mode has no scrollable viewport at all.
-              styles.workoutModeFillContent,
+              { paddingTop: headerHeight + spacing.md },
+              // Every widget is a direct child of this container, separated
+              // by exactly `widgetGap` -- see widgetStack's comment. Scrolls
+              // only when the stack genuinely exceeds the viewport; when it
+              // doesn't, the widgets themselves share the spare height so
+              // they fill from the mode switcher to the bottom navigation --
+              // see workoutStackFill and the grow* styles.
+              styles.widgetStack,
+              styles.workoutStackFill,
             ]}
           >
-            <View style={styles.greetingRow}>
-              <View style={styles.greetingBlock}>
-                <GlassBackground bordered={false} />
-                <Text testID="dashboard-greeting-eyebrow" style={styles.greetingEyebrow}>
-                  {greetingEyebrow}
-                </Text>
-                <Text testID="dashboard-greeting" style={styles.greeting}>
-                  {greetingDisplayName}
-                </Text>
-              </View>
-            </View>
-
             {profileError ? (
               <Text testID="dashboard-profile-error" style={styles.errorText}>
                 {profileError}
               </Text>
             ) : null}
 
-            <View style={styles.section}>
+            {/* Only a real Next Workout card grows to take spare height; the
+                one-line resume / "no upcoming workout" rows stay compact. */}
+            <View style={!activeWorkout && nextWorkoutPlan ? styles.growHero : undefined}>
               {activeWorkoutError ? (
                 <Text testID="dashboard-active-workout-error" style={styles.errorText}>
                   {activeWorkoutError}
@@ -496,207 +472,231 @@ export function DashboardScreen({ navigation }: Props) {
                     navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id })
                   }
                 >
-                  <View style={styles.listRow}>
-                    <View style={styles.listThumb}>
-                      <Feather name="activity" size={18} color={theme.accent} />
-                    </View>
-                    <View style={styles.listRowBody}>
-                      <Text style={styles.listRowTitle}>{activeWorkout.name}</Text>
-                      <Text style={styles.listRowMeta}>In progress · tap to resume</Text>
-                    </View>
-                    <Feather name="chevron-right" size={20} color={colors.textMuted} />
-                  </View>
+                  <ListRow
+                    icon="activity"
+                    title={activeWorkout.name}
+                    subtitle="In progress · tap to resume"
+                    chevron
+                  />
                 </AppCard>
               ) : nextWorkoutPlan ? (
-                <AppCard hero testID="dashboard-next-workout" style={styles.condensedCard}>
-                  <View style={styles.nextWorkoutHeaderRow}>
-                    <Text style={styles.nextWorkoutEyebrow}>Your Next Workout</Text>
-                    {splitBadgeText(nextWorkoutPlan.splitName) ? (
-                      <View
-                        testID="dashboard-next-workout-badge"
-                        style={[
-                          styles.splitBadge,
-                          { backgroundColor: theme.accentBg, borderColor: theme.accentBorder },
-                        ]}
-                      >
-                        <Text style={[styles.splitBadgeText, { color: theme.accent }]}>
-                          {splitBadgeText(nextWorkoutPlan.splitName)}
-                        </Text>
-                      </View>
+                <AppCard hero testID="dashboard-next-workout" style={styles.nextWorkoutCard}>
+                  <View>
+                    <View style={styles.nextWorkoutHeaderRow}>
+                      <Text style={styles.nextWorkoutEyebrow}>Your Next Workout</Text>
+                      {splitBadgeText(nextWorkoutPlan.splitName) ? (
+                        <Badge
+                          testID="dashboard-next-workout-badge"
+                          label={splitBadgeText(nextWorkoutPlan.splitName)!}
+                          color={theme.accent}
+                          backgroundColor={theme.accentBg}
+                        />
+                      ) : null}
+                    </View>
+                    <Text style={styles.nextWorkoutDayName}>{nextWorkoutPlan.day.name}</Text>
+                    <Text style={styles.nextWorkoutMeta}>{nextWorkoutPlan.splitName}</Text>
+                    {nextWorkoutPlan.day.muscleGroups.length > 0 ? (
+                      <Text testID="dashboard-next-workout-muscles" style={styles.nextWorkoutMeta}>
+                        {nextWorkoutPlan.day.muscleGroups
+                          .map((group) => SPLIT_MUSCLE_GROUP_LABELS[group])
+                          .join(' • ')}
+                      </Text>
                     ) : null}
                   </View>
-                  <Text style={styles.nextWorkoutDayName}>{nextWorkoutPlan.day.name}</Text>
-                  <Text style={styles.nextWorkoutSplitName}>{nextWorkoutPlan.splitName}</Text>
-                  {nextWorkoutPlan.day.muscleGroups.length > 0 ? (
-                    <Text
-                      testID="dashboard-next-workout-muscles"
-                      style={styles.nextWorkoutSplitName}
-                    >
-                      {nextWorkoutPlan.day.muscleGroups
-                        .map((group) => SPLIT_MUSCLE_GROUP_LABELS[group])
-                        .join(' • ')}
-                    </Text>
-                  ) : null}
 
-                  <TouchableOpacity
-                    testID="dashboard-start-next-workout"
-                    style={[styles.nextWorkoutButton, { backgroundColor: theme.accent }]}
-                    onPress={() => navigation.navigate('NewWorkout')}
-                  >
-                    <Text style={[styles.nextWorkoutButtonText, { color: theme.onAccent }]}>
-                      Start Workout
-                    </Text>
-                    <Feather name="arrow-right" size={18} color={theme.onAccent} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    testID="dashboard-change-split"
-                    style={styles.nextWorkoutSecondaryButton}
-                    onPress={() => navigation.navigate('WorkoutSplits')}
-                  >
-                    <Text style={styles.nextWorkoutSecondaryButtonText}>Change Workout</Text>
-                  </TouchableOpacity>
+                  <View style={styles.nextWorkoutActions}>
+                    <PrimaryButton
+                      testID="dashboard-start-next-workout"
+                      label="Start Workout"
+                      accentColor={theme.accent}
+                      onAccentColor={theme.onAccent}
+                      onPress={() => navigation.navigate('NewWorkout')}
+                    />
+                    <TextButton
+                      testID="dashboard-change-split"
+                      label="Change Workout"
+                      onPress={() => navigation.navigate('WorkoutSplits')}
+                    />
+                  </View>
                 </AppCard>
               ) : (
                 <AppCard
                   testID="dashboard-start-workout"
                   onPress={() => navigation.navigate('NewWorkout')}
                 >
-                  <View style={styles.listRow}>
-                    <View style={styles.listThumb}>
-                      <Feather name="calendar" size={18} color={colors.textMuted} />
-                    </View>
-                    <View style={styles.listRowBody}>
-                      <Text style={styles.listRowTitle}>No upcoming workout</Text>
-                      <Text style={styles.listRowMeta}>Tap to start a new workout</Text>
-                    </View>
-                    <Feather name="chevron-right" size={20} color={colors.textMuted} />
-                  </View>
+                  <ListRow
+                    icon="calendar"
+                    title="No upcoming workout"
+                    subtitle="Tap to start a new workout"
+                    chevron
+                  />
                 </AppCard>
               )}
             </View>
 
-            <View style={styles.section} testID="dashboard-stat-grid">
-              {statsError ? (
-                <Text testID="dashboard-stats-error" style={styles.errorText}>
-                  {statsError}
-                </Text>
-              ) : null}
-              <View style={styles.statGridRow}>
-                <DashboardStatCard
-                  testID="dashboard-stat-sets"
-                  icon="check-circle"
-                  value={String(allSetHistory.length)}
-                  title="Sets Done"
-                  subtitle="All Time"
-                  accentColor={theme.accent}
-                  onPress={() => navigation.navigate('ProgressOverview')}
-                />
-                <DashboardStatCard
-                  testID="dashboard-stat-workouts-month"
-                  icon="calendar"
-                  value={String(lifetimeStats.workoutsThisMonth)}
-                  title="Workouts"
-                  subtitle="This Month"
-                  accentColor={theme.accent}
-                  onPress={() => navigation.navigate('ProgressOverview')}
-                />
-              </View>
-              <View style={[styles.statGridRow, { marginTop: spacing.xs }]}>
-                <DashboardStatCard
-                  testID="dashboard-stat-steps"
-                  icon="activity"
-                  value="--"
-                  title="Steps"
-                  subtitle="Not connected"
-                  accentColor={theme.accent}
-                />
-                <DashboardStatCard
-                  testID="dashboard-stat-weekly-goal"
-                  icon="target"
-                  value={weeklyGoalValue}
-                  title="Weekly Goal"
-                  subtitle="This Week"
-                  accentColor={theme.accent}
-                />
-              </View>
-            </View>
-
-            <View style={styles.section}>
+            {/* Activity: this week and the four headline stats, in ONE card --
+                a set of facts that belong together -- with a hairline between
+                the two groups instead of five separate cards. */}
+            <View style={styles.growActivity}>
               {weekWorkoutsError ? (
                 <Text testID="dashboard-weekly-error" style={styles.errorText}>
                   {weekWorkoutsError}
                 </Text>
               ) : null}
-              <AppCard testID="dashboard-weekly-progress" style={styles.condensedCard}>
-                <View style={styles.weeklyHeaderRow}>
-                  <Text testID="dashboard-weekly-count" style={styles.weeklyCountText}>
-                    This week
-                  </Text>
-                  <TouchableOpacity
-                    testID="dashboard-weekly-view-details"
-                    onPress={() => navigation.navigate('WorkoutHistory')}
+              {statsError ? (
+                <Text testID="dashboard-stats-error" style={styles.errorText}>
+                  {statsError}
+                </Text>
+              ) : null}
+              <AppCard testID="dashboard-activity" style={styles.activityCard}>
+                <View testID="dashboard-weekly-progress">
+                  <Section
+                    title="This week"
+                    titleTestID="dashboard-weekly-count"
+                    action={{
+                      label: 'View Details',
+                      onPress: () => navigation.navigate('WorkoutHistory'),
+                      testID: 'dashboard-weekly-view-details',
+                    }}
+                    actionColor={theme.accent}
                   >
-                    <Text style={[styles.viewAllText, { color: theme.accent }]}>View Details</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.weeklyDaysRow}>
-                  {weeklyProgress.days.map((day) => (
-                    <View
-                      key={day.label}
-                      style={styles.weeklyDay}
-                      accessible
-                      accessibilityLabel={`${day.label}, ${
-                        day.completed ? 'completed' : day.isRestDay ? 'rest day' : 'not completed'
-                      }`}
-                    >
-                      <View
-                        style={[
-                          styles.weeklyDayCircle,
-                          day.completed && {
-                            backgroundColor: theme.accent,
-                            borderColor: theme.accent,
-                          },
-                        ]}
-                      >
-                        {day.completed ? (
-                          <Feather name="check" size={14} color={theme.onAccent} />
-                        ) : day.isRestDay ? (
-                          <Feather name="moon" size={12} color={colors.textMuted} />
-                        ) : null}
-                      </View>
-                      <Text style={styles.weeklyDayLabel}>{day.label}</Text>
+                    <View style={styles.weeklyDaysRow}>
+                      {weeklyProgress.days.map((day) => (
+                        <View
+                          key={day.label}
+                          style={styles.weeklyDay}
+                          accessible
+                          accessibilityLabel={`${day.label}, ${
+                            day.completed
+                              ? 'completed'
+                              : day.isRestDay
+                                ? 'rest day'
+                                : 'not completed'
+                          }`}
+                        >
+                          <View
+                            style={[
+                              styles.weeklyDayCircle,
+                              day.completed && {
+                                backgroundColor: theme.accent,
+                                borderColor: theme.accent,
+                              },
+                            ]}
+                          >
+                            {day.completed ? (
+                              <Feather name="check" size={14} color={theme.onAccent} />
+                            ) : day.isRestDay ? (
+                              <Feather name="moon" size={12} color={colors.textMuted} />
+                            ) : null}
+                          </View>
+                          <Text style={styles.weeklyDayLabel}>{day.label}</Text>
+                        </View>
+                      ))}
                     </View>
-                  ))}
+                  </Section>
+                </View>
+                <View style={styles.statGrid} testID="dashboard-stat-grid">
+                  <View style={styles.statRow}>
+                    <DashboardStat
+                      testID="dashboard-stat-sets"
+                      value={String(allSetHistory.length)}
+                      title="Sets Done"
+                      subtitle="All Time"
+                      onPress={() => navigation.navigate('ProgressOverview')}
+                    />
+                    <DashboardStat
+                      testID="dashboard-stat-workouts-month"
+                      value={String(lifetimeStats.workoutsThisMonth)}
+                      title="Workouts"
+                      subtitle="This Month"
+                      onPress={() => navigation.navigate('ProgressOverview')}
+                    />
+                  </View>
+                  <View style={styles.statRow}>
+                    <DashboardStat
+                      testID="dashboard-stat-steps"
+                      value="--"
+                      title="Steps"
+                      subtitle="Not connected"
+                    />
+                    {/* Last Workout: the most recent completed workout, read from
+                        the same fetchRecentWorkoutInfo result the Recent Workout
+                        card below already uses -- no second fetch. Tapping it
+                        opens that workout, exactly like the card does. With no
+                        completed workout yet it shows the same "--" empty
+                        treatment as Steps, never a made-up workout. */}
+                    {recentWorkout ? (
+                      <DashboardStat
+                        testID="dashboard-stat-last-workout"
+                        valueKind="text"
+                        value={recentWorkout.workout.name}
+                        title="Last Workout"
+                        subtitle={formatWorkoutDate(recentWorkout.workout.performedAt)}
+                        onPress={() =>
+                          navigation.navigate('WorkoutDetail', {
+                            workoutId: recentWorkout.workout.id,
+                          })
+                        }
+                      />
+                    ) : (
+                      <DashboardStat
+                        testID="dashboard-stat-last-workout"
+                        value="--"
+                        title="Last Workout"
+                        subtitle="No workouts yet"
+                      />
+                    )}
+                  </View>
                 </View>
               </AppCard>
             </View>
+            {/* The user's most recent completed workout, straight from
+                fetchRecentWorkoutInfo -- no completed workout yet simply
+                renders nothing (Next Workout above already covers "start
+                one"), never a placeholder card. */}
+            {recentWorkoutError || recentWorkout ? (
+              <View testID="dashboard-recent-workout-section" style={styles.growRecent}>
+                {recentWorkoutError ? (
+                  <Text testID="dashboard-recent-workout-error" style={styles.errorText}>
+                    {recentWorkoutError}
+                  </Text>
+                ) : null}
+                {recentWorkout ? (
+                  <RecentWorkoutCard
+                    info={recentWorkout}
+                    weightUnit={profile?.weightUnit ?? 'kg'}
+                    accentColor={theme.accent}
+                    accentBg={theme.accentBg}
+                    onPress={() =>
+                      navigation.navigate('WorkoutDetail', { workoutId: recentWorkout.workout.id })
+                    }
+                  />
+                ) : null}
+              </View>
+            ) : null}
           </ScrollView>
         ) : (
-          <View
+          // A ScrollView, like Workout mode: this screen used to be a fixed,
+          // non-scrolling View whose widgets were squeezed to fit, which
+          // clips at larger Dynamic Type sizes (the layout can't grow to fit
+          // its text). Widgets now keep their natural size and the stack
+          // scrolls only if it genuinely exceeds the viewport.
+          <ScrollView
             testID="dashboard-nutrition-content"
-            style={[
-              styles.nutritionScreenArea,
-              { paddingTop: headerHeight + spacing.md, paddingBottom: footerHeight + spacing.lg },
+            style={styles.scrollAreaInner}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingTop: headerHeight + spacing.md, paddingBottom: spacing.lg },
+              styles.widgetStack,
             ]}
           >
-            <View testID="dashboard-nutrition-greeting-row" style={styles.nutritionGreetingRow}>
-              <View style={styles.nutritionGreetingBlock}>
-                <Text testID="dashboard-greeting-eyebrow" style={styles.greetingEyebrow}>
-                  {greetingEyebrow}
-                </Text>
-                <Text testID="dashboard-greeting" style={styles.greeting}>
-                  {greetingDisplayName}
-                </Text>
-              </View>
-            </View>
-
             {profileError ? (
               <Text testID="dashboard-profile-error" style={styles.errorText}>
                 {profileError}
               </Text>
             ) : null}
 
-            <View testID="dashboard-nutrition-hero-section" style={styles.nutritionSection}>
+            <View testID="dashboard-nutrition-hero-section">
               {nutritionError ? (
                 <Text testID="dashboard-nutrition-error" style={styles.errorText}>
                   {nutritionError}
@@ -728,6 +728,19 @@ export function DashboardScreen({ navigation }: Props) {
                         </Text>
                       ) : null}
                     </Text>
+                    {caloriesRemaining !== null ? (
+                      <Text
+                        testID="dashboard-calories-remaining"
+                        style={[
+                          styles.calorieRemaining,
+                          caloriesRemaining >= 0 && { color: theme.accent },
+                        ]}
+                      >
+                        {caloriesRemaining >= 0
+                          ? `${caloriesRemaining.toLocaleString()} kcal left`
+                          : `${Math.abs(caloriesRemaining).toLocaleString()} kcal over`}
+                      </Text>
+                    ) : null}
                     {!hasAnyNutritionGoal ? (
                       <Text testID="dashboard-nutrition-no-goals" style={styles.noGoalsText}>
                         Set your nutrition goals
@@ -768,50 +781,45 @@ export function DashboardScreen({ navigation }: Props) {
               </AppCard>
             </View>
 
-            <View
-              testID="dashboard-nutrition-quick-actions-section"
-              style={[styles.nutritionSection, styles.nutritionQuickActionsSectionShrink]}
-            >
-              <View style={styles.quickActionsRow}>
-                <AppCard
-                  testID="dashboard-quick-search"
-                  style={[styles.compactCard, styles.quickActionCard]}
-                  onPress={() => navigation.navigate('FoodSearch')}
-                >
-                  <View style={[styles.quickActionIcon, { backgroundColor: theme.accentBg }]}>
-                    <Feather name="search" size={16} color={theme.accent} />
+            <View testID="dashboard-nutrition-quick-actions-section">
+              {/* One card, three actions, hairline-separated -- not three cards. */}
+              <AppCard style={styles.compactCard}>
+                <View style={styles.quickActionsRow}>
+                  <TouchableOpacity
+                    testID="dashboard-quick-search"
+                    style={styles.quickAction}
+                    onPress={() => navigation.navigate('FoodSearch')}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Search Food"
+                  >
+                    <Feather name="search" size={20} color={theme.accent} />
+                    <Text style={styles.quickActionTitle}>Search Food</Text>
+                  </TouchableOpacity>
+                  <View style={styles.quickActionDivider} />
+                  {/* Quick Add has no action behind it yet, so it is a plain view --
+                      not announced as a button, and never a control that silently does nothing. */}
+                  <View testID="dashboard-quick-add" style={styles.quickAction}>
+                    <Feather name="plus-circle" size={20} color={theme.accent} />
+                    <Text style={styles.quickActionTitle}>Quick Add</Text>
                   </View>
-                  <Text style={styles.quickActionTitle}>Search Food</Text>
-                  <Text style={styles.quickActionSubtitle}>Find and log food</Text>
-                </AppCard>
-                <AppCard
-                  testID="dashboard-quick-add"
-                  style={[styles.compactCard, styles.quickActionCard]}
-                >
-                  <View style={[styles.quickActionIcon, { backgroundColor: theme.accentBg }]}>
-                    <Feather name="plus-circle" size={16} color={theme.accent} />
-                  </View>
-                  <Text style={styles.quickActionTitle}>Quick Add</Text>
-                  <Text style={styles.quickActionSubtitle}>Add a food item</Text>
-                </AppCard>
-                <AppCard
-                  testID="dashboard-quick-scan"
-                  style={[styles.compactCard, styles.quickActionCard]}
-                  onPress={() => navigation.navigate('BarcodeScanner')}
-                >
-                  <View style={[styles.quickActionIcon, { backgroundColor: theme.accentBg }]}>
-                    <Feather name="camera" size={16} color={theme.accent} />
-                  </View>
-                  <Text style={styles.quickActionTitle}>Scan Barcode</Text>
-                  <Text style={styles.quickActionSubtitle}>Log in seconds</Text>
-                </AppCard>
-              </View>
+                  <View style={styles.quickActionDivider} />
+                  <TouchableOpacity
+                    testID="dashboard-quick-scan"
+                    style={styles.quickAction}
+                    onPress={() => navigation.navigate('BarcodeScanner')}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Scan Barcode"
+                  >
+                    <Feather name="camera" size={20} color={theme.accent} />
+                    <Text style={styles.quickActionTitle}>Scan Barcode</Text>
+                  </TouchableOpacity>
+                </View>
+              </AppCard>
             </View>
 
-            <View
-              testID="dashboard-nutrition-meals-section"
-              style={[styles.nutritionSection, styles.nutritionMealsSection]}
-            >
+            <View testID="dashboard-nutrition-meals-section">
               <AppCard testID="dashboard-todays-meals" style={styles.compactCard}>
                 <TouchableOpacity
                   testID="dashboard-view-meals"
@@ -820,9 +828,6 @@ export function DashboardScreen({ navigation }: Props) {
                   accessibilityRole="button"
                   accessibilityLabel="View all of today's meals"
                 >
-                  <View style={[styles.mealsHeaderIcon, { backgroundColor: theme.accentBg }]}>
-                    <Feather name="coffee" size={16} color={theme.accent} />
-                  </View>
                   <Text style={styles.mealsHeaderTitle}>{"Today's Meals"}</Text>
                   <Feather name="chevron-right" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
@@ -831,55 +836,34 @@ export function DashboardScreen({ navigation }: Props) {
                     No meals logged today
                   </Text>
                 ) : (
-                  // Capped to 3 (was 4) now that this card has to fit a
-                  // fixed, non-scrolling layout alongside three other
-                  // widgets -- the header row above already reaches the
-                  // full list.
-                  nutritionLogs.slice(0, 3).map((log) => (
-                    <View key={log.id} style={[styles.listRow, styles.listRowDivider]}>
-                      <View style={styles.listThumb}>
-                        <Feather name="coffee" size={18} color={colors.textMuted} />
-                      </View>
-                      <View style={styles.listRowBody}>
-                        <Text style={styles.listRowTitle}>{log.foodNameSnapshot}</Text>
-                        <Text style={styles.listRowMeta}>
-                          {log.servingSize}
-                          {log.servingUnit} × {log.quantity}
-                        </Text>
-                      </View>
-                      <Text style={[styles.listRowValue, { color: theme.accent }]}>
-                        {log.calories} kcal
-                      </Text>
-                    </View>
-                  ))
+                  // The header row above reaches the full list; this is the
+                  // most recent handful. (Capped at 3 back when this screen
+                  // was a fixed-height layout that had to fit; it scrolls now.)
+                  nutritionLogs
+                    .slice(0, 4)
+                    .map((log) => (
+                      <ListRow
+                        key={log.id}
+                        divider
+                        icon="coffee"
+                        title={log.foodNameSnapshot}
+                        subtitle={`${log.servingSize}${log.servingUnit} × ${log.quantity}`}
+                        value={`${log.calories} kcal`}
+                      />
+                    ))
                 )}
               </AppCard>
             </View>
-
-            <View style={[styles.nutritionSection, styles.weeklyCaloriesSectionFill]}>
+            <View>
               {/* The week's target is always the user's own saved daily
                   calorie target (Nutrition Goals) x7 -- see
                   computeWeeklyCalorieSummary. No goal set yet still shows an
                   honest empty state, never a fabricated number. This is the
                   last Nutrition-mode widget; it's sized by its own content
-                  like every other one, not stretched to fill leftover
-                  screen space -- see weeklyCaloriesSectionFill's comment in
-                  dashboardStyles.ts. */}
-              <AppCard
-                testID="dashboard-weekly-calories-card"
-                style={[styles.compactCard, styles.weeklyCaloriesCardFill]}
-              >
+                  like every other one. */}
+              <AppCard testID="dashboard-weekly-calories-card" style={styles.compactCard}>
                 <View style={styles.goalsHeaderRow}>
-                  <View style={styles.goalsTitleRow}>
-                    <Feather name="calendar" size={16} color={theme.accent} />
-                    <Text style={styles.cardTitle}>Weekly Calories</Text>
-                  </View>
-                  <TouchableOpacity
-                    testID="dashboard-weekly-calories-view-all"
-                    onPress={() => navigation.navigate('Nutrition')}
-                  >
-                    <Text style={[styles.viewAllText, { color: theme.accent }]}>View All</Text>
-                  </TouchableOpacity>
+                  <Text style={styles.cardTitle}>Weekly Calories</Text>
                 </View>
                 <View
                   testID="dashboard-weekly-calories-content"
@@ -933,96 +917,11 @@ export function DashboardScreen({ navigation }: Props) {
                 </View>
               </AppCard>
             </View>
-          </View>
+          </ScrollView>
         )}
       </View>
 
       <NutritionForegroundLayer visible={mode === 'nutrition'} />
-
-      <View
-        style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 8) }]}
-        testID="dashboard-bottom-bar"
-        onLayout={onFooterLayout}
-      >
-        <GlassBackground variant="chrome" bordered={false} />
-        <View style={styles.bottomBarItem}>
-          <Feather name="home" size={20} color={theme.accent} />
-          <Text style={[styles.bottomBarLabel, { color: theme.accent }]}>Home</Text>
-        </View>
-        <TouchableOpacity
-          testID="dashboard-bottom-workouts"
-          style={styles.bottomBarItem}
-          onPress={() => navigation.navigate(mode === 'workout' ? 'WorkoutHistory' : 'FoodLibrary')}
-        >
-          <Feather
-            name={mode === 'workout' ? 'activity' : 'pie-chart'}
-            size={20}
-            color={colors.textSecondary}
-          />
-          <Text style={[styles.bottomBarLabel, { color: colors.textSecondary }]}>
-            {mode === 'workout' ? 'Workouts' : 'Food'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          testID="dashboard-bottom-plus"
-          style={styles.bottomBarCenter}
-          onPress={() => setQuickActionsOpen(true)}
-          accessibilityLabel="Quick actions"
-        >
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.bottomBarCenterFill,
-              { backgroundColor: workoutTheme.accent, opacity: workoutFillOpacity },
-            ]}
-          />
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.bottomBarCenterFill,
-              { backgroundColor: nutritionTheme.accent, opacity: nutritionFillOpacity },
-            ]}
-          />
-          <Feather name="plus" size={22} color={theme.onAccent} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          testID="dashboard-bottom-progress"
-          style={styles.bottomBarItem}
-          disabled={mode !== 'workout'}
-          onPress={() => navigation.navigate('ProgressOverview')}
-        >
-          <Feather
-            name={mode === 'workout' ? 'trending-up' : 'target'}
-            size={20}
-            color={colors.textSecondary}
-          />
-          <Text style={[styles.bottomBarLabel, { color: colors.textSecondary }]}>
-            {mode === 'workout' ? 'Progress' : 'Goals'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          testID="dashboard-bottom-profile"
-          style={styles.bottomBarItem}
-          onPress={() => navigation.navigate('Profile')}
-        >
-          <Feather name="user" size={20} color={colors.textSecondary} />
-          <Text style={[styles.bottomBarLabel, { color: colors.textSecondary }]}>Profile</Text>
-        </TouchableOpacity>
-      </View>
-
-      <QuickActionMenu
-        visible={quickActionsOpen}
-        onClose={() => setQuickActionsOpen(false)}
-        onStartWorkout={() => {
-          setQuickActionsOpen(false);
-          navigation.navigate('NewWorkout');
-        }}
-        onLogFood={() => {
-          setQuickActionsOpen(false);
-          navigation.navigate('Nutrition');
-        }}
-        accentColor={theme.accent}
-      />
     </View>
   );
 }

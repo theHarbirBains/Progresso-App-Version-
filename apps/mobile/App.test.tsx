@@ -246,7 +246,7 @@ describe('Authentication flow', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
 
-    expect(await screen.findByTestId('dashboard-greeting')).toBeTruthy();
+    expect(await screen.findByTestId('dashboard-screen')).toBeTruthy();
     expect(mockAuth.signInWithPassword).toHaveBeenCalledWith({
       email: 'athlete@example.com',
       password: 'correct-password',
@@ -272,7 +272,7 @@ describe('Authentication flow', () => {
     fireEvent.press(screen.getByTestId('sign-in-submit'));
 
     expect(await screen.findByTestId('sign-in-error')).toBeTruthy();
-    expect(screen.queryByTestId('dashboard-greeting')).toBeNull();
+    expect(screen.queryByTestId('dashboard-screen')).toBeNull();
   });
 
   it('switches to sign-up and shows the email-confirmation message', async () => {
@@ -323,14 +323,16 @@ describe('Authentication flow', () => {
     // Welcome, not Dashboard, immediately after this fresh account's first
     // sign-in -- and Dashboard must not be reachable underneath it yet.
     expect(await screen.findByTestId('welcome-get-started')).toBeTruthy();
-    expect(screen.queryByTestId('dashboard-greeting')).toBeNull();
+    expect(screen.queryByTestId('dashboard-screen')).toBeNull();
 
     fireEvent.press(screen.getByTestId('welcome-get-started'));
 
     // A fresh account goes into onboarding next, not straight to Dashboard --
     // the full step-by-step flow is covered by OnboardingScreen.test.tsx.
     expect(await screen.findByTestId('onboarding-step-apple-health')).toBeTruthy();
-    expect(screen.queryByTestId('dashboard-greeting')).toBeNull();
+    expect(screen.queryByTestId('dashboard-screen')).toBeNull();
+    // Onboarding is the one route that never shows the bottom navigation.
+    expect(screen.queryByTestId('app-bottom-nav')).toBeNull();
   });
 
   it('signs out and returns to the sign-in screen', async () => {
@@ -339,13 +341,13 @@ describe('Authentication flow', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     // Sign out lives on AccountSettingsScreen, reached via Profile's own
     // settings affordance now that AccountSettingsScreen is no longer the
     // initial route. (Dashboard no longer shows a profile-picture shortcut
     // to it -- see the Workout Home redesign's removal of the avatar.)
-    fireEvent.press(screen.getByTestId('dashboard-bottom-profile'));
+    fireEvent.press(screen.getByTestId('bottom-nav-profile'));
     fireEvent.press(await screen.findByTestId('profile-open-settings'));
     await screen.findByTestId('sign-out-button');
     fireEvent.press(screen.getByTestId('sign-out-button'));
@@ -461,7 +463,7 @@ describe('OAuth sign-in', () => {
 
     // The mocked browser session resolves with a redirect URL carrying
     // tokens, which should establish a real session and sign the user in.
-    expect(await screen.findByTestId('dashboard-greeting')).toBeTruthy();
+    expect(await screen.findByTestId('dashboard-screen')).toBeTruthy();
   });
 
   it('tapping "Continue with Apple" starts the Supabase OAuth flow', async () => {
@@ -487,7 +489,7 @@ describe('App-level side menu', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
   }
 
   it('renders as a sibling of the screen stack, not clipped inside Dashboard', async () => {
@@ -532,7 +534,7 @@ describe('App-level side menu', () => {
     fireEvent.press(screen.getByTestId('app-menu-backdrop'));
 
     expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
-    expect(screen.getByTestId('dashboard-greeting')).toBeTruthy();
+    expect(screen.getByTestId('dashboard-screen')).toBeTruthy();
   });
 });
 
@@ -543,7 +545,7 @@ describe('Nutrition-specific side menu', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
   }
 
   it('shows the Workout menu (unchanged) while Dashboard is in Workout mode', async () => {
@@ -595,7 +597,7 @@ describe('Nutrition-specific side menu', () => {
     fireEvent.press(screen.getByTestId('app-menu-item-Recipes'));
 
     // Still on Dashboard, menu still open -- nothing happened.
-    expect(screen.getByTestId('dashboard-greeting')).toBeTruthy();
+    expect(screen.getByTestId('dashboard-screen')).toBeTruthy();
     expect(screen.getByTestId('app-menu-backdrop')).toBeTruthy();
   });
 });
@@ -607,7 +609,7 @@ describe('Nutrition-specific global bottom nav', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
   }
 
   // The bug this guards: the global bottom nav used to always use the
@@ -642,7 +644,7 @@ describe('Nutrition-specific global bottom nav', () => {
 
     // Back to Dashboard, swap to Workout mode, then into a Workout screen.
     fireEvent.press(screen.getByTestId('bottom-nav-home'));
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
     fireEvent.press(screen.getByTestId('dashboard-mode-workout'));
     fireEvent.press(screen.getByTestId('dashboard-open-menu'));
     fireEvent.press(screen.getByTestId('app-menu-item-WorkoutHistory'));
@@ -668,13 +670,15 @@ describe('Mode-aware background image', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
   }
 
   // Both the workout and nutrition photos stay mounted at all times (see
   // AppBackgroundLayer) -- only their opacity toggles -- so "which one is
   // showing" means "which one is at opacity 1", not "which one exists".
-  function expectVisibleBackground(expected: 'workout' | 'nutrition') {
+  // The photo is a Dashboard-only atmosphere: on every other screen NEITHER
+  // photo shows (`'none'`), and the screen sits on the flat theme fill.
+  function expectVisibleBackground(expected: 'workout' | 'nutrition' | 'none') {
     const workout = screen.getByTestId('app-background-image-workout');
     const nutrition = screen.getByTestId('app-background-image-nutrition');
     expect(workout.props.source).toEqual(workoutImage);
@@ -683,6 +687,10 @@ describe('Mode-aware background image', () => {
     expect(StyleSheet.flatten(nutrition.props.style).opacity).toBe(
       expected === 'nutrition' ? 1 : 0,
     );
+    // The vignette exists only to keep text readable over a photo.
+    expect(
+      StyleSheet.flatten(screen.getByTestId('app-background-depth-overlay').props.style).opacity,
+    ).toBe(expected === 'none' ? 0 : 1);
   }
 
   it('shows the Workout background by default on Dashboard', async () => {
@@ -703,7 +711,7 @@ describe('Mode-aware background image', () => {
     expectVisibleBackground('workout');
   });
 
-  it('keeps the Nutrition background on a Nutrition-only screen reached via the side menu', async () => {
+  it('drops the photo on a Nutrition-only screen reached via the side menu (flat theme fill there)', async () => {
     await signIn();
     fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
     fireEvent.press(screen.getByTestId('dashboard-open-menu'));
@@ -711,10 +719,10 @@ describe('Mode-aware background image', () => {
     fireEvent.press(screen.getByTestId('app-menu-item-FoodLibrary'));
 
     expect(await screen.findByTestId('food-library-screen')).toBeTruthy();
-    expectVisibleBackground('nutrition');
+    expectVisibleBackground('none');
   });
 
-  it('shows the Workout background on a non-Nutrition screen reached from Nutrition mode', async () => {
+  it('drops the photo on any non-Dashboard screen reached from Nutrition mode', async () => {
     await signIn();
     fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
     await screen.findByTestId('dashboard-nutrition');
@@ -724,7 +732,28 @@ describe('Mode-aware background image', () => {
     fireEvent.press(screen.getByTestId('app-menu-item-AccountSettings'));
 
     expect(await screen.findByTestId('sign-out-button')).toBeTruthy();
-    expectVisibleBackground('workout');
+    expectVisibleBackground('none');
+  });
+
+  it('brings the photo back, in the right mode, when the user returns to Dashboard', async () => {
+    await signIn();
+    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
+    await screen.findByTestId('dashboard-nutrition');
+    fireEvent.press(screen.getByTestId('bottom-nav-profile'));
+    await screen.findByTestId('profile-scroll');
+    expectVisibleBackground('none');
+
+    fireEvent.press(screen.getByTestId('bottom-nav-home'));
+    await screen.findByTestId('dashboard-screen');
+
+    expectVisibleBackground('nutrition');
+  });
+
+  it('shows no photo on the sign-in screen', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+
+    expectVisibleBackground('none');
   });
 
   // Regression coverage for a reported bug: switching to Nutrition mode
@@ -739,7 +768,7 @@ describe('Mode-aware background image', () => {
   // there.
   it('lands on Dashboard already in Nutrition mode, with no flash back to Workout, when switched to Nutrition from WorkoutHistory', async () => {
     await signIn();
-    fireEvent.press(screen.getByTestId('dashboard-bottom-workouts'));
+    fireEvent.press(screen.getByTestId('bottom-nav-workouts'));
     await screen.findByTestId('workout-history-open-menu');
 
     fireEvent.press(screen.getByTestId('workout-history-mode-nutrition'));
@@ -757,17 +786,68 @@ describe('Persistent bottom navigation', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
   }
 
-  // Dashboard renders its own mode-crossfading bottom bar (unchanged,
-  // pre-existing) -- the global one mounted in App.tsx deliberately stays
-  // hidden there so the two never stack.
-  it('does not render the global bottom nav on Dashboard, which keeps its own', async () => {
+  // There is exactly one bottom navigation in the app. Dashboard used to
+  // render its own second copy; it now gets the shared bar like every other
+  // screen, with Home active.
+  it('renders the shared bottom nav on Dashboard, with Home active, and no second copy', async () => {
     await signIn();
 
+    expect(screen.getByTestId('app-bottom-nav')).toBeTruthy();
+    expect(screen.getByTestId('bottom-nav-home').props.accessibilityState.selected).toBe(true);
+    expect(screen.queryByTestId('dashboard-bottom-bar')).toBeNull();
+    expect(screen.getAllByTestId('bottom-nav-home')).toHaveLength(1);
+  });
+
+  it('does not show the bottom nav on the sign-in screen (it renders outside the navigator)', async () => {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+
     expect(screen.queryByTestId('app-bottom-nav')).toBeNull();
-    expect(screen.getByTestId('dashboard-bottom-bar')).toBeTruthy();
+  });
+
+  it("follows Dashboard's Workout/Nutrition toggle: tab labels and the accent colour switch with the mode", async () => {
+    await signIn();
+
+    expect(screen.getByTestId('bottom-nav-workouts')).toHaveTextContent(/Workouts/);
+    const workoutHome = within(screen.getByTestId('bottom-nav-home')).getByText('Home');
+    expect(StyleSheet.flatten(workoutHome.props.style).color).toBe('#2F80FF');
+
+    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
+    await screen.findByTestId('dashboard-nutrition');
+
+    expect(screen.getByTestId('bottom-nav-workouts')).toHaveTextContent(/Food/);
+    expect(screen.getByTestId('bottom-nav-progress')).toHaveTextContent(/Goals/);
+    const nutritionHome = within(screen.getByTestId('bottom-nav-home')).getByText('Home');
+    expect(StyleSheet.flatten(nutritionHome.props.style).color).toBe('#10B981');
+  });
+
+  it('opens Workouts (or Food, in Nutrition mode) from the shared bar on Dashboard', async () => {
+    await signIn();
+    fireEvent.press(screen.getByTestId('bottom-nav-workouts'));
+    expect(await screen.findByTestId('workout-history-open-menu')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('bottom-nav-home'));
+    await screen.findByTestId('dashboard-screen');
+    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
+    await screen.findByTestId('dashboard-nutrition');
+    fireEvent.press(screen.getByTestId('bottom-nav-workouts'));
+
+    expect(await screen.findByTestId('food-library-screen')).toBeTruthy();
+  });
+
+  it('opens the quick-action menu from the shared bar on Dashboard, and closes it after choosing an action', async () => {
+    await signIn();
+
+    fireEvent.press(screen.getByTestId('bottom-nav-plus'));
+    expect(screen.getByTestId('quick-action-start-workout')).toBeTruthy();
+    expect(screen.getByTestId('quick-action-log-food')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('quick-action-log-food'));
+
+    expect(screen.queryByTestId('quick-action-log-food')).toBeNull();
   });
 
   // The whole point of this architecture change: navigating off Dashboard
@@ -776,7 +856,7 @@ describe('Persistent bottom navigation', () => {
   // render itself.
   it('shows the global bottom nav, with Profile active, after navigating to a secondary screen', async () => {
     await signIn();
-    fireEvent.press(screen.getByTestId('dashboard-bottom-profile'));
+    fireEvent.press(screen.getByTestId('bottom-nav-profile'));
     await screen.findByTestId('profile-scroll');
 
     expect(screen.getByTestId('app-bottom-nav')).toBeTruthy();
@@ -788,7 +868,7 @@ describe('Persistent bottom navigation', () => {
   // rather than showing no active tab.
   it("keeps a secondary screen's parent tab active, and the bar itself visible, on a screen nested under it", async () => {
     await signIn();
-    fireEvent.press(screen.getByTestId('dashboard-bottom-profile'));
+    fireEvent.press(screen.getByTestId('bottom-nav-profile'));
     await screen.findByTestId('profile-scroll');
 
     fireEvent.press(screen.getByTestId('profile-open-settings'));
@@ -800,14 +880,15 @@ describe('Persistent bottom navigation', () => {
 
   it("navigates via the global bottom nav's tabs", async () => {
     await signIn();
-    fireEvent.press(screen.getByTestId('dashboard-bottom-profile'));
+    fireEvent.press(screen.getByTestId('bottom-nav-profile'));
     await screen.findByTestId('profile-scroll');
 
     fireEvent.press(screen.getByTestId('bottom-nav-home'));
 
-    // Back on Dashboard: the global bar hides again (Dashboard's own bar
-    // takes over), proving the tab press actually navigated.
-    expect(await screen.findByTestId('dashboard-bottom-bar')).toBeTruthy();
-    expect(screen.queryByTestId('app-bottom-nav')).toBeNull();
+    // Back on Dashboard: the same bar is still there with Home now active,
+    // proving the tab press actually navigated.
+    await screen.findByTestId('dashboard-screen');
+    expect(screen.getByTestId('app-bottom-nav')).toBeTruthy();
+    expect(screen.getByTestId('bottom-nav-home').props.accessibilityState.selected).toBe(true);
   });
 });

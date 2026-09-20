@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
+import { Text } from '../design/Text';
 import { LineChart } from '../charts/LineChart';
 import { useAuth } from '../auth/AuthProvider';
+import { AppHeader } from '../design/AppHeader';
+import { ListRow } from '../design/ListRow';
+import { Screen } from '../design/Screen';
+import { SegmentedControl } from '../design/SegmentedControl';
+import { Section } from '../design/Section';
 import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
 import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchExerciseSetHistory, type HistoricalSet } from '../workouts/exerciseHistoryQueries';
 import {
   filterByTimeRange,
@@ -19,9 +26,23 @@ import {
   type TimeRange,
 } from '../workouts/exerciseProgress';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
-import { workoutStyles as styles } from './workoutStyles';
+import { exerciseProgressStyles as styles } from './exerciseProgressStyles';
 
 type Props = RootStackScreenProps<'ExerciseProgress'>;
+
+// Short visible labels so all five fit on one row; each is read out in full.
+const RANGE_LABELS: Record<TimeRange, { short: string; full: string }> = {
+  '4w': { short: '4W', full: '4 Weeks' },
+  '3m': { short: '3M', full: '3 Months' },
+  '6m': { short: '6M', full: '6 Months' },
+  '1y': { short: '1Y', full: '1 Year' },
+  all: { short: 'All', full: 'All Time' },
+};
+const RANGE_OPTIONS = TIME_RANGES.map((r) => ({
+  label: RANGE_LABELS[r.value].short,
+  accessibilityLabel: RANGE_LABELS[r.value].full,
+  value: r.value,
+}));
 
 function formatWeight(kg: number, unit: 'kg' | 'lb'): string {
   const value = roundWeight(fromKg(kg, unit));
@@ -49,11 +70,17 @@ function rangeLabel(points: ChartPoint[], unit: 'kg' | 'lb'): string | null {
 // training this. Deliberately not a statistics-heavy dashboard -- every
 // chart here is a direct, real-data reconstruction (see exerciseProgress.ts),
 // never an estimate.
+//
+// Layout: a time-range control, then sections (chart + its range as a mono
+// readout) separated by whitespace -- no cards. The charts and the
+// consistency line follow the selected range; Best Performances are
+// all-time. The plotted line is the user's Workout accent.
 export function ExerciseProgressScreen({ route, navigation }: Props) {
   const { exerciseId, exerciseName } = route.params;
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
+  const { theme } = useProgressTheme();
 
   const [history, setHistory] = useState<HistoricalSet[]>([]);
   const [repPRs, setRepPRs] = useState<RepPR[]>([]);
@@ -106,134 +133,162 @@ export function ExerciseProgressScreen({ route, navigation }: Props) {
   const bestRepPR = commonReps !== null ? repPRs.find((pr) => pr.reps === commonReps) : undefined;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{exerciseName}</Text>
-        <TouchableOpacity testID="exercise-progress-back" onPress={() => navigation.goBack()}>
-          <Text style={styles.backLink}>Back</Text>
-        </TouchableOpacity>
-      </View>
-
+    <Screen
+      scrollTestID="exercise-progress-scroll"
+      contentContainerStyle={styles.content}
+      header={
+        <AppHeader
+          title={exerciseName}
+          leftAction={{
+            icon: 'arrow-left',
+            onPress: () => navigation.goBack(),
+            accessibilityLabel: 'Back',
+            testID: 'exercise-progress-back',
+          }}
+        />
+      }
+    >
       {error ? (
-        <Text testID="exercise-progress-error" style={styles.error}>
+        <Text testID="exercise-progress-error" style={styles.errorText}>
           {error}
         </Text>
       ) : null}
 
       {loading ? (
-        <ActivityIndicator
-          testID="exercise-progress-loading"
-          size="large"
-          color={colors.textPrimary}
-        />
+        <View style={styles.loading}>
+          <ActivityIndicator
+            testID="exercise-progress-loading"
+            size="large"
+            color={colors.textPrimary}
+          />
+        </View>
       ) : (
         <>
-          <View style={styles.chipRow}>
-            {TIME_RANGES.map((r) => (
-              <TouchableOpacity
-                key={r.value}
-                testID={`range-${r.value}`}
-                style={[styles.chip, range === r.value ? styles.chipSelected : null]}
-                onPress={() => setRange(r.value)}
-              >
-                <Text style={[styles.chipText, range === r.value ? styles.chipTextSelected : null]}>
-                  {r.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <SegmentedControl
+            testID="range"
+            options={RANGE_OPTIONS}
+            value={range}
+            onChange={setRange}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
 
-          <View style={styles.banner}>
-            <Text style={styles.bannerTitle}>Top Set Progression</Text>
+          <Section title="Top Set Progression">
             {topSets.length > 0 ? (
               <>
-                <LineChart
+                <ProgressChart
                   testID="top-set-chart"
                   points={toChartPoints(topSets, weightUnit)}
-                  width={280}
-                  height={140}
+                  color={theme.accent}
                 />
-                <Text style={styles.cardMeta}>{rangeLabel(topSets, weightUnit)}</Text>
+                <Text style={styles.chartCaption}>{rangeLabel(topSets, weightUnit)}</Text>
               </>
             ) : (
               <Text testID="top-set-chart-empty" style={styles.emptyText}>
                 No sessions logged in this range
               </Text>
             )}
-          </View>
+          </Section>
 
-          <View style={styles.banner}>
-            <Text style={styles.bannerTitle}>
-              {commonReps !== null ? `${commonReps}-Rep PR Progression` : 'Rep PR Progression'}
-            </Text>
+          <Section
+            title={commonReps !== null ? `${commonReps}-Rep PR Progression` : 'Rep PR Progression'}
+          >
             {repProgression.length > 0 ? (
               <>
-                <LineChart
+                <ProgressChart
                   testID="rep-pr-chart"
                   points={toChartPoints(repProgression, weightUnit)}
-                  width={280}
-                  height={140}
+                  color={theme.accent}
                 />
-                <Text style={styles.cardMeta}>{rangeLabel(repProgression, weightUnit)}</Text>
+                <Text style={styles.chartCaption}>{rangeLabel(repProgression, weightUnit)}</Text>
               </>
             ) : (
               <Text testID="rep-pr-chart-empty" style={styles.emptyText}>
                 No rep PR history in this range
               </Text>
             )}
-          </View>
+          </Section>
 
-          <View style={styles.banner}>
-            <Text style={styles.bannerTitle}>True 1RM Progression</Text>
+          <Section title="True 1RM Progression">
             {ormProgression.length > 0 ? (
               <>
-                <LineChart
+                <ProgressChart
                   testID="one-rm-chart"
                   points={toChartPoints(ormProgression, weightUnit)}
-                  width={280}
-                  height={140}
+                  color={theme.accent}
                 />
-                <Text style={styles.cardMeta}>{rangeLabel(ormProgression, weightUnit)}</Text>
+                <Text style={styles.chartCaption}>{rangeLabel(ormProgression, weightUnit)}</Text>
               </>
             ) : (
               <Text testID="one-rm-chart-empty" style={styles.emptyText}>
                 No 1RM recorded yet — log a single-rep set to set one.
               </Text>
             )}
-          </View>
+          </Section>
 
-          <View style={styles.banner}>
-            <Text style={styles.bannerTitle}>Best Performances</Text>
+          <Section title="Best Performances">
             {oneRepMax ? (
-              <Text testID="best-one-rm-value" style={styles.cardMetaHighlight}>
-                1RM: {formatWeight(oneRepMax.weightKg, weightUnit)}
-                {weightUnit}
-              </Text>
+              <ListRow
+                testID="best-one-rm-value"
+                title="1RM"
+                value={`${formatWeight(oneRepMax.weightKg, weightUnit)}${weightUnit}`}
+              />
             ) : (
-              <Text testID="best-one-rm-empty" style={styles.cardMeta}>
-                No 1RM recorded yet
-              </Text>
+              <ListRow testID="best-one-rm-empty" title="1RM" subtitle="No 1RM recorded yet" />
             )}
             {bestRepPR ? (
-              <Text testID="best-rep-pr-value" style={styles.cardMetaHighlight}>
-                {bestRepPR.reps}-Rep PR: {formatWeight(bestRepPR.bestWeightKg, weightUnit)}
-                {weightUnit}
-              </Text>
+              <ListRow
+                testID="best-rep-pr-value"
+                divider
+                title={`${bestRepPR.reps}-Rep PR`}
+                value={`${formatWeight(bestRepPR.bestWeightKg, weightUnit)}${weightUnit}`}
+              />
             ) : (
-              <Text testID="best-rep-pr-empty" style={styles.cardMeta}>
-                No rep PR recorded yet
-              </Text>
+              <ListRow
+                testID="best-rep-pr-empty"
+                divider
+                title="Rep PR"
+                subtitle="No rep PR recorded yet"
+              />
             )}
-          </View>
+          </Section>
 
-          <View style={styles.banner}>
-            <Text style={styles.bannerTitle}>Consistency</Text>
-            <Text testID="session-frequency" style={styles.cardMetaHighlight}>
+          <Section title="Consistency">
+            <Text testID="session-frequency" style={styles.consistencyText}>
               {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'} in this period
             </Text>
-          </View>
+          </Section>
         </>
       )}
-    </ScrollView>
+    </Screen>
+  );
+}
+
+// A LineChart sized to the width it is given by the screen (it needs explicit
+// pixel dimensions). Starts at a sensible default and snaps to the measured
+// width on layout.
+const CHART_HEIGHT = 140;
+const DEFAULT_CHART_WIDTH = 280;
+
+function ProgressChart({
+  points,
+  color,
+  testID,
+}: {
+  points: { x: number; y: number }[];
+  color: string;
+  testID: string;
+}) {
+  const [width, setWidth] = useState(DEFAULT_CHART_WIDTH);
+  return (
+    <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+      <LineChart
+        testID={testID}
+        points={points}
+        width={width}
+        height={CHART_HEIGHT}
+        color={color}
+      />
+    </View>
   );
 }

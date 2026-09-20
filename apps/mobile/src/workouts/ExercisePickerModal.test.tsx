@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { fetchExercises } from '../exercises/exerciseQueries';
 import { BACKGROUND_THEMES } from '../design/backgroundThemes';
 import { useBackgroundTheme } from '../design/BackgroundThemeContext';
+import { AppCard } from '../design/AppCard';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { ExercisePickerModal } from './ExercisePickerModal';
 
@@ -179,7 +180,7 @@ describe('ExercisePickerModal', () => {
     expect(await screen.findByText('No exercises found')).toBeTruthy();
   });
 
-  it('shows a prominent Create Custom Exercise row near the top and calls onCreateCustom when pressed', async () => {
+  it('shows a Create Custom Exercise row at the top of the list and calls onCreateCustom when pressed', async () => {
     const onCreateCustom = jest.fn();
     render(
       <ExercisePickerModal
@@ -200,7 +201,7 @@ describe('ExercisePickerModal', () => {
     expect(onCreateCustom).toHaveBeenCalled();
   });
 
-  it("follows the given accentColor for the selected muscle-group chip and the Create Custom card's border", async () => {
+  it('follows the given accentColor for the selected muscle-group chip', async () => {
     render(
       <ExercisePickerModal
         visible={true}
@@ -218,9 +219,6 @@ describe('ExercisePickerModal', () => {
     fireEvent.press(screen.getByTestId('muscle-group-chip-chest'));
     const chip = screen.getByTestId('muscle-group-chip-chest');
     expect(StyleSheet.flatten(chip.props.style).backgroundColor).toBe('#8B5CF6');
-
-    const card = screen.getByTestId('exercise-picker-create-custom');
-    expect(StyleSheet.flatten(card.props.style).borderColor).toBe('#8B5CF6');
   });
 
   it('follows the current Background Theme for its own background -- unlike a normal screen, this Modal has no AppBackgroundLayer behind it', async () => {
@@ -258,5 +256,65 @@ describe('ExercisePickerModal', () => {
     await screen.findByText('Barbell Bench Press');
 
     expect(screen.UNSAFE_getByType(Modal).props.animationType).toBe('none');
+  });
+});
+
+describe('ExercisePickerModal -- one list of plain rows', () => {
+  function renderPicker(alreadyAddedIds: string[] = []) {
+    return render(
+      <ExercisePickerModal
+        visible={true}
+        onClose={jest.fn()}
+        onSelect={jest.fn()}
+        userId="user-1"
+        alreadyAddedIds={alreadyAddedIds}
+        onCreateCustom={jest.fn()}
+      />,
+    );
+  }
+
+  it('draws no cards -- Create Custom Exercise and every exercise are rows', async () => {
+    renderPicker();
+    await screen.findByText('Barbell Bench Press');
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    expect(screen.getByTestId('exercise-picker-create-custom').props.accessibilityRole).toBe(
+      'button',
+    );
+  });
+
+  it('names the close control for assistive tech', async () => {
+    renderPicker();
+    await screen.findByText('Barbell Bench Press');
+
+    expect(screen.getByTestId('exercise-picker-close').props.accessibilityLabel).toBe('Close');
+    expect(screen.getByText('Add Exercise')).toBeTruthy();
+  });
+
+  it('separates exercise rows with a hairline', async () => {
+    renderPicker();
+    const row = await screen.findByTestId('exercise-picker-item-ex1');
+
+    expect(StyleSheet.flatten(row.props.style).borderTopWidth).toBe(StyleSheet.hairlineWidth);
+  });
+
+  it('describes each row by name and muscle group, and says when it is already added', async () => {
+    renderPicker(['ex2']);
+    const open = await screen.findByTestId('exercise-picker-item-ex1');
+    const added = screen.getByTestId('exercise-picker-item-ex2');
+
+    expect(open.props.accessibilityLabel).toBe('Barbell Bench Press, Chest');
+    expect(added.props.accessibilityLabel).toBe('Barbell Back Squat, Quadriceps, already added');
+    expect(added.props.accessibilityState.disabled).toBe(true);
+    expect(open.props.accessibilityState.disabled).toBe(false);
+  });
+
+  it('labels the search field for assistive tech', async () => {
+    renderPicker();
+    await screen.findByText('Barbell Bench Press');
+
+    expect(screen.getByTestId('exercise-picker-search').props.accessibilityLabel).toBe(
+      'Search exercises',
+    );
   });
 });

@@ -1,10 +1,14 @@
 import { useState, type ReactNode } from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
+import { DashboardStat } from '../dashboard/DashboardStat';
+import { fetchRecentWorkoutInfo } from '../dashboard/recentWorkoutInfo';
 import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
+import { AppCard } from '../design/AppCard';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
+import { colors, radii, widgetGap } from '../design/theme';
 import { getMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchTodaysFoodLogs, fetchWeeklyFoodLogs } from '../nutrition/foodLogQueries';
@@ -17,7 +21,9 @@ import {
   fetchWorkoutSplitDetail,
 } from '../workouts/workoutSplitQueries';
 import { DEFAULT_NUTRITION_THEME, DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { DashboardScreen } from './DashboardScreen';
+import { dashboardStyles } from './dashboardStyles';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -54,6 +60,10 @@ jest.mock('../nutrition/nutritionGoalQueries', () => ({
   fetchNutritionGoals: jest.fn(),
 }));
 
+jest.mock('../dashboard/recentWorkoutInfo', () => ({
+  fetchRecentWorkoutInfo: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockFetchActiveWorkout = fetchActiveWorkout as jest.Mock;
@@ -65,6 +75,7 @@ const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 const mockFetchAllCompletedWorkouts = fetchAllCompletedWorkouts as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
 const mockFetchWorkoutsForDateRange = fetchWorkoutsForDateRange as jest.Mock;
+const mockFetchRecentWorkoutInfo = fetchRecentWorkoutInfo as jest.Mock;
 
 const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -158,63 +169,48 @@ beforeEach(() => {
   mockFetchAllCompletedWorkouts.mockReset().mockResolvedValue([]);
   mockFetchAllExerciseHistory.mockReset().mockResolvedValue([]);
   mockFetchWorkoutsForDateRange.mockReset().mockResolvedValue([]);
+  mockFetchRecentWorkoutInfo.mockReset().mockResolvedValue(null);
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
   mockReportMode.mockClear();
 });
 
-describe('DashboardScreen loading/greeting', () => {
+describe('DashboardScreen loading', () => {
   it('shows a loading indicator while fetching', async () => {
     renderDashboard();
 
     expect(screen.getByTestId('dashboard-loading')).toBeTruthy();
 
-    await screen.findByTestId('dashboard-greeting', {}, { timeout: 5000 });
+    await screen.findByTestId('dashboard-screen', {}, { timeout: 5000 });
   });
 
-  it('greets with the display name', async () => {
+  it('shows no greeting, name, or time-of-day welcome in Workout mode', async () => {
     renderDashboard();
 
-    expect(await screen.findByTestId('dashboard-greeting')).toHaveTextContent('Harbir');
+    await screen.findByTestId('dashboard-screen');
+    expect(screen.queryByTestId('dashboard-greeting')).toBeNull();
+    expect(screen.queryByTestId('dashboard-greeting-eyebrow')).toBeNull();
+    expect(screen.queryByText(/good (morning|afternoon|evening)/i)).toBeNull();
+    // The greeting used the profile's name -- it must not appear anywhere.
+    expect(screen.queryByText('Harbir')).toBeNull();
+    expect(screen.queryByText(/harbir_b/)).toBeNull();
   });
 
-  it('shows the time-of-day eyebrow above the name', async () => {
-    renderDashboard();
+  it('shows no greeting, name, or time-of-day welcome in Nutrition mode', async () => {
+    renderDashboard('nutrition');
 
-    await screen.findByTestId('dashboard-greeting');
-    expect(screen.getByTestId('dashboard-greeting-eyebrow')).toBeTruthy();
-  });
-
-  it('shows only the first word of a multi-word display name', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, displayName: 'Harbir Bains' });
-
-    renderDashboard();
-
-    expect(await screen.findByTestId('dashboard-greeting')).toHaveTextContent('Harbir');
-  });
-
-  it('falls back to username when displayName is unset', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, displayName: null });
-
-    renderDashboard();
-
-    expect(await screen.findByTestId('dashboard-greeting')).toHaveTextContent('harbir_b');
-  });
-
-  it('never greets with the raw email', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, displayName: null, username: null });
-
-    renderDashboard();
-
-    expect(await screen.findByTestId('dashboard-greeting')).not.toHaveTextContent(
-      /athlete@example\.com/,
-    );
+    await screen.findByTestId('dashboard-nutrition');
+    expect(screen.queryByTestId('dashboard-greeting')).toBeNull();
+    expect(screen.queryByTestId('dashboard-greeting-eyebrow')).toBeNull();
+    expect(screen.queryByTestId('dashboard-nutrition-greeting-row')).toBeNull();
+    expect(screen.queryByText(/good (morning|afternoon|evening)/i)).toBeNull();
+    expect(screen.queryByText('Harbir')).toBeNull();
   });
 
   it('shows no profile picture or avatar on the main dashboard', async () => {
     renderDashboard();
 
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
     expect(screen.queryByTestId('open-account-settings')).toBeNull();
   });
 
@@ -283,7 +279,7 @@ describe('DashboardScreen primary workout action', () => {
     expect(await screen.findByTestId('dashboard-active-workout-error')).toHaveTextContent(
       'network error',
     );
-    expect(screen.getByTestId('dashboard-greeting')).toBeTruthy();
+    expect(screen.getByTestId('dashboard-screen')).toBeTruthy();
   });
 
   it('keeps showing previously loaded active-workout data if a later background refresh fails', async () => {
@@ -456,14 +452,16 @@ describe('DashboardScreen nutrition snapshot', () => {
     expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
   });
 
-  it("navigates to Nutrition when Weekly Calories' View All is pressed", async () => {
+  it('shows the Weekly Calories title without a "View All" link', async () => {
     renderDashboard();
     fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
     await screen.findByTestId('dashboard-nutrition');
 
-    fireEvent.press(screen.getByTestId('dashboard-weekly-calories-view-all'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
+    expect(screen.getByTestId('dashboard-weekly-calories-card')).toHaveTextContent(
+      /Weekly Calories/,
+    );
+    expect(screen.queryByTestId('dashboard-weekly-calories-view-all')).toBeNull();
+    expect(screen.getByTestId('dashboard-weekly-calories-card')).not.toHaveTextContent(/View All/);
   });
 
   it('shows a nutrition error, and switching back to Workout mode still works fine', async () => {
@@ -675,7 +673,7 @@ describe('DashboardScreen background refresh on focus', () => {
 
   it('does not show the full-screen loading indicator on a focus-triggered refresh', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     const refresh = deferred<null>();
     mockFetchActiveWorkout.mockReturnValue(refresh.promise);
@@ -689,7 +687,7 @@ describe('DashboardScreen background refresh on focus', () => {
     // The refresh request is in flight -- the dashboard already on screen
     // must stay up, not be replaced by the full-screen loading state.
     expect(screen.queryByTestId('dashboard-loading')).toBeNull();
-    expect(screen.getByTestId('dashboard-greeting')).toBeTruthy();
+    expect(screen.getByTestId('dashboard-screen')).toBeTruthy();
 
     await act(async () => {
       refresh.resolve(null);
@@ -733,7 +731,7 @@ describe('DashboardScreen background refresh on focus', () => {
 
   it('does not issue a duplicate fetch beyond the one triggered by the focus event', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     const callsAfterInitialLoad = mockFetchActiveWorkout.mock.calls.length;
 
@@ -747,94 +745,270 @@ describe('DashboardScreen background refresh on focus', () => {
   });
 });
 
-describe('DashboardScreen fixed header/footer layout', () => {
-  it('keeps the mode toggle and bottom navigation outside the scrollable area', async () => {
+describe('DashboardScreen fixed header layout', () => {
+  it('keeps the mode toggle outside the scrollable area', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     const scrollArea = screen.getByTestId('dashboard-scroll');
-    // These are fixed siblings of the ScrollView, not children of it -- so
-    // they must never be found *within* the scrollable content.
+    // The header is a fixed sibling of the ScrollView, not a child of it --
+    // so it must never be found *within* the scrollable content.
     expect(within(scrollArea).queryByTestId('dashboard-fixed-header')).toBeNull();
     expect(within(scrollArea).queryByTestId('dashboard-mode-workout')).toBeNull();
-    expect(within(scrollArea).queryByTestId('dashboard-bottom-bar')).toBeNull();
 
     expect(screen.getByTestId('dashboard-fixed-header')).toBeTruthy();
     expect(screen.getByTestId('dashboard-mode-workout')).toBeTruthy();
-    expect(screen.getByTestId('dashboard-bottom-bar')).toBeTruthy();
   });
 
-  it('keeps the fixed header and bottom navigation present after switching modes', async () => {
+  it('keeps the fixed header present after switching modes', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
     await screen.findByTestId('dashboard-nutrition');
 
     expect(screen.getByTestId('dashboard-fixed-header')).toBeTruthy();
     expect(screen.getByTestId('dashboard-mode-workout')).toBeTruthy();
-    expect(screen.getByTestId('dashboard-bottom-bar')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('dashboard-mode-workout'));
     await screen.findByTestId('dashboard-start-workout');
 
     expect(screen.getByTestId('dashboard-fixed-header')).toBeTruthy();
-    expect(screen.getByTestId('dashboard-bottom-bar')).toBeTruthy();
   });
 
-  it('insets the scrollable content to match the measured header/footer heights, not a hardcoded value', async () => {
+  // The bottom navigation is the app-level BottomNavBar (App.tsx), an in-flow
+  // sibling of the navigator -- Dashboard renders no bar of its own, and so
+  // measures no footer.
+  it('renders no bottom navigation of its own', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
+
+    expect(screen.queryByTestId('dashboard-bottom-bar')).toBeNull();
+    expect(screen.queryByTestId('bottom-nav-bar')).toBeNull();
+    expect(screen.queryByTestId('quick-action-start-workout')).toBeNull();
+  });
+
+  it('insets the scrollable content to match the measured header height, not a hardcoded value', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-screen');
 
     fireEvent(screen.getByTestId('dashboard-fixed-header'), 'layout', {
       nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 180 } },
-    });
-    fireEvent(screen.getByTestId('dashboard-bottom-bar'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 100 } },
     });
 
     const scroll = screen.getByTestId('dashboard-scroll');
     const merged = Object.assign({}, ...[scroll.props.contentContainerStyle].flat());
 
     expect(merged.paddingTop).toBe(180 + 12);
-    expect(merged.paddingBottom).toBe(100 + 16);
+    // No footer is measured, and the gap under the last widget is the same
+    // 6px widget rhythm -- the bottom navigation (an in-flow sibling) owns
+    // the safe-area inset, so nothing here needs to add one.
+    expect(merged.paddingBottom).toBe(widgetGap);
   });
 
-  it('fills the viewport in Workout mode using a scrollable ScrollView that spreads gaps between its 3 widgets', async () => {
+  it('stacks Workout widgets at a fixed widgetGap and never stretches/distributes leftover height between them', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     const workoutStyle = Object.assign(
       {},
       ...[screen.getByTestId('dashboard-scroll').props.contentContainerStyle].flat(),
     );
-    expect(workoutStyle.flexGrow).toBe(1);
-    expect(workoutStyle.justifyContent).toBe('space-between');
+    expect(workoutStyle.gap).toBe(widgetGap);
+    // The old flexGrow + space-between stretched every gap to fill the
+    // device's leftover height -- exactly what breaks a strict max gap.
+    // None of the distributing modes may ever return.
+    expect(['space-between', 'space-around', 'space-evenly']).not.toContain(
+      workoutStyle.justifyContent,
+    );
   });
 
-  it('renders Nutrition mode as a plain, non-scrolling View (no nested ScrollView / "screen inside a screen")', async () => {
+  // Spare height on a tall phone used to be an empty band -- first at the
+  // bottom, then (when the stack was pushed down) directly under the mode
+  // switcher. The widgets themselves now share it, so they run from the
+  // switcher to the bottom navigation. Gaps stay exactly widgetGap.
+  describe('fills the space from the mode switcher to the bottom navigation', () => {
+    const style = (testID: string) =>
+      Object.assign({}, ...[screen.getByTestId(testID).props.style].flat(Infinity));
+    const stack = () =>
+      Object.assign(
+        {},
+        ...[screen.getByTestId('dashboard-scroll').props.contentContainerStyle].flat(),
+      );
+
+    it('makes the stack at least as tall as the scroll area, top-aligned, with the 6px rhythm intact', async () => {
+      renderDashboard();
+      await screen.findByTestId('dashboard-screen');
+
+      expect(stack().flexGrow).toBe(1);
+      // Top-aligned: nothing pushes the widgets down or to an edge.
+      expect(stack().justifyContent).toBeUndefined();
+      expect(stack().gap).toBe(widgetGap);
+      expect(stack().paddingBottom).toBe(widgetGap);
+      // No negative margins or offset hacks.
+      expect(stack().marginBottom).toBeUndefined();
+      expect(stack().marginTop).toBeUndefined();
+    });
+
+    it('shares spare height between the three widgets in proportion to their natural heights', async () => {
+      mockGetMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: 'split-1' });
+      mockFetchWorkoutSplitDetail.mockResolvedValue({
+        id: 'split-1',
+        name: 'PPL',
+        days: [{ id: 'd1', name: 'Push', orderIndex: 1, muscleGroups: ['chest'] }],
+      });
+      mockFetchRecentWorkoutInfo.mockResolvedValue({
+        workout: {
+          id: 'w1',
+          name: 'Pull Day',
+          performedAt: '2026-09-18T17:00:00.000Z',
+          completedAt: '2026-09-18T17:40:00.000Z',
+          workoutSplitDayId: null,
+        },
+        musclesTrained: 'Back',
+        durationMinutes: 40,
+        topExerciseName: null,
+        topExerciseSets: [],
+        previousExerciseSets: [],
+        topSet: null,
+        prLabel: null,
+      });
+      renderDashboard();
+      await screen.findByTestId('dashboard-recent-workout');
+
+      // The weight lives on each widget's wrapper -- the direct child of the
+      // stack that shares the spare height -- so read the largest flexGrow on
+      // the path from the card up to (not including) the scroll container.
+      const wrapperGrow = (testID: string) => {
+        let max = 0;
+        let node: ReturnType<typeof screen.getByTestId> | null = screen.getByTestId(testID);
+        while (node && node.props.testID !== 'dashboard-scroll') {
+          const grow = Object.assign({}, ...[node.props.style].flat(Infinity)).flexGrow;
+          if (typeof grow === 'number') max = Math.max(max, grow);
+          node = node.parent;
+        }
+        return max;
+      };
+      const heroGrow = wrapperGrow('dashboard-next-workout');
+      const activityGrow = wrapperGrow('dashboard-activity');
+      const recentGrow = wrapperGrow('dashboard-recent-workout');
+
+      expect(heroGrow).toBeGreaterThan(0);
+      expect(activityGrow).toBeGreaterThan(0);
+      expect(recentGrow).toBeGreaterThan(0);
+      // The two big widgets take the larger shares; the small Recent card less.
+      expect(recentGrow).toBeLessThan(heroGrow);
+      expect(recentGrow).toBeLessThan(activityGrow);
+    });
+
+    it("lets each card absorb the height without stretching its contents' gaps", async () => {
+      mockGetMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: 'split-1' });
+      mockFetchWorkoutSplitDetail.mockResolvedValue({
+        id: 'split-1',
+        name: 'PPL',
+        days: [{ id: 'd1', name: 'Push', orderIndex: 1, muscleGroups: ['chest'] }],
+      });
+      renderDashboard();
+      await screen.findByTestId('dashboard-next-workout');
+
+      // Next Workout: text on top, actions anchored beneath -- not a card
+      // whose every line drifts apart.
+      const hero = style('dashboard-next-workout');
+      expect(hero.flexGrow).toBe(1);
+      expect(hero.justifyContent).toBe('space-between');
+
+      // Activity: the week strip stays natural; the stat grid's rows grow.
+      expect(style('dashboard-activity').flexGrow).toBe(1);
+      expect(style('dashboard-stat-grid').flexGrow).toBe(1);
+    });
+
+    it('keeps the one-line resume and "no upcoming workout" cards compact -- they never grow', async () => {
+      renderDashboard();
+      const noPlan = await screen.findByTestId('dashboard-start-workout');
+
+      const wrapperStyle = Object.assign(
+        {},
+        ...[noPlan.parent!.parent!.props.style].flat(Infinity),
+      );
+      expect(wrapperStyle.flexGrow).toBeUndefined();
+    });
+
+    it('never distributes spare height into the gaps: the gap is the 6px token, never a flexed space', () => {
+      expect(dashboardStyles.widgetStack.gap).toBe(widgetGap);
+      expect(
+        (dashboardStyles.workoutStackFill as { justifyContent?: string }).justifyContent,
+      ).toBeUndefined();
+    });
+  });
+
+  it('keeps the widgets clear of the fixed header however much height is spare', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
+
+    fireEvent(screen.getByTestId('dashboard-fixed-header'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 190 } },
+    });
+
+    const style = Object.assign(
+      {},
+      ...[screen.getByTestId('dashboard-scroll').props.contentContainerStyle].flat(),
+    );
+    // Bottom-anchored content can never slide under the header: the top
+    // padding still tracks the measured header.
+    expect(style.paddingTop).toBe(190 + 12);
+  });
+
+  // Accessibility: Nutrition mode used to be a fixed, non-scrolling View whose
+  // widgets were squeezed to fit -- it clips at larger Dynamic Type sizes,
+  // since a layout that can't grow can't hold bigger text. It now scrolls
+  // (only when its content genuinely exceeds the viewport) exactly like
+  // Workout mode does.
+  it('renders Nutrition mode in a ScrollView, so larger text sizes can never clip its widgets', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-screen');
 
     fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
     await screen.findByTestId('dashboard-nutrition');
 
-    // The architectural fix: Nutrition mode must not contain any
-    // ScrollView -- its widgets sit directly in a fixed, non-scrolling
-    // View, so vertical scrolling to reach them is structurally
-    // impossible rather than merely avoided via flex tricks.
-    expect(screen.UNSAFE_queryAllByType(ScrollView)).toHaveLength(0);
+    // Exactly one ScrollView at a time: the Nutrition one (Workout's is
+    // unmounted while Nutrition is showing), with its own testID.
+    expect(screen.UNSAFE_queryAllByType(ScrollView)).toHaveLength(1);
     expect(screen.queryByTestId('dashboard-scroll')).toBeNull();
+    expect(screen.getByTestId('dashboard-nutrition-content')).toBeTruthy();
 
-    const nutritionContent = screen.getByTestId('dashboard-nutrition-content');
-    const nutritionStyle = Object.assign({}, ...[nutritionContent.props.style].flat(Infinity));
-    expect(nutritionStyle.flex).toBe(1);
+    const content = Object.assign(
+      {},
+      ...[screen.getByTestId('dashboard-nutrition-content').props.contentContainerStyle].flat(
+        Infinity,
+      ),
+    );
+    // Widgets keep their natural size: nothing stretches or is squeezed.
+    expect(content.flexGrow).toBeUndefined();
+    expect(content.justifyContent).toBeUndefined();
 
-    // Switching back to Workout mode must restore its own ScrollView --
-    // this pass only removed the ScrollView from Nutrition mode.
+    // Switching back to Workout mode restores its own ScrollView.
     fireEvent.press(screen.getByTestId('dashboard-mode-workout'));
     await screen.findByTestId('dashboard-start-workout');
     expect(screen.UNSAFE_queryAllByType(ScrollView)).toHaveLength(1);
+    expect(screen.getByTestId('dashboard-scroll')).toBeTruthy();
+  });
+
+  it('insets Nutrition content below the measured header, like Workout mode', async () => {
+    renderDashboard('nutrition');
+    await screen.findByTestId('dashboard-nutrition');
+
+    fireEvent(screen.getByTestId('dashboard-fixed-header'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 170 } },
+    });
+
+    const merged = Object.assign(
+      {},
+      ...[screen.getByTestId('dashboard-nutrition-content').props.contentContainerStyle].flat(
+        Infinity,
+      ),
+    );
+    expect(merged.paddingTop).toBe(170 + 12);
+    expect(merged.paddingBottom).toBe(16);
   });
 
   // Root cause of a real "large empty area inside the card" bug: an
@@ -854,8 +1028,6 @@ describe('DashboardScreen fixed header/footer layout', () => {
       ...[screen.getByTestId('dashboard-weekly-calories-card').props.style].flat(Infinity),
     );
     expect(weeklyCard.flexGrow).toBeUndefined();
-    // Still never compressed below its own content and clipped.
-    expect(weeklyCard.flexShrink).toBe(0);
 
     const contentFillStyle = Object.assign(
       {},
@@ -864,63 +1036,35 @@ describe('DashboardScreen fixed header/footer layout', () => {
     expect(contentFillStyle.flexGrow).toBeUndefined();
   });
 
-  // Real-device testing kept showing Weekly Calories itself clipped even
-  // after repeated spacing trims elsewhere -- guessing exact pixel budgets
-  // for "a typical phone" without being able to test on the actual device
-  // kept coming up short. The robust fix: Quick Actions, Recent Meals, and
-  // the greeting each carry their own flexShrink + minHeight floor, so
-  // whichever ones a given device leaves too little room for absorb the
-  // shortfall together. The Calorie/Macro ring card is deliberately NOT
-  // part of that pool -- CalorieRing draws a fixed-size SVG circle that
-  // flexShrink would clip rather than gracefully compress -- so it, like
-  // Weekly Calories itself, stays flexShrink: 0 and must fit on its own
-  // (reduced) natural size alone.
-  it('gives Quick Actions/Recent Meals/the greeting a flexShrink safety net, while the ring card and Weekly Calories stay fixed', async () => {
+  // The old fixed-height layout needed a "shrink pool": Quick Actions and
+  // Today's Meals carried flexShrink + minHeight so they could be squeezed
+  // to make everything fit, which is exactly what clipped text at larger
+  // sizes. With a scrolling layout nothing is ever squeezed -- so no widget
+  // may carry a shrink or a height floor/ceiling that could clip its content.
+  it('never squeezes or clamps a Nutrition widget: no flexShrink, minHeight, maxHeight or fixed height', async () => {
     renderDashboard();
     fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
     await screen.findByTestId('dashboard-nutrition');
 
-    const greetingRowStyle = Object.assign(
-      {},
-      ...[screen.getByTestId('dashboard-nutrition-greeting-row').props.style].flat(Infinity),
-    );
-    expect(greetingRowStyle.flexShrink).toBe(1);
-    expect(greetingRowStyle.minHeight).toBeGreaterThan(0);
-
-    const heroSectionStyle = Object.assign(
-      {},
-      ...[screen.getByTestId('dashboard-nutrition-hero-section').props.style].flat(Infinity),
-    );
-    expect(heroSectionStyle.flexShrink).toBeUndefined();
-
-    const quickActionsSectionStyle = Object.assign(
-      {},
-      ...[screen.getByTestId('dashboard-nutrition-quick-actions-section').props.style].flat(
-        Infinity,
-      ),
-    );
-    expect(quickActionsSectionStyle.flexShrink).toBe(1);
-    expect(quickActionsSectionStyle.minHeight).toBeGreaterThan(0);
-
-    const mealsSectionStyle = Object.assign(
-      {},
-      ...[screen.getByTestId('dashboard-nutrition-meals-section').props.style].flat(Infinity),
-    );
-    expect(mealsSectionStyle.flexShrink).toBe(1);
-    expect(mealsSectionStyle.minHeight).toBeGreaterThan(0);
-
-    const weeklyCardStyle = Object.assign(
-      {},
-      ...[screen.getByTestId('dashboard-weekly-calories-card').props.style].flat(Infinity),
-    );
-    expect(weeklyCardStyle.flexShrink).toBe(0);
+    for (const testID of [
+      'dashboard-nutrition-hero-section',
+      'dashboard-nutrition-quick-actions-section',
+      'dashboard-nutrition-meals-section',
+      'dashboard-weekly-calories-card',
+    ]) {
+      const style = Object.assign({}, ...[screen.getByTestId(testID).props.style].flat(Infinity));
+      expect(style.flexShrink).toBeUndefined();
+      expect(style.minHeight).toBeUndefined();
+      expect(style.maxHeight).toBeUndefined();
+      expect(style.height).toBeUndefined();
+    }
   });
 });
 
 describe('DashboardScreen mode-based accent theme', () => {
-  it('uses the workout blue accent for the toggle and bottom navigation by default', async () => {
+  it('uses the workout blue accent for the toggle and widgets by default', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     const workoutSegment = screen.getByTestId('dashboard-mode-workout');
     const workoutIcon = within(workoutSegment).UNSAFE_getByType(Feather);
@@ -930,15 +1074,16 @@ describe('DashboardScreen mode-based accent theme', () => {
     const nutritionIcon = within(nutritionSegment).UNSAFE_getByType(Feather);
     expect(nutritionIcon.props.color).not.toBe(DEFAULT_NUTRITION_THEME.onAccent);
 
-    const homeIcon = within(screen.getByTestId('dashboard-bottom-bar')).UNSAFE_getByProps({
-      name: 'home',
-    });
-    expect(homeIcon.props.color).toBe(DEFAULT_WORKOUT_THEME.accent);
+    // Workout Home's accent shows on its one quiet header action.
+    const action = within(screen.getByTestId('dashboard-weekly-view-details')).getByText(
+      'View Details',
+    );
+    expect(StyleSheet.flatten(action.props.style).color).toBe(DEFAULT_WORKOUT_THEME.accent);
   });
 
-  it('switches the toggle and bottom navigation to the nutrition green accent after switching modes', async () => {
+  it('switches the toggle and widgets to the nutrition green accent after switching modes', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
     await screen.findByTestId('dashboard-nutrition');
@@ -947,28 +1092,24 @@ describe('DashboardScreen mode-based accent theme', () => {
     const nutritionIcon = within(nutritionSegment).UNSAFE_getByType(Feather);
     expect(nutritionIcon.props.color).toBe(DEFAULT_NUTRITION_THEME.onAccent);
 
-    const homeIcon = within(screen.getByTestId('dashboard-bottom-bar')).UNSAFE_getByProps({
-      name: 'home',
+    const searchIcon = within(screen.getByTestId('dashboard-quick-search')).UNSAFE_getByProps({
+      name: 'search',
     });
-    expect(homeIcon.props.color).toBe(DEFAULT_NUTRITION_THEME.accent);
-
-    const calendarIcon = within(
-      screen.getByTestId('dashboard-weekly-calories-card'),
-    ).UNSAFE_getByProps({ name: 'calendar' });
-    expect(calendarIcon.props.color).toBe(DEFAULT_NUTRITION_THEME.accent);
+    expect(searchIcon.props.color).toBe(DEFAULT_NUTRITION_THEME.accent);
   });
 
   it("uses the user's saved custom workout color instead of the default", async () => {
     mockGetMyProfile.mockResolvedValue({ ...baseProfile, workoutAccentColor: '#EF4444' });
 
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
-    const homeIcon = within(screen.getByTestId('dashboard-bottom-bar')).UNSAFE_getByProps({
-      name: 'home',
-    });
-    expect(homeIcon.props.color).toBe('#EF4444');
-    expect(homeIcon.props.color).not.toBe(DEFAULT_WORKOUT_THEME.accent);
+    const action = within(screen.getByTestId('dashboard-weekly-view-details')).getByText(
+      'View Details',
+    );
+    const color = StyleSheet.flatten(action.props.style).color;
+    expect(color).toBe('#EF4444');
+    expect(color).not.toBe(DEFAULT_WORKOUT_THEME.accent);
   });
 
   it("uses the user's saved custom nutrition color instead of the default, independently of the workout color", async () => {
@@ -979,16 +1120,16 @@ describe('DashboardScreen mode-based accent theme', () => {
     });
 
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
     await screen.findByTestId('dashboard-nutrition');
 
-    const homeIcon = within(screen.getByTestId('dashboard-bottom-bar')).UNSAFE_getByProps({
-      name: 'home',
+    const searchIcon = within(screen.getByTestId('dashboard-quick-search')).UNSAFE_getByProps({
+      name: 'search',
     });
-    expect(homeIcon.props.color).toBe('#8B5CF6');
-    expect(homeIcon.props.color).not.toBe('#EF4444');
+    expect(searchIcon.props.color).toBe('#8B5CF6');
+    expect(searchIcon.props.color).not.toBe('#EF4444');
   });
 });
 
@@ -1201,22 +1342,97 @@ describe('DashboardScreen stat grid', () => {
     expect(screen.getByTestId('dashboard-stat-steps')).toHaveTextContent(/Not connected/);
   });
 
-  it('shows the Weekly Goal as completed/goal when a workout-frequency goal is set', async () => {
+  it('no longer shows a Weekly Goal stat', async () => {
     mockGetMyProfile.mockResolvedValue({ ...baseProfile, workoutFrequencyDays: 4 });
-    const { start: monday } = getCurrentWeekRange();
-    mockFetchWorkoutsForDateRange.mockResolvedValue([
-      {
-        id: 'w1',
-        name: 'Push Day',
-        performedAt: monday.toISOString(),
-        completedAt: monday.toISOString(),
-        workoutSplitDayId: null,
-      },
-    ]);
 
     renderDashboard();
+    await screen.findByTestId('dashboard-stat-grid');
 
-    expect(await screen.findByTestId('dashboard-stat-weekly-goal')).toHaveTextContent(/1\/4/);
+    expect(screen.queryByTestId('dashboard-stat-weekly-goal')).toBeNull();
+    expect(screen.queryByText('Weekly Goal')).toBeNull();
+  });
+
+  describe('Last Workout', () => {
+    const recentInfo = {
+      workout: {
+        id: 'w-last',
+        name: 'Pull Day',
+        performedAt: '2026-09-18T17:00:00.000Z',
+        completedAt: '2026-09-18T17:40:00.000Z',
+        workoutSplitDayId: null,
+      },
+      musclesTrained: 'Back',
+      durationMinutes: 40,
+      topExerciseName: null,
+      topExerciseSets: [],
+      previousExerciseSets: [],
+      topSet: null,
+      prLabel: null,
+    };
+
+    it("shows the user's most recent completed workout: its name, title and date", async () => {
+      mockFetchRecentWorkoutInfo.mockResolvedValue(recentInfo);
+
+      renderDashboard();
+
+      const cell = await screen.findByTestId('dashboard-stat-last-workout');
+      await waitFor(() => expect(cell).toHaveTextContent(/Pull Day/));
+      expect(cell).toHaveTextContent(/Last Workout/);
+      const date = new Date('2026-09-18T17:00:00.000Z').toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+      expect(cell).toHaveTextContent(new RegExp(date.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    });
+
+    it('sets the workout name in the regular UI face on one line, never the mono numeric face', async () => {
+      mockFetchRecentWorkoutInfo.mockResolvedValue(recentInfo);
+
+      renderDashboard();
+
+      const cell = await screen.findByTestId('dashboard-stat-last-workout');
+      const name = await within(cell).findByText('Pull Day');
+      expect(String(StyleSheet.flatten(name.props.style).fontFamily)).toMatch(/^Manrope_/);
+      expect(name.props.numberOfLines).toBe(1);
+    });
+
+    it('opens that workout when tapped, like the Recent Workout card', async () => {
+      mockFetchRecentWorkoutInfo.mockResolvedValue(recentInfo);
+
+      renderDashboard();
+      const cell = await screen.findByTestId('dashboard-stat-last-workout');
+      await waitFor(() => expect(cell).toHaveTextContent(/Pull Day/));
+      expect(cell.props.accessibilityRole).toBe('button');
+
+      fireEvent.press(cell);
+
+      expect(mockNavigate).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w-last' });
+    });
+
+    it('uses the data already fetched for Recent Workout -- one fetch, not a second one', async () => {
+      mockFetchRecentWorkoutInfo.mockResolvedValue(recentInfo);
+
+      renderDashboard();
+      await screen.findByTestId('dashboard-recent-workout');
+
+      expect(mockFetchRecentWorkoutInfo).toHaveBeenCalledTimes(1);
+      // Both surfaces name the very same workout.
+      expect(screen.getByTestId('dashboard-recent-workout-name')).toHaveTextContent('Pull Day');
+      expect(screen.getByTestId('dashboard-stat-last-workout')).toHaveTextContent(/Pull Day/);
+    });
+
+    it('shows the same "--" empty treatment as Steps, and is not tappable, when there is no completed workout', async () => {
+      renderDashboard();
+
+      const cell = await screen.findByTestId('dashboard-stat-last-workout');
+      expect(cell).toHaveTextContent(/--/);
+      expect(cell).toHaveTextContent(/Last Workout/);
+      expect(cell).toHaveTextContent(/No workouts yet/);
+      expect(cell.props.accessibilityRole).not.toBe('button');
+      fireEvent.press(cell);
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 
   it('navigates to Progress when the Sets Done or Workouts This Month tile is pressed', async () => {
@@ -1316,93 +1532,6 @@ describe('DashboardScreen Weekly Process widget', () => {
   });
 });
 
-describe('DashboardScreen bottom bar Progress navigation', () => {
-  it('navigates to Progress when the Progress item is pressed in Workout mode', async () => {
-    renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
-
-    fireEvent.press(screen.getByTestId('dashboard-bottom-progress'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('ProgressOverview');
-  });
-
-  it('is disabled in Nutrition mode (the item shows Goals there instead)', async () => {
-    renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
-
-    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
-    await screen.findByTestId('dashboard-nutrition');
-
-    fireEvent.press(screen.getByTestId('dashboard-bottom-progress'));
-
-    expect(mockNavigate).not.toHaveBeenCalledWith('ProgressOverview');
-  });
-});
-
-describe('DashboardScreen bottom bar Workouts/Plus/Profile', () => {
-  it('navigates to WorkoutHistory from the bottom bar in Workout mode', async () => {
-    renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
-
-    fireEvent.press(screen.getByTestId('dashboard-bottom-workouts'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('WorkoutHistory');
-  });
-
-  it('navigates to FoodLibrary from the bottom bar (now "Food") in Nutrition mode', async () => {
-    renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
-
-    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
-    await screen.findByTestId('dashboard-nutrition');
-
-    fireEvent.press(screen.getByTestId('dashboard-bottom-workouts'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
-  });
-
-  it('navigates to Profile when the Profile item is pressed', async () => {
-    renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
-
-    fireEvent.press(screen.getByTestId('dashboard-bottom-profile'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('Profile');
-  });
-
-  it('opens the quick action menu when the + button is pressed', async () => {
-    renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
-
-    fireEvent.press(screen.getByTestId('dashboard-bottom-plus'));
-
-    expect(screen.getByTestId('quick-action-start-workout')).toBeTruthy();
-    expect(screen.getByTestId('quick-action-log-food')).toBeTruthy();
-  });
-
-  it('navigates to NewWorkout and closes the menu when Start Workout is chosen', async () => {
-    renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
-    fireEvent.press(screen.getByTestId('dashboard-bottom-plus'));
-
-    fireEvent.press(screen.getByTestId('quick-action-start-workout'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
-    expect(screen.queryByTestId('quick-action-start-workout')).toBeNull();
-  });
-
-  it('navigates to Nutrition and closes the menu when Log Food is chosen', async () => {
-    renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
-    fireEvent.press(screen.getByTestId('dashboard-bottom-plus'));
-
-    fireEvent.press(screen.getByTestId('quick-action-log-food'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
-    expect(screen.queryByTestId('quick-action-log-food')).toBeNull();
-  });
-});
-
 describe('DashboardScreen app-level side menu', () => {
   // AppSideMenu itself is now mounted once at the app root (App.tsx), as a
   // sibling of the navigator, so it can render above the ENTIRE app instead
@@ -1411,7 +1540,7 @@ describe('DashboardScreen app-level side menu', () => {
   // DashboardScreen's own responsibility is just asking the root to open it.
   it('asks the app-level menu to open when the hamburger button is pressed', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     fireEvent.press(screen.getByTestId('dashboard-open-menu'));
 
@@ -1420,12 +1549,524 @@ describe('DashboardScreen app-level side menu', () => {
 
   it('remains reachable after switching to Nutrition mode', async () => {
     renderDashboard();
-    await screen.findByTestId('dashboard-greeting');
+    await screen.findByTestId('dashboard-screen');
 
     fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
     await screen.findByTestId('dashboard-nutrition');
     fireEvent.press(screen.getByTestId('dashboard-open-menu'));
 
     expect(mockOpenMenu).toHaveBeenCalled();
+  });
+});
+
+describe('DashboardScreen widget spacing', () => {
+  it('defines the widget gap as exactly 6px and uses that one token for every widget-to-widget gap', () => {
+    expect(widgetGap).toBe(6);
+    // Widget-to-widget spacing lives on the stack, once. (Inside a card, groups
+    // are separated by hairlines, not gaps -- see the Dashboard composition tests.)
+    expect(dashboardStyles.widgetStack.gap).toBe(widgetGap);
+  });
+
+  it('spaces Workout mode widgets by the widget gap, with no per-widget outer margin', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-screen');
+
+    const stackStyle = Object.assign(
+      {},
+      ...[screen.getByTestId('dashboard-scroll').props.contentContainerStyle].flat(),
+    );
+    expect(stackStyle.gap).toBe(widgetGap);
+
+    // The gap lives on the container; no widget adds its own margin on top.
+    for (const testID of [
+      'dashboard-next-workout',
+      'dashboard-start-workout',
+      'dashboard-activity',
+    ]) {
+      const node = screen.queryByTestId(testID);
+      if (!node) continue;
+      const style = Object.assign({}, ...[node.props.style].flat(Infinity));
+      expect(style.marginTop ?? 0).toBe(0);
+      expect(style.marginBottom ?? 0).toBe(0);
+    }
+  });
+
+  it('spaces Nutrition mode widgets by the widget gap, with no per-widget outer margin', async () => {
+    renderDashboard('nutrition');
+    await screen.findByTestId('dashboard-nutrition');
+
+    const areaStyle = Object.assign(
+      {},
+      ...[screen.getByTestId('dashboard-nutrition-content').props.contentContainerStyle].flat(
+        Infinity,
+      ),
+    );
+    expect(areaStyle.gap).toBe(widgetGap);
+
+    for (const testID of [
+      'dashboard-nutrition-hero-section',
+      'dashboard-nutrition-quick-actions-section',
+      'dashboard-nutrition-meals-section',
+    ]) {
+      const style = Object.assign({}, ...[screen.getByTestId(testID).props.style].flat(Infinity));
+      expect(style.marginTop ?? 0).toBe(0);
+      expect(style.marginBottom ?? 0).toBe(0);
+    }
+  });
+});
+
+describe('DashboardScreen Recent Workout card', () => {
+  const recentInfo = {
+    workout: {
+      id: 'w-recent',
+      name: 'Push Day',
+      performedAt: '2026-09-18T17:00:00.000Z',
+      completedAt: '2026-09-18T17:52:00.000Z',
+      workoutSplitDayId: null,
+    },
+    musclesTrained: 'Chest, Triceps',
+    durationMinutes: 52,
+    topExerciseName: 'Bench Press',
+    topExerciseSets: [],
+    previousExerciseSets: [],
+    topSet: {
+      id: 's1',
+      setIndex: 1,
+      weightKg: 100,
+      reps: 5,
+      completedAt: '2026-09-18T17:30:00.000Z',
+      side: 'none',
+    },
+    prLabel: '5 Rep PR',
+  };
+
+  it("shows the user's real most recent workout: name, duration, muscles, top set, and PR", async () => {
+    mockFetchRecentWorkoutInfo.mockResolvedValue(recentInfo);
+
+    renderDashboard();
+
+    expect(await screen.findByTestId('dashboard-recent-workout')).toBeTruthy();
+    expect(screen.getByTestId('dashboard-recent-workout-name')).toHaveTextContent('Push Day');
+    expect(screen.getByTestId('dashboard-recent-workout-meta')).toHaveTextContent(
+      '52 min · Chest, Triceps',
+    );
+    expect(screen.getByTestId('dashboard-recent-workout-top-set')).toHaveTextContent(
+      'Bench Press · 100kg × 5',
+    );
+    expect(screen.getByTestId('dashboard-recent-workout-pr')).toHaveTextContent('5 Rep PR');
+  });
+
+  it("shows the top set in the user's own weight unit", async () => {
+    mockGetMyProfile.mockResolvedValue({ ...baseProfile, weightUnit: 'lb' as const });
+    mockFetchRecentWorkoutInfo.mockResolvedValue(recentInfo);
+
+    renderDashboard();
+
+    expect(await screen.findByTestId('dashboard-recent-workout-top-set')).toHaveTextContent(
+      'Bench Press · 220.46lb × 5',
+    );
+  });
+
+  it('omits the PR badge when the top set is not currently a record', async () => {
+    mockFetchRecentWorkoutInfo.mockResolvedValue({ ...recentInfo, prLabel: null });
+
+    renderDashboard();
+
+    await screen.findByTestId('dashboard-recent-workout-top-set');
+    expect(screen.queryByTestId('dashboard-recent-workout-pr')).toBeNull();
+  });
+
+  it('omits missing pieces instead of showing placeholders when there is no duration or top set', async () => {
+    mockFetchRecentWorkoutInfo.mockResolvedValue({
+      ...recentInfo,
+      durationMinutes: null,
+      topSet: null,
+      topExerciseName: null,
+      prLabel: null,
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByTestId('dashboard-recent-workout-meta')).toHaveTextContent(
+      /^Chest, Triceps$/,
+    );
+    expect(screen.queryByTestId('dashboard-recent-workout-top-set')).toBeNull();
+  });
+
+  it('opens that workout when the card is pressed', async () => {
+    mockFetchRecentWorkoutInfo.mockResolvedValue(recentInfo);
+
+    renderDashboard();
+    fireEvent.press(await screen.findByTestId('dashboard-recent-workout'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w-recent' });
+  });
+
+  it('is announced as a button describing which workout it opens', async () => {
+    mockFetchRecentWorkoutInfo.mockResolvedValue(recentInfo);
+
+    renderDashboard();
+
+    const card = await screen.findByTestId('dashboard-recent-workout');
+    expect(card.props.accessibilityRole).toBe('button');
+    expect(card.props.accessibilityLabel).toMatch(/Recent workout, Push Day/);
+  });
+
+  it('renders nothing (no placeholder card) when the user has no completed workout yet', async () => {
+    renderDashboard();
+
+    await screen.findByTestId('dashboard-screen');
+    expect(screen.queryByTestId('dashboard-recent-workout')).toBeNull();
+    expect(screen.queryByTestId('dashboard-recent-workout-section')).toBeNull();
+  });
+
+  it('shows an error for this section without breaking the rest of the dashboard', async () => {
+    mockFetchRecentWorkoutInfo.mockRejectedValue(new Error('recent down'));
+
+    renderDashboard();
+
+    expect(await screen.findByTestId('dashboard-recent-workout-error')).toHaveTextContent(
+      'recent down',
+    );
+    expect(screen.getByTestId('dashboard-weekly-progress')).toBeTruthy();
+    expect(screen.getByTestId('dashboard-stat-grid')).toBeTruthy();
+  });
+
+  it('is a Workout-mode widget only', async () => {
+    mockFetchRecentWorkoutInfo.mockResolvedValue(recentInfo);
+
+    renderDashboard('nutrition');
+
+    await screen.findByTestId('dashboard-nutrition');
+    expect(screen.queryByTestId('dashboard-recent-workout')).toBeNull();
+  });
+});
+
+describe('DashboardScreen calories left', () => {
+  const log = {
+    id: 'l1',
+    foodId: 'f1',
+    foodNameSnapshot: 'Chicken',
+    servingSize: 100,
+    servingUnit: 'g',
+    quantity: 1,
+    calories: 500,
+    proteinG: 31,
+    carbsG: 0,
+    fatG: 3.6,
+    loggedAt: '2026-01-01T12:00:00Z',
+  };
+
+  it('shows how many calories are left today, from the real goal and logged food', async () => {
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: 2000,
+      proteinG: null,
+      carbsG: null,
+      fatG: null,
+    });
+    mockFetchTodaysFoodLogs.mockResolvedValue([log]);
+
+    renderDashboard('nutrition');
+
+    expect(await screen.findByTestId('dashboard-calories-remaining')).toHaveTextContent(
+      '1,500 kcal left',
+    );
+  });
+
+  it('says how far over the goal the user is once they exceed it', async () => {
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: 400,
+      proteinG: null,
+      carbsG: null,
+      fatG: null,
+    });
+    mockFetchTodaysFoodLogs.mockResolvedValue([log]);
+
+    renderDashboard('nutrition');
+
+    expect(await screen.findByTestId('dashboard-calories-remaining')).toHaveTextContent(
+      '100 kcal over',
+    );
+  });
+
+  it('shows nothing (never a made-up number) when no calorie goal is set', async () => {
+    renderDashboard('nutrition');
+
+    await screen.findByTestId('dashboard-nutrition');
+    expect(screen.queryByTestId('dashboard-calories-remaining')).toBeNull();
+  });
+});
+
+describe('DashboardScreen composition: a few purposeful surfaces, not a pile of cards', () => {
+  const nextPlan = {
+    id: 'split-1',
+    name: 'PPL - Hypertrophy',
+    days: [{ id: 'day-push', name: 'Push', orderIndex: 1, muscleGroups: ['chest', 'triceps'] }],
+  };
+
+  async function renderWithNextWorkout() {
+    mockGetMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: 'split-1' });
+    mockFetchWorkoutSplitDetail.mockResolvedValue(nextPlan);
+    mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
+    renderDashboard();
+    await screen.findByTestId('dashboard-next-workout');
+  }
+
+  it('Workout Home is three surfaces at most: Next Workout, one Activity card, and Recent Workout', async () => {
+    mockFetchRecentWorkoutInfo.mockResolvedValue({
+      workout: {
+        id: 'w1',
+        name: 'Pull Day',
+        performedAt: '2026-09-18T17:00:00.000Z',
+        completedAt: '2026-09-18T17:40:00.000Z',
+        workoutSplitDayId: null,
+      },
+      musclesTrained: 'Back',
+      durationMinutes: 40,
+      topExerciseName: null,
+      topExerciseSets: [],
+      previousExerciseSets: [],
+      topSet: null,
+      prLabel: null,
+    });
+    await renderWithNextWorkout();
+    await screen.findByTestId('dashboard-recent-workout');
+
+    expect(screen.UNSAFE_getAllByType(AppCard)).toHaveLength(3);
+  });
+
+  it('holds this week and all four stats in ONE activity card, with no card per stat', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-activity');
+
+    const activity = within(screen.getByTestId('dashboard-activity'));
+    expect(activity.getByTestId('dashboard-weekly-progress')).toBeTruthy();
+    for (const id of [
+      'dashboard-stat-sets',
+      'dashboard-stat-workouts-month',
+      'dashboard-stat-steps',
+      'dashboard-stat-last-workout',
+    ]) {
+      expect(activity.getByTestId(id)).toBeTruthy();
+    }
+    // A stat is a quiet block inside the card -- not a card of its own.
+    expect(
+      within(screen.getByTestId('dashboard-activity')).UNSAFE_queryAllByType(AppCard),
+    ).toHaveLength(0);
+    const cell = StyleSheet.flatten(screen.getByTestId('dashboard-stat-sets').props.style);
+    expect(cell.borderWidth).toBeUndefined();
+    expect(cell.backgroundColor).toBe(colors.surfaceRaised);
+  });
+
+  it('shows no decorative icon tile on the stats -- the number leads', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-activity');
+
+    expect(
+      within(screen.getByTestId('dashboard-stat-grid')).UNSAFE_queryAllByType(Feather),
+    ).toHaveLength(0);
+  });
+
+  it('keeps every stat that navigates announced as a button naming its whole content', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-activity');
+
+    const sets = screen.getByTestId('dashboard-stat-sets');
+    expect(sets.props.accessibilityRole).toBe('button');
+    expect(sets.props.accessibilityLabel).toBe('Sets Done, 0, All Time');
+    // Steps has nothing behind it yet, so it is not a button.
+    expect(screen.getByTestId('dashboard-stat-steps').props.accessibilityRole).not.toBe('button');
+  });
+
+  it('uses the shared PrimaryButton (in the mode accent) and a quiet TextButton on the Next Workout card', async () => {
+    await renderWithNextWorkout();
+
+    const start = screen.getByTestId('dashboard-start-next-workout');
+    expect(start.props.accessibilityRole).toBe('button');
+    expect(StyleSheet.flatten(start.props.style).backgroundColor).toBe(
+      DEFAULT_WORKOUT_THEME.accent,
+    );
+    expect(StyleSheet.flatten(start.props.style).minHeight).toBeGreaterThanOrEqual(44);
+
+    const change = screen.getByTestId('dashboard-change-split');
+    expect(change.props.accessibilityRole).toBe('button');
+    expect(change).toHaveTextContent(/Change Workout/);
+    // The secondary action is text, not a second filled/bordered button.
+    expect(StyleSheet.flatten(change.props.style).backgroundColor).toBeUndefined();
+    expect(StyleSheet.flatten(change.props.style).borderWidth).toBeUndefined();
+  });
+
+  it('shows the split badge through the shared Badge, with its real text', async () => {
+    await renderWithNextWorkout();
+
+    // The badge is the split's initials (see splitBadgeText): "PPL - Hypertrophy" -> "PH".
+    expect(screen.getByTestId('dashboard-next-workout-badge')).toHaveTextContent(/^PH$/);
+  });
+
+  it('Nutrition quick actions are ONE card holding three actions, not three cards', async () => {
+    renderDashboard('nutrition');
+    await screen.findByTestId('dashboard-nutrition');
+
+    const section = within(screen.getByTestId('dashboard-nutrition-quick-actions-section'));
+    expect(section.UNSAFE_getAllByType(AppCard)).toHaveLength(1);
+    for (const id of ['dashboard-quick-search', 'dashboard-quick-add', 'dashboard-quick-scan']) {
+      expect(section.getByTestId(id)).toBeTruthy();
+    }
+  });
+
+  it('names the quick actions by what they do, and leaves out the marketing subtitles', async () => {
+    renderDashboard('nutrition');
+    await screen.findByTestId('dashboard-nutrition');
+
+    expect(screen.getByTestId('dashboard-quick-search')).toHaveTextContent(/Search Food/);
+    expect(screen.getByTestId('dashboard-quick-scan')).toHaveTextContent(/Scan Barcode/);
+    expect(screen.queryByText('Find and log food')).toBeNull();
+    expect(screen.queryByText('Log in seconds')).toBeNull();
+  });
+
+  it('does not present Quick Add (no action behind it yet) as a button', async () => {
+    renderDashboard('nutrition');
+    await screen.findByTestId('dashboard-nutrition');
+
+    expect(screen.getByTestId('dashboard-quick-add').props.accessibilityRole).not.toBe('button');
+    fireEvent.press(screen.getByTestId('dashboard-quick-add'));
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.getByTestId('dashboard-quick-search').props.accessibilityRole).toBe('button');
+  });
+
+  it("shows up to four of today's meals as list rows, most recent handful only", async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue(
+      Array.from({ length: 6 }, (_, i) => ({
+        id: `l${i}`,
+        foodId: `f${i}`,
+        foodNameSnapshot: `Food ${i}`,
+        servingSize: 100,
+        servingUnit: 'g',
+        quantity: 1,
+        calories: 100 + i,
+        proteinG: 1,
+        carbsG: 1,
+        fatG: 1,
+        loggedAt: '2026-01-01T12:00:00Z',
+      })),
+    );
+    renderDashboard('nutrition');
+    await screen.findByTestId('dashboard-todays-meals');
+
+    expect(screen.getByText('Food 0')).toBeTruthy();
+    expect(screen.getByText('Food 3')).toBeTruthy();
+    expect(screen.queryByText('Food 4')).toBeNull();
+    expect(screen.getByText('100 kcal')).toBeTruthy();
+    // The header row is still the way into the full list.
+    expect(screen.getByTestId('dashboard-view-meals').props.accessibilityRole).toBe('button');
+  });
+
+  it('never nests a card inside another card on either mode', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-activity');
+    for (const card of screen.UNSAFE_getAllByType(AppCard)) {
+      // (within(card) includes the card itself, so 1 means nothing nested inside.)
+      expect(within(card).UNSAFE_queryAllByType(AppCard)).toHaveLength(1);
+    }
+
+    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
+    await screen.findByTestId('dashboard-nutrition');
+    for (const card of screen.UNSAFE_getAllByType(AppCard)) {
+      // (within(card) includes the card itself, so 1 means nothing nested inside.)
+      expect(within(card).UNSAFE_queryAllByType(AppCard)).toHaveLength(1);
+    }
+  });
+});
+
+describe('DashboardScreen Activity stat blocks: exactly 6px apart, one cohesive card', () => {
+  const flat = (testID: string) =>
+    Object.assign({}, ...[screen.getByTestId(testID).props.style].flat(Infinity));
+
+  it('separates the four stat blocks by exactly the 6px widget gap, both between rows and within a row', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-stat-grid');
+
+    // Between the two rows.
+    expect(flat('dashboard-stat-grid').gap).toBe(widgetGap);
+    expect(widgetGap).toBe(6);
+    // Between the two blocks in a row: each row is a flex row with the same gap.
+    const grid = screen.getByTestId('dashboard-stat-grid');
+    const rows = grid.children as unknown as { props: { style: unknown } }[];
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      const style = Object.assign({}, ...[row.props.style].flat(Infinity));
+      expect(style.flexDirection).toBe('row');
+      expect(style.gap).toBe(widgetGap);
+    }
+  });
+
+  it('draws no hairline dividers between the blocks -- the gap is the separation', () => {
+    for (const removed of ['statCellDivider', 'statRowDivider', 'activityDivider']) {
+      expect(removed in dashboardStyles).toBe(false);
+    }
+  });
+
+  it('gives each block a quiet raised fill and the control radius, with no border or margin', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-stat-grid');
+
+    for (const id of [
+      'dashboard-stat-sets',
+      'dashboard-stat-workouts-month',
+      'dashboard-stat-steps',
+      'dashboard-stat-last-workout',
+    ]) {
+      const style = flat(id);
+      expect(style.backgroundColor).toBe(colors.surfaceRaised);
+      expect(style.borderRadius).toBe(radii.md);
+      expect(style.borderWidth).toBeUndefined();
+      expect(style.margin).toBeUndefined();
+      expect(style.marginLeft).toBeUndefined();
+      expect(style.marginTop).toBeUndefined();
+    }
+  });
+
+  it('shows the four blocks in order -- Sets Done and Workouts, then Steps and Last Workout -- in two rows', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-stat-grid');
+
+    const blocks = within(screen.getByTestId('dashboard-stat-grid')).UNSAFE_getAllByType(
+      DashboardStat,
+    );
+    expect(blocks.map((block) => block.props.testID)).toEqual([
+      'dashboard-stat-sets',
+      'dashboard-stat-workouts-month',
+      'dashboard-stat-steps',
+      'dashboard-stat-last-workout',
+    ]);
+  });
+
+  it('keeps the blocks inside the single Activity card, with no extra border or icon', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-activity');
+
+    const activity = within(screen.getByTestId('dashboard-activity'));
+    expect(activity.getByTestId('dashboard-stat-grid')).toBeTruthy();
+    // Nothing nested inside it: the blocks are not cards.
+    expect(activity.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    expect(
+      within(screen.getByTestId('dashboard-stat-grid')).UNSAFE_queryAllByType(Feather),
+    ).toHaveLength(0);
+  });
+});
+
+describe('DashboardScreen renders no bare text outside <Text>', () => {
+  it('has no string directly inside a View in Workout mode', async () => {
+    renderDashboard();
+    await screen.findByTestId('dashboard-stat-grid');
+
+    expectNoBareText();
+  });
+
+  it('has no string directly inside a View in Nutrition mode', async () => {
+    renderDashboard('nutrition');
+    await screen.findByTestId('dashboard-nutrition-content');
+
+    expectNoBareText();
   });
 });

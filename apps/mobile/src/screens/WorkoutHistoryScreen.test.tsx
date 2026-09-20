@@ -1,4 +1,10 @@
+import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { Feather } from '@expo/vector-icons';
+import { AppCard } from '../design/AppCard';
+import { PrimaryButton } from '../design/Button';
+import { fonts } from '../design/theme';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { addMonths, MONTH_LABELS, toLocalDateKey } from '../workouts/calendarGrid';
@@ -435,6 +441,121 @@ describe('WorkoutHistoryScreen background refresh on focus', () => {
       monthRefresh.resolve([]);
       await monthRefresh.promise;
     });
+    await settle();
+  });
+});
+
+describe('WorkoutHistoryScreen -- flat page: rows, readouts, one primary action', () => {
+  const twoWorkouts = [
+    enrichedFixture({ id: 'w1' }),
+    enrichedFixture({ id: 'w2', splitDayName: 'Pull', name: 'Pull Day', completedSetCount: 12 }),
+  ];
+
+  it('draws no cards -- not for workouts, and not for the resume prompt', async () => {
+    mockFetchActiveWorkout.mockResolvedValue({ id: 'active-1', name: 'Leg Day' });
+    mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: false });
+    renderScreen();
+    await screen.findByTestId('workout-item-w1');
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    await settle();
+  });
+
+  it('shows a workout as one row: split day, muscles, then date · duration · sets', async () => {
+    mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: false });
+    renderScreen();
+
+    const row = await screen.findByTestId('workout-item-w1');
+    expect(row.props.accessibilityRole).toBe('button');
+    expect(row).toHaveTextContent(/Push/);
+    expect(row).toHaveTextContent(/Chest • Shoulders • Triceps/);
+    expect(row).toHaveTextContent(/58 min · 18 sets/);
+    await settle();
+  });
+
+  it('separates workout rows with a hairline, none above the first, and no accent stripe', async () => {
+    mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: false });
+    renderScreen();
+
+    const first = StyleSheet.flatten((await screen.findByTestId('workout-item-w1')).props.style);
+    const second = StyleSheet.flatten(screen.getByTestId('workout-item-w2').props.style);
+    expect(first.borderTopWidth).toBeUndefined();
+    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+    expect(first.borderLeftWidth).toBeUndefined();
+    await settle();
+  });
+
+  it('has exactly one filled button: Start New Workout, or Resume when one is in progress', async () => {
+    renderScreen();
+    await screen.findByTestId('start-new-workout');
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    await settle();
+  });
+
+  it('shows the resume prompt as a plain line above the one Resume button', async () => {
+    mockFetchActiveWorkout.mockResolvedValue({ id: 'active-1', name: 'Leg Day' });
+    renderScreen();
+
+    const banner = await screen.findByTestId('active-workout-banner');
+    expect(within(banner).getByText('You have a workout in progress')).toBeTruthy();
+    expect(screen.queryByTestId('start-new-workout')).toBeNull();
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    expect(StyleSheet.flatten(banner.props.style).backgroundColor).toBeUndefined();
+    await settle();
+  });
+
+  it('shows the month summary as three neutral mono readouts, without icon circles', async () => {
+    mockFetchWorkoutsForMonth.mockResolvedValue([enrichedFixture({})]);
+    renderScreen();
+
+    const total = await screen.findByTestId('workout-month-total');
+    const style = StyleSheet.flatten(total.props.style);
+    expect(style.fontFamily).toBe(fonts.mono);
+    expect(screen.UNSAFE_queryAllByType(Feather).map((i) => i.props.name)).not.toContain(
+      'check-square',
+    );
+    const summary = within(screen.getByTestId('workout-month-summary'));
+    expect(summary.getByText('Workouts')).toBeTruthy();
+    expect(summary.getByText('Total Time')).toBeTruthy();
+    expect(summary.getByText('Total Sets')).toBeTruthy();
+    await settle();
+  });
+
+  it('names the calendar month arrows and days for assistive tech', async () => {
+    mockFetchWorkoutsForMonth.mockResolvedValue([enrichedFixture({})]);
+    renderScreen();
+    await screen.findByTestId('workout-calendar');
+
+    expect(screen.getByTestId('calendar-prev-month').props.accessibilityLabel).toBe(
+      'Previous month',
+    );
+    expect(screen.getByTestId(`calendar-day-${FIXTURE_DATE_KEY}`).props.accessibilityLabel).toMatch(
+      /workout completed$/,
+    );
+    await settle();
+  });
+
+  it('shows Load More as a text action that reports busy while loading', async () => {
+    mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: true });
+    renderScreen();
+    const more = await screen.findByTestId('workout-history-load-more');
+
+    expect(more).toHaveTextContent('Load More');
+    expect(StyleSheet.flatten(more.props.style).borderWidth).toBeUndefined();
+    expect(StyleSheet.flatten(more.props.style).minHeight).toBeGreaterThanOrEqual(44);
+    await settle();
+  });
+
+  it('renders no bare text outside <Text>', async () => {
+    mockFetchActiveWorkout.mockResolvedValue({ id: 'active-1', name: 'Leg Day' });
+    mockFetchWorkoutsForMonth.mockResolvedValue([enrichedFixture({})]);
+    mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: true });
+    renderScreen();
+    await screen.findByTestId('workout-item-w1');
+    fireEvent.press(screen.getByTestId(`calendar-day-${FIXTURE_DATE_KEY}`));
+    await screen.findByTestId('selected-day-section');
+
+    expectNoBareText();
     await settle();
   });
 });

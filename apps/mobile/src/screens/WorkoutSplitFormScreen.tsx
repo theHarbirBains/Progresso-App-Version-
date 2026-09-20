@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
-import { AppCard } from '../design/AppCard';
+import { AppHeader } from '../design/AppHeader';
+import { PrimaryButton, SecondaryButton } from '../design/Button';
+import { IconButton } from '../design/IconButton';
 import { LoadingState } from '../design/LoadingState';
+import { Screen } from '../design/Screen';
+import { Section } from '../design/Section';
+import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import { updateMyProfile } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -48,7 +43,6 @@ export function WorkoutSplitFormScreen({ navigation, route }: Props) {
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
   const { theme, themeLoading } = useProgressTheme();
-  const insets = useSafeAreaInsets();
   const splitId = route.params?.splitId;
   const activateOnCreate = route.params?.activateOnCreate ?? false;
 
@@ -188,108 +182,91 @@ export function WorkoutSplitFormScreen({ navigation, route }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.screen, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top}
-    >
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        testID="workout-split-form-scroll"
-      >
-        <View style={styles.header}>
-          <TouchableOpacity
-            testID="workout-split-form-back"
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Back"
-            accessibilityRole="button"
-          >
-            <Feather name="arrow-left" size={18} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.title}>{splitId ? 'Edit Split' : 'Create Workout Split'}</Text>
-        </View>
-
-        {error ? (
-          <Text testID="workout-split-form-error" style={styles.errorText}>
-            {error}
-          </Text>
-        ) : null}
-
-        <Text style={styles.label}>Split Name</Text>
-        <TextInput
-          testID="workout-split-form-name"
-          style={styles.input}
-          placeholder="My Training"
-          placeholderTextColor={colors.textMuted}
-          value={splitName}
-          onChangeText={setSplitName}
-          onBlur={splitId ? handleRenameSplit : undefined}
+    <Screen
+      keyboardAvoiding
+      scrollTestID="workout-split-form-scroll"
+      contentContainerStyle={styles.content}
+      header={
+        <AppHeader
+          title={splitId ? 'Edit Split' : 'Create Workout Split'}
+          leftAction={{
+            icon: 'arrow-left',
+            onPress: () => navigation.goBack(),
+            accessibilityLabel: 'Back',
+            testID: 'workout-split-form-back',
+          }}
         />
+      }
+    >
+      {error ? (
+        <Text testID="workout-split-form-error" style={styles.errorText}>
+          {error}
+        </Text>
+      ) : null}
 
-        {!splitId ? (
-          <TouchableOpacity
-            testID="workout-split-form-create"
-            style={[styles.createButton, { backgroundColor: theme.accent, marginTop: 20 }]}
-            onPress={handleCreate}
-            disabled={creating || !splitName.trim()}
-          >
-            {creating ? (
-              <ActivityIndicator color={theme.onAccent} />
-            ) : (
-              <Text style={[styles.createButtonText, { color: theme.onAccent }]}>Create Split</Text>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <>
-            <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Workout Days</Text>
+      <TextInput
+        testID="workout-split-form-name"
+        label="Split Name"
+        placeholder="My Training"
+        value={splitName}
+        onChangeText={setSplitName}
+        onBlur={splitId ? handleRenameSplit : undefined}
+      />
+
+      {!splitId ? (
+        <PrimaryButton
+          testID="workout-split-form-create"
+          label="Create Split"
+          onPress={handleCreate}
+          loading={creating}
+          disabled={!splitName.trim()}
+          accentColor={theme.accent}
+          onAccentColor={theme.onAccent}
+        />
+      ) : (
+        <>
+          <Section title="Workout Days">
             {days.map((day, index) => (
-              <AppCard key={day.id} testID={`workout-split-day-${day.id}`} style={styles.dayCard}>
-                <View style={styles.dayHeaderRow}>
-                  <TextInput
-                    testID={`workout-split-day-name-${day.id}`}
-                    style={styles.dayInput}
-                    value={day.name}
-                    onChangeText={(text) => updateDayNameLocally(day.id, text)}
-                    onBlur={() => handleRenameDay(day.id, day.name)}
-                  />
-                  <TouchableOpacity
+              <View
+                key={day.id}
+                testID={`workout-split-day-${day.id}`}
+                style={[styles.dayBlock, index > 0 && styles.dayDivider]}
+              >
+                <View style={styles.formDayHeader}>
+                  <View style={styles.formDayName}>
+                    <TextInput
+                      testID={`workout-split-day-name-${day.id}`}
+                      value={day.name}
+                      onChangeText={(text) => updateDayNameLocally(day.id, text)}
+                      onBlur={() => handleRenameDay(day.id, day.name)}
+                      accessibilityLabel={`Day ${index + 1} name`}
+                    />
+                  </View>
+                  <IconButton
                     testID={`workout-split-day-up-${day.id}`}
-                    style={styles.dayReorderButton}
+                    icon="arrow-up"
+                    accessibilityLabel="Move day up"
                     onPress={() => handleMoveDay(index, -1)}
                     disabled={index === 0}
-                  >
-                    <Feather
-                      name="arrow-up"
-                      size={16}
-                      color={index === 0 ? colors.textMuted : colors.textPrimary}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  />
+                  <IconButton
                     testID={`workout-split-day-down-${day.id}`}
-                    style={styles.dayReorderButton}
+                    icon="arrow-down"
+                    accessibilityLabel="Move day down"
                     onPress={() => handleMoveDay(index, 1)}
                     disabled={index === days.length - 1}
-                  >
-                    <Feather
-                      name="arrow-down"
-                      size={16}
-                      color={index === days.length - 1 ? colors.textMuted : colors.textPrimary}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  />
+                  <IconButton
                     testID={`workout-split-day-remove-${day.id}`}
-                    style={styles.dayReorderButton}
+                    icon="trash-2"
+                    accessibilityLabel="Remove day"
+                    color={colors.destructive}
                     onPress={() => handleRemoveDay(day.id)}
-                  >
-                    <Feather name="trash-2" size={16} color={colors.destructive} />
-                  </TouchableOpacity>
+                  />
                 </View>
 
-                <Text style={styles.label}>Muscle Groups</Text>
-                <View style={styles.muscleChipRow}>
+                <Text style={styles.fieldLabel}>Muscle Groups</Text>
+                <View style={styles.chipRow}>
                   {SPLIT_MUSCLE_GROUPS.map((group) => {
                     const selected = day.muscleGroups.includes(group);
                     return (
@@ -297,45 +274,41 @@ export function WorkoutSplitFormScreen({ navigation, route }: Props) {
                         key={group}
                         testID={`workout-split-day-${day.id}-muscle-${group}`}
                         style={[
-                          styles.muscleChip,
+                          styles.chip,
                           selected && { backgroundColor: theme.accent, borderColor: theme.accent },
                         ]}
                         onPress={() => handleToggleMuscleGroup(day, group)}
+                        activeOpacity={0.8}
+                        hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
                         accessibilityRole="button"
                         accessibilityState={{ selected }}
                       >
-                        <Text
-                          style={[styles.muscleChipText, selected && { color: theme.onAccent }]}
-                        >
+                        <Text style={[styles.chipText, selected && { color: theme.onAccent }]}>
                           {SPLIT_MUSCLE_GROUP_LABELS[group]}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-              </AppCard>
+              </View>
             ))}
+          </Section>
 
-            <TouchableOpacity
-              testID="workout-split-form-add-day"
-              style={styles.addDayButton}
-              onPress={handleAddDay}
-            >
-              <Text style={styles.addDayButtonText}>+ Add Workout Day</Text>
-            </TouchableOpacity>
+          <SecondaryButton
+            testID="workout-split-form-add-day"
+            label="+ Add Workout Day"
+            onPress={handleAddDay}
+          />
 
-            <TouchableOpacity
-              testID="workout-split-form-done"
-              style={[styles.createButton, { backgroundColor: theme.accent, marginTop: 20 }]}
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={[styles.createButtonText, { color: theme.onAccent }]}>
-                {activateOnCreate ? 'Create Split' : 'Done'}
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <PrimaryButton
+            testID="workout-split-form-done"
+            label={activateOnCreate ? 'Create Split' : 'Done'}
+            onPress={() => navigation.goBack()}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+        </>
+      )}
+    </Screen>
   );
 }

@@ -1,4 +1,5 @@
-import { Text, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../design/theme';
 import { PROGRESS_LEVEL_LABELS, type ProgressLevel } from './strengthProgress';

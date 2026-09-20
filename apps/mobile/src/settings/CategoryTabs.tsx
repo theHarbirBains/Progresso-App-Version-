@@ -1,4 +1,5 @@
-import { ScrollView, Text, TouchableOpacity } from 'react-native';
+import { ScrollView, TouchableOpacity } from 'react-native';
+import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { GlassBackground } from '../design/GlassBackground';
 import { colors } from '../design/theme';

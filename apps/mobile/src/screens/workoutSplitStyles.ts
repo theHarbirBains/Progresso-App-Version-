@@ -1,231 +1,117 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
 
+// Shared by the three split screens -- the list (WorkoutSplitsScreen), the
+// read-only view (WorkoutSplitViewScreen) and the form (WorkoutSplitForm-
+// Screen). The frame (safe area, header, scroll, horizontal padding) is the
+// shared `Screen`; a split's days and muscle groups are plain rows and text on
+// the screen, so this file only holds what those rows need.
 export const workoutSplitStyles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
-    // paints the selected Background Theme; screens no longer hardcode it.
-    backgroundColor: 'transparent',
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxxl,
-  },
-  // Still used by WorkoutSplitFormScreen/WorkoutSplitViewScreen's own
-  // back-button headers (pushed detail screens, not the side-menu hamburger
-  // -- out of scope for the centered-title header pattern). WorkoutSplits-
-  // Screen itself now uses the shared AppHeader instead.
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingBottom: spacing.lg,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
+  // Vertical rhythm between a screen's groups.
+  content: {
+    gap: spacing.xxl,
   },
   errorText: {
+    ...typeScale.callout,
     color: colors.destructive,
-    fontSize: 14,
-    marginBottom: spacing.md,
-  },
-  sectionLabel: {
-    ...typeScale.sectionHeading,
-    color: colors.textMuted,
-    marginBottom: spacing.md,
-  },
-  list: {
-    marginBottom: spacing.xl,
-    gap: spacing.md,
-  },
-  splitCard: {
-    borderWidth: 1,
-  },
-  splitCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  splitName: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-  },
-  activeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-  },
-  activeBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  activateBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  activateBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    color: colors.textMuted,
-  },
-  splitMeta: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  splitActionsRow: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-  },
-  actionText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  deleteActionText: {
-    color: colors.destructive,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.md + 2,
-  },
-  createButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
   },
 
-  // Form screen
-  label: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
+  // ---- Splits list ---------------------------------------------------------
+  // One split = its row plus its actions; consecutive splits are separated by
+  // a hairline, not wrapped in a card each.
+  splitBlock: {
+    paddingBottom: spacing.xs,
   },
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    color: colors.textPrimary,
-    fontSize: 16,
+  splitDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+    paddingTop: spacing.xs,
   },
-  dayCard: {
-    marginBottom: spacing.md,
+  splitActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xl,
+  },
+  // The "this is your active split" marker. Uppercase caption, in the mode
+  // accent (colour supplied per render).
+  activeLabel: {
+    ...typeScale.caption,
+    letterSpacing: 1,
+  },
+
+  // ---- Split view (read-only) ----------------------------------------------
+  dayBlock: {
+    paddingVertical: spacing.md,
+  },
+  dayDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
   },
   dayName: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
   },
-  dayHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  dayInput: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  dayReorderButton: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  muscleChipRow: {
+  // A day's muscle groups as plain text in a wrapping line -- no chips or
+  // badges: they are read-only information, not controls.
+  muscleLine: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: spacing.sm,
+    rowGap: 2,
+    marginTop: spacing.xs,
+  },
+  muscleLabel: {
+    ...typeScale.secondary,
+    color: colors.textSecondaryBright,
+  },
+  muscleSeparator: {
+    ...typeScale.secondary,
+    color: colors.textMuted,
+  },
+  noGroups: {
+    ...typeScale.secondary,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
+
+  // ---- Split form ----------------------------------------------------------
+  formGap: {
+    gap: spacing.lg,
+  },
+  formDayHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     gap: spacing.xs,
   },
-  muscleChip: {
+  formDayName: {
+    flex: 1,
+  },
+  fieldLabel: {
+    ...typeScale.label,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  // Muscle-group toggles ARE controls (multi-select), so they are chips: a
+  // 36pt pill with a 44pt touch area, filled with the mode accent when on.
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  chip: {
+    minHeight: minTouchTarget - spacing.sm,
+    justifyContent: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceRaised,
   },
-  muscleChipText: {
-    fontSize: 12,
-    fontWeight: '600',
+  chipText: {
+    ...typeScale.secondary,
+    fontFamily: typeScale.label.fontFamily,
     color: colors.textSecondary,
-  },
-  addDayButton: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderStyle: 'dashed',
-    marginTop: spacing.sm,
-  },
-  addDayButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-
-  // Choose Your Workout Split
-  introText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginBottom: spacing.xl,
-  },
-  presetDayRow: {
-    marginTop: spacing.xs,
-  },
-  presetDayName: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  presetDayMuscles: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 1,
   },
 });

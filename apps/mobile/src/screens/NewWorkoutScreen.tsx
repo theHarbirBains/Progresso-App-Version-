@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { ActivityIndicator, View } from 'react-native';
+import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';
 import { BottomSheet } from '../design/BottomSheet';
 import { EmptyState } from '../design/EmptyState';
+import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
-import { SectionHeader } from '../design/SectionHeader';
+import { Screen } from '../design/Screen';
+import { Section } from '../design/Section';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
@@ -40,6 +42,10 @@ function musclesLabel(day: WorkoutSplitDay): string {
 // immediately creates the workout tagged with that day and enters the
 // live tracking screen; "Do a Different Workout" collects a free-text name
 // for an improvised, untagged workout via the same path.
+//
+// Layout: one clear primary action (the Next Workout card) and everything
+// else as plain rows -- the split's other days, then "Do a Different
+// Workout" -- rather than a card per option.
 export function NewWorkoutScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -140,36 +146,36 @@ export function NewWorkoutScreen({ navigation }: Props) {
 
   const trimmedCustomName = customName.trim();
 
+  const header = (
+    <AppHeader
+      title="Start Workout"
+      subtitle={loading || !hasActiveSplitId ? undefined : 'Choose a workout day to begin.'}
+      testID="start-workout-header"
+    />
+  );
+
   if (loading) {
     return (
-      <View style={styles.screen}>
-        <AppHeader title="Start Workout" testID="start-workout-header" />
+      <Screen header={header} scroll={false} padded={false}>
         <LoadingState testID="new-workout-loading" />
-      </View>
+      </Screen>
     );
   }
 
   if (!hasActiveSplitId) {
     return (
-      <View style={styles.screen}>
-        <AppHeader title="Start Workout" testID="start-workout-header" />
+      <Screen header={header} scroll={false} padded={false}>
         <View style={styles.emptyWrap}>
-          <EmptyState
-            testID="new-workout-no-split"
-            icon={<Feather name="layers" size={24} color={colors.textMuted} />}
-            title="Choose Your Workout Split"
+          <EmptyState testID="new-workout-no-split" title="Choose Your Workout Split" />
+          <PrimaryButton
+            testID="new-workout-choose-split"
+            label="Choose Your Workout Split"
+            onPress={() => navigation.navigate('ChooseWorkoutSplit')}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
           />
-          <View style={{ marginHorizontal: 24, marginTop: 16 }}>
-            <PrimaryButton
-              testID="new-workout-choose-split"
-              label="Choose Your Workout Split"
-              onPress={() => navigation.navigate('ChooseWorkoutSplit')}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-          </View>
         </View>
-      </View>
+      </Screen>
     );
   }
 
@@ -177,146 +183,116 @@ export function NewWorkoutScreen({ navigation }: Props) {
     ? [...activeSplit.days].sort((a, b) => a.orderIndex - b.orderIndex)
     : [];
   const otherDays = orderedDays.filter((d) => d.id !== nextPlan?.day.id);
+  const nextBusy = nextPlan ? busyKey === nextPlan.day.id : false;
 
   return (
-    <View style={styles.screen}>
-      <AppHeader
-        title="Start Workout"
-        subtitle="Choose a workout day to begin."
-        testID="start-workout-header"
-      />
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {error ? (
-          <Text testID="start-workout-error" style={styles.errorText}>
-            {error}
-          </Text>
-        ) : null}
-        {splitError ? (
-          <Text testID="start-workout-split-error" style={styles.errorText}>
-            {splitError}
-          </Text>
-        ) : null}
-
-        {conflict ? (
-          <View style={{ marginBottom: 16 }}>
-            <Text style={styles.errorText}>
-              You already have an active workout: &quot;{conflict.name}&quot;
-            </Text>
-            <PrimaryButton
-              testID="resume-instead"
-              label="Resume It Instead"
-              onPress={() => navigation.replace('ActiveWorkout', { workoutId: conflict.id })}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
+    <>
+      <Screen header={header} contentContainerStyle={styles.content}>
+        {error || splitError || conflict ? (
+          <View style={styles.conflictBlock}>
+            {error ? (
+              <Text testID="start-workout-error" style={styles.errorText}>
+                {error}
+              </Text>
+            ) : null}
+            {splitError ? (
+              <Text testID="start-workout-split-error" style={styles.errorText}>
+                {splitError}
+              </Text>
+            ) : null}
+            {conflict ? (
+              <>
+                <Text style={styles.errorText}>
+                  You already have an active workout: &quot;{conflict.name}&quot;
+                </Text>
+                <PrimaryButton
+                  testID="resume-instead"
+                  label="Resume It Instead"
+                  onPress={() => navigation.replace('ActiveWorkout', { workoutId: conflict.id })}
+                  accentColor={theme.accent}
+                  onAccentColor={theme.onAccent}
+                />
+              </>
+            ) : null}
           </View>
         ) : null}
 
         {nextPlan ? (
-          <View style={styles.section}>
-            <SectionHeader label="Your Next Workout" />
-            <AppCard
-              hero
-              testID="start-workout-next"
-              onPress={() => startWorkout(nextPlan.day.id, nextPlan.day.name, nextPlan.day.id)}
-              style={busyKey === nextPlan.day.id ? styles.dayRowDisabled : undefined}
-              accessibilityLabel={`Start ${nextPlan.day.name} workout${
-                nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
-              }`}
-              accessibilityState={{ disabled: busyKey === nextPlan.day.id }}
+          <AppCard
+            hero
+            testID="start-workout-next"
+            onPress={() => startWorkout(nextPlan.day.id, nextPlan.day.name, nextPlan.day.id)}
+            accessibilityLabel={`Start ${nextPlan.day.name} workout${
+              nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
+            }`}
+            accessibilityState={{ disabled: nextBusy }}
+          >
+            <Text style={styles.heroEyebrow}>Next Workout</Text>
+            <Text style={styles.heroDayName}>{nextPlan.day.name}</Text>
+            {nextPlan.day.muscleGroups.length > 0 ? (
+              <Text style={styles.heroMuscles}>{musclesLabel(nextPlan.day)}</Text>
+            ) : null}
+            <Text style={styles.heroMeta}>
+              {nextPlan.previousDayName
+                ? `Up next after ${nextPlan.previousDayName}`
+                : "Let's get started"}
+            </Text>
+            {/* The card is the one tap target; this is the real primary button,
+              shown for the eye (and its loading state) with its own touches off. */}
+            <View
+              style={styles.heroAction}
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
             >
-              <View style={styles.heroTopRow}>
-                <View style={[styles.heroIconChip, { backgroundColor: theme.accent }]}>
-                  <Feather name="activity" size={20} color={theme.onAccent} />
-                </View>
-                <View style={styles.heroTextBlock}>
-                  <Text style={[styles.heroEyebrow, { color: theme.accent }]}>Next Workout</Text>
-                  <Text style={styles.heroDayName}>{nextPlan.day.name}</Text>
-                  {nextPlan.day.muscleGroups.length > 0 ? (
-                    <Text style={styles.heroMuscles}>{musclesLabel(nextPlan.day)}</Text>
-                  ) : null}
-                </View>
-                {busyKey === nextPlan.day.id ? (
-                  <ActivityIndicator size="small" color={theme.accent} />
-                ) : (
-                  <View style={[styles.heroChevronCircle, { backgroundColor: theme.accent }]}>
-                    <Feather name="chevron-right" size={18} color={theme.onAccent} />
-                  </View>
-                )}
-              </View>
-              <View style={styles.heroMetaRow}>
-                <Feather name="calendar" size={13} color={colors.textSecondary} />
-                <Text style={styles.heroMetaText}>
-                  {nextPlan.previousDayName
-                    ? `Up next after ${nextPlan.previousDayName}`
-                    : "Let's get started"}
-                </Text>
-              </View>
-            </AppCard>
-          </View>
+              <PrimaryButton
+                label="Start Workout"
+                loading={nextBusy}
+                onPress={() => undefined}
+                accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
+              />
+            </View>
+          </AppCard>
         ) : null}
 
         {otherDays.length > 0 ? (
-          <View style={styles.section}>
-            <SectionHeader label="All Workout Days" />
-            {otherDays.map((day) => {
+          <Section title="All Workout Days">
+            {otherDays.map((day, index) => {
               const busy = busyKey === day.id;
               return (
-                <AppCard
+                <ListRow
                   key={day.id}
                   testID={`start-workout-day-${day.id}`}
+                  divider={index > 0}
+                  title={day.name}
+                  subtitle={day.muscleGroups.length > 0 ? musclesLabel(day) : undefined}
                   onPress={() => startWorkout(day.id, day.name, day.id)}
-                  style={[styles.dayRow, busy && styles.dayRowDisabled]}
+                  disabled={busy}
+                  trailing={
+                    busy ? (
+                      <ActivityIndicator size="small" color={colors.textSecondary} />
+                    ) : undefined
+                  }
                   accessibilityLabel={`Start ${day.name} workout${
                     day.muscleGroups.length > 0 ? `, ${musclesLabel(day)}` : ''
                   }`}
-                  accessibilityState={{ disabled: busy }}
-                >
-                  <View style={styles.dayRowInner}>
-                    <View style={styles.dayIconCircle}>
-                      <Feather name="activity" size={16} color={colors.textSecondary} />
-                    </View>
-                    <View style={styles.dayTextBlock}>
-                      <Text style={styles.dayName}>{day.name}</Text>
-                      {day.muscleGroups.length > 0 ? (
-                        <Text style={styles.dayMuscles}>{musclesLabel(day)}</Text>
-                      ) : null}
-                    </View>
-                    {busy ? (
-                      <ActivityIndicator size="small" color={colors.textSecondary} />
-                    ) : (
-                      <Feather name="chevron-right" size={20} color={colors.textMuted} />
-                    )}
-                  </View>
-                </AppCard>
+                />
               );
             })}
-          </View>
+          </Section>
         ) : null}
 
-        <View style={styles.section}>
-          <SectionHeader label="Do a Different Workout" />
-          <AppCard
+        <View>
+          <ListRow
             testID="start-workout-custom"
+            title="Do a Different Workout"
+            subtitle="Not part of your split"
             onPress={() => setCustomSheetOpen(true)}
-            style={styles.dayRow}
             accessibilityLabel="Do a Different Workout, not part of your split"
-          >
-            <View style={styles.dayRowInner}>
-              <View style={styles.dayIconCircle}>
-                <Feather name="plus" size={16} color={colors.textSecondary} />
-              </View>
-              <View style={styles.dayTextBlock}>
-                <Text style={styles.dayName}>Do a Different Workout</Text>
-                <Text style={styles.dayMuscles}>Not part of your split</Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={colors.textMuted} />
-            </View>
-          </AppCard>
+          />
         </View>
-      </ScrollView>
-
+      </Screen>
       <BottomSheet
         visible={customSheetOpen}
         onClose={() => (busyKey === CUSTOM_BUSY_KEY ? null : setCustomSheetOpen(false))}
@@ -338,14 +314,15 @@ export function NewWorkoutScreen({ navigation }: Props) {
         <View style={styles.sheetButtonRow}>
           <PrimaryButton
             testID="start-workout-custom-confirm"
-            label={busyKey === CUSTOM_BUSY_KEY ? 'Starting…' : 'Start Workout'}
+            label="Start Workout"
+            loading={busyKey === CUSTOM_BUSY_KEY}
             onPress={() => startWorkout(CUSTOM_BUSY_KEY, trimmedCustomName, undefined)}
-            disabled={trimmedCustomName.length === 0 || busyKey === CUSTOM_BUSY_KEY}
+            disabled={trimmedCustomName.length === 0}
             accentColor={theme.accent}
             onAccentColor={theme.onAccent}
           />
         </View>
       </BottomSheet>
-    </View>
+    </>
   );
 }

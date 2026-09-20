@@ -24,6 +24,17 @@ interface Props {
    * isNutritionRoute already uses elsewhere.
    */
   mode?: 'workout' | 'nutrition';
+  /**
+   * Whether the photograph shows at all. Default true (so the component is
+   * unchanged for any caller that doesn't say). App.tsx passes true only
+   * while Dashboard is the current route -- everywhere else the screen sits
+   * on the flat Background Theme fill (plus that theme's own restrained
+   * treatment). The photos stay mounted either way and only their opacity
+   * changes, for the same instant-flip reason as `mode` above: a photo that
+   * had to be re-decoded each time the user returned to Dashboard would
+   * flash in late.
+   */
+  showImage?: boolean;
 }
 
 // The single place that paints the selected Background Theme's environment,
@@ -35,7 +46,7 @@ interface Props {
 // restrained: low element counts, low opacity, slow-or-no motion -- the
 // existing Progresso UI stays the visual focus, this is only the atmosphere
 // behind it.
-export function AppBackgroundLayer({ mode = 'workout' }: Props) {
+export function AppBackgroundLayer({ mode = 'workout', showImage = true }: Props) {
   const { theme } = useBackgroundTheme();
   const reduceMotion = useReduceMotionPreference();
   // Explicit window size rather than relying on inherited flex/absoluteFill
@@ -64,7 +75,7 @@ export function AppBackgroundLayer({ mode = 'workout' }: Props) {
           // Full sharpness, no blur -- contrast for content sitting on top
           // comes from the depth overlay (edges) and each glass surface's
           // own tint, not from softening or darkening the photo itself.
-          style={[fullScreenStyle, { opacity: mode === 'workout' ? 1 : 0 }]}
+          style={[fullScreenStyle, { opacity: showImage && mode === 'workout' ? 1 : 0 }]}
           resizeMode="cover"
         />
       ) : null}
@@ -72,12 +83,12 @@ export function AppBackgroundLayer({ mode = 'workout' }: Props) {
         <Image
           testID="app-background-image-nutrition"
           source={theme.nutritionImageSource}
-          style={[fullScreenStyle, { opacity: mode === 'nutrition' ? 1 : 0 }]}
+          style={[fullScreenStyle, { opacity: showImage && mode === 'nutrition' ? 1 : 0 }]}
           resizeMode="cover"
         />
       ) : null}
       <Treatment theme={theme} reduceMotion={reduceMotion} />
-      <DepthOverlay />
+      <DepthOverlay visible={showImage} />
     </View>
   );
 }
@@ -91,14 +102,19 @@ export function AppBackgroundLayer({ mode = 'workout' }: Props) {
 // for -- content sits mostly in the untouched middle band; only the edges,
 // where glass chrome (headers, bottom nav) usually lives, get extra
 // contrast help.
-function DepthOverlay() {
+//
+// It exists to keep content readable over a *photograph*, so it only shows
+// while the photo does (Dashboard). On the flat theme fill it would just
+// muddy the theme's own colour at the edges. Kept mounted (opacity 0) rather
+// than removed, so it is ready the instant Dashboard returns.
+function DepthOverlay({ visible }: { visible: boolean }) {
   return (
     <LinearGradient
       testID="app-background-depth-overlay"
       pointerEvents="none"
       colors={['rgba(0,0,0,0.32)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.32)']}
       locations={[0, 0.22, 0.68, 1]}
-      style={StyleSheet.absoluteFill}
+      style={[StyleSheet.absoluteFill, { opacity: visible ? 1 : 0 }]}
     />
   );
 }

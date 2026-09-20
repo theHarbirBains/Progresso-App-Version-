@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
 import { progressStyles as styles } from './progressStyles';
 

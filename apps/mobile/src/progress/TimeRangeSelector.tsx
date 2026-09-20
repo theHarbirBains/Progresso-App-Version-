@@ -1,4 +1,5 @@
-import { Text, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
+import { Text } from '../design/Text';
 import { TIME_RANGES, type TimeRange } from '../workouts/exerciseProgress';
 import { progressStyles as styles } from './progressStyles';
 
