@@ -336,7 +336,13 @@ describe('FoodLibraryScreen', () => {
       fireEvent.press(screen.getByTestId('log-food-submit'));
     });
 
-    expect(mockLogFood).toHaveBeenCalledWith('user-1', apple, 1);
+    expect(mockLogFood).toHaveBeenCalledWith(
+      'user-1',
+      apple,
+      1,
+      // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
+      expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
+    );
     expect(mockGoBack).toHaveBeenCalled();
   });
 

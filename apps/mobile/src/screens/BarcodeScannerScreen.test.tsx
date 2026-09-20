@@ -282,6 +282,8 @@ describe('BarcodeScannerScreen logging', () => {
         fatG: 0,
       },
       1,
+      // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
+      expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
     );
     expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
   });

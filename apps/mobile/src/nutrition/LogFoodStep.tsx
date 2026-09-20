@@ -5,6 +5,7 @@ import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';
 import { TextInput } from '../design/TextInput';
 import { logFood } from './foodLogQueries';
+import { defaultMealTypeForTime } from './mealTypes';
 import { calculateLogTotals } from './nutritionCalculations';
 import type { FoodRow } from './foodQueries';
 import { foodLibraryStyles as styles } from '../screens/foodLibraryStyles';
@@ -55,7 +56,7 @@ export function LogFoodStep({
     setError(null);
     setSaving(true);
     try {
-      await logFood(userId, food, quantityNum);
+      await logFood(userId, food, quantityNum, defaultMealTypeForTime());
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to log food');

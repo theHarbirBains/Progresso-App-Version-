@@ -70,6 +70,7 @@ const domainRow: FoodLogRow = {
   carbsG: 20,
   fatG: 10,
   loggedAt: '2026-01-01T12:00:00Z',
+  mealType: null,
 };
 
 describe('getLocalDayRange', () => {
@@ -157,7 +158,7 @@ describe('logFood', () => {
       fatG: 3.6,
     };
 
-    await logFood('user-1', food, 1);
+    await logFood('user-1', food, 1, 'lunch');
 
     expect(builder.insert).toHaveBeenCalledWith({
       user_id: 'user-1',
@@ -170,6 +171,7 @@ describe('logFood', () => {
       protein_g: 31,
       carbs_g: 0,
       fat_g: 3.6,
+      meal_type: 'lunch',
     });
   });
 
@@ -186,7 +188,7 @@ describe('logFood', () => {
       fatG: 3.6,
     };
 
-    await logFood('user-1', food, 2);
+    await logFood('user-1', food, 2, 'dinner');
 
     expect(builder.insert).toHaveBeenCalledWith(
       expect.objectContaining({ quantity: 2, calories: 330, protein_g: 62 }),

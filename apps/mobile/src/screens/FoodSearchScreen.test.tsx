@@ -248,6 +248,8 @@ describe('FoodSearchScreen', () => {
         fatG: 3.6,
       },
       1,
+      // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
+      expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
     );
     expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
   });
@@ -270,6 +272,7 @@ describe('FoodSearchScreen', () => {
       'user-1',
       expect.objectContaining({ fatG: 0 }),
       1,
+      expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
     );
   });
 
