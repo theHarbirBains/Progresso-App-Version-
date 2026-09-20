@@ -9,7 +9,12 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
-import { LOGGING_STYLES, MOVEMENT_TYPES, type LoggingStyle, type MovementType } from '../movement-type';
+import {
+  LOGGING_STYLES,
+  MOVEMENT_TYPES,
+  type LoggingStyle,
+  type MovementType,
+} from '../movement-type';
 
 export class UpdateExerciseDto {
   @IsOptional()

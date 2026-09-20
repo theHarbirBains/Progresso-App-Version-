@@ -16,7 +16,7 @@ const baseProps = {
 };
 
 describe('UnilateralSetRow', () => {
-  it('shows the set index and both sides\' weight/reps', () => {
+  it("shows the set index and both sides' weight/reps", () => {
     render(
       <UnilateralSetRow
         {...baseProps}
@@ -32,11 +32,15 @@ describe('UnilateralSetRow', () => {
     expect(screen.getByTestId('unilateral-set-right-reps').props.value).toBe('10');
   });
 
-  it('routes each input\'s changes with its own side', () => {
+  it("routes each input's changes with its own side", () => {
     const onChangeWeight = jest.fn();
     const onChangeReps = jest.fn();
     render(
-      <UnilateralSetRow {...baseProps} onChangeWeight={onChangeWeight} onChangeReps={onChangeReps} />,
+      <UnilateralSetRow
+        {...baseProps}
+        onChangeWeight={onChangeWeight}
+        onChangeReps={onChangeReps}
+      />,
     );
 
     fireEvent.changeText(screen.getByTestId('unilateral-set-left-weight'), '42.5');
@@ -60,9 +64,7 @@ describe('UnilateralSetRow', () => {
 
   it('enables Complete once canComplete is true, and calls onToggleComplete when pressed', () => {
     const onToggleComplete = jest.fn();
-    render(
-      <UnilateralSetRow {...baseProps} canComplete onToggleComplete={onToggleComplete} />,
-    );
+    render(<UnilateralSetRow {...baseProps} canComplete onToggleComplete={onToggleComplete} />);
 
     const button = screen.getByTestId('unilateral-set-complete');
     expect(button.props.accessibilityState.disabled).toBe(false);
@@ -71,7 +73,7 @@ describe('UnilateralSetRow', () => {
     expect(onToggleComplete).toHaveBeenCalled();
   });
 
-  it('locks both sides\' inputs once completed, but still allows toggling back off', () => {
+  it("locks both sides' inputs once completed, but still allows toggling back off", () => {
     render(<UnilateralSetRow {...baseProps} completed canComplete={false} />);
 
     expect(screen.getByTestId('unilateral-set-left-weight').props.editable).toBe(false);

@@ -3,7 +3,10 @@ import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { getMyProfile } from '../lib/api';
 import { createWorkout } from '../workouts/workoutQueries';
-import { fetchLastWorkoutSplitDayId, fetchWorkoutSplitDetail } from '../workouts/workoutSplitQueries';
+import {
+  fetchLastWorkoutSplitDayId,
+  fetchWorkoutSplitDetail,
+} from '../workouts/workoutSplitQueries';
 import { NewWorkoutScreen } from './NewWorkoutScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -51,7 +54,12 @@ const splitDetail = {
   name: 'My Split',
   days: [
     { id: 'day-2', name: 'Recovery', orderIndex: 2, muscleGroups: ['abs' as const] },
-    { id: 'day-1', name: 'Full Body', orderIndex: 1, muscleGroups: ['chest' as const, 'back' as const] },
+    {
+      id: 'day-1',
+      name: 'Full Body',
+      orderIndex: 1,
+      muscleGroups: ['chest' as const, 'back' as const],
+    },
     { id: 'day-3', name: 'Conditioning', orderIndex: 3, muscleGroups: [] },
   ],
 };
@@ -80,7 +88,12 @@ beforeEach(() => {
   mockFetchLastWorkoutSplitDayId.mockReset().mockResolvedValue(null);
   mockCreateWorkout.mockReset().mockResolvedValue({
     type: 'created',
-    workout: { id: 'w1', name: 'Full Body', performedAt: '2026-01-01T00:00:00Z', completedAt: null },
+    workout: {
+      id: 'w1',
+      name: 'Full Body',
+      performedAt: '2026-01-01T00:00:00Z',
+      completedAt: null,
+    },
   });
   mockNavigate.mockClear();
   mockReplace.mockClear();
@@ -173,9 +186,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
     expect(confirmButton.props.accessibilityState.disabled).toBe(true);
 
     fireEvent.changeText(screen.getByTestId('start-workout-custom-name'), 'Arms + Abs');
-    expect(screen.getByTestId('start-workout-custom-confirm').props.accessibilityState.disabled).toBe(
-      false,
-    );
+    expect(
+      screen.getByTestId('start-workout-custom-confirm').props.accessibilityState.disabled,
+    ).toBe(false);
   });
 
   it('shows a resume option instead of creating a duplicate workout on conflict', async () => {

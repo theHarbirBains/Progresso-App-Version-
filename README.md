@@ -17,12 +17,14 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 ## Current Features
 
 **Accounts & onboarding**
+
 - Email/password sign up and sign in (Supabase Auth), password reset flow
 - Signup collects first name, last name, username, and a user-chosen display name (independently — none is derived from another)
 - Guided onboarding flow (profile basics, unit preference, permission steps)
 - Account settings: edit display name, username, and weight unit (kg/lb)
 
 **Workouts**
+
 - Create, edit, view, duplicate, and delete workout splits, including a set of built-in split presets (e.g. Push/Pull/Legs) that can be copied into an editable, user-owned split
 - Live workout tracking: log exercises, sets, reps, and weight against a split in progress, with a running workout timer
 - Custom exercises alongside a shared default exercise library, each tagged with a muscle group
@@ -30,17 +32,20 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Workout sharing (generates a shareable summary card)
 
 **Progress & analytics**
+
 - A tabbed Progress section (Overview, Strength, PRs, Exercises, Top Sets, 1-Rep Max), mirroring the same category-tab pattern used in Settings
 - Per-exercise and lifetime top sets, rep-count PRs, and true 1RM tracking (1RM is only ever recorded from an actual 1-rep set)
 - Strength trend charts and progress metrics per exercise
 - Muscle-group visualization based on which exercises the user has actually logged
 
 **Nutrition**
+
 - A food library (create/search/edit custom foods) and a food log for tracking daily intake
 - Daily nutrition totals against user-set nutrition goals
 - No integration with an external food database — all food entries are user-entered
 
 **Settings**
+
 - App-level Settings hub organized into horizontal category tabs: Account, Appearance, App, Notifications, Privacy, Help
 - Theme/accent color customization, applied consistently across primary buttons and controls app-wide
 - Notification preferences: push and email opt-in toggles are real and persisted; more granular categories (workout reminders, PR alerts, weekly summaries) are shown as explicit "Coming Soon" rows rather than toggles that wouldn't do anything
@@ -48,9 +53,11 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Apple Health connection is a preference-only placeholder in onboarding — there is no HealthKit integration
 
 **Social**
+
 - A front-end-only Social screen (profile entry point + an honest empty "Recent Activity" state) — no posts, follows, or activity feed backend exists yet
 
 **Backend (NestJS API)**
+
 - JWT authorization middleware validating Supabase-issued tokens on every route except `GET /health`
 - Role-based authorization (`user` / `support_admin` / `full_admin`) backed by an `admin_users` table, proven end-to-end by a minimal `GET /api/v1/admin/ping` route
 - User profile read/update endpoints (`GET/PATCH /api/v1/users/me`) and username-availability check
@@ -163,6 +170,7 @@ npm run format         # check formatting
 Progresso is **actively under development**. The core loop — accounts, onboarding, workout splits, live workout logging, workout history, and progress/PR analytics — is implemented and working end to end, along with a functional (if simpler) nutrition-logging feature and an app-wide Settings hub.
 
 Some areas are intentionally incomplete rather than hidden:
+
 - **Notifications**: opt-in preferences are real and saved; actual notification delivery (push or email) is not implemented.
 - **Account actions**: Change Password and Delete Account are visible in Settings but marked "Coming Soon."
 - **Apple Health**: onboarding shows a connect step, but it's a preference placeholder with no real HealthKit integration.
@@ -172,6 +180,7 @@ Some areas are intentionally incomplete rather than hidden:
 ## Roadmap
 
 Planned, not yet built:
+
 - Real notification delivery (push/email) behind the existing opt-in preferences
 - Account actions: password change and account deletion
 - A fuller admin dashboard (user management, support tooling, analytics) on top of the existing role/authorization system

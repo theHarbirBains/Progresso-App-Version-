@@ -160,7 +160,11 @@ describe('ExercisesService', () => {
       const service = serviceWith(client);
 
       await expect(
-        service.createCustom('user-1', { name: 'X', muscleGroup: 'chest', movementType: 'bilateral' }),
+        service.createCustom('user-1', {
+          name: 'X',
+          muscleGroup: 'chest',
+          movementType: 'bilateral',
+        }),
       ).rejects.toThrow('Failed to create exercise');
     });
   });
@@ -243,7 +247,10 @@ describe('ExercisesService', () => {
 
       const result = await service.updateCustom('user-1', 'ex-mine', { movementType: 'bilateral' });
 
-      expect(client.update).toHaveBeenCalledWith({ movement_type: 'bilateral', logging_style: null });
+      expect(client.update).toHaveBeenCalledWith({
+        movement_type: 'bilateral',
+        logging_style: null,
+      });
       expect(result.loggingStyle).toBeNull();
     });
 

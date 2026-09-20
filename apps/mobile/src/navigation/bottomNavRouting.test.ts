@@ -1,13 +1,13 @@
 import { routeToBottomNavTab } from './bottomNavRouting';
 
 describe('routeToBottomNavTab', () => {
-  it('maps each of the 4 tabs\' own primary route to itself', () => {
+  it("maps each of the 4 tabs' own primary route to itself", () => {
     expect(routeToBottomNavTab('WorkoutHistory')).toBe('workouts');
     expect(routeToBottomNavTab('ProgressOverview')).toBe('progress');
     expect(routeToBottomNavTab('Profile')).toBe('profile');
   });
 
-  it('keeps a secondary/nested screen\'s parent section active', () => {
+  it("keeps a secondary/nested screen's parent section active", () => {
     expect(routeToBottomNavTab('ActiveWorkout')).toBe('workouts');
     expect(routeToBottomNavTab('WorkoutDetail')).toBe('workouts');
     expect(routeToBottomNavTab('ExerciseLibrary')).toBe('workouts');

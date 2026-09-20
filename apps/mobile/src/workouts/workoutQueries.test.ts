@@ -569,7 +569,14 @@ describe('createSet/updateSet/deleteSet', () => {
   it('createSet with a side creates one row for that side, sharing the same set_index as its pair', async () => {
     const { sets } = mockTables({
       sets: {
-        data: { id: 's-left', set_index: 1, side: 'left', weight_kg: null, reps: null, completed_at: null },
+        data: {
+          id: 's-left',
+          set_index: 1,
+          side: 'left',
+          weight_kg: null,
+          reps: null,
+          completed_at: null,
+        },
         error: null,
       },
     });
@@ -681,12 +688,19 @@ describe('fetchPreviousPerformance', () => {
     expect(result).toEqual({
       performedAt: '2026-01-10T00:00:00Z',
       sets: [
-        { id: 's1', setIndex: 1, side: null, weightKg: 135, reps: 10, completedAt: '2026-01-10T00:05:00Z' },
+        {
+          id: 's1',
+          setIndex: 1,
+          side: null,
+          weightKg: 135,
+          reps: 10,
+          completedAt: '2026-01-10T00:05:00Z',
+        },
       ],
     });
   });
 
-  it('preserves left/right side independently for a unilateral exercise\'s previous performance', async () => {
+  it("preserves left/right side independently for a unilateral exercise's previous performance", async () => {
     mockTables({
       workout_exercises: {
         data: [

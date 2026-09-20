@@ -57,7 +57,13 @@ export function computeWeeklyWorkoutCounts(
   weeks = 8,
   now: Date = new Date(),
 ): WeeklyPoint[] {
-  return bucketByWeek(workouts, (w) => w.performedAt, () => 1, weeks, now);
+  return bucketByWeek(
+    workouts,
+    (w) => w.performedAt,
+    () => 1,
+    weeks,
+    now,
+  );
 }
 
 /**
@@ -70,7 +76,13 @@ export function computeWeeklyVolumeKg(
   weeks = 8,
   now: Date = new Date(),
 ): WeeklyPoint[] {
-  return bucketByWeek(sets, (s) => s.performedAt, (s) => s.weightKg * s.reps, weeks, now);
+  return bucketByWeek(
+    sets,
+    (s) => s.performedAt,
+    (s) => s.weightKg * s.reps,
+    weeks,
+    now,
+  );
 }
 
 /** One point per week: how many completed sets were logged that week. */
@@ -79,5 +91,11 @@ export function computeWeeklySetCounts(
   weeks = 8,
   now: Date = new Date(),
 ): WeeklyPoint[] {
-  return bucketByWeek(sets, (s) => s.performedAt, () => 1, weeks, now);
+  return bucketByWeek(
+    sets,
+    (s) => s.performedAt,
+    () => 1,
+    weeks,
+    now,
+  );
 }

@@ -223,7 +223,7 @@ describe('ExercisePickerModal', () => {
     expect(StyleSheet.flatten(card.props.style).borderColor).toBe('#8B5CF6');
   });
 
-  it("follows the current Background Theme for its own background -- unlike a normal screen, this Modal has no AppBackgroundLayer behind it", async () => {
+  it('follows the current Background Theme for its own background -- unlike a normal screen, this Modal has no AppBackgroundLayer behind it', async () => {
     mockUseBackgroundTheme.mockReturnValue({ theme: BACKGROUND_THEMES.midnight });
     render(
       <ExercisePickerModal

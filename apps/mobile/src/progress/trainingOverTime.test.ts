@@ -37,11 +37,7 @@ describe('computeWeeklyWorkoutCounts', () => {
   });
 
   it('does not count a workout outside the requested window', () => {
-    const points = computeWeeklyWorkoutCounts(
-      [{ performedAt: '2026-01-01T00:00:00' }],
-      2,
-      NOW,
-    );
+    const points = computeWeeklyWorkoutCounts([{ performedAt: '2026-01-01T00:00:00' }], 2, NOW);
 
     expect(points.reduce((sum, p) => sum + p.value, 0)).toBe(0);
   });

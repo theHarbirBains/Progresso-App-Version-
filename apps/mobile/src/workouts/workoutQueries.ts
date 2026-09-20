@@ -189,7 +189,9 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
 
   const { data: workoutExercises, error: weError } = await supabase
     .from('workout_exercises')
-    .select('id, exercise_id, order_index, exercises(name, muscle_group, movement_type, logging_style)')
+    .select(
+      'id, exercise_id, order_index, exercises(name, muscle_group, movement_type, logging_style)',
+    )
     .eq('workout_id', workoutId)
     .is('deleted_at', null)
     .order('order_index', { ascending: true });

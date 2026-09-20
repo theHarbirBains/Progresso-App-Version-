@@ -1,7 +1,12 @@
 import { Transform } from 'class-transformer';
 import { IsIn, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
-import { LOGGING_STYLES, MOVEMENT_TYPES, type LoggingStyle, type MovementType } from '../movement-type';
+import {
+  LOGGING_STYLES,
+  MOVEMENT_TYPES,
+  type LoggingStyle,
+  type MovementType,
+} from '../movement-type';
 
 export class CreateExerciseDto {
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))

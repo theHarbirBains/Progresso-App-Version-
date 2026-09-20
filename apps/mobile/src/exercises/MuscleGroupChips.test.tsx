@@ -81,7 +81,7 @@ describe('MuscleGroupChips', () => {
     expect(flat.backgroundColor).toBe('#FFFFFF');
   });
 
-  it("follows the given accentColor/onAccentColor for the selected chip instead of the static color", () => {
+  it('follows the given accentColor/onAccentColor for the selected chip instead of the static color', () => {
     render(
       <MuscleGroupChips
         value="chest"
@@ -124,11 +124,11 @@ describe('MuscleGroupChips', () => {
   it('marks the selected chip with accessibilityState', () => {
     render(<MuscleGroupChips value="chest" onChange={jest.fn()} />);
 
-    expect(
-      screen.getByTestId('muscle-group-chip-chest').props.accessibilityState.selected,
-    ).toBe(true);
-    expect(
-      screen.getByTestId('muscle-group-chip-back').props.accessibilityState.selected,
-    ).toBe(false);
+    expect(screen.getByTestId('muscle-group-chip-chest').props.accessibilityState.selected).toBe(
+      true,
+    );
+    expect(screen.getByTestId('muscle-group-chip-back').props.accessibilityState.selected).toBe(
+      false,
+    );
   });
 });

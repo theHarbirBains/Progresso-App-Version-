@@ -76,7 +76,7 @@ describe('computeTotalVolumeKg', () => {
     expect(computeTotalVolumeKg(exercises)).toBe(0);
   });
 
-  it('sums a unilateral exercise\'s left and right rows independently, never combining their weight', () => {
+  it("sums a unilateral exercise's left and right rows independently, never combining their weight", () => {
     // Bulgarian Split Squat, one logical set: left 42.5kg x10, right 40kg x10.
     // Real total work performed is additive (1105kg), but neither row's own
     // weight is ever summed into the other -- that distinction is what this

@@ -61,8 +61,8 @@ export function BackgroundThemeScreen({ navigation }: Props) {
             <Text style={styles.title}>Background Theme</Text>
           </View>
           <Text style={styles.subtitle}>
-            Choose the atmosphere behind the app. Independent of your Workout and Nutrition
-            accent colors.
+            Choose the atmosphere behind the app. Independent of your Workout and Nutrition accent
+            colors.
           </Text>
 
           <View style={styles.grid}>
