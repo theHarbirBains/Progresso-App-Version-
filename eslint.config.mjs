@@ -32,7 +32,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['apps/mobile/jest.setup.js'],
+    files: ['apps/mobile/jest.setup.js', 'apps/mobile/jest.setup.after-env.js'],
     languageOptions: {
       globals: globals.jest,
     },
