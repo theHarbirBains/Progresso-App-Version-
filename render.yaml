@@ -1,0 +1,33 @@
+# Render Blueprint for the Progresso backend (apps/api: NestJS + Fastify).
+#
+# No rootDir is set on purpose: the build and start commands run from the
+# repository root so npm workspaces (and the root package-lock.json) resolve.
+#
+# Secrets are NOT stored here. Variables marked `sync: false` are entered in
+# the Render dashboard.
+services:
+  - type: web
+    name: progresso-api
+    runtime: node
+    plan: free
+    autoDeployTrigger: commit
+    # `--include=dev` is required: Render passes NODE_ENV=production to the
+    # build, which would otherwise make `npm ci` skip devDependencies
+    # (@nestjs/cli, typescript) that `nest build` needs.
+    buildCommand: npm ci --include=dev && npm run build --workspace apps/api
+    startCommand: npm run start --workspace apps/api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: CORS_ORIGIN
+        value: '*'
+      # PORT is injected by Render and read by the app -- deliberately not set.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
