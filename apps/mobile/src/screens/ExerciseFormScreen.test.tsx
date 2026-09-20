@@ -120,18 +120,43 @@ describe('ExerciseFormScreen (create mode)', () => {
     );
   });
 
-  it('disables Save for a unilateral exercise until a logging style is chosen, and re-enables Save when switched back to bilateral', () => {
+  it('keeps Save enabled after choosing Unilateral (Single Side is the default shown), without touching Logging Style', async () => {
+    mockCreateExercise.mockResolvedValue({ id: 'new-id' });
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
     fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Single-Arm Row');
     fireEvent.press(screen.getByTestId('muscle-group-chip-back'));
-    expect(screen.getByTestId('exercise-form-save').props.accessibilityState.disabled).toBe(false);
-
     fireEvent.press(screen.getByTestId('exercise-form-movement-type-unilateral'));
-    expect(screen.getByTestId('exercise-form-save').props.accessibilityState.disabled).toBe(true);
-
-    fireEvent.press(screen.getByTestId('exercise-form-movement-type-bilateral'));
     expect(screen.getByTestId('exercise-form-save').props.accessibilityState.disabled).toBe(false);
+
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
+        name: 'Single-Arm Row',
+        muscleGroup: 'back',
+        movementType: 'unilateral',
+        loggingStyle: 'single_side',
+      }),
+    );
+  });
+
+  it('still saves as bilateral (no logging style) when switched back from Unilateral', async () => {
+    mockCreateExercise.mockResolvedValue({ id: 'new-id' });
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Row');
+    fireEvent.press(screen.getByTestId('muscle-group-chip-back'));
+    fireEvent.press(screen.getByTestId('exercise-form-movement-type-unilateral'));
+    fireEvent.press(screen.getByTestId('exercise-form-movement-type-bilateral'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
+        name: 'Row',
+        muscleGroup: 'back',
+        movementType: 'bilateral',
+      }),
+    );
   });
 
   it('hides the Logging Style control for a bilateral exercise', () => {

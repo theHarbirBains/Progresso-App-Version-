@@ -14,7 +14,16 @@
       "backgroundColor": "#0B0B0F"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.harbirbains.progresso",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6bf7f35b-5df8-4348-8d93-ebb1d81cb759"
+      }
     },
     "android": {
       "adaptiveIcon": {

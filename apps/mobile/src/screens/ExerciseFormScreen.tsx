@@ -113,7 +113,14 @@ export function ExerciseFormScreen(props: Props) {
     // A bilateral exercise never carries a logging style -- clear it
     // immediately rather than leaving a stale unilateral choice around that
     // would just get silently dropped on save.
-    if (next === 'bilateral') setLoggingStyle(null);
+    if (next === 'bilateral') {
+      setLoggingStyle(null);
+    } else {
+      // The Logging Style control below renders 'single_side' as selected
+      // when nothing has been chosen -- make the state match what's shown,
+      // otherwise Save stays disabled with a visibly-selected option.
+      setLoggingStyle((prev) => prev ?? 'single_side');
+    }
   }
 
   async function handlePickMachinePhoto() {
