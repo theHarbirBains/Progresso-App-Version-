@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import type { MovementType } from '../exercises/movementTypes';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import type { HistoricalSetWithExercise } from './exerciseHistoryGrouping';
 
@@ -20,7 +21,7 @@ export async function fetchAllExerciseHistory(
   const { data: workoutExercises, error: weError } = await supabase
     .from('workout_exercises')
     .select(
-      'id, exercise_id, exercises(name, muscle_group), workouts(performed_at, completed_at, deleted_at)',
+      'id, exercise_id, exercises(name, muscle_group, movement_type), workouts(performed_at, completed_at, deleted_at)',
     )
     .eq('user_id', userId)
     .is('deleted_at', null);
@@ -29,7 +30,7 @@ export async function fetchAllExerciseHistory(
   type Candidate = {
     id: string;
     exercise_id: string;
-    exercises: { name: string; muscle_group: MuscleGroup } | null;
+    exercises: { name: string; muscle_group: MuscleGroup; movement_type: MovementType } | null;
     workouts: {
       performed_at: string;
       completed_at: string | null;
@@ -49,6 +50,7 @@ export async function fetchAllExerciseHistory(
         exerciseId: c.exercise_id,
         exerciseName: c.exercises?.name ?? 'Exercise',
         muscleGroup: c.exercises?.muscle_group ?? 'other',
+        movementType: c.exercises?.movement_type ?? 'bilateral',
       },
     ]),
   );
@@ -77,6 +79,7 @@ export async function fetchAllExerciseHistory(
         exerciseId: info.exerciseId,
         exerciseName: info.exerciseName,
         muscleGroup: info.muscleGroup,
+        movementType: info.movementType,
       };
     })
     .sort((a, b) => new Date(a.performedAt).getTime() - new Date(b.performedAt).getTime());

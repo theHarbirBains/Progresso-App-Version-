@@ -35,6 +35,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('Account');
 
   const [displayName, setDisplayName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [workoutAccentColor, setWorkoutAccentColor] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
     try {
       const profile = await getMyProfile(accessToken);
       setDisplayName(profile.displayName ?? '');
+      setAvatarUrl(profile.avatarUrl);
       setUsername(profile.username ?? '');
       setWeightUnit(profile.weightUnit);
       setWorkoutAccentColor(profile.workoutAccentColor);
@@ -191,6 +193,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
         {activeCategory === 'Account' ? (
           <AccountCategory
             email={user?.email ?? ''}
+            avatarUrl={avatarUrl}
             displayName={displayName}
             onChangeDisplayName={setDisplayName}
             username={username}
@@ -214,6 +217,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
             resetting={resetting}
             onNavigateWorkoutColor={() => navigation.navigate('WorkoutColorSettings')}
             onNavigateNutritionColor={() => navigation.navigate('NutritionColorSettings')}
+            onNavigateBackgroundTheme={() => navigation.navigate('BackgroundThemeSettings')}
             onResetThemeColors={handleResetThemeColors}
           />
         ) : null}

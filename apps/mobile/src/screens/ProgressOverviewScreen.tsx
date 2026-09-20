@@ -1,24 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
 import { LoadingState } from '../design/LoadingState';
+import { ModeToggle } from '../design/ModeToggle';
+import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
-import { computeFirstPRAt, computeLifetimeStats } from '../progress/lifetimeStats';
-import { deriveGlobalMilestones } from '../progress/globalMilestones';
-import {
-  computeMuscleGroupSetCounts,
-  muscleGroupsForVisualization,
-} from '../progress/muscleGroupProgress';
-import { ExercisesSection } from '../progress/ExercisesSection';
-import { OneRepMaxSection } from '../progress/OneRepMaxSection';
+import { AllTimeSection } from '../progress/AllTimeSection';
+import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { OverviewSection } from '../progress/OverviewSection';
-import { PRsSection } from '../progress/PRsSection';
+import { ProgressEmptyState } from '../progress/ProgressEmptyState';
 import { ProgressHeader } from '../progress/ProgressHeader';
 import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { progressStyles as styles } from '../progress/progressStyles';
-import { StrengthSection } from '../progress/StrengthSection';
+import { StrengthProgressSection } from '../progress/StrengthProgressSection';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { CategoryTabs } from '../settings/CategoryTabs';
@@ -43,8 +39,21 @@ type Props = RootStackScreenProps<'ProgressOverview'>;
 export function ProgressOverviewScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const { theme, weightUnit, themeLoading } = useProgressTheme();
+  const { theme, nutritionTheme, weightUnit, themeLoading } = useProgressTheme();
   const insets = useSafeAreaInsets();
+  const { openMenu, reportMode, currentMode } = useAppMenu();
+
+  // Switching mode from a non-Dashboard root screen always goes to that
+  // mode's Home (Dashboard) -- Dashboard is each mode's one true landing
+  // page, not this screen's own in-place "coming soon" state (that only
+  // ever shows when the user arrives here already in Nutrition mode via
+  // the bottom nav/side menu, not from tapping this toggle). A no-op if
+  // the tapped segment is already selected.
+  function handleModeChange(next: 'workout' | 'nutrition') {
+    if (next === currentMode) return;
+    reportMode?.(next);
+    navigation.navigate('Dashboard');
+  }
 
   const [activeSection, setActiveSection] = useState<ProgressSection>('Overview');
 
@@ -54,10 +63,16 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   const [repPRs, setRepPRs] = useState<RepPRWithExercise[]>([]);
   const [oneRepMaxes, setOneRepMaxes] = useState<OneRepMaxWithExercise[]>([]);
   const [completedWorkouts, setCompletedWorkouts] = useState<WorkoutSummary[]>([]);
+  // Only the very first load should replace the whole screen with
+  // LoadingState -- every later call (the focus listener below, firing each
+  // time the user returns to this screen) is a background refresh: the
+  // already-loaded screen stays on screen while it re-fetches, same pattern
+  // as DashboardScreen/ProfileScreen.
+  const hasLoadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
+    if (!hasLoadedOnce.current) setLoading(true);
     setError(null);
     try {
       const [allHistory, allRepPRs, allOneRepMaxes, allWorkouts] = await Promise.all([
@@ -74,6 +89,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
       setError(err instanceof Error ? err.message : 'Failed to load progress');
     } finally {
       setLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, [userId]);
 
@@ -86,24 +102,6 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   const groups = useMemo(() => groupByExercise(history), [history]);
   const lifetimeStats = useMemo(() => computeLifetimeStats(completedWorkouts), [completedWorkouts]);
   const totalPRs = repPRs.length + oneRepMaxes.length;
-  const globalMilestones = useMemo(
-    () =>
-      deriveGlobalMilestones({
-        totalWorkouts: lifetimeStats.totalWorkouts,
-        totalCompletedSets: history.length,
-        firstWorkoutAt: lifetimeStats.firstWorkoutAt,
-        firstPRAt: computeFirstPRAt([
-          ...repPRs.map((p) => p.achievedAt),
-          ...oneRepMaxes.map((o) => o.achievedAt),
-        ]),
-      }),
-    [lifetimeStats, history.length, repPRs, oneRepMaxes],
-  );
-  const muscleGroupCounts = useMemo(() => computeMuscleGroupSetCounts(history), [history]);
-  const muscleGroupVisualization = useMemo(
-    () => muscleGroupsForVisualization(muscleGroupCounts),
-    [muscleGroupCounts],
-  );
 
   if (loading || themeLoading) {
     return <LoadingState testID="progress-overview-loading" />;
@@ -112,15 +110,35 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]} testID="progress-screen">
       <View style={{ paddingHorizontal: 24 }}>
-        <ProgressHeader title="Progress" subtitle="Track how you're getting stronger." />
-
-        <CategoryTabs
-          testID="progress-tabs"
-          categories={[...PROGRESS_SECTIONS]}
-          active={activeSection}
-          onSelect={setActiveSection}
+        <ProgressHeader
+          onOpenMenu={() => openMenu(currentMode)}
           accentColor={theme.accent}
+          modeToggle={
+            <ModeToggle
+              mode={currentMode}
+              onChange={handleModeChange}
+              workoutTheme={theme}
+              nutritionTheme={nutritionTheme}
+              testIDPrefix="progress"
+            />
+          }
+          // "Track Your Growth" + the supporting sentence are hidden on
+          // every Progress tab now (Overview already shows its own "Your
+          // Progress" card; Top Sets/Strength have their own section
+          // titles right below) -- kept as a prop rather than deleted from
+          // ProgressHeader in case a future section wants it back.
+          showHeading={false}
         />
+
+        {currentMode === 'workout' ? (
+          <CategoryTabs
+            testID="progress-tabs"
+            categories={[...PROGRESS_SECTIONS]}
+            active={activeSection}
+            onSelect={setActiveSection}
+            accentColor={theme.accent}
+          />
+        ) : null}
 
         {error ? (
           <Text testID="progress-overview-error" style={styles.errorText}>
@@ -129,72 +147,70 @@ export function ProgressOverviewScreen({ navigation }: Props) {
         ) : null}
       </View>
 
-      <View style={[styles.sectionFill, { paddingHorizontal: 24 }]}>
-        {activeSection === 'Overview' ? (
-          <OverviewSection
-            groups={groups}
-            weightUnit={weightUnit}
-            theme={theme}
-            oneRepMaxes={oneRepMaxes}
-            repPRs={repPRs}
-            lifetimeStats={lifetimeStats}
-            totalCompletedSets={history.length}
-            totalPRs={totalPRs}
-            globalMilestones={globalMilestones}
-            navigation={navigation}
+      {currentMode === 'nutrition' ? (
+        <View style={styles.sectionFill}>
+          <ProgressEmptyState
+            testID="progress-nutrition-coming-soon"
+            title="Nutrition progress is coming soon."
+            icon="pie-chart"
           />
-        ) : null}
+        </View>
+      ) : (
+        <View style={[styles.sectionFill, { paddingHorizontal: 24 }]}>
+          {activeSection === 'Overview' ? (
+            <OverviewSection
+              groups={groups}
+              lifetimeStats={lifetimeStats}
+              totalCompletedSets={history.length}
+              totalPRs={totalPRs}
+              repPRs={repPRs}
+              oneRepMaxes={oneRepMaxes}
+              weightUnit={weightUnit}
+              accentColor={theme.accent}
+              navigation={navigation}
+              onViewDetails={() => setActiveSection('Strength')}
+              onViewAllMilestones={() => setActiveSection('Strength')}
+            />
+          ) : null}
 
-        {activeSection === 'Strength' ? (
-          <StrengthSection
-            groups={groups}
-            weightUnit={weightUnit}
-            theme={theme}
-            oneRepMaxes={oneRepMaxes}
-            repPRs={repPRs}
-            muscleGroupCounts={muscleGroupCounts}
-            muscleGroupVisualization={muscleGroupVisualization}
-          />
-        ) : null}
+          {activeSection === 'Strength' ? (
+            <StrengthProgressSection
+              history={history}
+              groups={groups}
+              weightUnit={weightUnit}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+              navigation={navigation}
+            />
+          ) : null}
 
-        {activeSection === 'PRs' ? (
-          <PRsSection
-            repPRs={repPRs}
-            oneRepMaxes={oneRepMaxes}
-            weightUnit={weightUnit}
-            accentColor={theme.accent}
-            navigation={navigation}
-          />
-        ) : null}
+          {activeSection === 'TopSets' ? (
+            <TopSetsSection
+              history={history}
+              weightUnit={weightUnit}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+              navigation={navigation}
+            />
+          ) : null}
 
-        {activeSection === 'Exercises' ? (
-          <ExercisesSection
-            groups={groups}
-            weightUnit={weightUnit}
-            accentColor={theme.accent}
-            navigation={navigation}
-          />
-        ) : null}
-
-        {activeSection === 'TopSets' ? (
-          <TopSetsSection
-            groups={groups}
-            weightUnit={weightUnit}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
-            navigation={navigation}
-          />
-        ) : null}
-
-        {activeSection === 'OneRepMax' ? (
-          <OneRepMaxSection
-            oneRepMaxes={oneRepMaxes}
-            weightUnit={weightUnit}
-            accentColor={theme.accent}
-            navigation={navigation}
-          />
-        ) : null}
-      </View>
+          {activeSection === 'AllTime' ? (
+            <AllTimeSection
+              groups={groups}
+              history={history}
+              completedWorkouts={completedWorkouts}
+              lifetimeStats={lifetimeStats}
+              totalCompletedSets={history.length}
+              totalPRs={totalPRs}
+              repPRs={repPRs}
+              oneRepMaxes={oneRepMaxes}
+              weightUnit={weightUnit}
+              accentColor={theme.accent}
+              navigation={navigation}
+            />
+          ) : null}
+        </View>
+      )}
     </View>
   );
 }

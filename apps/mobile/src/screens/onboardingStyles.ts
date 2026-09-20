@@ -4,6 +4,9 @@ import { colors, radii, spacing, typeScale } from '../design/theme';
 export const onboardingStyles = StyleSheet.create({
   screen: {
     flex: 1,
+    // Onboarding is explicitly out of scope for the Background Theme
+    // feature (see the task's scope notes) -- stays on the static default,
+    // unlike the rest of the app's screen containers.
     backgroundColor: colors.background,
   },
   scrollContent: {

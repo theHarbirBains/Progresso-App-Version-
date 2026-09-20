@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { fetchExerciseSetHistory } from '../workouts/exerciseHistoryQueries';
@@ -161,5 +161,42 @@ describe('ProgressExerciseDetailScreen', () => {
     expect(await screen.findByTestId('progress-exercise-detail-error')).toHaveTextContent(
       'network down',
     );
+  });
+});
+
+// Regression coverage for a reported bug: returning to this screen briefly
+// blanked it with a full-screen spinner before the refreshed data arrived.
+// `load()` only sets `loading` true on the very first call now (see
+// `hasLoadedOnce`) -- every later focus-triggered call is a silent
+// background refresh.
+describe('ProgressExerciseDetailScreen background refresh on focus', () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  }
+
+  it('does not show the full-screen loading indicator on a focus-triggered refresh', async () => {
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('progress-exercise-detail-empty');
+
+    const refresh = deferred<unknown[]>();
+    mockFetchExerciseSetHistory.mockReturnValue(refresh.promise);
+
+    const calls = navigation.addListener.mock.calls;
+    const [, focusCallback] = calls[calls.length - 1];
+    act(() => {
+      focusCallback();
+    });
+
+    expect(screen.queryByTestId('progress-exercise-detail-loading')).toBeNull();
+    expect(screen.getByTestId('progress-exercise-detail-empty')).toBeTruthy();
+
+    await act(async () => {
+      refresh.resolve([]);
+      await refresh.promise;
+    });
   });
 });

@@ -196,13 +196,21 @@ export async function setWorkoutSplitDayMuscleGroups(
   if (insertError) throw new Error(insertError.message);
 }
 
-/** The split day the user's most recently completed workout was tagged with, or null if none/untagged. */
+/**
+ * The split day the user's most recently completed, split-tagged workout was
+ * tagged with, or null if none. Deliberately skips untagged workouts (e.g. a
+ * "Do a Different Workout" improvised session) rather than taking the single
+ * most recent completed workout regardless of tag -- an improvised workout
+ * has no bearing on split progression, so it must not reset next-workout
+ * recommendation back to day 1.
+ */
 export async function fetchLastWorkoutSplitDayId(userId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('workouts')
     .select('workout_split_day_id')
     .eq('user_id', userId)
     .not('completed_at', 'is', null)
+    .not('workout_split_day_id', 'is', null)
     .is('deleted_at', null)
     .order('performed_at', { ascending: false })
     .limit(1)

@@ -1,6 +1,7 @@
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GlassBackground } from './GlassBackground';
 import { colors, radii, spacing, typeScale } from './theme';
 
 interface Props {
@@ -34,6 +35,7 @@ export function QuickActionMenu({
         accessibilityLabel="Close quick actions"
       >
         <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}>
+          <GlassBackground variant="chrome" bordered={false} />
           <Text style={styles.title}>Quick Actions</Text>
           <TouchableOpacity
             testID="quick-action-start-workout"
@@ -70,11 +72,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.surface,
     borderTopLeftRadius: radii.lg,
     borderTopRightRadius: radii.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.glassBorderStrong,
     paddingTop: spacing.lg,
     paddingHorizontal: spacing.xxl,
+    overflow: 'hidden',
   },
   title: {
     ...typeScale.sectionHeading,

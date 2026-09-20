@@ -1,6 +1,8 @@
+import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { fetchExercises } from '../exercises/exerciseQueries';
+import { fetchExerciseSourceCounts, fetchExercises } from '../exercises/exerciseQueries';
+import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ExerciseLibraryScreen } from './ExerciseLibraryScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -9,6 +11,7 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../exercises/exerciseQueries', () => ({
   fetchExercises: jest.fn(),
+  fetchExerciseSourceCounts: jest.fn(),
 }));
 
 // Isolates this screen's own list/filter/pagination logic from the form's
@@ -45,14 +48,30 @@ jest.mock('./ExerciseFormScreen', () => {
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchExercises = fetchExercises as jest.Mock;
+const mockFetchExerciseSourceCounts = fetchExerciseSourceCounts as jest.Mock;
 const mockGoBack = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation = { goBack: mockGoBack } as any;
+
+const mockOpenMenu = jest.fn();
+
+// ExerciseLibraryScreen now opens the app-level side menu (via
+// AppMenuContext) from its own header, same as Dashboard -- this stands in
+// for that root-level provider.
+function renderScreen() {
+  return render(
+    <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
+      <ExerciseLibraryScreen navigation={navigation} route={{} as never} />
+    </AppMenuContext.Provider>,
+  );
+}
 
 const builtinRow = {
   id: 'ex-builtin',
   name: 'Barbell Bench Press',
   muscleGroup: 'chest',
+  movementType: 'bilateral',
+  loggingStyle: null,
   isActive: true,
   createdBy: null,
 };
@@ -60,6 +79,8 @@ const mineRow = {
   id: 'ex-mine',
   name: 'My Curl Variation',
   muscleGroup: 'biceps',
+  movementType: 'bilateral',
+  loggingStyle: null,
   isActive: true,
   createdBy: 'user-1',
 };
@@ -67,8 +88,15 @@ const mineRow = {
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
   mockFetchExercises.mockReset();
-  mockFetchExercises.mockResolvedValue({ rows: [builtinRow, mineRow], hasMore: false });
+  mockFetchExercises.mockResolvedValue({
+    rows: [builtinRow, mineRow],
+    hasMore: false,
+    totalCount: 2,
+  });
+  mockFetchExerciseSourceCounts.mockReset();
+  mockFetchExerciseSourceCounts.mockResolvedValue({ all: 328, builtin: 245, mine: 12 });
   mockGoBack.mockClear();
+  mockOpenMenu.mockClear();
 });
 
 // FlatList/VirtualizedList schedules a deferred internal setState (cell
@@ -86,7 +114,7 @@ async function settle() {
 
 describe('ExerciseLibraryScreen', () => {
   it('loads and displays exercises on mount', async () => {
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
 
     expect(await screen.findByTestId('exercise-item-ex-builtin')).toHaveTextContent(
       /Barbell Bench Press/,
@@ -98,24 +126,35 @@ describe('ExerciseLibraryScreen', () => {
         search: '',
         muscleGroup: null,
         source: 'all',
+        ascending: true,
         page: 0,
       }),
     );
     await settle();
   });
 
-  it('calls navigation.goBack() when Back is pressed', async () => {
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+  it('shows the centered "Exercise Library" title and hamburger on the shared AppHeader row', async () => {
+    renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
-    fireEvent.press(screen.getByTestId('exercise-library-back'));
+    expect(screen.getByTestId('exercise-library-header')).toBeTruthy();
+    expect(screen.getByTestId('exercise-library-open-menu')).toBeTruthy();
+    expect(screen.getByText('Exercise Library')).toBeTruthy();
+    await settle();
+  });
 
-    expect(mockGoBack).toHaveBeenCalled();
+  it('opens the app-level side menu (workout mode) when the header button is pressed', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    fireEvent.press(screen.getByTestId('exercise-library-open-menu'));
+
+    expect(mockOpenMenu).toHaveBeenCalledWith('workout');
     await settle();
   });
 
   it('debounces search input before querying', async () => {
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
     mockFetchExercises.mockClear();
 
@@ -128,7 +167,7 @@ describe('ExerciseLibraryScreen', () => {
   });
 
   it('filters by muscle group when a chip is pressed', async () => {
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
     mockFetchExercises.mockClear();
 
@@ -142,8 +181,19 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
-  it('filters by source when a tab is pressed', async () => {
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+  // Regression guard: the muscle-group filter row was sitting flush against
+  // the search input above and the source-filter row below (each only
+  // contributes margin on one side), reading as vertically cramped.
+  it('gives the muscle-group filter row vertical breathing room above and below', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    const wrap = screen.getByTestId('exercise-library-muscle-group-wrap');
+    expect(StyleSheet.flatten(wrap.props.style).marginVertical).toBeGreaterThan(0);
+  });
+
+  it('filters by source when a category card is pressed', async () => {
+    renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
     mockFetchExercises.mockClear();
 
@@ -155,8 +205,46 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
+  it('shows the real, independent total for each source category, never a fabricated count', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('exercise-source-all-count')).toHaveTextContent(/328/);
+    expect(screen.getByTestId('exercise-source-builtin-count')).toHaveTextContent(/245/);
+    expect(screen.getByTestId('exercise-source-mine-count')).toHaveTextContent(/12/);
+    await settle();
+  });
+
+  it('shows the real total count of the current filtered view, not just the loaded page', async () => {
+    mockFetchExercises.mockResolvedValue({
+      rows: [builtinRow],
+      hasMore: true,
+      totalCount: 328,
+    });
+
+    renderScreen();
+
+    expect(await screen.findByTestId('exercise-library-count')).toHaveTextContent(/328/);
+    await settle();
+  });
+
+  it('toggles sort order and refetches when the sort control is pressed', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+    mockFetchExercises.mockClear();
+
+    fireEvent.press(screen.getByTestId('exercise-library-sort'));
+
+    await waitFor(() =>
+      expect(mockFetchExercises).toHaveBeenCalledWith(
+        expect.objectContaining({ ascending: false }),
+      ),
+    );
+    expect(screen.getByTestId('exercise-library-sort')).toHaveTextContent(/Z → A/);
+    await settle();
+  });
+
   it('opens the create form when "New Exercise" is pressed', async () => {
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
     fireEvent.press(screen.getByTestId('exercise-create-button'));
@@ -166,7 +254,7 @@ describe('ExerciseLibraryScreen', () => {
   });
 
   it("opens the edit form for the user's own exercise", async () => {
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
     fireEvent.press(screen.getByTestId('exercise-item-ex-mine'));
@@ -177,7 +265,7 @@ describe('ExerciseLibraryScreen', () => {
   });
 
   it('does not open a form when a built-in exercise is pressed', async () => {
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
     fireEvent.press(screen.getByTestId('exercise-item-ex-builtin'));
@@ -186,8 +274,25 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
+  it('shows Built-in/Mine badges reflecting real ownership, never fabricated classifications', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('exercise-item-ex-builtin')).toHaveTextContent(/Built-in/);
+    expect(screen.getByTestId('exercise-item-ex-mine')).toHaveTextContent(/Mine/);
+    await settle();
+  });
+
+  it('shows real muscle-group and movement-type tags on each row, not images', async () => {
+    renderScreen();
+
+    const row = await screen.findByTestId('exercise-item-ex-builtin');
+    expect(row).toHaveTextContent(/Chest/);
+    expect(row).toHaveTextContent(/Bilateral/);
+    await settle();
+  });
+
   it('returns to the list and refetches when the form reports done', async () => {
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
     fireEvent.press(screen.getByTestId('exercise-create-button'));
     await screen.findByTestId('mock-exercise-form-mode');
@@ -202,10 +307,10 @@ describe('ExerciseLibraryScreen', () => {
 
   it('shows a Load More button when there are more pages, and appends results on press', async () => {
     mockFetchExercises
-      .mockResolvedValueOnce({ rows: [builtinRow], hasMore: true })
-      .mockResolvedValueOnce({ rows: [mineRow], hasMore: false });
+      .mockResolvedValueOnce({ rows: [builtinRow], hasMore: true, totalCount: 2 })
+      .mockResolvedValueOnce({ rows: [mineRow], hasMore: false, totalCount: 2 });
 
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
     expect(screen.getByTestId('exercise-load-more')).toBeTruthy();
 
@@ -220,9 +325,18 @@ describe('ExerciseLibraryScreen', () => {
   it('shows an error message when the query fails', async () => {
     mockFetchExercises.mockReset().mockRejectedValue(new Error('network error'));
 
-    render(<ExerciseLibraryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
 
     expect(await screen.findByTestId('exercise-library-error')).toHaveTextContent('network error');
+    await settle();
+  });
+
+  it('shows an empty state when no exercises match the current filters', async () => {
+    mockFetchExercises.mockResolvedValue({ rows: [], hasMore: false, totalCount: 0 });
+
+    renderScreen();
+
+    expect(await screen.findByTestId('exercise-library-empty')).toBeTruthy();
     await settle();
   });
 });

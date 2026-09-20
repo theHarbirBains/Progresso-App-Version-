@@ -1,4 +1,5 @@
 import type { MuscleGroup } from '../exercises/muscleGroups';
+import type { MovementType } from '../exercises/movementTypes';
 import type { HistoricalSet } from './exerciseHistoryQueries';
 
 // Pure grouping logic, deliberately kept dependency-free (no Supabase import)
@@ -9,6 +10,8 @@ export interface HistoricalSetWithExercise extends HistoricalSet {
   exerciseName: string;
   /** The exercise's own muscle group (exercises.muscle_group) -- constant across every set of the same exercise, used to attribute real training exposure per muscle group (see muscleGroupProgress.ts). */
   muscleGroup: MuscleGroup;
+  /** The exercise's own movement type (exercises.movement_type) -- constant across every set of the same exercise, same real classification Exercise Library shows (Bilateral/Unilateral; Progresso has no Compound/Isolation concept). */
+  movementType: MovementType;
 }
 
 export interface ExerciseHistoryGroup {

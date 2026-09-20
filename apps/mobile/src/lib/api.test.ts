@@ -156,3 +156,52 @@ describe('updateMyProfile', () => {
     );
   });
 });
+
+describe('getFoodByBarcode', () => {
+  it('sends a GET with the URL-encoded barcode and returns the found product', async () => {
+    const { getFoodByBarcode } = api;
+    const product = {
+      id: 'food-2',
+      name: 'Oreo Original',
+      brand: 'Oreo',
+      servingSize: 34,
+      servingUnit: 'g',
+      calories: 160,
+      proteinG: 1.6,
+      carbsG: 25,
+      fatG: 7,
+      provider: 'open_food_facts',
+      barcode: '0066721016123',
+    };
+    mockFetchOnce(200, product);
+
+    const result = await getFoodByBarcode('token-123', '0066721016123');
+
+    expect(result).toEqual(product);
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:4000/api/v1/foods/barcode/0066721016123',
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token-123',
+        },
+      },
+    );
+  });
+
+  it('resolves to null (not a thrown error) when the product is not found', async () => {
+    const { getFoodByBarcode } = api;
+    mockFetchOnce(200, null);
+
+    const result = await getFoodByBarcode('token-123', '0000000000000');
+
+    expect(result).toBeNull();
+  });
+
+  it('still throws on a real backend failure', async () => {
+    const { getFoodByBarcode } = api;
+    mockFetchOnce(500, { message: 'Internal server error' });
+
+    await expect(getFoodByBarcode('token-123', '123')).rejects.toThrow('Internal server error');
+  });
+});

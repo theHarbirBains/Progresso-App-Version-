@@ -1,4 +1,4 @@
-import { fromKg, roundWeight, toKg } from './units';
+import { fromKg, isValidWeightIncrement, roundWeight, toKg } from './units';
 
 describe('toKg', () => {
   it('returns the value unchanged for kg', () => {
@@ -37,5 +37,38 @@ describe('roundWeight', () => {
   it('leaves already-precise values unchanged', () => {
     expect(roundWeight(100)).toBe(100);
     expect(roundWeight(100.5)).toBe(100.5);
+  });
+});
+
+describe('isValidWeightIncrement', () => {
+  it('accepts whole numbers', () => {
+    expect(isValidWeightIncrement(0)).toBe(true);
+    expect(isValidWeightIncrement(1)).toBe(true);
+    expect(isValidWeightIncrement(100)).toBe(true);
+  });
+
+  it('accepts .5 increments', () => {
+    expect(isValidWeightIncrement(1.5)).toBe(true);
+    expect(isValidWeightIncrement(2.5)).toBe(true);
+    expect(isValidWeightIncrement(100.5)).toBe(true);
+  });
+
+  it('rejects arbitrary decimal precision', () => {
+    expect(isValidWeightIncrement(1.1)).toBe(false);
+    expect(isValidWeightIncrement(1.25)).toBe(false);
+    expect(isValidWeightIncrement(1.75)).toBe(false);
+    expect(isValidWeightIncrement(100.25)).toBe(false);
+    expect(isValidWeightIncrement(100.75)).toBe(false);
+  });
+
+  it('rejects non-finite values', () => {
+    expect(isValidWeightIncrement(NaN)).toBe(false);
+    expect(isValidWeightIncrement(Infinity)).toBe(false);
+  });
+
+  it('applies the same .5 step regardless of unit -- clean, round entries in kg (e.g. 100, 120) stay valid rather than being rejected for not matching an lb-derived fraction', () => {
+    expect(isValidWeightIncrement(220.5)).toBe(true); // e.g. 220.5 lb
+    expect(isValidWeightIncrement(100.5)).toBe(true); // e.g. 100.5 kg
+    expect(isValidWeightIncrement(120)).toBe(true); // e.g. 120 kg
   });
 });

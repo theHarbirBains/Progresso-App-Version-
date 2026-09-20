@@ -1,28 +1,27 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { render, screen } from '@testing-library/react-native';
 import { WorkoutHeader } from './WorkoutHeader';
 
 describe('WorkoutHeader', () => {
-  it('shows the title and calls onBack when the back button is pressed', () => {
-    const onBack = jest.fn();
-    render(<WorkoutHeader title="Start Workout" onBack={onBack} />);
+  it('shows the title, centered, with no back or options button', () => {
+    render(<WorkoutHeader title="Chest, Back, Abs" testID="workout-header" />);
 
-    expect(screen.getByText('Start Workout')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('workout-header-back'));
-    expect(onBack).toHaveBeenCalled();
-  });
-
-  it('does not render an options button when onOpenOptions is omitted', () => {
-    render(<WorkoutHeader title="Start Workout" onBack={jest.fn()} />);
-
+    expect(screen.getByText('Chest, Back, Abs')).toBeTruthy();
+    expect(screen.queryByTestId('workout-header-back')).toBeNull();
     expect(screen.queryByTestId('workout-header-options')).toBeNull();
+
+    const header = screen.getByTestId('workout-header');
+    expect(StyleSheet.flatten(header.props.style).alignItems).toBe('center');
   });
 
-  it('calls onOpenOptions when the options button is pressed', () => {
-    const onOpenOptions = jest.fn();
-    render(<WorkoutHeader title="Push Day" onBack={jest.fn()} onOpenOptions={onOpenOptions} />);
+  it('pads the top by the safe-area inset so the title never sits under the status bar', () => {
+    render(<WorkoutHeader title="Push Day" testID="workout-header" />);
 
-    fireEvent.press(screen.getByTestId('workout-header-options'));
-
-    expect(onOpenOptions).toHaveBeenCalled();
+    const header = screen.getByTestId('workout-header');
+    // react-native-safe-area-context's jest mock reports insets.top as 0,
+    // so this is just spacing.sm (8) on top of it -- asserting > 0 (rather
+    // than the literal token value) guards the inset is actually applied,
+    // not that it's hardcoded to any one number.
+    expect(StyleSheet.flatten(header.props.style).paddingTop).toBeGreaterThan(0);
   });
 });

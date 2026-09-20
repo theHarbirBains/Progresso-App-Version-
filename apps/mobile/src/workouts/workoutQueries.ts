@@ -1,5 +1,13 @@
 import { supabase } from '../lib/supabase';
+import type { LoggingStyle, MovementType } from '../exercises/movementTypes';
 import type { MuscleGroup } from '../exercises/muscleGroups';
+
+/** Mirrors the database's public.set_side enum ('none' | 'left' | 'right') -- see setCompletion.ts / the unilateral-exercises migrations for why 'none' rather than a nullable column. Exposed to the app as `null` for a bilateral set, matching every other "not applicable" field in this file. */
+export type SetSide = 'left' | 'right' | null;
+
+function fromDbSide(dbSide: 'none' | 'left' | 'right'): SetSide {
+  return dbSide === 'none' ? null : dbSide;
+}
 
 // Direct-to-Supabase reads and writes for workout logging, per the approved
 // Phase 3 architecture: ownership is fully enforced by existing RLS policies
@@ -27,6 +35,11 @@ export interface SetRecord {
   /** Null means "planned but not yet performed" -- the same nullable-
    * timestamp convention workouts.completed_at already uses. */
   completedAt: string | null;
+  /** null for a bilateral exercise's set (the overwhelming majority). For a
+   * unilateral exercise, a logical set is two SetRecords sharing the same
+   * setIndex -- one 'left', one 'right' -- each with its own independent
+   * weightKg/reps/completedAt. Weight is always per side; never summed. */
+  side: SetSide;
 }
 
 // Defined in setCompletion.ts (no supabase import) rather than here, so
@@ -40,6 +53,8 @@ export interface WorkoutExerciseWithSets {
   exerciseId: string;
   exerciseName: string;
   muscleGroup: MuscleGroup;
+  movementType: MovementType;
+  loggingStyle: LoggingStyle | null;
   orderIndex: number;
   sets: SetRecord[];
 }
@@ -139,6 +154,31 @@ export async function fetchWorkoutsForMonth(
   return (data ?? []).map(toWorkoutSummary);
 }
 
+/**
+ * Every completed workout performed within [start, end) local time -- for
+ * Dashboard's "Weekly Process" widget, which needs an arbitrary Mon-Sun
+ * range rather than a whole calendar month (a week can span two months, so
+ * this can't reuse fetchWorkoutsForMonth's single-month query).
+ */
+export async function fetchWorkoutsForDateRange(
+  userId: string,
+  start: Date,
+  end: Date,
+): Promise<WorkoutSummary[]> {
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('id, name, performed_at, completed_at, workout_split_day_id')
+    .eq('user_id', userId)
+    .not('completed_at', 'is', null)
+    .is('deleted_at', null)
+    .gte('performed_at', start.toISOString())
+    .lt('performed_at', end.toISOString())
+    .order('performed_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(toWorkoutSummary);
+}
+
 export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDetail> {
   const { data: workout, error: workoutError } = await supabase
     .from('workouts')
@@ -149,7 +189,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
 
   const { data: workoutExercises, error: weError } = await supabase
     .from('workout_exercises')
-    .select('id, exercise_id, order_index, exercises(name, muscle_group)')
+    .select('id, exercise_id, order_index, exercises(name, muscle_group, movement_type, logging_style)')
     .eq('workout_id', workoutId)
     .is('deleted_at', null)
     .order('order_index', { ascending: true });
@@ -160,7 +200,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
   if (workoutExerciseIds.length > 0) {
     const { data: sets, error: setsError } = await supabase
       .from('sets')
-      .select('id, workout_exercise_id, set_index, weight_kg, reps, completed_at')
+      .select('id, workout_exercise_id, set_index, side, weight_kg, reps, completed_at')
       .in('workout_exercise_id', workoutExerciseIds)
       .is('deleted_at', null)
       .order('set_index', { ascending: true });
@@ -172,6 +212,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
       list.push({
         id: s.id,
         setIndex: s.set_index,
+        side: fromDbSide(s.side),
         weightKg: s.weight_kg === null ? null : Number(s.weight_kg),
         reps: s.reps,
         completedAt: s.completed_at,
@@ -183,12 +224,19 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
   const exercises: WorkoutExerciseWithSets[] = (workoutExercises ?? []).map((we) => {
     // Supabase's generated types aren't wired up in this project, so the
     // embedded relation comes back loosely typed; narrow it defensively.
-    const embedded = we.exercises as unknown as { name: string; muscle_group: MuscleGroup } | null;
+    const embedded = we.exercises as unknown as {
+      name: string;
+      muscle_group: MuscleGroup;
+      movement_type: MovementType;
+      logging_style: LoggingStyle | null;
+    } | null;
     return {
       id: we.id,
       exerciseId: we.exercise_id,
       exerciseName: embedded?.name ?? '',
       muscleGroup: embedded?.muscle_group ?? 'other',
+      movementType: embedded?.movement_type ?? 'bilateral',
+      loggingStyle: embedded?.logging_style ?? null,
       orderIndex: we.order_index,
       sets: setsByWorkoutExercise.get(we.id) ?? [],
     };
@@ -246,6 +294,23 @@ export async function completeWorkout(workoutId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Cancels an in-progress workout -- the same soft-delete convention already
+ * used for sets/exercises (deleted_at, never a hard delete). Since this
+ * never sets completed_at, a cancelled workout is automatically invisible
+ * to every existing history/PR/next-workout query (all of which already
+ * filter on deleted_at is null, and next-workout progression additionally
+ * requires completed_at is not null) -- cancelling never advances split
+ * progression or leaves stray data behind.
+ */
+export async function cancelWorkout(workoutId: string): Promise<void> {
+  const { error } = await supabase
+    .from('workouts')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', workoutId);
+  if (error) throw new Error(error.message);
+}
+
 export async function addExerciseToWorkout(
   workoutId: string,
   exerciseId: string,
@@ -299,17 +364,32 @@ export async function reorderExercises(items: ReorderItem[]): Promise<void> {
  * null. This is the only way sets are created now: "Add Set" always adds
  * exactly one blank row immediately, which the user then fills in and
  * marks complete via updateSet.
+ *
+ * `side` is omitted (defaults to 'none' in the database) for a bilateral
+ * exercise. For a unilateral exercise, the caller (ActiveWorkoutScreen)
+ * creates one logical set by calling this twice with the same setIndex --
+ * once with side 'left', once 'right' -- rather than combining both sides
+ * into a single row.
  */
-export async function createSet(workoutExerciseId: string, setIndex: number): Promise<SetRecord> {
+export async function createSet(
+  workoutExerciseId: string,
+  setIndex: number,
+  side?: 'left' | 'right',
+): Promise<SetRecord> {
   const { data, error } = await supabase
     .from('sets')
-    .insert({ workout_exercise_id: workoutExerciseId, set_index: setIndex })
-    .select('id, set_index, weight_kg, reps, completed_at')
+    .insert({
+      workout_exercise_id: workoutExerciseId,
+      set_index: setIndex,
+      ...(side ? { side } : {}),
+    })
+    .select('id, set_index, side, weight_kg, reps, completed_at')
     .single();
   if (error) throw new Error(error.message);
   return {
     id: data.id,
     setIndex: data.set_index,
+    side: fromDbSide(data.side),
     weightKg: data.weight_kg === null ? null : Number(data.weight_kg),
     reps: data.reps,
     completedAt: data.completed_at,
@@ -329,12 +409,13 @@ export async function updateSet(
     .from('sets')
     .update(payload)
     .eq('id', setId)
-    .select('id, set_index, weight_kg, reps, completed_at')
+    .select('id, set_index, side, weight_kg, reps, completed_at')
     .single();
   if (error) throw new Error(error.message);
   return {
     id: data.id,
     setIndex: data.set_index,
+    side: fromDbSide(data.side),
     weightKg: data.weight_kg === null ? null : Number(data.weight_kg),
     reps: data.reps,
     completedAt: data.completed_at,
@@ -391,7 +472,7 @@ export async function fetchPreviousPerformance(
 
   const { data: sets, error: setsError } = await supabase
     .from('sets')
-    .select('id, set_index, weight_kg, reps, completed_at')
+    .select('id, set_index, side, weight_kg, reps, completed_at')
     .eq('workout_exercise_id', mostRecent.id)
     .is('deleted_at', null)
     // "Previous performance" only ever means real, logged history -- never
@@ -405,6 +486,7 @@ export async function fetchPreviousPerformance(
     sets: (sets ?? []).map((s) => ({
       id: s.id,
       setIndex: s.set_index,
+      side: fromDbSide(s.side),
       weightKg: s.weight_kg === null ? null : Number(s.weight_kg),
       reps: s.reps,
       completedAt: s.completed_at,

@@ -1,10 +1,13 @@
 import { Feather } from '@expo/vector-icons';
 import type { RootStackParamList } from './types';
 
-/** Any route that takes no params -- the only kind safe to list in a
- *  generic, config-driven navigation menu (no per-item params to supply). */
+/** Any route safely navigable with no params object at all -- either it
+ *  takes none (`undefined`), or every field it does take is optional (e.g.
+ *  FoodLibrary's `{ openCreate?: boolean; barcode?: string } | undefined`,
+ *  used by the Scan Barcode flow but not by this generic menu). The only
+ *  kind safe to list here, since there's no per-item params to supply. */
 type NoParamRoute = {
-  [K in keyof RootStackParamList]: RootStackParamList[K] extends undefined ? K : never;
+  [K in keyof RootStackParamList]: undefined extends RootStackParamList[K] ? K : never;
 }[keyof RootStackParamList];
 
 export type AppMenuRoute = NoParamRoute;
@@ -15,9 +18,18 @@ export interface AppMenuItem {
   icon: keyof typeof Feather.glyphMap;
 }
 
+/** A menu row for a destination that doesn't have a screen yet -- visible (for correct information architecture) but not navigable, same "real placeholder, never a fake action" precedent as Settings' ComingSoonRow. */
+export interface AppMenuComingSoonItem {
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+  comingSoon: true;
+}
+
+export type AppMenuEntry = AppMenuItem | AppMenuComingSoonItem;
+
 export interface AppMenuSection {
   title: string;
-  items: AppMenuItem[];
+  items: AppMenuEntry[];
 }
 
 /**
@@ -25,17 +37,15 @@ export interface AppMenuSection {
  * place to add a future destination -- once its screen actually exists --
  * without touching AppSideMenu itself. Every entry here must point at a
  * real, already-registered screen; never add a placeholder for an unbuilt
- * feature.
+ * feature. No "Home" entry -- Dashboard (Home) is already one tap away via
+ * the bottom nav, same reasoning as Profile never appearing here.
  */
 export const APP_MENU_SECTIONS: AppMenuSection[] = [
   {
     title: 'PROGRESSO',
     items: [
-      { route: 'Dashboard', label: 'Home', icon: 'home' },
       { route: 'WorkoutHistory', label: 'Workouts', icon: 'activity' },
       { route: 'ProgressOverview', label: 'Progress', icon: 'trending-up' },
-      { route: 'Nutrition', label: 'Nutrition', icon: 'pie-chart' },
-      { route: 'Social', label: 'Social', icon: 'users' },
     ],
   },
   {

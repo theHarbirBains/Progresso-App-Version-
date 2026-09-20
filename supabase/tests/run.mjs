@@ -13,6 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(__dirname, '..', 'migrations');
 const seedFile = join(__dirname, '..', 'seed.sql');
 const shimFile = join(__dirname, 'auth-shim.sql');
+const storageShimFile = join(__dirname, 'storage-shim.sql');
 
 const PORT = 54329;
 const dataDir = mkdtempSync(join(tmpdir(), 'progresso-pgtest-'));
@@ -48,6 +49,34 @@ async function expectThrows(promise, name, matcher) {
       matcher.test(message),
       matcher.test(message) ? undefined : `unexpected error: ${message}`,
     );
+  }
+}
+
+/**
+ * Same as expectThrows, but for a query that must run inside an already-open,
+ * still-needed shared transaction (e.g. the PR-recompute/unilateral tests,
+ * which build up state across many statements on one `admin` transaction
+ * rather than a fresh asUser() connection per check). Postgres aborts the
+ * *entire* transaction after any error until it sees a ROLLBACK, so without
+ * a savepoint here, one expected constraint-violation would silently poison
+ * every later statement in the same transaction (they'd all fail with
+ * "current transaction is aborted"). Wrapping in SAVEPOINT/ROLLBACK TO
+ * SAVEPOINT contains the expected failure to just this one check.
+ */
+async function expectThrowsInTransaction(client, queryPromiseFactory, name, matcher) {
+  await client.query('savepoint expect_throws_sp');
+  try {
+    await queryPromiseFactory();
+    record(name, false, 'expected an error but none was thrown');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    record(
+      name,
+      matcher.test(message),
+      matcher.test(message) ? undefined : `unexpected error: ${message}`,
+    );
+  } finally {
+    await client.query('rollback to savepoint expect_throws_sp');
   }
 }
 
@@ -112,6 +141,9 @@ async function main() {
 
   console.log('Applying auth shim...');
   await admin.query(readFileSync(shimFile, 'utf8'));
+
+  console.log('Applying storage shim...');
+  await admin.query(readFileSync(storageShimFile, 'utf8'));
 
   console.log('Applying migrations...');
   const migrationFiles = readdirSync(migrationsDir)
@@ -416,9 +448,7 @@ async function main() {
   );
 
   await expectThrows(
-    admin.query("update public.users set apple_health_preference = 'maybe' where id = $1", [
-      userA,
-    ]),
+    admin.query("update public.users set apple_health_preference = 'maybe' where id = $1", [userA]),
     'An invalid apple_health_preference is rejected by the format constraint',
     /violates check constraint/i,
   );
@@ -1543,6 +1573,175 @@ async function main() {
     await admin.query('rollback').catch(() => {});
   }
 
+  console.log('\nRunning unilateral exercise tests...\n');
+
+  await admin.query('begin');
+  try {
+    await asClaims(admin, userA);
+
+    const bulgarianSplitSquat = (
+      await admin.query(
+        "select id, movement_type, logging_style from public.exercises where name = 'Bulgarian Split Squat'",
+      )
+    ).rows[0];
+    record(
+      'Bulgarian Split Squat is reclassified as unilateral/alternating',
+      bulgarianSplitSquat.movement_type === 'unilateral' &&
+        bulgarianSplitSquat.logging_style === 'alternating',
+      `movement_type=${bulgarianSplitSquat.movement_type}, logging_style=${bulgarianSplitSquat.logging_style}`,
+    );
+
+    const singleArmRow = (
+      await admin.query(
+        "select movement_type, logging_style from public.exercises where name = 'Single-Arm Dumbbell Row'",
+      )
+    ).rows[0];
+    record(
+      'Single-Arm Dumbbell Row is reclassified as unilateral/single_side',
+      singleArmRow.movement_type === 'unilateral' && singleArmRow.logging_style === 'single_side',
+      `movement_type=${singleArmRow.movement_type}, logging_style=${singleArmRow.logging_style}`,
+    );
+
+    const benchPressRow = (
+      await admin.query(
+        "select movement_type, logging_style from public.exercises where name = 'Barbell Bench Press'",
+      )
+    ).rows[0];
+    record(
+      'An untouched built-in exercise stays bilateral with no logging_style (backward-compatible default)',
+      benchPressRow.movement_type === 'bilateral' && benchPressRow.logging_style === null,
+      `movement_type=${benchPressRow.movement_type}, logging_style=${benchPressRow.logging_style}`,
+    );
+
+    await expectThrowsInTransaction(
+      admin,
+      () =>
+        admin.query(
+          "insert into public.exercises (name, muscle_group, created_by, movement_type) values ('Bad Unilateral', 'chest', $1, 'unilateral')",
+          [userA],
+        ),
+      'A unilateral exercise cannot be created without a logging_style',
+      /check constraint|logging_style/i,
+    );
+
+    await expectThrowsInTransaction(
+      admin,
+      () =>
+        admin.query(
+          "insert into public.exercises (name, muscle_group, created_by, movement_type, logging_style) values ('Bad Bilateral', 'chest', $1, 'bilateral', 'single_side')",
+          [userA],
+        ),
+      'A bilateral exercise cannot be created with a logging_style',
+      /check constraint|logging_style/i,
+    );
+
+    // --- sets.side / uniqueness ---
+    const w = (
+      await admin.query(
+        "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'Unilateral Test Workout', now(), now()) returning id",
+        [userA],
+      )
+    ).rows[0];
+    const we = (
+      await admin.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+        [w.id, bulgarianSplitSquat.id],
+      )
+    ).rows[0];
+
+    const leftSet = (
+      await admin.query(
+        "insert into public.sets (workout_exercise_id, set_index, side, weight_kg, reps) values ($1, 1, 'left', 42.5, 10) returning id",
+        [we.id],
+      )
+    ).rows[0];
+    const rightSet = (
+      await admin.query(
+        "insert into public.sets (workout_exercise_id, set_index, side, weight_kg, reps) values ($1, 1, 'right', 40, 10) returning id",
+        [we.id],
+      )
+    ).rows[0];
+    record(
+      'Left and right rows can share the same set_index',
+      Boolean(leftSet.id) && Boolean(rightSet.id),
+    );
+
+    // The unique constraint is deferrable (needed for reorderExercises'
+    // real bulk-upsert use case elsewhere), so it's only checked at COMMIT
+    // by default -- and this whole test never commits (always rolled back
+    // for isolation). Force it to check immediately so the violation below
+    // actually raises within this still-open transaction.
+    await admin.query(
+      'set constraints public.sets_workout_exercise_id_set_index_side_key immediate',
+    );
+    await expectThrowsInTransaction(
+      admin,
+      () =>
+        admin.query(
+          "insert into public.sets (workout_exercise_id, set_index, side, weight_kg, reps) values ($1, 1, 'left', 50, 8)",
+          [we.id],
+        ),
+      'A second left row at the same set_index still violates uniqueness',
+      /duplicate key|unique/i,
+    );
+
+    // A plain bilateral exercise's set (side defaults to 'none') at the same
+    // workout_exercise_id/set_index combo -- the original one-row-per-
+    // set_index guarantee must still hold now that side exists, proving
+    // 'none' behaves as a real, equal-to-itself value rather than a null
+    // that would silently stop being enforced by the unique constraint.
+    const weBilateral = (
+      await admin.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 2) returning id',
+        [w.id, squat],
+      )
+    ).rows[0];
+    await admin.query(
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 100, 5)',
+      [weBilateral.id],
+    );
+    await admin.query(
+      'set constraints public.sets_workout_exercise_id_set_index_side_key immediate',
+    );
+    await expectThrowsInTransaction(
+      admin,
+      () =>
+        admin.query(
+          'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 105, 5)',
+          [weBilateral.id],
+        ),
+      "A second bilateral set at the same set_index still violates uniqueness ('none' is a real value, not null)",
+      /duplicate key|unique/i,
+    );
+
+    // --- PR recompute treats each side's weight independently, never combined ---
+    let bssPr = await admin.query(
+      'select best_weight_kg, source_set_id from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 10',
+      [userA, bulgarianSplitSquat.id],
+    );
+    record(
+      "Unilateral PR reflects the heavier side's weight (42.5kg), never a combined 82.5kg",
+      bssPr.rows[0]?.best_weight_kg === '42.50' && bssPr.rows[0]?.source_set_id === leftSet.id,
+      `best_weight_kg=${bssPr.rows[0]?.best_weight_kg}, source=${bssPr.rows[0]?.source_set_id}`,
+    );
+
+    // The right side later becomes the heavier one -- the PR must follow it,
+    // not stay pinned to whichever side happened to be entered first.
+    await admin.query('update public.sets set weight_kg = 45 where id = $1', [rightSet.id]);
+    bssPr = await admin.query(
+      'select best_weight_kg, source_set_id from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 10',
+      [userA, bulgarianSplitSquat.id],
+    );
+    record(
+      'Increasing the right side above the left recomputes the PR to the new heavier side',
+      bssPr.rows[0]?.best_weight_kg === '45.00' && bssPr.rows[0]?.source_set_id === rightSet.id,
+      `best_weight_kg=${bssPr.rows[0]?.best_weight_kg}, source=${bssPr.rows[0]?.source_set_id}`,
+    );
+  } finally {
+    await admin.query('reset role').catch(() => {});
+    await admin.query('rollback').catch(() => {});
+  }
+
   console.log('\nRunning nutrition tests (Phase 6)...\n');
 
   // Built via asUserCommitted (a real committed transaction on its own
@@ -1717,6 +1916,306 @@ async function main() {
     /duplicate key|unique/i,
   );
 
+  console.log('\nRunning default food database tests...\n');
+
+  await asUser(userA, async (client) => {
+    const seeded = await client.query(
+      'select count(*)::int as count from public.foods where created_by is null and is_active = true',
+    );
+    record(
+      'The default food catalog is seeded with more than a handful of foods',
+      seeded.rows[0].count > 20,
+      `count=${seeded.rows[0].count}`,
+    );
+  });
+
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      "select calories, protein_g, carbs_g, fat_g from public.foods where created_by is null and name = 'Chicken Breast (cooked)'",
+    );
+    expectRowCount(res, 1, 'A known default food (Chicken Breast) exists exactly once');
+    const row = res.rows[0];
+    record(
+      'Chicken Breast (cooked) has the expected (non-fabricated, real) nutritional values',
+      row &&
+        Number(row.calories) === 165 &&
+        Number(row.protein_g) === 31 &&
+        Number(row.carbs_g) === 0 &&
+        Number(row.fat_g) === 3.6,
+      JSON.stringify(row),
+    );
+  });
+
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      "select serving_size, serving_unit from public.foods where created_by is null and name = 'Banana'",
+    );
+    const row = res.rows[0];
+    record(
+      "Banana carries its own explicit serving amount/unit ('1 medium'), not an assumed gram value",
+      Boolean(row) && Number(row.serving_size) === 1 && row.serving_unit === 'medium',
+      JSON.stringify(row),
+    );
+  });
+
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      'select name from public.foods where created_by is null and is_active = true and name ilike $1 order by name',
+      ['%chick%'],
+    );
+    record(
+      'Partial, case-insensitive name search matches default foods (%chick% finds Chicken ...)',
+      res.rows.length >= 2 && res.rows.every((r) => r.name.toLowerCase().includes('chick')),
+      JSON.stringify(res.rows.map((r) => r.name)),
+    );
+  });
+
+  // Duplicate-safe seeding: re-inserting an existing built-in food (same
+  // name+brand) must not create a second row -- this is exactly what
+  // foods_builtin_name_brand_unique plus "on conflict ... do nothing" in
+  // the seed migration guarantees, and it's what makes it safe to re-run
+  // the seed insert (e.g. against a misapplied/rerun migration).
+  const beforeCount = (
+    await admin.query(
+      "select count(*)::int as count from public.foods where created_by is null and lower(name) = lower('Chicken Breast (cooked)')",
+    )
+  ).rows[0].count;
+
+  await admin.query(
+    `insert into public.foods (name, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g)
+     values ('Chicken Breast (cooked)', 100, 'g', 165, 31, 0, 3.6)
+     on conflict (lower(name), lower(coalesce(brand, ''))) where created_by is null do nothing`,
+  );
+
+  const afterCount = (
+    await admin.query(
+      "select count(*)::int as count from public.foods where created_by is null and lower(name) = lower('Chicken Breast (cooked)')",
+    )
+  ).rows[0].count;
+
+  record(
+    'Re-running the built-in seed insert does not create a duplicate row',
+    beforeCount === 1 && afterCount === 1,
+    `before=${beforeCount}, after=${afterCount}`,
+  );
+
+  // Brand search: two default foods sharing a name but from different
+  // brands must both be findable and kept distinct, not merged/deduped.
+  // Name is deliberately distinct from the 'Protein Bar' fixture created
+  // earlier in this file (built for the food_logs source-food tests above)
+  // so this check's row counts aren't polluted by that unrelated fixture.
+  await admin.query(
+    `insert into public.foods (name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g)
+     values
+       ('Trail Mix Bar (Test Fixture)', 'Acme', 1, 'bar', 200, 20, 20, 7),
+       ('Trail Mix Bar (Test Fixture)', 'Zenith', 1, 'bar', 210, 18, 22, 8)
+     on conflict (lower(name), lower(coalesce(brand, ''))) where created_by is null do nothing`,
+  );
+
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      'select brand from public.foods where created_by is null and brand ilike $1',
+      ['%acme%'],
+    );
+    record(
+      'Partial, case-insensitive brand search finds the right branded default food',
+      res.rows.length === 1 && res.rows[0].brand === 'Acme',
+      JSON.stringify(res.rows),
+    );
+  });
+
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      "select brand from public.foods where created_by is null and name = 'Trail Mix Bar (Test Fixture)' order by brand",
+    );
+    record(
+      'Two default foods sharing a name are kept distinct by brand',
+      res.rows.map((r) => r.brand).join(',') === 'Acme,Zenith',
+      JSON.stringify(res.rows),
+    );
+  });
+
+  console.log('\nRunning profile picture (avatar storage) tests...\n');
+
+  record(
+    'The avatars bucket is public (avatars are readable without a signed URL)',
+    (await admin.query("select public from storage.buckets where id = 'avatars'")).rows[0]
+      ?.public === true,
+  );
+
+  const userAAvatarPath = `${userA}/avatar.jpg`;
+
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      "insert into storage.objects (bucket_id, name, owner) values ('avatars', $1, $2)",
+      [userAAvatarPath, userA],
+    );
+    record(
+      'A user can upload their own avatar (insert under their own user-id folder)',
+      res.rowCount === 1,
+      `rowCount=${res.rowCount}`,
+    );
+  });
+
+  await expectThrows(
+    asUser(userB, (client) =>
+      client.query(
+        "insert into storage.objects (bucket_id, name, owner) values ('avatars', $1, $2)",
+        [userAAvatarPath, userA],
+      ),
+    ),
+    "User B cannot upload into User A's avatar folder",
+    RLS_ERROR,
+  );
+
+  await asUserCommitted(userA, (client) =>
+    client.query(
+      "insert into storage.objects (bucket_id, name, owner) values ('avatars', $1, $2) on conflict do nothing",
+      [userAAvatarPath, userA],
+    ),
+  );
+
+  await asUser(userB, async (client) => {
+    const res = await client.query(
+      "select * from storage.objects where bucket_id = 'avatars' and name = $1",
+      [userAAvatarPath],
+    );
+    record(
+      "Any authenticated user can read (view) User A's avatar object -- public read by design",
+      res.rowCount === 1,
+      `rowCount=${res.rowCount}`,
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const upd = await client.query(
+      "update storage.objects set name = 'hacked/avatar.jpg' where bucket_id = 'avatars' and name = $1",
+      [userAAvatarPath],
+    );
+    record(
+      "User B cannot overwrite User A's avatar via UPDATE",
+      upd.rowCount === 0,
+      `rowCount=${upd.rowCount}`,
+    );
+  });
+
+  await asUser(userB, async (client) => {
+    const del = await client.query(
+      "delete from storage.objects where bucket_id = 'avatars' and name = $1",
+      [userAAvatarPath],
+    );
+    record(
+      "User B cannot delete User A's avatar via DELETE",
+      del.rowCount === 0,
+      `rowCount=${del.rowCount}`,
+    );
+  });
+
+  await asUser(userA, async (client) => {
+    const upd = await client.query(
+      "update storage.objects set name = $1 where bucket_id = 'avatars' and name = $1",
+      [userAAvatarPath],
+    );
+    record(
+      'A user can update (replace/change) their own avatar',
+      upd.rowCount === 1,
+      `rowCount=${upd.rowCount}`,
+    );
+  });
+
+  await asUser(userA, async (client) => {
+    const del = await client.query(
+      "delete from storage.objects where bucket_id = 'avatars' and name = $1",
+      [userAAvatarPath],
+    );
+    record(
+      'A user can remove (delete) their own avatar',
+      del.rowCount === 1,
+      `rowCount=${del.rowCount}`,
+    );
+  });
+
+  await asUser(userA, async (client) => {
+    const res = await client.query('select avatar_url from public.users where id = $1', [userA]);
+    record(
+      'public.users.avatar_url exists and defaults to null (no picture set)',
+      res.rows.length === 1 && res.rows[0].avatar_url === null,
+      JSON.stringify(res.rows[0]),
+    );
+  });
+
+  await asUserCommitted(userA, (client) =>
+    client.query(
+      "update public.users set avatar_url = 'https://example.test/a.jpg' where id = $1",
+      [userA],
+    ),
+  );
+
+  await asUser(userB, async (client) => {
+    const res = await client.query('select avatar_url from public.users where id = $1', [userA]);
+    expectRowCount(
+      res,
+      0,
+      "User B cannot select User A's avatar_url (same users-table RLS as every other profile field)",
+    );
+  });
+
+  console.log('\nRunning external food provider (cached branded foods) tests...\n');
+
+  // A dedicated connection, isolated from `admin`'s own transaction state
+  // (which toggles between autocommit and explicit begin/commit blocks
+  // throughout this file) -- this section commits real rows and expects a
+  // real constraint violation, so it shouldn't have to reason about
+  // whatever state `admin` happens to be left in by earlier sections.
+  const foodsAdmin = connect();
+  await foodsAdmin.connect();
+
+  await foodsAdmin.query(
+    `insert into public.foods (name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, provider, provider_food_id, barcode)
+     values ('Oreo Original', 'Oreo', 34, 'g', 160, 1.6, 25, 7, 'open_food_facts', '0066721016123', '0066721016123')`,
+  );
+  // A different name/brand (so this can't also collide with the unrelated
+  // foods_builtin_name_brand_unique constraint) but the SAME provider +
+  // provider_food_id -- isolates testing foods_provider_food_unique
+  // specifically.
+  await expectThrows(
+    foodsAdmin.query(
+      `insert into public.foods (name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, provider, provider_food_id, barcode)
+       values ('Oreo Original (Relisted)', 'Oreo', 34, 'g', 160, 1.6, 25, 7, 'open_food_facts', '0066721016123', '0066721016123')`,
+    ),
+    'Caching the same external product twice (same provider + provider_food_id) violates the dedup-safe unique index',
+    /duplicate key|unique/i,
+  );
+
+  // foodsAdmin has no open transaction (each statement above autocommitted
+  // individually), so the expected failure above didn't poison anything --
+  // this upsert runs as a normal next statement, no rollback/savepoint needed.
+  await foodsAdmin.query(
+    `insert into public.foods (name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, provider, provider_food_id, barcode)
+     values ('Oreo Original', 'Oreo', 34, 'g', 165, 1.7, 25, 7, 'open_food_facts', '0066721016123', '0066721016123')
+     on conflict (provider, provider_food_id) do update set calories = excluded.calories`,
+  ); // matches the plain (non-partial) foods_provider_food_unique index
+  const refreshed = await foodsAdmin.query(
+    "select count(*)::int as count, max(calories) as calories from public.foods where provider = 'open_food_facts' and provider_food_id = '0066721016123'",
+  );
+  record(
+    'Re-searching the same external product upserts (refreshes) the cached row rather than duplicating it',
+    refreshed.rows[0].count === 1 && Number(refreshed.rows[0].calories) === 165,
+    JSON.stringify(refreshed.rows[0]),
+  );
+
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      "select barcode, provider from public.foods where barcode = '0066721016123'",
+    );
+    record(
+      'A cached external food is readable by any authenticated user (built-in, created_by is null)',
+      res.rows.length === 1 && res.rows[0].provider === 'open_food_facts',
+      JSON.stringify(res.rows),
+    );
+  });
+
+  await foodsAdmin.end();
   await admin.end();
 }
 

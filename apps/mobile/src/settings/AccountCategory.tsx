@@ -1,6 +1,7 @@
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
+import { Avatar } from '../design/Avatar';
 import { PrimaryButton } from '../design/Button';
 import { SectionHeader } from '../design/SectionHeader';
 import { SegmentedControl } from '../design/SegmentedControl';
@@ -10,6 +11,7 @@ import { settingsStyles as styles } from './settingsStyles';
 
 interface Props {
   email: string;
+  avatarUrl: string | null;
   displayName: string;
   onChangeDisplayName: (value: string) => void;
   username: string;
@@ -28,6 +30,7 @@ interface Props {
 /** Account category: the existing profile form (unchanged behavior/API) plus Account Actions -- Change Password and Delete Account are visible but not yet backed by real functionality (see the completion report), Sign Out reuses the existing signOut() exactly as before. */
 export function AccountCategory({
   email,
+  avatarUrl,
   displayName,
   onChangeDisplayName,
   username,
@@ -63,13 +66,14 @@ export function AccountCategory({
         <AppCard>
           <View style={accountAvatarStyles.row}>
             <View style={[accountAvatarStyles.avatar, { backgroundColor: accentColor }]}>
-              {avatarInitial ? (
-                <Text style={[accountAvatarStyles.avatarInitial, { color: onAccentColor }]}>
-                  {avatarInitial}
-                </Text>
-              ) : (
-                <Feather name="user" size={20} color={onAccentColor} />
-              )}
+              <Avatar
+                uri={avatarUrl}
+                initial={avatarInitial}
+                size={48}
+                iconSize={20}
+                iconColor={onAccentColor}
+                initialStyle={[accountAvatarStyles.avatarInitial, { color: onAccentColor }]}
+              />
             </View>
             <View style={styles.rowBody}>
               <Text testID="account-email" style={styles.rowTitle}>
@@ -201,6 +205,7 @@ const accountAvatarStyles = StyleSheet.create({
     borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   avatarInitial: {
     fontSize: 20,

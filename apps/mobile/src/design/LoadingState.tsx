@@ -16,6 +16,9 @@ export function LoadingState({ testID }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    // Kept on the static default rather than 'transparent': this shared
+    // component is also used by OnboardingScreen, which is explicitly out
+    // of scope for the Background Theme feature.
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',

@@ -3,14 +3,26 @@ import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { colors, typeScale } from '../design/theme';
 import { fromKg, roundWeight } from '../lib/units';
-import type { RootStackScreenProps } from '../navigation/types';
+import type { RootStackParamList } from '../navigation/types';
 import type { OneRepMaxWithExercise, RepPRWithExercise } from '../workouts/prSummaryQueries';
+import { mergeAndSortPRs, type PRFeedRow } from './prFeed';
 import { PRRow } from './PRRow';
 import { ProgressEmptyState } from './ProgressEmptyState';
 import { fetchWorkoutIdForSet } from './progressStatsQueries';
 import { progressStyles as styles } from './progressStyles';
 
-type Navigation = RootStackScreenProps<'ProgressOverview'>['navigation'];
+// A structural subset of the real navigation prop -- only the two routes
+// this component actually navigates to. Any screen's real navigation
+// object (ProgressOverviewScreen, ProfileScreen, ...) satisfies this
+// regardless of its own route name, without the generic-variance issues
+// NativeStackNavigationProp<RootStackParamList> (no pinned route) runs
+// into for methods like setParams that this component never calls.
+type Navigation = {
+  navigate<RouteName extends 'ShareWorkout' | 'ProgressExerciseDetail'>(
+    screen: RouteName,
+    params: RootStackParamList[RouteName],
+  ): void;
+};
 
 interface Props {
   repPRs: RepPRWithExercise[];
@@ -18,55 +30,39 @@ interface Props {
   weightUnit: 'kg' | 'lb';
   accentColor: string;
   navigation: Navigation;
-}
-
-interface Row {
-  key: string;
-  exerciseId: string;
-  exerciseName: string;
-  weightKg: number;
-  reps: number | null;
-  achievedAt: string;
-  recordType: string;
-  sourceSetId: string;
+  /** Defaults to true (ProgressOverviewScreen's own usage, where this
+   * section is the screen's only scrollable content). Pass false when
+   * this is already nested inside another vertical ScrollView (e.g.
+   * ProfileScreen) -- a FlatList nested inside a same-orientation
+   * ScrollView breaks windowing (RN's own documented warning), so this
+   * renders the identical rows as a plain, non-virtualized list instead.
+   * Nothing about the data/PR logic differs between the two modes. */
+  scrollable?: boolean;
 }
 
 // Every personal record Progresso currently tracks: rep-count PRs and true
 // 1RMs (both database-maintained, see prSummaryQueries.ts), merged into one
-// feed sorted by when they were achieved. The record-type distinction shown
+// feed sorted by when they were achieved (mergeAndSortPRs, shared with
+// OverviewSection's "Recent Milestones"). The record-type distinction shown
 // per row is exactly what the data supports -- nothing invented. Section 12
 // (Shareable Progress) lives here, next to the most recent record, reusing
 // the existing ShareWorkout flow by resolving a PR's source set back to the
 // workout it was achieved in.
-export function PRsSection({ repPRs, oneRepMaxes, weightUnit, accentColor, navigation }: Props) {
+export function PRsSection({
+  repPRs,
+  oneRepMaxes,
+  weightUnit,
+  accentColor,
+  navigation,
+  scrollable = true,
+}: Props) {
   const [shareError, setShareError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
 
-  const rows = useMemo<Row[]>(() => {
-    const fromPRs: Row[] = repPRs.map((pr) => ({
-      key: `pr-${pr.exerciseId}-${pr.reps}`,
-      exerciseId: pr.exerciseId,
-      exerciseName: pr.exerciseName,
-      weightKg: pr.bestWeightKg,
-      reps: pr.reps,
-      achievedAt: pr.achievedAt,
-      recordType: `${pr.reps}-Rep PR`,
-      sourceSetId: pr.sourceSetId,
-    }));
-    const fromOrms: Row[] = oneRepMaxes.map((orm) => ({
-      key: `orm-${orm.exerciseId}`,
-      exerciseId: orm.exerciseId,
-      exerciseName: orm.exerciseName,
-      weightKg: orm.weightKg,
-      reps: null,
-      achievedAt: orm.achievedAt,
-      recordType: '1RM',
-      sourceSetId: orm.sourceSetId,
-    }));
-    return [...fromPRs, ...fromOrms].sort(
-      (a, b) => new Date(b.achievedAt).getTime() - new Date(a.achievedAt).getTime(),
-    );
-  }, [repPRs, oneRepMaxes]);
+  const rows = useMemo<PRFeedRow[]>(
+    () => mergeAndSortPRs(repPRs, oneRepMaxes),
+    [repPRs, oneRepMaxes],
+  );
 
   const mostRecent = rows[0] ?? null;
 
@@ -86,6 +82,29 @@ export function PRsSection({ repPRs, oneRepMaxes, weightUnit, accentColor, navig
     } finally {
       setSharing(false);
     }
+  }
+
+  function renderRow(item: PRFeedRow, index: number) {
+    return (
+      <PRRow
+        key={item.key}
+        testID={`progress-pr-row-${item.key}`}
+        exerciseName={item.exerciseName}
+        weightDisplay={roundWeight(fromKg(item.weightKg, weightUnit))}
+        reps={item.reps}
+        unit={weightUnit}
+        achievedAt={item.achievedAt}
+        recordType={item.recordType}
+        accentColor={accentColor}
+        showDivider={index > 0}
+        onPress={() =>
+          navigation.navigate('ProgressExerciseDetail', {
+            exerciseId: item.exerciseId,
+            exerciseName: item.exerciseName,
+          })
+        }
+      />
+    );
   }
 
   if (rows.length === 0) {
@@ -123,31 +142,17 @@ export function PRsSection({ repPRs, oneRepMaxes, weightUnit, accentColor, navig
         <Feather name="share-2" size={14} color={accentColor} />
         <Text style={[styles.shareButtonText, { color: accentColor }]}>Share Progress</Text>
       </TouchableOpacity>
-      <FlatList
-        testID="progress-prs-list"
-        style={styles.sectionFill}
-        data={rows}
-        keyExtractor={(item) => item.key}
-        renderItem={({ item, index }) => (
-          <PRRow
-            testID={`progress-pr-row-${item.key}`}
-            exerciseName={item.exerciseName}
-            weightDisplay={roundWeight(fromKg(item.weightKg, weightUnit))}
-            reps={item.reps}
-            unit={weightUnit}
-            achievedAt={item.achievedAt}
-            recordType={item.recordType}
-            accentColor={accentColor}
-            showDivider={index > 0}
-            onPress={() =>
-              navigation.navigate('ProgressExerciseDetail', {
-                exerciseId: item.exerciseId,
-                exerciseName: item.exerciseName,
-              })
-            }
-          />
-        )}
-      />
+      {scrollable ? (
+        <FlatList
+          testID="progress-prs-list"
+          style={styles.sectionFill}
+          data={rows}
+          keyExtractor={(item) => item.key}
+          renderItem={({ item, index }) => renderRow(item, index)}
+        />
+      ) : (
+        <View testID="progress-prs-list">{rows.map((item, index) => renderRow(item, index))}</View>
+      )}
     </View>
   );
 }

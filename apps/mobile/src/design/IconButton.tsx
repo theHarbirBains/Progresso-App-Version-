@@ -1,5 +1,6 @@
 import { ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { GlassBackground } from './GlassBackground';
 import { colors, radii } from './theme';
 
 interface Props {
@@ -48,6 +49,7 @@ export function IconButton({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: Boolean(disabled) }}
     >
+      {!backgroundColor ? <GlassBackground /> : null}
       {loading ? (
         <ActivityIndicator size="small" color={color} />
       ) : (
@@ -62,11 +64,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   disabled: {
     opacity: 0.5,

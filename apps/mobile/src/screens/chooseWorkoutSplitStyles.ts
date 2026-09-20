@@ -7,7 +7,9 @@ import { colors, radii, spacing, typeScale } from '../design/theme';
 export const chooseWorkoutSplitStyles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
+    // paints the selected Background Theme; screens no longer hardcode it.
+    backgroundColor: 'transparent',
   },
   scrollContent: {
     paddingHorizontal: spacing.xxl,

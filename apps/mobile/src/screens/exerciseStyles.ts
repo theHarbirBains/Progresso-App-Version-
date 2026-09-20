@@ -45,6 +45,12 @@ export const exerciseStyles = StyleSheet.create({
     gap: 8,
     paddingBottom: 12,
   },
+  // Extra vertical breathing room around the muscle-group filter row on the
+  // library's browse/filter screen -- additive only, doesn't change chipRow/
+  // chip above (still used as-is by every existing caller).
+  chipsWrap: {
+    marginVertical: 8,
+  },
   chip: {
     borderRadius: 20,
     borderWidth: 1,

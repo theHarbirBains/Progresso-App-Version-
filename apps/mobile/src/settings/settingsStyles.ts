@@ -9,7 +9,9 @@ import { colors, radii, spacing, typeScale } from '../design/theme';
 export const settingsStyles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
+    // paints the selected Background Theme; screens no longer hardcode it.
+    backgroundColor: 'transparent',
   },
   // ScrollView defaults to flexGrow: 1 internally -- without this explicit
   // `flex: 1` on the *component* (not just its contentContainerStyle), this
@@ -54,8 +56,15 @@ export const settingsStyles = StyleSheet.create({
     paddingVertical: spacing.sm + 2,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: colors.glassBorder,
+    overflow: 'hidden',
+    // Centers a lone label (Settings' own tabs) exactly as before, and
+    // centers an icon-above-label stack (a caller that opts into
+    // CategoryTabs' optional `icon`, e.g. Progress) with a small gap
+    // between them -- a no-op for text-only callers since gap has no
+    // effect with a single child.
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   tabLabel: {
     fontSize: 14,

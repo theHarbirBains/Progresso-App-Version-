@@ -199,3 +199,40 @@ describe('NutritionTodayScreen', () => {
     expect(mockGoBack).toHaveBeenCalled();
   });
 });
+
+// Regression coverage for a reported bug: returning to this screen briefly
+// blanked it with a full-screen spinner before the refreshed data arrived.
+// `load()` only sets `loading` true on the very first call now (see
+// `hasLoadedOnce`) -- every later focus-triggered call is a silent
+// background refresh.
+describe('NutritionTodayScreen background refresh on focus', () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  }
+
+  it('does not show the loading indicator on a focus-triggered refresh', async () => {
+    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('food-log-empty');
+
+    const refresh = deferred<unknown[]>();
+    mockFetchTodaysFoodLogs.mockReturnValue(refresh.promise);
+
+    const calls = navigation.addListener.mock.calls;
+    const [, focusCallback] = calls[calls.length - 1];
+    act(() => {
+      focusCallback();
+    });
+
+    expect(screen.queryByTestId('nutrition-today-loading')).toBeNull();
+    expect(screen.getByTestId('nutrition-today-back')).toBeTruthy();
+
+    await act(async () => {
+      refresh.resolve([]);
+      await refresh.promise;
+    });
+  });
+});

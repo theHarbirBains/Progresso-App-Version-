@@ -8,6 +8,8 @@ export interface EnrichedWorkoutSummary extends WorkoutSummary {
   muscleGroups: SplitMuscleGroup[];
   /** Only sets that were actually logged (weight + reps entered and marked complete) -- the same completed-set definition used everywhere else in the app, never a raw count of every set row. */
   completedSetCount: number;
+  /** Same weight x reps definition as workoutSummary.ts's computeTotalVolumeKg, over the same completed-sets-only rows already fetched for completedSetCount -- no second query. */
+  totalVolumeKg: number;
   /** Null if somehow still incomplete (shouldn't happen for a completed-workout query, but avoids a NaN if it ever does). */
   durationMinutes: number | null;
 }
@@ -69,11 +71,12 @@ export async function enrichWorkoutSummaries(
   }
 
   const completedSetCountByWorkoutId = new Map<string, number>();
+  const totalVolumeKgByWorkoutId = new Map<string, number>();
   const workoutExerciseIds = Array.from(workoutIdByExerciseId.keys());
   if (workoutExerciseIds.length > 0) {
     const { data: sets, error: setsError } = await supabase
       .from('sets')
-      .select('workout_exercise_id')
+      .select('workout_exercise_id, weight_kg, reps')
       .in('workout_exercise_id', workoutExerciseIds)
       .is('deleted_at', null)
       .not('completed_at', 'is', null)
@@ -88,6 +91,10 @@ export async function enrichWorkoutSummaries(
         workoutId,
         (completedSetCountByWorkoutId.get(workoutId) ?? 0) + 1,
       );
+      totalVolumeKgByWorkoutId.set(
+        workoutId,
+        (totalVolumeKgByWorkoutId.get(workoutId) ?? 0) + Number(set.weight_kg) * Number(set.reps),
+      );
     }
   }
 
@@ -98,6 +105,7 @@ export async function enrichWorkoutSummaries(
       splitDayName: day?.name ?? null,
       muscleGroups: day?.muscleGroups ?? [],
       completedSetCount: completedSetCountByWorkoutId.get(workout.id) ?? 0,
+      totalVolumeKg: totalVolumeKgByWorkoutId.get(workout.id) ?? 0,
       durationMinutes: computeCompletedDurationMinutes(workout.performedAt, workout.completedAt),
     };
   });

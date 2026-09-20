@@ -1,11 +1,15 @@
+import { Alert, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile } from '../lib/api';
+import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
+import { createExercise, getMyProfile } from '../lib/api';
 import { fetchExercises } from '../exercises/exerciseQueries';
 import {
   addExerciseToWorkout,
+  cancelWorkout,
   completeWorkout,
   createSet,
+  fetchPreviousPerformance,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
   reorderExercises,
@@ -19,6 +23,14 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../lib/api', () => ({
   getMyProfile: jest.fn(),
+  updateMyProfile: jest.fn(),
+  createExercise: jest.fn(),
+  updateExercise: jest.fn(),
+  createEquipmentProfile: jest.fn(),
+}));
+
+jest.mock('../lib/equipmentPhotoUpload', () => ({
+  uploadEquipmentPhoto: jest.fn(),
 }));
 
 jest.mock('../exercises/exerciseQueries', () => ({
@@ -33,10 +45,13 @@ jest.mock('../workouts/workoutQueries', () => ({
   removeExerciseFromWorkout: jest.fn(),
   reorderExercises: jest.fn(),
   completeWorkout: jest.fn(),
+  cancelWorkout: jest.fn(),
+  fetchPreviousPerformance: jest.fn(),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockCreateExercise = createExercise as jest.Mock;
 const mockFetchExercises = fetchExercises as jest.Mock;
 const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 const mockCreateSet = createSet as jest.Mock;
@@ -45,11 +60,14 @@ const mockAddExerciseToWorkout = addExerciseToWorkout as jest.Mock;
 const mockRemoveExerciseFromWorkout = removeExerciseFromWorkout as jest.Mock;
 const mockReorderExercises = reorderExercises as jest.Mock;
 const mockCompleteWorkout = completeWorkout as jest.Mock;
+const mockCancelWorkout = cancelWorkout as jest.Mock;
+const mockFetchPreviousPerformance = fetchPreviousPerformance as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockReset = jest.fn();
+const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { goBack: mockGoBack, reset: mockReset };
+const navigation: any = { goBack: mockGoBack, reset: mockReset, navigate: mockNavigate };
 const route = { params: { workoutId: 'w1' } } as never;
 
 const baseWorkout = {
@@ -109,27 +127,42 @@ beforeEach(() => {
   mockRemoveExerciseFromWorkout.mockReset().mockResolvedValue(undefined);
   mockReorderExercises.mockReset().mockResolvedValue(undefined);
   mockCompleteWorkout.mockReset().mockResolvedValue(undefined);
+  mockFetchPreviousPerformance.mockReset().mockResolvedValue(null);
+  mockCancelWorkout.mockReset().mockResolvedValue(undefined);
   mockGoBack.mockClear();
   mockReset.mockClear();
+  mockNavigate.mockClear();
 });
 
 describe('ActiveWorkoutScreen', () => {
   it('loads the workout for the given workoutId (resuming the correct session)', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
 
     await waitFor(() => expect(mockFetchWorkoutDetail).toHaveBeenCalledWith('w1'));
     expect((await screen.findAllByText('Push Day')).length).toBeGreaterThan(0);
   });
 
   it('shows the muscle group from real exercise data, not hardcoded', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
 
     const card = await screen.findByTestId('exercise-card-we1');
     expect(within(card).getByText('Chest')).toBeTruthy();
   });
 
   it('never renders RIR, RPE, estimated calories, or an exercise image', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('exercise-card-we1');
 
     expect(screen.queryByText(/RIR/i)).toBeNull();
@@ -139,20 +172,32 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('shows Total Sets reflecting every set that exists, including an incomplete one', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
 
     expect(await screen.findByTestId('workout-summary-total-sets')).toHaveTextContent('2');
   });
 
   it('shows Total Volume reflecting only logged (completed) sets', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
 
     // Only s1 (100kg x 10) is completed; s2 is blank and contributes 0.
     expect(await screen.findByTestId('workout-summary-total-volume')).toHaveTextContent('1000 kg');
   });
 
   it('completing a set requires a valid weight and reps first', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('exercise-card-we1');
 
     const completeButton = screen.getByTestId('exercise-card-we1-set-s2-complete');
@@ -160,7 +205,11 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('marks a set complete once weight and reps are entered, using the existing set-update path', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '120');
@@ -175,8 +224,51 @@ describe('ActiveWorkoutScreen', () => {
     );
   });
 
+  it('accepts a .5 weight increment', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '100.5');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '6');
+
+    expect(
+      screen.getByTestId('exercise-card-we1-set-s2-complete').props.accessibilityState.disabled,
+    ).toBe(false);
+  });
+
+  it('rejects arbitrary decimal precision -- only whole numbers or .5 increments are a valid weight', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    for (const invalid of ['100.1', '100.25', '100.75']) {
+      fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), invalid);
+      fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '6');
+      expect(
+        screen.getByTestId('exercise-card-we1-set-s2-complete').props.accessibilityState.disabled,
+      ).toBe(true);
+    }
+
+    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
+    expect(mockUpdateSet).not.toHaveBeenCalledWith(
+      's2',
+      expect.objectContaining({ completedAt: expect.any(String) }),
+    );
+  });
+
   it('Total Sets increases by exactly one when Add Set is pressed', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('exercise-card-we1');
     expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('2');
 
@@ -188,7 +280,11 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('removes an exercise using the existing soft-delete function', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('exercise-card-we1-remove'));
@@ -211,7 +307,11 @@ describe('ActiveWorkoutScreen', () => {
       hasMore: false,
     });
 
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
@@ -225,7 +325,11 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('opens the existing custom-exercise creation flow', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('active-workout-create-custom'));
@@ -249,7 +353,11 @@ describe('ActiveWorkoutScreen', () => {
       ],
     });
 
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('exercise-card-we2');
 
     fireEvent.press(screen.getByTestId('exercise-card-we2-move-up'));
@@ -275,7 +383,11 @@ describe('ActiveWorkoutScreen', () => {
       activeWorkoutSplitId: null,
     });
 
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
 
     const badge = await screen.findByTestId('exercise-card-we1-muscle-group');
     const text = badge.props.children;
@@ -283,31 +395,533 @@ describe('ActiveWorkoutScreen', () => {
     expect(merged.color).toBe('#8B5CF6');
   });
 
-  it('completes the workout via the header options menu using the existing completeWorkout function', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+  it('has no back arrow or "..." options menu -- Finish Workout/Cancel Workout are the only exits', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('exercise-card-we1');
 
-    fireEvent.press(screen.getByTestId('workout-header-options'));
-    fireEvent.press(screen.getByTestId('workout-action-complete'));
-
-    await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
-    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'WorkoutHistory' }] });
+    expect(screen.queryByTestId('workout-header-back')).toBeNull();
+    expect(screen.queryByTestId('workout-header-options')).toBeNull();
+    expect(within(screen.getByTestId('active-workout-header')).getByText('Push Day')).toBeTruthy();
   });
 
-  it('goes back when Back is pressed', async () => {
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+  it('shows a prominent Finish Workout button that completes the workout via the same existing completeWorkout function -- exactly once, no duplicate record', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('exercise-card-we1');
 
-    fireEvent.press(screen.getByTestId('workout-header-back'));
+    const button = screen.getByTestId('complete-workout');
+    expect(button).toHaveTextContent('Finish Workout');
+    expect(screen.queryByText('Workout Complete')).toBeNull();
 
-    expect(mockGoBack).toHaveBeenCalled();
+    fireEvent.press(button);
+
+    await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
+    expect(mockCompleteWorkout).toHaveBeenCalledTimes(1);
+    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'WorkoutHistory' }] });
+    expect(mockCancelWorkout).not.toHaveBeenCalled();
+  });
+
+  it("the Finish Workout button follows the user's selected Workout accent, not a hardcoded color", async () => {
+    mockGetMyProfile.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@example.com',
+      role: 'user',
+      displayName: null,
+      username: null,
+      weightUnit: 'kg',
+      workoutAccentColor: '#8B5CF6',
+      nutritionAccentColor: null,
+      activeWorkoutSplitId: null,
+    });
+
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    const button = screen.getByTestId('complete-workout');
+    const flat = StyleSheet.flatten(button.props.style);
+    expect(flat.backgroundColor).toBe('#8B5CF6');
+  });
+
+  it('is reachable without scrolling even with many exercises, and does not interfere with adding sets/exercises', async () => {
+    const manyExercises = Array.from({ length: 15 }, (_, i) => ({
+      id: `we${i}`,
+      exerciseId: `ex${i}`,
+      exerciseName: `Exercise ${i}`,
+      muscleGroup: 'chest' as const,
+      orderIndex: i,
+      sets: [{ id: `s${i}`, setIndex: 1, weightKg: null, reps: null, completedAt: null }],
+    }));
+    mockFetchWorkoutDetail.mockResolvedValue({ ...baseWorkout, exercises: manyExercises });
+
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+
+    // The footer button is a sibling of the ScrollView, not inside its
+    // scrollable content, so it renders regardless of exercise count.
+    expect(await screen.findByTestId('complete-workout')).toBeTruthy();
+    expect(screen.getByTestId('active-workout-add-exercise')).toBeTruthy();
   });
 
   it('shows an error message when loading fails', async () => {
     mockFetchWorkoutDetail.mockRejectedValue(new Error('network error'));
 
-    render(<ActiveWorkoutScreen navigation={navigation} route={route} />);
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
 
     expect(await screen.findByTestId('active-workout-error')).toHaveTextContent('network error');
+  });
+});
+
+describe('ActiveWorkoutScreen unilateral exercises', () => {
+  const unilateralWorkout = {
+    ...baseWorkout,
+    exercises: [
+      {
+        id: 'we-bss',
+        exerciseId: 'ex-bss',
+        exerciseName: 'Bulgarian Split Squat',
+        muscleGroup: 'quadriceps' as const,
+        movementType: 'unilateral' as const,
+        loggingStyle: 'alternating' as const,
+        orderIndex: 1,
+        sets: [
+          {
+            id: 's-left',
+            setIndex: 1,
+            side: 'left' as const,
+            weightKg: null,
+            reps: null,
+            completedAt: null,
+          },
+          {
+            id: 's-right',
+            setIndex: 1,
+            side: 'right' as const,
+            weightKg: null,
+            reps: null,
+            completedAt: null,
+          },
+        ],
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    mockFetchWorkoutDetail.mockResolvedValue(unilateralWorkout);
+  });
+
+  it('shows the "weight is per side" note and Left/Right rows instead of a single weight/reps row', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+
+    const card = await screen.findByTestId('exercise-card-we-bss');
+    expect(within(card).getByTestId('exercise-card-we-bss-per-side-note')).toHaveTextContent(
+      'Weight is per side',
+    );
+    expect(within(card).getByTestId('exercise-card-we-bss-set-1-left-weight')).toBeTruthy();
+    expect(within(card).getByTestId('exercise-card-we-bss-set-1-right-weight')).toBeTruthy();
+  });
+
+  it('logs left and right performance independently, never combining them into one weight', async () => {
+    mockUpdateSet.mockReset().mockImplementation(async (setId: string, updates: unknown) => ({
+      id: setId,
+      setIndex: 1,
+      side: setId === 's-left' ? 'left' : 'right',
+      weightKg: null,
+      reps: null,
+      completedAt: null,
+      ...(updates as object),
+    }));
+
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we-bss');
+
+    fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-weight'), '42.5');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-reps'), '10');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-right-weight'), '40');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-right-reps'), '10');
+    fireEvent.press(screen.getByTestId('exercise-card-we-bss-set-1-complete'));
+
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        's-left',
+        expect.objectContaining({ weightKg: 42.5, reps: 10, completedAt: expect.any(String) }),
+      ),
+    );
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      's-right',
+      expect.objectContaining({ weightKg: 40, reps: 10, completedAt: expect.any(String) }),
+    );
+    // Confirms each side's own real weight was sent -- never 42.5 + 40 = 82.5.
+    expect(mockUpdateSet).not.toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ weightKg: 82.5 }),
+    );
+  });
+
+  it('keeps the set incomplete (and Complete disabled) until BOTH sides have valid values', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we-bss');
+
+    const completeButton = screen.getByTestId('exercise-card-we-bss-set-1-complete');
+    expect(completeButton.props.accessibilityState.disabled).toBe(true);
+
+    // Only the left side filled in -- still incomplete.
+    fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-weight'), '42.5');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-reps'), '10');
+    expect(
+      screen.getByTestId('exercise-card-we-bss-set-1-complete').props.accessibilityState.disabled,
+    ).toBe(true);
+
+    fireEvent.press(completeButton);
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it('creates a new set for a unilateral exercise as a left+right pair sharing the next set_index', async () => {
+    mockCreateSet
+      .mockReset()
+      .mockImplementation(async (_weId: string, setIndex: number, side?: string) => ({
+        id: side === 'left' ? 's-left-2' : 's-right-2',
+        setIndex,
+        side: side ?? null,
+        weightKg: null,
+        reps: null,
+        completedAt: null,
+      }));
+
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we-bss');
+
+    fireEvent.press(screen.getByTestId('exercise-card-we-bss-add-set'));
+
+    await waitFor(() => expect(mockCreateSet).toHaveBeenCalledWith('we-bss', 2, 'left'));
+    expect(mockCreateSet).toHaveBeenCalledWith('we-bss', 2, 'right');
+    expect(await screen.findByTestId('exercise-card-we-bss-set-2-left-weight')).toBeTruthy();
+    expect(screen.getByTestId('exercise-card-we-bss-set-2-right-weight')).toBeTruthy();
+  });
+
+  it('adds a unilateral exercise from the picker, creating both a left and a right blank row for its first set', async () => {
+    mockFetchExercises.mockResolvedValue({
+      rows: [
+        {
+          id: 'ex-row',
+          name: 'Single-Arm Dumbbell Row',
+          muscleGroup: 'back',
+          movementType: 'unilateral',
+          loggingStyle: 'single_side',
+          isActive: true,
+          createdBy: null,
+        },
+      ],
+      hasMore: false,
+    });
+    mockCreateSet
+      .mockReset()
+      .mockImplementation(async (weId: string, setIndex: number, side?: string) => ({
+        id: side === 'left' ? 's-row-left' : 's-row-right',
+        setIndex,
+        side: side ?? null,
+        weightKg: null,
+        reps: null,
+        completedAt: null,
+      }));
+
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we-bss');
+
+    fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
+    fireEvent.press(await screen.findByTestId('exercise-picker-item-ex-row'));
+
+    await waitFor(() => expect(mockAddExerciseToWorkout).toHaveBeenCalledWith('w1', 'ex-row', 2));
+    expect(mockCreateSet).toHaveBeenCalledWith('we2', 1, 'left');
+    expect(mockCreateSet).toHaveBeenCalledWith('we2', 1, 'right');
+    const card = await screen.findByTestId('exercise-card-we2');
+    expect(within(card).getByTestId('exercise-card-we2-set-1-left-weight')).toBeTruthy();
+    expect(within(card).getByTestId('exercise-card-we2-set-1-right-weight')).toBeTruthy();
+  });
+});
+
+describe('Last Time You Did This', () => {
+  // Explicitly removed from the live workout screen (was reintroducing
+  // extra vertical content mid-workout) -- this guards it doesn't quietly
+  // come back.
+  it('does not render anywhere on the live workout screen', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    expect(screen.queryByTestId('active-workout-last-time')).toBeNull();
+    expect(screen.queryByText('Last Time You Did This')).toBeNull();
+    expect(screen.queryByText('Shown are your top sets from last time.')).toBeNull();
+    expect(screen.getByText("Today's Workout")).toBeTruthy();
+  });
+});
+
+describe('Cancel Workout', () => {
+  it('asks for confirmation before cancelling', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('cancel-workout'));
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Cancel Workout',
+      expect.stringContaining('discards the current workout'),
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'Cancel Workout', style: 'destructive' }),
+      ]),
+    );
+    expect(mockCancelWorkout).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('does nothing when the confirmation is dismissed ("Keep Going")', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === 'Keep Going')?.onPress?.();
+    });
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('cancel-workout'));
+
+    expect(mockCancelWorkout).not.toHaveBeenCalled();
+    expect(mockReset).not.toHaveBeenCalled();
+  });
+
+  it('soft-deletes the workout and returns to Dashboard on confirm -- never completing or advancing it', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === 'Cancel Workout')?.onPress?.();
+    });
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('cancel-workout'));
+
+    await waitFor(() => expect(mockCancelWorkout).toHaveBeenCalledWith('w1'));
+    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Dashboard' }] });
+    expect(mockCompleteWorkout).not.toHaveBeenCalled();
+  });
+
+  it('shows an error and stays on screen if cancelling fails', async () => {
+    mockCancelWorkout.mockRejectedValue(new Error('network error'));
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === 'Cancel Workout')?.onPress?.();
+    });
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('cancel-workout'));
+
+    expect(await screen.findByTestId('active-workout-error')).toHaveTextContent('network error');
+    expect(mockReset).not.toHaveBeenCalled();
+  });
+});
+
+describe('Create Custom Exercise from Add Exercise', () => {
+  it('opens the full New Exercise screen from inside the picker, and reopens the picker with the new exercise addable after saving', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
+    fireEvent.press(await screen.findByTestId('exercise-picker-create-custom'));
+
+    // The picker closes and the full New Exercise screen (with the
+    // Machine/Equipment section) replaces the active workout in its place.
+    expect(screen.queryByTestId('exercise-picker-search')).toBeNull();
+    expect(await screen.findByText('New Exercise')).toBeTruthy();
+    expect(screen.getByText('Machine / Equipment')).toBeTruthy();
+
+    mockCreateExercise.mockResolvedValue({ id: 'ex-new' });
+    mockFetchExercises.mockResolvedValue({
+      rows: [
+        {
+          id: 'ex-new',
+          name: 'Cable Preacher Curl',
+          muscleGroup: 'biceps',
+          isActive: true,
+          createdBy: 'user-1',
+        },
+      ],
+      hasMore: false,
+    });
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Cable Preacher Curl');
+    fireEvent.press(screen.getByTestId('muscle-group-chip-biceps'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    // Back in the picker, immediately able to add the exercise just created.
+    fireEvent.press(await screen.findByTestId('exercise-picker-item-ex-new'));
+
+    await waitFor(() => expect(mockAddExerciseToWorkout).toHaveBeenCalledWith('w1', 'ex-new', 2));
+  });
+
+  it('also opens the same full New Exercise screen from the standalone Create Custom button', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('active-workout-create-custom'));
+
+    expect(await screen.findByText('New Exercise')).toBeTruthy();
+  });
+});
+
+describe('Last Workout', () => {
+  it('shows no section for an exercise with no prior session', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    expect(mockFetchPreviousPerformance).toHaveBeenCalledWith('user-1', 'ex1', 'w1');
+    expect(screen.queryByTestId('exercise-card-we1-previous-session')).toBeNull();
+  });
+
+  it('shows every set from the last completed session for an exercise already in the workout, not just the top one', async () => {
+    mockFetchPreviousPerformance.mockResolvedValue({
+      performedAt: '2026-01-05T00:00:00Z',
+      sets: [
+        { id: 'prev-1', setIndex: 1, weightKg: 100, reps: 5, completedAt: '...', side: null },
+        { id: 'prev-2', setIndex: 2, weightKg: 97.5, reps: 5, completedAt: '...', side: null },
+        { id: 'prev-3', setIndex: 3, weightKg: 95, reps: 6, completedAt: '...', side: null },
+      ],
+    });
+
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    const section = await screen.findByTestId('exercise-card-we1-previous-session');
+    expect(section).toHaveTextContent(/Last Workout/);
+    // In logged order, all 3 -- never capped or reduced to a single "top" set.
+    expect(screen.getByTestId('exercise-card-we1-previous-set-1')).toHaveTextContent(/100 kg/);
+    expect(screen.getByTestId('exercise-card-we1-previous-set-2')).toHaveTextContent(/97\.5 kg/);
+    expect(screen.getByTestId('exercise-card-we1-previous-set-3')).toHaveTextContent(/95 kg/);
+  });
+
+  it('fetches and shows the previous session for a newly added exercise too, not just ones already in the workout', async () => {
+    mockFetchExercises.mockResolvedValue({
+      rows: [{ id: 'ex2', name: 'Barbell Back Squat', muscleGroup: 'quadriceps', isActive: true }],
+      hasMore: false,
+    });
+    mockAddExerciseToWorkout.mockResolvedValue('we2');
+    mockFetchPreviousPerformance.mockImplementation(
+      async (_userId: string, exerciseId: string, _excludeWorkoutId: string) => {
+        if (exerciseId === 'ex2') {
+          return {
+            performedAt: '2026-01-04T00:00:00Z',
+            sets: [
+              { id: 'prev-x', setIndex: 1, weightKg: 60, reps: 8, completedAt: '...', side: null },
+            ],
+          };
+        }
+        return null;
+      },
+    );
+
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
+    fireEvent.press(await screen.findByTestId('exercise-picker-item-ex2'));
+
+    await waitFor(() =>
+      expect(mockFetchPreviousPerformance).toHaveBeenCalledWith('user-1', 'ex2', 'w1'),
+    );
+    const section = await screen.findByTestId('exercise-card-we2-previous-session');
+    expect(section).toHaveTextContent(/60 kg/);
+  });
+
+  it("opens this exercise's Progress detail when View History is pressed", async () => {
+    mockFetchPreviousPerformance.mockResolvedValue({
+      performedAt: '2026-01-05T00:00:00Z',
+      sets: [{ id: 'prev-1', setIndex: 1, weightKg: 100, reps: 5, completedAt: '...', side: null }],
+    });
+
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('exercise-card-we1-previous-session');
+
+    fireEvent.press(screen.getByTestId('exercise-card-we1-view-history'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('ProgressExerciseDetail', {
+      exerciseId: 'ex1',
+      exerciseName: 'Barbell Bench Press',
+    });
   });
 });

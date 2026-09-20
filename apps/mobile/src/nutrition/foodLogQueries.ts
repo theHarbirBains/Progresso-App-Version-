@@ -1,5 +1,7 @@
+import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
 import { supabase } from '../lib/supabase';
 import { calculateLogTotals, recalculateForQuantity } from './nutritionCalculations';
+import type { MealType } from './mealTypes';
 import type { FoodRow } from './foodQueries';
 
 // Direct-to-Supabase, same reasoning as foodQueries.ts: food_logs is
@@ -19,6 +21,8 @@ export interface FoodLogRow {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  /** Null for any log written before the food_log_meals_and_images migration -- never guessed. */
+  mealType: MealType | null;
   loggedAt: string;
 }
 
@@ -33,6 +37,7 @@ interface FoodLogDbRow {
   protein_g: string | number;
   carbs_g: string | number;
   fat_g: string | number;
+  meal_type: string | null;
   logged_at: string;
 }
 
@@ -48,12 +53,13 @@ function toFoodLogRow(row: FoodLogDbRow): FoodLogRow {
     proteinG: Number(row.protein_g),
     carbsG: Number(row.carbs_g),
     fatG: Number(row.fat_g),
+    mealType: row.meal_type as MealType | null,
     loggedAt: row.logged_at,
   };
 }
 
 const FOOD_LOG_COLUMNS =
-  'id, food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, logged_at';
+  'id, food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, meal_type, logged_at';
 
 /**
  * The current device's local calendar day as an absolute [start, end)
@@ -85,7 +91,32 @@ export async function fetchTodaysFoodLogs(
   return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
 }
 
-/** Logs `quantity` servings of `food` now. Snapshot totals are computed once, at log time, and stored -- never re-derived from foods afterward. */
+/**
+ * Every food log within the current Monday-start local week (through the
+ * following Monday, exclusive) -- same week boundary Workout Mode's own
+ * weekly widget already uses (dashboard/weeklyProgress.ts's
+ * getCurrentWeekRange), so "this week" means the same span everywhere in
+ * the app, not a second, differently-anchored definition.
+ */
+export async function fetchWeeklyFoodLogs(
+  userId: string,
+  now: Date = new Date(),
+): Promise<FoodLogRow[]> {
+  const { start, end } = getCurrentWeekRange(now);
+
+  const { data, error } = await supabase
+    .from('food_logs')
+    .select(FOOD_LOG_COLUMNS)
+    .eq('user_id', userId)
+    .gte('logged_at', start.toISOString())
+    .lt('logged_at', end.toISOString())
+    .order('logged_at', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
+}
+
+/** Logs `quantity` servings of `food` now, under `mealType`. Snapshot totals are computed once, at log time, and stored -- never re-derived from foods afterward. */
 export async function logFood(
   userId: string,
   food: Pick<
@@ -93,6 +124,7 @@ export async function logFood(
     'id' | 'name' | 'servingSize' | 'servingUnit' | 'calories' | 'proteinG' | 'carbsG' | 'fatG'
   >,
   quantity: number,
+  mealType: MealType,
 ): Promise<FoodLogRow> {
   const totals = calculateLogTotals(food, quantity);
 
@@ -109,6 +141,7 @@ export async function logFood(
       protein_g: totals.proteinG,
       carbs_g: totals.carbsG,
       fat_g: totals.fatG,
+      meal_type: mealType,
     })
     .select(FOOD_LOG_COLUMNS)
     .single();

@@ -41,7 +41,7 @@ describe('fetchAllRepPRs', () => {
           source_set_id: 'set-1',
           achieved_at: '2026-01-05T00:00:00Z',
           exercise_id: 'ex-1',
-          exercises: { name: 'Bench Press' },
+          exercises: { name: 'Bench Press', muscle_group: 'chest' },
         },
       ],
       error: null,
@@ -57,8 +57,29 @@ describe('fetchAllRepPRs', () => {
         achievedAt: '2026-01-05T00:00:00Z',
         exerciseId: 'ex-1',
         exerciseName: 'Bench Press',
+        muscleGroup: 'chest',
       },
     ]);
+  });
+
+  it("falls back to 'other' when the exercise join is missing a muscle group", async () => {
+    mockTable({
+      data: [
+        {
+          reps: 3,
+          best_weight_kg: '100.00',
+          source_set_id: 'set-3',
+          achieved_at: '2026-01-06T00:00:00Z',
+          exercise_id: 'ex-3',
+          exercises: null,
+        },
+      ],
+      error: null,
+    });
+
+    const result = await fetchAllRepPRs('user-1');
+
+    expect(result[0].muscleGroup).toBe('other');
   });
 
   it('returns an empty array when there are no rep PRs', async () => {

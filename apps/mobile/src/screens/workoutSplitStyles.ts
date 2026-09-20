@@ -4,12 +4,18 @@ import { colors, radii, spacing, typeScale } from '../design/theme';
 export const workoutSplitStyles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
+    // paints the selected Background Theme; screens no longer hardcode it.
+    backgroundColor: 'transparent',
   },
   scrollContent: {
     paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.xxxl,
   },
+  // Still used by WorkoutSplitFormScreen/WorkoutSplitViewScreen's own
+  // back-button headers (pushed detail screens, not the side-menu hamburger
+  // -- out of scope for the centered-title header pattern). WorkoutSplits-
+  // Screen itself now uses the shared AppHeader instead.
   header: {
     flexDirection: 'row',
     alignItems: 'center',

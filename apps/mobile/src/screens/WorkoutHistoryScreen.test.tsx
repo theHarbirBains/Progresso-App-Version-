@@ -1,5 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { AppMenuContext } from '../navigation/AppMenuContext';
 import { addMonths, MONTH_LABELS, toLocalDateKey } from '../workouts/calendarGrid';
 import { enrichWorkoutSummaries } from '../workouts/workoutHistoryEnrichment';
 import {
@@ -39,6 +40,22 @@ const navigation: any = {
   }),
 };
 
+const mockOpenMenu = jest.fn();
+const mockReportMode = jest.fn();
+
+// WorkoutHistoryScreen now opens the app-level side menu (via
+// AppMenuContext) from its own header, same as Dashboard -- this stands in
+// for that root-level provider.
+function renderScreen(currentMode: 'workout' | 'nutrition' = 'workout') {
+  return render(
+    <AppMenuContext.Provider
+      value={{ openMenu: mockOpenMenu, reportMode: mockReportMode, currentMode }}
+    >
+      <WorkoutHistoryScreen navigation={navigation} route={{} as never} />
+    </AppMenuContext.Provider>,
+  );
+}
+
 // Never hardcode "today" -- every fixture/assertion is built relative to
 // whenever the suite actually runs, so this never rots into a flaky
 // date-dependent test.
@@ -73,6 +90,8 @@ beforeEach(() => {
   mockFetchWorkoutHistory.mockReset().mockResolvedValue({ rows: [], hasMore: false });
   mockEnrichWorkoutSummaries.mockReset().mockImplementation(async (rows: unknown[]) => rows);
   mockNavigate.mockClear();
+  mockOpenMenu.mockClear();
+  mockReportMode.mockClear();
 });
 
 // FlatList/VirtualizedList schedules a deferred internal setState (cell
@@ -86,15 +105,69 @@ async function settle() {
 
 describe('WorkoutHistoryScreen', () => {
   it('shows the current month by default', async () => {
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
 
     expect(await screen.findByText(CURRENT_MONTH_LABEL)).toBeTruthy();
     expect(mockFetchWorkoutsForMonth).toHaveBeenCalledWith('user-1', CURRENT_YEAR, CURRENT_MONTH);
     await settle();
   });
 
+  it('opens the app-level side menu (workout mode) when the header button is pressed', async () => {
+    renderScreen();
+    await screen.findByText(CURRENT_MONTH_LABEL);
+
+    fireEvent.press(screen.getByTestId('workout-history-open-menu'));
+
+    expect(mockOpenMenu).toHaveBeenCalledWith('workout');
+    await settle();
+  });
+
+  // The hamburger and the page title used to be stacked in separate rows
+  // (menu button above "Workouts"); the shared AppHeader now puts them on
+  // one row, with the title centered.
+  it('renders the hamburger and the "Workouts" title on the shared AppHeader row', async () => {
+    renderScreen();
+    await screen.findByText(CURRENT_MONTH_LABEL);
+
+    const header = screen.getByTestId('workout-history-header');
+    expect(within(header).getByTestId('workout-history-open-menu')).toBeTruthy();
+    expect(within(header).getByText('Workouts')).toBeTruthy();
+    await settle();
+  });
+
+  it('shows the Workout/Nutrition mode toggle, since Workouts is a primary/root screen', async () => {
+    renderScreen();
+    await screen.findByText(CURRENT_MONTH_LABEL);
+
+    expect(screen.getByTestId('workout-history-mode-workout')).toBeTruthy();
+    expect(screen.getByTestId('workout-history-mode-nutrition')).toBeTruthy();
+    await settle();
+  });
+
+  it('navigates to Dashboard (Nutrition’s Home), not to Food, when the Nutrition segment is pressed', async () => {
+    renderScreen();
+    await screen.findByText(CURRENT_MONTH_LABEL);
+
+    fireEvent.press(screen.getByTestId('workout-history-mode-nutrition'));
+
+    expect(mockReportMode).toHaveBeenCalledWith('nutrition');
+    expect(mockNavigate).toHaveBeenCalledWith('Dashboard');
+    await settle();
+  });
+
+  it('does nothing when the already-selected Workout segment is pressed', async () => {
+    renderScreen();
+    await screen.findByText(CURRENT_MONTH_LABEL);
+
+    fireEvent.press(screen.getByTestId('workout-history-mode-workout'));
+
+    expect(mockReportMode).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    await settle();
+  });
+
   it("navigates to the previous/next month and reloads that month's data", async () => {
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByText(CURRENT_MONTH_LABEL);
     mockFetchWorkoutsForMonth.mockClear();
 
@@ -109,7 +182,7 @@ describe('WorkoutHistoryScreen', () => {
   it('marks real completed-workout dates on the calendar', async () => {
     mockFetchWorkoutsForMonth.mockResolvedValue([enrichedFixture({})]);
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('workout-calendar');
 
     const dot = await screen.findByTestId(`workout-calendar-dot-${FIXTURE_DATE_KEY}`);
@@ -122,7 +195,7 @@ describe('WorkoutHistoryScreen', () => {
   it('shows the workouts for a selected date', async () => {
     mockFetchWorkoutsForMonth.mockResolvedValue([enrichedFixture({})]);
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('workout-calendar');
 
     fireEvent.press(screen.getByTestId(`calendar-day-${FIXTURE_DATE_KEY}`));
@@ -134,7 +207,7 @@ describe('WorkoutHistoryScreen', () => {
   it('shows a clean empty state for a selected date with no workout', async () => {
     mockFetchWorkoutsForMonth.mockResolvedValue([enrichedFixture({})]);
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('workout-calendar');
 
     fireEvent.press(screen.getByTestId(`calendar-day-${OTHER_DAY_KEY}`));
@@ -148,7 +221,7 @@ describe('WorkoutHistoryScreen', () => {
   it('deselects a date when it is tapped again', async () => {
     mockFetchWorkoutsForMonth.mockResolvedValue([enrichedFixture({})]);
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('workout-calendar');
 
     fireEvent.press(screen.getByTestId(`calendar-day-${FIXTURE_DATE_KEY}`));
@@ -165,7 +238,7 @@ describe('WorkoutHistoryScreen', () => {
       enrichedFixture({ id: 'w2', durationMinutes: 62, completedSetCount: 15 }),
     ]);
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
 
     expect(await screen.findByTestId('workout-month-total')).toHaveTextContent('2');
     expect(screen.getByTestId('workout-month-time')).toHaveTextContent('2h 0m');
@@ -177,7 +250,7 @@ describe('WorkoutHistoryScreen', () => {
     mockFetchWorkoutsForMonth.mockResolvedValue([enrichedFixture({})]);
     mockFetchWorkoutHistory.mockResolvedValue({ rows: [enrichedFixture({})], hasMore: false });
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('workout-item-w1');
 
     expect(screen.queryByText(/volume/i)).toBeNull();
@@ -191,7 +264,7 @@ describe('WorkoutHistoryScreen', () => {
       hasMore: false,
     });
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
 
     const card = await screen.findByTestId('workout-item-w1');
     expect(card).toHaveTextContent(/Push/);
@@ -206,7 +279,7 @@ describe('WorkoutHistoryScreen', () => {
       hasMore: false,
     });
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
 
     expect(await screen.findByTestId('workout-item-w1')).toHaveTextContent(/Push Day/);
     await settle();
@@ -215,7 +288,7 @@ describe('WorkoutHistoryScreen', () => {
   it('navigates to WorkoutDetail when a recent workout card is pressed', async () => {
     mockFetchWorkoutHistory.mockResolvedValue({ rows: [enrichedFixture({})], hasMore: false });
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('workout-item-w1');
 
     fireEvent.press(screen.getByTestId('workout-item-w1'));
@@ -233,7 +306,7 @@ describe('WorkoutHistoryScreen', () => {
       workoutSplitDayId: null,
     });
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
 
     expect(await screen.findByTestId('resume-active-workout')).toHaveTextContent(/Leg Day/);
     expect(screen.queryByTestId('start-new-workout')).toBeNull();
@@ -244,7 +317,7 @@ describe('WorkoutHistoryScreen', () => {
   });
 
   it('navigates to NewWorkout when "Start New Workout" is pressed', async () => {
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('start-new-workout');
 
     fireEvent.press(screen.getByTestId('start-new-workout'));
@@ -261,7 +334,7 @@ describe('WorkoutHistoryScreen', () => {
         hasMore: false,
       });
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
     await screen.findByTestId('workout-item-w1');
     expect(screen.getByTestId('workout-history-load-more')).toBeTruthy();
 
@@ -275,59 +348,93 @@ describe('WorkoutHistoryScreen', () => {
   it('shows an error message with retry when loading the recent list fails', async () => {
     mockFetchWorkoutHistory.mockRejectedValue(new Error('network error'));
 
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
 
     expect(await screen.findByTestId('workout-history-error')).toHaveTextContent('network error');
     await settle();
   });
 
   it('shows a polished empty state when there is no workout history at all', async () => {
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+    renderScreen();
 
     await waitFor(() => expect(screen.queryByTestId('workout-history-loading')).toBeNull());
     expect(screen.getByTestId('workout-history-empty')).toBeTruthy();
     await settle();
   });
 
-  it('renders the shared bottom bar with Workouts active', async () => {
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+  // The bottom nav and its quick-action "+" menu are no longer owned by
+  // this screen -- both are mounted once at the app-shell level (App.tsx)
+  // so they persist across every screen instead of disappearing on
+  // navigation; see App.test.tsx's "Persistent bottom navigation" coverage.
+  it('does not render its own bottom nav', async () => {
+    renderScreen();
     await screen.findByTestId('workout-calendar');
 
-    expect(screen.getByTestId('workouts-bottom-bar')).toBeTruthy();
-    expect(screen.getByTestId('bottom-nav-workouts').props.accessibilityState.selected).toBe(true);
+    expect(screen.queryByTestId('bottom-nav-bar')).toBeNull();
+    await settle();
+  });
+});
+
+// Regression coverage for a reported bug: returning to this screen briefly
+// blanked the calendar/recent list with full-screen spinners before the
+// refreshed data arrived. loadMonth/loadRecent only set their own loading
+// flag true on the very first focus now (see `hasLoadedOnce`) -- every
+// later focus-triggered call is a silent background refresh. Explicit
+// month navigation (Prev/Next) is untouched and still shows its own loading
+// state, since that's a genuinely new fetch the user just asked for.
+describe('WorkoutHistoryScreen background refresh on focus', () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  }
+
+  it('does not show the month/recent loading indicators on a focus-triggered refresh', async () => {
+    renderScreen();
+    await screen.findByTestId('workout-calendar');
+    await settle();
+
+    const monthRefresh = deferred<unknown[]>();
+    const recentRefresh = deferred<{ rows: unknown[]; hasMore: boolean }>();
+    mockFetchWorkoutsForMonth.mockReturnValue(monthRefresh.promise);
+    mockFetchWorkoutHistory.mockReturnValue(recentRefresh.promise);
+
+    const calls = navigation.addListener.mock.calls;
+    const [, focusCallback] = calls[calls.length - 1];
+    act(() => {
+      focusCallback();
+    });
+
+    expect(screen.queryByTestId('workout-month-loading')).toBeNull();
+    expect(screen.queryByTestId('workout-history-loading')).toBeNull();
+    expect(screen.getByTestId('workout-calendar')).toBeTruthy();
+
+    await act(async () => {
+      monthRefresh.resolve([]);
+      recentRefresh.resolve({ rows: [], hasMore: false });
+      await Promise.all([monthRefresh.promise, recentRefresh.promise]);
+    });
     await settle();
   });
 
-  it('navigates to Social from the bottom bar', async () => {
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
+  it('still shows the month loading indicator when the user explicitly switches months', async () => {
+    renderScreen();
     await screen.findByTestId('workout-calendar');
-
-    fireEvent.press(screen.getByTestId('bottom-nav-social'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('Social');
     await settle();
-  });
 
-  it('navigates to ProgressOverview from the bottom bar', async () => {
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
-    await screen.findByTestId('workout-calendar');
+    const monthRefresh = deferred<unknown[]>();
+    mockFetchWorkoutsForMonth.mockReturnValue(monthRefresh.promise);
 
-    fireEvent.press(screen.getByTestId('bottom-nav-progress'));
+    fireEvent.press(screen.getByTestId('calendar-prev-month'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('ProgressOverview');
-    await settle();
-  });
+    expect(screen.getByTestId('workout-month-loading')).toBeTruthy();
 
-  it('opens the quick action menu and navigates to NewWorkout from it', async () => {
-    render(<WorkoutHistoryScreen navigation={navigation} route={{} as never} />);
-    await screen.findByTestId('workout-calendar');
-
-    fireEvent.press(screen.getByTestId('bottom-nav-plus'));
-    expect(screen.getByTestId('quick-action-log-food')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('quick-action-start-workout'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
+    await act(async () => {
+      monthRefresh.resolve([]);
+      await monthRefresh.promise;
+    });
     await settle();
   });
 });

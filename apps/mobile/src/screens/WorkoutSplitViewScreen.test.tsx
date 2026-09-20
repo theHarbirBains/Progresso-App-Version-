@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { fetchWorkoutSplitDetail } from '../workouts/workoutSplitQueries';
@@ -131,5 +131,42 @@ describe('WorkoutSplitViewScreen', () => {
     await screen.findByText('PPL - Hypertrophy');
 
     expect(mockFetchWorkoutSplitDetail).toHaveBeenCalledWith('split-1');
+  });
+});
+
+// Regression coverage for a reported bug: returning to this screen briefly
+// blanked it with a full-screen spinner before the refreshed data arrived.
+// `load()` only sets `loading` true on the very first call now (see
+// `hasLoadedOnce`) -- every later focus-triggered call is a silent
+// background refresh.
+describe('WorkoutSplitViewScreen background refresh on focus', () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  }
+
+  it('does not show the full-screen loading indicator on a focus-triggered refresh', async () => {
+    render(<WorkoutSplitViewScreen navigation={navigation} route={route} />);
+    await screen.findByText('PPL - Hypertrophy');
+
+    const refresh = deferred<typeof detail>();
+    mockFetchWorkoutSplitDetail.mockReturnValue(refresh.promise);
+
+    const calls = navigation.addListener.mock.calls;
+    const [, focusCallback] = calls[calls.length - 1];
+    act(() => {
+      focusCallback();
+    });
+
+    expect(screen.queryByTestId('workout-split-view-loading')).toBeNull();
+    expect(screen.getByText('PPL - Hypertrophy')).toBeTruthy();
+
+    await act(async () => {
+      refresh.resolve(detail);
+      await refresh.promise;
+    });
   });
 });

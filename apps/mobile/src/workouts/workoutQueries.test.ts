@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import {
   addExerciseToWorkout,
+  cancelWorkout,
   completedSetsOnly,
   completeWorkout,
   createSet,
@@ -10,6 +11,7 @@ import {
   fetchPreviousPerformance,
   fetchWorkoutDetail,
   fetchWorkoutHistory,
+  fetchWorkoutsForDateRange,
   fetchWorkoutsForMonth,
   removeExerciseFromWorkout,
   reorderExercises,
@@ -206,6 +208,52 @@ describe('fetchWorkoutsForMonth', () => {
   });
 });
 
+describe('fetchWorkoutsForDateRange', () => {
+  it('maps rows and filters to only completed, non-deleted workouts in range', async () => {
+    const { workouts } = mockTables({
+      workouts: {
+        data: [
+          {
+            id: 'w1',
+            name: 'Push Day',
+            performed_at: '2026-09-08T00:00:00Z',
+            completed_at: '2026-09-08T01:00:00Z',
+            workout_split_day_id: 'day-push',
+          },
+        ],
+        error: null,
+      },
+    });
+
+    const start = new Date('2026-09-07T00:00:00Z');
+    const end = new Date('2026-09-14T00:00:00Z');
+    const result = await fetchWorkoutsForDateRange('user-1', start, end);
+
+    expect(result).toEqual([
+      {
+        id: 'w1',
+        name: 'Push Day',
+        performedAt: '2026-09-08T00:00:00Z',
+        completedAt: '2026-09-08T01:00:00Z',
+        workoutSplitDayId: 'day-push',
+      },
+    ]);
+    expect(workouts.calls.eq).toEqual([['user_id', 'user-1']]);
+    expect(workouts.calls.not).toEqual([['completed_at', 'is', null]]);
+    expect(workouts.calls.is).toEqual([['deleted_at', null]]);
+    expect(workouts.calls.gte).toEqual([['performed_at', start.toISOString()]]);
+    expect(workouts.calls.lt).toEqual([['performed_at', end.toISOString()]]);
+  });
+
+  it('returns an empty array for a range with no workouts', async () => {
+    mockTables({ workouts: { data: [], error: null } });
+
+    await expect(
+      fetchWorkoutsForDateRange('user-1', new Date('2026-09-07'), new Date('2026-09-14')),
+    ).resolves.toEqual([]);
+  });
+});
+
 describe('fetchWorkoutDetail', () => {
   it('assembles workout + exercises + sets into one detail object', async () => {
     mockTables({
@@ -224,7 +272,12 @@ describe('fetchWorkoutDetail', () => {
             id: 'we1',
             exercise_id: 'ex1',
             order_index: 1,
-            exercises: { name: 'Bench Press', muscle_group: 'chest' },
+            exercises: {
+              name: 'Bench Press',
+              muscle_group: 'chest',
+              movement_type: 'bilateral',
+              logging_style: null,
+            },
           },
         ],
         error: null,
@@ -235,6 +288,7 @@ describe('fetchWorkoutDetail', () => {
             id: 's1',
             workout_exercise_id: 'we1',
             set_index: 1,
+            side: 'none',
             weight_kg: '100.00',
             reps: 5,
             completed_at: '2026-01-01T00:05:00Z',
@@ -243,6 +297,7 @@ describe('fetchWorkoutDetail', () => {
             id: 's2',
             workout_exercise_id: 'we1',
             set_index: 2,
+            side: 'none',
             weight_kg: null,
             reps: null,
             completed_at: null,
@@ -265,10 +320,19 @@ describe('fetchWorkoutDetail', () => {
           exerciseId: 'ex1',
           exerciseName: 'Bench Press',
           muscleGroup: 'chest',
+          movementType: 'bilateral',
+          loggingStyle: null,
           orderIndex: 1,
           sets: [
-            { id: 's1', setIndex: 1, weightKg: 100, reps: 5, completedAt: '2026-01-01T00:05:00Z' },
-            { id: 's2', setIndex: 2, weightKg: null, reps: null, completedAt: null },
+            {
+              id: 's1',
+              setIndex: 1,
+              side: null,
+              weightKg: 100,
+              reps: 5,
+              completedAt: '2026-01-01T00:05:00Z',
+            },
+            { id: 's2', setIndex: 2, side: null, weightKg: null, reps: null, completedAt: null },
           ],
         },
       ],
@@ -422,6 +486,22 @@ describe('completeWorkout', () => {
   });
 });
 
+describe('cancelWorkout', () => {
+  it('soft-deletes the workout via deleted_at, never completed_at', async () => {
+    const { workouts } = mockTables({ workouts: { data: null, error: null } });
+
+    await cancelWorkout('w1');
+
+    expect(workouts.builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ deleted_at: expect.any(String) }),
+    );
+    expect(workouts.builder.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ completed_at: expect.anything() }),
+    );
+    expect(workouts.calls.eq).toEqual([['id', 'w1']]);
+  });
+});
+
 describe('addExerciseToWorkout', () => {
   it('inserts and returns the new id', async () => {
     mockTables({ workout_exercises: { data: { id: 'we1' }, error: null } });
@@ -484,6 +564,31 @@ describe('createSet/updateSet/deleteSet', () => {
       completedAt: null,
     });
     expect(sets.builder.insert).toHaveBeenCalledWith({ workout_exercise_id: 'we1', set_index: 1 });
+  });
+
+  it('createSet with a side creates one row for that side, sharing the same set_index as its pair', async () => {
+    const { sets } = mockTables({
+      sets: {
+        data: { id: 's-left', set_index: 1, side: 'left', weight_kg: null, reps: null, completed_at: null },
+        error: null,
+      },
+    });
+
+    const result = await createSet('we1', 1, 'left');
+
+    expect(result).toEqual({
+      id: 's-left',
+      setIndex: 1,
+      side: 'left',
+      weightKg: null,
+      reps: null,
+      completedAt: null,
+    });
+    expect(sets.builder.insert).toHaveBeenCalledWith({
+      workout_exercise_id: 'we1',
+      set_index: 1,
+      side: 'left',
+    });
   });
 
   it('updateSet only sends the provided fields', async () => {
@@ -561,6 +666,7 @@ describe('fetchPreviousPerformance', () => {
           {
             id: 's1',
             set_index: 1,
+            side: 'none',
             weight_kg: '135.00',
             reps: 10,
             completed_at: '2026-01-10T00:05:00Z',
@@ -575,9 +681,68 @@ describe('fetchPreviousPerformance', () => {
     expect(result).toEqual({
       performedAt: '2026-01-10T00:00:00Z',
       sets: [
-        { id: 's1', setIndex: 1, weightKg: 135, reps: 10, completedAt: '2026-01-10T00:05:00Z' },
+        { id: 's1', setIndex: 1, side: null, weightKg: 135, reps: 10, completedAt: '2026-01-10T00:05:00Z' },
       ],
     });
+  });
+
+  it('preserves left/right side independently for a unilateral exercise\'s previous performance', async () => {
+    mockTables({
+      workout_exercises: {
+        data: [
+          {
+            id: 'we-bss',
+            workout_id: 'w-old',
+            workouts: { performed_at: '2026-01-05T00:00:00Z', deleted_at: null },
+          },
+        ],
+        error: null,
+      },
+      sets: {
+        data: [
+          {
+            id: 's-left',
+            set_index: 1,
+            side: 'left',
+            weight_kg: '42.50',
+            reps: 10,
+            completed_at: '2026-01-05T00:05:00Z',
+          },
+          {
+            id: 's-right',
+            set_index: 1,
+            side: 'right',
+            weight_kg: '40.00',
+            reps: 10,
+            completed_at: '2026-01-05T00:06:00Z',
+          },
+        ],
+        error: null,
+      },
+    });
+
+    const result = await fetchPreviousPerformance('user-1', 'ex-bss', 'w-current');
+
+    // Neither side's weight is ever summed with the other -- each row keeps
+    // its own real weight and its own side tag.
+    expect(result?.sets).toEqual([
+      {
+        id: 's-left',
+        setIndex: 1,
+        side: 'left',
+        weightKg: 42.5,
+        reps: 10,
+        completedAt: '2026-01-05T00:05:00Z',
+      },
+      {
+        id: 's-right',
+        setIndex: 1,
+        side: 'right',
+        weightKg: 40,
+        reps: 10,
+        completedAt: '2026-01-05T00:06:00Z',
+      },
+    ]);
   });
 
   it('only selects already-completed sets from the previous occurrence', async () => {
@@ -634,6 +799,7 @@ describe('completedSetsOnly', () => {
     return {
       id: 's1',
       setIndex: 1,
+      side: null,
       weightKg: 100,
       reps: 5,
       completedAt: '2026-01-01T00:00:00Z',

@@ -40,6 +40,7 @@ describe('UsersService', () => {
           username: 'harbir',
           workout_accent_color: '#2F80FF',
           nutrition_accent_color: '#10B981',
+          background_theme: 'midnight',
           active_workout_split_id: 'split-1',
         },
       });
@@ -51,6 +52,7 @@ describe('UsersService', () => {
         username: 'harbir',
         workoutAccentColor: '#2F80FF',
         nutritionAccentColor: '#10B981',
+        backgroundTheme: 'midnight',
         activeWorkoutSplitId: 'split-1',
       });
     });
@@ -103,6 +105,94 @@ describe('UsersService', () => {
       expect(result.nutritionAccentColor).toBeNull();
     });
 
+    it('updates the background theme independently of accent colors', async () => {
+      const client = createMockClient({
+        updateData: {
+          weight_unit: 'kg',
+          display_name: null,
+          username: null,
+          workout_accent_color: null,
+          nutrition_accent_color: null,
+          background_theme: 'forest',
+          active_workout_split_id: null,
+        },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateProfile('user-1', { backgroundTheme: 'forest' });
+
+      expect(client.update).toHaveBeenCalledWith({ background_theme: 'forest' });
+      expect(result.backgroundTheme).toBe('forest');
+      expect(result.workoutAccentColor).toBeNull();
+    });
+
+    it('sets the avatar URL', async () => {
+      const client = createMockClient({
+        updateData: {
+          weight_unit: 'kg',
+          display_name: null,
+          username: null,
+          workout_accent_color: null,
+          nutrition_accent_color: null,
+          active_workout_split_id: null,
+          avatar_url:
+            'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
+        },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateProfile('user-1', {
+        avatarUrl: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
+      });
+
+      expect(client.update).toHaveBeenCalledWith({
+        avatar_url:
+          'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
+      });
+      expect(result.avatarUrl).toBe(
+        'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
+      );
+    });
+
+    it('clears the avatar URL when explicitly set to null (removing the picture)', async () => {
+      const client = createMockClient({
+        updateData: {
+          weight_unit: 'kg',
+          display_name: null,
+          username: null,
+          workout_accent_color: null,
+          nutrition_accent_color: null,
+          active_workout_split_id: null,
+          avatar_url: null,
+        },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateProfile('user-1', { avatarUrl: null });
+
+      expect(client.update).toHaveBeenCalledWith({ avatar_url: null });
+      expect(result.avatarUrl).toBeNull();
+    });
+
+    it('leaves the avatar URL untouched when omitted', async () => {
+      const client = createMockClient({
+        updateData: {
+          weight_unit: 'lb',
+          display_name: null,
+          username: null,
+          workout_accent_color: null,
+          nutrition_accent_color: null,
+          active_workout_split_id: null,
+        },
+      });
+      const service = serviceWith(client);
+
+      await service.updateProfile('user-1', { weightUnit: 'lb' });
+
+      expect(client.update).toHaveBeenCalledWith({ weight_unit: 'lb' });
+      expect(client.update.mock.calls[0][0]).not.toHaveProperty('avatar_url');
+    });
+
     it('updates the active workout split', async () => {
       const client = createMockClient({
         updateData: {
@@ -144,6 +234,7 @@ describe('UsersService', () => {
           push_notifications_opt_in: false,
           apple_health_preference: 'not_now',
           onboarding_completed_at: null,
+          activity_level: 'moderately_active',
         },
       });
       const service = serviceWith(client);
@@ -161,6 +252,7 @@ describe('UsersService', () => {
         emailOptIn: true,
         pushNotificationsOptIn: false,
         appleHealthPreference: 'not_now',
+        activityLevel: 'moderately_active',
       });
 
       expect(client.update).toHaveBeenCalledWith({
@@ -176,9 +268,11 @@ describe('UsersService', () => {
         email_opt_in: true,
         push_notifications_opt_in: false,
         apple_health_preference: 'not_now',
+        activity_level: 'moderately_active',
       });
       expect(result.fitnessGoal).toBe('build_muscle');
       expect(result.pushNotificationsOptIn).toBe(false);
+      expect(result.activityLevel).toBe('moderately_active');
     });
 
     it('marks onboarding complete as a server-set timestamp, not a client-supplied value', async () => {

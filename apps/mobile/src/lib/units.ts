@@ -15,3 +15,23 @@ export function fromKg(kg: number, unit: 'kg' | 'lb'): number {
 export function roundWeight(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+/**
+ * Whether a weight value a user typed is a valid increment -- a whole
+ * number or a .5 increment (100, 100.5), never arbitrary decimal precision
+ * (100.25, 100.75). Applied to the raw value in whichever unit the user is
+ * actually entering it in (kg or lb) -- this is a constraint on user input,
+ * not on the converted/stored kg value, so it must run before toKg.
+ *
+ * Deliberately the same .5 step in either unit, not a converted "0.5 lb ==
+ * ~0.2268 kg" step: real gym plates come in their own, independent
+ * increments per unit system (lb plates as small as 2.5 lb; kg plates as
+ * small as 0.5-1.25 kg), so a kg lifter's clean, round kg entries (e.g.
+ * 100, 120) should stay valid rather than being rejected for not matching
+ * an lb-derived fraction.
+ */
+export function isValidWeightIncrement(value: number): boolean {
+  if (!Number.isFinite(value)) return false;
+  const doubled = value * 2;
+  return Math.abs(doubled - Math.round(doubled)) < 1e-9;
+}

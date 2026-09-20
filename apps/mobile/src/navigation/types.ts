@@ -17,17 +17,22 @@ export type RootStackParamList = {
   PRHistory: { exerciseId: string; exerciseName: string };
   ExerciseProgress: { exerciseId: string; exerciseName: string };
   Nutrition: undefined;
-  FoodLibrary: undefined;
+  /** `openCreate`/`barcode`: set by the Scan Barcode "Product not found" fallback so Food Library opens straight into creating a custom food, prefilled with the scanned barcode -- see BarcodeScannerScreen. */
+  FoodLibrary: { openCreate?: boolean; barcode?: string } | undefined;
+  FoodSearch: undefined;
+  BarcodeScanner: undefined;
   NutritionGoals: undefined;
+  CalorieEstimation: undefined;
   WorkoutColorSettings: undefined;
   NutritionColorSettings: undefined;
+  BackgroundThemeSettings: undefined;
   ProgressOverview: undefined;
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
   WorkoutSplits: undefined;
   WorkoutSplitView: { splitId: string };
   WorkoutSplitForm: { splitId?: string; activateOnCreate?: boolean };
   ChooseWorkoutSplit: undefined;
-  Social: undefined;
+  Profile: undefined;
 };
 
 export type RootStackScreenProps<Screen extends keyof RootStackParamList> = NativeStackScreenProps<

@@ -1,4 +1,4 @@
-import { getGreeting, greetingName } from './greeting';
+import { firstName, getGreeting, greetingName } from './greeting';
 
 describe('getGreeting', () => {
   it('returns "Good morning" before noon', () => {
@@ -41,5 +41,19 @@ describe('greetingName', () => {
 
   it('trims whitespace from a valid displayName', () => {
     expect(greetingName('  Harbir  ', null)).toBe('Harbir');
+  });
+});
+
+describe('firstName', () => {
+  it('returns a single-word name as-is', () => {
+    expect(firstName('harbir_b')).toBe('harbir_b');
+  });
+
+  it('returns only the first word of a multi-word name', () => {
+    expect(firstName('Harbir Bains')).toBe('Harbir');
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(firstName('  Harbir Bains  ')).toBe('Harbir');
   });
 });

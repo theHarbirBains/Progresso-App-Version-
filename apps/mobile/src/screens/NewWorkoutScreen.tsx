@@ -1,101 +1,78 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
-import { colors } from '../design/theme';
+import { AppCard } from '../design/AppCard';
+import { AppHeader } from '../design/AppHeader';
+import { PrimaryButton } from '../design/Button';
+import { BottomSheet } from '../design/BottomSheet';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { SectionHeader } from '../design/SectionHeader';
-import type { ExerciseRow } from '../exercises/exerciseQueries';
-import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
+import { TextInput } from '../design/TextInput';
+import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
-import { roundWeight, toKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { AddExerciseButton } from '../workouts/AddExerciseButton';
-import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
-import { ExerciseCard } from '../workouts/ExerciseCard';
-import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
-import { computeNextWorkout } from '../workouts/nextWorkout';
-import {
-  addExerciseToWorkout,
-  createSet,
-  createWorkout,
-  updateSet,
-  type WorkoutSummary,
-} from '../workouts/workoutQueries';
+import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
+import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
+import { createWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
 import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
+  type WorkoutSplitDay,
   type WorkoutSplitDetail,
 } from '../workouts/workoutSplitQueries';
-import { WorkoutHeader } from '../workouts/WorkoutHeader';
-import { WorkoutSummaryCard } from '../workouts/WorkoutSummaryCard';
-import { ExerciseFormScreen } from './ExerciseFormScreen';
-import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
+import { startWorkoutStyles as styles } from './startWorkoutStyles';
 
 type Props = RootStackScreenProps<'NewWorkout'>;
 
-interface LocalSetDraft {
-  weight: string;
-  reps: string;
-  completed: boolean;
+const CUSTOM_BUSY_KEY = 'custom';
+
+function musclesLabel(day: WorkoutSplitDay): string {
+  return day.muscleGroups.map((g) => SPLIT_MUSCLE_GROUP_LABELS[g]).join(' • ');
 }
 
-function isValidDraft(draft: LocalSetDraft | undefined): boolean {
-  if (!draft) return false;
-  const weightNum = Number(draft.weight);
-  const repsNum = Number(draft.reps);
-  return Number.isFinite(weightNum) && weightNum > 0 && Number.isInteger(repsNum) && repsNum > 0;
-}
-
-// The planning half of the Start Workout experience (see
-// ActiveWorkoutScreen.tsx for the live-tracking half). Exercises and their
-// planned sets exist only in local state until "Start Workout" is pressed --
-// the workout, its exercises, and every set are all created then, in their
-// final order, exactly matching the pre-existing "local draft before
-// persistence" pattern this screen already used for exercise selection
-// (now extended to each exercise's planned set count/values too). Any set
-// the user already filled in during planning is persisted already-complete;
-// anything left blank is created blank, ready for live logging.
+// This screen is ONLY about choosing which workout to perform -- no
+// exercise selection here. Exercises are added after entering
+// ActiveWorkoutScreen (which already supports that in full). Picking any
+// day (the recommended next one, or any other day in the active split)
+// immediately creates the workout tagged with that day and enters the
+// live tracking screen; "Do a Different Workout" collects a free-text name
+// for an improvised, untagged workout via the same path.
 export function NewWorkoutScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
-  const { theme, weightUnit } = useProgressTheme();
+  const { theme } = useProgressTheme();
 
-  const [name, setName] = useState('');
-  const [selected, setSelected] = useState<ExerciseRow[]>([]);
-  const [localSets, setLocalSets] = useState<Record<string, LocalSetDraft[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [hasActiveSplitId, setHasActiveSplitId] = useState(false);
+  const [activeSplit, setActiveSplit] = useState<WorkoutSplitDetail | null>(null);
+  const [nextPlan, setNextPlan] = useState<NextWorkoutPlan | null>(null);
+  const [splitError, setSplitError] = useState<string | null>(null);
 
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
-
-  const [starting, setStarting] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<WorkoutSummary | null>(null);
 
-  const [activeSplit, setActiveSplit] = useState<WorkoutSplitDetail | null>(null);
-  const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
-  const [splitLoading, setSplitLoading] = useState(true);
-  // Distinct from activeSplit itself: a user WITH an active split id whose
-  // detail momentarily fails to load should still be able to start a
-  // plain (day-less) workout, per the existing non-critical-failure
-  // behavior below -- only a genuinely absent activeWorkoutSplitId blocks
-  // tracking entirely (see the render below).
-  const [hasActiveSplitId, setHasActiveSplitId] = useState(false);
+  const [customSheetOpen, setCustomSheetOpen] = useState(false);
+  const [customName, setCustomName] = useState('');
+  // Only the very first load should replace the whole screen with a
+  // spinner -- every later call (the focus listener below, e.g. returning
+  // here after picking a split in ChooseWorkoutSplitScreen) is a background
+  // refresh, same pattern as DashboardScreen/ProfileScreen.
+  const hasLoadedOnce = useRef(false);
 
-  // A user MUST have an active split before they can track a workout --
-  // re-checked on every focus (not just mount) so returning here after
-  // picking one in ChooseWorkoutSplitScreen immediately unblocks this
-  // screen. Failures loading the split's *detail* are non-critical: the
-  // screen just falls back to the plain (day-less) experience rather than
-  // blocking workout creation, since the user does have an active split.
+  // Re-checked on every focus (not just mount) so returning here after
+  // picking a split in ChooseWorkoutSplitScreen immediately unblocks this
+  // screen, matching the previous screen's existing behavior.
   useEffect(() => {
     if (!userId || !accessToken) return;
     let cancelled = false;
-    async function loadActiveSplit() {
-      setSplitLoading(true);
+    async function load() {
+      if (!hasLoadedOnce.current) setLoading(true);
+      setSplitError(null);
       try {
         const profile = await getMyProfile(accessToken!);
         if (cancelled) return;
@@ -104,343 +81,271 @@ export function NewWorkoutScreen({ navigation }: Props) {
           return;
         }
         setHasActiveSplitId(true);
-        const [detail, lastDayId] = await Promise.all([
-          fetchWorkoutSplitDetail(profile.activeWorkoutSplitId),
-          fetchLastWorkoutSplitDayId(userId),
-        ]);
-        if (cancelled) return;
-        setActiveSplit(detail);
-        const plan = computeNextWorkout(detail, lastDayId);
-        if (plan) {
-          setSelectedDayId(plan.day.id);
-          setName(plan.day.name);
+        try {
+          const [detail, lastDayId] = await Promise.all([
+            fetchWorkoutSplitDetail(profile.activeWorkoutSplitId),
+            fetchLastWorkoutSplitDayId(userId),
+          ]);
+          if (cancelled) return;
+          setActiveSplit(detail);
+          setNextPlan(computeNextWorkout(detail, lastDayId));
+        } catch (err) {
+          // Non-critical: the user does have an active split, a failed
+          // detail fetch just means we can't show it right now -- "Do a
+          // Different Workout" still lets them start something.
+          if (!cancelled) {
+            setSplitError(err instanceof Error ? err.message : 'Failed to load your split');
+          }
         }
       } catch {
-        // Non-critical -- see comment above.
+        // Profile fetch itself failing is treated the same as "no split"
+        // rather than leaving the screen stuck loading forever.
+        if (!cancelled) setHasActiveSplitId(false);
       } finally {
-        if (!cancelled) setSplitLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          hasLoadedOnce.current = true;
+        }
       }
     }
-    const unsubscribe = navigation.addListener('focus', loadActiveSplit);
+    const unsubscribe = navigation.addListener('focus', load);
     return () => {
       cancelled = true;
       unsubscribe();
     };
   }, [userId, accessToken, navigation]);
 
-  function selectDay(dayId: string, dayName: string) {
-    setSelectedDayId(dayId);
-    setName(dayName);
-  }
-
-  function addToSelection(exercise: ExerciseRow) {
-    setPickerOpen(false);
-    setSelected((prev) => (prev.some((e) => e.id === exercise.id) ? prev : [...prev, exercise]));
-    setLocalSets((prev) =>
-      prev[exercise.id]
-        ? prev
-        : { ...prev, [exercise.id]: [{ weight: '', reps: '', completed: false }] },
-    );
-  }
-
-  function removeFromSelection(exerciseId: string) {
-    setSelected((prev) => prev.filter((e) => e.id !== exerciseId));
-    setLocalSets((prev) => {
-      const next = { ...prev };
-      delete next[exerciseId];
-      return next;
-    });
-  }
-
-  function moveSelection(index: number, direction: -1 | 1) {
-    setSelected((prev) => {
-      const target = index + direction;
-      if (target < 0 || target >= prev.length) return prev;
-      const next = [...prev];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
-  }
-
-  function handleAddLocalSet(exerciseId: string) {
-    setLocalSets((prev) => ({
-      ...prev,
-      [exerciseId]: [...(prev[exerciseId] ?? []), { weight: '', reps: '', completed: false }],
-    }));
-  }
-
-  function handleChangeLocalWeight(exerciseId: string, index: number, text: string) {
-    setLocalSets((prev) => {
-      const drafts = [...(prev[exerciseId] ?? [])];
-      if (!drafts[index]) return prev;
-      drafts[index] = { ...drafts[index], weight: text };
-      return { ...prev, [exerciseId]: drafts };
-    });
-  }
-
-  function handleChangeLocalReps(exerciseId: string, index: number, text: string) {
-    setLocalSets((prev) => {
-      const drafts = [...(prev[exerciseId] ?? [])];
-      if (!drafts[index]) return prev;
-      drafts[index] = { ...drafts[index], reps: text };
-      return { ...prev, [exerciseId]: drafts };
-    });
-  }
-
-  function handleToggleLocalComplete(exerciseId: string, index: number) {
-    setLocalSets((prev) => {
-      const drafts = [...(prev[exerciseId] ?? [])];
-      const draft = drafts[index];
-      if (!draft) return prev;
-      if (!draft.completed && !isValidDraft(draft)) return prev;
-      drafts[index] = { ...draft, completed: !draft.completed };
-      return { ...prev, [exerciseId]: drafts };
-    });
-  }
-
-  async function handleStart() {
-    if (!userId || !accessToken || !name.trim() || selected.length === 0 || starting) return;
-    setError(null);
-    setConflict(null);
-    setStarting(true);
-    try {
-      const result = await createWorkout(userId, name.trim(), selectedDayId ?? undefined);
-      if (result.type === 'conflict') {
-        setConflict(result.existingWorkout);
-        return;
-      }
-      for (let i = 0; i < selected.length; i++) {
-        const exercise = selected[i];
-        const workoutExerciseId = await addExerciseToWorkout(result.workout.id, exercise.id, i + 1);
-        const drafts = localSets[exercise.id] ?? [{ weight: '', reps: '', completed: false }];
-        for (let s = 0; s < drafts.length; s++) {
-          const draft = drafts[s];
-          const created = await createSet(workoutExerciseId, s + 1);
-          if (isValidDraft(draft)) {
-            await updateSet(created.id, {
-              weightKg: roundWeight(toKg(Number(draft.weight), weightUnit)),
-              reps: Math.trunc(Number(draft.reps)),
-              completedAt: new Date().toISOString(),
-            });
-          }
+  const startWorkout = useCallback(
+    async (key: string, name: string, dayId: string | undefined) => {
+      if (!userId || busyKey) return;
+      setError(null);
+      setConflict(null);
+      setBusyKey(key);
+      try {
+        const result = await createWorkout(userId, name, dayId);
+        if (result.type === 'conflict') {
+          setConflict(result.existingWorkout);
+          return;
         }
+        setCustomSheetOpen(false);
+        navigation.replace('ActiveWorkout', { workoutId: result.workout.id });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to start workout');
+      } finally {
+        setBusyKey(null);
       }
-      navigation.replace('ActiveWorkout', { workoutId: result.workout.id });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start workout');
-    } finally {
-      setStarting(false);
-    }
-  }
+    },
+    [userId, busyKey, navigation],
+  );
 
-  const canStart = name.trim().length > 0 && selected.length > 0 && !starting;
-  const muscleGroupsLabel = Array.from(
-    new Set(selected.map((e) => MUSCLE_GROUP_LABELS[e.muscleGroup])),
-  ).join(', ');
-  const totalSets = selected.reduce((sum, e) => sum + (localSets[e.id]?.length ?? 1), 0);
+  const trimmedCustomName = customName.trim();
 
-  // The header (with its Back button) stays immediately available in every
-  // state -- only the body below it changes -- so backing out never has to
-  // wait on the split check.
-  if (splitLoading) {
+  if (loading) {
     return (
       <View style={styles.screen}>
-        <WorkoutHeader title="Start Workout" onBack={() => navigation.goBack()} />
+        <AppHeader title="Start Workout" testID="start-workout-header" />
         <LoadingState testID="new-workout-loading" />
       </View>
     );
   }
 
-  // A user must select a workout split before they can track a workout --
-  // no exceptions, no "skip this" escape hatch.
   if (!hasActiveSplitId) {
     return (
       <View style={styles.screen}>
-        <WorkoutHeader title="Start Workout" onBack={() => navigation.goBack()} />
-        <View style={styles.emptyExercisesWrap}>
+        <AppHeader title="Start Workout" testID="start-workout-header" />
+        <View style={styles.emptyWrap}>
           <EmptyState
             testID="new-workout-no-split"
             icon={<Feather name="layers" size={24} color={colors.textMuted} />}
             title="Choose Your Workout Split"
           />
-          <TouchableOpacity
-            testID="new-workout-choose-split"
-            style={[styles.startButton, { backgroundColor: theme.accent, marginHorizontal: 24 }]}
-            onPress={() => navigation.navigate('ChooseWorkoutSplit')}
-          >
-            <Text style={[styles.startButtonText, { color: theme.onAccent }]}>
-              Choose Your Workout Split
-            </Text>
-          </TouchableOpacity>
+          <View style={{ marginHorizontal: 24, marginTop: 16 }}>
+            <PrimaryButton
+              testID="new-workout-choose-split"
+              label="Choose Your Workout Split"
+              onPress={() => navigation.navigate('ChooseWorkoutSplit')}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+            />
+          </View>
         </View>
       </View>
     );
   }
 
+  const orderedDays = activeSplit
+    ? [...activeSplit.days].sort((a, b) => a.orderIndex - b.orderIndex)
+    : [];
+  const otherDays = orderedDays.filter((d) => d.id !== nextPlan?.day.id);
+
   return (
     <View style={styles.screen}>
-      <WorkoutHeader title="Start Workout" onBack={() => navigation.goBack()} />
+      <AppHeader
+        title="Start Workout"
+        subtitle="Choose a workout day to begin."
+        testID="start-workout-header"
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {error ? (
-          <Text testID="new-workout-error" style={styles.errorText}>
+          <Text testID="start-workout-error" style={styles.errorText}>
             {error}
           </Text>
         ) : null}
-
-        {activeSplit && activeSplit.days.length > 0 ? (
-          <View testID="new-workout-split-days" style={{ marginBottom: 12 }}>
-            <SectionHeader label="Which day are you training?" />
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {activeSplit.days.map((day) => {
-                const isSelected = day.id === selectedDayId;
-                return (
-                  <TouchableOpacity
-                    key={day.id}
-                    testID={`new-workout-day-${day.id}`}
-                    style={[
-                      styles.addExerciseButton,
-                      { flex: undefined, paddingHorizontal: 16 },
-                      isSelected && { borderColor: theme.accent, backgroundColor: theme.accentBg },
-                    ]}
-                    onPress={() => selectDay(day.id, day.name)}
-                  >
-                    <Text
-                      style={[styles.addExerciseButtonText, isSelected && { color: theme.accent }]}
-                    >
-                      {day.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
+        {splitError ? (
+          <Text testID="start-workout-split-error" style={styles.errorText}>
+            {splitError}
+          </Text>
         ) : null}
 
-        <TextInput
-          testID="new-workout-name"
-          style={styles.searchInput}
-          placeholder="Workout name"
-          placeholderTextColor={colors.textMuted}
-          value={name}
-          onChangeText={setName}
-        />
-
-        <WorkoutSummaryCard
-          testID="new-workout-summary"
-          workoutName={name || 'New Workout'}
-          muscleGroupsLabel={muscleGroupsLabel}
-          performedAt={null}
-          active={false}
-          totalSets={totalSets}
-          totalVolumeDisplay={`0 ${weightUnit}`}
-          accentColor={theme.accent}
-        />
-
         {conflict ? (
-          <View style={{ marginTop: 16 }}>
+          <View style={{ marginBottom: 16 }}>
             <Text style={styles.errorText}>
               You already have an active workout: &quot;{conflict.name}&quot;
             </Text>
-            <TouchableOpacity
+            <PrimaryButton
               testID="resume-instead"
-              style={[styles.startButton, { backgroundColor: theme.accent }]}
+              label="Resume It Instead"
               onPress={() => navigation.replace('ActiveWorkout', { workoutId: conflict.id })}
-            >
-              <Text style={[styles.startButtonText, { color: theme.onAccent }]}>
-                Resume It Instead
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        <TouchableOpacity
-          testID="start-workout"
-          style={[
-            styles.startButton,
-            { backgroundColor: theme.accent },
-            !canStart && styles.startButtonDisabled,
-          ]}
-          onPress={handleStart}
-          disabled={!canStart}
-        >
-          <Text style={[styles.startButtonText, { color: theme.onAccent }]}>
-            {starting ? 'Starting...' : 'Start Workout'}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.sectionTitle}>
-          <SectionHeader label="Exercises" />
-        </View>
-
-        <View style={styles.addExerciseRow}>
-          <AddExerciseButton
-            testID="new-workout-add-exercise"
-            onPress={() => setPickerOpen(true)}
-          />
-          <CreateCustomExerciseButton
-            testID="new-workout-create-custom"
-            onPress={() => setCustomExerciseOpen(true)}
-          />
-        </View>
-
-        {selected.map((exercise, index) => {
-          const drafts = localSets[exercise.id] ?? [{ weight: '', reps: '', completed: false }];
-          return (
-            <ExerciseCard
-              key={exercise.id}
-              testID={`exercise-card-${exercise.id}`}
-              exerciseName={exercise.name}
-              muscleGroup={exercise.muscleGroup}
-              sets={drafts.map((draft, i) => ({
-                id: `${exercise.id}-${i}`,
-                setIndex: i + 1,
-                weight: draft.weight,
-                reps: draft.reps,
-                completed: draft.completed,
-                canComplete: isValidDraft(draft),
-              }))}
-              onChangeWeight={(setId, text) => {
-                const i = Number(setId.split('-').pop());
-                handleChangeLocalWeight(exercise.id, i, text);
-              }}
-              onChangeReps={(setId, text) => {
-                const i = Number(setId.split('-').pop());
-                handleChangeLocalReps(exercise.id, i, text);
-              }}
-              onToggleComplete={(setId) => {
-                const i = Number(setId.split('-').pop());
-                handleToggleLocalComplete(exercise.id, i);
-              }}
-              onAddSet={() => handleAddLocalSet(exercise.id)}
-              onRemoveExercise={() => removeFromSelection(exercise.id)}
-              onMoveUp={index > 0 ? () => moveSelection(index, -1) : undefined}
-              onMoveDown={index < selected.length - 1 ? () => moveSelection(index, 1) : undefined}
               accentColor={theme.accent}
               onAccentColor={theme.onAccent}
             />
-          );
-        })}
+          </View>
+        ) : null}
+
+        {nextPlan ? (
+          <View style={styles.section}>
+            <SectionHeader label="Your Next Workout" />
+            <AppCard
+              hero
+              testID="start-workout-next"
+              onPress={() => startWorkout(nextPlan.day.id, nextPlan.day.name, nextPlan.day.id)}
+              style={busyKey === nextPlan.day.id ? styles.dayRowDisabled : undefined}
+              accessibilityLabel={`Start ${nextPlan.day.name} workout${
+                nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
+              }`}
+              accessibilityState={{ disabled: busyKey === nextPlan.day.id }}
+            >
+              <View style={styles.heroTopRow}>
+                <View style={[styles.heroIconChip, { backgroundColor: theme.accent }]}>
+                  <Feather name="activity" size={20} color={theme.onAccent} />
+                </View>
+                <View style={styles.heroTextBlock}>
+                  <Text style={[styles.heroEyebrow, { color: theme.accent }]}>Next Workout</Text>
+                  <Text style={styles.heroDayName}>{nextPlan.day.name}</Text>
+                  {nextPlan.day.muscleGroups.length > 0 ? (
+                    <Text style={styles.heroMuscles}>{musclesLabel(nextPlan.day)}</Text>
+                  ) : null}
+                </View>
+                {busyKey === nextPlan.day.id ? (
+                  <ActivityIndicator size="small" color={theme.accent} />
+                ) : (
+                  <View style={[styles.heroChevronCircle, { backgroundColor: theme.accent }]}>
+                    <Feather name="chevron-right" size={18} color={theme.onAccent} />
+                  </View>
+                )}
+              </View>
+              <View style={styles.heroMetaRow}>
+                <Feather name="calendar" size={13} color={colors.textSecondary} />
+                <Text style={styles.heroMetaText}>
+                  {nextPlan.previousDayName
+                    ? `Up next after ${nextPlan.previousDayName}`
+                    : "Let's get started"}
+                </Text>
+              </View>
+            </AppCard>
+          </View>
+        ) : null}
+
+        {otherDays.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader label="All Workout Days" />
+            {otherDays.map((day) => {
+              const busy = busyKey === day.id;
+              return (
+                <AppCard
+                  key={day.id}
+                  testID={`start-workout-day-${day.id}`}
+                  onPress={() => startWorkout(day.id, day.name, day.id)}
+                  style={[styles.dayRow, busy && styles.dayRowDisabled]}
+                  accessibilityLabel={`Start ${day.name} workout${
+                    day.muscleGroups.length > 0 ? `, ${musclesLabel(day)}` : ''
+                  }`}
+                  accessibilityState={{ disabled: busy }}
+                >
+                  <View style={styles.dayRowInner}>
+                    <View style={styles.dayIconCircle}>
+                      <Feather name="activity" size={16} color={colors.textSecondary} />
+                    </View>
+                    <View style={styles.dayTextBlock}>
+                      <Text style={styles.dayName}>{day.name}</Text>
+                      {day.muscleGroups.length > 0 ? (
+                        <Text style={styles.dayMuscles}>{musclesLabel(day)}</Text>
+                      ) : null}
+                    </View>
+                    {busy ? (
+                      <ActivityIndicator size="small" color={colors.textSecondary} />
+                    ) : (
+                      <Feather name="chevron-right" size={20} color={colors.textMuted} />
+                    )}
+                  </View>
+                </AppCard>
+              );
+            })}
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <SectionHeader label="Do a Different Workout" />
+          <AppCard
+            testID="start-workout-custom"
+            onPress={() => setCustomSheetOpen(true)}
+            style={styles.dayRow}
+            accessibilityLabel="Do a Different Workout, not part of your split"
+          >
+            <View style={styles.dayRowInner}>
+              <View style={styles.dayIconCircle}>
+                <Feather name="plus" size={16} color={colors.textSecondary} />
+              </View>
+              <View style={styles.dayTextBlock}>
+                <Text style={styles.dayName}>Do a Different Workout</Text>
+                <Text style={styles.dayMuscles}>Not part of your split</Text>
+              </View>
+              <Feather name="chevron-right" size={20} color={colors.textMuted} />
+            </View>
+          </AppCard>
+        </View>
       </ScrollView>
 
-      <ExercisePickerModal
-        visible={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onSelect={addToSelection}
-        userId={userId}
-        alreadyAddedIds={selected.map((e) => e.id)}
-      />
-
-      {customExerciseOpen ? (
-        <ExerciseFormScreen
-          mode="create"
-          onDone={() => {
-            setCustomExerciseOpen(false);
-            setPickerOpen(true);
-          }}
-          onCancel={() => setCustomExerciseOpen(false)}
+      <BottomSheet
+        visible={customSheetOpen}
+        onClose={() => (busyKey === CUSTOM_BUSY_KEY ? null : setCustomSheetOpen(false))}
+        testID="start-workout-custom-sheet"
+      >
+        <Text style={styles.sheetTitle}>Do a Different Workout</Text>
+        <Text style={styles.sheetSubtitle}>
+          Name this workout. It won&apos;t be added to your split.
+        </Text>
+        <TextInput
+          testID="start-workout-custom-name"
+          label="Workout name"
+          placeholder="e.g. Arms + Abs"
+          value={customName}
+          onChangeText={setCustomName}
+          autoCapitalize="words"
+          returnKeyType="done"
         />
-      ) : null}
+        <View style={styles.sheetButtonRow}>
+          <PrimaryButton
+            testID="start-workout-custom-confirm"
+            label={busyKey === CUSTOM_BUSY_KEY ? 'Starting…' : 'Start Workout'}
+            onPress={() => startWorkout(CUSTOM_BUSY_KEY, trimmedCustomName, undefined)}
+            disabled={trimmedCustomName.length === 0 || busyKey === CUSTOM_BUSY_KEY}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+        </View>
+      </BottomSheet>
     </View>
   );
 }

@@ -1,20 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
-import { BottomNavBar } from '../design/BottomNavBar';
+import { AppHeader } from '../design/AppHeader';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { LoadingState } from '../design/LoadingState';
+import { ModeToggle } from '../design/ModeToggle';
 import { PrimaryButton } from '../design/Button';
-import { QuickActionMenu } from '../design/QuickActionMenu';
 import { SectionHeader } from '../design/SectionHeader';
 import { StatValue } from '../design/StatValue';
-import { colors } from '../design/theme';
+import { colors, spacing } from '../design/theme';
+import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
-import { useQuickActions } from '../navigation/useQuickActions';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { addMonths, isoToLocalDateKey, toLocalDateKey } from '../workouts/calendarGrid';
 import { MonthCalendar } from '../workouts/MonthCalendar';
@@ -36,7 +35,7 @@ const RECENT_PAGE_SIZE = 20;
 
 type Props = RootStackScreenProps<'WorkoutHistory'>;
 
-function formatCardDate(iso: string): string {
+export function formatCardDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     weekday: 'short',
     month: 'short',
@@ -45,20 +44,20 @@ function formatCardDate(iso: string): string {
   });
 }
 
-function formatCardDuration(minutes: number | null): string {
+export function formatCardDuration(minutes: number | null): string {
   if (minutes === null) return '--';
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return hours > 0 ? `${hours}h ${rest}m` : `${rest} min`;
 }
 
-interface WorkoutCardProps {
+export interface WorkoutCardProps {
   workout: EnrichedWorkoutSummary;
   accentColor: string;
   onPress: () => void;
 }
 
-function WorkoutCard({ workout, accentColor, onPress }: WorkoutCardProps) {
+export function WorkoutCard({ workout, accentColor, onPress }: WorkoutCardProps) {
   const title = workout.splitDayName ?? workout.name;
   return (
     <AppCard
@@ -98,9 +97,18 @@ function WorkoutCard({ workout, accentColor, onPress }: WorkoutCardProps) {
 export function WorkoutHistoryScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const { theme } = useProgressTheme();
-  const insets = useSafeAreaInsets();
-  const quickActions = useQuickActions(navigation);
+  const { theme, nutritionTheme } = useProgressTheme();
+  const { openMenu, reportMode, currentMode } = useAppMenu();
+
+  // Switching mode from a non-Dashboard root screen always goes to that
+  // mode's Home (Dashboard), never to this screen's own "mirror" in the
+  // other mode (e.g. not straight to Food) -- Dashboard is each mode's one
+  // true landing page. A no-op if the tapped segment is already selected.
+  function handleModeChange(next: 'workout' | 'nutrition') {
+    if (next === currentMode) return;
+    reportMode?.(next);
+    navigation.navigate('Dashboard');
+  }
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -130,10 +138,15 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
     }
   }, [userId]);
 
+  // silent skips the setXLoading(true) that would otherwise blank the
+  // calendar/list back to a spinner -- used only for the focus-listener's
+  // background refresh below, once this screen has already loaded once.
+  // Explicit user actions (switching months, "Load More") always pass the
+  // default (loud) so they keep their own real loading feedback.
   const loadMonth = useCallback(
-    async (targetYear: number, targetMonth: number) => {
+    async (targetYear: number, targetMonth: number, options: { silent?: boolean } = {}) => {
       if (!userId) return;
-      setMonthLoading(true);
+      if (!options.silent) setMonthLoading(true);
       setMonthError(null);
       try {
         const raw = await fetchWorkoutsForMonth(userId, targetYear, targetMonth);
@@ -147,21 +160,31 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
     [userId],
   );
 
-  const loadRecent = useCallback(async () => {
-    if (!userId) return;
-    setRecentLoading(true);
-    setRecentError(null);
-    try {
-      const history = await fetchWorkoutHistory(userId, 0, RECENT_PAGE_SIZE);
-      setRecentWorkouts(await enrichWorkoutSummaries(history.rows));
-      setRecentHasMore(history.hasMore);
-      setRecentPage(0);
-    } catch (err) {
-      setRecentError(err instanceof Error ? err.message : 'Failed to load workouts');
-    } finally {
-      setRecentLoading(false);
-    }
-  }, [userId]);
+  const loadRecent = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      if (!userId) return;
+      if (!options.silent) setRecentLoading(true);
+      setRecentError(null);
+      try {
+        const history = await fetchWorkoutHistory(userId, 0, RECENT_PAGE_SIZE);
+        setRecentWorkouts(await enrichWorkoutSummaries(history.rows));
+        setRecentHasMore(history.hasMore);
+        setRecentPage(0);
+      } catch (err) {
+        setRecentError(err instanceof Error ? err.message : 'Failed to load workouts');
+      } finally {
+        setRecentLoading(false);
+      }
+    },
+    [userId],
+  );
+
+  // Only the very first focus should replace the calendar/list with
+  // spinners -- every later focus (returning here after starting/completing
+  // a workout) is a background refresh, same pattern as
+  // DashboardScreen/ProfileScreen. loadActive never blanks anything itself
+  // (no loading flag of its own), so it isn't silenced.
+  const hasLoadedOnce = useRef(false);
 
   useEffect(() => {
     // Re-load every time this screen gains focus, not just on mount -- same
@@ -169,9 +192,11 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
     // (active workout, the viewed month, and the recent list) so returning
     // here after starting/completing a workout shows current data.
     const unsubscribe = navigation.addListener('focus', () => {
+      const silent = hasLoadedOnce.current;
       loadActive();
-      loadMonth(year, month);
-      loadRecent();
+      loadMonth(year, month, { silent });
+      loadRecent({ silent });
+      hasLoadedOnce.current = true;
     });
     return unsubscribe;
   }, [navigation, loadActive, loadMonth, loadRecent, year, month]);
@@ -227,13 +252,30 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       <FlatList
         data={showEmptyState ? [] : recentWorkouts}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 90 + insets.bottom }}
+        contentContainerStyle={{ paddingBottom: spacing.xxl }}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-              <Text style={styles.title}>Workouts</Text>
-              <Text style={styles.subtitle}>Your training history. Keep showing up.</Text>
+            <AppHeader
+              testID="workout-history-header"
+              title="Workouts"
+              leftAction={{
+                icon: 'menu',
+                onPress: () => openMenu('workout'),
+                accessibilityLabel: 'Open menu',
+                testID: 'workout-history-open-menu',
+              }}
+            />
+            <View style={styles.header}>
+              <View style={styles.modeToggleWrap}>
+                <ModeToggle
+                  mode={currentMode}
+                  onChange={handleModeChange}
+                  workoutTheme={theme}
+                  nutritionTheme={nutritionTheme}
+                  testIDPrefix="workout-history"
+                />
+              </View>
             </View>
 
             {activeWorkout ? (
@@ -420,27 +462,6 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
             </TouchableOpacity>
           ) : null
         }
-      />
-
-      <BottomNavBar
-        testID="workouts-bottom-bar"
-        active="workouts"
-        accentColor={theme.accent}
-        onAccentColor={theme.onAccent}
-        paddingBottom={Math.max(insets.bottom, 8)}
-        onNavigateHome={() => navigation.navigate('Dashboard')}
-        onNavigateWorkouts={() => {}}
-        onNavigateProgress={() => navigation.navigate('ProgressOverview')}
-        onNavigateSocial={() => navigation.navigate('Social')}
-        onPressPlus={quickActions.open}
-      />
-
-      <QuickActionMenu
-        visible={quickActions.visible}
-        onClose={quickActions.close}
-        onStartWorkout={quickActions.onStartWorkout}
-        onLogFood={quickActions.onLogFood}
-        accentColor={theme.accent}
       />
     </View>
   );

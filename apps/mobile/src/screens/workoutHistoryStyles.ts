@@ -8,27 +8,30 @@ import { colors, radii, spacing, typeScale } from '../design/theme';
 export const workoutHistoryStyles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
+    // paints the selected Background Theme; screens no longer hardcode it.
+    backgroundColor: 'transparent',
   },
+  // Mode toggle, below the shared AppHeader (hamburger + title). Condensed
+  // spacing throughout this file (this and the styles below) so the page's
+  // widgets sit closer together, without the subtitle line that used to
+  // separate the toggle from the header.
   header: {
     paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.sm,
   },
-  title: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
-  },
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginTop: spacing.xs,
+  // Wraps the shared ModeToggle (design/ModeToggle.tsx) -- Workouts is one
+  // of the app's primary/root screens, so it keeps this the same way
+  // Dashboard does; deeper screens reached from here don't.
+  modeToggleWrap: {
+    marginTop: spacing.sm,
   },
   section: {
     paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   banner: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   bannerTitle: {
     color: colors.textPrimary,
@@ -42,7 +45,7 @@ export const workoutHistoryStyles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.lg,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   legendItem: {
     flexDirection: 'row',

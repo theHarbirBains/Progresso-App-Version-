@@ -13,6 +13,8 @@ export interface UserProfile {
   username: string | null;
   workoutAccentColor: string | null;
   nutritionAccentColor: string | null;
+  backgroundTheme: string | null;
+  avatarUrl: string | null;
   activeWorkoutSplitId: string | null;
   gender: string | null;
   birthday: string | null;
@@ -22,6 +24,7 @@ export interface UserProfile {
   fitnessGoal: string | null;
   trainingExperience: string | null;
   workoutFrequencyDays: number | null;
+  activityLevel: string | null;
   trainingStylePreference: string | null;
   emailOptIn: boolean | null;
   pushNotificationsOptIn: boolean | null;
@@ -33,9 +36,10 @@ const USERNAME_UNIQUE_VIOLATION = '23505';
 
 const PROFILE_COLUMNS =
   'weight_unit, display_name, username, workout_accent_color, nutrition_accent_color, ' +
-  'active_workout_split_id, gender, birthday, weight_value, height_value, height_unit, ' +
-  'fitness_goal, training_experience, workout_frequency_days, training_style_preference, ' +
-  'email_opt_in, push_notifications_opt_in, apple_health_preference, onboarding_completed_at';
+  'background_theme, avatar_url, active_workout_split_id, gender, birthday, weight_value, ' +
+  'height_value, height_unit, fitness_goal, training_experience, workout_frequency_days, ' +
+  'training_style_preference, email_opt_in, push_notifications_opt_in, ' +
+  'apple_health_preference, onboarding_completed_at, activity_level';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
@@ -45,6 +49,8 @@ function toProfile(data: any): UserProfile {
     username: data.username,
     workoutAccentColor: data.workout_accent_color,
     nutritionAccentColor: data.nutrition_accent_color,
+    backgroundTheme: data.background_theme,
+    avatarUrl: data.avatar_url,
     activeWorkoutSplitId: data.active_workout_split_id,
     gender: data.gender,
     birthday: data.birthday,
@@ -54,6 +60,7 @@ function toProfile(data: any): UserProfile {
     fitnessGoal: data.fitness_goal,
     trainingExperience: data.training_experience,
     workoutFrequencyDays: data.workout_frequency_days,
+    activityLevel: data.activity_level,
     trainingStylePreference: data.training_style_preference,
     emailOptIn: data.email_opt_in,
     pushNotificationsOptIn: data.push_notifications_opt_in,
@@ -92,6 +99,10 @@ export class UsersService {
     if (dto.nutritionAccentColor !== undefined) {
       updatePayload.nutrition_accent_color = dto.nutritionAccentColor;
     }
+    if (dto.backgroundTheme !== undefined) {
+      updatePayload.background_theme = dto.backgroundTheme;
+    }
+    if (dto.avatarUrl !== undefined) updatePayload.avatar_url = dto.avatarUrl;
     if (dto.activeWorkoutSplitId !== undefined) {
       updatePayload.active_workout_split_id = dto.activeWorkoutSplitId;
     }
@@ -107,6 +118,7 @@ export class UsersService {
     if (dto.workoutFrequencyDays !== undefined) {
       updatePayload.workout_frequency_days = dto.workoutFrequencyDays;
     }
+    if (dto.activityLevel !== undefined) updatePayload.activity_level = dto.activityLevel;
     if (dto.trainingStylePreference !== undefined) {
       updatePayload.training_style_preference = dto.trainingStylePreference;
     }

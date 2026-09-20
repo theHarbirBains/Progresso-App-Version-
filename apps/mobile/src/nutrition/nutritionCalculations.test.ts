@@ -2,6 +2,7 @@ import type { FoodLogRow } from './foodLogQueries';
 import {
   calculateLogTotals,
   calculateRemaining,
+  computeWeeklyCalorieSummary,
   recalculateForQuantity,
   sumDailyTotals,
 } from './nutritionCalculations';
@@ -18,6 +19,7 @@ function log(overrides: Partial<FoodLogRow> = {}): FoodLogRow {
     proteinG: 31,
     carbsG: 0,
     fatG: 3.6,
+    mealType: null,
     loggedAt: '2026-01-01T12:00:00Z',
     ...overrides,
   };
@@ -73,6 +75,41 @@ describe('calculateRemaining', () => {
     const goals = { calories: 2000, proteinG: null, carbsG: null, fatG: null };
 
     expect(calculateRemaining(consumed, goals).calories).toBe(-200);
+  });
+});
+
+describe('computeWeeklyCalorieSummary', () => {
+  it('returns null (never a fabricated target) when no daily calorie target has been set', () => {
+    expect(computeWeeklyCalorieSummary(7000, null)).toBeNull();
+  });
+
+  it('computes the weekly target as exactly 7x the saved daily target -- never a separate value', () => {
+    const summary = computeWeeklyCalorieSummary(7000, 2000);
+
+    expect(summary?.target).toBe(14000);
+  });
+
+  it('computes real consumed/remaining/percent from the weekly total', () => {
+    const summary = computeWeeklyCalorieSummary(7000, 2000);
+
+    expect(summary).toEqual({ consumed: 7000, target: 14000, remaining: 7000, percent: 0.5 });
+  });
+
+  it('lets remaining go negative when the week is over budget, same as the daily calculation', () => {
+    const summary = computeWeeklyCalorieSummary(15000, 2000);
+
+    expect(summary?.remaining).toBe(-1000);
+  });
+
+  it('clamps the progress-bar percent at 1 even when over budget -- remaining still reports the real overage', () => {
+    const summary = computeWeeklyCalorieSummary(20000, 2000);
+
+    expect(summary?.percent).toBe(1);
+    expect(summary?.remaining).toBe(-6000);
+  });
+
+  it('returns 0% with nothing consumed yet', () => {
+    expect(computeWeeklyCalorieSummary(0, 2000)?.percent).toBe(0);
   });
 });
 

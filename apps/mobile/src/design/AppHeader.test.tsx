@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { AppHeader } from './AppHeader';
 
 describe('AppHeader', () => {
@@ -7,6 +8,20 @@ describe('AppHeader', () => {
 
     expect(screen.getByText('Workouts')).toBeTruthy();
     expect(screen.getByText('Your history')).toBeTruthy();
+  });
+
+  // The title sits in a flexible column between two equal-width side slots
+  // (a real left action or an equal-width empty spacer, same on the right),
+  // so that column is already centered in the row -- but the text itself
+  // still needs textAlign: 'center', or it renders flush to the column's
+  // left edge instead of the middle of the screen.
+  it('centers the title and subtitle text, not just the column that holds them', () => {
+    render(<AppHeader title="Workouts" subtitle="Your history" />);
+
+    expect(StyleSheet.flatten(screen.getByText('Workouts').props.style).textAlign).toBe('center');
+    expect(StyleSheet.flatten(screen.getByText('Your history').props.style).textAlign).toBe(
+      'center',
+    );
   });
 
   it('renders a Back button and calls onBack when pressed', () => {

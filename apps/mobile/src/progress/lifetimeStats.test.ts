@@ -1,5 +1,10 @@
+import type { ExerciseHistoryGroup } from '../workouts/exerciseHistoryGrouping';
 import type { WorkoutSummary } from '../workouts/workoutQueries';
-import { computeFirstPRAt, computeLifetimeStats } from './lifetimeStats';
+import {
+  computeLifetimeStats,
+  computeLifetimeVolumeKg,
+  rankExercisesByVolume,
+} from './lifetimeStats';
 
 function workout(overrides: Partial<WorkoutSummary> = {}): WorkoutSummary {
   return {
@@ -75,14 +80,58 @@ describe('computeLifetimeStats', () => {
   });
 });
 
-describe('computeFirstPRAt', () => {
-  it('returns null with no PR history', () => {
-    expect(computeFirstPRAt([])).toBeNull();
+describe('computeLifetimeVolumeKg', () => {
+  it('returns 0 for no sets', () => {
+    expect(computeLifetimeVolumeKg([])).toBe(0);
   });
 
-  it('returns the earliest date regardless of input order', () => {
+  it('sums weight x reps across every set', () => {
     expect(
-      computeFirstPRAt(['2026-02-01T00:00:00Z', '2026-01-05T00:00:00Z', '2026-03-01T00:00:00Z']),
-    ).toBe('2026-01-05T00:00:00Z');
+      computeLifetimeVolumeKg([
+        { weightKg: 100, reps: 5 },
+        { weightKg: 60, reps: 10 },
+      ]),
+    ).toBe(100 * 5 + 60 * 10);
+  });
+});
+
+describe('rankExercisesByVolume', () => {
+  function group(overrides: Partial<ExerciseHistoryGroup> = {}): ExerciseHistoryGroup {
+    return {
+      exerciseId: 'ex-1',
+      exerciseName: 'Barbell Squat',
+      sets: [
+        { weightKg: 100, reps: 5, performedAt: '2026-01-01T00:00:00Z', workoutExerciseId: 'we1' },
+      ],
+      ...overrides,
+    };
+  }
+
+  it('ranks exercises by lifetime volume, heaviest total first', () => {
+    const groups = [
+      group({
+        exerciseId: 'ex-1',
+        exerciseName: 'Barbell Squat',
+        sets: [
+          { weightKg: 100, reps: 5, performedAt: '2026-01-01T00:00:00Z', workoutExerciseId: 'we1' },
+        ],
+      }),
+      group({
+        exerciseId: 'ex-2',
+        exerciseName: 'Barbell Curl',
+        sets: [
+          { weightKg: 20, reps: 10, performedAt: '2026-01-01T00:00:00Z', workoutExerciseId: 'we2' },
+        ],
+      }),
+    ];
+
+    expect(rankExercisesByVolume(groups)).toEqual([
+      { exerciseId: 'ex-1', exerciseName: 'Barbell Squat', volumeKg: 500 },
+      { exerciseId: 'ex-2', exerciseName: 'Barbell Curl', volumeKg: 200 },
+    ]);
+  });
+
+  it('returns an empty list with no exercises', () => {
+    expect(rankExercisesByVolume([])).toEqual([]);
   });
 });

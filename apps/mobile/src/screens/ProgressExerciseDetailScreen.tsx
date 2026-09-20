@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,10 +49,20 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
   const [oneRepMax, setOneRepMax] = useState<OneRepMax | null>(null);
   const [range, setRange] = useState<TimeRange>('3m');
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
+  // Only the very first load for this exerciseId should replace the whole
+  // screen with a spinner -- every later call (the focus listener below) is
+  // a background refresh, same pattern as DashboardScreen/ProfileScreen.
+  // Reset when exerciseId itself changes since that's genuinely new data (a
+  // real edge case: navigation.setParams onto an already-mounted instance,
+  // rather than the usual fresh push/fresh mount).
+  const hasLoadedOnce = useRef(false);
+  useEffect(() => {
+    hasLoadedOnce.current = false;
+  }, [exerciseId]);
 
   const load = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
+    if (!hasLoadedOnce.current) setLoading(true);
     setError(null);
     try {
       const [fetchedHistory, prs, orm] = await Promise.all([
@@ -67,6 +77,7 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
       setError(err instanceof Error ? err.message : 'Failed to load progress');
     } finally {
       setLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, [userId, exerciseId]);
 

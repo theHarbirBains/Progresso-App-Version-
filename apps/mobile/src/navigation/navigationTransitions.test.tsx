@@ -5,20 +5,12 @@ import { AccessibilityInfo, Text } from 'react-native';
 import { getDefaultScreenOptions, useReduceMotionPreference } from './navigationTransitions';
 
 describe('getDefaultScreenOptions', () => {
-  it('uses the platform-native default transition with gesture support when motion is not reduced', () => {
-    const options = getDefaultScreenOptions(false);
-
-    expect(options.animation).toBe('default');
-    expect(options.gestureEnabled).toBe(true);
-    expect(options.fullScreenGestureEnabled).toBe(true);
-    expect(options.animationMatchesGesture).toBe(true);
-  });
-
-  it('disables the transition animation (but not the gesture) when motion is reduced', () => {
-    const options = getDefaultScreenOptions(true);
+  it('disables the page transition animation (instant navigation) while keeping swipe-back gesture support', () => {
+    const options = getDefaultScreenOptions();
 
     expect(options.animation).toBe('none');
     expect(options.gestureEnabled).toBe(true);
+    expect(options.fullScreenGestureEnabled).toBe(true);
   });
 });
 
@@ -61,10 +53,7 @@ describe('a screen registered with no options of its own', () => {
   it('renders normally under a navigator using the shared default screenOptions', () => {
     render(
       <NavigationContainer>
-        <TestStack.Navigator
-          initialRouteName="Second"
-          screenOptions={getDefaultScreenOptions(false)}
-        >
+        <TestStack.Navigator initialRouteName="Second" screenOptions={getDefaultScreenOptions()}>
           <TestStack.Screen name="First" component={FirstScreen} />
           <TestStack.Screen name="Second" component={SecondScreen} />
         </TestStack.Navigator>

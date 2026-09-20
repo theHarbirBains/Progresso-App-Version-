@@ -1,5 +1,5 @@
 import type { HistoricalSetWithExercise } from '../workouts/exerciseHistoryGrouping';
-import { computeMuscleGroupSetCounts, muscleGroupsForVisualization } from './muscleGroupProgress';
+import { computeMuscleGroupSetCounts, computeMuscleGroupVolumeKg } from './muscleGroupProgress';
 
 function set(
   muscleGroup: HistoricalSetWithExercise['muscleGroup'],
@@ -13,6 +13,7 @@ function set(
     exerciseId: 'ex-1',
     exerciseName: 'Bench Press',
     muscleGroup,
+    movementType: 'bilateral',
     ...overrides,
   };
 }
@@ -41,19 +42,21 @@ describe('computeMuscleGroupSetCounts', () => {
   });
 });
 
-describe('muscleGroupsForVisualization', () => {
-  it('maps to the coarser split-day vocabulary MuscleVisualization understands, deduplicated', () => {
-    const counts = computeMuscleGroupSetCounts([set('quadriceps'), set('core'), set('shoulders')]);
+describe('computeMuscleGroupVolumeKg', () => {
+  it('sums weight x reps per muscle group, heaviest first', () => {
+    const history = [
+      set('chest', { weightKg: 100, reps: 5 }),
+      set('chest', { weightKg: 100, reps: 5 }),
+      set('back', { weightKg: 80, reps: 10 }),
+    ];
 
-    expect(muscleGroupsForVisualization(counts)).toEqual(
-      expect.arrayContaining(['quads', 'abs', 'shoulders']),
-    );
-    expect(muscleGroupsForVisualization(counts)).toHaveLength(3);
+    expect(computeMuscleGroupVolumeKg(history)).toEqual([
+      { group: 'chest', label: 'Chest', volumeKg: 1000 },
+      { group: 'back', label: 'Back', volumeKg: 800 },
+    ]);
   });
 
-  it('excludes full_body and other -- no single anatomical region to highlight', () => {
-    const counts = computeMuscleGroupSetCounts([set('full_body'), set('other'), set('chest')]);
-
-    expect(muscleGroupsForVisualization(counts)).toEqual(['chest']);
+  it('never includes a muscle group with zero sets', () => {
+    expect(computeMuscleGroupVolumeKg([])).toEqual([]);
   });
 });

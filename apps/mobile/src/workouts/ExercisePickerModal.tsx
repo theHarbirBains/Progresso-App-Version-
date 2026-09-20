@@ -10,10 +10,13 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppCard } from '../design/AppCard';
+import { useBackgroundTheme } from '../design/BackgroundThemeContext';
 import { colors } from '../design/theme';
 import { fetchExercises, type ExerciseRow } from '../exercises/exerciseQueries';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
+import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -28,12 +31,17 @@ interface Props {
   /** Already-added exercise ids, shown as "(added)" and disabled -- same
    * convention NewWorkoutScreen already used. */
   alreadyAddedIds: string[];
+  /** Opens the Create Custom Exercise flow without leaving this picker. */
+  onCreateCustom: () => void;
+  /** Defaults to the static brand accent -- pass the user's Workout accent. */
+  accentColor?: string;
+  onAccentColor?: string;
 }
 
 /**
  * The existing search/select flow (fetchExercises, MuscleGroupChips),
- * reused as a modal so it works both before a workout exists (NewWorkoutScreen)
- * and mid-workout (ActiveWorkoutScreen) without duplicating the search UI.
+ * reused as a modal so it works mid-workout (ActiveWorkoutScreen) without
+ * duplicating the search UI.
  */
 export function ExercisePickerModal({
   visible,
@@ -41,8 +49,13 @@ export function ExercisePickerModal({
   onSelect,
   userId,
   alreadyAddedIds,
+  onCreateCustom,
+  accentColor = colors.accent,
+  onAccentColor = colors.onAccent,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { theme: backgroundTheme } = useBackgroundTheme();
+  const reduceMotion = useReduceMotionPreference();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(null);
@@ -71,8 +84,23 @@ export function ExercisePickerModal({
   }, [visible, userId, search, muscleGroup]);
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <Modal
+      visible={visible}
+      animationType={reduceMotion ? 'none' : 'slide'}
+      onRequestClose={onClose}
+    >
+      {/* Unlike a normal stacked screen, a native Modal opens its own
+          separate window -- it does NOT sit behind AppBackgroundLayer, so
+          `styles.screen`'s usual transparent background would expose the
+          OS's own (light) window background instead. This is the one place
+          that needs the current Background Theme's color applied directly. */}
+      <View
+        testID="exercise-picker-root"
+        style={[
+          styles.screen,
+          { backgroundColor: backgroundTheme.colors.background, paddingTop: insets.top },
+        ]}
+      >
         <View style={[styles.scrollContent, { flex: 1 }]}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Add Exercise</Text>
@@ -96,7 +124,37 @@ export function ExercisePickerModal({
             onChangeText={setSearchInput}
           />
 
-          <MuscleGroupChips value={muscleGroup} onChange={setMuscleGroup} includeAll />
+          <View testID="exercise-picker-muscle-group-wrap" style={styles.muscleGroupChipsWrap}>
+            <MuscleGroupChips
+              value={muscleGroup}
+              onChange={setMuscleGroup}
+              includeAll
+              accentColor={accentColor}
+              onAccentColor={onAccentColor}
+              chipBorderColor={colors.border}
+              chipTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <AppCard
+            testID="exercise-picker-create-custom"
+            onPress={onCreateCustom}
+            style={[styles.createCustomCard, { borderColor: accentColor }]}
+            accessibilityLabel="Create Custom Exercise. Can't find the exercise? Create your own."
+          >
+            <View style={styles.createCustomRow}>
+              <View style={[styles.createCustomIconCircle, { backgroundColor: accentColor }]}>
+                <Feather name="plus" size={18} color={onAccentColor} />
+              </View>
+              <View style={styles.createCustomTextBlock}>
+                <Text style={styles.createCustomTitle}>Create Custom Exercise</Text>
+                <Text style={styles.createCustomSubtitle}>
+                  Can&apos;t find the exercise? Create your own.
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={20} color={colors.textMuted} />
+            </View>
+          </AppCard>
 
           {loading ? (
             <ActivityIndicator
@@ -118,6 +176,9 @@ export function ExercisePickerModal({
                   style={styles.pickerItem}
                   disabled={added}
                   onPress={() => onSelect(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.name}, ${MUSCLE_GROUP_LABELS[item.muscleGroup]}${added ? ', already added' : ''}`}
+                  accessibilityState={{ disabled: added }}
                 >
                   <Text style={styles.pickerItemTitle}>
                     {item.name}

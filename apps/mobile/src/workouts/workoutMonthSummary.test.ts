@@ -11,6 +11,7 @@ function workout(overrides: Partial<EnrichedWorkoutSummary>): EnrichedWorkoutSum
     splitDayName: null,
     muscleGroups: [],
     completedSetCount: 0,
+    totalVolumeKg: 0,
     durationMinutes: 0,
     ...overrides,
   };

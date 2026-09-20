@@ -7,11 +7,11 @@ import type { SetRecord } from './workoutQueries';
 const fmt = (kg: number) => `${kg}kg`;
 
 function set(id: string, weightKg: number, reps: number): SetRecord {
-  return { id, setIndex: 1, weightKg, reps, completedAt: '2026-01-01T00:00:00Z' };
+  return { id, setIndex: 1, side: null, weightKg, reps, completedAt: '2026-01-01T00:00:00Z' };
 }
 
 function blankSet(id: string): SetRecord {
-  return { id, setIndex: 2, weightKg: null, reps: null, completedAt: null };
+  return { id, setIndex: 2, side: null, weightKg: null, reps: null, completedAt: null };
 }
 
 describe('compareToPrevious', () => {

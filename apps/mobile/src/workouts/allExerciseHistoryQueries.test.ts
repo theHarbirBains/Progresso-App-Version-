@@ -46,7 +46,7 @@ describe('fetchAllExerciseHistory', () => {
           {
             id: 'we1',
             exercise_id: 'ex-bench',
-            exercises: { name: 'Bench Press', muscle_group: 'chest' },
+            exercises: { name: 'Bench Press', muscle_group: 'chest', movement_type: 'bilateral' },
             workouts: {
               performed_at: '2026-02-01T00:00:00Z',
               completed_at: '2026-02-01T01:00:00Z',
@@ -56,7 +56,11 @@ describe('fetchAllExerciseHistory', () => {
           {
             id: 'we2',
             exercise_id: 'ex-squat',
-            exercises: { name: 'Squat', muscle_group: 'quadriceps' },
+            exercises: {
+              name: 'Squat',
+              muscle_group: 'quadriceps',
+              movement_type: 'bilateral',
+            },
             workouts: {
               performed_at: '2026-01-01T00:00:00Z',
               completed_at: '2026-01-01T01:00:00Z',
@@ -86,6 +90,7 @@ describe('fetchAllExerciseHistory', () => {
         exerciseId: 'ex-squat',
         exerciseName: 'Squat',
         muscleGroup: 'quadriceps',
+        movementType: 'bilateral',
       },
       {
         weightKg: 110,
@@ -95,11 +100,12 @@ describe('fetchAllExerciseHistory', () => {
         exerciseId: 'ex-bench',
         exerciseName: 'Bench Press',
         muscleGroup: 'chest',
+        movementType: 'bilateral',
       },
     ]);
   });
 
-  it('falls back to "other" when the exercise has somehow lost its muscle_group join', async () => {
+  it('falls back to "other"/"bilateral" when the exercise has somehow lost its join', async () => {
     mockTables({
       workout_exercises: {
         data: [
@@ -125,6 +131,7 @@ describe('fetchAllExerciseHistory', () => {
     const result = await fetchAllExerciseHistory('user-1');
 
     expect(result[0].muscleGroup).toBe('other');
+    expect(result[0].movementType).toBe('bilateral');
   });
 
   it('excludes planned-but-not-yet-performed sets (completed_at null) from the sets query', async () => {
@@ -233,6 +240,7 @@ describe('groupByExercise', () => {
         exerciseId: 'ex-bench',
         exerciseName: 'Bench Press',
         muscleGroup: 'chest',
+        movementType: 'bilateral',
       },
       {
         weightKg: 150,
@@ -242,6 +250,7 @@ describe('groupByExercise', () => {
         exerciseId: 'ex-squat',
         exerciseName: 'Squat',
         muscleGroup: 'quadriceps',
+        movementType: 'bilateral',
       },
       {
         weightKg: 115,
@@ -251,6 +260,7 @@ describe('groupByExercise', () => {
         exerciseId: 'ex-bench',
         exerciseName: 'Bench Press',
         muscleGroup: 'chest',
+        movementType: 'bilateral',
       },
     ];
 

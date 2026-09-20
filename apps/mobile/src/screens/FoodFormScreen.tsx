@@ -6,18 +6,25 @@ import { createFood, updateFood, type FoodRow } from '../nutrition/foodQueries';
 import { exerciseStyles as styles } from './exerciseStyles';
 
 type Props =
-  | { mode: 'create'; onDone: () => void; onCancel: () => void }
+  | { mode: 'create'; onDone: () => void; onCancel: () => void; initialBarcode?: string }
   | { mode: 'edit'; food: FoodRow; onDone: () => void; onCancel: () => void };
 
-// Only reachable from FoodLibraryScreen for the user's own custom foods --
-// there are no built-in foods in Phase 6. Direct Supabase writes (foods has
-// no unique-name constraint to justify routing this through the backend,
-// unlike exercises' ExerciseFormScreen).
+// Reachable from FoodLibraryScreen (the user's own custom foods) and, on
+// create, from the Scan Barcode flow's "Product not found" fallback (see
+// BarcodeScannerScreen) -- the same create/edit form either way, since a
+// custom food is just a `foods` row with created_by set, same as any other
+// (see foodQueries.ts). Direct Supabase writes: foods has no unique-name
+// constraint to justify routing this through the backend, unlike exercises'
+// ExerciseFormScreen.
 export function FoodFormScreen(props: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
 
   const [name, setName] = useState(props.mode === 'edit' ? props.food.name : '');
+  const [brand, setBrand] = useState(props.mode === 'edit' ? (props.food.brand ?? '') : '');
+  const [barcode, setBarcode] = useState(
+    props.mode === 'edit' ? (props.food.barcode ?? '') : (props.initialBarcode ?? ''),
+  );
   const [servingSize, setServingSize] = useState(
     props.mode === 'edit' ? String(props.food.servingSize) : '',
   );
@@ -64,6 +71,8 @@ export function FoodFormScreen(props: Props) {
     try {
       const input = {
         name: name.trim(),
+        brand: brand.trim() || null,
+        barcode: barcode.trim() || null,
         servingSize: servingSizeNum,
         servingUnit: servingUnit.trim(),
         calories: caloriesNum,
@@ -116,6 +125,27 @@ export function FoodFormScreen(props: Props) {
         placeholderTextColor={colors.textMuted}
         value={name}
         onChangeText={setName}
+      />
+
+      <Text style={styles.label}>Brand (optional)</Text>
+      <TextInput
+        testID="food-form-brand"
+        style={styles.input}
+        placeholder="e.g. Kirkland"
+        placeholderTextColor={colors.textMuted}
+        value={brand}
+        onChangeText={setBrand}
+      />
+
+      <Text style={styles.label}>Barcode (optional)</Text>
+      <TextInput
+        testID="food-form-barcode"
+        style={styles.input}
+        placeholder="e.g. 012345678905"
+        placeholderTextColor={colors.textMuted}
+        keyboardType="number-pad"
+        value={barcode}
+        onChangeText={setBarcode}
       />
 
       <Text style={styles.label}>Serving size</Text>

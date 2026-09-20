@@ -26,4 +26,22 @@ describe('AppCard', () => {
 
     expect(onPress).toHaveBeenCalled();
   });
+
+  it('defaults to an accessible button role when pressable, and forwards a given label/state', () => {
+    render(
+      <AppCard
+        testID="card"
+        onPress={jest.fn()}
+        accessibilityLabel="Start Push workout"
+        accessibilityState={{ disabled: true }}
+      >
+        <Text>Content</Text>
+      </AppCard>,
+    );
+
+    const card = screen.getByTestId('card');
+    expect(card.props.accessibilityRole).toBe('button');
+    expect(card.props.accessibilityLabel).toBe('Start Push workout');
+    expect(card.props.accessibilityState).toEqual({ disabled: true });
+  });
 });

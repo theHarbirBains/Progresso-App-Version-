@@ -1,3 +1,4 @@
+import type { ExerciseHistoryGroup } from '../workouts/exerciseHistoryGrouping';
 import type { WorkoutSummary } from '../workouts/workoutQueries';
 
 // Pure aggregation over already-fetched, real workout history -- no query of
@@ -52,10 +53,37 @@ export function computeLifetimeStats(
   return { totalWorkouts, totalMinutes, workoutsThisMonth, avgWorkoutsPerWeek, firstWorkoutAt };
 }
 
-/** The earliest achievedAt across every rep PR and true 1RM this user has -- "First PR", whichever kind of record it was. */
-export function computeFirstPRAt(achievedAtDates: string[]): string | null {
-  if (achievedAtDates.length === 0) return null;
-  return achievedAtDates.reduce((earliest, d) =>
-    new Date(d).getTime() < new Date(earliest).getTime() ? d : earliest,
-  );
+/**
+ * Lifetime training volume (kg) across every logged set this user has ever
+ * completed -- same weight x reps definition as workoutSummary.ts's
+ * computeTotalVolumeKg (one workout at a time), just summed over the whole
+ * history instead. Takes the already-fetched, already-correctly-filtered
+ * set list (fetchAllExerciseHistory: completed sets only, excludes
+ * cancelled/deleted workouts and never-logged "planned" set rows) rather
+ * than querying anything itself.
+ */
+export function computeLifetimeVolumeKg(sets: { weightKg: number; reps: number }[]): number {
+  return sets.reduce((sum, set) => sum + set.weightKg * set.reps, 0);
+}
+
+export interface ExerciseVolume {
+  exerciseId: string;
+  exerciseName: string;
+  volumeKg: number;
+}
+
+/**
+ * Every exercise the user has ever logged, ranked by lifetime total volume
+ * (heaviest total first) -- reuses computeLifetimeVolumeKg per exercise
+ * rather than a second volume formula. Takes the same groupByExercise
+ * output every other per-exercise Progress derivation already takes.
+ */
+export function rankExercisesByVolume(groups: ExerciseHistoryGroup[]): ExerciseVolume[] {
+  return groups
+    .map((g) => ({
+      exerciseId: g.exerciseId,
+      exerciseName: g.exerciseName,
+      volumeKg: computeLifetimeVolumeKg(g.sets),
+    }))
+    .sort((a, b) => b.volumeKg - a.volumeKg);
 }

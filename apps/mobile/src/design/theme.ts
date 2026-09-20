@@ -17,6 +17,14 @@ export const colors = {
 
   textPrimary: '#F1F6F6',
   textSecondary: '#8FA0A2',
+  // A brighter step between textSecondary and textPrimary -- for secondary
+  // text sitting directly over a busy photographic background (no card
+  // behind it, or a card whose own tint isn't enough on its own), where
+  // textSecondary's normal contrast reads as too dim against the photo.
+  // Introduced for the Workout Mode dashboard readability pass; reach for
+  // this instead of a one-off hex wherever textSecondary tests too dim in
+  // the same way.
+  textSecondaryBright: '#B4C4C6',
   textMuted: '#5E7072',
 
   // The single Progresso brand accent. Used for: primary CTA, active states,
@@ -31,6 +39,16 @@ export const colors = {
 
   chartAccent: '#29E3C7',
   chartMuted: '#212B2D',
+
+  // Glass-surface hairline borders (see GlassBackground.tsx) -- a neutral
+  // light-alpha edge that reads as "catching light" against any of the
+  // Background Theme environments, rather than each theme's own (much
+  // darker) `border` token. `glassBorder` is the default weight (cards,
+  // controls); `glassBorderStrong` is for the few persistent chrome
+  // surfaces (bottom nav, side menu, bottom sheet) that want a slightly
+  // more defined edge against constantly-changing content behind them.
+  glassBorder: 'rgba(255, 255, 255, 0.08)',
+  glassBorderStrong: 'rgba(255, 255, 255, 0.14)',
 } as const;
 
 export const radii = {

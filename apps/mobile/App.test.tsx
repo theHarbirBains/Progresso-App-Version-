@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import App from './App';
 
 interface MockAuthHandles {
@@ -48,12 +49,25 @@ jest.mock('./src/lib/api', () => ({
 // reads that have nothing to do with authentication.
 jest.mock('./src/workouts/workoutQueries', () => ({
   fetchActiveWorkout: jest.fn().mockResolvedValue(null),
+  fetchWorkoutsForDateRange: jest.fn().mockResolvedValue([]),
+  fetchWorkoutHistory: jest.fn().mockResolvedValue({ rows: [], hasMore: false }),
+}));
+jest.mock('./src/workouts/prSummaryQueries', () => ({
+  fetchAllRepPRs: jest.fn().mockResolvedValue([]),
+  fetchAllOneRepMaxes: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('./src/progress/progressStatsQueries', () => ({
+  fetchAllCompletedWorkouts: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('./src/workouts/allExerciseHistoryQueries', () => ({
+  fetchAllExerciseHistory: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('./src/dashboard/recentWorkoutInfo', () => ({
   fetchRecentWorkoutInfo: jest.fn().mockResolvedValue(null),
 }));
 jest.mock('./src/nutrition/foodLogQueries', () => ({
   fetchTodaysFoodLogs: jest.fn().mockResolvedValue([]),
+  fetchWeeklyFoodLogs: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('./src/nutrition/nutritionGoalQueries', () => ({
   fetchNutritionGoals: jest.fn().mockResolvedValue({
@@ -327,10 +341,12 @@ describe('Authentication flow', () => {
     fireEvent.press(screen.getByTestId('sign-in-submit'));
     await screen.findByTestId('dashboard-greeting');
 
-    // Sign out lives on AccountSettingsScreen, reached from the dashboard's
+    // Sign out lives on AccountSettingsScreen, reached via Profile's own
     // settings affordance now that AccountSettingsScreen is no longer the
-    // initial route.
-    fireEvent.press(screen.getByTestId('open-account-settings'));
+    // initial route. (Dashboard no longer shows a profile-picture shortcut
+    // to it -- see the Workout Home redesign's removal of the avatar.)
+    fireEvent.press(screen.getByTestId('dashboard-bottom-profile'));
+    fireEvent.press(await screen.findByTestId('profile-open-settings'));
     await screen.findByTestId('sign-out-button');
     fireEvent.press(screen.getByTestId('sign-out-button'));
 
@@ -493,18 +509,18 @@ describe('App-level side menu', () => {
     fireEvent.press(screen.getByTestId('dashboard-open-menu'));
 
     expect(screen.getByTestId('app-menu-backdrop')).toBeTruthy();
-    expect(screen.getByTestId('app-menu-item-Dashboard').props.accessibilityState.selected).toBe(
-      true,
-    );
+    // No Home entry -- Dashboard is already one tap away via the bottom nav.
+    expect(screen.queryByTestId('app-menu-item-Dashboard')).toBeNull();
+    expect(screen.getByTestId('app-menu-item-WorkoutHistory')).toBeTruthy();
   });
 
   it('navigates to the pressed destination and closes the menu', async () => {
     await signIn();
     fireEvent.press(screen.getByTestId('dashboard-open-menu'));
 
-    fireEvent.press(screen.getByTestId('app-menu-item-Social'));
+    fireEvent.press(screen.getByTestId('app-menu-item-WorkoutHistory'));
 
-    expect(await screen.findByTestId('social-scroll')).toBeTruthy();
+    expect(await screen.findByTestId('workout-history-open-menu')).toBeTruthy();
     expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
   });
 
@@ -517,5 +533,281 @@ describe('App-level side menu', () => {
 
     expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
     expect(screen.getByTestId('dashboard-greeting')).toBeTruthy();
+  });
+});
+
+describe('Nutrition-specific side menu', () => {
+  async function signIn() {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+    fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
+    fireEvent.press(screen.getByTestId('sign-in-submit'));
+    await screen.findByTestId('dashboard-greeting');
+  }
+
+  it('shows the Workout menu (unchanged) while Dashboard is in Workout mode', async () => {
+    await signIn();
+
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+
+    expect(screen.getByText('Progresso')).toBeTruthy();
+    expect(screen.getByTestId('app-menu-item-WorkoutHistory')).toBeTruthy();
+    expect(screen.queryByTestId('app-menu-item-NutritionGoals')).toBeNull();
+  });
+
+  it('shows the Nutrition-branded menu, with Nutrition nav items, once Dashboard is switched to Nutrition mode', async () => {
+    await signIn();
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
+
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+
+    expect(screen.getByText('Progresso · Nutrition')).toBeTruthy();
+    // No Home entry -- Dashboard is already one tap away via the bottom nav.
+    expect(screen.queryByTestId('app-menu-item-Nutrition')).toBeNull();
+    expect(screen.getByTestId('app-menu-item-FoodLibrary')).toHaveTextContent(/Food/);
+    expect(screen.getByTestId('app-menu-item-NutritionGoals')).toHaveTextContent(/Nutrition Goals/);
+    expect(screen.getByTestId('app-menu-item-Nutrition History')).toHaveTextContent(/Coming Soon/);
+    expect(screen.getByTestId('app-menu-item-Recipes')).toHaveTextContent(/Coming Soon/);
+    expect(screen.getByTestId('app-menu-item-AccountSettings')).toHaveTextContent(/Settings/);
+    // The Workout-only menu's own items must not leak into the Nutrition menu.
+    expect(screen.queryByTestId('app-menu-item-WorkoutHistory')).toBeNull();
+    expect(screen.queryByTestId('app-menu-item-ExerciseLibrary')).toBeNull();
+  });
+
+  it("navigates to the Nutrition Goals page via the Nutrition menu's Nutrition Goals item", async () => {
+    await signIn();
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+
+    fireEvent.press(screen.getByTestId('app-menu-item-NutritionGoals'));
+
+    expect(await screen.findByTestId('nutrition-goals-scroll')).toBeTruthy();
+    expect(screen.getByTestId('nutrition-goals-header')).toBeTruthy();
+    expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
+  });
+
+  it('does not navigate anywhere when a coming-soon Nutrition menu row is pressed', async () => {
+    await signIn();
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+
+    fireEvent.press(screen.getByTestId('app-menu-item-Recipes'));
+
+    // Still on Dashboard, menu still open -- nothing happened.
+    expect(screen.getByTestId('dashboard-greeting')).toBeTruthy();
+    expect(screen.getByTestId('app-menu-backdrop')).toBeTruthy();
+  });
+});
+
+describe('Nutrition-specific global bottom nav', () => {
+  async function signIn() {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+    fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
+    fireEvent.press(screen.getByTestId('sign-in-submit'));
+    await screen.findByTestId('dashboard-greeting');
+  }
+
+  // The bug this guards: the global bottom nav used to always use the
+  // Workout accent theme, even on Nutrition-mode screens -- it never turned
+  // green. Switching Dashboard to Nutrition mode and navigating to a
+  // Nutrition screen (FoodLibrary) must carry that mode through to the
+  // global bar: Food/Goals labels, matching icons, and the Nutrition accent
+  // color on the active tab and the center "+" button.
+  it('shows Nutrition-mode labels and the Nutrition accent color on a Nutrition screen', async () => {
+    await signIn();
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+    fireEvent.press(screen.getByTestId('app-menu-item-FoodLibrary'));
+
+    await screen.findByTestId('app-bottom-nav');
+    expect(screen.getByTestId('bottom-nav-home')).toHaveTextContent(/Home/);
+    expect(screen.getByTestId('bottom-nav-workouts')).toHaveTextContent(/Food/);
+    expect(screen.getByTestId('bottom-nav-progress')).toHaveTextContent(/Goals/);
+
+    const homeLabel = within(screen.getByTestId('bottom-nav-home')).getByText('Home');
+    expect(StyleSheet.flatten(homeLabel.props.style).color).toBe('#10B981');
+  });
+
+  // It should only switch to the Workout side once the user actually swaps
+  // modes -- confirms the fix isn't one-directional.
+  it('reverts to Workout-mode labels/color once the user swaps back to Workout mode', async () => {
+    await signIn();
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+    fireEvent.press(screen.getByTestId('app-menu-item-FoodLibrary'));
+    await screen.findByTestId('app-bottom-nav');
+
+    // Back to Dashboard, swap to Workout mode, then into a Workout screen.
+    fireEvent.press(screen.getByTestId('bottom-nav-home'));
+    await screen.findByTestId('dashboard-greeting');
+    fireEvent.press(screen.getByTestId('dashboard-mode-workout'));
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+    fireEvent.press(screen.getByTestId('app-menu-item-WorkoutHistory'));
+
+    await screen.findByTestId('workout-history-open-menu');
+    expect(screen.getByTestId('bottom-nav-workouts')).toHaveTextContent(/Workouts/);
+    expect(screen.getByTestId('bottom-nav-progress')).toHaveTextContent(/Progress/);
+
+    // WorkoutHistory maps to the 'workouts' tab (see bottomNavRouting.ts),
+    // so it's this tab -- not Home -- that's active and accent-colored here.
+    const workoutsLabel = within(screen.getByTestId('bottom-nav-workouts')).getByText('Workouts');
+    expect(StyleSheet.flatten(workoutsLabel.props.style).color).toBe('#2F80FF');
+  });
+});
+
+describe('Mode-aware background image', () => {
+  const workoutImage = require('./assets/WorkoutBackground.png');
+  const nutritionImage = require('./assets/NutritionBackground.png');
+
+  async function signIn() {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+    fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
+    fireEvent.press(screen.getByTestId('sign-in-submit'));
+    await screen.findByTestId('dashboard-greeting');
+  }
+
+  // Both the workout and nutrition photos stay mounted at all times (see
+  // AppBackgroundLayer) -- only their opacity toggles -- so "which one is
+  // showing" means "which one is at opacity 1", not "which one exists".
+  function expectVisibleBackground(expected: 'workout' | 'nutrition') {
+    const workout = screen.getByTestId('app-background-image-workout');
+    const nutrition = screen.getByTestId('app-background-image-nutrition');
+    expect(workout.props.source).toEqual(workoutImage);
+    expect(nutrition.props.source).toEqual(nutritionImage);
+    expect(StyleSheet.flatten(workout.props.style).opacity).toBe(expected === 'workout' ? 1 : 0);
+    expect(StyleSheet.flatten(nutrition.props.style).opacity).toBe(
+      expected === 'nutrition' ? 1 : 0,
+    );
+  }
+
+  it('shows the Workout background by default on Dashboard', async () => {
+    await signIn();
+
+    expectVisibleBackground('workout');
+  });
+
+  it('switches to the Nutrition background when Dashboard is toggled to Nutrition mode, and back', async () => {
+    await signIn();
+
+    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
+    await screen.findByTestId('dashboard-nutrition');
+    expectVisibleBackground('nutrition');
+
+    fireEvent.press(screen.getByTestId('dashboard-mode-workout'));
+    await screen.findByTestId('dashboard-start-workout');
+    expectVisibleBackground('workout');
+  });
+
+  it('keeps the Nutrition background on a Nutrition-only screen reached via the side menu', async () => {
+    await signIn();
+    fireEvent.press(await screen.findByTestId('dashboard-mode-nutrition'));
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+
+    fireEvent.press(screen.getByTestId('app-menu-item-FoodLibrary'));
+
+    expect(await screen.findByTestId('food-library-screen')).toBeTruthy();
+    expectVisibleBackground('nutrition');
+  });
+
+  it('shows the Workout background on a non-Nutrition screen reached from Nutrition mode', async () => {
+    await signIn();
+    fireEvent.press(screen.getByTestId('dashboard-mode-nutrition'));
+    await screen.findByTestId('dashboard-nutrition');
+    expectVisibleBackground('nutrition');
+
+    fireEvent.press(screen.getByTestId('dashboard-open-menu'));
+    fireEvent.press(screen.getByTestId('app-menu-item-AccountSettings'));
+
+    expect(await screen.findByTestId('sign-out-button')).toBeTruthy();
+    expectVisibleBackground('workout');
+  });
+
+  // Regression coverage for a reported bug: switching to Nutrition mode
+  // from a screen other than Dashboard (WorkoutHistory here) briefly
+  // flashed the Nutrition background/content, then snapped back to
+  // Workout -- Dashboard used to own a separate local `mode` state
+  // defaulting to 'workout', so navigating back to it (native stack's
+  // `navigate('Dashboard')` pops back to the already-mounted instance
+  // rather than remounting it) never picked up the shared mode the toggle
+  // had just reported. Dashboard now renders directly off the shared
+  // `currentMode`, so this must land in Nutrition immediately and stay
+  // there.
+  it('lands on Dashboard already in Nutrition mode, with no flash back to Workout, when switched to Nutrition from WorkoutHistory', async () => {
+    await signIn();
+    fireEvent.press(screen.getByTestId('dashboard-bottom-workouts'));
+    await screen.findByTestId('workout-history-open-menu');
+
+    fireEvent.press(screen.getByTestId('workout-history-mode-nutrition'));
+
+    expect(await screen.findByTestId('dashboard-nutrition')).toBeTruthy();
+    expect(screen.queryByTestId('dashboard-start-workout')).toBeNull();
+    expectVisibleBackground('nutrition');
+  });
+});
+
+describe('Persistent bottom navigation', () => {
+  async function signIn() {
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+    fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
+    fireEvent.press(screen.getByTestId('sign-in-submit'));
+    await screen.findByTestId('dashboard-greeting');
+  }
+
+  // Dashboard renders its own mode-crossfading bottom bar (unchanged,
+  // pre-existing) -- the global one mounted in App.tsx deliberately stays
+  // hidden there so the two never stack.
+  it('does not render the global bottom nav on Dashboard, which keeps its own', async () => {
+    await signIn();
+
+    expect(screen.queryByTestId('app-bottom-nav')).toBeNull();
+    expect(screen.getByTestId('dashboard-bottom-bar')).toBeTruthy();
+  });
+
+  // The whole point of this architecture change: navigating off Dashboard
+  // must not make the bottom nav disappear, and it must be the SAME
+  // instance (a sibling of the navigator), not something each screen has to
+  // render itself.
+  it('shows the global bottom nav, with Profile active, after navigating to a secondary screen', async () => {
+    await signIn();
+    fireEvent.press(screen.getByTestId('dashboard-bottom-profile'));
+    await screen.findByTestId('profile-scroll');
+
+    expect(screen.getByTestId('app-bottom-nav')).toBeTruthy();
+    expect(screen.getByTestId('bottom-nav-profile').props.accessibilityState.selected).toBe(true);
+  });
+
+  // AccountSettings is reached from Profile (a secondary/nested screen, not
+  // one of the 4 tabs itself) -- it must keep Profile's tab highlighted
+  // rather than showing no active tab.
+  it("keeps a secondary screen's parent tab active, and the bar itself visible, on a screen nested under it", async () => {
+    await signIn();
+    fireEvent.press(screen.getByTestId('dashboard-bottom-profile'));
+    await screen.findByTestId('profile-scroll');
+
+    fireEvent.press(screen.getByTestId('profile-open-settings'));
+
+    expect(await screen.findByTestId('sign-out-button')).toBeTruthy();
+    expect(screen.getByTestId('app-bottom-nav')).toBeTruthy();
+    expect(screen.getByTestId('bottom-nav-profile').props.accessibilityState.selected).toBe(true);
+  });
+
+  it("navigates via the global bottom nav's tabs", async () => {
+    await signIn();
+    fireEvent.press(screen.getByTestId('dashboard-bottom-profile'));
+    await screen.findByTestId('profile-scroll');
+
+    fireEvent.press(screen.getByTestId('bottom-nav-home'));
+
+    // Back on Dashboard: the global bar hides again (Dashboard's own bar
+    // takes over), proving the tab press actually navigated.
+    expect(await screen.findByTestId('dashboard-bottom-bar')).toBeTruthy();
+    expect(screen.queryByTestId('app-bottom-nav')).toBeNull();
   });
 });

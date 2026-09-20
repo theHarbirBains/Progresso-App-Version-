@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { Alert, StyleSheet } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { getMyProfile, updateMyProfile } from '../lib/api';
 import { DEFAULT_NUTRITION_COLOR, DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 import { AccountSettingsScreen } from './AccountSettingsScreen';
@@ -61,7 +62,11 @@ beforeEach(() => {
 
 describe('AccountSettingsScreen shell', () => {
   it('shows the Settings header and tagline', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
 
     expect(await screen.findByTestId('account-email')).toBeTruthy();
     expect(screen.getByText('Settings')).toBeTruthy();
@@ -69,7 +74,11 @@ describe('AccountSettingsScreen shell', () => {
   });
 
   it('goes back when the header back button is pressed', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     fireEvent.press(screen.getByTestId('app-header-back'));
@@ -78,13 +87,21 @@ describe('AccountSettingsScreen shell', () => {
   });
 
   it('defaults to the Account category', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
 
     expect(await screen.findByTestId('account-email')).toBeTruthy();
   });
 
   it('switches categories without losing the tab bar', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     goToCategory('Appearance');
@@ -98,7 +115,11 @@ describe('AccountSettingsScreen shell', () => {
   it('shows a load error without crashing the rest of the shell', async () => {
     mockGetMyProfile.mockRejectedValue(new Error('Failed to load profile'));
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
 
     expect(await screen.findByTestId('account-load-error')).toHaveTextContent(
       'Failed to load profile',
@@ -107,7 +128,11 @@ describe('AccountSettingsScreen shell', () => {
   });
 
   it('lists all six categories, horizontally scrollable', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     for (const category of ['Account', 'Appearance', 'App', 'Notifications', 'Privacy', 'Help']) {
@@ -123,7 +148,11 @@ describe('AccountSettingsScreen shell', () => {
   // ScrollView must always claim the remaining space, on every category,
   // never the tabs bar.
   it('keeps the content area (not the tab bar) flexible on every category, even short ones', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     for (const category of ['Appearance', 'App', 'Notifications', 'Privacy', 'Help']) {
@@ -139,7 +168,11 @@ describe('AccountSettingsScreen shell', () => {
 
 describe('AccountSettingsScreen Account category', () => {
   it('loads and displays the profile', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
 
     expect(await screen.findByTestId('account-email')).toHaveTextContent('athlete@example.com');
     expect(screen.getByTestId('account-display-name').props.value).toBe('Athlete');
@@ -150,7 +183,11 @@ describe('AccountSettingsScreen Account category', () => {
   it("colors Save Changes with the user's own Workout accent, not the static brand color", async () => {
     mockGetMyProfile.mockResolvedValue({ ...baseProfile, workoutAccentColor: '#EF4444' });
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     const style = StyleSheet.flatten(screen.getByTestId('account-save').props.style);
@@ -158,7 +195,11 @@ describe('AccountSettingsScreen Account category', () => {
   });
 
   it('lowercases username input as the user types', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     fireEvent.changeText(screen.getByTestId('account-username'), 'NewHandle');
@@ -169,7 +210,11 @@ describe('AccountSettingsScreen Account category', () => {
   it('saves the profile and shows a confirmation', async () => {
     mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, displayName: 'New Name' });
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     fireEvent.changeText(screen.getByTestId('account-display-name'), 'New Name');
@@ -187,7 +232,11 @@ describe('AccountSettingsScreen Account category', () => {
   it('shows a save error and does not show the saved confirmation on failure', async () => {
     mockUpdateMyProfile.mockRejectedValue(new Error('Username is already taken'));
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     fireEvent.press(screen.getByTestId('account-save'));
@@ -206,7 +255,11 @@ describe('AccountSettingsScreen Account category', () => {
       signOut,
     });
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     fireEvent.press(screen.getByTestId('sign-out-button'));
@@ -217,7 +270,11 @@ describe('AccountSettingsScreen Account category', () => {
   it('shows Change Password as not yet available rather than performing a fake action', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     fireEvent.press(screen.getByTestId('account-change-password'));
@@ -230,7 +287,11 @@ describe('AccountSettingsScreen Account category', () => {
   it('shows Delete Account as destructive and not yet available rather than deleting anything', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
 
     fireEvent.press(screen.getByTestId('account-delete-account'));
@@ -242,7 +303,11 @@ describe('AccountSettingsScreen Account category', () => {
 
 describe('AccountSettingsScreen Appearance category', () => {
   it('shows the default colors and preset names when the user has not customized either mode', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
 
@@ -257,7 +322,11 @@ describe('AccountSettingsScreen Appearance category', () => {
       nutritionAccentColor: '#654321',
     });
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
 
@@ -266,7 +335,11 @@ describe('AccountSettingsScreen Appearance category', () => {
   });
 
   it('navigates to WorkoutColorSettings when the Workout Mode row is pressed', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
 
@@ -276,13 +349,31 @@ describe('AccountSettingsScreen Appearance category', () => {
   });
 
   it('navigates to NutritionColorSettings when the Nutrition Mode row is pressed', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
 
     fireEvent.press(screen.getByTestId('open-nutrition-color-settings'));
 
     expect(mockNavigate).toHaveBeenCalledWith('NutritionColorSettings');
+  });
+
+  it('navigates to BackgroundThemeSettings when the Background Theme row is pressed', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('account-email');
+    goToCategory('Appearance');
+
+    fireEvent.press(screen.getByTestId('open-background-theme-settings'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('BackgroundThemeSettings');
   });
 
   it('asks for confirmation before resetting, and does nothing if cancelled', async () => {
@@ -293,7 +384,11 @@ describe('AccountSettingsScreen Appearance category', () => {
       nutritionAccentColor: '#8B5CF6',
     });
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
 
@@ -324,7 +419,11 @@ describe('AccountSettingsScreen Appearance category', () => {
       resetButton?.onPress?.();
     });
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
 
@@ -344,7 +443,11 @@ describe('AccountSettingsScreen Appearance category', () => {
 
 describe('AccountSettingsScreen App category', () => {
   it('navigates to Workout History when its row is pressed', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('App');
 
@@ -354,7 +457,11 @@ describe('AccountSettingsScreen App category', () => {
   });
 
   it('navigates to Workout Splits when its row is pressed', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('App');
 
@@ -364,7 +471,11 @@ describe('AccountSettingsScreen App category', () => {
   });
 
   it('navigates to the Exercise Library when its row is pressed', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('App');
 
@@ -374,7 +485,11 @@ describe('AccountSettingsScreen App category', () => {
   });
 
   it('navigates to Nutrition when its row is pressed', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('App');
 
@@ -392,7 +507,11 @@ describe('AccountSettingsScreen Notifications category', () => {
       emailOptIn: false,
     });
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Notifications');
 
@@ -403,7 +522,11 @@ describe('AccountSettingsScreen Notifications category', () => {
   it('persists a push-notification toggle immediately via the existing profile API', async () => {
     mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, pushNotificationsOptIn: true });
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Notifications');
 
@@ -418,7 +541,11 @@ describe('AccountSettingsScreen Notifications category', () => {
   it('reverts the toggle if saving the preference fails', async () => {
     mockUpdateMyProfile.mockRejectedValue(new Error('network down'));
 
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Notifications');
 
@@ -428,7 +555,11 @@ describe('AccountSettingsScreen Notifications category', () => {
   });
 
   it('shows the granular notification categories as real Coming Soon rows, not fake toggles', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Notifications');
 
@@ -441,7 +572,11 @@ describe('AccountSettingsScreen Notifications category', () => {
 
 describe('AccountSettingsScreen Privacy category', () => {
   it('shows a real coming-soon state, no invented privacy controls', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Privacy');
 
@@ -451,7 +586,11 @@ describe('AccountSettingsScreen Privacy category', () => {
 
 describe('AccountSettingsScreen Help category', () => {
   it('shows every help row as Coming Soon rather than a fabricated link', async () => {
-    render(<AccountSettingsScreen navigation={navigation} route={{} as never} />);
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
     await screen.findByTestId('account-email');
     goToCategory('Help');
 

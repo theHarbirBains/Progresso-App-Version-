@@ -45,6 +45,8 @@ function blankProfile(overrides: Partial<ProfileResponse> = {}): ProfileResponse
     weightUnit: 'kg',
     workoutAccentColor: null,
     nutritionAccentColor: null,
+    backgroundTheme: null,
+    avatarUrl: null,
     activeWorkoutSplitId: null,
     gender: null,
     birthday: null,
@@ -59,6 +61,7 @@ function blankProfile(overrides: Partial<ProfileResponse> = {}): ProfileResponse
     pushNotificationsOptIn: null,
     appleHealthPreference: null,
     onboardingCompletedAt: null,
+    activityLevel: null,
     ...overrides,
   };
 }

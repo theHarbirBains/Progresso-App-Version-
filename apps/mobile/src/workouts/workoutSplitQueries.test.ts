@@ -232,6 +232,14 @@ describe('fetchLastWorkoutSplitDayId', () => {
 
     await expect(fetchLastWorkoutSplitDayId('user-1')).resolves.toBeNull();
   });
+
+  it('excludes untagged workouts at the query level, so an improvised workout logged after a split day never resets progression to day 1', async () => {
+    const table = mockTable({ data: { workout_split_day_id: 'd1' }, error: null });
+
+    await fetchLastWorkoutSplitDayId('user-1');
+
+    expect(table.not).toHaveBeenCalledWith('workout_split_day_id', 'is', null);
+  });
 });
 
 describe('duplicateWorkoutSplit', () => {

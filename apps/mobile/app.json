@@ -32,7 +32,20 @@
       "expo-web-browser",
       "expo-font",
       "expo-sharing",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Progresso uses your photo library to let you set a profile picture or a machine photo.",
+          "cameraPermission": "Progresso uses your camera to scan food barcodes and let you take a profile or machine photo."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Progresso uses your camera to scan food barcodes and let you take a profile or machine photo."
+        }
+      ]
     ]
   }
 }

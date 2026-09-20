@@ -1,9 +1,13 @@
 import { ScrollView, Text, TouchableOpacity } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { GlassBackground } from '../design/GlassBackground';
+import { colors } from '../design/theme';
 import { withAlpha } from '../theme/accentColor';
 import { settingsStyles as styles } from './settingsStyles';
 
 interface Props<T extends string> {
-  categories: { key: T; label: string }[];
+  /** `icon` is optional per-category -- Settings' own tabs render text-only exactly as before; a caller (Progress) can opt into an icon above the label. */
+  categories: { key: T; label: string; icon?: keyof typeof Feather.glyphMap }[];
   active: T;
   onSelect: (category: T) => void;
   accentColor: string;
@@ -51,6 +55,14 @@ export function CategoryTabs<T extends string>({
             accessibilityRole="button"
             accessibilityState={{ selected }}
           >
+            {!selected ? <GlassBackground bordered={false} /> : null}
+            {category.icon ? (
+              <Feather
+                name={category.icon}
+                size={16}
+                color={selected ? accentColor : colors.textSecondary}
+              />
+            ) : null}
             <Text style={[styles.tabLabel, selected && styles.tabLabelSelected]}>
               {category.label}
             </Text>

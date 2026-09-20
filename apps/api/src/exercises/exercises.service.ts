@@ -9,11 +9,14 @@ import { SupabaseService } from '../supabase/supabase.service';
 import type { CreateExerciseDto } from './dto/create-exercise.dto';
 import type { UpdateExerciseDto } from './dto/update-exercise.dto';
 import type { MuscleGroup } from './muscle-group';
+import type { LoggingStyle, MovementType } from './movement-type';
 
 export interface ExerciseRecord {
   id: string;
   name: string;
   muscleGroup: MuscleGroup;
+  movementType: MovementType;
+  loggingStyle: LoggingStyle | null;
   isActive: boolean;
   createdBy: string | null;
   createdAt: string;
@@ -27,6 +30,8 @@ function toExerciseRecord(row: Record<string, unknown>): ExerciseRecord {
     id: row.id as string,
     name: row.name as string,
     muscleGroup: row.muscle_group as MuscleGroup,
+    movementType: row.movement_type as MovementType,
+    loggingStyle: (row.logging_style as LoggingStyle | null) ?? null,
     isActive: row.is_active as boolean,
     createdBy: (row.created_by as string | null) ?? null,
     createdAt: row.created_at as string,
@@ -45,7 +50,17 @@ export class ExercisesService {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('exercises')
-      .insert({ name: dto.name, muscle_group: dto.muscleGroup, created_by: userId })
+      .insert({
+        name: dto.name,
+        muscle_group: dto.muscleGroup,
+        created_by: userId,
+        movement_type: dto.movementType,
+        // Only a unilateral exercise ever has one -- CreateExerciseDto's
+        // ValidateIf already guarantees dto.loggingStyle is present when
+        // movementType is 'unilateral', so this is never silently null for
+        // a unilateral exercise.
+        logging_style: dto.movementType === 'unilateral' ? dto.loggingStyle : null,
+      })
       .select('*')
       .single();
 
@@ -70,6 +85,17 @@ export class ExercisesService {
     if (dto.name !== undefined) updatePayload.name = dto.name;
     if (dto.muscleGroup !== undefined) updatePayload.muscle_group = dto.muscleGroup;
     if (dto.isActive !== undefined) updatePayload.is_active = dto.isActive;
+    if (dto.movementType !== undefined) {
+      updatePayload.movement_type = dto.movementType;
+      // Switching to bilateral always clears logging_style (it's only ever
+      // meaningful for a unilateral exercise -- see the database's own
+      // exercises_logging_style_matches_movement_type check constraint);
+      // switching to unilateral requires dto.loggingStyle, already enforced
+      // by UpdateExerciseDto's ValidateIf.
+      updatePayload.logging_style = dto.movementType === 'unilateral' ? dto.loggingStyle : null;
+    } else if (dto.loggingStyle !== undefined) {
+      updatePayload.logging_style = dto.loggingStyle;
+    }
 
     if (Object.keys(updatePayload).length === 0) {
       return existing;

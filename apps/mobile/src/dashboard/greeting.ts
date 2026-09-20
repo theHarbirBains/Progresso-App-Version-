@@ -23,3 +23,8 @@ export function greetingName(
   if (trimmedUsername) return trimmedUsername;
   return null;
 }
+
+/** The first word of a resolved greeting name -- "Harbir Bains" -> "Harbir". A username has no spaces, so this is a no-op for it. */
+export function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0];
+}

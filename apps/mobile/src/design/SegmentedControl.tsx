@@ -1,4 +1,5 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { GlassBackground } from './GlassBackground';
 import { colors, radii, spacing } from './theme';
 
 interface Option<T extends string> {
@@ -8,7 +9,8 @@ interface Option<T extends string> {
 
 interface Props<T extends string> {
   options: Option<T>[];
-  value: T;
+  /** null renders every segment unselected -- for a choice that genuinely has no default yet (e.g. a required field the user hasn't answered). */
+  value: T | null;
   onChange: (value: T) => void;
   disabled?: boolean;
   /** Defaults to colors.accent -- pass a contextual Workout/Nutrition accent where relevant. */
@@ -32,6 +34,7 @@ export function SegmentedControl<T extends string>({
 }: Props<T>) {
   return (
     <View testID={testID} style={[styles.track, disabled && styles.disabled]}>
+      <GlassBackground />
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -59,10 +62,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignSelf: 'flex-start',
     borderRadius: radii.pill,
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: 4,
+    overflow: 'hidden',
   },
   disabled: {
     opacity: 0.5,

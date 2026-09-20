@@ -1,8 +1,10 @@
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
+import { useBackgroundTheme } from '../design/BackgroundThemeContext';
 import { SectionHeader } from '../design/SectionHeader';
 import { colors, spacing } from '../design/theme';
+import { BACKGROUND_THEMES } from '../design/backgroundThemes';
 import { DEFAULT_NUTRITION_COLOR, DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 import { findPresetName } from '../theme/accentPalette';
 import { settingsStyles as styles } from './settingsStyles';
@@ -13,25 +15,48 @@ interface Props {
   resetting: boolean;
   onNavigateWorkoutColor: () => void;
   onNavigateNutritionColor: () => void;
+  onNavigateBackgroundTheme: () => void;
   onResetThemeColors: () => void;
 }
 
 // Appearance is app-level/global (Settings, not "Workout Settings"), which is
 // exactly why the Nutrition accent lives here alongside Workout's -- both
 // are theme configuration, reusing the existing accentColor.ts/
-// accentPalette.ts/buildAccentTheme() architecture unchanged. There is no
-// light/dark/system appearance concept anywhere in the app today (Progresso
-// is a single dark theme), so this category deliberately doesn't invent one.
+// accentPalette.ts/buildAccentTheme() architecture unchanged. Background
+// Theme (the app's environment/backdrop) is a third, independent
+// configuration layer -- see design/BackgroundThemeContext.tsx -- listed in
+// its own card so it reads as a separate choice from the two accent colors.
+// Dark variants only for now: there is still no light/dark/system mode
+// concept (Progresso's UI itself stays a single dark theme).
 export function AppearanceCategory({
   workoutAccentColor,
   nutritionAccentColor,
   resetting,
   onNavigateWorkoutColor,
   onNavigateNutritionColor,
+  onNavigateBackgroundTheme,
   onResetThemeColors,
 }: Props) {
+  const { theme: backgroundTheme } = useBackgroundTheme();
+
   return (
     <View style={styles.section}>
+      <SectionHeader label="Background Theme" />
+      <AppCard>
+        <TouchableOpacity
+          testID="open-background-theme-settings"
+          style={styles.row}
+          onPress={onNavigateBackgroundTheme}
+        >
+          <View style={[styles.swatch, { backgroundColor: backgroundTheme.colors.background }]} />
+          <View style={styles.rowBody}>
+            <Text style={styles.rowTitle}>Background Theme</Text>
+            <Text style={styles.rowValue}>{BACKGROUND_THEMES[backgroundTheme.id].name}</Text>
+          </View>
+          <Feather name="chevron-right" size={20} color={colors.textMuted} />
+        </TouchableOpacity>
+      </AppCard>
+
       <SectionHeader label="Theme Colors" />
       <AppCard>
         <TouchableOpacity

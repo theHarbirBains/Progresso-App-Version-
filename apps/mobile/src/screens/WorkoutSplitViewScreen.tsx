@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,9 +27,16 @@ export function WorkoutSplitViewScreen({ navigation, route }: Props) {
   const [detail, setDetail] = useState<WorkoutSplitDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Only the very first load for this splitId should replace the whole
+  // screen with a spinner -- every later call (the focus listener below) is
+  // a background refresh, same pattern as DashboardScreen/ProfileScreen.
+  const hasLoadedOnce = useRef(false);
+  useEffect(() => {
+    hasLoadedOnce.current = false;
+  }, [splitId]);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!hasLoadedOnce.current) setLoading(true);
     setError(null);
     try {
       setDetail(await fetchWorkoutSplitDetail(splitId));
@@ -37,6 +44,7 @@ export function WorkoutSplitViewScreen({ navigation, route }: Props) {
       setError(err instanceof Error ? err.message : 'Failed to load workout split');
     } finally {
       setLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, [splitId]);
 

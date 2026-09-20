@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -33,10 +33,14 @@ export function NutritionTodayScreen({ navigation }: Props) {
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Only the very first load should replace the whole screen with a
+  // spinner -- every later call (the focus listener below) is a background
+  // refresh, same pattern as DashboardScreen/ProfileScreen.
+  const hasLoadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
+    if (!hasLoadedOnce.current) setLoading(true);
     setError(null);
     try {
       const [todaysLogs, nutritionGoals] = await Promise.all([
@@ -52,6 +56,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
       setError(err instanceof Error ? err.message : 'Failed to load nutrition');
     } finally {
       setLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, [userId]);
 

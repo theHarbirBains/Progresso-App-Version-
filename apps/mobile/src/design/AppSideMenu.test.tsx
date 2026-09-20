@@ -3,7 +3,7 @@ import { BackHandler } from 'react-native';
 import { AppSideMenu } from './AppSideMenu';
 
 const baseProps = {
-  activeRoute: 'Dashboard' as const,
+  activeRoute: 'WorkoutHistory' as const,
   onNavigate: jest.fn(),
   onClose: jest.fn(),
   accentColor: '#29E3C7',
@@ -17,11 +17,15 @@ describe('AppSideMenu', () => {
     expect(screen.getByText('TRAINING / TOOLS')).toBeTruthy();
     expect(screen.getByText('MORE')).toBeTruthy();
 
-    expect(screen.getByTestId('app-menu-item-Dashboard')).toHaveTextContent(/Home/);
+    // No Home entry -- Dashboard is already one tap away via the bottom nav.
+    expect(screen.queryByTestId('app-menu-item-Dashboard')).toBeNull();
     expect(screen.getByTestId('app-menu-item-WorkoutHistory')).toHaveTextContent(/Workouts/);
     expect(screen.getByTestId('app-menu-item-ProgressOverview')).toHaveTextContent(/Progress/);
-    expect(screen.getByTestId('app-menu-item-Nutrition')).toHaveTextContent(/Nutrition/);
-    expect(screen.getByTestId('app-menu-item-Social')).toHaveTextContent(/Social/);
+    // Workout mode's menu is workout-only -- no Nutrition or Profile item
+    // (Nutrition mode has its own, separate section list; Profile stays
+    // reachable via the bottom nav either way).
+    expect(screen.queryByTestId('app-menu-item-Nutrition')).toBeNull();
+    expect(screen.queryByTestId('app-menu-item-Profile')).toBeNull();
     expect(screen.getByTestId('app-menu-item-WorkoutSplits')).toHaveTextContent(/Workout Splits/);
     expect(screen.getByTestId('app-menu-item-ExerciseLibrary')).toHaveTextContent(
       /Exercise Library/,
@@ -30,13 +34,13 @@ describe('AppSideMenu', () => {
   });
 
   it('marks the active route as selected', () => {
-    render(<AppSideMenu {...baseProps} visible={true} activeRoute="Dashboard" />);
+    render(<AppSideMenu {...baseProps} visible={true} activeRoute="WorkoutHistory" />);
 
-    expect(screen.getByTestId('app-menu-item-Dashboard').props.accessibilityState.selected).toBe(
-      true,
-    );
     expect(
       screen.getByTestId('app-menu-item-WorkoutHistory').props.accessibilityState.selected,
+    ).toBe(true);
+    expect(
+      screen.getByTestId('app-menu-item-ProgressOverview').props.accessibilityState.selected,
     ).toBe(false);
   });
 
@@ -44,9 +48,9 @@ describe('AppSideMenu', () => {
     const onNavigate = jest.fn();
     render(<AppSideMenu {...baseProps} visible={true} onNavigate={onNavigate} />);
 
-    fireEvent.press(screen.getByTestId('app-menu-item-Social'));
+    fireEvent.press(screen.getByTestId('app-menu-item-WorkoutHistory'));
 
-    expect(onNavigate).toHaveBeenCalledWith('Social');
+    expect(onNavigate).toHaveBeenCalledWith('WorkoutHistory');
   });
 
   it('calls onClose when the backdrop is pressed', () => {
@@ -62,6 +66,57 @@ describe('AppSideMenu', () => {
     render(<AppSideMenu {...baseProps} visible={false} />);
 
     expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
+  });
+
+  it('renders a custom title when given one, in place of the default "Progresso"', () => {
+    render(<AppSideMenu {...baseProps} visible={true} title="Progresso · Nutrition" />);
+
+    expect(screen.getByText('Progresso · Nutrition')).toBeTruthy();
+    expect(screen.queryByText('Progresso')).toBeNull();
+  });
+
+  it('renders a custom section list when given one, in place of APP_MENU_SECTIONS', () => {
+    render(
+      <AppSideMenu
+        {...baseProps}
+        visible={true}
+        sections={[
+          {
+            title: 'NUTRITION',
+            items: [{ route: 'Nutrition', label: 'Nutrition Home', icon: 'home' }],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('NUTRITION')).toBeTruthy();
+    expect(screen.getByTestId('app-menu-item-Nutrition')).toHaveTextContent(/Nutrition Home/);
+    expect(screen.queryByText('PROGRESSO')).toBeNull();
+    expect(screen.queryByTestId('app-menu-item-Dashboard')).toBeNull();
+  });
+
+  it('renders a comingSoon entry as a labeled, non-navigable row', () => {
+    const onNavigate = jest.fn();
+    render(
+      <AppSideMenu
+        {...baseProps}
+        visible={true}
+        onNavigate={onNavigate}
+        sections={[
+          {
+            title: 'NUTRITION',
+            items: [{ label: 'Recipes', icon: 'book-open', comingSoon: true }],
+          },
+        ]}
+      />,
+    );
+
+    const row = screen.getByTestId('app-menu-item-Recipes');
+    expect(row).toHaveTextContent(/Recipes/);
+    expect(row).toHaveTextContent(/Coming Soon/);
+
+    fireEvent.press(row);
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 
   it('calls onClose on the Android hardware back press while open', () => {

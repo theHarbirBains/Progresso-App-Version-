@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
+import { AppHeader } from '../design/AppHeader';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { colors } from '../design/theme';
 import { updateMyProfile } from '../lib/api';
+import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import {
@@ -30,16 +32,23 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
   const accessToken = session?.access_token;
   const { theme, activeWorkoutSplitId, themeLoading } = useProgressTheme();
   const insets = useSafeAreaInsets();
+  const { openMenu } = useAppMenu();
 
   const [splits, setSplits] = useState<WorkoutSplitSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busySplitId, setBusySplitId] = useState<string | null>(null);
+  // Only the very first load should replace the whole screen with a
+  // spinner -- every later call (the focus listener, or refreshing the
+  // list after a duplicate/delete, which already has its own per-row
+  // busySplitId feedback) is a background refresh, same pattern as
+  // DashboardScreen/ProfileScreen.
+  const hasLoadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
+    if (!hasLoadedOnce.current) setLoading(true);
     setError(null);
     try {
       setSplits(await fetchWorkoutSplits(userId));
@@ -47,6 +56,7 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
       setError(err instanceof Error ? err.message : 'Failed to load workout splits');
     } finally {
       setLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, [userId]);
 
@@ -120,20 +130,18 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <AppHeader
+        testID="workout-splits-header"
+        title="Workout Splits"
+        leftAction={{
+          icon: 'menu',
+          onPress: () => openMenu('workout'),
+          accessibilityLabel: 'Open menu',
+          testID: 'workout-splits-open-menu',
+        }}
+        safeArea={false}
+      />
       <ScrollView contentContainerStyle={styles.scrollContent} testID="workout-splits-scroll">
-        <View style={styles.header}>
-          <TouchableOpacity
-            testID="workout-splits-back"
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Back"
-            accessibilityRole="button"
-          >
-            <Feather name="arrow-left" size={18} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Workout Splits</Text>
-        </View>
-
         {error ? (
           <Text testID="workout-splits-error" style={styles.errorText}>
             {error}

@@ -113,10 +113,12 @@ const styles = StyleSheet.create({
   title: {
     ...typeScale.screenTitle,
     color: colors.textPrimary,
+    textAlign: 'center',
   },
   subtitle: {
     ...typeScale.body,
     color: colors.textSecondary,
     marginTop: 2,
+    textAlign: 'center',
   },
 });

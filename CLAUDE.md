@@ -8,6 +8,10 @@ This file contains the **permanent** working rules for any coding agent (Claude 
 
 Some areas remain intentionally incomplete rather than hidden — do not treat these as done: real notification delivery (only opt-in preferences exist), Change Password/Delete Account (visible but "Coming Soon"), Apple Health (preference placeholder, no HealthKit integration), Social (front-end-only shell, no backend), and the admin surface (authorization is real and tested; the admin dashboard itself is still a placeholder route). Do not implement these, AI features, or anything else beyond the current feature set until explicitly approved.
 
+## Design System
+
+[DESIGN.md](DESIGN.md) is the visual/design source of truth for Progresso. Read it before making any UI/UX change. Follow its documented colors, typography, spacing, radii, components, navigation, states, and accessibility rules exactly — do not invent colors, typography, spacing, radii, or component styling that conflicts with it. Do not introduce a new visual pattern that conflicts with DESIGN.md without first explaining the conflict and getting explicit approval.
+
 ## Working Process (required for every non-trivial change)
 
 1. Inspect the existing project state before proposing changes.

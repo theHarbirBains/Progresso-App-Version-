@@ -82,9 +82,9 @@ describe('enrichWorkoutSummaries', () => {
       },
       sets: {
         data: [
-          { workout_exercise_id: 'we1' },
-          { workout_exercise_id: 'we1' },
-          { workout_exercise_id: 'we2' },
+          { workout_exercise_id: 'we1', weight_kg: 100, reps: 5 },
+          { workout_exercise_id: 'we1', weight_kg: 80, reps: 8 },
+          { workout_exercise_id: 'we2', weight_kg: 60, reps: 10 },
         ],
         error: null,
       },
@@ -102,6 +102,8 @@ describe('enrichWorkoutSummaries', () => {
         splitDayName: 'Push',
         muscleGroups: ['chest', 'shoulders'],
         completedSetCount: 3,
+        // 100*5 + 80*8 + 60*10 = 500 + 640 + 600 = 1740
+        totalVolumeKg: 1740,
         durationMinutes: 60,
       },
     ]);
@@ -128,6 +130,22 @@ describe('enrichWorkoutSummaries', () => {
 
     await enrichWorkoutSummaries([workout({})]);
 
+    expect(tables.sets.calls.not).toEqual([
+      ['completed_at', 'is', null],
+      ['weight_kg', 'is', null],
+      ['reps', 'is', null],
+    ]);
+  });
+
+  it('excludes incomplete/blank sets from totalVolumeKg the same way it does for completedSetCount', async () => {
+    const tables = mockTables({
+      workout_exercises: { data: [{ id: 'we1', workout_id: 'w1' }], error: null },
+      sets: { data: [], error: null },
+    });
+
+    const result = await enrichWorkoutSummaries([workout({})]);
+
+    expect(result[0].totalVolumeKg).toBe(0);
     expect(tables.sets.calls.not).toEqual([
       ['completed_at', 'is', null],
       ['weight_kg', 'is', null],

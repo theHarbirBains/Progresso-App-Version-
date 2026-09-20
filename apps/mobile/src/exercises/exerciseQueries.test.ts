@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { fetchExercises } from './exerciseQueries';
+import { fetchExerciseSourceCounts, fetchExercises } from './exerciseQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
 
@@ -8,6 +8,7 @@ const mockFrom = supabase.from as jest.Mock;
 interface MockResult {
   data: Record<string, unknown>[] | null;
   error: { message: string } | null;
+  count?: number | null;
 }
 
 function mockQueryBuilder(result: MockResult) {
@@ -173,5 +174,87 @@ describe('fetchExercises', () => {
     mockQueryBuilder({ data: null, error: { message: 'network error' } });
 
     await expect(fetchExercises(baseParams)).rejects.toThrow('network error');
+  });
+
+  it('passes ascending through to the order clause (defaults to true when omitted)', async () => {
+    const calls = mockQueryBuilder({ data: [], error: null });
+
+    await fetchExercises({ ...baseParams, ascending: false });
+
+    expect(calls.order).toEqual([['name', { ascending: false }]]);
+  });
+
+  it('returns the exact total count from the query, not the page size', async () => {
+    mockQueryBuilder({ data: [{ id: 'ex-1', name: 'Push-Up' }], error: null, count: 328 });
+
+    const result = await fetchExercises(baseParams);
+
+    expect(result.totalCount).toBe(328);
+  });
+
+  it('falls back to the returned row count if the query reports no count', async () => {
+    mockQueryBuilder({ data: [{ id: 'ex-1', name: 'Push-Up' }], error: null });
+
+    const result = await fetchExercises(baseParams);
+
+    expect(result.totalCount).toBe(1);
+  });
+});
+
+// A thenable, infinitely-chainable stand-in for Supabase's
+// PostgrestFilterBuilder. fetchExerciseSourceCounts fires its three count
+// queries concurrently (Promise.all), each via its own supabase.from(...)
+// call -- so mockFrom builds a FRESH, independent builder per call (via
+// mockImplementation, not a single shared mockReturnValue), each one
+// tracking which filter it saw and resolving to that source's own result.
+// A single shared builder object would race: all three call chains would
+// mutate the same "current source" flag before any of them actually
+// resolved, so every query would resolve to whichever ran last.
+function mockCountQueryBuilder(results: Record<'all' | 'builtin' | 'mine', MockResult>) {
+  mockFrom.mockImplementation(() => {
+    let source: 'all' | 'builtin' | 'mine' = 'all';
+    interface Builder {
+      select: jest.Mock;
+      eq: jest.Mock;
+      is: jest.Mock;
+      then: (resolve: (v: unknown) => void) => void;
+    }
+    const builder: Builder = {
+      select: jest.fn(() => builder),
+      eq: jest.fn((column: string) => {
+        if (column === 'created_by') source = 'mine';
+        return builder;
+      }),
+      is: jest.fn(() => {
+        source = 'builtin';
+        return builder;
+      }),
+      then: (resolve: (v: unknown) => void) => resolve(results[source]),
+    };
+    return builder;
+  });
+}
+
+describe('fetchExerciseSourceCounts', () => {
+  it('returns the real, independent count for each source', async () => {
+    mockCountQueryBuilder({
+      all: { data: null, error: null, count: 328 },
+      builtin: { data: null, error: null, count: 245 },
+      mine: { data: null, error: null, count: 12 },
+    });
+
+    const result = await fetchExerciseSourceCounts('user-1');
+
+    expect(result).toEqual({ all: 328, builtin: 245, mine: 12 });
+  });
+
+  it('throws when any of the three count queries errors', async () => {
+    mockCountQueryBuilder({
+      all: { data: null, error: null, count: 328 },
+      builtin: { data: null, error: { message: 'network error' }, count: null },
+      mine: { data: null, error: null, count: 12 },
+    });
+
+    await expect(fetchExerciseSourceCounts('user-1')).rejects.toThrow('network error');
   });
 });

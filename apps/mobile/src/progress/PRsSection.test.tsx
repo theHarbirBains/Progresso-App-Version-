@@ -1,3 +1,4 @@
+import { FlatList } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { fetchWorkoutIdForSet } from './progressStatsQueries';
 import { PRsSection } from './PRsSection';
@@ -18,6 +19,7 @@ const repPR = {
   achievedAt: '2026-02-15T12:00:00Z',
   exerciseId: 'ex-bench',
   exerciseName: 'Bench Press',
+  muscleGroup: 'chest' as const,
 };
 
 beforeEach(() => {
@@ -123,5 +125,39 @@ describe('PRsSection', () => {
       'That workout is no longer available to share.',
     );
     expect(mockNavigate).not.toHaveBeenCalledWith('ShareWorkout', expect.anything());
+  });
+
+  it('uses a FlatList by default (ProgressOverviewScreen, where this is the only scrollable content)', () => {
+    render(
+      <PRsSection
+        repPRs={[repPR]}
+        oneRepMaxes={[]}
+        weightUnit="kg"
+        accentColor="#2F80FF"
+        navigation={navigation}
+      />,
+    );
+
+    expect(screen.UNSAFE_getByType(FlatList)).toBeTruthy();
+  });
+
+  // Regression guard: a FlatList nested inside another vertical ScrollView
+  // (e.g. ProfileScreen, which wraps its whole page in one) breaks RN's own
+  // windowing and triggers its documented warning. scrollable={false} must
+  // render the identical rows without an inner VirtualizedList.
+  it('renders a plain (non-virtualized) list instead of a FlatList when scrollable is false', () => {
+    render(
+      <PRsSection
+        repPRs={[repPR]}
+        oneRepMaxes={[]}
+        weightUnit="kg"
+        accentColor="#2F80FF"
+        navigation={navigation}
+        scrollable={false}
+      />,
+    );
+
+    expect(screen.UNSAFE_queryAllByType(FlatList)).toHaveLength(0);
+    expect(screen.getByTestId('progress-pr-row-pr-ex-bench-5')).toBeTruthy();
   });
 });
