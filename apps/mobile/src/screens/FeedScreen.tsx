@@ -6,9 +6,11 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
+import { BottomSheet } from '../design/BottomSheet';
 import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
+import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
@@ -42,6 +44,13 @@ type Props = RootStackScreenProps<'Feed'>;
 // (no kudos/social prompts) since there's no social graph yet. `topAccent`
 // is a neutral top band on every card; which activity a card is comes
 // across via its byline icon, not a color.
+//
+// The header's "+" mirrors Strava's own top-bar button: a shortcut sheet
+// (Start Workout / Log Food) to the same destinations Train's and
+// Nutrition's own primary buttons already open. It's an addition, not a
+// replacement -- those tab-root buttons are still how starting a workout
+// or logging food normally happens (see the "option A" decision this
+// redesign made); this is just a faster path from Feed itself.
 export function FeedScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
@@ -54,6 +63,7 @@ export function FeedScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   // Only the very first load should replace the whole screen with a
   // spinner -- every later focus is a background refresh, same pattern as
   // WorkoutHistoryScreen/ProfileScreen.
@@ -122,9 +132,42 @@ export function FeedScreen({ navigation }: Props) {
             accessibilityLabel: 'Open menu',
             testID: 'feed-open-menu',
           }}
+          rightAction={{
+            icon: 'plus',
+            onPress: () => setQuickActionsOpen(true),
+            accessibilityLabel: 'Quick actions',
+            testID: 'feed-quick-actions',
+          }}
         />
       }
     >
+      <BottomSheet
+        testID="feed-quick-actions-sheet"
+        visible={quickActionsOpen}
+        onClose={() => setQuickActionsOpen(false)}
+      >
+        <Text style={styles.sheetTitle}>Quick Actions</Text>
+        <ListRow
+          testID="feed-quick-action-start-workout"
+          icon="activity"
+          title="Start Workout"
+          onPress={() => {
+            setQuickActionsOpen(false);
+            navigation.navigate('NewWorkout');
+          }}
+        />
+        <ListRow
+          testID="feed-quick-action-log-food"
+          icon="coffee"
+          title="Log Food"
+          divider
+          onPress={() => {
+            setQuickActionsOpen(false);
+            navigation.navigate('FoodLibrary');
+          }}
+        />
+      </BottomSheet>
+
       {error ? (
         <ErrorState testID="feed-error" message={error} onRetry={load} />
       ) : loading ? (

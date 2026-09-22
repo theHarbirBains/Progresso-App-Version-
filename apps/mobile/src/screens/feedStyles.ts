@@ -18,6 +18,13 @@ export const feedStyles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
 
+  // The header "+" button's action sheet.
+  sheetTitle: {
+    ...typeScale.sectionHeading,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+
   // The byline: a small avatar, the account's own name, and a quiet
   // icon+timestamp line underneath -- Strava's "who, when" row, without the
   // social graph (it's always the signed-in user).

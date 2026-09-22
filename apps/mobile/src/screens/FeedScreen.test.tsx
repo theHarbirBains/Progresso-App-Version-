@@ -207,6 +207,39 @@ describe('FeedScreen', () => {
     expect(mockOpenMenu).toHaveBeenCalledWith();
   });
 
+  it('opens a quick-actions sheet from the header "+", offering Start Workout and Log Food', async () => {
+    renderScreen();
+    await screen.findByTestId('feed-empty');
+
+    expect(screen.queryByTestId('feed-quick-action-start-workout')).toBeNull();
+    fireEvent.press(screen.getByTestId('feed-quick-actions'));
+
+    expect(screen.getByTestId('feed-quick-action-start-workout')).toBeTruthy();
+    expect(screen.getByTestId('feed-quick-action-log-food')).toBeTruthy();
+  });
+
+  it('starting a workout from the quick-actions sheet navigates to New Workout and closes the sheet', async () => {
+    renderScreen();
+    await screen.findByTestId('feed-empty');
+    fireEvent.press(screen.getByTestId('feed-quick-actions'));
+
+    fireEvent.press(screen.getByTestId('feed-quick-action-start-workout'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
+    expect(screen.queryByTestId('feed-quick-action-start-workout')).toBeNull();
+  });
+
+  it('logging food from the quick-actions sheet navigates to Food Library and closes the sheet', async () => {
+    renderScreen();
+    await screen.findByTestId('feed-empty');
+    fireEvent.press(screen.getByTestId('feed-quick-actions'));
+
+    fireEvent.press(screen.getByTestId('feed-quick-action-log-food'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
+    expect(screen.queryByTestId('feed-quick-action-log-food')).toBeNull();
+  });
+
   it('reloads on focus without showing the loading indicator again', async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
     renderScreen();
