@@ -10,16 +10,15 @@ import {
 } from '@expo-google-fonts/manrope';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
-import { AppBackgroundLayer } from './src/design/AppBackgroundLayer';
+import { AppBackgroundLayer, ScreenBackdrop } from './src/design/AppBackgroundLayer';
 import { AppSideMenu } from './src/design/AppSideMenu';
 import { BackgroundThemeProvider, useBackgroundTheme } from './src/design/BackgroundThemeContext';
 import { BottomNavBar } from './src/design/BottomNavBar';
 import { LoadingState } from './src/design/LoadingState';
-import { QuickActionMenu } from './src/design/QuickActionMenu';
 import { getMyProfile } from './src/lib/api';
 import { wrapApp } from './src/lib/sentry';
 import { AppMenuContext } from './src/navigation/AppMenuContext';
@@ -34,10 +33,10 @@ import { ActiveWorkoutScreen } from './src/screens/ActiveWorkoutScreen';
 import { BackgroundThemeScreen } from './src/screens/BackgroundThemeScreen';
 import { CalorieEstimationScreen } from './src/screens/CalorieEstimationScreen';
 import { ChooseWorkoutSplitScreen } from './src/screens/ChooseWorkoutSplitScreen';
-import { DashboardScreen } from './src/screens/DashboardScreen';
 import { BarcodeScannerScreen } from './src/screens/BarcodeScannerScreen';
 import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
 import { ExerciseProgressScreen } from './src/screens/ExerciseProgressScreen';
+import { FeedScreen } from './src/screens/FeedScreen';
 import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
@@ -72,11 +71,11 @@ type AuthMode = 'signIn' | 'signUp' | 'forgotPassword';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// The app's mode-agnostic root screens -- none of them navigate when the
-// Workout/Nutrition toggle changes, so their mode can't be read off the
-// current route the way every other screen's can (see isNutritionRoute).
-// See Root's own `sharedMode` for how this is used.
-const MODE_AGNOSTIC_ROUTES = new Set(['Dashboard', 'ProgressOverview', 'Profile']);
+// The app's mode-agnostic root screens -- Feed, Progress and You (Profile)
+// show both Train and Nutrition content (or neither), so their accent/glow
+// can't be read off the current route the way every other screen's can (see
+// isNutritionRoute). See Root's own `sharedMode` for how this is used.
+const MODE_AGNOSTIC_ROUTES = new Set(['Feed', 'ProgressOverview', 'Profile']);
 
 // Sign-in/up/forgot-password/reset-password stay on the pre-existing local
 // screen-state pattern (untouched by Phase 3) -- only the signed-in app
@@ -95,27 +94,20 @@ const MODE_AGNOSTIC_ROUTES = new Set(['Dashboard', 'ProgressOverview', 'Profile'
 // users.onboarding_completed_at (see the onboarding/sign-up redesign): a
 // signed-in session that ISN'T a fresh signup (e.g. the app was closed
 // mid-onboarding and reopened later) still needs to land on Onboarding
-// rather than Dashboard, which a purely in-memory flag could never capture.
-interface RootProps {
-  /** Reports the currently-effective Workout/Nutrition mode up to AppShell, so AppBackgroundLayer (mounted outside the navigator) can follow it. */
-  onBackgroundModeChange: (mode: 'workout' | 'nutrition') => void;
-  /** Reports whether the photographic background should show -- true only while Dashboard is the current route (every other screen sits on the flat theme fill). */
-  onBackgroundPhotoChange: (visible: boolean) => void;
-}
-
-function Root({ onBackgroundModeChange, onBackgroundPhotoChange }: RootProps) {
+// rather than Feed, which a purely in-memory flag could never capture.
+function Root() {
   const { status, session } = useAuth();
+  const { theme: backgroundTheme } = useBackgroundTheme();
   const accessToken = session?.access_token;
   const [mode, setMode] = useState<AuthMode>('signIn');
-  // Dashboard, Progress, and Profile are the app's mode-agnostic root
-  // screens -- none of them navigate when the Workout/Nutrition toggle
-  // changes, so their mode can't be read off the current route the way
-  // every other screen's can (see isNutritionRoute). Each reports changes
-  // here via AppMenuContext's reportMode, and this is the single shared
-  // flag all three fall back to. Workouts/Food's own toggle also reports
-  // here (even though their own mode IS route-derived) purely to keep this
-  // flag current for whichever of the three mode-agnostic screens the user
-  // visits next.
+  // Feed, Progress, and You (Profile) are the app's mode-agnostic root
+  // screens -- reachable directly from the bottom nav, not by switching a
+  // toggle, so their accent/glow can't be read off the current route the way
+  // every other screen's can (see isNutritionRoute). `sharedMode` is the one
+  // flag all three fall back to: it updates automatically to whichever of
+  // Train/Nutrition the user most recently visited (see the effect below),
+  // so the fallback always reflects "wherever you were a moment ago" rather
+  // than a fixed default.
   const [sharedMode, setSharedMode] = useState<'workout' | 'nutrition'>('workout');
   const [justCreatedAccount, setJustCreatedAccount] = useState(false);
   const [onboardingStatus, setOnboardingStatus] = useState<'checking' | 'needed' | 'done'>(
@@ -127,7 +119,7 @@ function Root({ onBackgroundModeChange, onBackgroundPhotoChange }: RootProps) {
   // every screen, instead of being clipped to whatever z-index games one
   // screen's own fixed header happens to play. navigationRef is how it
   // navigates/highlights the current route without being inside the
-  // navigator itself; AppMenuContext is how a screen (Dashboard today) asks
+  // navigator itself; AppMenuContext is how a screen (Feed, Workouts, etc.) asks
   // it to open.
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuMode, setMenuMode] = useState<'workout' | 'nutrition'>('workout');
@@ -137,9 +129,9 @@ function Root({ onBackgroundModeChange, onBackgroundPhotoChange }: RootProps) {
   // AppSideMenu's own accent/section content follows whichever mode the
   // current screen belongs to (see isNutritionRoute) -- menuTheme above
   // stays Workout-only (per useProgressTheme's own scope) and still drives
-  // the global BottomNavBar/QuickActionMenu, unchanged; this is a second,
-  // separate theme fetch, following the same pattern FoodSearchScreen/
-  // DashboardScreen already use for their own Nutrition accent.
+  // the global BottomNavBar's Train accent; this is a second, separate
+  // theme fetch, following the same pattern FoodSearchScreen uses for its
+  // own Nutrition accent.
   const [nutritionMenuTheme, setNutritionMenuTheme] =
     useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
   useEffect(() => {
@@ -167,32 +159,25 @@ function Root({ onBackgroundModeChange, onBackgroundPhotoChange }: RootProps) {
   // individual screen. currentRouteName is tracked via onReady/onStateChange
   // below since navigationRef's own current route doesn't trigger a
   // re-render on its own -- without this the bar would render but never
-  // update its active tab as the user navigates. Dashboard is skipped (see
-  // routeToBottomNavTab's comment) since it renders its own bottom bar.
+  // update its active tab as the user navigates.
   const [currentRouteName, setCurrentRouteName] = useState<string | undefined>(undefined);
-  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
-  // The background image (AppBackgroundLayer, mounted outside the
-  // navigator in AppShell) follows this same mode -- the shared flag when
-  // the current route is mode-agnostic, otherwise whichever mode the route
+  // Every screen's glow/accent follows this -- the shared flag when the
+  // current route is mode-agnostic, otherwise whichever mode the route
   // belongs to (see isNutritionRoute).
   const backgroundMode: 'workout' | 'nutrition' = MODE_AGNOSTIC_ROUTES.has(currentRouteName ?? '')
     ? sharedMode
     : isNutritionRoute(currentRouteName)
       ? 'nutrition'
       : 'workout';
+  // Keeps `sharedMode` current automatically as the user navigates, now that
+  // there is no Workout/Nutrition toggle to report it explicitly: landing on
+  // a route with an unambiguous mode (anything not in MODE_AGNOSTIC_ROUTES)
+  // updates the shared fallback, so the next time Feed/Progress/You is
+  // visited its accent reflects wherever the user was a moment ago.
   useEffect(() => {
-    onBackgroundModeChange(backgroundMode);
-  }, [backgroundMode, onBackgroundModeChange]);
-  // The photo is a Dashboard-only atmosphere: it is the one screen designed
-  // around it. Every other screen -- including sign-in, onboarding and the
-  // Workout/Nutrition sub-screens -- sits on the flat Background Theme fill,
-  // so dense, data-heavy content never competes with a photograph.
-  // Auth screens render outside the navigator, so currentRouteName is
-  // undefined for them and the photo stays off.
-  const showBackgroundPhoto = status === 'signedIn' && currentRouteName === 'Dashboard';
-  useEffect(() => {
-    onBackgroundPhotoChange(showBackgroundPhoto);
-  }, [showBackgroundPhoto, onBackgroundPhotoChange]);
+    if (currentRouteName === undefined || MODE_AGNOSTIC_ROUTES.has(currentRouteName)) return;
+    setSharedMode(isNutritionRoute(currentRouteName) ? 'nutrition' : 'workout');
+  }, [currentRouteName]);
   // Set right before clearing justCreatedAccount (a fresh account obviously
   // needs onboarding, no fetch required) so the generic profile-check effect
   // below -- which also re-runs on that same justCreatedAccount transition --
@@ -241,12 +226,37 @@ function Root({ onBackgroundModeChange, onBackgroundPhotoChange }: RootProps) {
       return <LoadingState testID="onboarding-status-loading" />;
     }
 
-    // Onboarding shows no bottom nav at all -- every other screen, Dashboard
-    // included, gets this one persistent bar for free, with no per-screen
-    // wiring, since it's a sibling of the navigator rather than owned by any
-    // individual screen. (Dashboard used to render its own second copy; there
-    // is now exactly one bottom navigation in the app.)
+    // Onboarding shows no bottom nav at all -- every other screen gets this
+    // one persistent bar for free, with no per-screen wiring, since it's a
+    // sibling of the navigator rather than owned by any individual screen.
     const showGlobalBottomNav = currentRouteName !== undefined && currentRouteName !== 'Onboarding';
+
+    // Every screen gets an opaque, themed backdrop that is part of the
+    // screen itself, so a push/pop never depends on JS to paint what's
+    // behind the incoming page in time (see ScreenBackdrop). Its soft glow
+    // follows the mode of the screen it sits under: the mode-agnostic roots
+    // (Feed, Progress, You) follow the shared mode, everything else its own
+    // route's mode.
+    const renderScreenLayout = ({
+      route,
+      children,
+    }: {
+      route: { name: string };
+      children: ReactNode;
+    }) => {
+      const screenMode = MODE_AGNOSTIC_ROUTES.has(route.name)
+        ? sharedMode
+        : isNutritionRoute(route.name)
+          ? 'nutrition'
+          : 'workout';
+      return (
+        <ScreenBackdrop
+          accentColor={screenMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent}
+        >
+          {children}
+        </ScreenBackdrop>
+      );
+    };
 
     return (
       <AppMenuContext.Provider
@@ -254,24 +264,6 @@ function Root({ onBackgroundModeChange, onBackgroundPhotoChange }: RootProps) {
           openMenu: (mode) => {
             setMenuMode(mode ?? backgroundMode);
             setMenuOpen(true);
-          },
-          // Calls onBackgroundModeChange directly, in the same tick as
-          // setSharedMode, instead of only setting state and waiting for
-          // the backgroundMode useEffect below to notice on Root's next
-          // render -- that extra render+effect round trip was the visible
-          // one-beat delay between tapping the Workout/Nutrition toggle and
-          // the background image actually swapping. The effect below stays,
-          // since it's still what keeps AppShell in sync when currentRouteName
-          // changes (plain navigation, not this toggle).
-          reportMode: (nextMode) => {
-            setSharedMode(nextMode);
-            onBackgroundModeChange(
-              MODE_AGNOSTIC_ROUTES.has(currentRouteName ?? '')
-                ? nextMode
-                : isNutritionRoute(currentRouteName)
-                  ? 'nutrition'
-                  : 'workout',
-            );
           },
           currentMode: backgroundMode,
         }}
@@ -286,19 +278,19 @@ function Root({ onBackgroundModeChange, onBackgroundPhotoChange }: RootProps) {
               }
             >
               <Stack.Navigator
-                initialRouteName={onboardingStatus === 'needed' ? 'Onboarding' : 'Dashboard'}
+                initialRouteName={onboardingStatus === 'needed' ? 'Onboarding' : 'Feed'}
                 screenOptions={{
                   headerShown: false,
-                  // Transparent so each screen's own (now-transparent) root
-                  // container reveals AppBackgroundLayer, mounted once behind
-                  // the whole navigator, instead of each screen fighting over
-                  // its own opaque background -- see the Background Theme
-                  // architecture in AppBackgroundLayer.tsx.
+                  // Transparent so each screen's own (transparent) root
+                  // container reveals its backdrop -- every screen is wrapped
+                  // in an opaque ScreenBackdrop by `screenLayout` -- see the
+                  // Background Theme architecture in AppBackgroundLayer.tsx.
                   contentStyle: { backgroundColor: 'transparent' },
                   ...getDefaultScreenOptions(),
                 }}
+                screenLayout={renderScreenLayout}
               >
-                <Stack.Screen name="Dashboard" component={DashboardScreen} />
+                <Stack.Screen name="Feed" component={FeedScreen} />
                 <Stack.Screen name="Onboarding" component={OnboardingScreen} />
                 <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
                 <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
@@ -333,34 +325,32 @@ function Root({ onBackgroundModeChange, onBackgroundPhotoChange }: RootProps) {
           </View>
 
           {showGlobalBottomNav ? (
-            <BottomNavBar
-              testID="app-bottom-nav"
-              active={routeToBottomNavTab(currentRouteName)}
-              mode={backgroundMode}
-              accentColor={
-                backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
-              }
-              onAccentColor={
-                backgroundMode === 'nutrition' ? nutritionMenuTheme.onAccent : menuTheme.onAccent
-              }
-              paddingBottom={Math.max(insets.bottom, 8)}
-              onNavigateHome={() => navigationRef.current?.navigate('Dashboard')}
-              onNavigateWorkouts={() =>
-                navigationRef.current?.navigate(
-                  backgroundMode === 'nutrition' ? 'FoodLibrary' : 'WorkoutHistory',
-                )
-              }
-              onNavigateProgress={() => navigationRef.current?.navigate('ProgressOverview')}
-              onNavigateProfile={() => navigationRef.current?.navigate('Profile')}
-              onPressPlus={() => setQuickActionsOpen(true)}
-            />
+            // The strip behind the bar is opaque flat theme colour -- every
+            // screen paints its own opaque backdrop now, so nothing behind
+            // the bar is ever a photograph.
+            <View style={{ backgroundColor: backgroundTheme.colors.background }}>
+              <BottomNavBar
+                testID="app-bottom-nav"
+                active={routeToBottomNavTab(currentRouteName)}
+                workoutAccentColor={menuTheme.accent}
+                nutritionAccentColor={nutritionMenuTheme.accent}
+                neutralAccentColor={
+                  backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
+                }
+                paddingBottom={Math.max(insets.bottom, 8)}
+                onNavigateFeed={() => navigationRef.current?.navigate('Feed')}
+                onNavigateTrain={() => navigationRef.current?.navigate('WorkoutHistory')}
+                onNavigateNutrition={() => navigationRef.current?.navigate('Nutrition')}
+                onNavigateProgress={() => navigationRef.current?.navigate('ProgressOverview')}
+                onNavigateYou={() => navigationRef.current?.navigate('Profile')}
+              />
+            </View>
           ) : null}
 
           <AppSideMenu
             visible={menuOpen}
             activeRoute={
-              (navigationRef.current?.getCurrentRoute()?.name as AppMenuRoute | undefined) ??
-              'Dashboard'
+              (navigationRef.current?.getCurrentRoute()?.name as AppMenuRoute | undefined) ?? 'Feed'
             }
             onNavigate={(route) => {
               setMenuOpen(false);
@@ -370,22 +360,6 @@ function Root({ onBackgroundModeChange, onBackgroundPhotoChange }: RootProps) {
             accentColor={menuMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent}
             sections={menuMode === 'nutrition' ? NUTRITION_MENU_SECTIONS : APP_MENU_SECTIONS}
             title={menuMode === 'nutrition' ? 'Progresso · Nutrition' : 'Progresso'}
-          />
-
-          <QuickActionMenu
-            visible={quickActionsOpen}
-            onClose={() => setQuickActionsOpen(false)}
-            onStartWorkout={() => {
-              setQuickActionsOpen(false);
-              navigationRef.current?.navigate('NewWorkout');
-            }}
-            onLogFood={() => {
-              setQuickActionsOpen(false);
-              navigationRef.current?.navigate('Nutrition');
-            }}
-            accentColor={
-              backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
-            }
           />
         </View>
       </AppMenuContext.Provider>
@@ -426,24 +400,17 @@ function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
   // does, so the app never briefly shows the default (Obsidian) theme
   // before switching to the user's saved one.
   const ready = fontsLoaded && status !== 'loading' && backgroundThemeReady;
-  // Lives here (rather than inside Root) because AppBackgroundLayer is
-  // Root's sibling, not its descendant -- it needs to keep showing
-  // something (defaulting to 'workout') even before Root ever mounts, e.g.
-  // during sign-in/sign-up, which render outside the Stack.Navigator
-  // entirely and so never report a mode of their own.
-  const [backgroundMode, setBackgroundMode] = useState<'workout' | 'nutrition'>('workout');
-  // Off until Dashboard reports itself as the current route -- see Root.
-  const [showBackgroundPhoto, setShowBackgroundPhoto] = useState(false);
 
   return (
     <View style={styles.shell}>
-      <AppBackgroundLayer mode={backgroundMode} showImage={showBackgroundPhoto} />
-      {ready ? (
-        <Root
-          onBackgroundModeChange={setBackgroundMode}
-          onBackgroundPhotoChange={setShowBackgroundPhoto}
-        />
-      ) : null}
+      {/* Lives here (rather than inside Root) because it needs to keep
+          showing something even before Root ever mounts, e.g. during
+          sign-in/sign-up, which render outside the Stack.Navigator entirely.
+          Every signed-in screen paints its own opaque ScreenBackdrop over
+          this now (see Root's screenLayout), so it is only ever actually
+          *seen* pre-sign-in -- a plain flat theme fill, no glow, no mode. */}
+      <AppBackgroundLayer showAtmosphere={false} />
+      {ready ? <Root /> : null}
       <LaunchScreen ready={ready} />
     </View>
   );

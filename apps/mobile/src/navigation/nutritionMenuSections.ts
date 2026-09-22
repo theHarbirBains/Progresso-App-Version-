@@ -16,7 +16,7 @@ import type { AppMenuSection } from './appMenuSections';
  * destination of its own; it's the "Edit" sub-screen NutritionGoals routes
  * to for editing the personal info its calculation needs, same as any other
  * edit-detail screen reached by pushing forward rather than from this menu.
- * No "Home" entry -- Dashboard (Home) is already one tap away via the
+ * No "Home" entry -- Feed (Home) is already one tap away via the
  * bottom nav in both modes, same reasoning as Profile never appearing here.
  */
 export const NUTRITION_MENU_SECTIONS: AppMenuSection[] = [

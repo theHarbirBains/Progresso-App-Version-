@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, TouchableOpacity, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
-import { colors } from '../design/theme';
+import { IconButton } from '../design/IconButton';
 import { LoadingState } from '../design/LoadingState';
+import { PrimaryButton } from '../design/Button';
 import {
   getMyProfile,
   updateMyProfile,
@@ -193,7 +193,7 @@ export function OnboardingScreen({ navigation }: Props) {
     setError(null);
     try {
       await updateMyProfile(accessToken, { onboardingCompleted: true });
-      navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to complete onboarding');
       setSaving(false);
@@ -266,14 +266,12 @@ export function OnboardingScreen({ navigation }: Props) {
               {error}
             </Text>
           ) : null}
-          <TouchableOpacity
+          <PrimaryButton
             testID="onboarding-start-training"
-            style={styles.startButton}
+            label={saving ? 'Starting...' : 'Start Training'}
             onPress={handleStartTraining}
             disabled={saving}
-          >
-            <Text style={styles.startButtonText}>{saving ? 'Starting...' : 'Start Training'}</Text>
-          </TouchableOpacity>
+          />
         </View>
       </View>
     );
@@ -285,15 +283,12 @@ export function OnboardingScreen({ navigation }: Props) {
     <>
       <View style={styles.header}>
         {stepIndex > 0 ? (
-          <TouchableOpacity
+          <IconButton
             testID="onboarding-back"
-            style={styles.backButton}
+            icon="arrow-left"
             onPress={goBackStep}
             accessibilityLabel="Back"
-            accessibilityRole="button"
-          >
-            <Feather name="arrow-left" size={18} color={colors.textPrimary} />
-          </TouchableOpacity>
+          />
         ) : null}
         <View style={styles.progress}>
           <OnboardingProgress
@@ -495,14 +490,12 @@ export function OnboardingScreen({ navigation }: Props) {
 
       {GENERIC_CONTINUE_STEPS.has(step) ? (
         <View style={styles.footer}>
-          <TouchableOpacity
+          <PrimaryButton
             testID="onboarding-continue"
-            style={[styles.continueButton, !canContinue(step) && styles.continueButtonDisabled]}
+            label={saving ? 'Saving...' : 'Continue'}
             onPress={() => handleGenericContinue(step)}
             disabled={!canContinue(step) || saving}
-          >
-            <Text style={styles.continueButtonText}>{saving ? 'Saving...' : 'Continue'}</Text>
-          </TouchableOpacity>
+          />
         </View>
       ) : null}
     </>

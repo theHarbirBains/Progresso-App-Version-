@@ -5,7 +5,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 // Phase 3) since they're a separate, already-working flow with nothing to
 // gain from a stack navigator.
 export type RootStackParamList = {
-  Dashboard: undefined;
+  /** The app's landing screen: a personal activity feed, replacing the old Dashboard + Workout/Nutrition toggle. */
+  Feed: undefined;
   Onboarding: undefined;
   AccountSettings: undefined;
   ExerciseLibrary: undefined;

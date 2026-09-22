@@ -9,7 +9,7 @@ import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
-import { fromKg, isValidWeightIncrement, roundWeight, toKg } from '../lib/units';
+import { isValidWeightIncrement, roundWeight, toKg, formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { AddExerciseButton } from '../workouts/AddExerciseButton';
@@ -46,11 +46,6 @@ interface SetInputDraft {
   reps: string;
 }
 
-function formatWeight(kg: number, unit: 'kg' | 'lb'): string {
-  const value = roundWeight(fromKg(kg, unit));
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
 function formatSessionDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     month: 'short',
@@ -70,7 +65,7 @@ function buildPreviousSessionDisplay(
     dateDisplay: formatSessionDate(previous.performedAt),
     sets: previous.sets.map((s, i) => ({
       setNumber: i + 1,
-      weightDisplay: formatWeight(s.weightKg ?? 0, unit),
+      weightDisplay: formatWeightKg(s.weightKg ?? 0, unit),
       unit,
       reps: s.reps ?? 0,
       side: s.side,
@@ -202,7 +197,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         for (const exercise of detail.exercises) {
           for (const set of exercise.sets) {
             nextInputs[set.id] = {
-              weight: set.weightKg !== null ? formatWeight(set.weightKg, weightUnit) : '',
+              weight: set.weightKg !== null ? formatWeightKg(set.weightKg, weightUnit) : '',
               reps: set.reps !== null ? String(set.reps) : '',
             };
           }
@@ -462,7 +457,15 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     setCompleting(true);
     try {
       await completeWorkout(workout.id);
-      navigation.reset({ index: 0, routes: [{ name: 'WorkoutHistory' }] });
+      // Land on the Share screen -- the natural moment to share -- with Workout
+      // History underneath, so Back (or finishing there) still ends in History.
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'WorkoutHistory' },
+          { name: 'ShareWorkout', params: { workoutId: workout.id } },
+        ],
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to complete workout');
       setCompleting(false);
@@ -478,7 +481,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       // enters history, never advances split progression, and never
       // affects PR/1RM data. See cancelWorkout's own comment.
       await cancelWorkout(workout.id);
-      navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to cancel workout');
       setCancelling(false);
@@ -536,7 +539,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   ).join(', ');
   const totalSets = computeTotalSets(workout.exercises);
   const totalVolumeKg = computeTotalVolumeKg(workout.exercises);
-  const totalVolumeDisplay = `${formatWeight(totalVolumeKg, weightUnit)} ${weightUnit}`;
+  const totalVolumeDisplay = `${formatWeightKg(totalVolumeKg, weightUnit)} ${weightUnit}`;
 
   return (
     <>

@@ -12,24 +12,19 @@ interface AppMenuContextValue {
    */
   openMenu: (mode?: 'workout' | 'nutrition') => void;
   /**
-   * Every primary/root screen that renders the shared `ModeToggle`
-   * (Dashboard, Progress, Profile -- none of which navigate on mode
-   * change) calls this whenever the toggle changes, so the shared mode
-   * flag (App.tsx's `Root`) stays in sync for whichever of those screens
-   * the user visits next, and so the background layer (mounted outside the
-   * navigator) follows along. Workouts/Food also call it on their own
-   * toggle for the same reason, even though their own mode is otherwise
-   * inferred from the route (see isNutritionRoute) -- keeping the shared
-   * flag current is still needed for Progress/Profile's sake. Optional so
-   * call sites/tests that only care about opening the menu don't need to
-   * supply it.
+   * Unused now that there is no Workout/Nutrition toggle -- App.tsx's
+   * `Root` keeps its shared mode flag current automatically, by watching
+   * which route the user navigates to (see Root's own effect). Kept
+   * optional on the type for now rather than removed, since a number of
+   * screens' tests still construct a full context value; nothing in the
+   * app calls it any more.
    */
   reportMode?: (mode: 'workout' | 'nutrition') => void;
   /**
    * The app's current effective mode, as computed by Root (route-derived
    * for screens with an unambiguous mode identity, the shared flag above
-   * for mode-agnostic root screens). Read by any screen rendering the
-   * shared `ModeToggle` so its selected segment reflects reality.
+   * for the mode-agnostic root screens -- Feed, Progress, You). Read by
+   * Feed and by anything opening the side menu without an explicit mode.
    */
   currentMode: 'workout' | 'nutrition';
 }

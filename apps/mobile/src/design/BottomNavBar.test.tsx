@@ -3,91 +3,93 @@ import { fireEvent, render, screen, within } from '@testing-library/react-native
 import { BottomNavBar } from './BottomNavBar';
 
 const baseProps = {
-  mode: 'workout' as const,
-  accentColor: '#2F80FF',
-  onAccentColor: '#000000',
+  workoutAccentColor: '#2F80FF',
+  nutritionAccentColor: '#10B981',
+  neutralAccentColor: '#2F80FF',
   paddingBottom: 8,
-  onNavigateHome: jest.fn(),
-  onNavigateWorkouts: jest.fn(),
+  onNavigateFeed: jest.fn(),
+  onNavigateTrain: jest.fn(),
+  onNavigateNutrition: jest.fn(),
   onNavigateProgress: jest.fn(),
-  onNavigateProfile: jest.fn(),
-  onPressPlus: jest.fn(),
+  onNavigateYou: jest.fn(),
 };
 
 describe('BottomNavBar', () => {
   it('renders all 5 destinations', () => {
-    render(<BottomNavBar {...baseProps} active="home" />);
+    render(<BottomNavBar {...baseProps} active="feed" />);
 
-    expect(screen.getByTestId('bottom-nav-home')).toBeTruthy();
-    expect(screen.getByTestId('bottom-nav-workouts')).toBeTruthy();
-    expect(screen.getByTestId('bottom-nav-plus')).toBeTruthy();
+    expect(screen.getByTestId('bottom-nav-feed')).toBeTruthy();
+    expect(screen.getByTestId('bottom-nav-train')).toBeTruthy();
+    expect(screen.getByTestId('bottom-nav-nutrition')).toBeTruthy();
     expect(screen.getByTestId('bottom-nav-progress')).toBeTruthy();
-    expect(screen.getByTestId('bottom-nav-profile')).toBeTruthy();
+    expect(screen.getByTestId('bottom-nav-you')).toBeTruthy();
   });
 
   it('marks the active destination as selected', () => {
-    render(<BottomNavBar {...baseProps} active="workouts" />);
+    render(<BottomNavBar {...baseProps} active="train" />);
 
-    expect(screen.getByTestId('bottom-nav-workouts').props.accessibilityState.selected).toBe(true);
-    expect(screen.getByTestId('bottom-nav-home').props.accessibilityState.selected).toBe(false);
+    expect(screen.getByTestId('bottom-nav-train').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('bottom-nav-feed').props.accessibilityState.selected).toBe(false);
   });
 
   it('calls the right callback for each destination', () => {
     const props = { ...baseProps };
-    render(<BottomNavBar {...props} active="home" />);
+    render(<BottomNavBar {...props} active="feed" />);
 
-    fireEvent.press(screen.getByTestId('bottom-nav-workouts'));
-    expect(props.onNavigateWorkouts).toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('bottom-nav-train'));
+    expect(props.onNavigateTrain).toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
+    expect(props.onNavigateNutrition).toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('bottom-nav-progress'));
     expect(props.onNavigateProgress).toHaveBeenCalled();
 
-    fireEvent.press(screen.getByTestId('bottom-nav-profile'));
-    expect(props.onNavigateProfile).toHaveBeenCalled();
-
-    fireEvent.press(screen.getByTestId('bottom-nav-plus'));
-    expect(props.onPressPlus).toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('bottom-nav-you'));
+    expect(props.onNavigateYou).toHaveBeenCalled();
   });
 
-  it('shows the Workout-mode labels by default', () => {
-    render(<BottomNavBar {...baseProps} active="home" mode="workout" />);
+  // There is no Workout/Nutrition toggle any more -- every tab always shows
+  // the same label/icon, regardless of where you currently are.
+  it('always shows the same fixed labels, in both directions', () => {
+    const { rerender } = render(<BottomNavBar {...baseProps} active="feed" />);
+    expect(screen.getByTestId('bottom-nav-train')).toHaveTextContent(/Train/);
+    expect(screen.getByTestId('bottom-nav-nutrition')).toHaveTextContent(/Nutrition/);
 
-    expect(screen.getByTestId('bottom-nav-workouts')).toHaveTextContent(/Workouts/);
-    expect(screen.getByTestId('bottom-nav-progress')).toHaveTextContent(/Progress/);
+    rerender(<BottomNavBar {...baseProps} active="nutrition" />);
+    expect(screen.getByTestId('bottom-nav-train')).toHaveTextContent(/Train/);
+    expect(screen.getByTestId('bottom-nav-nutrition')).toHaveTextContent(/Nutrition/);
   });
 
-  // The bug this guards: the global bar used to always show Workout-mode
-  // labels/colors, even on Nutrition-mode screens (FoodLibrary, FoodSearch,
-  // NutritionGoals) -- it never reflected Nutrition mode at all. `mode`
-  // (driven by App.tsx's route-derived backgroundMode) now mirrors
-  // Dashboard's own copy of this bar (DashboardScreen.tsx): Workouts->Food,
-  // Progress->Goals, with matching icon swaps. accentColor/onAccentColor are
-  // supplied by the caller (App.tsx picks the Nutrition accent theme when
-  // backgroundMode is 'nutrition'), so the whole bar -- including the center
-  // "+" fill and the active tab's icon/label -- turns green without this
-  // component needing to know about accent themes itself.
-  it("shows the Nutrition-mode labels ('Food'/'Goals') when mode is nutrition", () => {
-    render(<BottomNavBar {...baseProps} active="home" mode="nutrition" accentColor="#10B981" />);
+  it("renders Train's active tab in the Workout accent and Nutrition's in the Nutrition accent", () => {
+    const { rerender } = render(<BottomNavBar {...baseProps} active="train" />);
+    let label = within(screen.getByTestId('bottom-nav-train')).getByText('Train');
+    expect(StyleSheet.flatten(label.props.style).color).toBe('#2F80FF');
 
-    expect(screen.getByTestId('bottom-nav-workouts')).toHaveTextContent(/Food/);
-    expect(screen.queryByText('Workouts')).toBeNull();
-    expect(screen.getByTestId('bottom-nav-progress')).toHaveTextContent(/Goals/);
-    expect(screen.queryByText('Progress')).toBeNull();
-  });
-
-  it('renders the active tab in whatever accentColor the caller passes, following the current mode theme', () => {
-    render(<BottomNavBar {...baseProps} active="home" mode="nutrition" accentColor="#10B981" />);
-
-    const label = within(screen.getByTestId('bottom-nav-home')).getByText('Home');
+    rerender(<BottomNavBar {...baseProps} active="nutrition" />);
+    label = within(screen.getByTestId('bottom-nav-nutrition')).getByText('Nutrition');
     expect(StyleSheet.flatten(label.props.style).color).toBe('#10B981');
   });
 
-  // Regression guard: this bar is now mounted once at the app-shell level
+  it('renders a mode-agnostic tab (Feed/Progress/You) in the given neutral accent when active', () => {
+    render(<BottomNavBar {...baseProps} active="feed" neutralAccentColor="#10B981" />);
+
+    const label = within(screen.getByTestId('bottom-nav-feed')).getByText('Feed');
+    expect(StyleSheet.flatten(label.props.style).color).toBe('#10B981');
+  });
+
+  it('leaves an inactive tab in the neutral secondary colour, regardless of accent', () => {
+    render(<BottomNavBar {...baseProps} active="feed" />);
+
+    const label = within(screen.getByTestId('bottom-nav-train')).getByText('Train');
+    expect(StyleSheet.flatten(label.props.style).color).not.toBe('#2F80FF');
+  });
+
+  // Regression guard: this bar is mounted once at the app-shell level
   // (App.tsx) as a normal in-flow sibling of the navigator, not an
-  // absolutely-positioned overlay a screen has to leave room for itself --
-  // see the navigation architecture change that made it persistent.
+  // absolutely-positioned overlay a screen has to leave room for itself.
   it('lays out in normal flow, not as an absolutely-positioned overlay', () => {
-    render(<BottomNavBar {...baseProps} active="home" />);
+    render(<BottomNavBar {...baseProps} active="feed" />);
 
     const bar = screen.getByTestId('bottom-nav-bar');
     expect(StyleSheet.flatten(bar.props.style).position).not.toBe('absolute');
@@ -96,14 +98,15 @@ describe('BottomNavBar', () => {
 
 describe('BottomNavBar accessibility and touch targets', () => {
   it('is exposed as a tab list whose destinations are tabs with clear names', () => {
-    render(<BottomNavBar {...baseProps} active="workouts" />);
+    render(<BottomNavBar {...baseProps} active="train" />);
 
     expect(screen.getByTestId('bottom-nav-bar').props.accessibilityRole).toBe('tablist');
     for (const [id, name] of [
-      ['bottom-nav-home', 'Home'],
-      ['bottom-nav-workouts', 'Workouts'],
+      ['bottom-nav-feed', 'Feed'],
+      ['bottom-nav-train', 'Train'],
+      ['bottom-nav-nutrition', 'Nutrition'],
       ['bottom-nav-progress', 'Progress'],
-      ['bottom-nav-profile', 'Profile'],
+      ['bottom-nav-you', 'You'],
     ] as const) {
       const tab = screen.getByTestId(id);
       expect(tab.props.accessibilityRole).toBe('tab');
@@ -111,21 +114,15 @@ describe('BottomNavBar accessibility and touch targets', () => {
     }
   });
 
-  it("names the Nutrition-mode tabs by what they are now ('Food', 'Goals')", () => {
-    render(<BottomNavBar {...baseProps} active="home" mode="nutrition" />);
-
-    expect(screen.getByTestId('bottom-nav-workouts').props.accessibilityLabel).toBe('Food');
-    expect(screen.getByTestId('bottom-nav-progress').props.accessibilityLabel).toBe('Goals');
-  });
-
   it('gives every tab at least the 44pt minimum touch height and a 56pt width', () => {
-    render(<BottomNavBar {...baseProps} active="home" />);
+    render(<BottomNavBar {...baseProps} active="feed" />);
 
     for (const id of [
-      'bottom-nav-home',
-      'bottom-nav-workouts',
+      'bottom-nav-feed',
+      'bottom-nav-train',
+      'bottom-nav-nutrition',
       'bottom-nav-progress',
-      'bottom-nav-profile',
+      'bottom-nav-you',
     ]) {
       const style = StyleSheet.flatten(screen.getByTestId(id).props.style);
       expect(style.minHeight).toBeGreaterThanOrEqual(44);
@@ -133,23 +130,12 @@ describe('BottomNavBar accessibility and touch targets', () => {
     }
   });
 
-  it('makes the centre "+" a 44pt circle that sits flush in the row, with no negative-margin hack', () => {
-    render(<BottomNavBar {...baseProps} active="home" />);
+  it('accepts an accent change without remounting or crashing', () => {
+    const { rerender } = render(<BottomNavBar {...baseProps} active="feed" />);
 
-    const style = StyleSheet.flatten(screen.getByTestId('bottom-nav-plus').props.style);
-    expect(style.width).toBe(44);
-    expect(style.height).toBe(44);
-    expect(style.marginTop).toBeUndefined();
-    expect(screen.getByTestId('bottom-nav-plus').props.accessibilityLabel).toBe('Quick actions');
-  });
+    rerender(<BottomNavBar {...baseProps} active="feed" neutralAccentColor="#10B981" />);
 
-  it('accepts an accent change (the Workout <-> Nutrition switch) without remounting or crashing', () => {
-    const { rerender } = render(<BottomNavBar {...baseProps} active="home" />);
-
-    rerender(<BottomNavBar {...baseProps} active="home" mode="nutrition" accentColor="#10B981" />);
-
-    const label = within(screen.getByTestId('bottom-nav-home')).getByText('Home');
+    const label = within(screen.getByTestId('bottom-nav-feed')).getByText('Feed');
     expect(StyleSheet.flatten(label.props.style).color).toBe('#10B981');
-    expect(screen.getByTestId('bottom-nav-plus')).toBeTruthy();
   });
 });

@@ -1,131 +1,111 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-  type LayoutChangeEvent,
-} from 'react-native';
+import { StyleSheet, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { GlassBackground } from './GlassBackground';
 import { Text } from './Text';
-import { colors, minTouchTarget, radii, spacing, typeScale } from './theme';
+import { colors, minTouchTarget, spacing, typeScale } from './theme';
 
-export type BottomNavDestination = 'home' | 'workouts' | 'progress' | 'profile';
+export type BottomNavDestination = 'feed' | 'train' | 'nutrition' | 'progress' | 'you';
+
+interface NavItem {
+  destination: BottomNavDestination;
+  testID: string;
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+  onPress: () => void;
+  /** This tab's own accent when it's the active one -- Train is always blue, Nutrition always green. Omit for a neutral tab (Feed/Progress/You), which uses `neutralAccentColor` instead. */
+  accentColor?: string;
+}
 
 interface Props {
   active: BottomNavDestination;
-  /** Which mode's tabs to show -- Workouts/Progress in Workout mode, Food/Goals in Nutrition mode. Drives the second and fourth tab's label/icon only; Home and Profile stay the same in both modes. */
-  mode: 'workout' | 'nutrition';
-  accentColor: string;
-  onAccentColor: string;
-  onNavigateHome: () => void;
-  onNavigateWorkouts: () => void;
+  onNavigateFeed: () => void;
+  onNavigateTrain: () => void;
+  onNavigateNutrition: () => void;
   onNavigateProgress: () => void;
-  onNavigateProfile: () => void;
-  onPressPlus: () => void;
+  onNavigateYou: () => void;
+  workoutAccentColor: string;
+  nutritionAccentColor: string;
+  /** The accent a mode-agnostic tab (Feed/Progress/You) uses when active -- whichever of Train/Nutrition the user was in most recently. */
+  neutralAccentColor: string;
   paddingBottom: number;
   onLayout?: (event: LayoutChangeEvent) => void;
   testID?: string;
 }
 
-const ACCENT_CROSSFADE_MS = 260;
-
 /**
- * THE bottom navigation -- the only one in the app. Mounted once in App.tsx
- * as a sibling of the whole screen-stack navigator, so it persists across
- * every push/pop and appears on Dashboard too (Dashboard used to render a
- * second, hand-maintained copy; the two are now one system).
+ * THE bottom navigation -- the only one in the app, and the app's sole means
+ * of switching between Train and Nutrition content now (there is no
+ * Workout/Nutrition toggle any more -- see DESIGN.md's Feed/navigation
+ * section). Five fixed tabs, each always the same label/icon regardless of
+ * where you are: Feed (the landing screen/personal activity feed), Train,
+ * Nutrition, Progress, You. Mounted once in App.tsx as a sibling of the whole
+ * screen-stack navigator, so it persists across every push/pop.
  *
  * Normal in-flow layout (not an absolutely-positioned overlay) so the
  * navigator's content area is naturally sized to end above it -- no screen
  * ever needs its own bottom padding to clear it.
  *
- * `mode` and `accentColor` come from the caller (App.tsx derives both from
- * the current route / Dashboard's mode toggle). When the accent changes -- the
- * Workout <-> Nutrition switch -- the centre "+" button crossfades between the
- * two colours over 260ms (instantly under Reduce Motion), which is the one
- * behaviour Dashboard's own copy of the bar had that this one lacked.
+ * Train and Nutrition each carry their own fixed accent, so the active tab's
+ * colour is always the same regardless of which tab you came from. The
+ * mode-agnostic tabs (Feed/Progress/You) use `neutralAccentColor` --
+ * whichever of the two you were most recently in.
  *
  * Navigation UI only: it calls back, it does not navigate. It is not a second
  * navigation system on top of the single stack navigator.
  */
 export function BottomNavBar({
   active,
-  mode,
-  accentColor,
-  onAccentColor,
-  onNavigateHome,
-  onNavigateWorkouts,
+  onNavigateFeed,
+  onNavigateTrain,
+  onNavigateNutrition,
   onNavigateProgress,
-  onNavigateProfile,
-  onPressPlus,
+  onNavigateYou,
+  workoutAccentColor,
+  nutritionAccentColor,
+  neutralAccentColor,
   paddingBottom,
   onLayout,
   testID,
 }: Props) {
-  const reduceMotion = useReduceMotionPreference();
-  const fill = useRef(new Animated.Value(1)).current;
-  const shownAccent = useRef(accentColor);
-  const [fromAccent, setFromAccent] = useState(accentColor);
-
-  useEffect(() => {
-    if (shownAccent.current === accentColor) return;
-    setFromAccent(shownAccent.current);
-    shownAccent.current = accentColor;
-    if (reduceMotion) {
-      fill.setValue(1);
-      return;
-    }
-    fill.setValue(0);
-    // A colour can't run on the native driver, so this one animation stays on
-    // the JS thread -- it is a single 260ms interpolation on one small view.
-    Animated.timing(fill, {
-      toValue: 1,
-      duration: ACCENT_CROSSFADE_MS,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: false,
-    }).start();
-  }, [accentColor, reduceMotion, fill]);
-
-  const centerFill = fill.interpolate({
-    inputRange: [0, 1],
-    outputRange: [fromAccent, accentColor],
-  });
-
-  function itemColor(destination: BottomNavDestination) {
-    return destination === active ? accentColor : colors.textSecondary;
-  }
-  const workoutsLabel = mode === 'workout' ? 'Workouts' : 'Food';
-  const workoutsIcon = mode === 'workout' ? 'activity' : 'pie-chart';
-  const progressLabel = mode === 'workout' ? 'Progress' : 'Goals';
-  const progressIcon = mode === 'workout' ? 'trending-up' : 'target';
-
-  function renderItem(
-    destination: BottomNavDestination,
-    itemTestID: string,
-    label: string,
-    icon: keyof typeof Feather.glyphMap,
-    onPress: () => void,
-  ) {
-    const selected = destination === active;
-    return (
-      <TouchableOpacity
-        testID={itemTestID}
-        style={styles.item}
-        onPress={onPress}
-        activeOpacity={0.7}
-        accessibilityRole="tab"
-        accessibilityLabel={label}
-        accessibilityState={{ selected }}
-      >
-        <Feather name={icon} size={22} color={itemColor(destination)} />
-        <Text style={[styles.label, { color: itemColor(destination) }]}>{label}</Text>
-      </TouchableOpacity>
-    );
-  }
+  const items: NavItem[] = [
+    {
+      destination: 'feed',
+      testID: 'bottom-nav-feed',
+      label: 'Feed',
+      icon: 'zap',
+      onPress: onNavigateFeed,
+    },
+    {
+      destination: 'train',
+      testID: 'bottom-nav-train',
+      label: 'Train',
+      icon: 'activity',
+      onPress: onNavigateTrain,
+      accentColor: workoutAccentColor,
+    },
+    {
+      destination: 'nutrition',
+      testID: 'bottom-nav-nutrition',
+      label: 'Nutrition',
+      icon: 'pie-chart',
+      onPress: onNavigateNutrition,
+      accentColor: nutritionAccentColor,
+    },
+    {
+      destination: 'progress',
+      testID: 'bottom-nav-progress',
+      label: 'Progress',
+      icon: 'trending-up',
+      onPress: onNavigateProgress,
+    },
+    {
+      destination: 'you',
+      testID: 'bottom-nav-you',
+      label: 'You',
+      icon: 'user',
+      onPress: onNavigateYou,
+    },
+  ];
 
   return (
     <View
@@ -135,38 +115,25 @@ export function BottomNavBar({
       accessibilityRole="tablist"
     >
       <GlassBackground variant="chrome" bordered={false} />
-      {renderItem('home', 'bottom-nav-home', 'Home', 'home', onNavigateHome)}
-      {renderItem(
-        'workouts',
-        'bottom-nav-workouts',
-        workoutsLabel,
-        workoutsIcon,
-        onNavigateWorkouts,
-      )}
-
-      <TouchableOpacity
-        testID="bottom-nav-plus"
-        style={styles.center}
-        onPress={onPressPlus}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityLabel="Quick actions"
-      >
-        <Animated.View
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { backgroundColor: centerFill }]}
-        />
-        <Feather name="plus" size={22} color={onAccentColor} />
-      </TouchableOpacity>
-
-      {renderItem(
-        'progress',
-        'bottom-nav-progress',
-        progressLabel,
-        progressIcon,
-        onNavigateProgress,
-      )}
-      {renderItem('profile', 'bottom-nav-profile', 'Profile', 'user', onNavigateProfile)}
+      {items.map((item) => {
+        const selected = item.destination === active;
+        const color = selected ? (item.accentColor ?? neutralAccentColor) : colors.textSecondary;
+        return (
+          <TouchableOpacity
+            key={item.destination}
+            testID={item.testID}
+            style={styles.item}
+            onPress={item.onPress}
+            activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityLabel={item.label}
+            accessibilityState={{ selected }}
+          >
+            <Feather name={item.icon} size={22} color={color} />
+            <Text style={[styles.label, { color }]}>{item.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
@@ -182,7 +149,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   // A comfortable target: at least 56 wide and 48 tall (the 44pt minimum plus
-  // room for the label), rather than the ~48x40 hit box the old bar had.
+  // room for the label).
   item: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -192,16 +159,5 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typeScale.caption,
-  },
-  // Sits flush in the row: no negative margin lifting it above the bar (the
-  // bar's own overflow: 'hidden' clipped that, which is what the old raised
-  // button kept fighting). The circle is the 44pt minimum.
-  center: {
-    width: minTouchTarget,
-    height: minTouchTarget,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
   },
 });

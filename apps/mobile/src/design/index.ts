@@ -21,7 +21,6 @@ export { LoadingState } from './LoadingState';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
 export { BottomNavBar, type BottomNavDestination } from './BottomNavBar';
-export { QuickActionMenu } from './QuickActionMenu';
 export { AppSideMenu } from './AppSideMenu';
 export { AppHeader } from './AppHeader';
 export { IconButton } from './IconButton';

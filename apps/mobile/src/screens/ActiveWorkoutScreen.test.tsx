@@ -427,7 +427,11 @@ describe('ActiveWorkoutScreen', () => {
 
     await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
     expect(mockCompleteWorkout).toHaveBeenCalledTimes(1);
-    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'WorkoutHistory' }] });
+    // Straight to the Share screen (History stays underneath it).
+    expect(mockReset).toHaveBeenCalledWith({
+      index: 1,
+      routes: [{ name: 'WorkoutHistory' }, { name: 'ShareWorkout', params: { workoutId: 'w1' } }],
+    });
     expect(mockCancelWorkout).not.toHaveBeenCalled();
   });
 
@@ -738,7 +742,7 @@ describe('Cancel Workout', () => {
     expect(mockReset).not.toHaveBeenCalled();
   });
 
-  it('soft-deletes the workout and returns to Dashboard on confirm -- never completing or advancing it', async () => {
+  it('soft-deletes the workout and returns to Feed on confirm -- never completing or advancing it', async () => {
     jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
       buttons?.find((b) => b.text === 'Cancel Workout')?.onPress?.();
     });
@@ -752,7 +756,7 @@ describe('Cancel Workout', () => {
     fireEvent.press(screen.getByTestId('cancel-workout'));
 
     await waitFor(() => expect(mockCancelWorkout).toHaveBeenCalledWith('w1'));
-    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Dashboard' }] });
+    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Feed' }] });
     expect(mockCompleteWorkout).not.toHaveBeenCalled();
   });
 

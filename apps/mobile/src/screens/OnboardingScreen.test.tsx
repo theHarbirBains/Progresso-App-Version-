@@ -236,7 +236,7 @@ describe('OnboardingScreen', () => {
     await waitFor(() =>
       expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', { onboardingCompleted: true }),
     );
-    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Dashboard' }] });
+    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Feed' }] });
   });
 
   it('does not nest the wheel picker inside the outer ScrollView (avoids the VirtualizedList nesting warning)', async () => {

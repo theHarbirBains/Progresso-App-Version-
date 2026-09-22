@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { IconButton } from '../design/IconButton';
-import { colors } from '../design/theme';
+import { AppHeader } from '../design/AppHeader';
 import { progressStyles as styles } from './progressStyles';
 
 interface Props {
@@ -10,8 +9,8 @@ interface Props {
   onOpenMenu: () => void;
   /** The "PROGRESS" eyebrow's color -- the active mode's accent (Workout blue today; Progress is Workout-only). */
   accentColor: string;
-  /** The shared ModeToggle, rendered by the caller (it owns the mode state/handlers) but placed here, between the chrome row and the heading -- matching the reference's composition. */
-  modeToggle: ReactNode;
+  /** Optional content placed between the chrome row and the heading -- unused since the Workout/Nutrition toggle was replaced by dedicated bottom-nav tabs; kept for any future caller that wants a similar slot. */
+  modeToggle?: ReactNode;
   /** Defaults to true. The Overview tab already shows its own "Your Progress" stat card right below this header, making the "Track Your Growth" heading + supporting text redundant there -- pass false to hide them, while keeping the eyebrow-less spacing otherwise identical. */
   showHeading?: boolean;
   testID?: string;
@@ -38,19 +37,17 @@ export function ProgressHeader({
 }: Props) {
   return (
     <View testID={testID}>
-      <View style={styles.topBar}>
-        <IconButton
-          testID="progress-open-menu"
-          icon="menu"
-          onPress={onOpenMenu}
-          accessibilityLabel="Open menu"
-          color={colors.textSecondaryBright}
-        />
-        <Text style={styles.wordmark}>Progress</Text>
-        <View style={styles.topBarSpacer} />
-      </View>
+      <AppHeader
+        title="Progress"
+        leftAction={{
+          icon: 'menu',
+          onPress: onOpenMenu,
+          accessibilityLabel: 'Open menu',
+          testID: 'progress-open-menu',
+        }}
+      />
 
-      <View style={styles.modeToggleWrap}>{modeToggle}</View>
+      {modeToggle ? <View style={styles.modeToggleWrap}>{modeToggle}</View> : null}
 
       {showHeading ? (
         <View style={styles.headingBlock}>

@@ -37,7 +37,7 @@ export interface AppMenuSection {
  * place to add a future destination -- once its screen actually exists --
  * without touching AppSideMenu itself. Every entry here must point at a
  * real, already-registered screen; never add a placeholder for an unbuilt
- * feature. No "Home" entry -- Dashboard (Home) is already one tap away via
+ * feature. No "Home" entry -- Feed (Home) is already one tap away via
  * the bottom nav, same reasoning as Profile never appearing here.
  */
 export const APP_MENU_SECTIONS: AppMenuSection[] = [
