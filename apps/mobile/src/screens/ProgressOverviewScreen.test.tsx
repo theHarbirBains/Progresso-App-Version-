@@ -1,4 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { AppCard } from '../design/AppCard';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
@@ -215,34 +217,6 @@ describe('ProgressOverviewScreen shell', () => {
     expect(mockOpenMenu).toHaveBeenCalledWith('nutrition');
   });
 
-  it('shows the Workout/Nutrition mode toggle, since Progress is a primary/root screen', async () => {
-    renderScreen();
-    await screen.findByText('Progress');
-
-    expect(screen.getByTestId('progress-mode-workout')).toBeTruthy();
-    expect(screen.getByTestId('progress-mode-nutrition')).toBeTruthy();
-  });
-
-  it('navigates to Dashboard (Nutrition’s Home) and reports the mode change when the Nutrition segment is pressed', async () => {
-    renderScreen();
-    await screen.findByText('Progress');
-
-    fireEvent.press(screen.getByTestId('progress-mode-nutrition'));
-
-    expect(mockReportMode).toHaveBeenCalledWith('nutrition');
-    expect(mockNavigate).toHaveBeenCalledWith('Dashboard');
-  });
-
-  it('does nothing when the already-selected Workout segment is pressed', async () => {
-    renderScreen();
-    await screen.findByText('Progress');
-
-    fireEvent.press(screen.getByTestId('progress-mode-workout'));
-
-    expect(mockReportMode).not.toHaveBeenCalled();
-    expect(mockNavigate).not.toHaveBeenCalled();
-  });
-
   it('shows a "coming soon" placeholder, not the Workout section tabs, when in Nutrition mode', async () => {
     renderScreen('nutrition');
     await screen.findByText('Progress');
@@ -403,5 +377,36 @@ describe('ProgressOverviewScreen background refresh on focus', () => {
       refresh.resolve([]);
       await refresh.promise;
     });
+  });
+});
+
+describe('ProgressOverviewScreen -- one widget for the active section', () => {
+  async function ready() {
+    renderScreen();
+    await screen.findByTestId('progress-screen');
+  }
+
+  it('puts the active section in its own widget, on every tab', async () => {
+    await ready();
+    for (const section of ['Overview', 'Strength', 'TopSets', 'AllTime']) {
+      goToSection(section);
+      expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(1);
+      expect(screen.getByTestId('progress-section-card')).toBeTruthy();
+    }
+  });
+
+  it('uses the shared header with a named menu button', async () => {
+    await ready();
+
+    expect(screen.getByTestId('progress-open-menu').props.accessibilityLabel).toBe('Open menu');
+    expect(screen.getByText('Progress')).toBeTruthy();
+  });
+
+  it('renders no bare text outside <Text> on any tab', async () => {
+    await ready();
+    for (const section of ['Overview', 'Strength', 'TopSets', 'AllTime']) {
+      goToSection(section);
+      expectNoBareText();
+    }
   });
 });

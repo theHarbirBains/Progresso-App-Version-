@@ -1,5 +1,8 @@
-import { FlatList, Image } from 'react-native';
+import { FlatList, Image, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { AppCard } from '../design/AppCard';
+import { PrimaryButton } from '../design/Button';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
@@ -181,34 +184,6 @@ describe('ProfileScreen identity', () => {
     renderProfile();
     expect(screen.getByTestId('profile-loading')).toBeTruthy();
     await screen.findByTestId('profile-display-name');
-  });
-
-  it('shows the Workout/Nutrition mode toggle, since Profile is a primary/root screen', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-display-name');
-
-    expect(screen.getByTestId('profile-mode-workout')).toBeTruthy();
-    expect(screen.getByTestId('profile-mode-nutrition')).toBeTruthy();
-  });
-
-  it('navigates to Dashboard (Nutrition’s Home) and reports the mode change when the Nutrition segment is pressed', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-display-name');
-
-    fireEvent.press(screen.getByTestId('profile-mode-nutrition'));
-
-    expect(mockReportMode).toHaveBeenCalledWith('nutrition');
-    expect(mockNavigate).toHaveBeenCalledWith('Dashboard');
-  });
-
-  it('does nothing when the already-selected Workout segment is pressed', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-display-name');
-
-    fireEvent.press(screen.getByTestId('profile-mode-workout'));
-
-    expect(mockReportMode).not.toHaveBeenCalled();
-    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('keeps showing the same Profile content regardless of the selected mode', async () => {
@@ -438,10 +413,10 @@ describe('ProfileScreen lifetime stats', () => {
   it('computes Workouts/Total Sets/Total Volume from real data, not hardcoded values', async () => {
     renderProfile();
 
-    expect(await screen.findByTestId('profile-stat-workouts')).toHaveTextContent('2');
-    expect(screen.getByTestId('profile-stat-sets')).toHaveTextContent('2');
+    expect(await screen.findByTestId('profile-stat-workouts')).toHaveTextContent(/2/);
+    expect(screen.getByTestId('profile-stat-sets')).toHaveTextContent(/2/);
     // 100*5 + 60*10 = 1100 kg
-    expect(screen.getByTestId('profile-stat-volume')).toHaveTextContent('1,100');
+    expect(screen.getByTestId('profile-stat-volume')).toHaveTextContent(/1,100/);
   });
 
   it('shows an error without crashing when the lifetime stats fetch fails', async () => {
@@ -633,5 +608,54 @@ describe('ProfileScreen navigation', () => {
     await screen.findByTestId('profile-display-name');
 
     await waitFor(() => expect(mockGetMyProfile).toHaveBeenCalled());
+  });
+});
+
+describe('ProfileScreen -- header, widgets, one primary action', () => {
+  it('is a stack of widgets: the identity hero, the stats card, and the active tab in its own card', async () => {
+    renderProfile();
+    await screen.findByTestId('profile-workout-w1');
+
+    let cards = screen.UNSAFE_queryAllByType(AppCard);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false]);
+    expect(
+      within(screen.getByTestId('profile-tab-content')).getByTestId('profile-workout-w1'),
+    ).toBeTruthy();
+
+    for (const tab of ['Stats', 'PRs']) {
+      fireEvent.press(screen.getByTestId(`profile-tabs-${tab}`));
+      cards = screen.UNSAFE_queryAllByType(AppCard);
+      expect(cards).toHaveLength(3);
+    }
+  });
+
+  it('puts a named Settings action in the shared header and offers Edit Profile as one outlined button', async () => {
+    renderProfile();
+    await screen.findByTestId('profile-workout-w1');
+
+    expect(screen.getByTestId('profile-open-settings').props.accessibilityLabel).toBe('Settings');
+    const edit = StyleSheet.flatten(screen.getByTestId('profile-edit').props.style);
+    expect(edit.backgroundColor).toBeUndefined();
+    expect(edit.borderWidth).toBe(1);
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(0);
+  });
+
+  it('shows each workout as a row, separated by hairlines, none above the first', async () => {
+    renderProfile();
+
+    const first = StyleSheet.flatten((await screen.findByTestId('profile-workout-w1')).props.style);
+    expect(first.borderTopWidth).toBeUndefined();
+    expect(screen.getByTestId('profile-workout-w1').props.accessibilityRole).toBe('button');
+  });
+
+  it('renders no bare text outside <Text> on any tab', async () => {
+    renderProfile();
+    await screen.findByTestId('profile-workout-w1');
+    expectNoBareText();
+
+    for (const tab of ['Stats', 'PRs']) {
+      fireEvent.press(screen.getByTestId(`profile-tabs-${tab}`));
+      expectNoBareText();
+    }
   });
 });

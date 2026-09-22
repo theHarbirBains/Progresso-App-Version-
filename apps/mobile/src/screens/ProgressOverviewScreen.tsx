@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { LoadingState } from '../design/LoadingState';
-import { ModeToggle } from '../design/ModeToggle';
+import { Screen } from '../design/Screen';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { AllTimeSection } from '../progress/AllTimeSection';
@@ -32,29 +32,22 @@ type Props = RootStackScreenProps<'ProgressOverview'>;
 
 // Progress's shell: header + the horizontal section navigation (reusing
 // Settings' own CategoryTabs component, not a second implementation) +
-// whichever section is active. All Progress data is fetched once here and
-// passed down as props -- switching sections never re-fetches, and no
-// section duplicates another's data-loading logic. Individual exercise
-// detail still opens its own dedicated screen (ProgressExerciseDetail),
-// unaffected by this restructuring.
+// whichever section is active, in its own widget (an AppCard filling the
+// remaining screen height, matching the workout/nutrition tabs' AppCard-
+// per-widget language). All Progress data is fetched once here and passed
+// down as props -- switching sections never re-fetches, and no section
+// duplicates another's data-loading logic. Individual exercise detail still
+// opens its own dedicated screen (ProgressExerciseDetail), unaffected by
+// this restructuring.
 export function ProgressOverviewScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const { theme, nutritionTheme, weightUnit, themeLoading } = useProgressTheme();
-  const insets = useSafeAreaInsets();
-  const { openMenu, reportMode, currentMode } = useAppMenu();
-
-  // Switching mode from a non-Dashboard root screen always goes to that
-  // mode's Home (Dashboard) -- Dashboard is each mode's one true landing
-  // page, not this screen's own in-place "coming soon" state (that only
-  // ever shows when the user arrives here already in Nutrition mode via
-  // the bottom nav/side menu, not from tapping this toggle). A no-op if
-  // the tapped segment is already selected.
-  function handleModeChange(next: 'workout' | 'nutrition') {
-    if (next === currentMode) return;
-    reportMode?.(next);
-    navigation.navigate('Dashboard');
-  }
+  const { theme, weightUnit, themeLoading } = useProgressTheme();
+  // Progress has no Train/Nutrition sub-tabs of its own, so which content it
+  // shows (the real Workout sections vs. a "coming soon" placeholder) still
+  // follows the shared mode -- whichever of Train/Nutrition the user was
+  // most recently in, same source BottomNavBar's neutral tabs use.
+  const { openMenu, currentMode } = useAppMenu();
 
   const [activeSection, setActiveSection] = useState<ProgressSection>('Overview');
 
@@ -109,20 +102,14 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]} testID="progress-screen">
-      <View style={{ paddingHorizontal: 24 }}>
+    <Screen
+      scroll={false}
+      padded={false}
+      testID="progress-screen"
+      header={
         <ProgressHeader
           onOpenMenu={() => openMenu(currentMode)}
           accentColor={theme.accent}
-          modeToggle={
-            <ModeToggle
-              mode={currentMode}
-              onChange={handleModeChange}
-              workoutTheme={theme}
-              nutritionTheme={nutritionTheme}
-              testIDPrefix="progress"
-            />
-          }
           // "Track Your Growth" + the supporting sentence are hidden on
           // every Progress tab now (Overview already shows its own "Your
           // Progress" card; Top Sets/Strength have their own section
@@ -130,7 +117,9 @@ export function ProgressOverviewScreen({ navigation }: Props) {
           // ProgressHeader in case a future section wants it back.
           showHeading={false}
         />
-
+      }
+    >
+      <View style={styles.tabsWrap}>
         {currentMode === 'workout' ? (
           <CategoryTabs
             testID="progress-tabs"
@@ -149,15 +138,15 @@ export function ProgressOverviewScreen({ navigation }: Props) {
       </View>
 
       {currentMode === 'nutrition' ? (
-        <View style={styles.sectionFill}>
+        <AppCard testID="progress-section-card" style={styles.sectionCard}>
           <ProgressEmptyState
             testID="progress-nutrition-coming-soon"
             title="Nutrition progress is coming soon."
             icon="pie-chart"
           />
-        </View>
+        </AppCard>
       ) : (
-        <View style={[styles.sectionFill, { paddingHorizontal: 24 }]}>
+        <AppCard testID="progress-section-card" style={styles.sectionCard}>
           {activeSection === 'Overview' ? (
             <OverviewSection
               groups={groups}
@@ -210,8 +199,8 @@ export function ProgressOverviewScreen({ navigation }: Props) {
               navigation={navigation}
             />
           ) : null}
-        </View>
+        </AppCard>
       )}
-    </View>
+    </Screen>
   );
 }

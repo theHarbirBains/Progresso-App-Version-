@@ -1,11 +1,12 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, fonts, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
 // Profile-specific layout only -- everything reusable (cards, buttons,
-// section headers, stat values, segmented control) comes from src/design/
+// section headers, stat blocks, segmented control) comes from src/design/
 // and src/progress/. This file exists for the handful of things unique to
 // this screen's composition, following the same per-screen-stylesheet
-// convention as dashboardStyles.ts/workoutHistoryStyles.ts.
+// convention used throughout the app. The screen is a stack of widgets
+// (AppCards) `widgetGap` apart, same rhythm as the workout/nutrition tabs.
 export const profileStyles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -14,8 +15,8 @@ export const profileStyles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   scrollContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: widgetGap,
     // The persistent bottom nav (App.tsx) is a normal in-flow sibling now,
     // not an overlay this screen has to leave room for -- this is just
     // ordinary breathing room at the end of the scroll content.
@@ -23,31 +24,9 @@ export const profileStyles = StyleSheet.create({
   },
 
   errorText: {
+    ...typeScale.callout,
     color: colors.destructive,
-    fontSize: 14,
     marginBottom: spacing.md,
-  },
-
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: spacing.md,
-  },
-  // Wraps the shared ModeToggle (design/ModeToggle.tsx) -- Profile is one
-  // of the app's primary/root screens, so it keeps this the same way
-  // Dashboard does; deeper screens reached from here don't.
-  modeToggleWrap: {
-    marginBottom: spacing.lg,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   identityRow: {
@@ -69,7 +48,6 @@ export const profileStyles = StyleSheet.create({
   },
   avatarInitial: {
     ...typeScale.display,
-    fontSize: 28,
   },
   // Minimal camera badge signaling the avatar above is tappable -- the one
   // small edit indicator DESIGN.md's icon system already supports (Feather,
@@ -95,38 +73,18 @@ export const profileStyles = StyleSheet.create({
     color: colors.textPrimary,
   },
   username: {
+    ...typeScale.callout,
     color: colors.textSecondary,
-    fontSize: 14,
     marginTop: 2,
   },
 
-  editProfileButton: {
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
+  editProfileWrap: {
     marginBottom: spacing.xl,
-  },
-  editProfileButtonText: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
   },
 
   statsRow: {
     flexDirection: 'row',
-    marginBottom: spacing.xl,
-  },
-  statBlock: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statLabel: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
-    textAlign: 'center',
+    gap: widgetGap,
   },
 
   section: {
@@ -134,26 +92,12 @@ export const profileStyles = StyleSheet.create({
   },
 
   tabsWrap: {
-    marginBottom: spacing.lg,
-  },
-  tabContent: {
-    minHeight: 120,
+    marginBottom: spacing.xs,
   },
 
-  emptyWrap: {
-    paddingVertical: spacing.lg,
-  },
   emptyText: {
     ...typeScale.secondary,
     color: colors.textMuted,
-  },
-  viewAllRow: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  viewAllText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
 
   // StatTile (progress/StatTile.tsx) already sizes itself (flexBasis: 47%,
@@ -164,44 +108,6 @@ export const profileStyles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.xl,
-  },
-
-  // Workouts tab -- ProfileWorkoutRow (ProfileScreen.tsx). Deliberately its
-  // own layout rather than reusing WorkoutHistoryScreen's WorkoutCard
-  // verbatim: this design calls for a sets/volume summary row WorkoutCard
-  // doesn't have, and that screen is out of scope for this change.
-  workoutCard: {
-    marginBottom: spacing.md,
-  },
-  workoutTitle: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-  },
-  workoutMeta: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  workoutMuscleGroups: {
-    ...typeScale.secondary,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  workoutStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-  },
-  workoutStatsText: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-  },
-  workoutStatsValue: {
-    ...typeScale.cardTitle,
   },
 
   // Stats tab -- "Most Trained Muscle Groups" bar list, same recipe
@@ -240,8 +146,7 @@ export const profileStyles = StyleSheet.create({
     borderRadius: radii.sm,
   },
 
-  // Profile picture BottomSheet (Choose Photo / Remove Photo) -- same
-  // title+action-row shape as QuickActionMenu's own sheet content.
+  // Profile picture BottomSheet (Choose Photo / Remove Photo).
   avatarSheetTitle: {
     ...typeScale.sectionHeading,
     color: colors.textMuted,
@@ -254,9 +159,9 @@ export const profileStyles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   avatarSheetActionLabel: {
+    ...typeScale.cardTitle,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
   },
   avatarSheetActionDestructive: {
     color: colors.destructive,

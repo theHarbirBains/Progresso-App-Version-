@@ -74,6 +74,7 @@ export const progressStyles = StyleSheet.create({
   // prominent, matching the reference, while still built from the same
   // typeScale/spacing tokens rather than a one-off size.
   headingBlock: {
+    paddingHorizontal: spacing.xxl,
     marginBottom: spacing.xl,
   },
   eyebrow: {
@@ -105,6 +106,19 @@ export const progressStyles = StyleSheet.create({
   // of the app's primary/root screens, so it keeps this the same way
   // Dashboard does; deeper detail screens reached from here don't.
   modeToggleWrap: {
+    paddingHorizontal: spacing.xxl,
+    marginBottom: spacing.lg,
+  },
+  // Section tabs + error, under the header.
+  tabsWrap: {
+    paddingHorizontal: spacing.xxl,
+  },
+  // The active section's widget: a card filling the remaining height below
+  // the tabs, inset to the same screen margin the tabs use.
+  sectionCard: {
+    flex: 1,
+    marginHorizontal: spacing.xxl,
+    marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },
 
@@ -125,35 +139,42 @@ export const progressStyles = StyleSheet.create({
     marginBottom: spacing.xxl,
   },
 
+  // ProgressExerciseDetailScreen's scrolling body (the frame is `Screen`).
+  detailContent: {
+    paddingBottom: spacing.xxl,
+  },
+
   // Featured exercise (ProgressExerciseDetailScreen)
   featuredCurrent: {
+    ...typeScale.statMedium,
     fontFamily: fonts.monoBold,
-    fontSize: 22,
     color: colors.textPrimary,
     marginTop: spacing.sm,
   },
   featuredDelta: {
-    fontSize: 13,
+    ...typeScale.secondary,
     marginTop: 2,
   },
 
   // TimeRangeSelector
   chipRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },
   chip: {
+    minHeight: 36,
+    justifyContent: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
   chipText: {
-    fontSize: 12,
-    fontWeight: '600',
+    ...typeScale.secondary,
+    fontFamily: fonts.semibold,
     color: colors.textSecondary,
   },
 
@@ -170,12 +191,12 @@ export const progressStyles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   pointDetailHeadline: {
+    ...typeScale.statMedium,
     fontFamily: fonts.monoBold,
-    fontSize: 20,
   },
   pointDetailMeta: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
   pointDetailDismiss: {
@@ -194,16 +215,16 @@ export const progressStyles = StyleSheet.create({
     minWidth: 80,
   },
   pointDetailStatLabel: {
+    ...typeScale.caption,
     color: colors.textMuted,
-    fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   pointDetailStatValue: {
+    ...typeScale.statSmall,
     fontFamily: fonts.monoBold,
     color: colors.textPrimary,
-    fontSize: 15,
   },
 
   // MetricCard
@@ -217,23 +238,23 @@ export const progressStyles = StyleSheet.create({
     flexGrow: 1,
   },
   metricLabel: {
+    ...typeScale.secondary,
+    fontFamily: fonts.semibold,
     color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
     marginBottom: spacing.xs,
   },
   metricValue: {
+    ...typeScale.statMedium,
     fontFamily: fonts.monoBold,
-    fontSize: 20,
     color: colors.textPrimary,
   },
   metricUnit: {
-    fontSize: 13,
+    ...typeScale.secondary,
     color: colors.textSecondary,
   },
   metricEmpty: {
+    ...typeScale.secondary,
     color: colors.textMuted,
-    fontSize: 13,
   },
 
   // Milestones (Progression Journey)
@@ -249,13 +270,13 @@ export const progressStyles = StyleSheet.create({
     borderRadius: radii.pill,
   },
   milestoneLabel: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
   },
   milestoneDate: {
+    ...typeScale.secondary,
     color: colors.textMuted,
-    fontSize: 12,
     marginTop: 1,
   },
 
@@ -281,18 +302,18 @@ export const progressStyles = StyleSheet.create({
     flex: 1,
   },
   recordRowTitle: {
+    ...typeScale.body,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
   },
   recordRowMeta: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
   recordRowValue: {
+    ...typeScale.statSmall,
     fontFamily: fonts.monoBold,
-    fontSize: 15,
   },
 
   // Top Sets' own compact intro -- deliberately small (cardTitle scale, not
@@ -304,14 +325,18 @@ export const progressStyles = StyleSheet.create({
     color: colors.textPrimary,
   },
   topSetsSectionSubtitle: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
     marginBottom: spacing.md,
   },
 
-  // Search row (Top Sets/Exercises)
+  // Search row (Top Sets/Exercises): the shared TextInput, with space below.
+  searchWrap: {
+    marginBottom: spacing.md,
+  },
   searchInput: {
+    ...typeScale.body,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -319,7 +344,6 @@ export const progressStyles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     color: colors.textPrimary,
-    fontSize: 15,
     marginBottom: spacing.md,
   },
 
@@ -329,7 +353,14 @@ export const progressStyles = StyleSheet.create({
   // ItemSeparatorComponent (see TopSetsSection.tsx), not a margin here, so
   // this card's own footprint stays identical to every other AppCard.
   topSetCard: {
+    minHeight: 56,
+    justifyContent: 'center',
     paddingVertical: spacing.md,
+  },
+  // Hairline between Top Set rows.
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.divider,
   },
   topSetRowContent: {
     flexDirection: 'row',
@@ -341,13 +372,13 @@ export const progressStyles = StyleSheet.create({
     flex: 1,
   },
   topSetExerciseName: {
+    ...typeScale.body,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
   },
   topSetMuscleGroup: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
   topSetRowRight: {
@@ -359,12 +390,12 @@ export const progressStyles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   topSetValue: {
+    ...typeScale.statSmall,
     fontFamily: fonts.monoBold,
-    fontSize: 15,
   },
   topSetCaption: {
+    ...typeScale.caption,
     color: colors.textMuted,
-    fontSize: 11,
     marginTop: 2,
   },
 
@@ -378,8 +409,8 @@ export const progressStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   errorText: {
+    ...typeScale.callout,
     color: colors.destructive,
-    fontSize: 14,
     marginBottom: spacing.md,
   },
 
@@ -389,7 +420,7 @@ export const progressStyles = StyleSheet.create({
   // (statTile below has no background of its own; PRRow's own rows use the
   // shared divider pattern), not separate bright cards.
   overviewCard: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xxl,
   },
   overviewCardHeader: {
     flexDirection: 'row',
@@ -412,8 +443,8 @@ export const progressStyles = StyleSheet.create({
     color: colors.textPrimary,
   },
   overviewCardSubtitle: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
 
@@ -442,14 +473,14 @@ export const progressStyles = StyleSheet.create({
     color: colors.textPrimary,
   },
   statTileLabel: {
-    fontSize: 12,
+    ...typeScale.secondary,
     color: colors.textSecondary,
   },
 
   // "View All" link on a section header
   viewAllText: {
-    fontSize: 13,
-    fontWeight: '600',
+    ...typeScale.secondary,
+    fontFamily: fonts.semibold,
   },
 
   // Muscle Group Progress
@@ -462,13 +493,13 @@ export const progressStyles = StyleSheet.create({
     marginBottom: 6,
   },
   muscleGroupLabel: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
   },
   muscleGroupCount: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
   },
   muscleGroupBarTrack: {
     height: 6,
@@ -490,7 +521,6 @@ export const progressStyles = StyleSheet.create({
   },
   strengthCardName: {
     ...typeScale.cardTitle,
-    fontSize: 18,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
@@ -506,9 +536,9 @@ export const progressStyles = StyleSheet.create({
     paddingVertical: 3,
   },
   strengthTagText: {
+    ...typeScale.caption,
+    fontFamily: fonts.semibold,
     color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
   },
   strengthPerfGrid: {
     flexDirection: 'row',
@@ -516,21 +546,21 @@ export const progressStyles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   strengthPerfLabel: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 12,
     marginBottom: 2,
   },
   strengthPerfValue: {
+    ...typeScale.statMedium,
     fontFamily: fonts.monoBold,
     color: colors.textPrimary,
-    fontSize: 17,
   },
   strengthDeltaRow: {
     marginBottom: spacing.lg,
   },
   strengthDeltaValue: {
+    ...typeScale.statMedium,
     fontFamily: fonts.monoBold,
-    fontSize: 24,
   },
   strengthLevelBadge: {
     alignSelf: 'flex-start',
@@ -540,8 +570,8 @@ export const progressStyles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   strengthLevelBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
+    ...typeScale.secondary,
+    fontFamily: fonts.display,
   },
 
   strengthListRow: {
@@ -558,25 +588,25 @@ export const progressStyles = StyleSheet.create({
     flex: 1,
   },
   strengthListRowName: {
+    ...typeScale.body,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
   },
   strengthListRowMeta: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
   strengthListRowTrailing: {
     alignItems: 'flex-end',
   },
   strengthListRowDelta: {
+    ...typeScale.statSmall,
     fontFamily: fonts.monoBold,
-    fontSize: 15,
   },
   strengthListRowLevel: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 12,
     marginTop: 2,
   },
 
@@ -593,8 +623,8 @@ export const progressStyles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   allTimeHeroSubtitle: {
+    ...typeScale.callout,
     color: colors.textSecondary,
-    fontSize: 14,
     lineHeight: 20,
   },
   allTimeStatGrid: {
@@ -621,7 +651,7 @@ export const progressStyles = StyleSheet.create({
     color: colors.textPrimary,
   },
   allTimeStatLabel: {
-    fontSize: 12,
+    ...typeScale.secondary,
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -635,18 +665,18 @@ export const progressStyles = StyleSheet.create({
     flexBasis: '50%',
   },
   allTimePrName: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 12,
     marginBottom: 2,
   },
   allTimePrValue: {
+    ...typeScale.statMedium,
     fontFamily: fonts.monoBold,
-    fontSize: 19,
     color: colors.textPrimary,
   },
   allTimePrCaption: {
+    ...typeScale.secondary,
     color: colors.textMuted,
-    fontSize: 12,
     marginTop: 2,
   },
 
@@ -670,19 +700,19 @@ export const progressStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   allTimeRankBadgeText: {
+    ...typeScale.secondary,
+    fontFamily: fonts.display,
     color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
   },
   allTimeRankName: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
     flex: 1,
     color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
   },
   allTimeRankValue: {
+    ...typeScale.statSmall,
     fontFamily: fonts.monoBold,
-    fontSize: 14,
     color: colors.textPrimary,
   },
 
@@ -697,15 +727,15 @@ export const progressStyles = StyleSheet.create({
     borderTopColor: colors.divider,
   },
   allTimeMilestoneLabel: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
     flex: 1,
     marginRight: spacing.md,
   },
   allTimeMilestoneDate: {
+    ...typeScale.secondary,
     color: colors.textMuted,
-    fontSize: 12,
   },
 
   // Relative Strength -- honest "not enough data yet" state (see section
@@ -716,8 +746,8 @@ export const progressStyles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   relativeStrengthBody: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
     lineHeight: 19,
   },
 
@@ -732,7 +762,7 @@ export const progressStyles = StyleSheet.create({
     borderWidth: 1,
   },
   shareButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
+    ...typeScale.secondary,
+    fontFamily: fonts.semibold,
   },
 });

@@ -220,6 +220,7 @@ export function NewWorkoutScreen({ navigation }: Props) {
         {nextPlan ? (
           <AppCard
             hero
+            topAccent={theme.accent}
             testID="start-workout-next"
             onPress={() => startWorkout(nextPlan.day.id, nextPlan.day.name, nextPlan.day.id)}
             accessibilityLabel={`Start ${nextPlan.day.name} workout${

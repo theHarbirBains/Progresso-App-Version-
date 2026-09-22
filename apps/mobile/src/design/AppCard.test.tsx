@@ -48,6 +48,32 @@ describe('AppCard', () => {
   });
 });
 
+describe('AppCard top accent', () => {
+  it('draws no accent band by default', () => {
+    render(
+      <AppCard testID="card">
+        <Text>Content</Text>
+      </AppCard>,
+    );
+
+    expect(screen.queryByTestId('card-top-accent')).toBeNull();
+  });
+
+  it('draws a colored band across the top edge when given one', () => {
+    render(
+      <AppCard testID="card" topAccent="#2F80FF">
+        <Text>Content</Text>
+      </AppCard>,
+    );
+
+    const band = screen.getByTestId('card-top-accent');
+    const style = StyleSheet.flatten(band.props.style);
+    expect(style.backgroundColor).toBe('#2F80FF');
+    expect(style.position).toBe('absolute');
+    expect(style.top).toBe(0);
+  });
+});
+
 describe('AppCard variants and nesting', () => {
   it('draws a glass surface by default, and none for the outline variant', () => {
     const { rerender } = render(

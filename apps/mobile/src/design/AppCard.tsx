@@ -25,6 +25,14 @@ interface Props {
    */
   variant?: CardVariant;
   onPress?: () => void;
+  /**
+   * A slim colored band across the card's top edge, in the given color --
+   * the one Strava-style flourish this system borrows (see DESIGN.md's Feed
+   * section): a quick, glanceable "what kind of activity is this" cue.
+   * Clipped to the card's own corners by its `overflow: 'hidden'`, so it
+   * never needs its own radius. Optional -- most cards have none.
+   */
+  topAccent?: string;
   testID?: string;
   style?: StyleProp<ViewStyle>;
   /** Ignored when there's no `onPress` (a non-pressable card has nothing to announce). Defaults to "button". */
@@ -67,6 +75,7 @@ export function AppCard({
   hero,
   variant = 'surface',
   onPress,
+  topAccent,
   testID,
   style,
   accessibilityRole,
@@ -84,6 +93,12 @@ export function AppCard({
   const content = (
     <InsideCardContext.Provider value={true}>
       {outline ? null : <GlassBackground tintColor={tintColor} borderColor={borderColor} />}
+      {topAccent ? (
+        <View
+          testID={testID ? `${testID}-top-accent` : undefined}
+          style={[styles.topAccent, { backgroundColor: topAccent }]}
+        />
+      ) : null}
       {children}
     </InsideCardContext.Provider>
   );
@@ -122,5 +137,12 @@ const styles = StyleSheet.create({
   outline: {
     borderWidth: 1,
     borderColor: colors.glassBorder,
+  },
+  topAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
   },
 });
