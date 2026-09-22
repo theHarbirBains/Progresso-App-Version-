@@ -1,121 +1,121 @@
-import { useEffect, useMemo, useRef } from 'react';
-import {
-  Animated,
-  Image,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-  type DimensionValue,
-} from 'react-native';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Animated, StyleSheet, useWindowDimensions, View, type DimensionValue } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line, Path } from 'react-native-svg';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { useBackgroundTheme } from './backgroundThemeStore';
 import type { BackgroundThemeDefinition } from './backgroundThemes';
+import { withAlpha } from '../theme/accentColor';
 
 interface Props {
   /**
-   * Which mode's photo to show -- Dashboard's own Workout/Nutrition toggle
-   * for Dashboard itself, or whichever mode the current route belongs to
-   * everywhere else (see App.tsx's mode-tracking, isNutritionRoute). Any
-   * screen reached before a mode is known yet (sign-in, sign-up, password
-   * reset -- rendered outside the Stack.Navigator entirely) defaults to
-   * 'workout', the same "workout unless proven nutrition" convention
-   * isNutritionRoute already uses elsewhere.
+   * The current mode's accent (Workout blue / Nutrition green, the user's own
+   * choice), which tints the soft glow. App.tsx picks it from the mode --
+   * Dashboard's own Workout/Nutrition toggle for Dashboard itself, or whichever
+   * mode the current route belongs to (see isNutritionRoute). Omit for no glow
+   * (sign-in and the other screens shown before a mode exists).
    */
-  mode?: 'workout' | 'nutrition';
+  accentColor?: string;
   /**
-   * Whether the photograph shows at all. Default true (so the component is
-   * unchanged for any caller that doesn't say). App.tsx passes true only
-   * while Dashboard is the current route -- everywhere else the screen sits
-   * on the flat Background Theme fill (plus that theme's own restrained
-   * treatment). The photos stay mounted either way and only their opacity
-   * changes, for the same instant-flip reason as `mode` above: a photo that
-   * had to be re-decoded each time the user returned to Dashboard would
-   * flash in late.
+   * Whether the glow and shade show at all. Default true. App.tsx passes true
+   * whenever the user is signed in and leaves it on for the whole session; it
+   * is off only before sign-in, where the flat fill stands alone. Kept mounted
+   * either way, with only its opacity changing.
    */
-  showImage?: boolean;
+  showAtmosphere?: boolean;
 }
 
 // The single place that paints the selected Background Theme's environment,
 // mounted once behind the whole app (see App.tsx's AppShell) so every screen
 // inherits it automatically -- screens themselves know nothing about the
 // current theme; they simply render on a transparent root so this shows
-// through (see the screen-container `backgroundColor: 'transparent'` change
-// that accompanies this file). Every treatment here is deliberately
-// restrained: low element counts, low opacity, slow-or-no motion -- the
-// existing Progresso UI stays the visual focus, this is only the atmosphere
-// behind it.
-export function AppBackgroundLayer({ mode = 'workout', showImage = true }: Props) {
+// through. It is the same background in both modes -- the theme's flat fill,
+// its restrained treatment, and the accent glow and shade (`Atmosphere`) --
+// only the accent differs (blue for Workout, green for Nutrition). Every
+// treatment is deliberately quiet: low element counts, low opacity, slow-or-no
+// motion -- the Progresso UI stays the visual focus.
+export function AppBackgroundLayer({ accentColor, showAtmosphere = true }: Props) {
   const { theme } = useBackgroundTheme();
   const reduceMotion = useReduceMotionPreference();
   // Explicit window size rather than relying on inherited flex/absoluteFill
   // sizing through SafeAreaProvider et al -- `useWindowDimensions` is the
   // one value guaranteed to match the device's actual full screen (and it
-  // updates live on rotation), so the image can never end up sized against
-  // a slightly-off ancestor box, which is what an over-cropped/"zoomed"
-  // `resizeMode="cover"` result usually means.
+  // updates live on rotation).
   const { width, height } = useWindowDimensions();
   const fullScreenStyle = { position: 'absolute' as const, top: 0, left: 0, width, height };
 
   return (
     <View style={fullScreenStyle} pointerEvents="none" testID="app-background-layer">
       <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.background }]} />
-      {/* Both photos stay mounted (and decoded) at all times, regardless of
-          `mode` -- only their opacity toggles. Swapping a single Image's
-          `source` on mode change would mean the incoming photo has to be
-          decoded from scratch before it can paint, a real, visible delay on
-          a 2MB+ full-screen PNG; two permanently-mounted Images make the
-          Workout/Nutrition toggle an instant opacity flip instead, with no
-          load cost paid at switch time. */}
-      {theme.workoutImageSource ? (
-        <Image
-          testID="app-background-image-workout"
-          source={theme.workoutImageSource}
-          // Full sharpness, no blur -- contrast for content sitting on top
-          // comes from the depth overlay (edges) and each glass surface's
-          // own tint, not from softening or darkening the photo itself.
-          style={[fullScreenStyle, { opacity: showImage && mode === 'workout' ? 1 : 0 }]}
-          resizeMode="cover"
-        />
-      ) : null}
-      {theme.nutritionImageSource ? (
-        <Image
-          testID="app-background-image-nutrition"
-          source={theme.nutritionImageSource}
-          style={[fullScreenStyle, { opacity: showImage && mode === 'nutrition' ? 1 : 0 }]}
-          resizeMode="cover"
-        />
-      ) : null}
       <Treatment theme={theme} reduceMotion={reduceMotion} />
-      <DepthOverlay visible={showImage} />
+      <View
+        testID="app-background-atmosphere"
+        style={[StyleSheet.absoluteFill, { opacity: showAtmosphere ? 1 : 0 }]}
+      >
+        <Atmosphere accentColor={accentColor} testIDPrefix="app-background" />
+      </View>
     </View>
   );
 }
 
-// The "premium glass" base atmosphere every theme now shares, layered above
-// the flat fill/image/treatment: a static (never-animated, so unaffected by
-// Reduce Motion) vertical vignette that darkens the very top and bottom
-// edges while leaving the middle clear. This is what gives every screen its
-// sense of cinematic depth without touching any per-theme color, and it
-// doubles as the "background overlay for readability" DESIGN.md calls
-// for -- content sits mostly in the untouched middle band; only the edges,
-// where glass chrome (headers, bottom nav) usually lives, get extra
-// contrast help.
-//
-// It exists to keep content readable over a *photograph*, so it only shows
-// while the photo does (Dashboard). On the flat theme fill it would just
-// muddy the theme's own colour at the edges. Kept mounted (opacity 0) rather
-// than removed, so it is ready the instant Dashboard returns.
-function DepthOverlay({ visible }: { visible: boolean }) {
+/**
+ * The backdrop of every screen except Dashboard: the Background Theme's flat
+ * fill (opaque) plus that theme's own restrained treatment, painted by the
+ * screen itself. Because it is opaque and part of the screen, it moves with
+ * the screen during a push/pop, so a page transition never shows the layer
+ * behind it (or waits on JS to change it). Applied once, to every
+ * non-Dashboard route, by the navigator's `screenLayout` in App.tsx, with the
+ * same glow and shade the layer behind Dashboard draws -- the two read as one
+ * background.
+ */
+export function ScreenBackdrop({
+  children,
+  accentColor,
+}: {
+  children: ReactNode;
+  /** The screen's mode accent (Workout blue / Nutrition green). Tints a soft glow in the top corner; omit for none. */
+  accentColor?: string;
+}) {
+  const { theme } = useBackgroundTheme();
+  const reduceMotion = useReduceMotionPreference();
   return (
-    <LinearGradient
-      testID="app-background-depth-overlay"
-      pointerEvents="none"
-      colors={['rgba(0,0,0,0.32)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.32)']}
-      locations={[0, 0.22, 0.68, 1]}
-      style={[StyleSheet.absoluteFill, { opacity: visible ? 1 : 0 }]}
-    />
+    <View
+      testID="screen-backdrop"
+      style={[styles.backdrop, { backgroundColor: theme.colors.background }]}
+    >
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Treatment theme={theme} reduceMotion={reduceMotion} />
+        <Atmosphere accentColor={accentColor} testIDPrefix="screen-backdrop" />
+      </View>
+      {children}
+    </View>
+  );
+}
+
+// Two quiet layers, and nothing more: a soft glow of the mode accent easing in
+// from the top-left corner (so each mode has its own tone), and a gentle shade
+// toward the bottom edge for depth. Both are static and low-contrast, so content
+// on top stays the focus. Shared by every page's ScreenBackdrop and by the layer
+// behind Dashboard, in both modes, so they read as one background.
+function Atmosphere({ accentColor, testIDPrefix }: { accentColor?: string; testIDPrefix: string }) {
+  return (
+    <>
+      {accentColor ? (
+        <LinearGradient
+          testID={`${testIDPrefix}-glow`}
+          colors={[withAlpha(accentColor, 0.2), withAlpha(accentColor, 0)]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.85, y: 0.55 }}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
+      <LinearGradient
+        testID={`${testIDPrefix}-shade`}
+        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.28)']}
+        locations={[0.55, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+    </>
   );
 }
 
@@ -352,6 +352,9 @@ function CarbonFiber() {
 }
 
 const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+  },
   auroraShape: {
     position: 'absolute',
     width: '90%',

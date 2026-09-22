@@ -35,3 +35,19 @@ export function isValidWeightIncrement(value: number): boolean {
   const doubled = value * 2;
   return Math.abs(doubled - Math.round(doubled)) < 1e-9;
 }
+
+/**
+ * A weight for display: a whole number, or one decimal place ("100", "102.5") --
+ * never a trailing ".0". The value is rounded to one decimal FIRST, so a
+ * converted 224.97 lb reads "225", not "225.0". Takes a value already in the
+ * unit being shown.
+ */
+export function formatWeight(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+/** A canonical-kg weight formatted in the user's display unit, rounded to the stored precision first. */
+export function formatWeightKg(kg: number, unit: 'kg' | 'lb'): string {
+  return formatWeight(roundWeight(fromKg(kg, unit)));
+}

@@ -1,5 +1,3 @@
-import type { ImageSourcePropType } from 'react-native';
-
 // Background Theme definitions -- the "environment" layer behind Progresso's
 // existing dark UI (Appearance settings > Background Theme). Deliberately
 // separate from theme.ts's `colors` (kept as the static Obsidian default for
@@ -50,34 +48,11 @@ export interface BackgroundThemeDefinition {
   treatment: BackgroundTreatment;
   /** True only for treatments with a (Reduce-Motion-respecting) animated variant. */
   animated: boolean;
-  /**
-   * Static background images, layered by AppBackgroundLayer above the flat
-   * `colors.background` fill and below the treatment + depth overlay (which
-   * darkens it for text contrast the same way it would a flat theme).
-   *
-   * Two images, not one: the background follows whichever mode (Workout or
-   * Nutrition) the app is currently in -- see AppBackgroundLayer's `mode`
-   * prop and App.tsx's mode-tracking. Every theme shares the same pair of
-   * photos today, so the "Dark Glass" backdrop is consistent regardless of
-   * which Background Theme a user has picked in Appearance settings -- each
-   * theme's own `colors`/`treatment` still layer on top (the scrim/overlay
-   * tint, plus starlight dots, aurora wash, etc.), so themes stay visually
-   * distinguishable without losing the shared photos.
-   */
-  workoutImageSource?: ImageSourcePropType;
-  nutritionImageSource?: ImageSourcePropType;
 }
 
 export const DEFAULT_BACKGROUND_THEME: BackgroundThemeId = 'obsidian';
 
-const WORKOUT_BACKGROUND_IMAGE = require('../../assets/WorkoutBackground.png');
-const NUTRITION_BACKGROUND_IMAGE = require('../../assets/NutritionBackground.png');
-
 // Obsidian's environment colors are exactly theme.ts's existing colors.
-// Every theme below shares the same Workout/Nutrition photo pair as its
-// backdrop -- the "Dark Glass" look is meant to be consistent across the
-// whole app regardless of which Background Theme a user has picked, not
-// just the default.
 export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinition> = {
   obsidian: {
     id: 'obsidian',
@@ -92,8 +67,6 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     },
     treatment: 'flat',
     animated: false,
-    workoutImageSource: WORKOUT_BACKGROUND_IMAGE,
-    nutritionImageSource: NUTRITION_BACKGROUND_IMAGE,
   },
   midnight: {
     id: 'midnight',
@@ -108,8 +81,6 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     },
     treatment: 'flat',
     animated: false,
-    workoutImageSource: WORKOUT_BACKGROUND_IMAGE,
-    nutritionImageSource: NUTRITION_BACKGROUND_IMAGE,
   },
   forest: {
     id: 'forest',
@@ -124,8 +95,6 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     },
     treatment: 'flat',
     animated: false,
-    workoutImageSource: WORKOUT_BACKGROUND_IMAGE,
-    nutritionImageSource: NUTRITION_BACKGROUND_IMAGE,
   },
   plum: {
     id: 'plum',
@@ -140,8 +109,6 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     },
     treatment: 'flat',
     animated: false,
-    workoutImageSource: WORKOUT_BACKGROUND_IMAGE,
-    nutritionImageSource: NUTRITION_BACKGROUND_IMAGE,
   },
   starlight: {
     id: 'starlight',
@@ -156,8 +123,6 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     },
     treatment: 'starlight',
     animated: true,
-    workoutImageSource: WORKOUT_BACKGROUND_IMAGE,
-    nutritionImageSource: NUTRITION_BACKGROUND_IMAGE,
   },
   aurora: {
     id: 'aurora',
@@ -172,8 +137,6 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     },
     treatment: 'aurora',
     animated: true,
-    workoutImageSource: WORKOUT_BACKGROUND_IMAGE,
-    nutritionImageSource: NUTRITION_BACKGROUND_IMAGE,
   },
   topographic: {
     id: 'topographic',
@@ -188,8 +151,6 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     },
     treatment: 'topographic',
     animated: false,
-    workoutImageSource: WORKOUT_BACKGROUND_IMAGE,
-    nutritionImageSource: NUTRITION_BACKGROUND_IMAGE,
   },
   carbon: {
     id: 'carbon',
@@ -204,8 +165,6 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     },
     treatment: 'carbon',
     animated: false,
-    workoutImageSource: WORKOUT_BACKGROUND_IMAGE,
-    nutritionImageSource: NUTRITION_BACKGROUND_IMAGE,
   },
   particles: {
     id: 'particles',
@@ -220,8 +179,6 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     },
     treatment: 'particles',
     animated: true,
-    workoutImageSource: WORKOUT_BACKGROUND_IMAGE,
-    nutritionImageSource: NUTRITION_BACKGROUND_IMAGE,
   },
 };
 

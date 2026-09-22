@@ -1,4 +1,11 @@
-import { fromKg, isValidWeightIncrement, roundWeight, toKg } from './units';
+import {
+  formatWeight,
+  formatWeightKg,
+  fromKg,
+  isValidWeightIncrement,
+  roundWeight,
+  toKg,
+} from './units';
 
 describe('toKg', () => {
   it('returns the value unchanged for kg', () => {
@@ -70,5 +77,33 @@ describe('isValidWeightIncrement', () => {
     expect(isValidWeightIncrement(220.5)).toBe(true); // e.g. 220.5 lb
     expect(isValidWeightIncrement(100.5)).toBe(true); // e.g. 100.5 kg
     expect(isValidWeightIncrement(120)).toBe(true); // e.g. 120 kg
+  });
+});
+
+describe('formatWeight / formatWeightKg', () => {
+  it('shows a whole number as-is and anything else with one decimal', () => {
+    expect(formatWeight(100)).toBe('100');
+    expect(formatWeight(102.5)).toBe('102.5');
+    expect(formatWeight(102.25)).toBe('102.3');
+  });
+
+  it('never shows a trailing .0 -- a value that rounds to a whole number is a whole number', () => {
+    expect(formatWeight(224.97)).toBe('225');
+    expect(formatWeight(225.04)).toBe('225');
+    expect(formatWeight(99.96)).toBe('100');
+    expect(formatWeight(225.0)).toBe('225');
+    expect(formatWeight(0.04)).toBe('0');
+    expect(formatWeight(102.5)).toBe('102.5');
+  });
+
+  it('shows a converted lb weight that lands on a whole number without a decimal', () => {
+    // 102.05 kg is 224.97 lb.
+    expect(formatWeightKg(102.05, 'lb')).toBe('225');
+  });
+
+  it('converts canonical kg to the display unit, rounded to the stored precision, then formats it', () => {
+    expect(formatWeightKg(100, 'kg')).toBe('100');
+    expect(formatWeightKg(100, 'lb')).toBe('220.5');
+    expect(formatWeightKg(45.359237, 'lb')).toBe('100');
   });
 });
