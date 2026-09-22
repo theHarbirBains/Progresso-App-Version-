@@ -4,6 +4,12 @@ import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 // FeedScreen. Token-only. The frame (safe area, header, scrolling body) is
 // the shared `Screen`; each feed item is its own widget (`AppCard`), so this
 // holds only what's inside a card.
+//
+// Card anatomy (byline row -> bold title -> stat strip) mirrors Strava's
+// activity-card structure -- see DESIGN.md's Feed section -- kept strictly
+// black-and-white/monochrome (textPrimary/textSecondary/textMuted only, no
+// accent color) per the explicit design call: Feed distinguishes a
+// workout from a food log with an icon, not a color.
 export const feedStyles = StyleSheet.create({
   content: {
     gap: widgetGap,
@@ -12,46 +18,69 @@ export const feedStyles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
 
-  // Shared by both card kinds: a title row (name left, a quiet date/time on
-  // the right) above the card's own body.
-  itemHeader: {
+  // The byline: a small avatar, the account's own name, and a quiet
+  // icon+timestamp line underneath -- Strava's "who, when" row, without the
+  // social graph (it's always the signed-in user).
+  metaRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: spacing.md,
     marginBottom: spacing.md,
   },
-  itemTitle: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
+  avatarWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarInitial: {
+    ...typeScale.label,
+    color: colors.textSecondary,
+  },
+  metaBody: {
     flex: 1,
   },
-  itemTimestamp: {
+  metaName: {
+    ...typeScale.label,
+    color: colors.textPrimary,
+  },
+  metaSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: 2,
+  },
+  metaTimestamp: {
     ...typeScale.caption,
     color: colors.textMuted,
+  },
+
+  itemTitle: {
+    ...typeScale.screenTitle,
+    color: colors.textPrimary,
+    flex: 1,
   },
   itemSubtitle: {
     ...typeScale.secondary,
     color: colors.textSecondary,
+    marginTop: 2,
     marginBottom: spacing.md,
   },
 
   statRow: {
     flexDirection: 'row',
     gap: widgetGap,
+    marginTop: spacing.md,
   },
 
-  foodRow: {
+  // The food-log title row: the photo stands in for Strava's route map --
+  // a real image where one exists, rather than fabricated location data.
+  foodTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.lg,
-  },
-  foodBody: {
-    flex: 1,
-  },
-  foodMeta: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: 2,
   },
 });

@@ -109,16 +109,20 @@ function renderScreen() {
 }
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
+  mockUseAuth.mockReturnValue({
+    user: { id: 'user-1' },
+    session: { access_token: 'token-123' },
+  });
   mockGetMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',
-    displayName: null,
+    displayName: 'Harbir Bains',
     username: null,
     weightUnit: 'kg',
     workoutAccentColor: null,
     nutritionAccentColor: null,
+    avatarUrl: null,
   });
   mockFetchFeedItems.mockReset().mockResolvedValue(feedPage([]));
   mockNavigate.mockClear();
@@ -158,8 +162,17 @@ describe('FeedScreen', () => {
     const card = within(await screen.findByTestId('feed-item-workout-w1'));
     expect(card.getByText('Push')).toBeTruthy();
     expect(card.getByText(/Chest.*Shoulders/)).toBeTruthy();
+    expect(screen.getByTestId('feed-item-workout-w1-duration')).toHaveTextContent(/1h/);
     expect(screen.getByTestId('feed-item-workout-w1-sets')).toHaveTextContent(/12/);
     expect(screen.getByTestId('feed-item-workout-w1-volume')).toHaveTextContent(/1000/);
+  });
+
+  it("shows the account's own name and picture as each card's byline", async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    renderScreen();
+
+    const card = within(await screen.findByTestId('feed-item-workout-w1'));
+    expect(await card.findByText('Harbir Bains')).toBeTruthy();
   });
 
   it('shows a logged food as a card: name, meal, and calories', async () => {
@@ -170,6 +183,7 @@ describe('FeedScreen', () => {
     expect(card.getByText('Chicken Breast')).toBeTruthy();
     expect(card.getByText(/Lunch/)).toBeTruthy();
     expect(screen.getByTestId('feed-item-foodlog-log-1-calories')).toHaveTextContent(/165/);
+    expect(screen.getByTestId('feed-item-foodlog-log-1-protein')).toHaveTextContent(/31/);
   });
 
   it('navigates to the workout on tap, and to Nutrition on a food log tap', async () => {
@@ -219,7 +233,7 @@ describe('FeedScreen', () => {
 });
 
 describe('FeedScreen -- Strava-style activity cards', () => {
-  it("colors a workout card's top accent band in the Workout accent, and a food card's in the Nutrition accent", async () => {
+  it("gives every card the same neutral top accent band -- Feed is black-and-white, kind comes across via icon, not color", async () => {
     mockGetMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
@@ -227,6 +241,8 @@ describe('FeedScreen -- Strava-style activity cards', () => {
       displayName: null,
       username: null,
       weightUnit: 'kg',
+      // Even with per-mode accent colors set, Feed never uses them --
+      // that dual-accent system stays scoped to Train/Nutrition/Profile.
       workoutAccentColor: '#2F80FF',
       nutritionAccentColor: '#10B981',
     });
@@ -237,11 +253,12 @@ describe('FeedScreen -- Strava-style activity cards', () => {
     const workoutBand = StyleSheet.flatten(
       screen.getByTestId('feed-item-workout-w1-top-accent').props.style,
     );
-    expect(workoutBand.backgroundColor).toBe('#2F80FF');
     const foodBand = StyleSheet.flatten(
       screen.getByTestId('feed-item-foodlog-log-1-top-accent').props.style,
     );
-    expect(foodBand.backgroundColor).toBe('#10B981');
+    expect(workoutBand.backgroundColor).toBe(foodBand.backgroundColor);
+    expect(workoutBand.backgroundColor).not.toBe('#2F80FF');
+    expect(workoutBand.backgroundColor).not.toBe('#10B981');
   });
 
   it('draws one card per item, each with its own top accent -- no plain rows', async () => {

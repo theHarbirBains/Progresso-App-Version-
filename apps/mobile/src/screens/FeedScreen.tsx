@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Text } from '../design/Text';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { Avatar } from '../design/Avatar';
 import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
-import { StatValue } from '../design/StatValue';
 import { colors } from '../design/theme';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
 import { formatWeightKg } from '../lib/units';
@@ -19,7 +20,7 @@ import { mealTypeLabel } from '../nutrition/mealTypes';
 import { FoodImage } from '../nutrition/FoodImage';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
-import { formatCardDate } from '../workouts/workoutFormat';
+import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 import { feedStyles as styles } from './feedStyles';
 
 type Props = RootStackScreenProps<'Feed'>;
@@ -32,11 +33,20 @@ type Props = RootStackScreenProps<'Feed'>;
 // their own tabs (Train/Nutrition) now, not here. Load More pages in older
 // workouts (food logs stay bounded to the current week -- see
 // feedQueries.ts's own comment on why).
+//
+// Card anatomy deliberately borrows Strava's activity-feed structure (a
+// byline row, a bold title, a stat strip) -- see DESIGN.md's Feed section
+// -- but stays black-and-white/monochrome rather than Strava's orange, and
+// has no GPS map or streak/"congratulate" banner: Progresso has no
+// location data to draw a route from, and Feed stays purely informational
+// (no kudos/social prompts) since there's no social graph yet. `topAccent`
+// is a neutral top band on every card; which activity a card is comes
+// across via its byline icon, not a color.
 export function FeedScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { openMenu } = useAppMenu();
-  const { theme, nutritionTheme, weightUnit } = useProgressTheme();
+  const { weightUnit, displayName, username, avatarUrl } = useProgressTheme();
 
   const [items, setItems] = useState<FeedItem[]>([]);
   const [page, setPage] = useState(0);
@@ -94,6 +104,9 @@ export function FeedScreen({ navigation }: Props) {
     }
   }
 
+  const byline = displayName ?? username ?? 'You';
+  const avatarInitial = byline.charAt(0).toUpperCase();
+
   return (
     <Screen
       scrollTestID="feed-scroll"
@@ -131,15 +144,34 @@ export function FeedScreen({ navigation }: Props) {
               <AppCard
                 key={item.id}
                 testID={`feed-item-workout-${item.workout.id}`}
-                topAccent={theme.accent}
+                topAccent={colors.textPrimary}
                 onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.workout.id })}
               >
-                <View style={styles.itemHeader}>
-                  <Text style={styles.itemTitle} numberOfLines={1}>
-                    {item.workout.splitDayName ?? item.workout.name}
-                  </Text>
-                  <Text style={styles.itemTimestamp}>{formatCardDate(item.timestamp)}</Text>
+                <View style={styles.metaRow}>
+                  <View style={styles.avatarWrap}>
+                    <Avatar
+                      uri={avatarUrl}
+                      initial={avatarInitial}
+                      size={32}
+                      iconSize={16}
+                      iconColor={colors.textSecondary}
+                      initialStyle={styles.avatarInitial}
+                    />
+                  </View>
+                  <View style={styles.metaBody}>
+                    <Text style={styles.metaName} numberOfLines={1}>
+                      {byline}
+                    </Text>
+                    <View style={styles.metaSubRow}>
+                      <Feather name="activity" size={11} color={colors.textMuted} />
+                      <Text style={styles.metaTimestamp}>{formatCardDate(item.timestamp)}</Text>
+                    </View>
+                  </View>
                 </View>
+
+                <Text style={styles.itemTitle} numberOfLines={1}>
+                  {item.workout.splitDayName ?? item.workout.name}
+                </Text>
                 {item.workout.muscleGroups.length > 0 ? (
                   <Text style={styles.itemSubtitle} numberOfLines={1}>
                     {item.workout.muscleGroups
@@ -147,7 +179,13 @@ export function FeedScreen({ navigation }: Props) {
                       .join(' • ')}
                   </Text>
                 ) : null}
+
                 <View style={styles.statRow}>
+                  <StatBlock
+                    testID={`feed-item-workout-${item.workout.id}-duration`}
+                    value={formatCardDuration(item.workout.durationMinutes)}
+                    label="Duration"
+                  />
                   <StatBlock
                     testID={`feed-item-workout-${item.workout.id}-sets`}
                     value={String(item.workout.completedSetCount)}
@@ -157,7 +195,6 @@ export function FeedScreen({ navigation }: Props) {
                     testID={`feed-item-workout-${item.workout.id}-volume`}
                     value={formatWeightKg(item.workout.totalVolumeKg, weightUnit)}
                     label={`Volume (${weightUnit})`}
-                    valueColor={theme.accent}
                   />
                 </View>
               </AppCard>
@@ -165,26 +202,51 @@ export function FeedScreen({ navigation }: Props) {
               <AppCard
                 key={item.id}
                 testID={`feed-item-foodlog-${item.log.id}`}
-                topAccent={nutritionTheme.accent}
+                topAccent={colors.textPrimary}
                 onPress={() => navigation.navigate('Nutrition')}
               >
-                <View style={styles.foodRow}>
-                  <FoodImage uri={item.log.imageUrl} name={item.log.foodNameSnapshot} size={48} />
-                  <View style={styles.foodBody}>
-                    <Text style={styles.itemTitle} numberOfLines={1}>
-                      {item.log.foodNameSnapshot}
-                    </Text>
-                    <Text style={styles.foodMeta}>
-                      {item.log.mealType ? `${mealTypeLabel(item.log.mealType)} · ` : ''}
-                      {formatCardDate(item.timestamp)}
-                    </Text>
+                <View style={styles.metaRow}>
+                  <View style={styles.avatarWrap}>
+                    <Avatar
+                      uri={avatarUrl}
+                      initial={avatarInitial}
+                      size={32}
+                      iconSize={16}
+                      iconColor={colors.textSecondary}
+                      initialStyle={styles.avatarInitial}
+                    />
                   </View>
-                  <StatValue
+                  <View style={styles.metaBody}>
+                    <Text style={styles.metaName} numberOfLines={1}>
+                      {byline}
+                    </Text>
+                    <View style={styles.metaSubRow}>
+                      <Feather name="coffee" size={11} color={colors.textMuted} />
+                      <Text style={styles.metaTimestamp}>
+                        {item.log.mealType ? `${mealTypeLabel(item.log.mealType)} · ` : ''}
+                        {formatCardDate(item.timestamp)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.foodTitleRow}>
+                  <FoodImage uri={item.log.imageUrl} name={item.log.foodNameSnapshot} size={56} />
+                  <Text style={styles.itemTitle} numberOfLines={2}>
+                    {item.log.foodNameSnapshot}
+                  </Text>
+                </View>
+
+                <View style={styles.statRow}>
+                  <StatBlock
                     testID={`feed-item-foodlog-${item.log.id}-calories`}
                     value={String(item.log.calories)}
-                    unit=" cal"
-                    size="medium"
-                    color={nutritionTheme.accent}
+                    label="Calories"
+                  />
+                  <StatBlock
+                    testID={`feed-item-foodlog-${item.log.id}-protein`}
+                    value={`${Math.round(item.log.proteinG)}g`}
+                    label="Protein"
                   />
                 </View>
               </AppCard>

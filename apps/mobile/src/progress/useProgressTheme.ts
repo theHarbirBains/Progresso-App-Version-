@@ -20,12 +20,20 @@ import {
  * profile at no extra query cost -- needed by any screen that renders the
  * shared `ModeToggle` (its crossfade needs both themes, not just its own),
  * not by every caller of this hook.
+ *
+ * Also exposes the identity fields (`displayName`, `username`,
+ * `avatarUrl`) off that same already-fetched profile -- no second request
+ * -- for any screen that needs to show "who this is" (e.g. Feed's
+ * per-item byline) without re-fetching what this hook already has.
  */
 export function useProgressTheme(): {
   theme: AccentTheme;
   nutritionTheme: AccentTheme;
   weightUnit: 'kg' | 'lb';
   activeWorkoutSplitId: string | null;
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
   themeLoading: boolean;
 } {
   const { session } = useAuth();
@@ -34,6 +42,9 @@ export function useProgressTheme(): {
   const [nutritionTheme, setNutritionTheme] = useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [activeWorkoutSplitId, setActiveWorkoutSplitId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [themeLoading, setThemeLoading] = useState(true);
 
   useEffect(() => {
@@ -55,6 +66,9 @@ export function useProgressTheme(): {
         );
         setWeightUnit(profile.weightUnit);
         setActiveWorkoutSplitId(profile.activeWorkoutSplitId);
+        setDisplayName(profile.displayName);
+        setUsername(profile.username);
+        setAvatarUrl(profile.avatarUrl);
       } catch {
         // Profile fetch failed (network error, stale session, etc.) --
         // theme/weightUnit/activeWorkoutSplitId simply keep their existing
@@ -70,5 +84,14 @@ export function useProgressTheme(): {
     };
   }, [accessToken]);
 
-  return { theme, nutritionTheme, weightUnit, activeWorkoutSplitId, themeLoading };
+  return {
+    theme,
+    nutritionTheme,
+    weightUnit,
+    activeWorkoutSplitId,
+    displayName,
+    username,
+    avatarUrl,
+    themeLoading,
+  };
 }

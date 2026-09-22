@@ -26,6 +26,9 @@ describe('useProgressTheme', () => {
       workoutAccentColor: '#EF4444',
       weightUnit: 'lb',
       activeWorkoutSplitId: 'split-1',
+      displayName: 'Harbir Bains',
+      username: 'harbir',
+      avatarUrl: 'https://example.com/avatar.jpg',
     });
 
     const { result } = renderHook(() => useProgressTheme());
@@ -34,6 +37,9 @@ describe('useProgressTheme', () => {
     expect(result.current.theme.accent).toBe('#EF4444');
     expect(result.current.weightUnit).toBe('lb');
     expect(result.current.activeWorkoutSplitId).toBe('split-1');
+    expect(result.current.displayName).toBe('Harbir Bains');
+    expect(result.current.username).toBe('harbir');
+    expect(result.current.avatarUrl).toBe('https://example.com/avatar.jpg');
   });
 
   it('falls back to the default theme, without throwing, when the profile request fails', async () => {
@@ -45,5 +51,8 @@ describe('useProgressTheme', () => {
     expect(result.current.theme).toBe(DEFAULT_WORKOUT_THEME);
     expect(result.current.weightUnit).toBe('kg');
     expect(result.current.activeWorkoutSplitId).toBeNull();
+    expect(result.current.displayName).toBeNull();
+    expect(result.current.username).toBeNull();
+    expect(result.current.avatarUrl).toBeNull();
   });
 });
