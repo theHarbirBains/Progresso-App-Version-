@@ -19,6 +19,7 @@ function createQueryBuilder(result: Result) {
     'is',
     'eq',
     'ilike',
+    'or',
     'order',
     'limit',
     'upsert',
@@ -239,7 +240,35 @@ describe('FoodsService', () => {
   });
 });
 
+const USER_ID = '11111111-1111-4111-8111-111111111111';
+
 describe('FoodsService.getByBarcode', () => {
+  it("scopes the local lookup to the shared catalog plus the caller's own custom foods, own first", async () => {
+    const { supabaseService, instances } = mockSupabaseSequence([
+      { data: cachedExternalFoodRow, error: null },
+    ]);
+    const service = new FoodsService(supabaseService, mockProvider());
+
+    await service.getByBarcode('0066721016123', USER_ID);
+
+    expect(instances[0]!.calls.or?.[0]).toEqual([`created_by.is.null,created_by.eq.${USER_ID}`]);
+    expect(instances[0]!.calls.order?.[0]).toEqual([
+      'created_by',
+      { ascending: true, nullsFirst: false },
+    ]);
+  });
+
+  it('falls back to the shared catalog only if the user id is not a plain UUID', async () => {
+    const { supabaseService, instances } = mockSupabaseSequence([
+      { data: cachedExternalFoodRow, error: null },
+    ]);
+    const service = new FoodsService(supabaseService, mockProvider());
+
+    await service.getByBarcode('0066721016123', 'x,created_by.neq.null');
+
+    expect(instances[0]!.calls.or?.[0]).toEqual(['created_by.is.null']);
+  });
+
   it('returns a cached product without calling the provider, on a cache hit', async () => {
     const { supabaseService } = mockSupabaseSequence([
       { data: cachedExternalFoodRow, error: null }, // local barcode lookup
@@ -247,7 +276,7 @@ describe('FoodsService.getByBarcode', () => {
     const provider = mockProvider();
     const service = new FoodsService(supabaseService, provider);
 
-    const result = await service.getByBarcode('0066721016123');
+    const result = await service.getByBarcode('0066721016123', USER_ID);
 
     expect(result).toMatchObject({ id: 'food-2', name: 'Oreo Original', barcode: '0066721016123' });
     expect(provider.getFoodByBarcode).not.toHaveBeenCalled();
@@ -263,7 +292,7 @@ describe('FoodsService.getByBarcode', () => {
     });
     const service = new FoodsService(supabaseService, provider);
 
-    const result = await service.getByBarcode('0066721016123');
+    const result = await service.getByBarcode('0066721016123', USER_ID);
 
     expect(provider.getFoodByBarcode).toHaveBeenCalledWith('0066721016123');
     expect(result).toMatchObject({ name: 'Oreo Original', provider: 'open_food_facts' });
@@ -280,7 +309,7 @@ describe('FoodsService.getByBarcode', () => {
     const provider = mockProvider({ getFoodByBarcode: jest.fn().mockResolvedValue(null) });
     const service = new FoodsService(supabaseService, provider);
 
-    const result = await service.getByBarcode('0000000000000');
+    const result = await service.getByBarcode('0000000000000', USER_ID);
 
     expect(result).toBeNull();
   });
@@ -292,7 +321,7 @@ describe('FoodsService.getByBarcode', () => {
     });
     const service = new FoodsService(supabaseService, provider);
 
-    const result = await service.getByBarcode('0000000000000');
+    const result = await service.getByBarcode('0000000000000', USER_ID);
 
     expect(result).toBeNull();
   });
@@ -302,7 +331,7 @@ describe('FoodsService.getByBarcode', () => {
     const provider = mockProvider();
     const service = new FoodsService(supabaseService, provider);
 
-    const result = await service.getByBarcode('   ');
+    const result = await service.getByBarcode('   ', USER_ID);
 
     expect(result).toBeNull();
     expect(from).not.toHaveBeenCalled();
@@ -314,6 +343,8 @@ describe('FoodsService.getByBarcode', () => {
     const provider = mockProvider();
     const service = new FoodsService(supabaseService, provider);
 
-    await expect(service.getByBarcode('123')).rejects.toBeInstanceOf(InternalServerErrorException);
+    await expect(service.getByBarcode('123', USER_ID)).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
   });
 });

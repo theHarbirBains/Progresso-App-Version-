@@ -1,4 +1,6 @@
 import { BadRequestException, Controller, Get, Param, Query } from '@nestjs/common';
+import type { AuthenticatedUser } from '../auth/types/authenticated-request';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { SearchFoodsDto } from './dto/search-foods.dto';
@@ -30,10 +32,10 @@ export class FoodsController {
   // failure.
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Get('barcode/:barcode')
-  async getByBarcode(@Param('barcode') barcode: string) {
+  async getByBarcode(@CurrentUser() user: AuthenticatedUser, @Param('barcode') barcode: string) {
     if (!barcode.trim()) {
       throw new BadRequestException('barcode must not be empty');
     }
-    return this.foodsService.getByBarcode(barcode);
+    return this.foodsService.getByBarcode(barcode, user.id);
   }
 }

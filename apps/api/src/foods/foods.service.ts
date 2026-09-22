@@ -22,6 +22,8 @@ export interface FoodSearchResponse {
   hasMore: boolean;
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const FOOD_COLUMNS =
   'id, name, brand, image_url, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, provider, barcode';
 
@@ -151,12 +153,19 @@ export class FoodsService {
    * lookup failing is an expected, normal outcome (Open Food Facts doesn't
    * have every product), not an exceptional one; the controller/mobile
    * side render this as a friendly "Product not found" state either way.
+   *
+   * The local lookup is scoped to the caller: the shared catalog
+   * (created_by is null) plus the caller's OWN custom foods. A custom food a
+   * user entered by hand for an unknown barcode is private to them -- it must
+   * never be returned to anyone else who scans the same code (user data
+   * isolation) -- and preferring the caller's own means their entry wins on
+   * the next scan.
    */
-  async getByBarcode(barcode: string): Promise<FoodRecord | null> {
+  async getByBarcode(barcode: string, userId: string): Promise<FoodRecord | null> {
     const trimmed = barcode.trim();
     if (!trimmed) return null;
 
-    const cached = await this.queryLocalByBarcode(trimmed);
+    const cached = await this.queryLocalByBarcode(trimmed, userId);
     if (cached) return cached;
 
     let food: NormalizedFood | null;
@@ -173,13 +182,20 @@ export class FoodsService {
     return this.upsertExternalFood(food);
   }
 
-  private async queryLocalByBarcode(barcode: string): Promise<FoodRecord | null> {
+  private async queryLocalByBarcode(barcode: string, userId: string): Promise<FoodRecord | null> {
+    // The id comes from the verified auth token, but it is interpolated into a
+    // PostgREST filter string, so it must be a plain UUID -- anything else can
+    // only match the shared catalog.
+    const ownFilter = UUID_PATTERN.test(userId) ? `,created_by.eq.${userId}` : '';
     const { data, error } = await this.supabaseService
       .getClient()
       .from('foods')
       .select(FOOD_COLUMNS)
       .eq('barcode', barcode)
       .eq('is_active', true)
+      .or(`created_by.is.null${ownFilter}`)
+      // Own custom food first (a non-null created_by), then the shared catalog.
+      .order('created_by', { ascending: true, nullsFirst: false })
       .limit(1)
       .maybeSingle();
 
