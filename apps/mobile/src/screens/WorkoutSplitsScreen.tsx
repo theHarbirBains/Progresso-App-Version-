@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
-import { Section } from '../design/Section';
 import { updateMyProfile } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -23,11 +23,11 @@ import { workoutSplitStyles as styles } from './workoutSplitStyles';
 
 type Props = RootStackScreenProps<'WorkoutSplits'>;
 
-// Every saved split as a row, the active one marked. A split only ever holds
-// day names + muscle groups (see workoutSplitQueries.ts) -- exercises are
-// chosen when the workout is actually performed. Tapping a split opens its
-// read-only view; Edit / Duplicate / Delete sit quietly beneath it, and
-// "Create Workout Split" is the one primary action.
+// Every saved split as its own widget, the active one the hero card. A split
+// only ever holds day names + muscle groups (see workoutSplitQueries.ts) --
+// exercises are chosen when the workout is actually performed. Tapping a split
+// opens its read-only view; Edit / Duplicate / Delete sit quietly beneath it
+// inside the widget, and "Create Workout Split" is the one primary action.
 export function WorkoutSplitsScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -132,7 +132,7 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
   return (
     <Screen
       scrollTestID="workout-splits-scroll"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={styles.listContent}
       header={
         <AppHeader
           testID="workout-splits-header"
@@ -158,59 +158,58 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
           title="Create a split to plan your training days."
         />
       ) : (
-        <Section title="My Workout Splits">
-          {splits.map((split, index) => {
-            const isActive = split.id === activeId;
-            const busy = busySplitId === split.id;
-            return (
-              <View
-                key={split.id}
-                testID={`workout-split-${split.id}`}
-                style={[styles.splitBlock, index > 0 && styles.splitDivider]}
-              >
-                <ListRow
-                  testID={`workout-split-view-${split.id}`}
-                  title={split.name}
-                  onPress={() => navigation.navigate('WorkoutSplitView', { splitId: split.id })}
-                  disabled={busy}
-                  trailing={
-                    isActive ? (
-                      <Text style={[styles.activeLabel, { color: theme.accent }]}>ACTIVE</Text>
-                    ) : (
-                      <TextButton
-                        testID={`workout-split-activate-${split.id}`}
-                        label="Set Active"
-                        accessibilityLabel="Set as active split"
-                        onPress={() => confirmSelectActive(split)}
-                        disabled={busy}
-                      />
-                    )
-                  }
+        splits.map((split) => {
+          const isActive = split.id === activeId;
+          const busy = busySplitId === split.id;
+          return (
+            <AppCard
+              key={split.id}
+              testID={`workout-split-${split.id}`}
+              hero={isActive}
+              topAccent={isActive ? theme.accent : undefined}
+            >
+              <ListRow
+                testID={`workout-split-view-${split.id}`}
+                title={split.name}
+                onPress={() => navigation.navigate('WorkoutSplitView', { splitId: split.id })}
+                disabled={busy}
+                trailing={
+                  isActive ? (
+                    <Text style={[styles.activeLabel, { color: theme.accent }]}>ACTIVE</Text>
+                  ) : (
+                    <TextButton
+                      testID={`workout-split-activate-${split.id}`}
+                      label="Set Active"
+                      accessibilityLabel="Set as active split"
+                      onPress={() => confirmSelectActive(split)}
+                      disabled={busy}
+                    />
+                  )
+                }
+              />
+              <View style={styles.splitActions}>
+                <TextButton
+                  testID={`workout-split-edit-${split.id}`}
+                  label="Edit"
+                  onPress={() => navigation.navigate('WorkoutSplitForm', { splitId: split.id })}
                 />
-                <View style={styles.splitActions}>
-                  <TextButton
-                    testID={`workout-split-edit-${split.id}`}
-                    label="Edit"
-                    onPress={() => navigation.navigate('WorkoutSplitForm', { splitId: split.id })}
-                  />
-                  <TextButton
-                    testID={`workout-split-duplicate-${split.id}`}
-                    label="Duplicate"
-                    onPress={() => handleDuplicate(split)}
-                    disabled={busy}
-                  />
-                  <TextButton
-                    testID={`workout-split-delete-${split.id}`}
-                    label="Delete"
-                    destructive
-                    onPress={() => confirmDelete(split)}
-                    disabled={busy}
-                  />
-                </View>
+                <TextButton
+                  testID={`workout-split-duplicate-${split.id}`}
+                  label="Duplicate"
+                  onPress={() => handleDuplicate(split)}
+                  disabled={busy}
+                />
+                <TextButton
+                  testID={`workout-split-delete-${split.id}`}
+                  label="Delete"
+                  destructive
+                  onPress={() => confirmDelete(split)}
+                  disabled={busy}
+                />
               </View>
-            );
-          })}
-        </Section>
+            </AppCard>
+          );
+        })
       )}
 
       <PrimaryButton

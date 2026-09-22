@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
-import { ModeToggle } from '../design/ModeToggle';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
-import { StatValue } from '../design/StatValue';
+import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -18,6 +18,7 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { addMonths, isoToLocalDateKey, toLocalDateKey } from '../workouts/calendarGrid';
 import { MonthCalendar } from '../workouts/MonthCalendar';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
+import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 import {
   enrichWorkoutSummaries,
   type EnrichedWorkoutSummary,
@@ -35,22 +36,6 @@ const RECENT_PAGE_SIZE = 20;
 
 type Props = RootStackScreenProps<'WorkoutHistory'>;
 
-export function formatCardDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-export function formatCardDuration(minutes: number | null): string {
-  if (minutes === null) return '--';
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return hours > 0 ? `${hours}h ${rest}m` : `${rest} min`;
-}
-
 export interface WorkoutRowProps {
   workout: EnrichedWorkoutSummary;
   /** A hairline above the row -- every row but the first in a list. */
@@ -58,7 +43,7 @@ export interface WorkoutRowProps {
   onPress: () => void;
 }
 
-// One completed workout as a plain row: the split day (or the workout's own
+// One completed workout as a row (sat inside a widget): the split day (or the workout's own
 // name), the muscles trained, and one muted line of date, duration and sets.
 export function WorkoutRow({ workout, divider, onPress }: WorkoutRowProps) {
   const muscles = workout.muscleGroups.map((g) => SPLIT_MUSCLE_GROUP_LABELS[g]).join(' • ');
@@ -77,18 +62,8 @@ export function WorkoutRow({ workout, divider, onPress }: WorkoutRowProps) {
 export function WorkoutHistoryScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const { theme, nutritionTheme } = useProgressTheme();
-  const { openMenu, reportMode, currentMode } = useAppMenu();
-
-  // Switching mode from a non-Dashboard root screen always goes to that
-  // mode's Home (Dashboard), never to this screen's own "mirror" in the
-  // other mode (e.g. not straight to Food) -- Dashboard is each mode's one
-  // true landing page. A no-op if the tapped segment is already selected.
-  function handleModeChange(next: 'workout' | 'nutrition') {
-    if (next === currentMode) return;
-    reportMode?.(next);
-    navigation.navigate('Dashboard');
-  }
+  const { theme } = useProgressTheme();
+  const { openMenu } = useAppMenu();
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -229,8 +204,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
 
   return (
     <Screen
-      scroll={false}
-      padded={false}
+      contentContainerStyle={styles.content}
       header={
         <AppHeader
           testID="workout-history-header"
@@ -244,192 +218,155 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
         />
       }
     >
-      <FlatList
-        data={showEmptyState ? [] : recentWorkouts}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View>
-            <View style={[styles.block, styles.modeToggleWrap]}>
-              <ModeToggle
-                mode={currentMode}
-                onChange={handleModeChange}
-                workoutTheme={theme}
-                nutritionTheme={nutritionTheme}
-                testIDPrefix="workout-history"
-              />
-            </View>
-
-            {activeWorkout ? (
-              <View testID="active-workout-banner" style={styles.block}>
-                <Text style={styles.resumeText}>You have a workout in progress</Text>
-                <PrimaryButton
-                  testID="resume-active-workout"
-                  label={`Resume "${activeWorkout.name}"`}
-                  onPress={() =>
-                    navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id })
-                  }
-                  accentColor={theme.accent}
-                  onAccentColor={theme.onAccent}
-                />
-              </View>
-            ) : (
-              <View style={styles.block}>
-                <PrimaryButton
-                  testID="start-new-workout"
-                  label="Start New Workout"
-                  onPress={() => navigation.navigate('NewWorkout')}
-                  accentColor={theme.accent}
-                  onAccentColor={theme.onAccent}
-                />
-              </View>
-            )}
-
-            <View style={styles.block}>
-              <MonthCalendar
-                testID="workout-calendar"
-                year={year}
-                month={month}
-                completedDateKeys={completedDateKeys}
-                selectedDateKey={selectedDateKey}
-                todayKey={todayKey}
-                accentColor={theme.accent}
-                onAccentColor={theme.onAccent}
-                onSelectDate={handleSelectDate}
-                onPrevMonth={handlePrevMonth}
-                onNextMonth={handleNextMonth}
-              />
-
-              <View style={styles.legendRow}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
-                  <Text style={styles.legendLabel}>Completed</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
-                  <Text style={styles.legendLabel}>Today</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.border }]} />
-                  <Text style={styles.legendLabel}>No workout</Text>
-                </View>
-              </View>
-
-              {monthError ? (
-                <Text testID="workout-month-error" style={styles.errorText}>
-                  {monthError}
-                </Text>
-              ) : monthLoading ? (
-                <View style={styles.loading}>
-                  <ActivityIndicator
-                    testID="workout-month-loading"
-                    size="large"
-                    color={colors.textPrimary}
-                  />
-                </View>
-              ) : (
-                <View testID="workout-month-summary" style={styles.summaryRow}>
-                  <View style={styles.summaryStat}>
-                    <StatValue
-                      testID="workout-month-total"
-                      value={String(monthSummary.totalWorkouts)}
-                      size="medium"
-                      color={colors.textPrimary}
-                    />
-                    <Text style={styles.summaryLabel}>Workouts</Text>
-                  </View>
-                  <View style={styles.summaryStat}>
-                    <StatValue
-                      testID="workout-month-time"
-                      value={formatTotalTime(monthSummary.totalMinutes)}
-                      size="medium"
-                      color={colors.textPrimary}
-                    />
-                    <Text style={styles.summaryLabel}>Total Time</Text>
-                  </View>
-                  <View style={styles.summaryStat}>
-                    <StatValue
-                      testID="workout-month-sets"
-                      value={String(monthSummary.totalSets)}
-                      size="medium"
-                      color={colors.textPrimary}
-                    />
-                    <Text style={styles.summaryLabel}>Total Sets</Text>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            {selectedDateKey ? (
-              <View testID="selected-day-section" style={styles.block}>
-                <SectionHeader
-                  label={new Date(selectedDateKey).toLocaleDateString(undefined, {
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                />
-                {selectedDayWorkouts.length > 0 ? (
-                  selectedDayWorkouts.map((workout, index) => (
-                    <WorkoutRow
-                      key={workout.id}
-                      workout={workout}
-                      divider={index > 0}
-                      onPress={() =>
-                        navigation.navigate('WorkoutDetail', { workoutId: workout.id })
-                      }
-                    />
-                  ))
-                ) : (
-                  <EmptyState testID="selected-day-empty" title="No workout on this day" />
-                )}
-              </View>
-            ) : null}
-
-            <SectionHeader label="Recent Workouts" />
-
-            {recentError ? (
-              <ErrorState
-                testID="workout-history-error"
-                message={recentError}
-                onRetry={loadRecent}
-              />
-            ) : recentLoading ? (
-              <View style={styles.loading}>
-                <ActivityIndicator
-                  testID="workout-history-loading"
-                  size="large"
-                  color={colors.textPrimary}
-                />
-              </View>
-            ) : showEmptyState ? (
-              <EmptyState
-                testID="workout-history-empty"
-                title="No workouts yet. Complete your first workout and your training history will appear here."
-              />
-            ) : null}
-          </View>
-        }
-        renderItem={({ item, index }) => (
-          <WorkoutRow
-            workout={item}
-            divider={index > 0}
-            onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id })}
+      {activeWorkout ? (
+        <AppCard hero topAccent={theme.accent} testID="active-workout-banner">
+          <Text style={styles.actionLine}>You have a workout in progress</Text>
+          <PrimaryButton
+            testID="resume-active-workout"
+            label={`Resume "${activeWorkout.name}"`}
+            onPress={() => navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id })}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
           />
-        )}
-        ListFooterComponent={
-          recentHasMore ? (
-            <TextButton
-              testID="workout-history-load-more"
-              label="Load More"
-              loading={recentLoadingMore}
-              onPress={handleLoadMoreRecent}
+        </AppCard>
+      ) : (
+        <AppCard hero topAccent={theme.accent} testID="workout-history-start">
+          <Text style={styles.actionLine}>Ready to train?</Text>
+          <PrimaryButton
+            testID="start-new-workout"
+            label="Start New Workout"
+            onPress={() => navigation.navigate('NewWorkout')}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+        </AppCard>
+      )}
+
+      <AppCard testID="workout-history-calendar-card">
+        <MonthCalendar
+          testID="workout-calendar"
+          year={year}
+          month={month}
+          completedDateKeys={completedDateKeys}
+          selectedDateKey={selectedDateKey}
+          todayKey={todayKey}
+          accentColor={theme.accent}
+          onAccentColor={theme.onAccent}
+          onSelectDate={handleSelectDate}
+          onPrevMonth={handlePrevMonth}
+          onNextMonth={handleNextMonth}
+        />
+
+        <View style={styles.legendRow}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
+            <Text style={styles.legendLabel}>Completed</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
+            <Text style={styles.legendLabel}>Today</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.border }]} />
+            <Text style={styles.legendLabel}>No workout</Text>
+          </View>
+        </View>
+
+        {monthError ? (
+          <Text testID="workout-month-error" style={styles.errorText}>
+            {monthError}
+          </Text>
+        ) : monthLoading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator
+              testID="workout-month-loading"
+              size="large"
+              color={colors.textPrimary}
             />
-          ) : null
-        }
-      />
+          </View>
+        ) : (
+          <View testID="workout-month-summary" style={styles.summaryRow}>
+            <StatBlock
+              testID="workout-month-total"
+              value={String(monthSummary.totalWorkouts)}
+              label="Workouts"
+            />
+            <StatBlock
+              testID="workout-month-time"
+              value={formatTotalTime(monthSummary.totalMinutes)}
+              label="Total Time"
+            />
+            <StatBlock
+              testID="workout-month-sets"
+              value={String(monthSummary.totalSets)}
+              label="Total Sets"
+            />
+          </View>
+        )}
+      </AppCard>
+
+      {selectedDateKey ? (
+        <AppCard testID="selected-day-section">
+          <SectionHeader
+            label={new Date(selectedDateKey).toLocaleDateString(undefined, {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+            })}
+          />
+          {selectedDayWorkouts.length > 0 ? (
+            selectedDayWorkouts.map((workout, index) => (
+              <WorkoutRow
+                key={workout.id}
+                workout={workout}
+                divider={index > 0}
+                onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout.id })}
+              />
+            ))
+          ) : (
+            <EmptyState testID="selected-day-empty" title="No workout on this day" />
+          )}
+        </AppCard>
+      ) : null}
+
+      <AppCard testID="workout-history-recent">
+        <SectionHeader label="Recent Workouts" />
+
+        {recentError ? (
+          <ErrorState testID="workout-history-error" message={recentError} onRetry={loadRecent} />
+        ) : recentLoading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator
+              testID="workout-history-loading"
+              size="large"
+              color={colors.textPrimary}
+            />
+          </View>
+        ) : showEmptyState ? (
+          <EmptyState
+            testID="workout-history-empty"
+            title="No workouts yet. Complete your first workout and your training history will appear here."
+          />
+        ) : (
+          recentWorkouts.map((workout, index) => (
+            <WorkoutRow
+              key={workout.id}
+              workout={workout}
+              divider={index > 0}
+              onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout.id })}
+            />
+          ))
+        )}
+
+        {recentHasMore ? (
+          <TextButton
+            testID="workout-history-load-more"
+            label="Load More"
+            loading={recentLoadingMore}
+            onPress={handleLoadMoreRecent}
+          />
+        ) : null}
+      </AppCard>
     </Screen>
   );
 }

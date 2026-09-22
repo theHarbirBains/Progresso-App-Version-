@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { Text } from '../design/Text';
 import { LineChart } from '../charts/LineChart';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
@@ -10,7 +11,7 @@ import { SegmentedControl } from '../design/SegmentedControl';
 import { Section } from '../design/Section';
 import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
-import { fromKg, roundWeight } from '../lib/units';
+import { fromKg, formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchExerciseSetHistory, type HistoricalSet } from '../workouts/exerciseHistoryQueries';
@@ -44,11 +45,6 @@ const RANGE_OPTIONS = TIME_RANGES.map((r) => ({
   value: r.value,
 }));
 
-function formatWeight(kg: number, unit: 'kg' | 'lb'): string {
-  const value = roundWeight(fromKg(kg, unit));
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
 function toChartPoints(points: ChartPoint[], unit: 'kg' | 'lb'): { x: number; y: number }[] {
   return points.map((p) => ({
     x: new Date(p.performedAt).getTime(),
@@ -61,8 +57,8 @@ function rangeLabel(points: ChartPoint[], unit: 'kg' | 'lb'): string | null {
   const weights = points.map((p) => p.weightKg);
   const min = Math.min(...weights);
   const max = Math.max(...weights);
-  if (min === max) return `${formatWeight(min, unit)}${unit}`;
-  return `${formatWeight(min, unit)}${unit} – ${formatWeight(max, unit)}${unit}`;
+  if (min === max) return `${formatWeightKg(min, unit)}${unit}`;
+  return `${formatWeightKg(min, unit)}${unit} – ${formatWeightKg(max, unit)}${unit}`;
 }
 
 // Focused on three questions: am I getting stronger, how much have I
@@ -71,8 +67,8 @@ function rangeLabel(points: ChartPoint[], unit: 'kg' | 'lb'): string | null {
 // chart here is a direct, real-data reconstruction (see exerciseProgress.ts),
 // never an estimate.
 //
-// Layout: a time-range control, then sections (chart + its range as a mono
-// readout) separated by whitespace -- no cards. The charts and the
+// Layout: a time-range control, then a stack of widgets (chart + its range
+// as a mono readout, best performances, consistency). The charts and the
 // consistency line follow the selected range; Best Performances are
 // all-time. The plotted line is the user's Workout accent.
 export function ExerciseProgressScreen({ route, navigation }: Props) {
@@ -173,91 +169,103 @@ export function ExerciseProgressScreen({ route, navigation }: Props) {
             onAccentColor={theme.onAccent}
           />
 
-          <Section title="Top Set Progression">
-            {topSets.length > 0 ? (
-              <>
-                <ProgressChart
-                  testID="top-set-chart"
-                  points={toChartPoints(topSets, weightUnit)}
-                  color={theme.accent}
+          <AppCard>
+            <Section title="Top Set Progression">
+              {topSets.length > 0 ? (
+                <>
+                  <ProgressChart
+                    testID="top-set-chart"
+                    points={toChartPoints(topSets, weightUnit)}
+                    color={theme.accent}
+                  />
+                  <Text style={styles.chartCaption}>{rangeLabel(topSets, weightUnit)}</Text>
+                </>
+              ) : (
+                <Text testID="top-set-chart-empty" style={styles.emptyText}>
+                  No sessions logged in this range
+                </Text>
+              )}
+            </Section>
+          </AppCard>
+
+          <AppCard>
+            <Section
+              title={
+                commonReps !== null ? `${commonReps}-Rep PR Progression` : 'Rep PR Progression'
+              }
+            >
+              {repProgression.length > 0 ? (
+                <>
+                  <ProgressChart
+                    testID="rep-pr-chart"
+                    points={toChartPoints(repProgression, weightUnit)}
+                    color={theme.accent}
+                  />
+                  <Text style={styles.chartCaption}>{rangeLabel(repProgression, weightUnit)}</Text>
+                </>
+              ) : (
+                <Text testID="rep-pr-chart-empty" style={styles.emptyText}>
+                  No rep PR history in this range
+                </Text>
+              )}
+            </Section>
+          </AppCard>
+
+          <AppCard>
+            <Section title="True 1RM Progression">
+              {ormProgression.length > 0 ? (
+                <>
+                  <ProgressChart
+                    testID="one-rm-chart"
+                    points={toChartPoints(ormProgression, weightUnit)}
+                    color={theme.accent}
+                  />
+                  <Text style={styles.chartCaption}>{rangeLabel(ormProgression, weightUnit)}</Text>
+                </>
+              ) : (
+                <Text testID="one-rm-chart-empty" style={styles.emptyText}>
+                  No 1RM recorded yet — log a single-rep set to set one.
+                </Text>
+              )}
+            </Section>
+          </AppCard>
+
+          <AppCard>
+            <Section title="Best Performances">
+              {oneRepMax ? (
+                <ListRow
+                  testID="best-one-rm-value"
+                  title="1RM"
+                  value={`${formatWeightKg(oneRepMax.weightKg, weightUnit)}${weightUnit}`}
                 />
-                <Text style={styles.chartCaption}>{rangeLabel(topSets, weightUnit)}</Text>
-              </>
-            ) : (
-              <Text testID="top-set-chart-empty" style={styles.emptyText}>
-                No sessions logged in this range
-              </Text>
-            )}
-          </Section>
-
-          <Section
-            title={commonReps !== null ? `${commonReps}-Rep PR Progression` : 'Rep PR Progression'}
-          >
-            {repProgression.length > 0 ? (
-              <>
-                <ProgressChart
-                  testID="rep-pr-chart"
-                  points={toChartPoints(repProgression, weightUnit)}
-                  color={theme.accent}
+              ) : (
+                <ListRow testID="best-one-rm-empty" title="1RM" subtitle="No 1RM recorded yet" />
+              )}
+              {bestRepPR ? (
+                <ListRow
+                  testID="best-rep-pr-value"
+                  divider
+                  title={`${bestRepPR.reps}-Rep PR`}
+                  value={`${formatWeightKg(bestRepPR.bestWeightKg, weightUnit)}${weightUnit}`}
                 />
-                <Text style={styles.chartCaption}>{rangeLabel(repProgression, weightUnit)}</Text>
-              </>
-            ) : (
-              <Text testID="rep-pr-chart-empty" style={styles.emptyText}>
-                No rep PR history in this range
-              </Text>
-            )}
-          </Section>
-
-          <Section title="True 1RM Progression">
-            {ormProgression.length > 0 ? (
-              <>
-                <ProgressChart
-                  testID="one-rm-chart"
-                  points={toChartPoints(ormProgression, weightUnit)}
-                  color={theme.accent}
+              ) : (
+                <ListRow
+                  testID="best-rep-pr-empty"
+                  divider
+                  title="Rep PR"
+                  subtitle="No rep PR recorded yet"
                 />
-                <Text style={styles.chartCaption}>{rangeLabel(ormProgression, weightUnit)}</Text>
-              </>
-            ) : (
-              <Text testID="one-rm-chart-empty" style={styles.emptyText}>
-                No 1RM recorded yet — log a single-rep set to set one.
+              )}
+            </Section>
+          </AppCard>
+
+          <AppCard>
+            <Section title="Consistency">
+              <Text testID="session-frequency" style={styles.consistencyText}>
+                {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'} in this period
               </Text>
-            )}
-          </Section>
-
-          <Section title="Best Performances">
-            {oneRepMax ? (
-              <ListRow
-                testID="best-one-rm-value"
-                title="1RM"
-                value={`${formatWeight(oneRepMax.weightKg, weightUnit)}${weightUnit}`}
-              />
-            ) : (
-              <ListRow testID="best-one-rm-empty" title="1RM" subtitle="No 1RM recorded yet" />
-            )}
-            {bestRepPR ? (
-              <ListRow
-                testID="best-rep-pr-value"
-                divider
-                title={`${bestRepPR.reps}-Rep PR`}
-                value={`${formatWeight(bestRepPR.bestWeightKg, weightUnit)}${weightUnit}`}
-              />
-            ) : (
-              <ListRow
-                testID="best-rep-pr-empty"
-                divider
-                title="Rep PR"
-                subtitle="No rep PR recorded yet"
-              />
-            )}
-          </Section>
-
-          <Section title="Consistency">
-            <Text testID="session-frequency" style={styles.consistencyText}>
-              {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'} in this period
-            </Text>
-          </Section>
+            </Section>
+          </AppCard>
         </>
       )}
     </Screen>

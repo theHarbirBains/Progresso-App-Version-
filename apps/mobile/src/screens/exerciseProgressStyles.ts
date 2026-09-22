@@ -1,14 +1,15 @@
 import { StyleSheet } from 'react-native';
-import { colors, spacing, typeScale } from '../design/theme';
+import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 
 // Shared by ExerciseProgressScreen and PRHistoryScreen -- the two
 // single-exercise performance screens. Token-only. The frame is the shared
-// `Screen`, sections are `Section`s and PR/best-performance lines are
-// `ListRow`s, so this holds only what those don't cover.
+// `Screen`, each section is a widget (an `AppCard` around a `Section`) and
+// PR/best-performance lines are `ListRow`s, so this holds only what those
+// don't cover.
 export const exerciseProgressStyles = StyleSheet.create({
-  // Vertical rhythm between the screen's sections.
+  // The widgets are `widgetGap` apart, like every widget stack.
   content: {
-    gap: spacing.xxl,
+    gap: widgetGap,
   },
   errorText: {
     ...typeScale.callout,

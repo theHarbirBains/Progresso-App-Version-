@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
 import { fonts } from '../design/theme';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
@@ -163,18 +163,21 @@ describe('PRHistoryScreen', () => {
   });
 });
 
-describe('PRHistoryScreen -- plain rows, one large 1RM readout', () => {
+describe('PRHistoryScreen -- widgets, one large 1RM readout', () => {
   const twoPRs = [
     { reps: 5, bestWeightKg: 110, sourceSetId: 's5', achievedAt: '2026-01-01T00:00:00Z' },
     { reps: 8, bestWeightKg: 100, sourceSetId: 's8', achievedAt: '2026-01-02T00:00:00Z' },
   ];
 
-  it('draws no cards', async () => {
+  it('is three widgets: View Trend, the 1RM hero and the rep PRs', async () => {
     mockFetchRepPRs.mockResolvedValue(twoPRs);
     render(<PRHistoryScreen navigation={navigation} route={route} />);
     await screen.findByTestId('pr-row-5');
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    const cards = screen.UNSAFE_queryAllByType(AppCard);
+    expect(cards).toHaveLength(3);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([false, true, false]);
+    expect(within(screen.getByTestId('pr-history-rep-prs')).getByTestId('pr-row-5')).toBeTruthy();
   });
 
   it('shows the true 1RM as the one large accent-coloured mono readout, with its date beneath', async () => {

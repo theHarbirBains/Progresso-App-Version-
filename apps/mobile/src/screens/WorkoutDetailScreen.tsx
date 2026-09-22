@@ -3,11 +3,15 @@ import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { Badge } from '../design/Badge';
 import { Screen } from '../design/Screen';
+import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
+import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { getMyProfile } from '../lib/api';
-import { fromKg, roundWeight } from '../lib/units';
+import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
@@ -17,14 +21,10 @@ import {
   type CompletedSetRecord,
   type WorkoutDetail,
 } from '../workouts/workoutQueries';
+import { formatCardDuration } from '../workouts/workoutFormat';
 import { workoutDetailStyles as styles } from './workoutDetailStyles';
 
 type Props = RootStackScreenProps<'WorkoutDetail'>;
-
-function formatWeight(kg: number, unit: 'kg' | 'lb'): string {
-  const value = roundWeight(fromKg(kg, unit));
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -41,10 +41,11 @@ function formatDateTime(iso: string): string {
 // foundation (no separate storage or query).
 //
 // Layout: the workout's name and date in the header (Back on the left, Share
-// on the right once it is completed), then each exercise as a plain block
-// separated by hairlines -- name (opens its PR history), top set, and a row
-// per logged set with a quiet PR / 1RM word while that set is still the live
-// record.
+// on the right once it is completed), then a stack of widgets 6px apart: a
+// summary card (muscles trained, and duration / sets / volume / records as
+// stat blocks) and one card per exercise -- its name (opens PR history), the
+// top set called out, and a row per logged set with a PR / 1RM badge while
+// that set is still the live record.
 export function WorkoutDetailScreen({ route, navigation }: Props) {
   const { workoutId } = route.params;
   const { user, session } = useAuth();
@@ -134,6 +135,30 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     );
   }
 
+  // The workout as a whole, from the sets that were actually logged.
+  const loggedByExercise = workout.exercises.map((exercise) => ({
+    exercise,
+    sets: completedSetsOnly(exercise.sets),
+  }));
+  const allLogged = loggedByExercise.flatMap((entry) => entry.sets);
+  const totalVolumeKg = allLogged.reduce((sum, set) => sum + set.weightKg * set.reps, 0);
+  const durationMinutes = workout.completedAt
+    ? Math.round(
+        (new Date(workout.completedAt).getTime() - new Date(workout.performedAt).getTime()) / 60000,
+      )
+    : null;
+  const isRecord = (exerciseId: string, set: CompletedSetRecord, reps: number) =>
+    Boolean(repPRs[exerciseId]?.some((pr) => pr.reps === reps && pr.sourceSetId === set.id)) ||
+    oneRepMaxes[exerciseId]?.sourceSetId === set.id;
+  const recordCount = loggedByExercise.reduce(
+    (sum, { exercise, sets }) =>
+      sum + sets.filter((set) => isRecord(exercise.id, set, set.reps)).length,
+    0,
+  );
+  const muscles = Array.from(
+    new Set(workout.exercises.map((e) => MUSCLE_GROUP_LABELS[e.muscleGroup])),
+  ).join(' • ');
+
   return (
     <Screen
       contentContainerStyle={styles.content}
@@ -160,21 +185,47 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         />
       }
     >
-      {workout.exercises.map((exercise, index) => {
+      <AppCard hero topAccent={theme.accent} testID="workout-detail-summary">
+        {muscles ? <Text style={styles.eyebrow}>{muscles}</Text> : null}
+        <View style={styles.statGrid}>
+          <View style={styles.statRow}>
+            <StatBlock
+              testID="workout-detail-stat-duration"
+              value={durationMinutes !== null ? formatCardDuration(durationMinutes) : '--'}
+              label="Duration"
+            />
+            <StatBlock
+              testID="workout-detail-stat-sets"
+              value={String(allLogged.length)}
+              label="Sets"
+            />
+          </View>
+          <View style={styles.statRow}>
+            <StatBlock
+              testID="workout-detail-stat-volume"
+              value={`${Number(formatWeightKg(totalVolumeKg, weightUnit)).toLocaleString()} ${weightUnit}`}
+              label="Volume"
+            />
+            <StatBlock
+              testID="workout-detail-stat-records"
+              value={String(recordCount)}
+              label={recordCount === 1 ? 'Record' : 'Records'}
+              valueColor={recordCount > 0 ? theme.accent : undefined}
+            />
+          </View>
+        </View>
+      </AppCard>
+
+      {loggedByExercise.map(({ exercise, sets: loggedSets }) => {
         // A workout's history view only ever shows sets that were actually
         // logged -- a blank/incomplete set left over from a live session
         // that was completed anyway is not real performance data.
-        const loggedSets = completedSetsOnly(exercise.sets);
         const topSet = loggedSets.reduce<CompletedSetRecord | null>(
           (max, s) => (!max || s.weightKg > max.weightKg ? s : max),
           null,
         );
         return (
-          <View
-            key={exercise.id}
-            testID={`exercise-card-${exercise.id}`}
-            style={[styles.exerciseBlock, index > 0 && styles.exerciseDivider]}
-          >
+          <AppCard key={exercise.id} testID={`exercise-card-${exercise.id}`}>
             <TouchableOpacity
               testID={`exercise-title-${exercise.id}`}
               style={styles.exerciseTitleRow}
@@ -187,41 +238,51 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
               accessibilityRole="button"
               accessibilityLabel={`${exercise.exerciseName}, view PR history`}
             >
-              <Text style={styles.exerciseTitle}>{exercise.exerciseName}</Text>
+              <View style={styles.exerciseTitleBody}>
+                <Text style={styles.exerciseTitle}>{exercise.exerciseName}</Text>
+                <Text style={styles.exerciseMuscle}>
+                  {MUSCLE_GROUP_LABELS[exercise.muscleGroup]}
+                </Text>
+              </View>
               <Feather name="chevron-right" size={18} color={colors.textMuted} />
             </TouchableOpacity>
             {topSet ? (
-              <Text testID={`top-set-${exercise.id}`} style={styles.topSet}>
-                Top set: {formatWeight(topSet.weightKg, weightUnit)}
-                {weightUnit}
-                {'×'}
-                {topSet.reps}
-              </Text>
+              <View style={styles.topSetBlock}>
+                <Text
+                  testID={`top-set-${exercise.id}`}
+                  style={[styles.topSet, { color: theme.accent }]}
+                >
+                  Top set: {formatWeightKg(topSet.weightKg, weightUnit)}
+                  {weightUnit}
+                  {'×'}
+                  {topSet.reps}
+                </Text>
+              </View>
             ) : null}
-            {loggedSets.map((set) => {
-              const isCurrentRepPR = repPRs[exercise.id]?.some(
-                (pr) => pr.reps === set.reps && pr.sourceSetId === set.id,
-              );
-              const isCurrentOneRepMax = oneRepMaxes[exercise.id]?.sourceSetId === set.id;
-              return (
-                <View key={set.id} style={styles.setRow}>
-                  <Text style={styles.setLabel}>Set {set.setIndex}</Text>
-                  <Text style={styles.setValue}>
-                    {formatWeight(set.weightKg, weightUnit)}
-                    {weightUnit} × {set.reps}
-                  </Text>
-                  {isCurrentOneRepMax || isCurrentRepPR ? (
-                    <Text
-                      testID={`pr-tag-${set.id}`}
-                      style={[styles.prTag, { color: theme.accent }]}
-                    >
-                      {isCurrentOneRepMax ? '1RM' : 'PR'}
+            <View style={styles.sets}>
+              {loggedSets.map((set) => {
+                const oneRepMax = oneRepMaxes[exercise.id]?.sourceSetId === set.id;
+                const record = isRecord(exercise.id, set, set.reps);
+                return (
+                  <View key={set.id} style={styles.setRow}>
+                    <Text style={styles.setLabel}>Set {set.setIndex}</Text>
+                    <Text style={styles.setValue}>
+                      {formatWeightKg(set.weightKg, weightUnit)}
+                      {weightUnit} × {set.reps}
                     </Text>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
+                    {record ? (
+                      <Badge
+                        testID={`pr-tag-${set.id}`}
+                        label={oneRepMax ? '1RM' : 'PR'}
+                        color={theme.accent}
+                        backgroundColor={theme.accentBg}
+                      />
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+          </AppCard>
         );
       })}
     </Screen>

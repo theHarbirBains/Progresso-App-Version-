@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
@@ -63,6 +64,7 @@ export function WorkoutSplitViewScreen({ navigation, route }: Props) {
   return (
     <Screen
       scrollTestID="workout-split-view-scroll"
+      contentContainerStyle={styles.listContent}
       header={
         <AppHeader
           title={detail?.name ?? 'Workout Split'}
@@ -95,12 +97,8 @@ export function WorkoutSplitViewScreen({ navigation, route }: Props) {
         <EmptyState testID="workout-split-view-empty" title="This split has no days yet." />
       ) : null}
 
-      {detail?.days.map((day, index) => (
-        <View
-          key={day.id}
-          testID={`workout-split-view-day-${day.id}`}
-          style={[styles.dayBlock, index > 0 && styles.dayDivider]}
-        >
+      {detail?.days.map((day) => (
+        <AppCard key={day.id} testID={`workout-split-view-day-${day.id}`}>
           <Text style={styles.dayName}>{day.name}</Text>
           {day.muscleGroups.length > 0 ? (
             <View style={styles.muscleLine}>
@@ -121,7 +119,7 @@ export function WorkoutSplitViewScreen({ navigation, route }: Props) {
               No muscle groups set
             </Text>
           )}
-        </View>
+        </AppCard>
       ))}
     </Screen>
   );

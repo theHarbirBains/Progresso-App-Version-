@@ -2,24 +2,20 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
-import { fromKg, roundWeight } from '../lib/units';
+import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import { exerciseProgressStyles as styles } from './exerciseProgressStyles';
 
 type Props = RootStackScreenProps<'PRHistory'>;
-
-function formatWeight(kg: number, unit: 'kg' | 'lb'): string {
-  const value = roundWeight(fromKg(kg, unit));
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -34,9 +30,10 @@ function formatDate(iso: string): string {
 // here is calculated client-side, it's a direct display of what the
 // database has already recomputed.
 //
-// Layout: the true 1RM as the one large accent readout (never estimated --
-// only a logged single-rep set makes one), then each rep-count PR as a plain
-// row (rep count, date, heaviest weight). "View Trend" is a row at the top.
+// Layout: a stack of widgets -- "View Trend", the true 1RM as the one large
+// accent readout in the hero card (never estimated -- only a logged single-rep
+// set makes one), then the rep-count PRs as rows (rep count, date, heaviest
+// weight).
 export function PRHistoryScreen({ route, navigation }: Props) {
   const { exerciseId, exerciseName } = route.params;
   const { user, session } = useAuth();
@@ -106,51 +103,57 @@ export function PRHistoryScreen({ route, navigation }: Props) {
         </View>
       ) : (
         <>
-          <ListRow
-            testID="view-trend"
-            icon="trending-up"
-            title="View Trend"
-            subtitle="See how this lift has progressed over time"
-            onPress={() => navigation.navigate('ExerciseProgress', { exerciseId, exerciseName })}
-          />
+          <AppCard>
+            <ListRow
+              testID="view-trend"
+              icon="trending-up"
+              title="View Trend"
+              subtitle="See how this lift has progressed over time"
+              onPress={() => navigation.navigate('ExerciseProgress', { exerciseId, exerciseName })}
+            />
+          </AppCard>
 
-          <Section title="1RM">
-            {oneRepMax ? (
-              <View>
-                <Text
-                  testID="one-rep-max-value"
-                  style={[styles.oneRepMaxValue, { color: theme.accent }]}
-                >
-                  {formatWeight(oneRepMax.weightKg, weightUnit)}
-                  {weightUnit}
+          <AppCard hero topAccent={theme.accent} testID="pr-history-one-rep-max">
+            <Section title="1RM">
+              {oneRepMax ? (
+                <View>
+                  <Text
+                    testID="one-rep-max-value"
+                    style={[styles.oneRepMaxValue, { color: theme.accent }]}
+                  >
+                    {formatWeightKg(oneRepMax.weightKg, weightUnit)}
+                    {weightUnit}
+                  </Text>
+                  <Text style={styles.oneRepMaxDate}>{formatDate(oneRepMax.achievedAt)}</Text>
+                </View>
+              ) : (
+                <Text testID="one-rep-max-empty" style={styles.emptyText}>
+                  No 1RM recorded yet — log a single-rep set to set one.
                 </Text>
-                <Text style={styles.oneRepMaxDate}>{formatDate(oneRepMax.achievedAt)}</Text>
-              </View>
-            ) : (
-              <Text testID="one-rep-max-empty" style={styles.emptyText}>
-                No 1RM recorded yet — log a single-rep set to set one.
-              </Text>
-            )}
-          </Section>
+              )}
+            </Section>
+          </AppCard>
 
-          <Section title="Rep PRs">
-            {repPRs.length === 0 ? (
-              <Text testID="rep-prs-empty" style={styles.emptyText}>
-                No rep PRs recorded yet
-              </Text>
-            ) : (
-              repPRs.map((pr, index) => (
-                <ListRow
-                  key={pr.reps}
-                  testID={`pr-row-${pr.reps}`}
-                  divider={index > 0}
-                  title={`${pr.reps} Rep`}
-                  subtitle={formatDate(pr.achievedAt)}
-                  value={`${formatWeight(pr.bestWeightKg, weightUnit)}${weightUnit}`}
-                />
-              ))
-            )}
-          </Section>
+          <AppCard testID="pr-history-rep-prs">
+            <Section title="Rep PRs">
+              {repPRs.length === 0 ? (
+                <Text testID="rep-prs-empty" style={styles.emptyText}>
+                  No rep PRs recorded yet
+                </Text>
+              ) : (
+                repPRs.map((pr, index) => (
+                  <ListRow
+                    key={pr.reps}
+                    testID={`pr-row-${pr.reps}`}
+                    divider={index > 0}
+                    title={`${pr.reps} Rep`}
+                    subtitle={formatDate(pr.achievedAt)}
+                    value={`${formatWeightKg(pr.bestWeightKg, weightUnit)}${weightUnit}`}
+                  />
+                ))
+              )}
+            </Section>
+          </AppCard>
         </>
       )}
     </Screen>

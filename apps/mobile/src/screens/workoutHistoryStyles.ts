@@ -1,29 +1,26 @@
 import { StyleSheet } from 'react-native';
-import { colors, spacing, typeScale } from '../design/theme';
+import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 
 // WorkoutHistoryScreen ("Workouts"). Token-only. The frame (safe area, fixed
-// header, transparent root) is the shared `Screen`; workouts are `ListRow`s,
-// so this holds only the blocks that make up the page.
+// header, scrolling body) is the shared `Screen`; the page is a stack of
+// widgets -- the start/resume action, the calendar with its month summary, the
+// selected day and the recent workouts -- `widgetGap` apart, the same rhythm
+// as the dashboards. Workouts themselves are `ListRow`s inside a widget.
 export const workoutHistoryStyles = StyleSheet.create({
-  listContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxl,
-  },
-  // Every group on the page (mode toggle, primary action, calendar, summary,
-  // day/recent lists) is separated by the same vertical step.
-  block: {
-    marginBottom: spacing.xl,
+  content: {
+    gap: widgetGap,
   },
   // Wraps the shared ModeToggle -- Workouts is one of the app's primary/root
   // screens, so it keeps this the same way Dashboard does; deeper screens
   // reached from here don't.
   modeToggleWrap: {
     marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
 
-  // "You have a workout in progress" -- a plain line above the one primary
-  // button, not a card.
-  resumeText: {
+  // The line above the one primary button ("Ready to train?", "You have a
+  // workout in progress").
+  actionLine: {
     ...typeScale.callout,
     color: colors.textSecondary,
     marginBottom: spacing.sm,
@@ -34,7 +31,7 @@ export const workoutHistoryStyles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.lg,
-    marginBottom: spacing.md,
+    marginVertical: spacing.md,
   },
   legendItem: {
     flexDirection: 'row',
@@ -51,22 +48,10 @@ export const workoutHistoryStyles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Monthly summary: three neutral mono readouts separated from the calendar
-  // by a hairline.
+  // Monthly summary: three raised stat blocks, `widgetGap` apart.
   summaryRow: {
     flexDirection: 'row',
-    paddingTop: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-  },
-  summaryStat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-    marginTop: 2,
+    gap: widgetGap,
   },
   errorText: {
     ...typeScale.callout,

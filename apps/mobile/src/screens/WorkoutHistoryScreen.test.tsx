@@ -141,37 +141,6 @@ describe('WorkoutHistoryScreen', () => {
     await settle();
   });
 
-  it('shows the Workout/Nutrition mode toggle, since Workouts is a primary/root screen', async () => {
-    renderScreen();
-    await screen.findByText(CURRENT_MONTH_LABEL);
-
-    expect(screen.getByTestId('workout-history-mode-workout')).toBeTruthy();
-    expect(screen.getByTestId('workout-history-mode-nutrition')).toBeTruthy();
-    await settle();
-  });
-
-  it('navigates to Dashboard (Nutrition’s Home), not to Food, when the Nutrition segment is pressed', async () => {
-    renderScreen();
-    await screen.findByText(CURRENT_MONTH_LABEL);
-
-    fireEvent.press(screen.getByTestId('workout-history-mode-nutrition'));
-
-    expect(mockReportMode).toHaveBeenCalledWith('nutrition');
-    expect(mockNavigate).toHaveBeenCalledWith('Dashboard');
-    await settle();
-  });
-
-  it('does nothing when the already-selected Workout segment is pressed', async () => {
-    renderScreen();
-    await screen.findByText(CURRENT_MONTH_LABEL);
-
-    fireEvent.press(screen.getByTestId('workout-history-mode-workout'));
-
-    expect(mockReportMode).not.toHaveBeenCalled();
-    expect(mockNavigate).not.toHaveBeenCalled();
-    await settle();
-  });
-
   it("navigates to the previous/next month and reloads that month's data", async () => {
     renderScreen();
     await screen.findByText(CURRENT_MONTH_LABEL);
@@ -246,9 +215,9 @@ describe('WorkoutHistoryScreen', () => {
 
     renderScreen();
 
-    expect(await screen.findByTestId('workout-month-total')).toHaveTextContent('2');
-    expect(screen.getByTestId('workout-month-time')).toHaveTextContent('2h 0m');
-    expect(screen.getByTestId('workout-month-sets')).toHaveTextContent('33');
+    expect(await screen.findByTestId('workout-month-total')).toHaveTextContent(/^2/);
+    expect(screen.getByTestId('workout-month-time')).toHaveTextContent(/^2h 0m/);
+    expect(screen.getByTestId('workout-month-sets')).toHaveTextContent(/^33/);
     await settle();
   });
 
@@ -445,19 +414,38 @@ describe('WorkoutHistoryScreen background refresh on focus', () => {
   });
 });
 
-describe('WorkoutHistoryScreen -- flat page: rows, readouts, one primary action', () => {
+describe('WorkoutHistoryScreen -- a stack of widgets', () => {
   const twoWorkouts = [
     enrichedFixture({ id: 'w1' }),
     enrichedFixture({ id: 'w2', splitDayName: 'Pull', name: 'Pull Day', completedSetCount: 12 }),
   ];
 
-  it('draws no cards -- not for workouts, and not for the resume prompt', async () => {
-    mockFetchActiveWorkout.mockResolvedValue({ id: 'active-1', name: 'Leg Day' });
+  it('is a stack of widgets: action, calendar and recent workouts', async () => {
     mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: false });
     renderScreen();
     await screen.findByTestId('workout-item-w1');
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(3);
+    expect(screen.getByTestId('workout-history-start')).toBeTruthy();
+    expect(screen.getByTestId('workout-history-calendar-card')).toBeTruthy();
+    expect(
+      within(screen.getByTestId('workout-history-recent')).getByTestId('workout-item-w1'),
+    ).toBeTruthy();
+    await settle();
+  });
+
+  it('adds a widget for the selected day, and swaps the start widget for the resume one', async () => {
+    mockFetchActiveWorkout.mockResolvedValue({ id: 'active-1', name: 'Leg Day' });
+    mockFetchWorkoutsForMonth.mockResolvedValue([enrichedFixture({})]);
+    mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: false });
+    renderScreen();
+    await screen.findByTestId('active-workout-banner');
+    fireEvent.press(await screen.findByTestId(`calendar-day-${FIXTURE_DATE_KEY}`));
+    await screen.findByTestId('selected-day-section');
+
+    // resume + calendar + selected day + recent
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(4);
+    expect(screen.queryByTestId('workout-history-start')).toBeNull();
     await settle();
   });
 
@@ -492,7 +480,7 @@ describe('WorkoutHistoryScreen -- flat page: rows, readouts, one primary action'
     await settle();
   });
 
-  it('shows the resume prompt as a plain line above the one Resume button', async () => {
+  it('shows the resume prompt as a line above the one Resume button, in its own widget', async () => {
     mockFetchActiveWorkout.mockResolvedValue({ id: 'active-1', name: 'Leg Day' });
     renderScreen();
 
@@ -500,16 +488,15 @@ describe('WorkoutHistoryScreen -- flat page: rows, readouts, one primary action'
     expect(within(banner).getByText('You have a workout in progress')).toBeTruthy();
     expect(screen.queryByTestId('start-new-workout')).toBeNull();
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    expect(StyleSheet.flatten(banner.props.style).backgroundColor).toBeUndefined();
     await settle();
   });
 
-  it('shows the month summary as three neutral mono readouts, without icon circles', async () => {
+  it('shows the month summary as three raised stat blocks with neutral mono figures, without icon circles', async () => {
     mockFetchWorkoutsForMonth.mockResolvedValue([enrichedFixture({})]);
     renderScreen();
 
     const total = await screen.findByTestId('workout-month-total');
-    const style = StyleSheet.flatten(total.props.style);
+    const style = StyleSheet.flatten(within(total).getByText('1').props.style);
     expect(style.fontFamily).toBe(fonts.mono);
     expect(screen.UNSAFE_queryAllByType(Feather).map((i) => i.props.name)).not.toContain(
       'check-square',

@@ -1,11 +1,12 @@
 import { StyleSheet } from 'react-native';
-import { colors, spacing, typeScale } from '../design/theme';
+import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
-// WorkoutDetailScreen -- a completed workout's exercises and sets. Token-only.
-// The frame is the shared `Screen`; each exercise is a plain block separated
-// from the next by a hairline, with its sets as compact rows.
+// WorkoutDetailScreen -- a completed workout as a stack of widgets: one summary
+// card, then one card per exercise. Token-only. Widgets are separated by exactly
+// `widgetGap` (6px), the same rhythm as the Dashboard.
 export const workoutDetailStyles = StyleSheet.create({
   content: {
+    gap: widgetGap,
     paddingBottom: spacing.xxl,
   },
   errorText: {
@@ -16,49 +17,70 @@ export const workoutDetailStyles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
 
-  exerciseBlock: {
-    paddingVertical: spacing.xl,
+  // ---- Summary widget -------------------------------------------------------
+  eyebrow: {
+    ...typeScale.sectionHeading,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
   },
-  exerciseDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
+  statGrid: {
+    gap: widgetGap,
   },
-  // Exercise name (opens its PR history) + chevron.
+  statRow: {
+    flexDirection: 'row',
+    gap: widgetGap,
+  },
+
+  // ---- Exercise widget ------------------------------------------------------
   exerciseTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 44,
+    gap: spacing.md,
+    minHeight: minTouchTarget,
+  },
+  exerciseTitleBody: {
+    flex: 1,
   },
   exerciseTitle: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
-    flex: 1,
+  },
+  exerciseMuscle: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  // The heaviest logged set, called out on its own raised block above the list.
+  topSetBlock: {
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radii.md,
   },
   topSet: {
-    ...typeScale.callout,
-    color: colors.textSecondary,
+    ...typeScale.statSmall,
   },
 
+  sets: {
+    marginTop: spacing.sm,
+  },
   setRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
   },
   setLabel: {
     ...typeScale.caption,
     color: colors.textMuted,
-    width: 44,
+    width: 48,
   },
   setValue: {
     ...typeScale.statSmall,
     color: colors.textPrimary,
     flex: 1,
-  },
-  // "PR" / "1RM": only while the set is still the live record. A quiet
-  // uppercase word in the mode accent (colour supplied per render), not a badge.
-  prTag: {
-    ...typeScale.caption,
-    letterSpacing: 1,
   },
 });

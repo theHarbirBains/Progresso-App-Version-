@@ -346,12 +346,18 @@ describe('ExerciseLibraryScreen', () => {
   });
 });
 
-describe('ExerciseLibraryScreen -- plain rows, tabs for the source, New Exercise in the header', () => {
-  it('draws no cards', async () => {
+describe('ExerciseLibraryScreen -- two widgets, source blocks, New Exercise in the header', () => {
+  it('is two widgets: browse (search, filters, sources) and the exercise list', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+    const browse = within(screen.getByTestId('exercise-library-browse'));
+    expect(browse.getByTestId('exercise-search')).toBeTruthy();
+    expect(browse.getByTestId('exercise-source-all')).toBeTruthy();
+    const list = within(screen.getByTestId('exercise-library-list'));
+    expect(list.getByTestId('exercise-library-count')).toBeTruthy();
+    expect(list.getByTestId('exercise-item-ex-builtin')).toBeTruthy();
     await settle();
   });
 
@@ -416,18 +422,16 @@ describe('ExerciseLibraryScreen -- plain rows, tabs for the source, New Exercise
     await settle();
   });
 
-  it('shows All / Built-in / Mine as tabs with their real totals, the selected one in the accent', async () => {
+  it('shows All / Built-in / Mine as blocks with their real totals, the selected one in the accent', async () => {
     renderScreen();
     const all = await screen.findByTestId('exercise-source-all');
 
     expect(all.props.accessibilityLabel).toBe('All, 328 exercises');
     expect(all.props.accessibilityState.selected).toBe(true);
-    expect(StyleSheet.flatten(all.props.style).borderBottomColor).toBe(
-      DEFAULT_WORKOUT_THEME.accent,
-    );
+    expect(StyleSheet.flatten(all.props.style).borderColor).toBe(DEFAULT_WORKOUT_THEME.accent);
     const mine = screen.getByTestId('exercise-source-mine');
     expect(mine.props.accessibilityState.selected).toBe(false);
-    expect(StyleSheet.flatten(mine.props.style).borderBottomColor).toBe('transparent');
+    expect(StyleSheet.flatten(mine.props.style).borderColor).toBe('transparent');
     await settle();
   });
 

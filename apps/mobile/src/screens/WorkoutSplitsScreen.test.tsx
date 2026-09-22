@@ -235,12 +235,12 @@ describe('WorkoutSplitsScreen background refresh on focus', () => {
   });
 });
 
-describe('WorkoutSplitsScreen -- rows, not cards', () => {
-  it('shows each split as a row with its actions beneath it, in no cards', async () => {
+describe('WorkoutSplitsScreen -- one widget per split', () => {
+  it('shows each split as its own widget: a row with its actions beneath it', async () => {
     renderScreen();
     await screen.findByTestId('workout-split-split-1');
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
     const block = within(screen.getByTestId('workout-split-split-1'));
     expect(block.getByTestId('workout-split-view-split-1')).toHaveTextContent(/PPL - Hypertrophy/);
     for (const action of ['edit', 'duplicate', 'delete']) {
@@ -248,13 +248,20 @@ describe('WorkoutSplitsScreen -- rows, not cards', () => {
     }
   });
 
-  it('separates the splits with a hairline, none above the first', async () => {
+  it('makes the active split the hero widget and leaves the others as plain glass', async () => {
     renderScreen();
-    const first = await screen.findByTestId('workout-split-split-1');
-    const second = screen.getByTestId('workout-split-split-2');
+    await screen.findByTestId('workout-split-split-1');
 
-    expect(StyleSheet.flatten(first.props.style).borderTopWidth).toBeUndefined();
-    expect(StyleSheet.flatten(second.props.style).borderTopWidth).toBe(StyleSheet.hairlineWidth);
+    const cards = screen.UNSAFE_queryAllByType(AppCard);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false]);
+  });
+
+  it('bands only the active split in the Workout accent, never the others', async () => {
+    renderScreen();
+    await screen.findByTestId('workout-split-split-1');
+
+    expect(screen.getByTestId('workout-split-split-1-top-accent')).toBeTruthy();
+    expect(screen.queryByTestId('workout-split-split-2-top-accent')).toBeNull();
   });
 
   it('marks the active split with a quiet ACTIVE label in the mode accent, not a badge', async () => {

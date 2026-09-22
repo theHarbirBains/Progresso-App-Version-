@@ -173,12 +173,16 @@ describe('WorkoutSplitViewScreen background refresh on focus', () => {
   });
 });
 
-describe('WorkoutSplitViewScreen -- plain days and muscle text, no chips', () => {
-  it('shows days as plain blocks in no cards', async () => {
+describe('WorkoutSplitViewScreen -- a widget per day, plain muscle text, no chips', () => {
+  it('shows each day as its own widget', async () => {
     render(<WorkoutSplitViewScreen navigation={navigation} route={route} />);
     await screen.findByText('PPL - Hypertrophy');
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    const cards = screen.UNSAFE_queryAllByType(AppCard);
+    expect(cards.length).toBeGreaterThanOrEqual(2);
+    expect(
+      within(screen.getByTestId('workout-split-view-day-day-1')).getByText('Push'),
+    ).toBeTruthy();
   });
 
   it("shows a day's muscle groups as one line of plain text separated by dots, not filled chips", async () => {
@@ -193,15 +197,6 @@ describe('WorkoutSplitViewScreen -- plain days and muscle text, no chips', () =>
       expect(style.backgroundColor).toBeUndefined();
       expect(style.borderWidth).toBeUndefined();
     }
-  });
-
-  it('separates days with a hairline, none above the first', async () => {
-    render(<WorkoutSplitViewScreen navigation={navigation} route={route} />);
-    const first = await screen.findByTestId('workout-split-view-day-day-1');
-    const second = screen.getByTestId('workout-split-view-day-day-2');
-
-    expect(StyleSheet.flatten(first.props.style).borderTopWidth).toBeUndefined();
-    expect(StyleSheet.flatten(second.props.style).borderTopWidth).toBe(StyleSheet.hairlineWidth);
   });
 
   it('puts Back and Edit in the shared header, each named for assistive tech', async () => {

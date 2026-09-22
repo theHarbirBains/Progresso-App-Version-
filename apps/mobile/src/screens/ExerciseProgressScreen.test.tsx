@@ -186,13 +186,13 @@ describe('ExerciseProgressScreen', () => {
   });
 });
 
-describe('ExerciseProgressScreen -- sections, not cards', () => {
-  it('draws no cards', async () => {
+describe('ExerciseProgressScreen -- a stack of widgets', () => {
+  it('is five widgets: three charts, best performances and consistency', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
     render(<ExerciseProgressScreen navigation={navigation} route={route} />);
     await screen.findByTestId('top-set-chart');
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(5);
   });
 
   it('offers the time range as one segmented control, short labels each read out in full', async () => {

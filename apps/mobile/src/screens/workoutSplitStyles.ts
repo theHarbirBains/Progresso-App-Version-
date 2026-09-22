@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
+import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
 // Shared by the three split screens -- the list (WorkoutSplitsScreen), the
 // read-only view (WorkoutSplitViewScreen) and the form (WorkoutSplitForm-
@@ -17,16 +17,12 @@ export const workoutSplitStyles = StyleSheet.create({
   },
 
   // ---- Splits list ---------------------------------------------------------
-  // One split = its row plus its actions; consecutive splits are separated by
-  // a hairline, not wrapped in a card each.
-  splitBlock: {
-    paddingBottom: spacing.xs,
+  // Every split is its own widget (a card), `widgetGap` apart, with the
+  // "Create Workout Split" button beneath the last one.
+  listContent: {
+    gap: widgetGap,
   },
-  splitDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-    paddingTop: spacing.xs,
-  },
+  // Edit / Duplicate / Delete, beneath a split's row inside its widget.
   splitActions: {
     flexDirection: 'row',
     alignItems: 'center',

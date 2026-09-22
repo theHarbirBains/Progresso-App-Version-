@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
@@ -43,10 +44,12 @@ const SOURCE_OPTIONS: { value: ExerciseSource; label: string }[] = [
 // user's own custom exercises, searchable/filterable/sortable, text-only
 // (no exercise artwork -- Progresso has none, and none is added here).
 //
-// Layout: search, muscle filter, then an All / Built-in / Mine tab row with
-// the real per-source totals; below it the exercises as plain rows (name,
-// "Muscle · Movement", and a quiet Built-in/Mine marker). New Exercise is the
-// header's "+". Your own exercises open for editing; built-ins are read-only.
+// Layout: two widgets `widgetGap` apart. The browse widget holds search, the
+// muscle filter and an All / Built-in / Mine block row with the real
+// per-source totals; the list widget holds the count and sort control, then the
+// exercises as rows (name, "Muscle · Movement", and a quiet Built-in/Mine
+// marker). New Exercise is the header's "+". Your own exercises open for
+// editing; built-ins are read-only.
 // Search/filter/pagination/create/edit logic is unchanged.
 export function ExerciseLibraryScreen({ navigation }: Props) {
   const { user } = useAuth();
@@ -174,8 +177,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
 
   return (
     <Screen
-      scroll={false}
-      padded={false}
+      contentContainerStyle={styles.content}
       testID="exercise-library-screen"
       header={
         <AppHeader
@@ -196,104 +198,97 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         />
       }
     >
-      <FlatList
-        data={rows}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View>
-            <View style={styles.searchWrap}>
-              <TextInput
-                testID="exercise-search"
-                placeholder="Search exercises..."
-                value={searchInput}
-                onChangeText={setSearchInput}
-                autoCapitalize="none"
-                leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
-              />
-            </View>
+      <AppCard testID="exercise-library-browse">
+        <View style={styles.searchWrap}>
+          <TextInput
+            testID="exercise-search"
+            placeholder="Search exercises..."
+            value={searchInput}
+            onChangeText={setSearchInput}
+            autoCapitalize="none"
+            leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
+          />
+        </View>
 
-            <View testID="exercise-library-muscle-group-wrap" style={styles.chipsWrap}>
-              <MuscleGroupChips
-                value={muscleGroup}
-                onChange={setMuscleGroup}
-                includeAll
-                accentColor={theme.accent}
-                onAccentColor={theme.onAccent}
-              />
-            </View>
+        <View testID="exercise-library-muscle-group-wrap" style={styles.chipsWrap}>
+          <MuscleGroupChips
+            value={muscleGroup}
+            onChange={setMuscleGroup}
+            includeAll
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+        </View>
 
-            <View style={styles.sourceTabs}>
-              {SOURCE_OPTIONS.map((option) => {
-                const selected = option.value === source;
-                const count = sourceCounts?.[option.value] ?? null;
-                return (
-                  <TouchableOpacity
-                    key={option.value}
-                    testID={`exercise-source-${option.value}`}
-                    style={[
-                      styles.sourceTab,
-                      selected ? { borderBottomColor: theme.accent } : null,
-                    ]}
-                    onPress={() => setSource(option.value)}
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      count !== null ? `${option.label}, ${count} exercises` : option.label
-                    }
-                    accessibilityState={{ selected }}
-                  >
-                    <Text
-                      style={[styles.sourceTabLabel, selected ? { color: theme.accent } : null]}
-                    >
-                      {option.label}
-                    </Text>
-                    <Text
-                      testID={`exercise-source-${option.value}-count`}
-                      style={styles.sourceTabCount}
-                    >
-                      {count !== null ? String(count) : ' '}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+        <View style={styles.sourceTabs}>
+          {SOURCE_OPTIONS.map((option) => {
+            const selected = option.value === source;
+            const count = sourceCounts?.[option.value] ?? null;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                testID={`exercise-source-${option.value}`}
+                style={[
+                  styles.sourceTab,
+                  selected ? { backgroundColor: theme.accentBg, borderColor: theme.accent } : null,
+                ]}
+                onPress={() => setSource(option.value)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  count !== null ? `${option.label}, ${count} exercises` : option.label
+                }
+                accessibilityState={{ selected }}
+              >
+                <Text style={[styles.sourceTabLabel, selected ? { color: theme.accent } : null]}>
+                  {option.label}
+                </Text>
+                <Text
+                  testID={`exercise-source-${option.value}-count`}
+                  style={styles.sourceTabCount}
+                >
+                  {count !== null ? String(count) : ' '}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </AppCard>
 
-            <View style={styles.countSortRow}>
-              <Text testID="exercise-library-count" style={styles.countText}>
-                {totalCount} {totalCount === 1 ? 'exercise' : 'exercises'}
-              </Text>
-              <TextButton
-                testID="exercise-library-sort"
-                label={`Sort: ${ascending ? 'A → Z' : 'Z → A'}`}
-                accessibilityLabel="Toggle sort order"
-                onPress={() => setAscending((prev) => !prev)}
-              />
-            </View>
+      <AppCard testID="exercise-library-list">
+        <View style={styles.countSortRow}>
+          <Text testID="exercise-library-count" style={styles.countText}>
+            {totalCount} {totalCount === 1 ? 'exercise' : 'exercises'}
+          </Text>
+          <TextButton
+            testID="exercise-library-sort"
+            label={`Sort: ${ascending ? 'A → Z' : 'Z → A'}`}
+            accessibilityLabel="Toggle sort order"
+            onPress={() => setAscending((prev) => !prev)}
+          />
+        </View>
 
-            {error ? (
-              <Text testID="exercise-library-error" style={styles.errorText}>
-                {error}
-              </Text>
-            ) : null}
+        {error ? (
+          <Text testID="exercise-library-error" style={styles.errorText}>
+            {error}
+          </Text>
+        ) : null}
 
-            {loading ? (
-              <View style={styles.loading}>
-                <ActivityIndicator
-                  testID="exercise-library-loading"
-                  size="large"
-                  color={colors.textPrimary}
-                />
-              </View>
-            ) : null}
+        {loading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator
+              testID="exercise-library-loading"
+              size="large"
+              color={colors.textPrimary}
+            />
           </View>
-        }
-        renderItem={({ item, index }) => {
+        ) : null}
+
+        {rows.map((item, index) => {
           const isMine = item.createdBy != null;
           return (
             <ListRow
+              key={item.id}
               testID={`exercise-item-${item.id}`}
               title={item.name}
               subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
@@ -316,25 +311,21 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
               }
             />
           );
-        }}
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyWrap}>
-              <EmptyState testID="exercise-library-empty" title="No exercises found" />
-            </View>
-          ) : null
-        }
-        ListFooterComponent={
-          hasMore ? (
-            <TextButton
-              testID="exercise-load-more"
-              label="Load More"
-              loading={loadingMore}
-              onPress={() => void loadPage(page + 1, false)}
-            />
-          ) : null
-        }
-      />
+        })}
+
+        {!loading && rows.length === 0 ? (
+          <EmptyState testID="exercise-library-empty" title="No exercises found" />
+        ) : null}
+
+        {hasMore ? (
+          <TextButton
+            testID="exercise-load-more"
+            label="Load More"
+            loading={loadingMore}
+            onPress={() => void loadPage(page + 1, false)}
+          />
+        ) : null}
+      </AppCard>
     </Screen>
   );
 }

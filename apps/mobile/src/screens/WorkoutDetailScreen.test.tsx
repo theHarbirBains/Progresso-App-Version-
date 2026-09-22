@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
-import { fonts } from '../design/theme';
+import { fonts, widgetGap } from '../design/theme';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
@@ -220,7 +220,7 @@ describe('WorkoutDetailScreen current PR/1RM indicators', () => {
   });
 });
 
-describe('WorkoutDetailScreen -- plain blocks, quiet PR words', () => {
+describe('WorkoutDetailScreen -- a stack of widgets', () => {
   const twoExercises = {
     ...workout,
     exercises: [
@@ -238,74 +238,129 @@ describe('WorkoutDetailScreen -- plain blocks, quiet PR words', () => {
     ],
   };
 
-  it('draws no cards', async () => {
-    mockFetchWorkoutDetail.mockResolvedValue(twoExercises);
+  async function ready(detail = twoExercises) {
+    mockFetchWorkoutDetail.mockResolvedValue(detail);
     render(<WorkoutDetailScreen navigation={navigation} route={route} />);
     await screen.findByTestId('exercise-card-we2');
+  }
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+  it('leads with one summary card, then one card per exercise', async () => {
+    await ready();
+
+    // Summary + two exercises.
+    expect(screen.UNSAFE_getAllByType(AppCard)).toHaveLength(3);
+    expect(screen.getByTestId('workout-detail-summary')).toBeTruthy();
   });
 
-  it('separates exercises with a hairline, none above the first', async () => {
-    mockFetchWorkoutDetail.mockResolvedValue(twoExercises);
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+  it('bands the summary card in the Workout accent, like a Feed activity card', async () => {
+    await ready();
 
-    const first = StyleSheet.flatten((await screen.findByTestId('exercise-card-we1')).props.style);
-    const second = StyleSheet.flatten(screen.getByTestId('exercise-card-we2').props.style);
-    expect(first.borderTopWidth).toBeUndefined();
-    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+    const band = StyleSheet.flatten(
+      screen.getByTestId('workout-detail-summary-top-accent').props.style,
+    );
+    expect(band.backgroundColor).toBe(DEFAULT_WORKOUT_THEME.accent);
   });
 
-  it('puts the workout name and its date in the header, with a named Back', async () => {
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+  it('separates the widgets by exactly the widget gap, with no per-widget margin', async () => {
+    await ready();
 
-    expect(await screen.findByText('Push Day')).toBeTruthy();
-    expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeTruthy();
-    expect(screen.getByTestId('workout-detail-back').props.accessibilityLabel).toBe('Back');
+    const scroll = screen.getByTestId('workout-detail-summary').parent!.parent!;
+    const contentStyle = Object.assign(
+      {},
+      ...[scroll.props.contentContainerStyle ?? scroll.props.style].flat(Infinity),
+    );
+    expect(contentStyle.gap ?? widgetGap).toBe(widgetGap);
+    const style = StyleSheet.flatten(screen.getByTestId('exercise-card-we2').props.style) ?? {};
+    expect(style.marginBottom ?? 0).toBe(0);
   });
 
-  it('offers Share as a named header action, only for a completed workout', async () => {
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+  it('summarises the workout: muscles, duration, sets, volume and records', async () => {
+    mockFetchRepPRs.mockResolvedValue([
+      { reps: 8, bestWeightKg: 110, sourceSetId: 's2', achievedAt: '2026-01-01T00:00:00Z' },
+    ]);
+    await ready();
 
-    const share = await screen.findByTestId('workout-detail-share');
-    expect(share.props.accessibilityLabel).toBe('Share workout');
+    const summary = within(screen.getByTestId('workout-detail-summary'));
+    expect(summary.getByText(/Chest.*Shoulders/)).toBeTruthy();
+    expect(screen.getByTestId('workout-detail-stat-duration')).toHaveTextContent(/1h 0m/);
+    expect(screen.getByTestId('workout-detail-stat-sets')).toHaveTextContent(/^3/);
+    // 100x10 + 110x8 + 60x8 = 2,360 kg
+    expect(screen.getByTestId('workout-detail-stat-volume')).toHaveTextContent(/2,360 kg/);
+    expect(await screen.findByTestId('workout-detail-stat-records')).toHaveTextContent(/^1/);
   });
 
-  it('makes each exercise title a named 44pt row that opens its PR history', async () => {
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+  it("shows the volume in the user's unit, without a trailing .0", async () => {
+    mockGetMyProfile.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@example.com',
+      role: 'user',
+      displayName: null,
+      username: null,
+      weightUnit: 'lb',
+    });
+    await ready();
 
-    const title = await screen.findByTestId('exercise-title-we1');
+    const volume = screen.getByTestId('workout-detail-stat-volume');
+    expect(volume).toHaveTextContent(/lb/);
+    expect(volume).not.toHaveTextContent(/\.0\b/);
+  });
+
+  it("calls out each exercise's top set on its own block, in the mode accent and the mono face", async () => {
+    await ready();
+
+    const top = StyleSheet.flatten(screen.getByTestId('top-set-we1').props.style);
+    expect(top.color).toBe(DEFAULT_WORKOUT_THEME.accent);
+    expect(top.fontFamily).toBe(fonts.monoBold);
+    expect(screen.getByTestId('top-set-we1')).toHaveTextContent('Top set: 110kg×8');
+  });
+
+  it("shows each exercise's muscle group and one row per logged set, hairline-separated", async () => {
+    await ready();
+
+    const card = within(screen.getByTestId('exercise-card-we1'));
+    expect(card.getByText('Chest')).toBeTruthy();
+    expect(card.getByText('Set 1')).toBeTruthy();
+    expect(card.getByText('Set 2')).toBeTruthy();
+    expect(card.getByText(/100kg × 10/)).toBeTruthy();
+  });
+
+  it('badges a live PR (and a 1RM) on its set, in the mode accent', async () => {
+    mockFetchRepPRs.mockResolvedValue([
+      { reps: 8, bestWeightKg: 110, sourceSetId: 's2', achievedAt: '2026-01-01T00:00:00Z' },
+    ]);
+    await ready();
+
+    const badge = await screen.findByTestId('pr-tag-s2');
+    expect(badge).toHaveTextContent('PR');
+    expect(within(badge).getByText('PR')).toBeTruthy();
+    expect(screen.queryByTestId('pr-tag-s1')).toBeNull();
+  });
+
+  it('makes each exercise name a named 44pt row that opens its PR history', async () => {
+    await ready();
+
+    const title = screen.getByTestId('exercise-title-we1');
     expect(title.props.accessibilityLabel).toBe('Bench Press, view PR history');
     expect(StyleSheet.flatten(title.props.style).minHeight).toBeGreaterThanOrEqual(44);
   });
 
-  it('shows each logged set as a row: its label, then the weight × reps as a mono readout', async () => {
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+  it('puts the workout name and date in the header, with a named Back and Share', async () => {
+    await ready();
 
-    const value = await screen.findByText(/100kg × 10/);
-    expect(StyleSheet.flatten(value.props.style).fontFamily).toBe(fonts.monoBold);
-  });
-
-  it('marks a live PR with a quiet accent word, not a filled badge', async () => {
-    mockFetchRepPRs.mockResolvedValue([
-      { reps: 8, bestWeightKg: 110, sourceSetId: 's2', achievedAt: '2026-01-01T00:00:00Z' },
-    ]);
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
-
-    const tag = StyleSheet.flatten((await screen.findByTestId('pr-tag-s2')).props.style);
-    expect(tag.color).toBe(DEFAULT_WORKOUT_THEME.accent);
-    expect(tag.backgroundColor).toBeUndefined();
-    expect(tag.borderWidth).toBeUndefined();
+    expect(screen.getByText('Push Day')).toBeTruthy();
+    expect(screen.getByTestId('workout-detail-back').props.accessibilityLabel).toBe('Back');
+    expect(screen.getByTestId('workout-detail-share').props.accessibilityLabel).toBe(
+      'Share workout',
+    );
   });
 
   it('renders no bare text outside <Text>', async () => {
-    mockFetchWorkoutDetail.mockResolvedValue(twoExercises);
     mockFetchOneRepMax.mockResolvedValue({
       weightKg: 110,
       sourceSetId: 's2',
       achievedAt: '2026-01-01T00:00:00Z',
     });
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />);
+    await ready();
     await screen.findByTestId('pr-tag-s2');
 
     expectNoBareText();

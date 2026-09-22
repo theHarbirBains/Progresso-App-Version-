@@ -1,14 +1,14 @@
 import { StyleSheet } from 'react-native';
-import { colors, minTouchTarget, spacing, typeScale } from '../design/theme';
+import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
 // ExerciseLibraryScreen's list/browse view. Token-only; the screen frame
-// (safe area, header, transparent root) is the shared `Screen`, and each
-// exercise is a `ListRow`, so this file only holds what those don't cover:
-// the filter block above the list and the source tabs.
+// (safe area, header, scrolling body) is the shared `Screen`, the page is two
+// widgets (`AppCard`) `widgetGap` apart, and each exercise is a `ListRow`, so
+// this file only holds what those don't cover: the filter block and the
+// source blocks.
 export const exerciseLibraryStyles = StyleSheet.create({
-  listContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxl,
+  content: {
+    gap: widgetGap,
   },
 
   searchWrap: {
@@ -20,22 +20,23 @@ export const exerciseLibraryStyles = StyleSheet.create({
     marginVertical: spacing.sm,
   },
 
-  // "All / Built-in / Mine": three equal tabs sharing one hairline; the
-  // selected one is underlined and coloured with the mode accent. Plain
-  // pressable text, not cards -- there is nothing to group.
+  // "All / Built-in / Mine": three equal raised blocks, `widgetGap` apart; the
+  // selected one takes the mode accent (tint fill + accent outline -- the
+  // outline is always 1px, transparent when unselected, so nothing shifts).
   sourceTabs: {
     flexDirection: 'row',
+    gap: widgetGap,
     marginTop: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
   },
   sourceTab: {
     flex: 1,
     minHeight: minTouchTarget + spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   sourceTabLabel: {
     ...typeScale.callout,
@@ -66,9 +67,6 @@ export const exerciseLibraryStyles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 
-  emptyWrap: {
-    paddingTop: spacing.xxl,
-  },
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,
