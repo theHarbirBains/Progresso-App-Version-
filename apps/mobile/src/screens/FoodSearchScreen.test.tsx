@@ -1,4 +1,9 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { Image, StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { AppCard } from '../design/AppCard';
+import { PrimaryButton } from '../design/Button';
+import { fonts } from '../design/theme';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, searchFoods } from '../lib/api';
 import { logFood } from '../nutrition/foodLogQueries';
@@ -54,6 +59,7 @@ const oreoOriginal = {
   fatG: null,
   provider: 'open_food_facts',
   barcode: '0066721016123',
+  imageUrl: 'https://images.example/oreo-front.jpg',
 };
 
 const baseProfile = {
@@ -287,5 +293,90 @@ describe('FoodSearchScreen', () => {
     fireEvent.press(screen.getByTestId('app-header-back'));
 
     expect(screen.getByTestId('food-search-detail-header')).toBeTruthy();
+  });
+});
+
+describe('FoodSearchScreen -- rows, shared nutrition view, one primary action', () => {
+  async function searchTwo() {
+    mockSearchFoods.mockResolvedValue({ foods: [chickenBreast, oreoOriginal], hasMore: false });
+    render(<FoodSearchScreen navigation={navigation} route={route} />);
+    await typeSearch('food');
+    await screen.findByTestId('food-search-result-food-2');
+  }
+
+  it('shows results as rows in one widget: name, brand · serving, calories as a mono value', async () => {
+    await searchTwo();
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(1);
+    const row = screen.getByTestId('food-search-result-food-2');
+    expect(row.props.accessibilityRole).toBe('button');
+    expect(row).toHaveTextContent(/Oreo Original/);
+    expect(row).toHaveTextContent(/Oreo · 34 g/);
+    expect(row).toHaveTextContent(/160 cal/);
+  });
+
+  it("shows each result's photo when it has one, and a category glyph when it does not", async () => {
+    await searchTwo();
+
+    const withPhoto = within(screen.getByTestId('food-search-result-food-2'));
+    expect(withPhoto.UNSAFE_getByType(Image).props.source).toEqual({
+      uri: 'https://images.example/oreo-front.jpg',
+    });
+    expect(
+      within(screen.getByTestId('food-search-result-food-1')).UNSAFE_queryAllByType(Image),
+    ).toHaveLength(0);
+  });
+
+  it('separates result rows with a hairline, none above the first', async () => {
+    await searchTwo();
+
+    const first = StyleSheet.flatten(screen.getByTestId('food-search-result-food-1').props.style);
+    const second = StyleSheet.flatten(screen.getByTestId('food-search-result-food-2').props.style);
+    expect(first.borderTopWidth).toBeUndefined();
+    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+  });
+
+  it('shows the detail with calories as the accent mono readout and exactly one filled button', async () => {
+    await searchTwo();
+    fireEvent.press(screen.getByTestId('food-search-result-food-1'));
+
+    const calories = StyleSheet.flatten(
+      (await screen.findByTestId('food-search-detail-calories')).props.style,
+    );
+    expect(calories.fontFamily).toBe(fonts.monoBold);
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    // Hero (picture, serving, calories) and macros.
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+  });
+
+  it('labels the Log Food step: named quantity field, one filled button that reports busy', async () => {
+    await searchTwo();
+    fireEvent.press(screen.getByTestId('food-search-result-food-1'));
+    fireEvent.press(await screen.findByTestId('food-search-log-button'));
+
+    expect((await screen.findByTestId('log-food-quantity')).props.accessibilityLabel).toBe(
+      'Quantity',
+    );
+    mockLogFood.mockReturnValue(new Promise(() => undefined));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('log-food-submit'));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('log-food-submit').props.accessibilityState).toEqual({
+      disabled: true,
+      busy: true,
+    });
+  });
+
+  it('renders no bare text outside <Text> on the results, the detail or the log step', async () => {
+    await searchTwo();
+    expectNoBareText();
+    fireEvent.press(screen.getByTestId('food-search-result-food-2'));
+    await screen.findByTestId('food-search-detail-card');
+    expectNoBareText();
+    fireEvent.press(screen.getByTestId('food-search-log-button'));
+    await screen.findByTestId('log-food-quantity');
+    expectNoBareText();
   });
 });

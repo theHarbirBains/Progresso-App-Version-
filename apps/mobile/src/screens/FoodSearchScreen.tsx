@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { Text } from '../design/Text';
+import { ActivityIndicator, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -8,13 +7,15 @@ import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
-import { LoadingState } from '../design/LoadingState';
+import { ListRow } from '../design/ListRow';
+import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
-import { StatValue } from '../design/StatValue';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import { getMyProfile, searchFoods, type FoodSearchResult } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { FoodFacts } from '../nutrition/FoodFacts';
+import { FoodImage } from '../nutrition/FoodImage';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { buildAccentTheme, DEFAULT_NUTRITION_THEME, type AccentTheme } from '../theme/accentColor';
 import { foodSearchStyles as styles } from './foodSearchStyles';
@@ -22,11 +23,6 @@ import { foodSearchStyles as styles } from './foodSearchStyles';
 type Props = RootStackScreenProps<'FoodSearch'>;
 
 const SEARCH_DEBOUNCE_MS = 300;
-
-/** "—" for a macro the provider genuinely didn't report -- never fabricated as 0. */
-function formatMacro(value: number | null): string {
-  return value === null ? '—' : String(value);
-}
 
 // Searches Progresso's food database (generic foods plus real branded
 // grocery products cached from an external provider -- see
@@ -39,6 +35,11 @@ function formatMacro(value: number | null): string {
 // didn't supply (null, shown as "—" on this screen) becomes 0 only at the
 // point of logging, since food_logs' own columns are NOT NULL -- never
 // displayed as a fabricated 0 beforehand.
+//
+// Layout: the search field is pinned under the header; the results sit in
+// one widget as rows (the food's picture, name, "brand · serving", calories as
+// a mono value) separated by hairlines; the detail is the shared FoodFacts
+// widgets with one filled Log Food button.
 export function FoodSearchScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -125,6 +126,7 @@ export function FoodSearchScreen({ navigation }: Props) {
           proteinG: selected.proteinG ?? 0,
           carbsG: selected.carbsG ?? 0,
           fatG: selected.fatG ?? 0,
+          imageUrl: selected.imageUrl,
         }}
         userId={userId}
         accentColor={theme.accent}
@@ -137,108 +139,77 @@ export function FoodSearchScreen({ navigation }: Props) {
 
   if (selected) {
     return (
-      <View style={styles.screen}>
-        <AppHeader
-          title={selected.name}
-          subtitle={selected.brand ?? undefined}
-          onBack={() => setSelected(null)}
-          testID="food-search-detail-header"
-        />
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <AppCard testID="food-search-detail-card">
-            <Text testID="food-search-detail-serving" style={styles.detailServing}>
-              Serving: {selected.servingSize} {selected.servingUnit}
-            </Text>
+      <Screen
+        scrollTestID="food-search-detail-scroll"
+        header={
+          <AppHeader
+            title={selected.name}
+            subtitle={selected.brand ?? undefined}
+            onBack={() => setSelected(null)}
+            testID="food-search-detail-header"
+          />
+        }
+      >
+        <View testID="food-search-detail-card">
+          <FoodFacts
+            name={selected.name}
+            imageUrl={selected.imageUrl}
+            servingSize={selected.servingSize}
+            servingUnit={selected.servingUnit}
+            calories={selected.calories}
+            proteinG={selected.proteinG}
+            carbsG={selected.carbsG}
+            fatG={selected.fatG}
+            showAttribution={selected.provider === 'open_food_facts'}
+            accentColor={theme.accent}
+            testIDs={{
+              serving: 'food-search-detail-serving',
+              calories: 'food-search-detail-calories',
+              protein: 'food-search-detail-protein',
+              carbs: 'food-search-detail-carbs',
+              fat: 'food-search-detail-fat',
+              attribution: 'food-search-detail-attribution',
+            }}
+          />
+        </View>
 
-            <View style={styles.detailCalorieRow}>
-              <StatValue
-                testID="food-search-detail-calories"
-                value={String(selected.calories)}
-                unit=" cal"
-                color={theme.accent}
-              />
-            </View>
-
-            <View style={styles.detailMacroRow}>
-              <View style={styles.detailMacroItem}>
-                <Text style={styles.detailMacroLabel}>Protein</Text>
-                <StatValue
-                  testID="food-search-detail-protein"
-                  size="medium"
-                  value={formatMacro(selected.proteinG)}
-                  unit={selected.proteinG === null ? undefined : 'g'}
-                  color={colors.textPrimary}
-                />
-              </View>
-              <View style={styles.detailMacroItem}>
-                <Text style={styles.detailMacroLabel}>Carbs</Text>
-                <StatValue
-                  testID="food-search-detail-carbs"
-                  size="medium"
-                  value={formatMacro(selected.carbsG)}
-                  unit={selected.carbsG === null ? undefined : 'g'}
-                  color={colors.textPrimary}
-                />
-              </View>
-              <View style={styles.detailMacroItem}>
-                <Text style={styles.detailMacroLabel}>Fat</Text>
-                <StatValue
-                  testID="food-search-detail-fat"
-                  size="medium"
-                  value={formatMacro(selected.fatG)}
-                  unit={selected.fatG === null ? undefined : 'g'}
-                  color={colors.textPrimary}
-                />
-              </View>
-            </View>
-
-            {/* Open Food Facts' ODbL license asks integrations to credit
-                the source -- kept to one small muted line on the detail
-                view only (never on search result rows), not a badge. */}
-            {selected.provider === 'open_food_facts' ? (
-              <Text testID="food-search-detail-attribution" style={styles.detailAttribution}>
-                Data from Open Food Facts
-              </Text>
-            ) : null}
-          </AppCard>
-
-          <View style={styles.logButtonWrap}>
-            <PrimaryButton
-              testID="food-search-log-button"
-              label="Log Food"
-              onPress={() => setLogging(true)}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-          </View>
-        </ScrollView>
-      </View>
+        <View style={styles.logButtonWrap}>
+          <PrimaryButton
+            testID="food-search-log-button"
+            label="Log Food"
+            onPress={() => setLogging(true)}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.screen}>
-      <AppHeader
-        title="Search Food"
-        onBack={() => navigation.goBack()}
-        testID="food-search-header"
-      />
-
-      <View style={styles.searchRow}>
-        <TextInput
-          testID="food-search-input"
-          placeholder="Search foods (e.g. chicken breast)"
-          value={searchInput}
-          onChangeText={setSearchInput}
-          autoCapitalize="none"
-          leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
-        />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+    <Screen
+      scrollTestID="food-search-scroll"
+      header={
+        <View>
+          <AppHeader
+            title="Search Food"
+            onBack={() => navigation.goBack()}
+            testID="food-search-header"
+          />
+          <View style={styles.searchRow}>
+            <TextInput
+              testID="food-search-input"
+              placeholder="Search foods (e.g. chicken breast)"
+              value={searchInput}
+              onChangeText={setSearchInput}
+              autoCapitalize="none"
+              leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
+            />
+          </View>
+        </View>
+      }
+    >
+      <AppCard testID="food-search-results-card">
         {error ? (
           <ErrorState
             testID="food-search-error"
@@ -248,47 +219,38 @@ export function FoodSearchScreen({ navigation }: Props) {
             }}
           />
         ) : loading ? (
-          <LoadingState testID="food-search-loading" />
+          <View style={styles.loading}>
+            <ActivityIndicator
+              testID="food-search-loading"
+              size="large"
+              color={colors.textPrimary}
+            />
+          </View>
         ) : search === '' ? (
           <EmptyState
             testID="food-search-empty-initial"
-            icon={<Feather name="search" size={24} color={colors.textMuted} />}
             title="Search for a food to see its nutrition info"
           />
         ) : results.length === 0 ? (
-          <EmptyState
-            testID="food-search-empty-results"
-            icon={<Feather name="inbox" size={24} color={colors.textMuted} />}
-            title={`No foods found for "${search}"`}
-          />
+          <EmptyState testID="food-search-empty-results" title={`No foods found for "${search}"`} />
         ) : (
           <>
             <SectionHeader label="Results" />
-            {results.map((food) => (
-              <AppCard
+            {results.map((food, index) => (
+              <ListRow
                 key={food.id}
                 testID={`food-search-result-${food.id}`}
+                leading={<FoodImage uri={food.imageUrl} name={food.name} size={44} />}
+                title={food.name}
+                subtitle={`${food.brand ? `${food.brand} · ` : ''}${food.servingSize} ${food.servingUnit}`}
+                value={`${food.calories} cal`}
+                divider={index > 0}
                 onPress={() => setSelected(food)}
-                style={styles.resultCard}
-              >
-                <View style={styles.resultRow}>
-                  <View style={styles.resultIconWrap}>
-                    <Feather name="circle" size={16} color={theme.accent} />
-                  </View>
-                  <View style={styles.resultBody}>
-                    <Text style={styles.resultName}>{food.name}</Text>
-                    <Text style={styles.resultMeta}>
-                      {food.brand ? `${food.brand} · ` : ''}
-                      {food.servingSize} {food.servingUnit}
-                    </Text>
-                  </View>
-                  <Text style={styles.resultCalories}>{food.calories} cal</Text>
-                </View>
-              </AppCard>
+              />
             ))}
           </>
         )}
-      </ScrollView>
-    </View>
+      </AppCard>
+    </Screen>
   );
 }

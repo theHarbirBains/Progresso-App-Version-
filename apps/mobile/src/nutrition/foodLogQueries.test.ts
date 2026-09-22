@@ -137,6 +137,26 @@ describe('fetchTodaysFoodLogs', () => {
     expect(calls.lt).toEqual([['logged_at', end.toISOString()]]);
   });
 
+  it("also reads each food's photo through the food link, for both an object and an array embed", async () => {
+    const { calls } = mockTable({
+      data: [
+        { ...dbRow, foods: { image_url: 'https://images.example/a.jpg' } },
+        { ...dbRow, id: 'log-2', foods: [{ image_url: 'https://images.example/b.jpg' }] },
+        { ...dbRow, id: 'log-3', foods: null },
+      ],
+      error: null,
+    });
+
+    const result = await fetchTodaysFoodLogs('user-1', new Date(2026, 1, 15, 12, 0, 0));
+
+    expect(calls.select?.[0]?.[0]).toContain('foods(image_url)');
+    expect(result.map((log) => log.imageUrl)).toEqual([
+      'https://images.example/a.jpg',
+      'https://images.example/b.jpg',
+      null,
+    ]);
+  });
+
   it('throws on a query error', async () => {
     mockTable({ data: null, error: { message: 'boom' } });
 

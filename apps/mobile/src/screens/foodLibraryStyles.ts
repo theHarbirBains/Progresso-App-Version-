@@ -1,173 +1,61 @@
 import { StyleSheet } from 'react-native';
-import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
+import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 
 const INDEX_RAIL_WIDTH = 20;
 
-// Local to FoodLibraryScreen.tsx. A primary bottom-tab destination (like
-// Dashboard), not a pushed detail screen -- so its header is a hamburger +
-// brand row (side menu always reachable, no dead-end back button) rather
-// than AppHeader's back-button shape, mirroring dashboardStyles.ts's own
-// top bar.
+// FoodLibraryScreen. Token-only. The frame (safe area, fixed header, transparent
+// root) is the shared `Screen` and each food is a `ListRow`, so this holds only
+// the controls block above the list and the row/rail geometry.
 export const foodLibraryStyles = StyleSheet.create({
-  screen: {
+  flex: {
     flex: 1,
-    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
-    // paints the selected Background Theme; screens no longer hardcode it.
-    backgroundColor: 'transparent',
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  // The whole page: the mode toggle, the search/count widget and the list
+  // widget (which takes the remaining height and scrolls inside itself),
+  // `widgetGap` apart.
+  page: {
+    flex: 1,
+    gap: widgetGap,
     paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.lg,
+    paddingBottom: spacing.lg,
   },
-  topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  logo: {
-    width: 22,
-    height: 22,
-  },
-  wordmark: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-
-  // Wraps the shared ModeToggle (design/ModeToggle.tsx) -- Food is one of
-  // the app's primary/root screens, so it keeps this the same way Dashboard
-  // does; deeper screens reached from here don't.
   modeToggleWrap: {
-    paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xs,
   },
-
-  titleBlock: {
-    paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.lg,
+  listCard: {
+    flex: 1,
   },
-  title: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
+  block: {
+    marginBottom: spacing.md,
   },
-  subtitle: {
-    ...typeScale.body,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-
-  searchWrap: {
-    paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.lg,
-  },
-
   countRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xxl,
-    marginBottom: spacing.sm,
   },
   countText: {
     ...typeScale.secondary,
     color: colors.textSecondary,
   },
-  countRowActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+  padded: {
+    paddingHorizontal: spacing.xxl,
   },
-  sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: radii.pill,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-  },
-  sortButtonText: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  addButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+  loading: {
+    paddingVertical: spacing.xxl,
   },
 
   listContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingRight: spacing.xxl + INDEX_RAIL_WIDTH,
-    paddingBottom: spacing.xxxl,
+    paddingRight: INDEX_RAIL_WIDTH,
   },
-  sectionHeader: {
-    backgroundColor: colors.background,
-    paddingVertical: spacing.xs,
-  },
-  sectionHeaderText: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-    fontWeight: '700',
-  },
-
+  // A food row: the ListRow (logs it) beside its edit button; consecutive
+  // rows in a section are separated by a hairline across both.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
   },
-  rowTouchable: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  rowIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowBody: {
-    flex: 1,
-  },
-  rowName: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-  },
-  rowMeta: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  rowCalories: {
-    fontFamily: fonts.monoBold,
-    color: colors.textPrimary,
-    fontSize: 14,
-  },
-  rowEditButton: {
-    padding: spacing.xs,
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
   },
 
   indexRailWrap: {
@@ -176,21 +64,5 @@ export const foodLibraryStyles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-  },
-
-  emptyWrap: {
-    paddingTop: spacing.xxl,
-  },
-
-  logFoodContent: {
-    paddingHorizontal: spacing.xxl,
-  },
-  logFoodField: {
-    marginTop: spacing.lg,
-  },
-  logFoodError: {
-    ...typeScale.caption,
-    color: colors.destructive,
-    marginTop: spacing.sm,
   },
 });

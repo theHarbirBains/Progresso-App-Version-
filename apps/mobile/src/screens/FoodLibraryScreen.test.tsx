@@ -1,7 +1,13 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { Alert, Image, StyleSheet } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { AppCard } from '../design/AppCard';
+import { PrimaryButton } from '../design/Button';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { uploadFoodPhoto } from '../lib/foodPhotoUpload';
 import { logFood } from '../nutrition/foodLogQueries';
 import { createFood, fetchAllFoods, updateFood } from '../nutrition/foodQueries';
 import { FoodLibraryScreen } from './FoodLibraryScreen';
@@ -20,6 +26,10 @@ jest.mock('../nutrition/foodQueries', () => ({
   updateFood: jest.fn(),
 }));
 
+jest.mock('../lib/foodPhotoUpload', () => ({
+  uploadFoodPhoto: jest.fn(),
+}));
+
 jest.mock('../nutrition/foodLogQueries', () => ({
   logFood: jest.fn(),
 }));
@@ -30,6 +40,7 @@ const mockFetchAllFoods = fetchAllFoods as jest.Mock;
 const mockCreateFood = createFood as jest.Mock;
 const mockUpdateFood = updateFood as jest.Mock;
 const mockLogFood = logFood as jest.Mock;
+const mockUploadFoodPhoto = uploadFoodPhoto as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
@@ -97,6 +108,7 @@ beforeEach(() => {
   mockCreateFood.mockReset();
   mockUpdateFood.mockReset();
   mockLogFood.mockReset();
+  mockUploadFoodPhoto.mockReset();
   mockGoBack.mockClear();
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
@@ -114,34 +126,6 @@ describe('FoodLibraryScreen', () => {
     expect(mockFetchAllFoods).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1', search: '', ascending: true }),
     );
-  });
-
-  it('shows the Workout/Nutrition mode toggle, since Food is a primary/root screen', async () => {
-    renderScreen();
-    await screen.findByTestId('food-item-food-apple');
-
-    expect(screen.getByTestId('food-library-mode-workout')).toBeTruthy();
-    expect(screen.getByTestId('food-library-mode-nutrition')).toBeTruthy();
-  });
-
-  it('navigates to Dashboard (Workout’s Home), not to Workouts, when the Workout segment is pressed', async () => {
-    renderScreen();
-    await screen.findByTestId('food-item-food-apple');
-
-    fireEvent.press(screen.getByTestId('food-library-mode-workout'));
-
-    expect(mockReportMode).toHaveBeenCalledWith('workout');
-    expect(mockNavigate).toHaveBeenCalledWith('Dashboard');
-  });
-
-  it('does nothing when the already-selected Nutrition segment is pressed', async () => {
-    renderScreen();
-    await screen.findByTestId('food-item-food-apple');
-
-    fireEvent.press(screen.getByTestId('food-library-mode-nutrition'));
-
-    expect(mockReportMode).not.toHaveBeenCalled();
-    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('shows the real, non-fabricated count of saved foods', async () => {
@@ -271,6 +255,164 @@ describe('FoodLibraryScreen', () => {
     expect(screen.getByTestId('food-form-barcode')).toHaveProp('value', '012345678905');
   });
 
+  it('carries straight on to logging the food it just created for a scanned barcode', async () => {
+    mockCreateFood.mockResolvedValue({
+      ...apple,
+      id: 'food-scanned',
+      name: 'Mystery Bar',
+      barcode: '012345678905',
+    });
+    renderScreen('nutrition', { openCreate: true, barcode: '012345678905' });
+
+    fireEvent.changeText(await screen.findByTestId('food-form-name'), 'Mystery Bar');
+    fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '40');
+    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
+    fireEvent.changeText(screen.getByTestId('food-form-calories'), '180');
+    fireEvent.changeText(screen.getByTestId('food-form-protein'), '10');
+    fireEvent.changeText(screen.getByTestId('food-form-carbs'), '20');
+    fireEvent.changeText(screen.getByTestId('food-form-fat'), '6');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('food-form-save'));
+    });
+
+    // Saved with the scanned barcode...
+    expect(mockCreateFood).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ name: 'Mystery Bar', barcode: '012345678905' }),
+    );
+    // ...and now on the log step for that very food, not back at the list.
+    expect(await screen.findByTestId('log-food-quantity')).toBeTruthy();
+    expect(screen.getByText('Mystery Bar')).toBeTruthy();
+
+    mockLogFood.mockResolvedValue(undefined);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('log-food-submit'));
+    });
+    expect(mockLogFood).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ id: 'food-scanned' }),
+      1,
+      expect.anything(),
+    );
+    // Done returns to Nutrition, not back to the scanner's not-found screen.
+    expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
+  });
+
+  it('goes back to the list, not to logging, after creating a food the ordinary way', async () => {
+    mockCreateFood.mockResolvedValue({ ...apple, id: 'food-3', name: 'Almonds' });
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    fireEvent.press(screen.getByTestId('food-create-button'));
+    fireEvent.changeText(await screen.findByTestId('food-form-name'), 'Almonds');
+    fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '28');
+    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
+    fireEvent.changeText(screen.getByTestId('food-form-calories'), '160');
+    fireEvent.changeText(screen.getByTestId('food-form-protein'), '6');
+    fireEvent.changeText(screen.getByTestId('food-form-carbs'), '6');
+    fireEvent.changeText(screen.getByTestId('food-form-fat'), '14');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('food-form-save'));
+    });
+
+    expect(await screen.findByTestId('food-item-food-apple')).toBeTruthy();
+    expect(screen.queryByTestId('log-food-quantity')).toBeNull();
+  });
+
+  it("shows a food's photo on its row when it has one, and a glyph when it does not", async () => {
+    mockFetchAllFoods.mockResolvedValue([
+      { ...apple, imageUrl: 'https://images.example/apple.jpg' },
+      { ...banana, imageUrl: null },
+    ]);
+    renderScreen();
+
+    const withPhoto = await screen.findByTestId('food-item-food-apple');
+    expect(within(withPhoto).UNSAFE_getByType(Image).props.source).toEqual({
+      uri: 'https://images.example/apple.jpg',
+    });
+    expect(
+      within(screen.getByTestId('food-item-food-banana')).UNSAFE_queryAllByType(Image),
+    ).toHaveLength(0);
+  });
+
+  it('lets the user add a photo of a custom food, uploading it on save and storing its URL', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === 'Choose from Library')?.onPress?.();
+    });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file://food.jpg' }],
+    });
+    mockUploadFoodPhoto.mockResolvedValue('https://images.example/food.jpg');
+    mockCreateFood.mockResolvedValue({ ...apple, id: 'food-3', name: 'Almonds' });
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    fireEvent.press(screen.getByTestId('food-create-button'));
+    fireEvent.changeText(await screen.findByTestId('food-form-name'), 'Almonds');
+    expect(screen.getByTestId('food-form-photo-add')).toHaveTextContent('Add Photo');
+    fireEvent.press(screen.getByTestId('food-form-photo-add'));
+    expect(await screen.findByTestId('food-form-photo-remove')).toBeTruthy();
+    expect(screen.getByTestId('food-form-photo-add')).toHaveTextContent('Change Photo');
+    fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '28');
+    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
+    fireEvent.changeText(screen.getByTestId('food-form-calories'), '160');
+    fireEvent.changeText(screen.getByTestId('food-form-protein'), '6');
+    fireEvent.changeText(screen.getByTestId('food-form-carbs'), '6');
+    fireEvent.changeText(screen.getByTestId('food-form-fat'), '14');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('food-form-save'));
+    });
+
+    expect(mockUploadFoodPhoto).toHaveBeenCalledWith('user-1', 'file://food.jpg');
+    expect(mockCreateFood).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ imageUrl: 'https://images.example/food.jpg' }),
+    );
+  });
+
+  it('saves a food with no photo when none was chosen, without touching storage', async () => {
+    mockCreateFood.mockResolvedValue({ ...apple, id: 'food-3', name: 'Almonds' });
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    fireEvent.press(screen.getByTestId('food-create-button'));
+    fireEvent.changeText(await screen.findByTestId('food-form-name'), 'Almonds');
+    fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '28');
+    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
+    fireEvent.changeText(screen.getByTestId('food-form-calories'), '160');
+    fireEvent.changeText(screen.getByTestId('food-form-protein'), '6');
+    fireEvent.changeText(screen.getByTestId('food-form-carbs'), '6');
+    fireEvent.changeText(screen.getByTestId('food-form-fat'), '14');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('food-form-save'));
+    });
+
+    expect(mockUploadFoodPhoto).not.toHaveBeenCalled();
+    expect(mockCreateFood.mock.calls[0][1]).not.toHaveProperty('imageUrl');
+  });
+
+  it('shows the photo an existing food has, and clears it on save when removed', async () => {
+    mockFetchAllFoods.mockResolvedValue([
+      { ...apple, imageUrl: 'https://images.example/apple.jpg' },
+    ]);
+    mockUpdateFood.mockResolvedValue(apple);
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    fireEvent.press(screen.getByTestId('food-edit-food-apple'));
+    fireEvent.press(await screen.findByTestId('food-form-photo-remove'));
+    expect(screen.queryByTestId('food-form-photo-remove')).toBeNull();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('food-form-save'));
+    });
+
+    expect(mockUpdateFood).toHaveBeenCalledWith(
+      'food-apple',
+      expect.objectContaining({ imageUrl: null }),
+    );
+  });
+
   it('creates a food with the optional brand and barcode filled in', async () => {
     mockCreateFood.mockResolvedValue({ ...apple, id: 'food-3', name: 'Almonds' });
 
@@ -368,5 +510,122 @@ describe('FoodLibraryScreen', () => {
     fireEvent.press(screen.getByTestId('app-header-back'));
 
     expect(await screen.findByTestId('food-item-food-apple')).toBeTruthy();
+  });
+});
+
+describe('FoodLibraryScreen -- widgets, "+" in the header', () => {
+  it('is two widgets (search and count, then the list), and puts a named "+" in the header beside the menu', async () => {
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+    expect(
+      within(screen.getByTestId('food-library-controls')).getByTestId('food-search'),
+    ).toBeTruthy();
+    expect(
+      within(screen.getByTestId('food-library-list-card')).getByTestId('food-item-food-apple'),
+    ).toBeTruthy();
+    expect(screen.getByTestId('food-create-button').props.accessibilityLabel).toBe(
+      'Add a new food',
+    );
+    expect(screen.getByText('Food Library')).toBeTruthy();
+  });
+
+  it('shows each food as a row: name, serving, calories as a mono value -- with a named 44pt edit button', async () => {
+    renderScreen();
+
+    const row = await screen.findByTestId('food-item-food-apple');
+    expect(row.props.accessibilityRole).toBe('button');
+    expect(row).toHaveTextContent(/Apple/);
+    expect(row).toHaveTextContent(/95 cal/);
+    const edit = screen.getByTestId('food-edit-food-apple');
+    expect(edit.props.accessibilityLabel).toBe('Edit Apple');
+    const slop = edit.props.hitSlop as { top: number; bottom: number };
+    expect(
+      StyleSheet.flatten(edit.props.style).height + slop.top + slop.bottom,
+    ).toBeGreaterThanOrEqual(44);
+  });
+
+  it('shows sort as a quiet text action, not a bordered pill', async () => {
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    const sort = screen.getByTestId('food-library-sort');
+    expect(sort).toHaveTextContent('Sort A → Z');
+    expect(StyleSheet.flatten(sort.props.style).borderWidth).toBeUndefined();
+    expect(sort.props.accessibilityLabel).toBe('Toggle sort order');
+  });
+
+  it('offers Create a food as the empty state action', async () => {
+    mockFetchAllFoods.mockResolvedValue([]);
+    renderScreen();
+
+    const create = await screen.findByTestId('food-empty-create');
+    expect(create).toHaveTextContent('Create a food');
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(0);
+  });
+
+  it('renders no bare text outside <Text>', async () => {
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    expectNoBareText();
+  });
+});
+
+describe('FoodFormScreen (via Food Library) -- labelled inputs, one primary action', () => {
+  it('uses labelled shared inputs and a named Cancel', async () => {
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+    fireEvent.press(screen.getByTestId('food-create-button'));
+
+    const name = await screen.findByTestId('food-form-name');
+    expect(name.props.accessibilityLabel).toBe('Name');
+    expect(screen.getByTestId('food-form-serving-size').props.accessibilityLabel).toBe(
+      'Serving size',
+    );
+    expect(screen.getByTestId('food-form-protein').props.accessibilityLabel).toBe('Protein (g)');
+    expect(screen.getByTestId('food-form-cancel').props.accessibilityLabel).toBe('Cancel');
+    // Details, Serving and Nutrition per serving.
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(3);
+  });
+
+  it('has one filled Save, disabled until the form is valid, and busy while saving', async () => {
+    mockCreateFood.mockReturnValue(new Promise(() => undefined));
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+    fireEvent.press(screen.getByTestId('food-create-button'));
+    await screen.findByTestId('food-form-name');
+
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    expect(screen.getByTestId('food-form-save').props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.changeText(screen.getByTestId('food-form-name'), 'Cherry');
+    fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '150');
+    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
+    fireEvent.changeText(screen.getByTestId('food-form-calories'), '50');
+    fireEvent.changeText(screen.getByTestId('food-form-protein'), '1');
+    fireEvent.changeText(screen.getByTestId('food-form-carbs'), '12');
+    fireEvent.changeText(screen.getByTestId('food-form-fat'), '0');
+    expect(screen.getByTestId('food-form-save').props.accessibilityState.disabled).toBe(false);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('food-form-save'));
+    });
+    expect(screen.getByTestId('food-form-save').props.accessibilityState).toEqual({
+      disabled: true,
+      busy: true,
+    });
+  });
+
+  it('shows Deactivate as a destructive outline beneath Save when editing', async () => {
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+    fireEvent.press(screen.getByTestId('food-edit-food-apple'));
+
+    const toggle = await screen.findByTestId('food-form-toggle-active');
+    expect(toggle).toHaveTextContent('Deactivate');
+    expect(StyleSheet.flatten(toggle.props.style).borderWidth).toBe(1);
+    expectNoBareText();
   });
 });

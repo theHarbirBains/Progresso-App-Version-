@@ -24,6 +24,8 @@ export interface FoodLogRow {
   /** Null for any log written before the food_log_meals_and_images migration -- never guessed. */
   mealType: MealType | null;
   loggedAt: string;
+  /** The food's photo as it is now -- a presentation detail, not part of the nutrition snapshot. Only loaded for today's list; null when the food has none (or was deleted). */
+  imageUrl?: string | null;
 }
 
 interface FoodLogDbRow {
@@ -39,6 +41,13 @@ interface FoodLogDbRow {
   fat_g: string | number;
   meal_type: string | null;
   logged_at: string;
+  // A to-one embed comes back as an object; the client's inferred type says array, so both are read.
+  foods?: { image_url: string | null } | { image_url: string | null }[] | null;
+}
+
+function embeddedImageUrl(foods: FoodLogDbRow['foods']): string | null {
+  const food = Array.isArray(foods) ? foods[0] : foods;
+  return food?.image_url ?? null;
 }
 
 function toFoodLogRow(row: FoodLogDbRow): FoodLogRow {
@@ -55,11 +64,16 @@ function toFoodLogRow(row: FoodLogDbRow): FoodLogRow {
     fatG: Number(row.fat_g),
     mealType: row.meal_type as MealType | null,
     loggedAt: row.logged_at,
+    ...(row.foods !== undefined ? { imageUrl: embeddedImageUrl(row.foods) } : {}),
   };
 }
 
 const FOOD_LOG_COLUMNS =
   'id, food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, meal_type, logged_at';
+
+// Today's list also shows each food's picture, read through the food_id link
+// rather than copied into the log.
+const TODAYS_FOOD_LOG_COLUMNS = `${FOOD_LOG_COLUMNS}, foods(image_url)`;
 
 /**
  * The current device's local calendar day as an absolute [start, end)
@@ -81,7 +95,7 @@ export async function fetchTodaysFoodLogs(
 
   const { data, error } = await supabase
     .from('food_logs')
-    .select(FOOD_LOG_COLUMNS)
+    .select(TODAYS_FOOD_LOG_COLUMNS)
     .eq('user_id', userId)
     .gte('logged_at', start.toISOString())
     .lt('logged_at', end.toISOString())

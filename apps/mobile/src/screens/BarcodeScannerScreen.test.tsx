@@ -1,6 +1,9 @@
+import { Linking, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Linking } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
+import { PrimaryButton } from '../design/Button';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { getFoodByBarcode, getMyProfile } from '../lib/api';
 import { logFood } from '../nutrition/foodLogQueries';
 import { BarcodeScannerScreen } from './BarcodeScannerScreen';
@@ -218,7 +221,7 @@ describe('BarcodeScannerScreen scan -> lookup flow', () => {
     expect(mockGetFoodByBarcode).toHaveBeenLastCalledWith('token-123', '0066721016123');
   });
 
-  it('offers Search Food and Create Custom Food from the not-found state', async () => {
+  it('opens manual entry, carrying the scanned barcode, from the not-found state', async () => {
     mockGetFoodByBarcode.mockResolvedValue(null);
     render(<BarcodeScannerScreen navigation={navigation} route={route} />);
     await screen.findByTestId('barcode-scanner-camera');
@@ -297,5 +300,63 @@ describe('BarcodeScannerScreen logging', () => {
     expect(await screen.findByTestId('barcode-scanner-attribution')).toHaveTextContent(
       /Open Food Facts/,
     );
+  });
+});
+
+describe('BarcodeScannerScreen -- one primary action per state', () => {
+  it('shows the found product as the shared fact widgets and one filled button', async () => {
+    mockGetFoodByBarcode.mockResolvedValue(oreo);
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('barcode-scanner-camera');
+    await scan();
+
+    await screen.findByTestId('barcode-scanner-found-header');
+    expect(screen.getByTestId('barcode-scanner-serving')).toHaveTextContent('Serving: 34 g');
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+    expectNoBareText();
+  });
+
+  it('on not-found, makes Enter Manually the one filled button, with Scan Again and Search Food outlined', async () => {
+    mockGetFoodByBarcode.mockResolvedValue(null);
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('barcode-scanner-camera');
+    await scan('0000000000000');
+    await screen.findByTestId('barcode-scanner-not-found');
+
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    expect(screen.getByTestId('barcode-scanner-create-custom')).toHaveTextContent('Enter Manually');
+    for (const id of ['barcode-scanner-scan-again', 'barcode-scanner-search-food']) {
+      expect(StyleSheet.flatten(screen.getByTestId(id).props.style).borderWidth).toBe(1);
+    }
+    expect(
+      screen.getByText("We couldn't find a match for that barcode in our database."),
+    ).toBeTruthy();
+    // Two widgets: what happened, and what to do about it.
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+    expectNoBareText();
+  });
+
+  it('shows which barcode had no match, so it can be checked against the packaging', async () => {
+    mockGetFoodByBarcode.mockResolvedValue(null);
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('barcode-scanner-camera');
+    await scan('0012345678905');
+
+    expect(await screen.findByTestId('barcode-scanner-not-found-code')).toHaveTextContent(
+      '0012345678905',
+    );
+  });
+
+  it('renders no bare text on the camera and permission states', async () => {
+    const { unmount } = render(<BarcodeScannerScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('barcode-scanner-camera');
+    expectNoBareText();
+    unmount();
+
+    mockPermission = { granted: false, canAskAgain: true };
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />);
+    await screen.findByTestId('barcode-scanner-permission-denied');
+    expectNoBareText();
   });
 });

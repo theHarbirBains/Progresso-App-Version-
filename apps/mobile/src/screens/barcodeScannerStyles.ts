@@ -1,12 +1,10 @@
 import { StyleSheet } from 'react-native';
-import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
+import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
-// Local to BarcodeScannerScreen.tsx. The live-camera state is the one
-// screen in the app that's genuinely full-bleed (the camera itself, not a
-// Background Theme) -- AppHeader is layered on top as an absolute overlay
-// (same "fixed chrome over live content" shape Dashboard's own header
-// uses) rather than pushing the camera down, so the preview fills the
-// whole screen right up to the header's own glass.
+// BarcodeScannerScreen. Token-only. The live-camera state is the one screen in
+// the app that is genuinely full-bleed (the camera itself, not a Background
+// Theme): the header is layered over it as an absolute overlay rather than
+// pushing the preview down. Every other state is the shared `Screen`.
 export const barcodeScannerStyles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -38,71 +36,45 @@ export const barcodeScannerStyles = StyleSheet.create({
     borderRadius: radii.lg,
     borderWidth: 3,
   },
+  // The hint sits on a solid pill so it stays legible over any live image,
+  // instead of a text shadow.
+  hintPill: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
   frameHint: {
-    ...typeScale.body,
+    ...typeScale.callout,
     color: colors.textPrimary,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.65)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
 
-  permissionContent: {
-    flex: 1,
+  // Permission / not-found / error states: content centred in the space under
+  // the header, with the actions beneath it.
+  centered: {
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
-    gap: spacing.xl,
+    gap: widgetGap,
   },
-  permissionActions: {
-    gap: spacing.md,
-  },
-
-  foundContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.lg,
-  },
-  foundServing: {
-    ...typeScale.body,
+  // The code that had no match, in the mono face, so it can be checked
+  // against the packaging.
+  scannedCode: {
+    ...typeScale.statSmall,
     color: colors.textSecondary,
-    marginBottom: spacing.lg,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
-  foundCalories: {
-    fontFamily: fonts.monoBold,
-    color: colors.textPrimary,
-    fontSize: 30,
-    marginBottom: spacing.xl,
-  },
-  foundMacroRow: {
-    flexDirection: 'row',
-    gap: spacing.xl,
-    marginBottom: spacing.lg,
-  },
-  foundMacro: {
+  manualHint: {
     ...typeScale.secondary,
-    color: colors.textSecondary,
-  },
-  foundAttribution: {
-    ...typeScale.caption,
     color: colors.textMuted,
-    marginBottom: spacing.xl,
-  },
-  foundButtonWrap: {
+    textAlign: 'center',
     marginTop: spacing.md,
   },
-
-  fallbackContent: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
-    gap: spacing.lg,
-  },
-  fallbackSubtitle: {
-    ...typeScale.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: -spacing.md,
-  },
-  fallbackActions: {
+  actions: {
     gap: spacing.md,
+  },
+
+  foundButtonWrap: {
+    marginTop: spacing.xxl,
   },
 });

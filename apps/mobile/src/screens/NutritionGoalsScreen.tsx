@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { Badge } from '../design/Badge';
+import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { LoadingState } from '../design/LoadingState';
-import { colors, spacing } from '../design/theme';
+import { Screen } from '../design/Screen';
+import { Section } from '../design/Section';
+import { TextInput } from '../design/TextInput';
 import { getMyProfile, type ProfileResponse } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -24,12 +24,7 @@ import {
   type NutritionGoals,
 } from '../nutrition/nutritionGoalQueries';
 import { feetAndInchesFromCm, kgToLb } from '../onboarding/weightHeightConversion';
-import {
-  buildAccentTheme,
-  DEFAULT_NUTRITION_THEME,
-  withAlpha,
-  type AccentTheme,
-} from '../theme/accentColor';
+import { buildAccentTheme, DEFAULT_NUTRITION_THEME, type AccentTheme } from '../theme/accentColor';
 import { nutritionGoalsStyles as styles } from './nutritionGoalsStyles';
 
 type Props = RootStackScreenProps<'NutritionGoals'>;
@@ -52,51 +47,18 @@ function formatWeight(weightKg: number, unit: 'kg' | 'lb'): string {
   return `${Math.round(value * 10) / 10} ${unit}`;
 }
 
-interface OptionCardProps {
-  testID: string;
-  icon: keyof typeof Feather.glyphMap;
-  title: string;
-  subtitle: string;
-  calories: number;
-  delta: number;
-  accentColor: string;
-}
-
-// One of the 4 calculated-option tiles -- purely informational (see the
-// screen's own comment on why: no onPress, no selection state, no
-// affordance suggesting it's tappable).
-function OptionCard({
-  testID,
-  icon,
-  title,
-  subtitle,
-  calories,
-  delta,
-  accentColor,
-}: OptionCardProps) {
-  const deltaLabel = delta === 0 ? '0' : delta > 0 ? `+${delta}` : String(delta);
-  return (
-    <AppCard testID={testID} style={styles.optionCard}>
-      <View style={[styles.optionIconWrap, { backgroundColor: withAlpha(accentColor, 0.16) }]}>
-        <Feather name={icon} size={18} color={accentColor} />
-      </View>
-      <Text style={styles.optionTitle}>{title}</Text>
-      <Text style={styles.optionSubtitle}>{subtitle}</Text>
-      <Text testID={`${testID}-value`} style={styles.optionValue}>
-        {calories.toLocaleString()}
-      </Text>
-      <Text style={styles.optionValueUnit}>calories/day</Text>
-      <View style={styles.optionDeltaRow}>
-        <Badge
-          label={deltaLabel}
-          color={accentColor}
-          backgroundColor={withAlpha(accentColor, 0.14)}
-        />
-        <Text style={styles.optionDeltaLabel}>vs. maintenance</Text>
-      </View>
-    </AppCard>
-  );
-}
+// The four calculated targets, in the order they are shown -- purely
+// informational rows (no press handler, no selection state).
+const OPTIONS = [
+  { key: 'surplus', testID: 'nutrition-goals-option-surplus', title: 'Weight Gain' },
+  { key: 'maintenance', testID: 'nutrition-goals-option-maintenance', title: 'Maintenance' },
+  { key: 'deficit', testID: 'nutrition-goals-option-deficit', title: 'Weight Loss' },
+  {
+    key: 'aggressiveDeficit',
+    testID: 'nutrition-goals-option-aggressive',
+    title: 'Aggressive Loss',
+  },
+] as const;
 
 /** Whole numbers only (section 7's "whole-number input"), matching the
  * nutrition_goals.calories column's own integer type -- never a decimal. */
@@ -116,11 +78,14 @@ function parseWholeCalories(text: string): number | null {
 // one place that happens; "Edit" just navigates there, and this screen
 // re-fetches + recalculates whenever it regains focus, so an edit there is
 // reflected the moment the user comes back.
+//
+// Layout: a plain summary line with Edit, the four estimates as rows (name,
+// how they differ from maintenance, and the calories as a mono readout), the
+// custom target as one labelled field, one filled Save, then the notes.
 export function NutritionGoalsScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
-  const insets = useSafeAreaInsets();
   const { openMenu } = useAppMenu();
 
   const [theme, setTheme] = useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
@@ -250,33 +215,25 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   const canSave = parsedCustom !== null && !saving;
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <AppHeader
-        title="Nutrition Goals"
-        leftAction={{
-          icon: 'menu',
-          onPress: () => openMenu('nutrition'),
-          accessibilityLabel: 'Open menu',
-          testID: 'nutrition-goals-open-menu',
-        }}
-        testID="nutrition-goals-header"
-        safeArea={false}
-      />
-
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + spacing.xl },
-        ]}
-        showsVerticalScrollIndicator={false}
-        testID="nutrition-goals-scroll"
-      >
-        <Text style={styles.subtitle}>Here are your estimated daily calorie targets.</Text>
-
-        <AppCard testID="nutrition-goals-info-card" style={styles.infoCard}>
-          <View style={[styles.infoIconWrap, { backgroundColor: withAlpha(theme.accent, 0.16) }]}>
-            <Feather name="user" size={20} color={theme.accent} />
-          </View>
+    <Screen
+      scrollTestID="nutrition-goals-scroll"
+      contentContainerStyle={styles.content}
+      header={
+        <AppHeader
+          title="Nutrition Goals"
+          subtitle="Here are your estimated daily calorie targets."
+          leftAction={{
+            icon: 'menu',
+            onPress: () => openMenu('nutrition'),
+            accessibilityLabel: 'Open menu',
+            testID: 'nutrition-goals-open-menu',
+          }}
+          testID="nutrition-goals-header"
+        />
+      }
+    >
+      <AppCard hero topAccent={theme.accent} testID="nutrition-goals-info-card">
+        <View style={styles.infoRow}>
           <View style={styles.infoBody}>
             {summaryParts.length > 0 ? (
               <Text testID="nutrition-goals-summary" style={styles.infoSummary}>
@@ -287,139 +244,112 @@ export function NutritionGoalsScreen({ navigation }: Props) {
             )}
             {activityLabel ? <Text style={styles.infoActivity}>{activityLabel}</Text> : null}
           </View>
-          <TouchableOpacity
+          <TextButton
             testID="nutrition-goals-edit"
-            style={[styles.editButton, { borderColor: theme.accent }]}
-            onPress={() => navigation.navigate('CalorieEstimation')}
-            accessibilityRole="button"
+            label="Edit"
             accessibilityLabel="Edit personal information"
-          >
-            <Text style={[styles.editButtonText, { color: theme.accent }]}>Edit</Text>
-          </TouchableOpacity>
-        </AppCard>
+            onPress={() => navigation.navigate('CalorieEstimation')}
+          />
+        </View>
+      </AppCard>
 
-        {targets ? (
-          <View style={styles.optionsGrid}>
-            <OptionCard
-              testID="nutrition-goals-option-surplus"
-              icon="trending-up"
-              title="Weight Gain"
-              subtitle="(Surplus)"
-              calories={targets.surplus}
-              delta={targets.surplus - targets.maintenance}
-              accentColor={theme.accent}
-            />
-            <OptionCard
-              testID="nutrition-goals-option-maintenance"
-              icon="target"
-              title="Maintenance"
-              subtitle="(Maintenance)"
-              calories={targets.maintenance}
-              delta={0}
-              accentColor={theme.accent}
-            />
-            <OptionCard
-              testID="nutrition-goals-option-deficit"
-              icon="trending-down"
-              title="Weight Loss"
-              subtitle="(Deficit)"
-              calories={targets.deficit}
-              delta={targets.deficit - targets.maintenance}
-              accentColor={theme.accent}
-            />
-            <OptionCard
-              testID="nutrition-goals-option-aggressive"
-              icon="chevrons-down"
-              title="Aggressive Loss"
-              subtitle="(Aggressive Deficit)"
-              calories={targets.aggressiveDeficit}
-              delta={targets.aggressiveDeficit - targets.maintenance}
-              accentColor={theme.accent}
-            />
-          </View>
-        ) : (
-          <AppCard testID="nutrition-goals-incomplete" style={styles.incompleteProfileCard}>
-            <Text style={styles.incompleteProfileTitle}>Complete your information</Text>
-            <Text style={styles.incompleteProfileBody}>
-              Add your gender, birthday, height, weight, and activity level to see personalized
-              calorie targets.
+      {targets ? (
+        <AppCard testID="nutrition-goals-targets">
+          <Section title="Estimated daily targets">
+            {OPTIONS.map((option, index) => {
+              const calories = targets[option.key];
+              const delta = calories - targets.maintenance;
+              return (
+                <View
+                  key={option.testID}
+                  testID={option.testID}
+                  style={[styles.optionRow, index > 0 && styles.optionDivider]}
+                >
+                  <View style={styles.optionBody}>
+                    <Text style={styles.optionTitle}>{option.title}</Text>
+                    <Text style={styles.optionMeta}>
+                      {option.key === 'maintenance'
+                        ? 'Holds your current weight'
+                        : `${delta > 0 ? '+' : ''}${delta} vs. maintenance`}
+                    </Text>
+                  </View>
+                  <View style={styles.optionValueBlock}>
+                    <Text testID={`${option.testID}-value`} style={styles.optionValue}>
+                      {calories.toLocaleString()}
+                    </Text>
+                    <Text style={styles.optionUnit}>calories/day</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </Section>
+        </AppCard>
+      ) : (
+        <AppCard testID="nutrition-goals-incomplete" style={styles.incomplete}>
+          <Text style={styles.incompleteTitle}>Complete your information</Text>
+          <Text style={styles.incompleteBody}>
+            Add your gender, birthday, height, weight, and activity level to see personalized
+            calorie targets.
+          </Text>
+          <SecondaryButton
+            testID="nutrition-goals-complete-profile"
+            label="Add Information"
+            accessibilityLabel="Add your information"
+            onPress={() => navigation.navigate('CalorieEstimation')}
+          />
+        </AppCard>
+      )}
+
+      <AppCard testID="nutrition-goals-custom-card">
+        <Section title="Custom Calorie Target">
+          <TextInput
+            testID="nutrition-goals-custom-input"
+            label="Daily calorie target"
+            helperText="Set as your daily calorie target."
+            placeholder="0"
+            keyboardType="number-pad"
+            value={customInput}
+            onChangeText={setCustomInput}
+            rightAccessory={<Text style={styles.inputUnit}>calories/day</Text>}
+          />
+        </Section>
+
+        <View style={styles.actions}>
+          {error ? (
+            <Text testID="nutrition-goals-error" style={styles.errorText}>
+              {error}
             </Text>
-            <TouchableOpacity
-              testID="nutrition-goals-complete-profile"
-              style={[styles.editButton, { borderColor: theme.accent }]}
-              onPress={() => navigation.navigate('CalorieEstimation')}
-              accessibilityRole="button"
-              accessibilityLabel="Add your information"
-            >
-              <Text style={[styles.editButtonText, { color: theme.accent }]}>Add Information</Text>
-            </TouchableOpacity>
-          </AppCard>
-        )}
-
-        <AppCard testID="nutrition-goals-custom-card" style={styles.customCard}>
-          <Text style={styles.customTitle}>Custom Calorie Target</Text>
-          <Text style={styles.customSubtitle}>Set your own daily calorie target.</Text>
-          <View style={styles.customInputRow}>
-            <TextInput
-              testID="nutrition-goals-custom-input"
-              style={styles.customInput}
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="number-pad"
-              value={customInput}
-              onChangeText={setCustomInput}
-            />
-            <Text style={styles.customInputUnit}>calories/day</Text>
-          </View>
-        </AppCard>
-
-        {error ? (
-          <Text testID="nutrition-goals-error" style={styles.errorText}>
-            {error}
-          </Text>
-        ) : null}
-        {saved ? (
-          <Text testID="nutrition-goals-saved" style={styles.errorText}>
-            Saved
-          </Text>
-        ) : null}
-
-        <TouchableOpacity
-          testID="nutrition-goals-save"
-          style={[
-            styles.saveButton,
-            { backgroundColor: theme.accent },
-            !canSave && styles.saveButtonDisabled,
-          ]}
-          onPress={handleSave}
-          disabled={!canSave}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !canSave }}
-        >
-          <Text style={[styles.saveButtonTitle, { color: theme.onAccent }]}>
-            {saving
-              ? 'Saving…'
-              : parsedCustom !== null
+          ) : null}
+          {saved ? (
+            <Text testID="nutrition-goals-saved" style={styles.savedText}>
+              Saved
+            </Text>
+          ) : null}
+          <PrimaryButton
+            testID="nutrition-goals-save"
+            label={
+              parsedCustom !== null
                 ? `Save ${parsedCustom.toLocaleString()} Calories`
-                : 'Save Calories'}
-          </Text>
-          <Text style={[styles.saveButtonSubtitle, { color: withAlpha(theme.onAccent, 0.8) }]}>
-            Set as my daily target
-          </Text>
-        </TouchableOpacity>
+                : 'Save Calories'
+            }
+            onPress={handleSave}
+            loading={saving}
+            disabled={!canSave && !saving}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+        </View>
+      </AppCard>
 
-        <AppCard testID="nutrition-goals-notes" style={styles.notesCard}>
-          <View style={styles.notesHeaderRow}>
-            <Feather name="info" size={16} color={theme.accent} />
-            <Text style={styles.notesTitle}>Important Notes</Text>
-          </View>
-          <Text style={styles.notesBullet}>
+      <AppCard testID="nutrition-goals-notes">
+        <Section title="Important Notes">
+          <Text style={styles.note}>
             • These are estimates and may vary based on your activity level and body composition.
           </Text>
-          <Text style={styles.notesBullet}>• Adjust based on your progress and how you feel.</Text>
-          <Text style={styles.notesBullet}>• You can always change your target later.</Text>
-        </AppCard>
-      </ScrollView>
-    </View>
+          <Text style={styles.note}>• Adjust based on your progress and how you feel.</Text>
+          <Text style={styles.note}>• You can always change your target later.</Text>
+        </Section>
+      </AppCard>
+    </Screen>
   );
 }

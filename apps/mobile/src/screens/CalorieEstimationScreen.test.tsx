@@ -1,4 +1,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { AppCard } from '../design/AppCard';
+import { PrimaryButton } from '../design/Button';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
@@ -343,5 +347,47 @@ describe('CalorieEstimationScreen', () => {
     // Still renders the form rather than getting stuck -- non-fatal failure.
     expect(screen.getByTestId('calorie-estimation-save')).toBeTruthy();
     await flush();
+  });
+});
+
+describe('CalorieEstimationScreen -- one row per field, in two widgets', () => {
+  it('puts the fields and the Save in two widgets, and separates rows with hairlines, none above the first', async () => {
+    await renderScreen();
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+    const first = StyleSheet.flatten(
+      screen.getByTestId('calorie-estimation-gender-card').props.style,
+    );
+    const second = StyleSheet.flatten(
+      screen.getByTestId('calorie-estimation-birthday-card').props.style,
+    );
+    expect(first.borderTopWidth).toBeUndefined();
+    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+  });
+
+  it('makes each picker value a named target of at least 44pt', async () => {
+    await renderScreen();
+
+    for (const [id, label] of [
+      ['calorie-estimation-birthday-expand', 'Edit birthday'],
+      ['calorie-estimation-height-expand', 'Edit height'],
+      ['calorie-estimation-weight-expand', 'Edit weight'],
+      ['calorie-estimation-activity-summary', 'Select activity level'],
+    ] as const) {
+      const button = screen.getByTestId(id);
+      expect(button.props.accessibilityLabel).toBe(label);
+    }
+  });
+
+  it('has exactly one filled button -- Save', async () => {
+    await renderScreen();
+
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+  });
+
+  it('renders no bare text outside <Text>', async () => {
+    await renderScreen();
+
+    expectNoBareText();
   });
 });

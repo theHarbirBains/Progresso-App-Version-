@@ -1,20 +1,25 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Text } from '../design/Text';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';
+import { Screen } from '../design/Screen';
 import { TextInput } from '../design/TextInput';
+import { colors, spacing, typeScale, widgetGap } from '../design/theme';
+import { FoodImage } from './FoodImage';
 import { logFood } from './foodLogQueries';
 import { defaultMealTypeForTime } from './mealTypes';
 import { calculateLogTotals } from './nutritionCalculations';
 import type { FoodRow } from './foodQueries';
-import { foodLibraryStyles as styles } from '../screens/foodLibraryStyles';
 
 export type LoggableFood = Pick<
   FoodRow,
   'id' | 'name' | 'servingSize' | 'servingUnit' | 'calories' | 'proteinG' | 'carbsG' | 'fatG'
->;
+> & {
+  /** The food's photo, when it has one -- shown on the step; never sent to the log. */
+  imageUrl?: string | null;
+};
 
 interface LogFoodStepProps {
   food: LoggableFood;
@@ -34,6 +39,10 @@ interface LogFoodStepProps {
  * own content once a food is selected. Originally inline in
  * FoodLibraryScreen; extracted so FoodSearchScreen and BarcodeScannerScreen
  * can reuse the exact same step rather than a second logging UI.
+ *
+ * Layout: two widgets `widgetGap` apart -- the food (its picture and serving)
+ * and the Quantity field with a live preview of what that quantity adds up
+ * to -- then the one filled Log Food button.
  */
 export function LogFoodStep({
   food,
@@ -43,7 +52,6 @@ export function LogFoodStep({
   onDone,
   onCancel,
 }: LogFoodStepProps) {
-  const insets = useSafeAreaInsets();
   const [quantity, setQuantity] = useState('1');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,48 +74,78 @@ export function LogFoodStep({
   }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <AppHeader title={food.name} onBack={onCancel} testID="log-food-header" safeArea={false} />
-      <View style={styles.logFoodContent}>
-        <Text style={styles.rowMeta}>
-          Serving: {food.servingSize}
-          {food.servingUnit}
-        </Text>
-
-        <View style={styles.logFoodField}>
-          <TextInput
-            testID="log-food-quantity"
-            label="Quantity"
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType="decimal-pad"
-          />
+    <Screen
+      keyboardAvoiding
+      contentContainerStyle={styles.content}
+      header={<AppHeader title={food.name} onBack={onCancel} testID="log-food-header" />}
+    >
+      <AppCard hero testID="log-food-summary">
+        <View style={styles.foodRow}>
+          <FoodImage uri={food.imageUrl} name={food.name} size={64} />
+          <Text style={styles.serving}>
+            Serving: {food.servingSize}
+            {food.servingUnit}
+          </Text>
         </View>
+      </AppCard>
+
+      <AppCard testID="log-food-quantity-card">
+        <TextInput
+          testID="log-food-quantity"
+          label="Quantity"
+          value={quantity}
+          onChangeText={setQuantity}
+          keyboardType="decimal-pad"
+        />
 
         {preview ? (
-          <Text testID="log-food-preview" style={styles.rowMeta}>
+          <Text testID="log-food-preview" style={styles.preview}>
             {preview.calories} cal · {preview.proteinG}g protein · {preview.carbsG}g carbs ·{' '}
             {preview.fatG}g fat
           </Text>
         ) : null}
+      </AppCard>
 
-        {error ? (
-          <Text testID="log-food-error" style={styles.logFoodError}>
-            {error}
-          </Text>
-        ) : null}
+      {error ? (
+        <Text testID="log-food-error" style={styles.error}>
+          {error}
+        </Text>
+      ) : null}
 
-        <View style={styles.logFoodField}>
-          <PrimaryButton
-            testID="log-food-submit"
-            label={saving ? 'Logging…' : 'Log Food'}
-            onPress={handleLog}
-            disabled={!canLog}
-            accentColor={accentColor}
-            onAccentColor={onAccentColor}
-          />
-        </View>
-      </View>
-    </View>
+      <PrimaryButton
+        testID="log-food-submit"
+        label="Log Food"
+        onPress={handleLog}
+        loading={saving}
+        disabled={!canLog && !saving}
+        accentColor={accentColor}
+        onAccentColor={onAccentColor}
+      />
+    </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  content: {
+    gap: widgetGap,
+  },
+  foodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+  },
+  serving: {
+    ...typeScale.body,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  preview: {
+    ...typeScale.callout,
+    color: colors.textPrimary,
+    marginTop: spacing.md,
+  },
+  error: {
+    ...typeScale.callout,
+    color: colors.destructive,
+  },
+});

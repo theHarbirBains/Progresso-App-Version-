@@ -1,5 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Image, StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { AppCard } from '../design/AppCard';
+import { PrimaryButton } from '../design/Button';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
+import { AppMenuContext } from '../navigation/AppMenuContext';
 import {
   deleteFoodLog,
   fetchTodaysFoodLogs,
@@ -40,6 +45,18 @@ const navigation: any = {
   }),
 };
 const route = {} as never;
+const mockOpenMenu = jest.fn();
+
+// NutritionTodayScreen opens the app-level side menu (via AppMenuContext)
+// from its own header, same as every other tab-root screen -- this stands in
+// for that root-level provider.
+function renderScreen() {
+  return render(
+    <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+      <NutritionTodayScreen navigation={navigation} route={route} />
+    </AppMenuContext.Provider>,
+  );
+}
 
 const sampleLog = {
   id: 'log-1',
@@ -72,7 +89,7 @@ beforeEach(() => {
 
 describe('NutritionTodayScreen', () => {
   it('shows a loading indicator while fetching', async () => {
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
 
     expect(screen.getByTestId('nutrition-today-loading')).toBeTruthy();
 
@@ -84,13 +101,13 @@ describe('NutritionTodayScreen', () => {
   it('shows an error message when loading fails', async () => {
     mockFetchTodaysFoodLogs.mockRejectedValue(new Error('network error'));
 
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
 
     expect(await screen.findByTestId('nutrition-today-error')).toHaveTextContent('network error');
   });
 
   it('shows an empty state when no foods are logged today', async () => {
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
 
     expect(await screen.findByTestId('food-log-empty')).toBeTruthy();
     expect(screen.getByTestId('calories-consumed')).toHaveTextContent('Calories: 0');
@@ -99,7 +116,7 @@ describe('NutritionTodayScreen', () => {
   it('shows consumed totals without targets/remaining when no goals are set', async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
 
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
 
     expect(await screen.findByTestId('food-log-row-log-1')).toBeTruthy();
     expect(screen.getByTestId('calories-consumed')).toHaveTextContent('Calories: 330');
@@ -115,7 +132,7 @@ describe('NutritionTodayScreen', () => {
       fatG: 60,
     });
 
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
 
     expect(await screen.findByTestId('calories-consumed')).toHaveTextContent(
       'Calories: 330 / 2000',
@@ -127,7 +144,7 @@ describe('NutritionTodayScreen', () => {
   it('lists each logged food with its snapshot values', async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
 
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
 
     expect(await screen.findByTestId('food-log-row-log-1')).toHaveTextContent(/Chicken Breast/);
     expect(screen.getByTestId('food-log-row-log-1')).toHaveTextContent(/330 cal/);
@@ -142,7 +159,7 @@ describe('NutritionTodayScreen', () => {
       proteinG: 93,
     });
 
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
     await screen.findByTestId('food-log-row-log-1');
 
     fireEvent.changeText(screen.getByTestId('food-log-quantity-log-1'), '3');
@@ -160,7 +177,7 @@ describe('NutritionTodayScreen', () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     mockDeleteFoodLog.mockResolvedValue(undefined);
 
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
     await screen.findByTestId('food-log-row-log-1');
 
     await act(async () => {
@@ -173,7 +190,7 @@ describe('NutritionTodayScreen', () => {
   });
 
   it('navigates to FoodLibrary when Log Food is pressed', async () => {
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
     await screen.findByTestId('food-log-empty');
 
     fireEvent.press(screen.getByTestId('log-food-button'));
@@ -182,7 +199,7 @@ describe('NutritionTodayScreen', () => {
   });
 
   it('navigates to NutritionGoals when the goals link is pressed', async () => {
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
     await screen.findByTestId('food-log-empty');
 
     fireEvent.press(screen.getByTestId('nutrition-goals-link'));
@@ -190,13 +207,13 @@ describe('NutritionTodayScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('NutritionGoals');
   });
 
-  it('goes back when Back is pressed', async () => {
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+  it('opens the app-level side menu when the header button is pressed', async () => {
+    renderScreen();
     await screen.findByTestId('food-log-empty');
 
-    fireEvent.press(screen.getByTestId('nutrition-today-back'));
+    fireEvent.press(screen.getByTestId('nutrition-today-open-menu'));
 
-    expect(mockGoBack).toHaveBeenCalled();
+    expect(mockOpenMenu).toHaveBeenCalledWith('nutrition');
   });
 });
 
@@ -215,7 +232,7 @@ describe('NutritionTodayScreen background refresh on focus', () => {
   }
 
   it('does not show the loading indicator on a focus-triggered refresh', async () => {
-    render(<NutritionTodayScreen navigation={navigation} route={route} />);
+    renderScreen();
     await screen.findByTestId('food-log-empty');
 
     const refresh = deferred<unknown[]>();
@@ -228,11 +245,83 @@ describe('NutritionTodayScreen background refresh on focus', () => {
     });
 
     expect(screen.queryByTestId('nutrition-today-loading')).toBeNull();
-    expect(screen.getByTestId('nutrition-today-back')).toBeTruthy();
+    expect(screen.getByTestId('nutrition-today-open-menu')).toBeTruthy();
 
     await act(async () => {
       refresh.resolve([]);
       await refresh.promise;
     });
+  });
+});
+
+describe('NutritionTodayScreen -- widgets, one primary action', () => {
+  it("is three widgets: the macros, the actions and today's foods", async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    renderScreen();
+    await screen.findByTestId('food-log-row-log-1');
+
+    const cards = screen.UNSAFE_queryAllByType(AppCard);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false]);
+    expect(
+      within(screen.getByTestId('nutrition-today-foods')).getByTestId('food-log-row-log-1'),
+    ).toBeTruthy();
+  });
+
+  it("shows the logged food's photo when it has one, and a glyph when it does not", async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([
+      { ...sampleLog, imageUrl: 'https://images.example/a.jpg' },
+      { ...sampleLog, id: 'log-2', imageUrl: null },
+    ]);
+    renderScreen();
+
+    const withPhoto = await screen.findByTestId('food-log-row-log-1');
+    expect(within(withPhoto).UNSAFE_getByType(Image).props.source).toEqual({
+      uri: 'https://images.example/a.jpg',
+    });
+    expect(
+      within(screen.getByTestId('food-log-row-log-2')).UNSAFE_queryAllByType(Image),
+    ).toHaveLength(0);
+  });
+
+  it('has one filled button -- Log Food -- with Nutrition Goals outlined', async () => {
+    renderScreen();
+    await screen.findByTestId('log-food-button');
+
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    const goals = StyleSheet.flatten(screen.getByTestId('nutrition-goals-link').props.style);
+    expect(goals.backgroundColor).toBeUndefined();
+    expect(goals.borderWidth).toBe(1);
+  });
+
+  it('names the menu control for assistive tech', async () => {
+    renderScreen();
+    await screen.findByTestId('log-food-button');
+
+    expect(screen.getByTestId('nutrition-today-open-menu').props.accessibilityLabel).toBe(
+      'Open menu',
+    );
+  });
+
+  it('shows each logged food as a row with a named quantity field and a quiet destructive Delete', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    renderScreen();
+
+    const row = await screen.findByTestId(`food-log-row-${sampleLog.id}`);
+    expect(row).toBeTruthy();
+    expect(
+      screen.getByTestId(`food-log-quantity-${sampleLog.id}`).props.accessibilityLabel,
+    ).toMatch(/^Quantity of /);
+    const del = screen.getByTestId(`food-log-delete-${sampleLog.id}`);
+    expect(del.props.accessibilityLabel).toMatch(/^Delete /);
+    expect(StyleSheet.flatten(del.props.style).borderWidth).toBeUndefined();
+    expect(StyleSheet.flatten(del.props.style).minHeight).toBeGreaterThanOrEqual(44);
+  });
+
+  it('renders no bare text outside <Text>', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    renderScreen();
+    await screen.findByTestId(`food-log-row-${sampleLog.id}`);
+
+    expectNoBareText();
   });
 });

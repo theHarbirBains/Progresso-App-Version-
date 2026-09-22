@@ -1,16 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { BottomSheet } from '../design/BottomSheet';
 import { PrimaryButton } from '../design/Button';
 import { LoadingState } from '../design/LoadingState';
+import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
-import { colors, spacing } from '../design/theme';
+import { colors } from '../design/theme';
 import { getMyProfile, updateMyProfile, type Gender, type HeightUnit } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -59,28 +59,54 @@ function formatWeight(weightKg: number, unit: 'kg' | 'lb'): string {
 
 interface FieldRowProps {
   testID?: string;
-  icon: keyof typeof Feather.glyphMap;
   label: string;
-  accentColor: string;
+  /** A hairline above the row -- every row but the first. */
+  divider?: boolean;
   children?: ReactNode;
 }
 
-// One compact "icon + label + inline control" row, the shape every field on
-// this screen shares -- local to this screen since nothing else needs it yet
-// (see CLAUDE.md's no-premature-abstraction rule).
-function FieldRow({ testID, icon, label, accentColor, children }: FieldRowProps) {
+// One field: its label on the left and its control(s) on the right, separated
+// from the next by a hairline. Local to this screen since nothing else needs
+// it yet (see CLAUDE.md's no-premature-abstraction rule).
+function FieldRow({ testID, label, divider, children }: FieldRowProps) {
   return (
-    <View testID={testID} style={styles.fieldRow}>
-      <View style={styles.fieldIconWrap}>
-        <Feather name={icon} size={18} color={accentColor} />
-      </View>
-      <View style={styles.fieldRowBody}>
-        <Text style={styles.fieldRowLabel} numberOfLines={1}>
-          {label}
-        </Text>
-      </View>
+    <View testID={testID} style={[styles.fieldRow, divider && styles.fieldDivider]}>
+      <Text style={styles.fieldRowLabel} numberOfLines={1}>
+        {label}
+      </Text>
       {children ? <View style={styles.fieldRowControl}>{children}</View> : null}
     </View>
+  );
+}
+
+// A value that opens its picker sheet: the current value, then a disclosure
+// chevron, as one 44pt-tall target.
+function ValueButton({
+  testID,
+  valueTestID,
+  accessibilityLabel,
+  value,
+  onPress,
+}: {
+  testID: string;
+  valueTestID: string;
+  accessibilityLabel: string;
+  value: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      testID={testID}
+      style={styles.valueButton}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Text testID={valueTestID} style={styles.valueText}>
+        {value}
+      </Text>
+      <Feather name="chevron-right" size={16} color={colors.textMuted} />
+    </Pressable>
   );
 }
 
@@ -106,10 +132,13 @@ function FieldRow({ testID, icon, label, accentColor, children }: FieldRowProps)
 // onboarding's own DateWheelPicker rather than a free-text age field --
 // birthday (not a separately-stored age) is the one persisted value, same as
 // every other screen that shows an age derived from it.
+//
+// Layout: the shared Screen with two widgets `widgetGap` apart -- one row per
+// field (label left, control right) separated by hairlines, then one filled
+// Save.
 export function CalorieEstimationScreen({ navigation }: Props) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
-  const insets = useSafeAreaInsets();
   const { openMenu } = useAppMenu();
 
   const [theme, setTheme] = useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
@@ -215,38 +244,27 @@ export function CalorieEstimationScreen({ navigation }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.screen, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top}
-    >
-      <AppHeader
-        title="Personal Information"
-        leftAction={{
-          icon: 'menu',
-          onPress: () => openMenu('nutrition'),
-          accessibilityLabel: 'Open menu',
-          testID: 'calorie-estimation-open-menu',
-        }}
-        testID="calorie-estimation-header"
-        safeArea={false}
-      />
-
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + spacing.xl },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        testID="calorie-estimation-scroll"
+    <>
+      <Screen
+        keyboardAvoiding
+        scrollTestID="calorie-estimation-scroll"
+        contentContainerStyle={styles.content}
+        header={
+          <AppHeader
+            title="Personal Information"
+            subtitle="Used to calculate your personalized calorie targets on Nutrition Goals."
+            leftAction={{
+              icon: 'menu',
+              onPress: () => openMenu('nutrition'),
+              accessibilityLabel: 'Open menu',
+              testID: 'calorie-estimation-open-menu',
+            }}
+            testID="calorie-estimation-header"
+          />
+        }
       >
-        <Text style={styles.intro}>
-          Used to calculate your personalized calorie targets on Nutrition Goals.
-        </Text>
-
-        <AppCard testID="calorie-estimation-gender-card" style={styles.fieldCard}>
-          <FieldRow icon="users" label="Gender" accentColor={theme.accent}>
+        <AppCard testID="calorie-estimation-fields">
+          <FieldRow testID="calorie-estimation-gender-card" label="Gender">
             <SegmentedControl
               testID="calorie-estimation-gender"
               options={[
@@ -264,44 +282,30 @@ export function CalorieEstimationScreen({ navigation }: Props) {
               {errors.gender}
             </Text>
           ) : null}
-        </AppCard>
 
-        <AppCard testID="calorie-estimation-birthday-card" style={styles.fieldCard}>
-          <FieldRow icon="calendar" label="Birthday" accentColor={theme.accent}>
-            <Pressable
+          <FieldRow testID="calorie-estimation-birthday-card" label="Birthday" divider>
+            <ValueButton
               testID="calorie-estimation-birthday-expand"
-              style={styles.compactValueButton}
-              onPress={() => setBirthdaySheetOpen(true)}
-              accessibilityRole="button"
+              valueTestID="calorie-estimation-birthday-value"
               accessibilityLabel="Edit birthday"
-            >
-              <Text testID="calorie-estimation-birthday-value" style={styles.compactValueText}>
-                {formatMonthDayYear(new Date(birthdayYear, birthdayMonth, birthdayDay))}
-              </Text>
-              <Feather name="chevron-down" size={16} color={colors.textMuted} />
-            </Pressable>
+              value={formatMonthDayYear(new Date(birthdayYear, birthdayMonth, birthdayDay))}
+              onPress={() => setBirthdaySheetOpen(true)}
+            />
           </FieldRow>
           {submitted && errors.birthday ? (
             <Text testID="calorie-estimation-birthday-error" style={styles.fieldError}>
               {errors.birthday}
             </Text>
           ) : null}
-        </AppCard>
 
-        <AppCard testID="calorie-estimation-height-card" style={styles.fieldCard}>
-          <FieldRow icon="maximize-2" label="Height" accentColor={theme.accent}>
-            <Pressable
+          <FieldRow testID="calorie-estimation-height-card" label="Height" divider>
+            <ValueButton
               testID="calorie-estimation-height-expand"
-              style={styles.compactValueButton}
-              onPress={() => setHeightSheetOpen(true)}
-              accessibilityRole="button"
+              valueTestID="calorie-estimation-height-value"
               accessibilityLabel="Edit height"
-            >
-              <Text testID="calorie-estimation-height-value" style={styles.compactValueText}>
-                {formatHeight(heightCm, heightUnit)}
-              </Text>
-              <Feather name="chevron-down" size={16} color={colors.textMuted} />
-            </Pressable>
+              value={formatHeight(heightCm, heightUnit)}
+              onPress={() => setHeightSheetOpen(true)}
+            />
             <SegmentedControl
               testID="calorie-estimation-height-unit"
               options={[
@@ -314,22 +318,15 @@ export function CalorieEstimationScreen({ navigation }: Props) {
               onAccentColor={theme.onAccent}
             />
           </FieldRow>
-        </AppCard>
 
-        <AppCard testID="calorie-estimation-weight-card" style={styles.fieldCard}>
-          <FieldRow icon="disc" label="Weight" accentColor={theme.accent}>
-            <Pressable
+          <FieldRow testID="calorie-estimation-weight-card" label="Weight" divider>
+            <ValueButton
               testID="calorie-estimation-weight-expand"
-              style={styles.compactValueButton}
-              onPress={() => setWeightSheetOpen(true)}
-              accessibilityRole="button"
+              valueTestID="calorie-estimation-weight-value"
               accessibilityLabel="Edit weight"
-            >
-              <Text testID="calorie-estimation-weight-value" style={styles.compactValueText}>
-                {formatWeight(weightKg, weightUnit)}
-              </Text>
-              <Feather name="chevron-down" size={16} color={colors.textMuted} />
-            </Pressable>
+              value={formatWeight(weightKg, weightUnit)}
+              onPress={() => setWeightSheetOpen(true)}
+            />
             <SegmentedControl
               testID="calorie-estimation-weight-unit"
               options={[
@@ -342,27 +339,21 @@ export function CalorieEstimationScreen({ navigation }: Props) {
               onAccentColor={theme.onAccent}
             />
           </FieldRow>
-        </AppCard>
 
-        <AppCard testID="calorie-estimation-activity-card" style={styles.fieldCard}>
-          <FieldRow icon="activity" label="Activity Level" accentColor={theme.accent} />
-          <Pressable
-            testID="calorie-estimation-activity-summary"
-            style={styles.activitySummaryRow}
-            onPress={() => setActivitySheetOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Select activity level"
-          >
-            <View style={styles.activitySummaryIconWrap}>
-              <Feather name="activity" size={16} color={theme.accent} />
-            </View>
-            <View style={styles.activitySummaryBody}>
-              <Text style={styles.activitySummaryLabel} numberOfLines={1}>
+          <FieldRow testID="calorie-estimation-activity-card" label="Activity Level" divider>
+            <Pressable
+              testID="calorie-estimation-activity-summary"
+              style={styles.valueButton}
+              onPress={() => setActivitySheetOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Select activity level"
+            >
+              <Text style={styles.valueText} numberOfLines={1}>
                 {selectedActivity ? selectedActivity.label : 'Select your activity level'}
               </Text>
-            </View>
-            <Feather name="chevron-down" size={18} color={colors.textMuted} />
-          </Pressable>
+              <Feather name="chevron-right" size={16} color={colors.textMuted} />
+            </Pressable>
+          </FieldRow>
           {submitted && errors.activityLevel ? (
             <Text testID="calorie-estimation-activity-error" style={styles.fieldError}>
               {errors.activityLevel}
@@ -370,28 +361,28 @@ export function CalorieEstimationScreen({ navigation }: Props) {
           ) : null}
         </AppCard>
 
-        <View style={styles.sectionSpacer} />
+        <AppCard testID="calorie-estimation-actions" style={styles.actions}>
+          {saveError ? (
+            <Text testID="calorie-estimation-save-error" style={styles.fieldError}>
+              {saveError}
+            </Text>
+          ) : null}
 
-        {saveError ? (
-          <Text testID="calorie-estimation-save-error" style={styles.fieldError}>
-            {saveError}
+          <PrimaryButton
+            testID="calorie-estimation-save"
+            label="Save"
+            onPress={handleSave}
+            loading={saving}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+
+          <Text style={styles.footnote}>
+            Used by Nutrition Goals to calculate your calorie targets, via the Mifflin-St Jeor
+            equation.
           </Text>
-        ) : null}
-
-        <PrimaryButton
-          testID="calorie-estimation-save"
-          label={saving ? 'Saving…' : 'Save'}
-          onPress={handleSave}
-          disabled={saving}
-          accentColor={theme.accent}
-          onAccentColor={theme.onAccent}
-        />
-
-        <Text style={styles.footnote}>
-          Used by Nutrition Goals to calculate your calorie targets, via the Mifflin-St Jeor
-          equation.
-        </Text>
-      </ScrollView>
+        </AppCard>
+      </Screen>
 
       <BottomSheet
         visible={birthdaySheetOpen}
@@ -492,6 +483,6 @@ export function CalorieEstimationScreen({ navigation }: Props) {
           ))}
         </ScrollView>
       </BottomSheet>
-    </KeyboardAvoidingView>
+    </>
   );
 }

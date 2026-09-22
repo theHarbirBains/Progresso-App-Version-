@@ -1,34 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, SectionList, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SectionList, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
 import { AlphabetIndexRail } from '../design/AlphabetIndexRail';
+import { AppCard } from '../design/AppCard';
+import { AppHeader } from '../design/AppHeader';
+import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
-import { GlassBackground } from '../design/GlassBackground';
 import { IconButton } from '../design/IconButton';
-import { LoadingState } from '../design/LoadingState';
-import { ModeToggle } from '../design/ModeToggle';
+import { ListRow } from '../design/ListRow';
+import { Screen } from '../design/Screen';
+import { SectionHeader } from '../design/SectionHeader';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import { getMyProfile } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
+import { FoodImage } from '../nutrition/FoodImage';
 import { ALPHABET_INDEX_LETTERS, groupFoodsByLetter } from '../nutrition/foodLibraryGrouping';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { fetchAllFoods, type FoodRow } from '../nutrition/foodQueries';
-import {
-  buildAccentTheme,
-  DEFAULT_NUTRITION_THEME,
-  DEFAULT_WORKOUT_THEME,
-  type AccentTheme,
-} from '../theme/accentColor';
+import { buildAccentTheme, DEFAULT_NUTRITION_THEME, type AccentTheme } from '../theme/accentColor';
 import { foodLibraryStyles as styles } from './foodLibraryStyles';
 import { FoodFormScreen } from './FoodFormScreen';
 
-const logo = require('../../assets/progresso-mark.png');
 const SEARCH_DEBOUNCE_MS = 300;
 
 type Props = RootStackScreenProps<'FoodLibrary'>;
@@ -37,22 +34,31 @@ type Mode =
   | { type: 'list' }
   | { type: 'create'; initialBarcode?: string }
   | { type: 'edit'; food: FoodRow }
-  | { type: 'log'; food: FoodRow };
+  | { type: 'log'; food: FoodRow; fromScan?: boolean };
 
 // The "Food" bottom-tab destination in Nutrition mode -- the user's own
 // saved/custom foods, sorted and sectioned alphabetically (A-Z, like iOS
 // Contacts) rather than the small paginated list this screen used to be,
 // since a jump-to-letter index needs the whole set up front. Creating,
 // editing, and logging a food are unchanged from before, just restyled.
+//
+// Layout: the shared header (menu left, "+" right), then two widgets
+// `widgetGap` apart: search with a count and a quiet sort action, and the
+// foods -- each with its picture (or category glyph), name, serving and
+// calories as a mono value -- under letter headings, with the A-Z rail on
+// the right. Tapping a row logs it; the pencil edits it.
+//
+// Reached from the barcode scanner's "Enter Manually", it opens straight into
+// the create form (barcode prefilled) and, once saved, on into logging that
+// food -- so a scanned item nobody has a record of goes from unknown to
+// logged in one pass.
 export function FoodLibraryScreen({ navigation, route }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
-  const insets = useSafeAreaInsets();
-  const { openMenu, reportMode, currentMode } = useAppMenu();
+  const { openMenu } = useAppMenu();
 
   const [theme, setTheme] = useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
-  const [workoutTheme, setWorkoutTheme] = useState<AccentTheme>(DEFAULT_WORKOUT_THEME);
   // Opens straight into "create a custom food" when reached from the Scan
   // Barcode flow's "Product not found" fallback (see BarcodeScannerScreen),
   // prefilled with the barcode that had no match -- the user never has to
@@ -83,13 +89,8 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
             ? buildAccentTheme(profile.nutritionAccentColor)
             : DEFAULT_NUTRITION_THEME,
         );
-        setWorkoutTheme(
-          profile.workoutAccentColor
-            ? buildAccentTheme(profile.workoutAccentColor)
-            : DEFAULT_WORKOUT_THEME,
-        );
       } catch {
-        // Keep the default themes -- non-fatal.
+        // Keep the default theme -- non-fatal.
       }
     }
     void loadTheme();
@@ -97,16 +98,6 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
       mounted = false;
     };
   }, [accessToken]);
-
-  // Switching mode from a non-Dashboard root screen always goes to that
-  // mode's Home (Dashboard), never to this screen's own "mirror" in the
-  // other mode (e.g. not straight to Workouts) -- Dashboard is each mode's
-  // one true landing page. A no-op if the tapped segment is already selected.
-  function handleModeChange(next: 'workout' | 'nutrition') {
-    if (next === currentMode) return;
-    reportMode?.(next);
-    navigation.navigate('Dashboard');
-  }
 
   // Debounce free-text input before it drives a query, so every keystroke
   // doesn't fire its own request -- same pattern as FoodSearchScreen.
@@ -133,8 +124,13 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
     void load();
   }, [load]);
 
-  function handleDone() {
-    setMode({ type: 'list' });
+  function handleDone(saved?: FoodRow) {
+    // A food entered by hand for a scanned barcode goes straight on to logging.
+    if (saved && mode.type === 'create' && mode.initialBarcode) {
+      setMode({ type: 'log', food: saved, fromScan: true });
+    } else {
+      setMode({ type: 'list' });
+    }
     void load();
   }
 
@@ -145,6 +141,8 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         initialBarcode={mode.initialBarcode}
         onDone={handleDone}
         onCancel={() => setMode({ type: 'list' })}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
       />
     );
   }
@@ -156,6 +154,8 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         food={mode.food}
         onDone={handleDone}
         onCancel={() => setMode({ type: 'list' })}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
       />
     );
   }
@@ -167,7 +167,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         userId={userId}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
-        onDone={() => navigation.goBack()}
+        onDone={() => (mode.fromScan ? navigation.navigate('Nutrition') : navigation.goBack())}
         onCancel={() => setMode({ type: 'list' })}
       />
     );
@@ -189,171 +189,151 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
   }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]} testID="food-library-screen">
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <IconButton
-            testID="food-library-open-menu"
-            icon="menu"
-            onPress={() => openMenu('nutrition')}
-            accessibilityLabel="Open menu"
-            color={colors.textSecondary}
-          />
-          <View style={styles.brandRow}>
-            <Image source={logo} style={styles.logo} resizeMode="contain" />
-            <Text style={styles.wordmark}>PROGRESSO</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.modeToggleWrap}>
-        <ModeToggle
-          mode={currentMode}
-          onChange={handleModeChange}
-          workoutTheme={workoutTheme}
-          nutritionTheme={theme}
-          testIDPrefix="food-library"
-        />
-      </View>
-
-      <View style={styles.titleBlock}>
-        <Text style={styles.title}>Food Library</Text>
-        <Text style={styles.subtitle}>Your saved foods, always at hand.</Text>
-      </View>
-
-      <View style={styles.searchWrap}>
-        <TextInput
-          testID="food-search"
-          placeholder="Search your food library..."
-          value={searchInput}
-          onChangeText={setSearchInput}
-          autoCapitalize="none"
-          leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
-        />
-      </View>
-
-      <View style={styles.countRow}>
-        <Text testID="food-library-count" style={styles.countText}>
-          {rows.length} {rows.length === 1 ? 'food' : 'foods'} saved
-        </Text>
-        <View style={styles.countRowActions}>
-          <TouchableOpacity
-            testID="food-library-sort"
-            style={styles.sortButton}
-            onPress={() => setAscending((prev) => !prev)}
-            accessibilityRole="button"
-            accessibilityLabel="Toggle sort order"
-          >
-            <Feather name="list" size={12} color={colors.textSecondary} />
-            <Text style={styles.sortButtonText}>Sort {ascending ? 'A → Z' : 'Z → A'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            testID="food-create-button"
-            style={styles.addButton}
-            onPress={() => setMode({ type: 'create' })}
-            accessibilityRole="button"
-            accessibilityLabel="Add a new food"
-          >
-            <GlassBackground />
-            <Feather name="plus" size={16} color={theme.accent} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {error ? (
-        <ErrorState
-          testID="food-library-error"
-          message={error}
-          onRetry={() => {
-            void load();
+    <Screen
+      scroll={false}
+      padded={false}
+      testID="food-library-screen"
+      header={
+        <AppHeader
+          testID="food-library-header"
+          title="Food Library"
+          leftAction={{
+            icon: 'menu',
+            onPress: () => openMenu('nutrition'),
+            accessibilityLabel: 'Open menu',
+            testID: 'food-library-open-menu',
+          }}
+          rightAction={{
+            icon: 'plus',
+            onPress: () => setMode({ type: 'create' }),
+            accessibilityLabel: 'Add a new food',
+            testID: 'food-create-button',
           }}
         />
-      ) : loading ? (
-        <LoadingState testID="food-library-loading" />
-      ) : rows.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <EmptyState
-            testID="food-library-empty"
-            icon={<Feather name="inbox" size={24} color={colors.textMuted} />}
-            title={search ? `No foods found for "${search}"` : 'No foods yet'}
-          />
-          {!search ? (
-            <TouchableOpacity
-              testID="food-empty-create"
-              style={styles.addButton}
-              onPress={() => setMode({ type: 'create' })}
-              accessibilityRole="button"
-              accessibilityLabel="Create a food"
-            >
-              <GlassBackground />
-              <Feather name="plus" size={16} color={theme.accent} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      ) : (
-        <View style={{ flex: 1 }}>
-          <SectionList
-            ref={sectionListRef}
-            testID="food-library-list"
-            sections={sections.map((section) => ({ title: section.letter, data: section.data }))}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            stickySectionHeadersEnabled
-            showsVerticalScrollIndicator={false}
-            renderSectionHeader={({ section }) => (
-              <View style={styles.sectionHeader} testID={`food-library-section-${section.title}`}>
-                <Text style={styles.sectionHeaderText}>{section.title}</Text>
-              </View>
-            )}
-            renderItem={({ item }) => (
-              <View style={styles.row}>
-                <TouchableOpacity
-                  testID={`food-item-${item.id}`}
-                  style={styles.rowTouchable}
-                  onPress={() => setMode({ type: 'log', food: item })}
-                >
-                  <View style={styles.rowIconWrap}>
-                    <Feather name="coffee" size={18} color={colors.textMuted} />
-                  </View>
-                  <View style={styles.rowBody}>
-                    <Text style={styles.rowName}>{item.name}</Text>
-                    <Text style={styles.rowMeta}>
-                      {item.servingSize}
-                      {item.servingUnit}
-                    </Text>
-                  </View>
-                  <Text style={styles.rowCalories}>{item.calories} cal</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  testID={`food-edit-${item.id}`}
-                  style={styles.rowEditButton}
-                  onPress={() => setMode({ type: 'edit', food: item })}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Edit ${item.name}`}
-                >
-                  <Feather name="edit-2" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-            )}
-            onScrollToIndexFailed={() => {
-              // A section can be shorter than the viewport at the very end
-              // of the list; retry is unnecessary since scrollToLocation
-              // already handles this internally on modern RN -- this is
-              // just a safety net against the dev-only warning.
-            }}
-          />
-          <View style={styles.indexRailWrap} pointerEvents="box-none">
-            <AlphabetIndexRail
-              testID="food-library-index"
-              letters={ALPHABET_INDEX_LETTERS}
-              availableLetters={availableLetters}
-              activeLetter={activeLetter}
-              onSelect={jumpToLetter}
-              accentColor={theme.accent}
+      }
+    >
+      <View style={styles.page}>
+        <AppCard testID="food-library-controls">
+          <View style={styles.block}>
+            <TextInput
+              testID="food-search"
+              placeholder="Search your food library..."
+              value={searchInput}
+              onChangeText={setSearchInput}
+              autoCapitalize="none"
+              leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
             />
           </View>
-        </View>
-      )}
-    </View>
+
+          <View style={styles.countRow}>
+            <Text testID="food-library-count" style={styles.countText}>
+              {rows.length} {rows.length === 1 ? 'food' : 'foods'} saved
+            </Text>
+            <TextButton
+              testID="food-library-sort"
+              label={`Sort ${ascending ? 'A → Z' : 'Z → A'}`}
+              accessibilityLabel="Toggle sort order"
+              onPress={() => setAscending((prev) => !prev)}
+            />
+          </View>
+        </AppCard>
+
+        <AppCard testID="food-library-list-card" style={styles.listCard}>
+          {error ? (
+            <View>
+              <ErrorState
+                testID="food-library-error"
+                message={error}
+                onRetry={() => {
+                  void load();
+                }}
+              />
+            </View>
+          ) : loading ? (
+            <View style={styles.loading}>
+              <ActivityIndicator
+                testID="food-library-loading"
+                size="large"
+                color={colors.textPrimary}
+              />
+            </View>
+          ) : rows.length === 0 ? (
+            <View>
+              <EmptyState
+                testID="food-library-empty"
+                title={search ? `No foods found for "${search}"` : 'No foods yet'}
+                action={
+                  search
+                    ? undefined
+                    : {
+                        label: 'Create a food',
+                        onPress: () => setMode({ type: 'create' }),
+                        testID: 'food-empty-create',
+                      }
+                }
+              />
+            </View>
+          ) : (
+            <View style={styles.flex}>
+              <SectionList
+                ref={sectionListRef}
+                testID="food-library-list"
+                sections={sections.map((section) => ({
+                  title: section.letter,
+                  data: section.data,
+                }))}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.listContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                renderSectionHeader={({ section }) => (
+                  <View testID={`food-library-section-${section.title}`}>
+                    <SectionHeader label={section.title} />
+                  </View>
+                )}
+                renderItem={({ item, index }) => (
+                  <View style={[styles.row, index > 0 && styles.rowDivider]}>
+                    <View style={styles.flex}>
+                      <ListRow
+                        testID={`food-item-${item.id}`}
+                        leading={<FoodImage uri={item.imageUrl} name={item.name} size={44} />}
+                        title={item.name}
+                        subtitle={`${item.servingSize}${item.servingUnit}`}
+                        value={`${item.calories} cal`}
+                        chevron={false}
+                        onPress={() => setMode({ type: 'log', food: item })}
+                      />
+                    </View>
+                    <IconButton
+                      testID={`food-edit-${item.id}`}
+                      icon="edit-2"
+                      onPress={() => setMode({ type: 'edit', food: item })}
+                      accessibilityLabel={`Edit ${item.name}`}
+                      color={colors.textSecondary}
+                    />
+                  </View>
+                )}
+                onScrollToIndexFailed={() => {
+                  // A section can be shorter than the viewport at the very end
+                  // of the list; retry is unnecessary since scrollToLocation
+                  // already handles this internally on modern RN -- this is
+                  // just a safety net against the dev-only warning.
+                }}
+              />
+              <View style={styles.indexRailWrap} pointerEvents="box-none">
+                <AlphabetIndexRail
+                  testID="food-library-index"
+                  letters={ALPHABET_INDEX_LETTERS}
+                  availableLetters={availableLetters}
+                  activeLetter={activeLetter}
+                  onSelect={jumpToLetter}
+                  accentColor={theme.accent}
+                />
+              </View>
+            </View>
+          )}
+        </AppCard>
+      </View>
+    </Screen>
   );
 }

@@ -1,130 +1,76 @@
 import { StyleSheet } from 'react-native';
-import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
+import { colors, minTouchTarget, spacing, typeScale, widgetGap } from '../design/theme';
 
-// Local to CalorieEstimationScreen.tsx -- one compact glass card per field
-// (icon + label + inline control, no supporting caption text), matching
-// startWorkoutStyles.ts's screen/scrollContent shape for a header +
-// scrollable-form screen. Height/Weight/Activity Level show a compact
-// summary here and expand into a BottomSheet for the actual picker -- see
-// the screen's own comment on why.
+// CalorieEstimationScreen ("Personal Information"). Token-only; the frame is
+// the shared `Screen`. One row per field, separated by hairlines.
 export const calorieEstimationStyles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
-    // paints the selected Background Theme; screens no longer hardcode it.
-    backgroundColor: 'transparent',
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxxl,
-  },
-  intro: {
-    ...typeScale.body,
-    color: colors.textSecondary,
-    marginBottom: spacing.xl,
+  // The widgets, `widgetGap` apart.
+  content: {
+    gap: widgetGap,
+    paddingBottom: spacing.xxl,
   },
 
-  fieldCard: {
-    marginBottom: spacing.md,
-  },
   fieldRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.md,
+    minHeight: minTouchTarget + spacing.md,
+    paddingVertical: spacing.sm,
   },
-  fieldIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fieldRowBody: {
-    flex: 1,
+  fieldDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
   },
   fieldRowLabel: {
-    ...typeScale.cardTitle,
+    ...typeScale.callout,
+    fontFamily: typeScale.cardTitle.fontFamily,
     color: colors.textPrimary,
   },
+  // The value(s) and any unit toggle, kept together on the right.
   fieldRowControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
+    flexShrink: 1,
+  },
+  valueButton: {
+    minHeight: minTouchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    flexShrink: 1,
+  },
+  valueText: {
+    ...typeScale.callout,
+    color: colors.textPrimary,
+    flexShrink: 1,
   },
   fieldError: {
     ...typeScale.caption,
     color: colors.destructive,
-    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
   },
 
-  // Height/Weight's collapsed value box -- tapping it opens the BottomSheet
-  // with the full wheel picker; the unit toggle beside it (a plain
-  // SegmentedControl) works immediately, without opening anything.
-  compactValueButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  compactValueText: {
-    fontFamily: fonts.monoBold,
-    color: colors.textPrimary,
-    fontSize: 15,
-  },
-
-  // Activity Level's collapsed summary sub-row, nested under the card's own
-  // icon/label header -- tapping it opens the BottomSheet listing all 5
-  // tiers (each with its own description -- only the summary row stays to a
-  // single line).
-  activitySummaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  actions: {
     gap: spacing.md,
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-  },
-  activitySummaryIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activitySummaryBody: {
-    flex: 1,
-  },
-  activitySummaryLabel: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-  },
-
-  sheetTitle: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
-    marginBottom: spacing.lg,
-  },
-  sheetDoneButton: {
-    marginTop: spacing.lg,
-  },
-  sheetList: {
-    maxHeight: 420,
-  },
-
-  sectionSpacer: {
-    height: spacing.xl,
   },
   footnote: {
     ...typeScale.caption,
     color: colors.textMuted,
-    marginTop: spacing.lg,
     textAlign: 'center',
+  },
+
+  // Picker sheets.
+  sheetTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  sheetList: {
+    maxHeight: 420,
+  },
+  sheetDoneButton: {
+    marginTop: spacing.lg,
   },
 });

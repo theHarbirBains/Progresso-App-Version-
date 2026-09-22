@@ -2,16 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, View } from 'react-native';
 import { Text } from '../design/Text';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
-import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { LoadingState } from '../design/LoadingState';
-import { colors } from '../design/theme';
+import { Screen } from '../design/Screen';
 import { getFoodByBarcode, getMyProfile, type FoodSearchResult } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { FoodFacts } from '../nutrition/FoodFacts';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { buildAccentTheme, DEFAULT_NUTRITION_THEME, type AccentTheme } from '../theme/accentColor';
 import { barcodeScannerStyles as styles } from './barcodeScannerStyles';
@@ -37,6 +38,15 @@ type ScanState =
 // Looks up the scanned barcode via the backend's GET /foods/barcode/:barcode
 // (apps/api/src/foods/) -- never talks to Open Food Facts directly, same
 // external-provider-orchestration reasoning as food search.
+//
+// States: live camera (full-bleed, header floating over it), camera-permission
+// prompt, the found product (shared FoodFacts widgets + one filled Log Food),
+// not found and lookup error. Every state but the live camera is a stack of
+// widgets. Not found tells the user which code it was and makes **Enter
+// Manually** the one filled button: it opens the custom-food form already
+// carrying the scanned barcode, then goes straight on to logging it (see
+// FoodLibraryScreen), and the next scan of that code finds the user's own entry.
+// Scan Again and Search Food are outlined.
 export function BarcodeScannerScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -108,50 +118,52 @@ export function BarcodeScannerScreen({ navigation }: Props) {
     return <LoadingState testID="barcode-scanner-permission-loading" />;
   }
 
+  const scanHeader = (
+    <AppHeader
+      title="Scan Barcode"
+      onBack={() => navigation.goBack()}
+      testID="barcode-scanner-header"
+    />
+  );
+
   if (!permission.granted) {
     return (
-      <View style={styles.screen}>
-        <AppHeader
-          title="Scan Barcode"
-          onBack={() => navigation.goBack()}
-          testID="barcode-scanner-header"
-        />
-        <View style={styles.permissionContent}>
+      <Screen scroll={false} header={scanHeader} contentContainerStyle={styles.centered}>
+        <AppCard hero>
           <EmptyState
             testID="barcode-scanner-permission-denied"
-            icon={<Feather name="camera-off" size={28} color={colors.textMuted} />}
             title={
               permission.canAskAgain
                 ? 'Progresso needs camera access to scan barcodes'
                 : 'Camera access is off for Progresso -- turn it on in Settings to scan barcodes'
             }
           />
-          <View style={styles.permissionActions}>
-            {permission.canAskAgain ? (
-              <PrimaryButton
-                testID="barcode-scanner-request-permission"
-                label="Enable Camera"
-                onPress={() => void requestPermission()}
-                accentColor={theme.accent}
-                onAccentColor={theme.onAccent}
-              />
-            ) : (
-              <PrimaryButton
-                testID="barcode-scanner-open-settings"
-                label="Open Settings"
-                onPress={() => void Linking.openSettings()}
-                accentColor={theme.accent}
-                onAccentColor={theme.onAccent}
-              />
-            )}
-            <SecondaryButton
-              testID="barcode-scanner-search-instead"
-              label="Search Food Instead"
-              onPress={() => navigation.navigate('FoodSearch')}
+        </AppCard>
+        <AppCard style={styles.actions}>
+          {permission.canAskAgain ? (
+            <PrimaryButton
+              testID="barcode-scanner-request-permission"
+              label="Enable Camera"
+              onPress={() => void requestPermission()}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
             />
-          </View>
-        </View>
-      </View>
+          ) : (
+            <PrimaryButton
+              testID="barcode-scanner-open-settings"
+              label="Open Settings"
+              onPress={() => void Linking.openSettings()}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+            />
+          )}
+          <SecondaryButton
+            testID="barcode-scanner-search-instead"
+            label="Search Food Instead"
+            onPress={() => navigation.navigate('FoodSearch')}
+          />
+        </AppCard>
+      </Screen>
     );
   }
 
@@ -167,6 +179,7 @@ export function BarcodeScannerScreen({ navigation }: Props) {
           proteinG: state.product.proteinG ?? 0,
           carbsG: state.product.carbsG ?? 0,
           fatG: state.product.fatG ?? 0,
+          imageUrl: state.product.imageUrl,
         }}
         userId={userId}
         accentColor={theme.accent}
@@ -180,114 +193,111 @@ export function BarcodeScannerScreen({ navigation }: Props) {
   if (state.status === 'found') {
     const product = state.product;
     return (
-      <View style={styles.screen}>
-        <AppHeader
-          title={product.name}
-          subtitle={product.brand ?? undefined}
-          onBack={resetToScanning}
-          testID="barcode-scanner-found-header"
+      <Screen
+        header={
+          <AppHeader
+            title={product.name}
+            subtitle={product.brand ?? undefined}
+            onBack={resetToScanning}
+            testID="barcode-scanner-found-header"
+          />
+        }
+      >
+        <FoodFacts
+          name={product.name}
+          imageUrl={product.imageUrl}
+          servingSize={product.servingSize}
+          servingUnit={product.servingUnit}
+          calories={product.calories}
+          proteinG={product.proteinG}
+          carbsG={product.carbsG}
+          fatG={product.fatG}
+          showAttribution={product.provider === 'open_food_facts'}
+          accentColor={theme.accent}
+          testIDs={{
+            serving: 'barcode-scanner-serving',
+            calories: 'barcode-scanner-calories',
+            attribution: 'barcode-scanner-attribution',
+          }}
         />
-        <View style={styles.foundContent}>
-          <Text testID="barcode-scanner-serving" style={styles.foundServing}>
-            Serving: {product.servingSize} {product.servingUnit}
-          </Text>
-          <Text testID="barcode-scanner-calories" style={styles.foundCalories}>
-            {product.calories} cal
-          </Text>
-          <View style={styles.foundMacroRow}>
-            <Text style={styles.foundMacro}>Protein {product.proteinG ?? '—'}</Text>
-            <Text style={styles.foundMacro}>Carbs {product.carbsG ?? '—'}</Text>
-            <Text style={styles.foundMacro}>Fat {product.fatG ?? '—'}</Text>
-          </View>
-          {product.provider === 'open_food_facts' ? (
-            <Text testID="barcode-scanner-attribution" style={styles.foundAttribution}>
-              Data from Open Food Facts
-            </Text>
-          ) : null}
-          <View style={styles.foundButtonWrap}>
-            <PrimaryButton
-              testID="barcode-scanner-log-button"
-              label="Log Food"
-              onPress={() => setState({ status: 'logging', product })}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-          </View>
+        <View style={styles.foundButtonWrap}>
+          <PrimaryButton
+            testID="barcode-scanner-log-button"
+            label="Log Food"
+            onPress={() => setState({ status: 'logging', product })}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
         </View>
-      </View>
+      </Screen>
     );
   }
 
   if (state.status === 'not-found') {
     return (
-      <View style={styles.screen}>
-        <AppHeader
-          title="Scan Barcode"
-          onBack={() => navigation.goBack()}
-          testID="barcode-scanner-header"
-        />
-        <View style={styles.fallbackContent}>
+      <Screen scroll={false} header={scanHeader} contentContainerStyle={styles.centered}>
+        <AppCard hero testID="barcode-scanner-not-found-card">
           <EmptyState
             testID="barcode-scanner-not-found"
-            icon={<Feather name="search" size={28} color={colors.textMuted} />}
             title="Product not found"
+            description="We couldn't find a match for that barcode in our database."
           />
-          <Text style={styles.fallbackSubtitle}>
-            {"We couldn't find a match for that barcode in our database."}
+          <Text testID="barcode-scanner-not-found-code" style={styles.scannedCode}>
+            {state.barcode}
           </Text>
-          <View style={styles.fallbackActions}>
-            <PrimaryButton
-              testID="barcode-scanner-scan-again"
-              label="Scan Again"
-              onPress={resetToScanning}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-            <SecondaryButton
-              testID="barcode-scanner-search-food"
-              label="Search Food"
-              onPress={() => navigation.navigate('FoodSearch')}
-            />
-            <SecondaryButton
-              testID="barcode-scanner-create-custom"
-              label="Create Custom Food"
-              onPress={() =>
-                navigation.navigate('FoodLibrary', { openCreate: true, barcode: state.barcode })
-              }
-            />
-          </View>
-        </View>
-      </View>
+          <Text style={styles.manualHint}>
+            You can add it yourself: enter its details once and log it straight away.
+          </Text>
+        </AppCard>
+        <AppCard style={styles.actions}>
+          <PrimaryButton
+            testID="barcode-scanner-create-custom"
+            label="Enter Manually"
+            onPress={() =>
+              navigation.navigate('FoodLibrary', { openCreate: true, barcode: state.barcode })
+            }
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+          <SecondaryButton
+            testID="barcode-scanner-scan-again"
+            label="Scan Again"
+            onPress={resetToScanning}
+          />
+          <SecondaryButton
+            testID="barcode-scanner-search-food"
+            label="Search Food"
+            onPress={() => navigation.navigate('FoodSearch')}
+          />
+        </AppCard>
+      </Screen>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <View style={styles.screen}>
-        <AppHeader
-          title="Scan Barcode"
-          onBack={() => navigation.goBack()}
-          testID="barcode-scanner-header"
-        />
-        <View style={styles.fallbackContent}>
+      <Screen scroll={false} header={scanHeader} contentContainerStyle={styles.centered}>
+        <AppCard hero>
           <ErrorState
             testID="barcode-scanner-error"
             message={state.message}
             onRetry={() => void lookUp(state.barcode)}
           />
-          <View style={styles.fallbackActions}>
-            <SecondaryButton
-              testID="barcode-scanner-search-food"
-              label="Search Food"
-              onPress={() => navigation.navigate('FoodSearch')}
-            />
-          </View>
-        </View>
-      </View>
+        </AppCard>
+        <AppCard style={styles.actions}>
+          <SecondaryButton
+            testID="barcode-scanner-search-food"
+            label="Search Food"
+            onPress={() => navigation.navigate('FoodSearch')}
+          />
+        </AppCard>
+      </Screen>
     );
   }
 
   // status === 'scanning' | 'looking-up'
+  // The live camera is the one genuinely full-bleed screen in the app: the
+  // preview fills everything and the header floats over it.
   return (
     <View style={styles.screen}>
       <CameraView
@@ -298,18 +308,16 @@ export function BarcodeScannerScreen({ navigation }: Props) {
         onBarcodeScanned={state.status === 'scanning' ? handleBarcodeScanned : undefined}
       />
       <View style={styles.overlay} pointerEvents="box-none">
-        <AppHeader
-          title="Scan Barcode"
-          onBack={() => navigation.goBack()}
-          testID="barcode-scanner-header"
-        />
+        {scanHeader}
         <View style={styles.frameWrap} pointerEvents="none">
           <View style={[styles.frame, { borderColor: theme.accent }]} />
-          <Text style={styles.frameHint}>
-            {state.status === 'looking-up'
-              ? 'Looking up product…'
-              : 'Point your camera at a barcode'}
-          </Text>
+          <View style={styles.hintPill}>
+            <Text style={styles.frameHint}>
+              {state.status === 'looking-up'
+                ? 'Looking up product…'
+                : 'Point your camera at a barcode'}
+            </Text>
+          </View>
         </View>
       </View>
     </View>

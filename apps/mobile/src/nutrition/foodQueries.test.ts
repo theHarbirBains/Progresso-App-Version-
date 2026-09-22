@@ -182,6 +182,48 @@ describe('fetchAllFoods', () => {
   });
 });
 
+describe('food photos', () => {
+  const input = {
+    name: 'Mystery Bar',
+    servingSize: 40,
+    servingUnit: 'g',
+    calories: 180,
+    proteinG: 10,
+    carbsG: 20,
+    fatG: 6,
+  };
+
+  it('stores the photo URL on create when one is given, and leaves image_url out otherwise', async () => {
+    const { builder } = mockTable({ data: dbRow, error: null });
+    await createFood('user-1', { ...input, imageUrl: 'https://images.example/bar.jpg' });
+    expect(builder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ image_url: 'https://images.example/bar.jpg' }),
+    );
+
+    const second = mockTable({ data: dbRow, error: null });
+    await createFood('user-1', input);
+    expect(second.builder.insert).toHaveBeenCalledWith(
+      expect.not.objectContaining({ image_url: expect.anything() }),
+    );
+  });
+
+  it('sets, clears, or leaves alone the photo on update', async () => {
+    const set = mockTable({ data: dbRow, error: null });
+    await updateFood('food-1', { imageUrl: 'https://images.example/bar.jpg' });
+    expect(set.builder.update).toHaveBeenCalledWith({
+      image_url: 'https://images.example/bar.jpg',
+    });
+
+    const clear = mockTable({ data: dbRow, error: null });
+    await updateFood('food-1', { imageUrl: null });
+    expect(clear.builder.update).toHaveBeenCalledWith({ image_url: null });
+
+    const untouched = mockTable({ data: dbRow, error: null });
+    await updateFood('food-1', { name: 'Renamed' });
+    expect(untouched.builder.update).toHaveBeenCalledWith({ name: 'Renamed' });
+  });
+});
+
 describe('createFood', () => {
   it('inserts with created_by set to the current user, and null brand/barcode when omitted', async () => {
     const { builder } = mockTable({ data: dbRow, error: null });

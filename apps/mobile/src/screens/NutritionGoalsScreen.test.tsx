@@ -1,4 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { AppCard } from '../design/AppCard';
+import { PrimaryButton } from '../design/Button';
+import { fonts } from '../design/theme';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
@@ -265,5 +270,76 @@ describe('NutritionGoalsScreen', () => {
     await screen.findByTestId('nutrition-goals-scroll');
 
     expect(screen.getByTestId('nutrition-goals-notes')).toHaveTextContent(/estimates/i);
+  });
+});
+
+describe('NutritionGoalsScreen -- rows and one labelled field, one primary action', () => {
+  it('is four widgets: your information, the estimates, the custom target and the notes', async () => {
+    renderScreen();
+    await screen.findByTestId('nutrition-goals-scroll');
+
+    const cards = screen.UNSAFE_queryAllByType(AppCard);
+    expect(cards).toHaveLength(4);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false]);
+  });
+
+  it('shows the four estimates as rows with the calories as a mono readout, separated by hairlines', async () => {
+    renderScreen();
+    await screen.findByTestId('nutrition-goals-scroll');
+
+    const value = StyleSheet.flatten(
+      screen.getByTestId('nutrition-goals-option-maintenance-value').props.style,
+    );
+    expect(value.fontFamily).toBe(fonts.mono);
+    expect(screen.getByTestId('nutrition-goals-option-maintenance')).toHaveTextContent(
+      /Holds your current weight/,
+    );
+    expect(screen.getByTestId('nutrition-goals-option-deficit')).toHaveTextContent(
+      /vs\. maintenance/,
+    );
+    const first = StyleSheet.flatten(
+      screen.getByTestId('nutrition-goals-option-surplus').props.style,
+    );
+    const second = StyleSheet.flatten(
+      screen.getByTestId('nutrition-goals-option-maintenance').props.style,
+    );
+    expect(first.borderTopWidth).toBeUndefined();
+    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+  });
+
+  it('labels the custom target field and offers Edit as a plain 44pt text action', async () => {
+    renderScreen();
+    await screen.findByTestId('nutrition-goals-scroll');
+
+    expect(screen.getByTestId('nutrition-goals-custom-input').props.accessibilityLabel).toBe(
+      'Daily calorie target',
+    );
+    const edit = screen.getByTestId('nutrition-goals-edit');
+    expect(StyleSheet.flatten(edit.props.style).borderWidth).toBeUndefined();
+    expect(StyleSheet.flatten(edit.props.style).minHeight).toBeGreaterThanOrEqual(44);
+  });
+
+  it('has one filled Save that reports busy while saving', async () => {
+    mockSaveNutritionGoals.mockReturnValue(new Promise(() => undefined));
+    renderScreen();
+    await screen.findByTestId('nutrition-goals-scroll');
+
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-custom-input'), '2400');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('nutrition-goals-save'));
+    });
+
+    expect(screen.getByTestId('nutrition-goals-save').props.accessibilityState).toEqual({
+      disabled: true,
+      busy: true,
+    });
+  });
+
+  it('renders no bare text outside <Text>', async () => {
+    renderScreen();
+    await screen.findByTestId('nutrition-goals-scroll');
+
+    expectNoBareText();
   });
 });

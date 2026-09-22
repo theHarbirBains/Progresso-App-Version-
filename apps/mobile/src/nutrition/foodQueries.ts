@@ -15,7 +15,7 @@ export interface FoodRow {
   name: string;
   brand: string | null;
   barcode: string | null;
-  /** Always null for a user's own custom food (no way to add one yet) -- only ever set on a cached provider product. */
+  /** A cached provider product's photo, or the one the user added to their own custom food. Null when there is none. */
   imageUrl: string | null;
   servingSize: number;
   servingUnit: string;
@@ -145,6 +145,8 @@ export interface FoodInput {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  /** A photo of the food (its uploaded URL). Omit to leave it alone; null clears it. */
+  imageUrl?: string | null;
 }
 
 export async function createFood(userId: string, input: FoodInput): Promise<FoodRow> {
@@ -161,6 +163,7 @@ export async function createFood(userId: string, input: FoodInput): Promise<Food
       protein_g: input.proteinG,
       carbs_g: input.carbsG,
       fat_g: input.fatG,
+      ...(input.imageUrl !== undefined ? { image_url: input.imageUrl } : {}),
     })
     .select(FOOD_COLUMNS)
     .single();
@@ -182,6 +185,7 @@ export async function updateFood(foodId: string, input: UpdateFoodInput): Promis
   if (input.proteinG !== undefined) payload.protein_g = input.proteinG;
   if (input.carbsG !== undefined) payload.carbs_g = input.carbsG;
   if (input.fatG !== undefined) payload.fat_g = input.fatG;
+  if (input.imageUrl !== undefined) payload.image_url = input.imageUrl;
   if (input.isActive !== undefined) payload.is_active = input.isActive;
 
   const { data, error } = await supabase
