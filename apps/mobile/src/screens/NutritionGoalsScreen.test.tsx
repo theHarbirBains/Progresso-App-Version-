@@ -8,6 +8,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals, saveNutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
 import { computeCalorieTargets } from '../nutrition/calorieTargets';
 import { ProfileProvider, useProfile, type ProfileContextValue } from '../profile/ProfileProvider';
 import { NutritionGoalsScreen } from './NutritionGoalsScreen';
@@ -72,9 +73,11 @@ const emptyGoals = { calories: null, proteinG: null, carbsG: null, fatG: null };
 function renderScreen() {
   return render(
     <ProfileProvider>
-      <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-        <NutritionGoalsScreen navigation={navigation} route={route} />
-      </AppMenuContext.Provider>
+      <NutritionGoalsProvider>
+        <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+          <NutritionGoalsScreen navigation={navigation} route={route} />
+        </AppMenuContext.Provider>
+      </NutritionGoalsProvider>
     </ProfileProvider>,
   );
 }
@@ -280,10 +283,12 @@ describe('NutritionGoalsScreen', () => {
 
     render(
       <ProfileProvider>
-        <CaptureUpdateProfile />
-        <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-          <NutritionGoalsScreen navigation={navigation} route={route} />
-        </AppMenuContext.Provider>
+        <NutritionGoalsProvider>
+          <CaptureUpdateProfile />
+          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+            <NutritionGoalsScreen navigation={navigation} route={route} />
+          </AppMenuContext.Provider>
+        </NutritionGoalsProvider>
       </ProfileProvider>,
     );
     await screen.findByTestId('nutrition-goals-scroll');

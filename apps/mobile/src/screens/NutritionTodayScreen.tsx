@@ -19,7 +19,8 @@ import {
   type FoodLogRow,
 } from '../nutrition/foodLogQueries';
 import { calculateRemaining, sumDailyTotals } from '../nutrition/nutritionCalculations';
-import { fetchNutritionGoals, type NutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
+import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 
 type Props = RootStackScreenProps<'Nutrition'>;
 
@@ -39,9 +40,13 @@ export function NutritionTodayScreen({ navigation }: Props) {
   const userId = user?.id ?? '';
   const { nutritionTheme } = useProgressTheme();
   const { openMenu } = useAppMenu();
+  // Goals rarely change and are shared with ProfileScreen/NutritionGoalsScreen
+  // via the same cache -- only today's logs, which genuinely change within a
+  // session (logging/editing/deleting), still refetch on every focus here.
+  const { goals: cachedGoals, loading: goalsLoading, error: goalsError } = useNutritionGoals();
+  const goals = cachedGoals ?? EMPTY_GOALS;
 
   const [logs, setLogs] = useState<FoodLogRow[]>([]);
-  const [goals, setGoals] = useState<NutritionGoals>(EMPTY_GOALS);
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,12 +60,8 @@ export function NutritionTodayScreen({ navigation }: Props) {
     if (!hasLoadedOnce.current) setLoading(true);
     setError(null);
     try {
-      const [todaysLogs, nutritionGoals] = await Promise.all([
-        fetchTodaysFoodLogs(userId),
-        fetchNutritionGoals(userId),
-      ]);
+      const todaysLogs = await fetchTodaysFoodLogs(userId);
       setLogs(todaysLogs);
-      setGoals(nutritionGoals);
       setQuantityInputs(
         Object.fromEntries(todaysLogs.map((log) => [log.id, String(log.quantity)])),
       );
@@ -81,6 +82,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
 
   const consumed = useMemo(() => sumDailyTotals(logs), [logs]);
   const remaining = useMemo(() => calculateRemaining(consumed, goals), [consumed, goals]);
+  const displayError = error ?? goalsError;
 
   async function handleUpdateQuantity(log: FoodLogRow) {
     const raw = quantityInputs[log.id];
@@ -122,7 +124,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
     />
   );
 
-  if (loading) {
+  if (loading || goalsLoading) {
     return (
       <Screen scroll={false} header={header}>
         <View style={styles.loading}>
@@ -173,9 +175,9 @@ export function NutritionTodayScreen({ navigation }: Props) {
 
   return (
     <Screen contentContainerStyle={styles.content} header={header}>
-      {error ? (
+      {displayError ? (
         <Text testID="nutrition-today-error" style={styles.errorText}>
-          {error}
+          {displayError}
         </Text>
       ) : null}
 

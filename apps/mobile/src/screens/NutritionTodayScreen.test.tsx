@@ -11,6 +11,7 @@ import {
   updateFoodLogQuantity,
 } from '../nutrition/foodLogQueries';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { NutritionTodayScreen } from './NutritionTodayScreen';
 
@@ -54,9 +55,11 @@ const mockOpenMenu = jest.fn();
 function renderScreen() {
   return render(
     <ProfileProvider>
-      <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-        <NutritionTodayScreen navigation={navigation} route={route} />
-      </AppMenuContext.Provider>
+      <NutritionGoalsProvider>
+        <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+          <NutritionTodayScreen navigation={navigation} route={route} />
+        </AppMenuContext.Provider>
+      </NutritionGoalsProvider>
     </ProfileProvider>,
   );
 }

@@ -21,7 +21,7 @@ import { fromKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { fetchTodaysFoodLogs, type FoodLogRow } from '../nutrition/foodLogQueries';
 import { sumDailyTotals } from '../nutrition/nutritionCalculations';
-import { fetchNutritionGoals, type NutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { useProfile } from '../profile/ProfileProvider';
 import { computeLifetimeStats, computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 import { computeMuscleGroupSetCounts } from '../progress/muscleGroupProgress';
@@ -134,6 +134,11 @@ export function ProfileScreen({ navigation }: Props) {
   const userId = user?.id ?? '';
   const { theme, nutritionTheme, weightUnit, themeLoading } = useProgressTheme();
   const { profile, error: profileError, updateProfile } = useProfile();
+  const {
+    goals: nutritionGoals,
+    loading: nutritionGoalsLoading,
+    error: nutritionGoalsError,
+  } = useNutritionGoals();
 
   const [tab, setTab] = useState<ProfileTab>('Workouts');
 
@@ -142,13 +147,8 @@ export function ProfileScreen({ navigation }: Props) {
   const [statsError, setStatsError] = useState<string | null>(null);
 
   const [todaysFoodLogs, setTodaysFoodLogs] = useState<FoodLogRow[]>([]);
-  const [nutritionGoals, setNutritionGoals] = useState<NutritionGoals>({
-    calories: null,
-    proteinG: null,
-    carbsG: null,
-    fatG: null,
-  });
   const [nutritionError, setNutritionError] = useState<string | null>(null);
+  const displayNutritionError = nutritionError ?? nutritionGoalsError;
 
   const [repPRs, setRepPRs] = useState<RepPRWithExercise[]>([]);
   const [oneRepMaxes, setOneRepMaxes] = useState<OneRepMaxWithExercise[]>([]);
@@ -178,7 +178,7 @@ export function ProfileScreen({ navigation }: Props) {
       fetchWorkoutHistory(userId, 0, RECENT_WORKOUTS_LIMIT).then((result) =>
         enrichWorkoutSummaries(result.rows),
       ),
-      Promise.all([fetchTodaysFoodLogs(userId), fetchNutritionGoals(userId)]),
+      fetchTodaysFoodLogs(userId),
     ]);
 
     if (statsResult.status === 'fulfilled') {
@@ -202,8 +202,7 @@ export function ProfileScreen({ navigation }: Props) {
     }
 
     if (nutritionResult.status === 'fulfilled') {
-      setTodaysFoodLogs(nutritionResult.value[0]);
-      setNutritionGoals(nutritionResult.value[1]);
+      setTodaysFoodLogs(nutritionResult.value);
     } else {
       setNutritionError(errorMessage(nutritionResult.reason));
     }
@@ -262,7 +261,7 @@ export function ProfileScreen({ navigation }: Props) {
     }
   }
 
-  if (loading || themeLoading) {
+  if (loading || themeLoading || nutritionGoalsLoading) {
     return <LoadingState testID="profile-loading" />;
   }
 
@@ -407,31 +406,39 @@ export function ProfileScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('Nutrition')}
         >
           <Text style={styles.nutritionTitle}>Today&apos;s Calories & Macros</Text>
-          {nutritionError ? (
+          {displayNutritionError ? (
             <Text testID="profile-nutrition-error" style={styles.errorText}>
-              {nutritionError}
+              {displayNutritionError}
             </Text>
           ) : null}
           <View style={styles.statTileGrid}>
             <StatTile
               testID="profile-nutrition-calories"
               label="Calories"
-              value={formatMacro(todaysNutritionTotals.calories, nutritionGoals.calories, '')}
+              value={formatMacro(
+                todaysNutritionTotals.calories,
+                nutritionGoals?.calories ?? null,
+                '',
+              )}
             />
             <StatTile
               testID="profile-nutrition-protein"
               label="Protein"
-              value={formatMacro(todaysNutritionTotals.proteinG, nutritionGoals.proteinG, 'g')}
+              value={formatMacro(
+                todaysNutritionTotals.proteinG,
+                nutritionGoals?.proteinG ?? null,
+                'g',
+              )}
             />
             <StatTile
               testID="profile-nutrition-carbs"
               label="Carbs"
-              value={formatMacro(todaysNutritionTotals.carbsG, nutritionGoals.carbsG, 'g')}
+              value={formatMacro(todaysNutritionTotals.carbsG, nutritionGoals?.carbsG ?? null, 'g')}
             />
             <StatTile
               testID="profile-nutrition-fat"
               label="Fat"
-              value={formatMacro(todaysNutritionTotals.fatG, nutritionGoals.fatG, 'g')}
+              value={formatMacro(todaysNutritionTotals.fatG, nutritionGoals?.fatG ?? null, 'g')}
             />
           </View>
         </AppCard>
