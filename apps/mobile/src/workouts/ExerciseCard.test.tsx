@@ -1,8 +1,7 @@
-import { Profiler, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { fonts } from '../design/theme';
-import { ExerciseCard } from './ExerciseCard';
+import { arePropsEqual, ExerciseCard } from './ExerciseCard';
 
 const baseProps = {
   exerciseName: 'Barbell Bench Press',
@@ -425,57 +424,79 @@ describe('ExerciseCard -- a plain block, quiet controls, previous numbers beside
 // covering the whole workout), so typing into ONE exercise's set used to
 // re-render every OTHER exercise's card too -- on the screen most core to
 // the app's live-tracking use case. ExerciseCard is now memoized with a
-// custom comparator that checks those props by value instead of reference
-// (see the component's own comment); these tests prove that comparator
-// actually stops the sibling re-render, not just that behavior is
-// unchanged (the tests above already cover that).
-describe('ExerciseCard memoization', () => {
-  // Simulates two sibling cards the way ActiveWorkoutScreen renders them:
-  // editing one exercise's set produces a brand-new `sets` array for BOTH
-  // cards (since both derive from the same setInputs map), but only card
-  // A's array actually differs in content.
-  function TwoCards({ onRenderA, onRenderB }: { onRenderA: () => void; onRenderB: () => void }) {
-    const [weight, setWeight] = useState('');
-    const setsA = [
-      { id: 'a1', setIndex: 1, weight, reps: '', completed: false, canComplete: false },
-    ];
-    const setsB = [
-      { id: 'b1', setIndex: 1, weight: '', reps: '', completed: false, canComplete: false },
-    ];
-    return (
-      <View>
-        <Profiler id="card-a" onRender={onRenderA}>
-          <ExerciseCard {...baseProps} testID="card-a" sets={setsA} />
-        </Profiler>
-        <Profiler id="card-b" onRender={onRenderB}>
-          <ExerciseCard {...baseProps} testID="card-b" sets={setsB} />
-        </Profiler>
-        <View testID="trigger" onTouchEnd={() => setWeight('100')} />
-      </View>
-    );
-  }
+// custom comparator (arePropsEqual, exported for exactly this) that checks
+// those props by value instead of reference. Tested directly against the
+// comparator rather than via a Profiler render-count harness -- a timing
+// measurement is inherently noisy under parallel test-suite load (observed
+// flaking here), where a deterministic equality check on the actual
+// mechanism is not.
+describe('ExerciseCard.arePropsEqual', () => {
+  it('treats new-but-equal sets/unilateralSets/previousSession arrays as equal', () => {
+    const previousSession = {
+      dateDisplay: 'Jan 1, 2026',
+      sets: [{ setNumber: 1, weightDisplay: '100', unit: 'kg' as const, reps: 5, side: null }],
+    };
+    const prev = { ...baseProps, previousSession, unilateralSets: oneUnilateralSet };
+    const next = {
+      ...baseProps,
+      sets: [...baseProps.sets],
+      unilateralSets: oneUnilateralSet.map((s) => ({ ...s })),
+      previousSession: { ...previousSession, sets: [...previousSession.sets] },
+    };
 
-  it('does not re-render an unrelated exercise card when another one changes', () => {
-    // Profiler.onRender fires for every commit that touches its position in
-    // the tree, even when React.memo bails a child out of actually
-    // re-rendering -- so a bailed-out card still gets called once, but with
-    // actualDuration 0 (no render work happened below it). A real
-    // re-render's actualDuration is never negative and, unlike the
-    // bailed-out case, is not driven to exactly 0.
-    const onRenderA = jest.fn();
-    const onRenderB = jest.fn();
-    render(<TwoCards onRenderA={onRenderA} onRenderB={onRenderB} />);
-    onRenderA.mockClear();
-    onRenderB.mockClear();
+    expect(arePropsEqual(prev, next)).toBe(true);
+  });
 
-    fireEvent(screen.getByTestId('trigger'), 'touchEnd');
+  it('detects a real change in one set among several', () => {
+    const prev = { ...baseProps, sets: [...baseProps.sets, { ...baseProps.sets[0], id: 's2' }] };
+    const next = {
+      ...prev,
+      sets: [{ ...prev.sets[0], weight: '100' }, prev.sets[1]],
+    };
 
-    expect(onRenderA).toHaveBeenCalled();
-    const [, , actualDurationA] = onRenderA.mock.calls[0];
-    expect(actualDurationA).toBeGreaterThan(0);
+    expect(arePropsEqual(prev, next)).toBe(false);
+  });
 
-    expect(onRenderB).toHaveBeenCalled();
-    const [, , actualDurationB] = onRenderB.mock.calls[0];
-    expect(actualDurationB).toBe(0);
+  it('detects a real change in a unilateral side', () => {
+    const prev = { ...baseProps, unilateralSets: oneUnilateralSet };
+    const next = {
+      ...baseProps,
+      unilateralSets: [{ ...oneUnilateralSet[0], left: { ...oneUnilateralSet[0].left, weight: '50' } }],
+    };
+
+    expect(arePropsEqual(prev, next)).toBe(false);
+  });
+
+  // Every set-mutation callback is deliberately ignored by the comparator
+  // (see its own comment) -- a fresh closure reference every render must
+  // never by itself force a re-render, or the whole fix is defeated.
+  it('ignores identity changes in the set-mutation callbacks', () => {
+    const prev = { ...baseProps };
+    const next = {
+      ...baseProps,
+      onChangeWeight: jest.fn(),
+      onChangeReps: jest.fn(),
+      onToggleComplete: jest.fn(),
+      onToggleUnilateralComplete: jest.fn(),
+      onChangeUnilateralWeight: jest.fn(),
+      onChangeUnilateralReps: jest.fn(),
+      onAddSet: jest.fn(),
+      onRemoveExercise: jest.fn(),
+    };
+
+    expect(arePropsEqual(prev, next)).toBe(true);
+  });
+
+  // The one exception: onMoveUp/onMoveDown are position-based, so a stale
+  // reference after a reorder would move the wrong exercise -- these ARE
+  // compared by identity, which only works because ActiveWorkoutScreen
+  // caches one stable handler per index/direction (see that file).
+  it('treats a changed onMoveUp/onMoveDown reference as a real change', () => {
+    const onMoveUp = () => {};
+    const prev = { ...baseProps, onMoveUp };
+    const next = { ...baseProps, onMoveUp: () => {} };
+
+    expect(arePropsEqual(prev, next)).toBe(false);
+    expect(arePropsEqual(prev, { ...baseProps, onMoveUp })).toBe(true);
   });
 });

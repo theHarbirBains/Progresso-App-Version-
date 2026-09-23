@@ -356,7 +356,11 @@ function previousSessionEqual(
 // one. onMoveUp/onMoveDown are the one exception (see ActiveWorkoutScreen's
 // own comment on why they're kept genuinely stable per position) and ARE
 // compared, via React.memo's own default shallow check on every other prop.
-function arePropsEqual(prev: Props, next: Props): boolean {
+// Exported (not just used internally) so its exact equality semantics --
+// the actual mechanism behind ExerciseCard's re-render fix -- can be unit
+// tested directly and deterministically, rather than only indirectly and
+// timing-sensitively through a Profiler-based render-count test.
+export function arePropsEqual(prev: Props, next: Props): boolean {
   return (
     prev.exerciseName === next.exerciseName &&
     prev.muscleGroup === next.muscleGroup &&
