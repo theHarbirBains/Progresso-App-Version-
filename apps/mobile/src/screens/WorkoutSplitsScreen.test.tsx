@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile } from '../lib/api';
 import { AppCard } from '../design/AppCard';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import {
   deleteWorkoutSplit,
@@ -54,9 +55,11 @@ const mockOpenMenu = jest.fn();
 // for that root-level provider.
 function renderScreen() {
   return render(
-    <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
-      <WorkoutSplitsScreen navigation={navigation} route={route} />
-    </AppMenuContext.Provider>,
+    <ProfileProvider>
+      <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
+        <WorkoutSplitsScreen navigation={navigation} route={route} />
+      </AppMenuContext.Provider>
+    </ProfileProvider>,
   );
 }
 

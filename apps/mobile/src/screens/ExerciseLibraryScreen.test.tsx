@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { colors } from '../design/theme';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ExerciseLibraryScreen } from './ExerciseLibraryScreen';
@@ -65,9 +66,11 @@ const mockOpenMenu = jest.fn();
 // for that root-level provider.
 function renderScreen() {
   return render(
-    <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
-      <ExerciseLibraryScreen navigation={navigation} route={{} as never} />
-    </AppMenuContext.Provider>,
+    <ProfileProvider>
+      <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
+        <ExerciseLibraryScreen navigation={navigation} route={{} as never} />
+      </AppMenuContext.Provider>
+    </ProfileProvider>,
   );
 }
 

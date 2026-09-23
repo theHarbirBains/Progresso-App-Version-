@@ -6,6 +6,7 @@ import { Badge } from '../design/Badge';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile } from '../lib/api';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchWorkoutSplits, materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { ChooseWorkoutSplitScreen } from './ChooseWorkoutSplitScreen';
 
@@ -72,7 +73,7 @@ beforeEach(() => {
 
 describe('ChooseWorkoutSplitScreen', () => {
   it('lists every preset', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(screen.getByTestId('choose-split-preset-ppl')).toBeTruthy();
     expect(screen.getByTestId('choose-split-preset-upper-lower')).toBeTruthy();
@@ -82,7 +83,7 @@ describe('ChooseWorkoutSplitScreen', () => {
   });
 
   it('shows a concise line of day names per preset instead of the full structured muscle-group list', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     const pplCard = screen.getByTestId('choose-split-preset-ppl');
     // One quiet line ("Push · Pull · Legs"), not a badge per day.
@@ -95,7 +96,7 @@ describe('ChooseWorkoutSplitScreen', () => {
   });
 
   it('shows a short description for each preset', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(
       screen.getByText('A balanced and popular split for strength and muscle growth.'),
@@ -115,7 +116,7 @@ describe('ChooseWorkoutSplitScreen', () => {
   });
 
   it('does not include Hypertrophy/Strength/Cutting/Bulking in any preset name', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     // Scoped to the preset *name* text specifically -- descriptions are
     // free-form copy and may legitimately use a plain word like "strength"
@@ -131,7 +132,7 @@ describe('ChooseWorkoutSplitScreen', () => {
   });
 
   it('materializes and activates the selected preset, then goes back', async () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     fireEvent.press(screen.getByTestId('choose-split-preset-ppl'));
 
@@ -155,7 +156,7 @@ describe('ChooseWorkoutSplitScreen', () => {
       }),
     );
 
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     fireEvent.press(screen.getByTestId('choose-split-preset-ppl'));
 
     expect(await screen.findByTestId('choose-split-preset-ppl-selected')).toBeTruthy();
@@ -165,7 +166,7 @@ describe('ChooseWorkoutSplitScreen', () => {
   });
 
   it('navigates to WorkoutSplitForm with activateOnCreate when Create Your Own is pressed', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     fireEvent.press(screen.getByTestId('choose-split-create-own'));
 
@@ -175,7 +176,7 @@ describe('ChooseWorkoutSplitScreen', () => {
   it('shows an error message without crashing when materializing fails', async () => {
     mockMaterializeWorkoutSplitPreset.mockRejectedValue(new Error('network error'));
 
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     fireEvent.press(screen.getByTestId('choose-split-preset-ppl'));
 
     expect(await screen.findByTestId('choose-split-error')).toHaveTextContent('network error');
@@ -183,7 +184,7 @@ describe('ChooseWorkoutSplitScreen', () => {
   });
 
   it('goes back when Back is pressed', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     fireEvent.press(screen.getByTestId('choose-split-back'));
 
@@ -191,7 +192,7 @@ describe('ChooseWorkoutSplitScreen', () => {
   });
 
   it('navigates to WorkoutSplits when the settings icon is pressed', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     fireEvent.press(screen.getByTestId('choose-split-settings'));
 
@@ -215,7 +216,7 @@ describe('ChooseWorkoutSplitScreen', () => {
       { id: 'split-2', name: 'Some Other Split' },
     ]);
 
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('choose-split-preset-ppl-selected')).toBeTruthy();
     expect(screen.queryByTestId('choose-split-preset-upper-lower-selected')).toBeNull();
@@ -235,7 +236,7 @@ describe('ChooseWorkoutSplitScreen', () => {
     });
     mockFetchWorkoutSplits.mockResolvedValue([{ id: 'split-1', name: 'My Custom Split' }]);
 
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('choose-split-preset-ppl');
 
     expect(screen.queryByTestId('choose-split-preset-ppl-selected')).toBeNull();
@@ -244,7 +245,7 @@ describe('ChooseWorkoutSplitScreen', () => {
 
 describe('ChooseWorkoutSplitScreen -- plain rows, one secondary action', () => {
   it('shows every preset as a row of name, description and day names -- no cards, badges or icon circles', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
     expect(screen.UNSAFE_queryAllByType(Badge)).toHaveLength(0);
@@ -257,7 +258,7 @@ describe('ChooseWorkoutSplitScreen -- plain rows, one secondary action', () => {
   });
 
   it('separates the preset rows with hairlines, none above the first', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     const first = StyleSheet.flatten(screen.getByTestId('choose-split-preset-ppl').props.style);
     const second = StyleSheet.flatten(
@@ -274,7 +275,7 @@ describe('ChooseWorkoutSplitScreen -- plain rows, one secondary action', () => {
         finish = () => resolve({ id: 'new-split', name: 'PPL' });
       }),
     );
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     fireEvent.press(screen.getByTestId('choose-split-preset-ppl'));
 
@@ -290,7 +291,7 @@ describe('ChooseWorkoutSplitScreen -- plain rows, one secondary action', () => {
   });
 
   it('offers "Create Custom Split" as the one secondary action, not a competing filled button', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     const create = screen.getByTestId('choose-split-create-own');
     const style = StyleSheet.flatten(create.props.style);
@@ -301,7 +302,7 @@ describe('ChooseWorkoutSplitScreen -- plain rows, one secondary action', () => {
   });
 
   it('puts Back and Manage-splits in the shared header, each named for assistive tech', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(screen.getByTestId('choose-split-back').props.accessibilityLabel).toBe('Back');
     expect(screen.getByTestId('choose-split-settings').props.accessibilityLabel).toBe(
@@ -311,7 +312,7 @@ describe('ChooseWorkoutSplitScreen -- plain rows, one secondary action', () => {
   });
 
   it('gives every preset row at least a 44pt target', () => {
-    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />);
+    render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(
       StyleSheet.flatten(screen.getByTestId('choose-split-preset-ppl').props.style).minHeight,

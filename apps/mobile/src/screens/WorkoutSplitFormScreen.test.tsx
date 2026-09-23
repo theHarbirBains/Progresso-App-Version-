@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { updateMyProfile } from '../lib/api';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import {
   createWorkoutSplit,
@@ -84,7 +85,7 @@ describe('WorkoutSplitFormScreen -- create mode (no splitId)', () => {
   const route = { params: {} } as never;
 
   it('shows only the name field and a Create button', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('workout-split-form-name')).toBeTruthy();
     expect(screen.getByTestId('workout-split-form-create')).toBeTruthy();
@@ -92,7 +93,7 @@ describe('WorkoutSplitFormScreen -- create mode (no splitId)', () => {
   });
 
   it('disables Create until a name is entered', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(
       (await screen.findByTestId('workout-split-form-create')).props.accessibilityState?.disabled,
@@ -102,7 +103,7 @@ describe('WorkoutSplitFormScreen -- create mode (no splitId)', () => {
   it('creates the split and switches into edit mode via setParams', async () => {
     mockCreateWorkoutSplit.mockResolvedValue({ id: 'split-1', name: 'PPL' });
 
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     fireEvent.changeText(await screen.findByTestId('workout-split-form-name'), 'PPL');
     fireEvent.press(screen.getByTestId('workout-split-form-create'));
 
@@ -113,7 +114,7 @@ describe('WorkoutSplitFormScreen -- create mode (no splitId)', () => {
   it('does not activate the new split by default', async () => {
     mockCreateWorkoutSplit.mockResolvedValue({ id: 'split-1', name: 'PPL' });
 
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     fireEvent.changeText(await screen.findByTestId('workout-split-form-name'), 'PPL');
     fireEvent.press(screen.getByTestId('workout-split-form-create'));
 
@@ -128,7 +129,7 @@ describe('WorkoutSplitFormScreen -- create mode with activateOnCreate', () => {
   it('activates the new split immediately after creating it', async () => {
     mockCreateWorkoutSplit.mockResolvedValue({ id: 'split-1', name: 'My Training' });
 
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     fireEvent.changeText(await screen.findByTestId('workout-split-form-name'), 'My Training');
     fireEvent.press(screen.getByTestId('workout-split-form-create'));
 
@@ -156,7 +157,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('loads and displays the split name and its days', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('workout-split-form-name')).toHaveProp(
       'value',
@@ -167,7 +168,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('renames the split on blur', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-form-name');
 
     fireEvent.changeText(screen.getByTestId('workout-split-form-name'), 'New Name');
@@ -184,7 +185,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
       muscleGroups: [],
     });
 
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-form-add-day');
 
     fireEvent.press(screen.getByTestId('workout-split-form-add-day'));
@@ -196,7 +197,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('renames a day on blur', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-name-day-push');
 
     fireEvent.changeText(screen.getByTestId('workout-split-day-name-day-push'), 'Upper A');
@@ -208,7 +209,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('allows an arbitrary custom day name and never sends it as a muscle group', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-name-day-push');
 
     fireEvent.changeText(
@@ -226,7 +227,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('reverts the display to the last confirmed name when a day name is cleared to blank on blur', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-name-day-push');
 
     fireEvent.changeText(screen.getByTestId('workout-split-day-name-day-push'), '');
@@ -240,7 +241,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('removes a day', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-remove-day-pull');
 
     fireEvent.press(screen.getByTestId('workout-split-day-remove-day-pull'));
@@ -250,7 +251,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('reorders days via the up/down buttons', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-down-day-push');
 
     fireEvent.press(screen.getByTestId('workout-split-day-down-day-push'));
@@ -264,7 +265,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('disables moving the first day up and the last day down', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-up-day-push');
 
     expect(
@@ -276,7 +277,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('toggles a muscle group on a day', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-day-pull-muscle-back');
 
     fireEvent.press(screen.getByTestId('workout-split-day-day-pull-muscle-back'));
@@ -287,7 +288,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('persists "Shoulders" as a single general muscle group, not a day-name-derived value', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-day-push-muscle-shoulders');
 
     fireEvent.press(screen.getByTestId('workout-split-day-day-push-muscle-shoulders'));
@@ -301,7 +302,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('keeps Biceps, Triceps, and Forearms as independently toggleable groups', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-day-pull-muscle-biceps');
 
     fireEvent.press(screen.getByTestId('workout-split-day-day-pull-muscle-biceps'));
@@ -328,7 +329,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('untoggles an already-selected muscle group', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-day-push-muscle-chest');
 
     fireEvent.press(screen.getByTestId('workout-split-day-day-push-muscle-chest'));
@@ -339,7 +340,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('shows a "Done" button that goes back when this is not the activateOnCreate flow', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-form-done');
 
     expect(screen.getByTestId('workout-split-form-done')).toHaveTextContent('Done');
@@ -349,7 +350,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   });
 
   it('goes back when Back is pressed', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-form-back');
 
     fireEvent.press(screen.getByTestId('workout-split-form-back'));
@@ -360,7 +361,7 @@ describe('WorkoutSplitFormScreen -- edit mode', () => {
   it('shows a load error without crashing', async () => {
     mockFetchWorkoutSplitDetail.mockRejectedValue(new Error('network down'));
 
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('workout-split-form-error')).toHaveTextContent('network down');
   });
@@ -376,7 +377,7 @@ describe('WorkoutSplitFormScreen -- edit mode reached via activateOnCreate', () 
       days: [{ id: 'day-push', name: 'Push', orderIndex: 1, muscleGroups: [] }],
     });
 
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('workout-split-form-done')).toHaveTextContent('Create Split');
     fireEvent.press(screen.getByTestId('workout-split-form-done'));
@@ -399,7 +400,7 @@ describe('WorkoutSplitFormScreen -- shared controls, days as blocks', () => {
   });
 
   it('shows days as hairline-separated blocks in no cards', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     const first = await screen.findByTestId('workout-split-day-day-push');
     const second = screen.getByTestId('workout-split-day-day-pull');
 
@@ -409,7 +410,7 @@ describe('WorkoutSplitFormScreen -- shared controls, days as blocks', () => {
   });
 
   it('uses labelled shared inputs for the split and each day', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect((await screen.findByTestId('workout-split-form-name')).props.accessibilityLabel).toBe(
       'Split Name',
@@ -421,7 +422,7 @@ describe('WorkoutSplitFormScreen -- shared controls, days as blocks', () => {
   });
 
   it('names the reorder/remove controls for assistive tech, and gives each a 44pt touch area', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('workout-split-day-day-push');
 
     for (const [id, label] of [
@@ -438,7 +439,7 @@ describe('WorkoutSplitFormScreen -- shared controls, days as blocks', () => {
   });
 
   it('shows a selected muscle chip filled in the mode accent, an unselected one neutral', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     const on = await screen.findByTestId('workout-split-day-day-push-muscle-chest');
     const off = screen.getByTestId('workout-split-day-day-push-muscle-back');
 
@@ -451,7 +452,7 @@ describe('WorkoutSplitFormScreen -- shared controls, days as blocks', () => {
   });
 
   it('keeps each chip a comfortable target: 36pt visible plus a hit area that reaches 44pt', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     const chip = await screen.findByTestId('workout-split-day-day-push-muscle-chest');
 
     const style = StyleSheet.flatten(chip.props.style);
@@ -460,7 +461,7 @@ describe('WorkoutSplitFormScreen -- shared controls, days as blocks', () => {
   });
 
   it('has one clear primary action -- Done -- with Add Workout Day as the quiet secondary', async () => {
-    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     const done = await screen.findByTestId('workout-split-form-done');
     const add = screen.getByTestId('workout-split-form-add-day');
 
@@ -474,7 +475,7 @@ describe('WorkoutSplitFormScreen -- shared controls, days as blocks', () => {
   it('shows the busy state on the Create button while a new split is created', async () => {
     mockCreateWorkoutSplit.mockReturnValue(new Promise(() => undefined));
     const createRoute = { params: {} } as never;
-    render(<WorkoutSplitFormScreen navigation={navigation} route={createRoute} />);
+    render(<WorkoutSplitFormScreen navigation={navigation} route={createRoute} />, { wrapper: ProfileProvider });
 
     fireEvent.changeText(await screen.findByTestId('workout-split-form-name'), 'My Split');
     fireEvent.press(screen.getByTestId('workout-split-form-create'));

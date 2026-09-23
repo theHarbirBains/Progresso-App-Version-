@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { getMyProfile, updateMyProfile } from '../lib/api';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { BackgroundThemeScreen } from './BackgroundThemeScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -24,9 +25,11 @@ const route = {} as never;
 
 function renderScreen() {
   return render(
-    <BackgroundThemeProvider>
-      <BackgroundThemeScreen navigation={navigation} route={route} />
-    </BackgroundThemeProvider>,
+    <ProfileProvider>
+      <BackgroundThemeProvider>
+        <BackgroundThemeScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>
+    </ProfileProvider>,
   );
 }
 

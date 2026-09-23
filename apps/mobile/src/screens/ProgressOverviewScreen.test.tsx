@@ -4,6 +4,7 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
@@ -57,11 +58,13 @@ const mockOpenMenu = jest.fn();
 // for that root-level provider.
 function renderScreen(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
-    <AppMenuContext.Provider
-      value={{ openMenu: mockOpenMenu, currentMode }}
-    >
-      <ProgressOverviewScreen navigation={navigation} route={route} />
-    </AppMenuContext.Provider>,
+    <ProfileProvider>
+      <AppMenuContext.Provider
+        value={{ openMenu: mockOpenMenu, currentMode }}
+      >
+        <ProgressOverviewScreen navigation={navigation} route={route} />
+      </AppMenuContext.Provider>
+    </ProfileProvider>,
   );
 }
 

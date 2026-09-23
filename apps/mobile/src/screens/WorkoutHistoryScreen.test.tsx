@@ -7,6 +7,7 @@ import { fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { addMonths, MONTH_LABELS, toLocalDateKey } from '../workouts/calendarGrid';
 import { enrichWorkoutSummaries } from '../workouts/workoutHistoryEnrichment';
 import {
@@ -53,11 +54,13 @@ const mockOpenMenu = jest.fn();
 // for that root-level provider.
 function renderScreen(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
-    <AppMenuContext.Provider
-      value={{ openMenu: mockOpenMenu, currentMode }}
-    >
-      <WorkoutHistoryScreen navigation={navigation} route={{} as never} />
-    </AppMenuContext.Provider>,
+    <ProfileProvider>
+      <AppMenuContext.Provider
+        value={{ openMenu: mockOpenMenu, currentMode }}
+      >
+        <WorkoutHistoryScreen navigation={navigation} route={{} as never} />
+      </AppMenuContext.Provider>
+    </ProfileProvider>,
   );
 }
 

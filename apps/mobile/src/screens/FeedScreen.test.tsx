@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { fetchFeedItems } from '../feed/feedQueries';
 import { getMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { FeedScreen } from './FeedScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -104,9 +105,11 @@ const foodLogItem = {
 // root-level provider.
 function renderScreen() {
   return render(
-    <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
-      <FeedScreen navigation={navigation} route={route} />
-    </AppMenuContext.Provider>,
+    <ProfileProvider>
+      <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
+        <FeedScreen navigation={navigation} route={route} />
+      </AppMenuContext.Provider>
+    </ProfileProvider>,
   );
 }
 

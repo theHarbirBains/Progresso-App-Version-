@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { getMyProfile } from '../lib/api';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { createWorkout } from '../workouts/workoutQueries';
 import {
   fetchLastWorkoutSplitDayId,
@@ -108,6 +109,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     const hero = await screen.findByTestId('start-workout-next');
@@ -121,6 +123,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('start-workout-next');
 
@@ -136,6 +139,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     fireEvent.press(await screen.findByTestId('start-workout-next'));
@@ -151,6 +155,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     fireEvent.press(await screen.findByTestId('start-workout-day-day-2'));
@@ -164,6 +169,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     fireEvent.press(await screen.findByTestId('start-workout-custom'));
@@ -182,6 +188,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     fireEvent.press(await screen.findByTestId('start-workout-custom'));
 
@@ -208,6 +215,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     fireEvent.press(await screen.findByTestId('start-workout-next'));
@@ -221,6 +229,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('start-workout-next');
 
@@ -235,6 +244,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('start-workout-next');
 
@@ -248,6 +258,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     expect(await screen.findByText('Recovery')).toBeTruthy();
@@ -266,6 +277,7 @@ describe('NewWorkoutScreen without an active split', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     expect(await screen.findByTestId('new-workout-no-split')).toBeTruthy();
@@ -280,6 +292,7 @@ describe('NewWorkoutScreen without an active split', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     fireEvent.press(await screen.findByTestId('new-workout-choose-split'));
 
@@ -306,6 +319,7 @@ describe('NewWorkoutScreen background refresh on focus', () => {
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('start-workout-next');
 
@@ -334,6 +348,7 @@ describe('NewWorkoutScreen -- one primary action, everything else plain rows', (
       <BackgroundThemeProvider>
         <NewWorkoutScreen navigation={navigation} route={route} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
   }
 

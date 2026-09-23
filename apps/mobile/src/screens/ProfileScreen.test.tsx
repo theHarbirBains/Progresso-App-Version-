@@ -11,6 +11,7 @@ import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchTodaysFoodLogs } from '../nutrition/foodLogQueries';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
@@ -183,13 +184,15 @@ const mockOpenMenu = jest.fn();
 // this stands in for that root-level provider.
 function renderProfile(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
-    <BackgroundThemeProvider>
-      <AppMenuContext.Provider
-        value={{ openMenu: mockOpenMenu, currentMode }}
-      >
-        <ProfileScreen navigation={navigation} route={route} />
-      </AppMenuContext.Provider>
-    </BackgroundThemeProvider>,
+    <ProfileProvider>
+      <BackgroundThemeProvider>
+        <AppMenuContext.Provider
+          value={{ openMenu: mockOpenMenu, currentMode }}
+        >
+          <ProfileScreen navigation={navigation} route={route} />
+        </AppMenuContext.Provider>
+      </BackgroundThemeProvider>
+    </ProfileProvider>,
   );
 }
 

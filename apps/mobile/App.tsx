@@ -27,6 +27,7 @@ import { routeToBottomNavTab } from './src/navigation/bottomNavRouting';
 import { getDefaultScreenOptions } from './src/navigation/navigationTransitions';
 import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
+import { ProfileProvider } from './src/profile/ProfileProvider';
 import { useProgressTheme } from './src/progress/useProgressTheme';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
 import { ActiveWorkoutScreen } from './src/screens/ActiveWorkoutScreen';
@@ -405,10 +406,12 @@ function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <BackgroundThemeProvider>
-          <AppShell fontsLoaded={fontsLoaded} />
-          <StatusBar style="light" />
-        </BackgroundThemeProvider>
+        <ProfileProvider>
+          <BackgroundThemeProvider>
+            <AppShell fontsLoaded={fontsLoaded} />
+            <StatusBar style="light" />
+          </BackgroundThemeProvider>
+        </ProfileProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

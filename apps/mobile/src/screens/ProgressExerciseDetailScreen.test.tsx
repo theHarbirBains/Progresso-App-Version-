@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchExerciseSetHistory } from '../workouts/exerciseHistoryQueries';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import { ProgressExerciseDetailScreen } from './ProgressExerciseDetailScreen';
@@ -72,7 +73,7 @@ afterEach(() => {
 
 describe('ProgressExerciseDetailScreen', () => {
   it('shows the exercise name and an empty state with no history', async () => {
-    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByText('Bench Press')).toBeTruthy();
     expect(await screen.findByTestId('progress-exercise-detail-empty')).toHaveTextContent(
@@ -83,7 +84,7 @@ describe('ProgressExerciseDetailScreen', () => {
   it('shows the current top set and lifetime improvement', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
 
-    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('progress-exercise-detail-current')).toHaveTextContent(
       '110kg × 8',
@@ -96,7 +97,7 @@ describe('ProgressExerciseDetailScreen', () => {
   it('renders a chart point for each session and shows its detail on tap', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
 
-    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('progress-exercise-detail-chart');
 
     fireEvent(screen.getByTestId('progress-exercise-detail-chart'), 'layout', {
@@ -112,7 +113,7 @@ describe('ProgressExerciseDetailScreen', () => {
   it('dismisses the point detail', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
 
-    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('progress-exercise-detail-chart');
     fireEvent(screen.getByTestId('progress-exercise-detail-chart'), 'layout', {
       nativeEvent: { layout: { x: 0, y: 0, width: 280, height: 160 } },
@@ -136,7 +137,7 @@ describe('ProgressExerciseDetailScreen', () => {
       { reps: 8, bestWeightKg: 110, sourceSetId: 'set-2', achievedAt: '2026-02-01T12:00:00Z' },
     ]);
 
-    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('progress-exercise-detail-metric-1rm')).toHaveTextContent(
       /140/,
@@ -145,7 +146,7 @@ describe('ProgressExerciseDetailScreen', () => {
   });
 
   it('goes back when the back button is pressed', async () => {
-    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('progress-exercise-detail-back');
 
     fireEvent.press(screen.getByTestId('progress-exercise-detail-back'));
@@ -156,7 +157,7 @@ describe('ProgressExerciseDetailScreen', () => {
   it('shows a load error without crashing', async () => {
     mockFetchExerciseSetHistory.mockRejectedValue(new Error('network down'));
 
-    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('progress-exercise-detail-error')).toHaveTextContent(
       'network down',
@@ -179,7 +180,7 @@ describe('ProgressExerciseDetailScreen background refresh on focus', () => {
   }
 
   it('does not show the full-screen loading indicator on a focus-triggered refresh', async () => {
-    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('progress-exercise-detail-empty');
 
     const refresh = deferred<unknown[]>();

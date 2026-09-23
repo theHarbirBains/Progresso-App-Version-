@@ -11,6 +11,7 @@ import {
   updateFoodLogQuantity,
 } from '../nutrition/foodLogQueries';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { NutritionTodayScreen } from './NutritionTodayScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -52,9 +53,11 @@ const mockOpenMenu = jest.fn();
 // for that root-level provider.
 function renderScreen() {
   return render(
-    <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-      <NutritionTodayScreen navigation={navigation} route={route} />
-    </AppMenuContext.Provider>,
+    <ProfileProvider>
+      <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+        <NutritionTodayScreen navigation={navigation} route={route} />
+      </AppMenuContext.Provider>
+    </ProfileProvider>,
   );
 }
 

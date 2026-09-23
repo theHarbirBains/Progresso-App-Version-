@@ -6,6 +6,7 @@ import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import { PRHistoryScreen } from './PRHistoryScreen';
 
@@ -54,7 +55,7 @@ beforeEach(() => {
 
 describe('PRHistoryScreen', () => {
   it('shows the exercise name as the header', async () => {
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByText('Bench Press')).toBeTruthy();
   });
@@ -65,7 +66,7 @@ describe('PRHistoryScreen', () => {
       { reps: 8, bestWeightKg: 100, sourceSetId: 's8', achievedAt: '2026-01-02T00:00:00Z' },
     ]);
 
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     const five = await screen.findByTestId('pr-row-5');
     expect(five).toHaveTextContent(/5 Rep/);
@@ -76,7 +77,7 @@ describe('PRHistoryScreen', () => {
   });
 
   it('shows an empty state when there are no rep PRs yet', async () => {
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('rep-prs-empty')).toBeTruthy();
   });
@@ -88,13 +89,13 @@ describe('PRHistoryScreen', () => {
       achievedAt: '2026-01-01T00:00:00Z',
     });
 
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('one-rep-max-value')).toHaveTextContent(/225kg/);
   });
 
   it('shows an explicit empty state instead of estimating a 1RM', async () => {
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('one-rep-max-empty')).toHaveTextContent(/No 1RM recorded yet/);
   });
@@ -117,14 +118,14 @@ describe('PRHistoryScreen', () => {
       achievedAt: '2026-01-01T00:00:00Z',
     });
 
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('pr-row-5')).toHaveTextContent(/lb/);
     expect(screen.getByTestId('one-rep-max-value')).toHaveTextContent(/lb/);
   });
 
   it('shows a loading indicator while fetching', async () => {
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(screen.getByTestId('pr-history-loading')).toBeTruthy();
 
@@ -136,13 +137,13 @@ describe('PRHistoryScreen', () => {
   it('shows an error message when loading fails', async () => {
     mockFetchRepPRs.mockRejectedValue(new Error('network error'));
 
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('pr-history-error')).toHaveTextContent('network error');
   });
 
   it('goes back when Back is pressed', async () => {
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByText('Bench Press');
 
     fireEvent.press(screen.getByTestId('pr-history-back'));
@@ -151,7 +152,7 @@ describe('PRHistoryScreen', () => {
   });
 
   it('navigates to ExerciseProgress when View Trend is pressed', async () => {
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('view-trend');
 
     fireEvent.press(screen.getByTestId('view-trend'));
@@ -171,7 +172,7 @@ describe('PRHistoryScreen -- widgets, one large 1RM readout', () => {
 
   it('is three widgets: View Trend, the 1RM hero and the rep PRs', async () => {
     mockFetchRepPRs.mockResolvedValue(twoPRs);
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('pr-row-5');
 
     const cards = screen.UNSAFE_queryAllByType(AppCard);
@@ -186,7 +187,7 @@ describe('PRHistoryScreen -- widgets, one large 1RM readout', () => {
       sourceSetId: 's1',
       achievedAt: '2026-01-01T00:00:00Z',
     });
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     const value = StyleSheet.flatten((await screen.findByTestId('one-rep-max-value')).props.style);
     expect(value.color).toBe(DEFAULT_WORKOUT_THEME.accent);
@@ -197,7 +198,7 @@ describe('PRHistoryScreen -- widgets, one large 1RM readout', () => {
 
   it('shows each rep PR as a row: rep count and date on the left, the weight on the right', async () => {
     mockFetchRepPRs.mockResolvedValue(twoPRs);
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     const row = await screen.findByTestId('pr-row-5');
     expect(row).toHaveTextContent(/^5 Rep.*110kg$/);
@@ -205,7 +206,7 @@ describe('PRHistoryScreen -- widgets, one large 1RM readout', () => {
 
   it('separates rep PR rows with a hairline, none above the first', async () => {
     mockFetchRepPRs.mockResolvedValue(twoPRs);
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     const first = StyleSheet.flatten((await screen.findByTestId('pr-row-5')).props.style);
     const second = StyleSheet.flatten(screen.getByTestId('pr-row-8').props.style);
@@ -214,7 +215,7 @@ describe('PRHistoryScreen -- widgets, one large 1RM readout', () => {
   });
 
   it('offers View Trend as a plain, named row -- not a button styled as a card', async () => {
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     const trend = await screen.findByTestId('view-trend');
     expect(trend.props.accessibilityRole).toBe('button');
@@ -222,7 +223,7 @@ describe('PRHistoryScreen -- widgets, one large 1RM readout', () => {
   });
 
   it('names the back control for assistive tech', async () => {
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('view-trend');
 
     expect(screen.getByTestId('pr-history-back').props.accessibilityLabel).toBe('Back');
@@ -235,7 +236,7 @@ describe('PRHistoryScreen -- widgets, one large 1RM readout', () => {
       sourceSetId: 's1',
       achievedAt: '2026-01-01T00:00:00Z',
     });
-    render(<PRHistoryScreen navigation={navigation} route={route} />);
+    render(<PRHistoryScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('pr-row-5');
 
     expectNoBareText();

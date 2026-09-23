@@ -7,6 +7,7 @@ import { Alert, StyleSheet } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { getMyProfile, updateMyProfile } from '../lib/api';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_NUTRITION_COLOR, DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 import { AccountSettingsScreen } from './AccountSettingsScreen';
 
@@ -70,6 +71,7 @@ describe('AccountSettingsScreen shell', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     expect(await screen.findByTestId('account-email')).toBeTruthy();
@@ -82,6 +84,7 @@ describe('AccountSettingsScreen shell', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -95,6 +98,7 @@ describe('AccountSettingsScreen shell', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     expect(await screen.findByTestId('account-email')).toBeTruthy();
@@ -105,6 +109,7 @@ describe('AccountSettingsScreen shell', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -123,6 +128,7 @@ describe('AccountSettingsScreen shell', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     expect(await screen.findByTestId('account-load-error')).toHaveTextContent(
@@ -136,6 +142,7 @@ describe('AccountSettingsScreen shell', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -156,6 +163,7 @@ describe('AccountSettingsScreen shell', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -176,6 +184,7 @@ describe('AccountSettingsScreen Account category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
 
     expect(await screen.findByTestId('account-email')).toHaveTextContent('athlete@example.com');
@@ -191,6 +200,7 @@ describe('AccountSettingsScreen Account category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -203,6 +213,7 @@ describe('AccountSettingsScreen Account category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -218,6 +229,7 @@ describe('AccountSettingsScreen Account category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -240,6 +252,7 @@ describe('AccountSettingsScreen Account category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -263,6 +276,7 @@ describe('AccountSettingsScreen Account category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -278,6 +292,7 @@ describe('AccountSettingsScreen Account category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -295,6 +310,7 @@ describe('AccountSettingsScreen Account category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
 
@@ -311,6 +327,7 @@ describe('AccountSettingsScreen Appearance category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
@@ -330,6 +347,7 @@ describe('AccountSettingsScreen Appearance category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
@@ -343,6 +361,7 @@ describe('AccountSettingsScreen Appearance category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
@@ -357,6 +376,7 @@ describe('AccountSettingsScreen Appearance category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
@@ -371,6 +391,7 @@ describe('AccountSettingsScreen Appearance category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
@@ -392,6 +413,7 @@ describe('AccountSettingsScreen Appearance category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
@@ -427,6 +449,7 @@ describe('AccountSettingsScreen Appearance category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
@@ -451,6 +474,7 @@ describe('AccountSettingsScreen App category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('App');
@@ -465,6 +489,7 @@ describe('AccountSettingsScreen App category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('App');
@@ -479,6 +504,7 @@ describe('AccountSettingsScreen App category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('App');
@@ -493,6 +519,7 @@ describe('AccountSettingsScreen App category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('App');
@@ -515,6 +542,7 @@ describe('AccountSettingsScreen Notifications category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Notifications');
@@ -530,6 +558,7 @@ describe('AccountSettingsScreen Notifications category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Notifications');
@@ -549,6 +578,7 @@ describe('AccountSettingsScreen Notifications category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Notifications');
@@ -563,6 +593,7 @@ describe('AccountSettingsScreen Notifications category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Notifications');
@@ -580,6 +611,7 @@ describe('AccountSettingsScreen Privacy category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Privacy');
@@ -594,6 +626,7 @@ describe('AccountSettingsScreen Help category', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
     goToCategory('Help');
@@ -617,6 +650,7 @@ describe('AccountSettingsScreen -- sections and rows, no cards', () => {
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
       </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
     );
     await screen.findByTestId('account-email');
   }
