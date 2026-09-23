@@ -199,7 +199,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
           title="Food Library"
           leftAction={{
             icon: 'menu',
-            onPress: () => openMenu('nutrition'),
+            onPress: () => openMenu(),
             accessibilityLabel: 'Open menu',
             testID: 'food-library-open-menu',
           }}

@@ -148,13 +148,13 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
-  it('opens the app-level side menu (workout mode) when the header button is pressed', async () => {
+  it('opens the app-level side menu when the header button is pressed', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
     fireEvent.press(screen.getByTestId('exercise-library-open-menu'));
 
-    expect(mockOpenMenu).toHaveBeenCalledWith('workout');
+    expect(mockOpenMenu).toHaveBeenCalledWith();
     await settle();
   });
 

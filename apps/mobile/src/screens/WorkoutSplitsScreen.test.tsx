@@ -174,11 +174,11 @@ describe('WorkoutSplitsScreen', () => {
     alertSpy.mockRestore();
   });
 
-  it('opens the app-level side menu (workout mode) when the header button is pressed', async () => {
+  it('opens the app-level side menu when the header button is pressed', async () => {
     renderScreen();
     fireEvent.press(await screen.findByTestId('workout-splits-open-menu'));
 
-    expect(mockOpenMenu).toHaveBeenCalledWith('workout');
+    expect(mockOpenMenu).toHaveBeenCalledWith();
   });
 
   it('renders the hamburger and the "Workout Splits" title on the shared AppHeader row', async () => {

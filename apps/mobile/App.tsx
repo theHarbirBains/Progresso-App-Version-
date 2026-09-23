@@ -22,10 +22,10 @@ import { LoadingState } from './src/design/LoadingState';
 import { getMyProfile } from './src/lib/api';
 import { wrapApp } from './src/lib/sentry';
 import { AppMenuContext } from './src/navigation/AppMenuContext';
-import { APP_MENU_SECTIONS, type AppMenuRoute } from './src/navigation/appMenuSections';
+import type { AppMenuRoute } from './src/navigation/appMenuSections';
 import { routeToBottomNavTab } from './src/navigation/bottomNavRouting';
 import { getDefaultScreenOptions } from './src/navigation/navigationTransitions';
-import { isNutritionRoute, NUTRITION_MENU_SECTIONS } from './src/navigation/nutritionMenuSections';
+import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
 import { useProgressTheme } from './src/progress/useProgressTheme';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
@@ -118,18 +118,20 @@ function Root() {
   // navigator itself; AppMenuContext is how a screen (Feed, Workouts, etc.) asks
   // it to open.
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuMode, setMenuMode] = useState<'workout' | 'nutrition'>('workout');
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
   const { theme: menuTheme } = useProgressTheme();
   const insets = useSafeAreaInsets();
-  // AppSideMenu's own accent/section content follows whichever mode the
-  // current screen belongs to (see isNutritionRoute) -- menuTheme above
+  // AppSideMenu itself is one universal list now (APP_MENU_SECTIONS) --
+  // there's no more per-mode section list to pick, so nothing here needs to
+  // track "which mode was the menu opened from" any more. menuTheme above
   // stays Workout-only (per useProgressTheme's own scope) and still drives
-  // the global BottomNavBar's Train accent. nutritionMenuTheme is its
-  // Nutrition counterpart -- always the fixed default now (the app-wide
-  // black-and-white redesign, unconditional regardless of any saved
-  // nutritionAccentColor -- see useProgressTheme's own comment), so no
-  // longer needs its own profile fetch/effect.
+  // the global BottomNavBar's Train accent (and, below, a screen's own
+  // background glow when its mode is Workout). nutritionMenuTheme is its
+  // Nutrition counterpart, for the same per-screen glow purpose -- always
+  // the fixed default now (the app-wide black-and-white redesign,
+  // unconditional regardless of any saved nutritionAccentColor -- see
+  // useProgressTheme's own comment), so no longer needs its own profile
+  // fetch/effect.
   const nutritionMenuTheme: AccentTheme = DEFAULT_NUTRITION_THEME;
   // The persistent bottom nav (BottomNavBar) is mounted here for the same
   // reason AppSideMenu is: as a sibling of the navigator so it survives
@@ -239,10 +241,7 @@ function Root() {
     return (
       <AppMenuContext.Provider
         value={{
-          openMenu: (mode) => {
-            setMenuMode(mode ?? backgroundMode);
-            setMenuOpen(true);
-          },
+          openMenu: () => setMenuOpen(true),
           currentMode: backgroundMode,
         }}
       >
@@ -335,9 +334,7 @@ function Root() {
               navigationRef.current?.navigate(route);
             }}
             onClose={() => setMenuOpen(false)}
-            accentColor={menuMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent}
-            sections={menuMode === 'nutrition' ? NUTRITION_MENU_SECTIONS : APP_MENU_SECTIONS}
-            title={menuMode === 'nutrition' ? 'Progresso · Nutrition' : 'Progresso'}
+            accentColor={backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent}
           />
         </View>
       </AppMenuContext.Provider>

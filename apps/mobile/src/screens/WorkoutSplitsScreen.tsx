@@ -139,7 +139,7 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
           title="Workout Splits"
           leftAction={{
             icon: 'menu',
-            onPress: () => openMenu('workout'),
+            onPress: () => openMenu(),
             accessibilityLabel: 'Open menu',
             testID: 'workout-splits-open-menu',
           }}

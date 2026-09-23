@@ -45,7 +45,6 @@ const mockUploadFoodPhoto = uploadFoodPhoto as jest.Mock;
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
 const mockOpenMenu = jest.fn();
-const mockReportMode = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation: any = { goBack: mockGoBack, navigate: mockNavigate };
 
@@ -94,7 +93,7 @@ function renderScreen(
 ) {
   return render(
     <AppMenuContext.Provider
-      value={{ openMenu: mockOpenMenu, reportMode: mockReportMode, currentMode }}
+      value={{ openMenu: mockOpenMenu, currentMode }}
     >
       <FoodLibraryScreen navigation={navigation} route={{ params } as never} />
     </AppMenuContext.Provider>,
@@ -112,7 +111,6 @@ beforeEach(() => {
   mockGoBack.mockClear();
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
-  mockReportMode.mockClear();
 });
 
 describe('FoodLibraryScreen', () => {
@@ -204,7 +202,7 @@ describe('FoodLibraryScreen', () => {
     expect(screen.getByTestId('food-library-index-Z').props.accessibilityState.disabled).toBe(true);
   });
 
-  it('opens the Nutrition side menu from the hamburger button, not a back arrow', async () => {
+  it('opens the app-level side menu from the hamburger button, not a back arrow', async () => {
     renderScreen();
     await screen.findByTestId('food-item-food-apple');
 
@@ -212,7 +210,7 @@ describe('FoodLibraryScreen', () => {
 
     fireEvent.press(screen.getByTestId('food-library-open-menu'));
 
-    expect(mockOpenMenu).toHaveBeenCalledWith('nutrition');
+    expect(mockOpenMenu).toHaveBeenCalledWith();
   });
 
   it('creates a food and returns to the list', async () => {

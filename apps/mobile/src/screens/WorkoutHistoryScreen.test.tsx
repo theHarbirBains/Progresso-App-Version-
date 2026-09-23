@@ -47,7 +47,6 @@ const navigation: any = {
 };
 
 const mockOpenMenu = jest.fn();
-const mockReportMode = jest.fn();
 
 // WorkoutHistoryScreen now opens the app-level side menu (via
 // AppMenuContext) from its own header, same as Dashboard -- this stands in
@@ -55,7 +54,7 @@ const mockReportMode = jest.fn();
 function renderScreen(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
     <AppMenuContext.Provider
-      value={{ openMenu: mockOpenMenu, reportMode: mockReportMode, currentMode }}
+      value={{ openMenu: mockOpenMenu, currentMode }}
     >
       <WorkoutHistoryScreen navigation={navigation} route={{} as never} />
     </AppMenuContext.Provider>,
@@ -97,7 +96,6 @@ beforeEach(() => {
   mockEnrichWorkoutSummaries.mockReset().mockImplementation(async (rows: unknown[]) => rows);
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
-  mockReportMode.mockClear();
 });
 
 // FlatList/VirtualizedList schedules a deferred internal setState (cell
@@ -118,13 +116,13 @@ describe('WorkoutHistoryScreen', () => {
     await settle();
   });
 
-  it('opens the app-level side menu (workout mode) when the header button is pressed', async () => {
+  it('opens the app-level side menu when the header button is pressed', async () => {
     renderScreen();
     await screen.findByText(CURRENT_MONTH_LABEL);
 
     fireEvent.press(screen.getByTestId('workout-history-open-menu'));
 
-    expect(mockOpenMenu).toHaveBeenCalledWith('workout');
+    expect(mockOpenMenu).toHaveBeenCalledWith();
     await settle();
   });
 

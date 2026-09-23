@@ -255,7 +255,7 @@ export function CalorieEstimationScreen({ navigation }: Props) {
             subtitle="Used to calculate your personalized calorie targets on Nutrition Goals."
             leftAction={{
               icon: 'menu',
-              onPress: () => openMenu('nutrition'),
+              onPress: () => openMenu(),
               accessibilityLabel: 'Open menu',
               testID: 'calorie-estimation-open-menu',
             }}

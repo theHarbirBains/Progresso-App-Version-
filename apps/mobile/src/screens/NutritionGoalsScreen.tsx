@@ -224,7 +224,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
           subtitle="Here are your estimated daily calorie targets."
           leftAction={{
             icon: 'menu',
-            onPress: () => openMenu('nutrition'),
+            onPress: () => openMenu(),
             accessibilityLabel: 'Open menu',
             testID: 'nutrition-goals-open-menu',
           }}

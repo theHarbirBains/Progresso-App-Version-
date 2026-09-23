@@ -213,7 +213,7 @@ describe('NutritionTodayScreen', () => {
 
     fireEvent.press(screen.getByTestId('nutrition-today-open-menu'));
 
-    expect(mockOpenMenu).toHaveBeenCalledWith('nutrition');
+    expect(mockOpenMenu).toHaveBeenCalledWith();
   });
 });
 

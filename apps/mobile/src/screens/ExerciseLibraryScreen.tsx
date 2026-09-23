@@ -185,7 +185,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
           title="Exercise Library"
           leftAction={{
             icon: 'menu',
-            onPress: () => openMenu('workout'),
+            onPress: () => openMenu(),
             accessibilityLabel: 'Open menu',
             testID: 'exercise-library-open-menu',
           }}

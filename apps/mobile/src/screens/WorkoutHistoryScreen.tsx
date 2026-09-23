@@ -211,7 +211,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
           title="Workouts"
           leftAction={{
             icon: 'menu',
-            onPress: () => openMenu('workout'),
+            onPress: () => openMenu(),
             accessibilityLabel: 'Open menu',
             testID: 'workout-history-open-menu',
           }}

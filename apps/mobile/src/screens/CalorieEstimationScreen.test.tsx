@@ -329,14 +329,14 @@ describe('CalorieEstimationScreen', () => {
     ).toBe(false);
   });
 
-  it('has no back button -- the header opens the Nutrition side menu instead', async () => {
+  it('has no back button -- the header opens the app-level side menu instead', async () => {
     await renderScreen();
 
     expect(screen.queryByTestId('app-header-back')).toBeNull();
 
     fireEvent.press(screen.getByTestId('calorie-estimation-open-menu'));
 
-    expect(mockOpenMenu).toHaveBeenCalledWith('nutrition');
+    expect(mockOpenMenu).toHaveBeenCalledWith();
   });
 
   it('degrades to the default nutrition theme when the profile fetch fails', async () => {

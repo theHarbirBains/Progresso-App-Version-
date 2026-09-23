@@ -536,7 +536,13 @@ describe('App-level side menu', () => {
   });
 });
 
-describe('Nutrition-specific side menu', () => {
+// Regression coverage: the side menu previously showed one of two different
+// section lists (Workout-branded vs. "Progresso · Nutrition"-branded),
+// switched by whichever mode the current screen belonged to -- a leftover
+// from the removed Workout/Nutrition toggle. There is no more toggle, so
+// the menu is one universal list now (APP_MENU_SECTIONS), the same
+// regardless of which screen opens it.
+describe('Universal side menu', () => {
   async function signIn() {
     render(<App />);
     await screen.findByTestId('sign-in-email');
@@ -546,7 +552,7 @@ describe('Nutrition-specific side menu', () => {
     await screen.findByTestId('feed-screen');
   }
 
-  it('shows the Workout menu (unchanged) from a Train screen', async () => {
+  it('shows the same universal menu -- both Workout and Nutrition destinations -- from a Train screen', async () => {
     await signIn();
     fireEvent.press(screen.getByTestId('bottom-nav-train'));
     await screen.findByTestId('workout-history-open-menu');
@@ -555,17 +561,17 @@ describe('Nutrition-specific side menu', () => {
 
     expect(screen.getByText('Progresso')).toBeTruthy();
     expect(screen.getByTestId('app-menu-item-WorkoutHistory')).toBeTruthy();
-    expect(screen.queryByTestId('app-menu-item-NutritionGoals')).toBeNull();
+    expect(screen.getByTestId('app-menu-item-NutritionGoals')).toBeTruthy();
   });
 
-  it('shows the Nutrition-branded menu, with Nutrition nav items, from the Nutrition tab', async () => {
+  it('shows the exact same universal menu from the Nutrition tab', async () => {
     await signIn();
     fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
     await screen.findByTestId('nutrition-today-open-menu');
 
     fireEvent.press(screen.getByTestId('nutrition-today-open-menu'));
 
-    expect(screen.getByText('Progresso · Nutrition')).toBeTruthy();
+    expect(screen.getByText('Progresso')).toBeTruthy();
     // No Nutrition (Home) entry -- it's already one tap away via the bottom nav.
     expect(screen.queryByTestId('app-menu-item-Nutrition')).toBeNull();
     expect(screen.getByTestId('app-menu-item-FoodLibrary')).toHaveTextContent(/Food/);
@@ -573,9 +579,9 @@ describe('Nutrition-specific side menu', () => {
     expect(screen.getByTestId('app-menu-item-Nutrition History')).toHaveTextContent(/Coming Soon/);
     expect(screen.getByTestId('app-menu-item-Recipes')).toHaveTextContent(/Coming Soon/);
     expect(screen.getByTestId('app-menu-item-AccountSettings')).toHaveTextContent(/Settings/);
-    // The Workout-only menu's own items must not leak into the Nutrition menu.
-    expect(screen.queryByTestId('app-menu-item-WorkoutHistory')).toBeNull();
-    expect(screen.queryByTestId('app-menu-item-ExerciseLibrary')).toBeNull();
+    // The Workout destinations are still there too -- one universal list.
+    expect(screen.getByTestId('app-menu-item-WorkoutHistory')).toBeTruthy();
+    expect(screen.getByTestId('app-menu-item-ExerciseLibrary')).toBeTruthy();
   });
 
   it("navigates to the Nutrition Goals page via the Nutrition menu's Nutrition Goals item", async () => {

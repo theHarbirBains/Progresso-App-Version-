@@ -33,12 +33,22 @@ export interface AppMenuSection {
 }
 
 /**
- * Contents of the app-level side menu (AppSideMenu). This is the single
- * place to add a future destination -- once its screen actually exists --
- * without touching AppSideMenu itself. Every entry here must point at a
- * real, already-registered screen; never add a placeholder for an unbuilt
- * feature. No "Home" entry -- Feed (Home) is already one tap away via
- * the bottom nav, same reasoning as Profile never appearing here.
+ * Contents of the app-level side menu (AppSideMenu) -- one single, universal
+ * list, the same regardless of which screen it's opened from. This is the
+ * single place to add a future destination -- once its screen actually
+ * exists -- without touching AppSideMenu itself. Every entry here must
+ * point at a real, already-registered screen; never add a placeholder for
+ * an unbuilt feature (the exception is a `comingSoon` entry -- visible for
+ * correct information architecture, never a broken link). No "Home" entry
+ * -- Feed (Home) is already one tap away via the bottom nav, same reasoning
+ * as Profile never appearing here.
+ *
+ * Previously split into this (Workout Mode) and a separate
+ * NUTRITION_MENU_SECTIONS, switched by which mode the app was in -- merged
+ * into one list once the Workout/Nutrition toggle was removed (see
+ * DESIGN.md §11): there is no more "mode" for the menu to switch on, so
+ * every destination -- workout and nutrition alike -- belongs in the one
+ * menu every screen opens.
  */
 export const APP_MENU_SECTIONS: AppMenuSection[] = [
   {
@@ -46,6 +56,7 @@ export const APP_MENU_SECTIONS: AppMenuSection[] = [
     items: [
       { route: 'WorkoutHistory', label: 'Workouts', icon: 'activity' },
       { route: 'ProgressOverview', label: 'Progress', icon: 'trending-up' },
+      { route: 'FoodLibrary', label: 'Food', icon: 'pie-chart' },
     ],
   },
   {
@@ -53,6 +64,14 @@ export const APP_MENU_SECTIONS: AppMenuSection[] = [
     items: [
       { route: 'WorkoutSplits', label: 'Workout Splits', icon: 'layers' },
       { route: 'ExerciseLibrary', label: 'Exercise Library', icon: 'list' },
+    ],
+  },
+  {
+    title: 'NUTRITION',
+    items: [
+      { route: 'NutritionGoals', label: 'Nutrition Goals', icon: 'target' },
+      { label: 'Nutrition History', icon: 'clock', comingSoon: true },
+      { label: 'Recipes', icon: 'book-open', comingSoon: true },
     ],
   },
   {

@@ -10,7 +10,6 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { AllTimeSection } from '../progress/AllTimeSection';
 import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { OverviewSection } from '../progress/OverviewSection';
-import { ProgressEmptyState } from '../progress/ProgressEmptyState';
 import { ProgressHeader } from '../progress/ProgressHeader';
 import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
@@ -43,11 +42,14 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
-  // Progress has no Train/Nutrition sub-tabs of its own, so which content it
-  // shows (the real Workout sections vs. a "coming soon" placeholder) still
-  // follows the shared mode -- whichever of Train/Nutrition the user was
-  // most recently in, same source BottomNavBar's neutral tabs use.
-  const { openMenu, currentMode } = useAppMenu();
+  // Progress always shows the same real content (Overview/Strength/Top
+  // Sets/All-Time, all Workout-performance analytics) regardless of which
+  // tab the user was on before -- there is no more Workout/Nutrition
+  // toggle for it to follow, so it must not vary with navigation history
+  // (see DESIGN.md §11; a dedicated Nutrition-side analytics screen, if
+  // ever built, would be its own destination reachable from the app menu,
+  // not a conditional variant of this one).
+  const { openMenu } = useAppMenu();
 
   const [activeSection, setActiveSection] = useState<ProgressSection>('Overview');
 
@@ -108,7 +110,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
       testID="progress-screen"
       header={
         <ProgressHeader
-          onOpenMenu={() => openMenu(currentMode)}
+          onOpenMenu={() => openMenu()}
           accentColor={theme.accent}
           // "Track Your Growth" + the supporting sentence are hidden on
           // every Progress tab now (Overview already shows its own "Your
@@ -120,15 +122,13 @@ export function ProgressOverviewScreen({ navigation }: Props) {
       }
     >
       <View style={styles.tabsWrap}>
-        {currentMode === 'workout' ? (
-          <CategoryTabs
-            testID="progress-tabs"
-            categories={[...PROGRESS_SECTIONS]}
-            active={activeSection}
-            onSelect={setActiveSection}
-            accentColor={theme.accent}
-          />
-        ) : null}
+        <CategoryTabs
+          testID="progress-tabs"
+          categories={[...PROGRESS_SECTIONS]}
+          active={activeSection}
+          onSelect={setActiveSection}
+          accentColor={theme.accent}
+        />
 
         {error ? (
           <Text testID="progress-overview-error" style={styles.errorText}>
@@ -137,70 +137,60 @@ export function ProgressOverviewScreen({ navigation }: Props) {
         ) : null}
       </View>
 
-      {currentMode === 'nutrition' ? (
-        <AppCard testID="progress-section-card" style={styles.sectionCard}>
-          <ProgressEmptyState
-            testID="progress-nutrition-coming-soon"
-            title="Nutrition progress is coming soon."
-            icon="pie-chart"
+      <AppCard testID="progress-section-card" style={styles.sectionCard}>
+        {activeSection === 'Overview' ? (
+          <OverviewSection
+            groups={groups}
+            lifetimeStats={lifetimeStats}
+            totalCompletedSets={history.length}
+            totalPRs={totalPRs}
+            repPRs={repPRs}
+            oneRepMaxes={oneRepMaxes}
+            weightUnit={weightUnit}
+            accentColor={theme.accent}
+            navigation={navigation}
+            onViewDetails={() => setActiveSection('Strength')}
+            onViewAllMilestones={() => setActiveSection('Strength')}
           />
-        </AppCard>
-      ) : (
-        <AppCard testID="progress-section-card" style={styles.sectionCard}>
-          {activeSection === 'Overview' ? (
-            <OverviewSection
-              groups={groups}
-              lifetimeStats={lifetimeStats}
-              totalCompletedSets={history.length}
-              totalPRs={totalPRs}
-              repPRs={repPRs}
-              oneRepMaxes={oneRepMaxes}
-              weightUnit={weightUnit}
-              accentColor={theme.accent}
-              navigation={navigation}
-              onViewDetails={() => setActiveSection('Strength')}
-              onViewAllMilestones={() => setActiveSection('Strength')}
-            />
-          ) : null}
+        ) : null}
 
-          {activeSection === 'Strength' ? (
-            <StrengthProgressSection
-              history={history}
-              groups={groups}
-              weightUnit={weightUnit}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-              navigation={navigation}
-            />
-          ) : null}
+        {activeSection === 'Strength' ? (
+          <StrengthProgressSection
+            history={history}
+            groups={groups}
+            weightUnit={weightUnit}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+            navigation={navigation}
+          />
+        ) : null}
 
-          {activeSection === 'TopSets' ? (
-            <TopSetsSection
-              history={history}
-              weightUnit={weightUnit}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-              navigation={navigation}
-            />
-          ) : null}
+        {activeSection === 'TopSets' ? (
+          <TopSetsSection
+            history={history}
+            weightUnit={weightUnit}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+            navigation={navigation}
+          />
+        ) : null}
 
-          {activeSection === 'AllTime' ? (
-            <AllTimeSection
-              groups={groups}
-              history={history}
-              completedWorkouts={completedWorkouts}
-              lifetimeStats={lifetimeStats}
-              totalCompletedSets={history.length}
-              totalPRs={totalPRs}
-              repPRs={repPRs}
-              oneRepMaxes={oneRepMaxes}
-              weightUnit={weightUnit}
-              accentColor={theme.accent}
-              navigation={navigation}
-            />
-          ) : null}
-        </AppCard>
-      )}
+        {activeSection === 'AllTime' ? (
+          <AllTimeSection
+            groups={groups}
+            history={history}
+            completedWorkouts={completedWorkouts}
+            lifetimeStats={lifetimeStats}
+            totalCompletedSets={history.length}
+            totalPRs={totalPRs}
+            repPRs={repPRs}
+            oneRepMaxes={oneRepMaxes}
+            weightUnit={weightUnit}
+            accentColor={theme.accent}
+            navigation={navigation}
+          />
+        ) : null}
+      </AppCard>
     </Screen>
   );
 }

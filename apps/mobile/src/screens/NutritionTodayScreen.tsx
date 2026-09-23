@@ -115,7 +115,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
       title="Nutrition Today"
       leftAction={{
         icon: 'menu',
-        onPress: () => openMenu('nutrition'),
+        onPress: () => openMenu(),
         accessibilityLabel: 'Open menu',
         testID: 'nutrition-today-open-menu',
       }}

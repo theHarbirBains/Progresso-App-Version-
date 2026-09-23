@@ -51,7 +51,6 @@ const navigation: any = {
 const route = {} as never;
 
 const mockOpenMenu = jest.fn();
-const mockReportMode = jest.fn();
 
 // ProgressOverviewScreen now opens the app-level side menu (via
 // AppMenuContext) from its own header, same as Dashboard -- this stands in
@@ -59,7 +58,7 @@ const mockReportMode = jest.fn();
 function renderScreen(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
     <AppMenuContext.Provider
-      value={{ openMenu: mockOpenMenu, reportMode: mockReportMode, currentMode }}
+      value={{ openMenu: mockOpenMenu, currentMode }}
     >
       <ProgressOverviewScreen navigation={navigation} route={route} />
     </AppMenuContext.Provider>,
@@ -164,7 +163,6 @@ beforeEach(() => {
   mockFetchAllCompletedWorkouts.mockReset().mockResolvedValue([]);
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
-  mockReportMode.mockClear();
 });
 
 describe('ProgressOverviewScreen shell', () => {
@@ -199,33 +197,33 @@ describe('ProgressOverviewScreen shell', () => {
     expect(screen.queryByTestId('progress-header-subtitle')).toBeNull();
   });
 
-  it('opens the app-level side menu (workout mode) when the header button is pressed', async () => {
+  it('opens the app-level side menu when the header button is pressed', async () => {
     renderScreen();
     await screen.findByText('Progress');
 
     fireEvent.press(screen.getByTestId('progress-open-menu'));
 
-    expect(mockOpenMenu).toHaveBeenCalledWith('workout');
+    expect(mockOpenMenu).toHaveBeenCalledWith();
   });
 
-  it('opens the app-level side menu in whichever mode is currently active', async () => {
+  // Regression coverage: Progress previously showed a "Nutrition progress is
+  // coming soon" placeholder (and hid its own section tabs) whenever
+  // `currentMode` was 'nutrition' -- a leftover from the removed Workout/
+  // Nutrition toggle that made this screen's content depend on unrelated
+  // prior navigation (e.g. having visited Nutrition before Progress), which
+  // is exactly the inconsistency the toggle's removal was supposed to
+  // eliminate. Progress is one of the app's fixed bottom-nav destinations
+  // now and must show the same real content every time, regardless of
+  // `currentMode`.
+  it('shows the real section tabs and content the same way regardless of currentMode -- no mode-dependent placeholder', async () => {
+    mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     renderScreen('nutrition');
-    await screen.findByText('Progress');
+    await screen.findByTestId('progress-overview-scroll');
 
-    fireEvent.press(screen.getByTestId('progress-open-menu'));
-
-    expect(mockOpenMenu).toHaveBeenCalledWith('nutrition');
-  });
-
-  it('shows a "coming soon" placeholder, not the Workout section tabs, when in Nutrition mode', async () => {
-    renderScreen('nutrition');
-    await screen.findByText('Progress');
-
-    expect(screen.getByTestId('progress-nutrition-coming-soon')).toHaveTextContent(
-      'Nutrition progress is coming soon.',
-    );
-    expect(screen.queryByTestId('progress-tabs')).toBeNull();
-    expect(screen.queryByTestId('progress-overview-scroll')).toBeNull();
+    expect(screen.queryByTestId('progress-nutrition-coming-soon')).toBeNull();
+    for (const section of ['Overview', 'TopSets', 'Strength', 'AllTime']) {
+      expect(screen.getByTestId(`progress-tabs-${section}`)).toBeTruthy();
+    }
   });
 
   it('lists exactly four sections (Overview, Top Sets, Strength, All Time), defaulting to Overview', async () => {

@@ -20,7 +20,7 @@ import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { Badge } from './Badge';
 import { GlassBackground } from './GlassBackground';
 import { SectionHeader } from './SectionHeader';
-import { colors, radii, spacing, typeScale } from './theme';
+import { colors, fonts, radii, spacing, typeScale } from './theme';
 
 const PANEL_WIDTH = 280;
 
@@ -30,9 +30,9 @@ interface Props {
   onNavigate: (route: AppMenuRoute) => void;
   onClose: () => void;
   accentColor: string;
-  /** Defaults to the Workout-mode APP_MENU_SECTIONS -- pass NUTRITION_MENU_SECTIONS while in Nutrition Mode. */
+  /** Defaults to APP_MENU_SECTIONS -- the one universal menu, the same regardless of which screen opened it. A test/story can still override it; App.tsx itself no longer does. */
   sections?: AppMenuSection[];
-  /** Defaults to "Progresso" -- pass a mode-branded variant (e.g. "Progresso · Nutrition") while in Nutrition Mode. */
+  /** Defaults to "Progresso". */
   title?: string;
 }
 
@@ -146,7 +146,7 @@ export function AppSideMenu({
                     <Text
                       style={[
                         styles.itemLabel,
-                        isActive && { color: colors.textPrimary, fontWeight: '700' },
+                        isActive && { color: colors.textPrimary, fontFamily: fonts.display },
                       ]}
                     >
                       {item.label}
@@ -203,8 +203,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
   },
   itemLabel: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...typeScale.cardTitle,
+    fontFamily: fonts.semibold,
     color: colors.textSecondary,
     flex: 1,
   },
