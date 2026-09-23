@@ -168,6 +168,17 @@ describe('StrengthProgressSection', () => {
     expect(screen.queryByText('Bench Press')).toBeNull();
   });
 
+  // Regression coverage for a reported layout bug: the Muscle Group and
+  // Time Range chip rows sat flush against each other with no space
+  // between them, and no label telling the two apart. Each now has its
+  // own "Muscle Group"/"Time Range" label above it.
+  it('labels the Muscle Group and Time Range filters so the two chip rows read as distinct controls', () => {
+    renderSection(significantBench);
+
+    expect(screen.getByText('Muscle Group')).toBeTruthy();
+    expect(screen.getByText('Time Range')).toBeTruthy();
+  });
+
   it('defaults the time range to 4 Weeks', () => {
     renderSection(significantBench);
 

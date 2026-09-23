@@ -335,6 +335,24 @@ export const progressStyles = StyleSheet.create({
   searchWrap: {
     marginBottom: spacing.md,
   },
+
+  // Strength Progress's two stacked filters (Muscle Group, Time Range) --
+  // each its own labeled block, `spacing.lg` apart, so the two chip rows
+  // read as two distinct controls rather than one dense, unlabeled block
+  // (the "bad spacing" this was built to fix -- MuscleGroupChips and
+  // TimeRangeSelector each carry no spacing of their own on this shared
+  // side, so nothing separated them before). TimeRangeSelector's own
+  // `chipRow` already carries its usual trailing `marginBottom` after the
+  // last block, so this group doesn't add a second one.
+  filterGroup: {
+    gap: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  filterLabel: {
+    ...typeScale.label,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
   searchInput: {
     ...typeScale.body,
     backgroundColor: colors.surface,

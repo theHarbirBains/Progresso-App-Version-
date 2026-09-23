@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
-import { AppCard } from '../design/AppCard';
 import { colors } from '../design/theme';
+import { TextInput } from '../design/TextInput';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
 import { MOVEMENT_TYPE_LABELS, type MovementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
-import { fromKg, roundWeight } from '../lib/units';
+import { fromKg, roundWeight, formatWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import type {
   ExerciseHistoryGroup,
@@ -30,10 +30,6 @@ interface Props {
   accentColor: string;
   onAccentColor: string;
   navigation: Navigation;
-}
-
-function formatWeight(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 /**
@@ -178,35 +174,42 @@ export function StrengthProgressSection({
       <Text style={styles.topSetsSectionTitle}>Strength Progress</Text>
       <Text style={styles.topSetsSectionSubtitle}>Track meaningful progress over time.</Text>
 
-      <TextInput
-        testID="progress-strength-search"
-        style={styles.searchInput}
-        placeholder="Search exercises..."
-        placeholderTextColor={colors.textMuted}
-        value={search}
-        onChangeText={setSearch}
-      />
-
-      <View testID="progress-strength-muscle-group-wrap">
-        <MuscleGroupChips
-          value={muscleGroup}
-          onChange={setMuscleGroup}
-          includeAll
-          accentColor={accentColor}
-          onAccentColor={onAccentColor}
+      <View style={styles.searchWrap}>
+        <TextInput
+          testID="progress-strength-search"
+          placeholder="Search exercises..."
+          accessibilityLabel="Search exercises"
+          value={search}
+          onChangeText={setSearch}
         />
       </View>
 
-      <TimeRangeSelector
-        value={range}
-        onChange={setRange}
-        accentColor={accentColor}
-        onAccentColor={onAccentColor}
-      />
+      <View style={styles.filterGroup}>
+        <View testID="progress-strength-muscle-group-wrap">
+          <Text style={styles.filterLabel}>Muscle Group</Text>
+          <MuscleGroupChips
+            value={muscleGroup}
+            onChange={setMuscleGroup}
+            includeAll
+            accentColor={accentColor}
+            onAccentColor={onAccentColor}
+          />
+        </View>
+
+        <View>
+          <Text style={styles.filterLabel}>Time Range</Text>
+          <TimeRangeSelector
+            value={range}
+            onChange={setRange}
+            accentColor={accentColor}
+            onAccentColor={onAccentColor}
+          />
+        </View>
+      </View>
 
       {featured && featured.summary ? (
         <>
-          <AppCard testID="progress-strength-card" style={styles.strengthCard}>
+          <View testID="progress-strength-card" style={styles.strengthCard}>
             <Text style={styles.strengthCardName}>{featured.exerciseName}</Text>
             <View style={styles.strengthTagsRow}>
               <View style={styles.strengthTag}>
@@ -279,7 +282,7 @@ export function StrengthProgressSection({
                 `${formatWeight(roundWeight(fromKg(featured.points[i].weightKg, weightUnit)))}${weightUnit} times ${featured.points[i].reps} on ${new Date(featured.points[i].performedAt).toLocaleDateString()}`
               }
             />
-          </AppCard>
+          </View>
 
           {selectedDetail ? (
             <ChartPointDetail
