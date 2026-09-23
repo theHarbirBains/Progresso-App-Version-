@@ -92,3 +92,41 @@ jest.mock('expo-camera', () => {
     useCameraPermissions: () => [{ granted: true, canAskAgain: true }, jest.fn()],
   };
 });
+
+// expo-secure-store/expo-crypto have no jest-expo auto-mock either, and
+// lib/supabase.ts (via SecureSessionStorage) now imports both transitively
+// for basically every screen. An in-memory Map stands in for the Keychain/
+// Keystore; secureSessionStorage.test.ts exercises the real encrypt/decrypt
+// round trip against these mocks directly, so nothing here needs to fake
+// actual randomness/entropy -- deterministic bytes are fine for every other
+// test, which never inspects them.
+jest.mock('expo-secure-store', () => {
+  const store = new Map();
+  return {
+    getItemAsync: jest.fn((key) => Promise.resolve(store.get(key) ?? null)),
+    setItemAsync: jest.fn((key, value) => {
+      store.set(key, value);
+      return Promise.resolve();
+    }),
+    deleteItemAsync: jest.fn((key) => {
+      store.delete(key);
+      return Promise.resolve();
+    }),
+  };
+});
+
+jest.mock('expo-crypto', () => {
+  let callCount = 0;
+  return {
+    // Varies per call (not just per byte index) so two keys generated in
+    // the same test are never accidentally identical -- deterministic
+    // randomness would otherwise make a real bug (e.g. reusing one key for
+    // every value) invisible to a test asserting keys differ.
+    getRandomBytesAsync: jest.fn((byteCount) => {
+      callCount += 1;
+      const bytes = new Uint8Array(byteCount);
+      for (let i = 0; i < byteCount; i += 1) bytes[i] = (i + callCount) % 256;
+      return Promise.resolve(bytes);
+    }),
+  };
+});
