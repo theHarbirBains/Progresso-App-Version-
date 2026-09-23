@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
@@ -403,6 +403,29 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     }
   }
 
+  // Keeps handleMoveExercise's latest closure (fresh `workout` etc. each
+  // render) reachable from the stable per-position handlers below, without
+  // those handlers themselves needing to change identity every render.
+  const handleMoveExerciseRef = useRef(handleMoveExercise);
+  handleMoveExerciseRef.current = handleMoveExercise;
+  // ExerciseCard is memoized on its own props (see that file's own
+  // comment) to stop a keystroke in one exercise from re-rendering every
+  // other exercise's card -- which only works if onMoveUp/onMoveDown are
+  // themselves stable across renders. They're position-based (move "whoever
+  // is currently at this index"), so caching one handler per index/direction
+  // pair is correct even across a reorder: the cached handler still means
+  // "move whatever is at position N right now" for whichever exercise ends
+  // up rendered there.
+  const moveHandlersRef = useRef(new Map<string, () => void>());
+  function getMoveHandler(index: number, direction: -1 | 1): () => void {
+    const cacheKey = `${index}:${direction}`;
+    const cached = moveHandlersRef.current.get(cacheKey);
+    if (cached) return cached;
+    const handler = () => handleMoveExerciseRef.current(index, direction);
+    moveHandlersRef.current.set(cacheKey, handler);
+    return handler;
+  }
+
   async function handleSelectExercise(exercise: ExerciseRow) {
     if (!workout) return;
     setPickerOpen(false);
@@ -669,11 +692,9 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               }}
               onAddSet={() => handleAddSet(exercise)}
               onRemoveExercise={() => handleRemoveExercise(exercise.id)}
-              onMoveUp={index > 0 ? () => handleMoveExercise(index, -1) : undefined}
+              onMoveUp={index > 0 ? getMoveHandler(index, -1) : undefined}
               onMoveDown={
-                index < workout.exercises.length - 1
-                  ? () => handleMoveExercise(index, 1)
-                  : undefined
+                index < workout.exercises.length - 1 ? getMoveHandler(index, 1) : undefined
               }
               divider={index > 0}
               accentColor={theme.accent}

@@ -1,3 +1,4 @@
+import { Profiler, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { fonts } from '../design/theme';
@@ -415,5 +416,66 @@ describe('ExerciseCard -- a plain block, quiet controls, previous numbers beside
     expect(screen.getByTestId('exercise-card-set-1-left-weight').props.accessibilityLabel).toBe(
       'Set 1 left weight',
     );
+  });
+});
+
+// Regression coverage for the reported bug: ActiveWorkoutScreen rebuilds
+// every exercise's sets/unilateralSets/previousSession as fresh array/object
+// literals on every render (they're derived from one flat setInputs map
+// covering the whole workout), so typing into ONE exercise's set used to
+// re-render every OTHER exercise's card too -- on the screen most core to
+// the app's live-tracking use case. ExerciseCard is now memoized with a
+// custom comparator that checks those props by value instead of reference
+// (see the component's own comment); these tests prove that comparator
+// actually stops the sibling re-render, not just that behavior is
+// unchanged (the tests above already cover that).
+describe('ExerciseCard memoization', () => {
+  // Simulates two sibling cards the way ActiveWorkoutScreen renders them:
+  // editing one exercise's set produces a brand-new `sets` array for BOTH
+  // cards (since both derive from the same setInputs map), but only card
+  // A's array actually differs in content.
+  function TwoCards({ onRenderA, onRenderB }: { onRenderA: () => void; onRenderB: () => void }) {
+    const [weight, setWeight] = useState('');
+    const setsA = [
+      { id: 'a1', setIndex: 1, weight, reps: '', completed: false, canComplete: false },
+    ];
+    const setsB = [
+      { id: 'b1', setIndex: 1, weight: '', reps: '', completed: false, canComplete: false },
+    ];
+    return (
+      <View>
+        <Profiler id="card-a" onRender={onRenderA}>
+          <ExerciseCard {...baseProps} testID="card-a" sets={setsA} />
+        </Profiler>
+        <Profiler id="card-b" onRender={onRenderB}>
+          <ExerciseCard {...baseProps} testID="card-b" sets={setsB} />
+        </Profiler>
+        <View testID="trigger" onTouchEnd={() => setWeight('100')} />
+      </View>
+    );
+  }
+
+  it('does not re-render an unrelated exercise card when another one changes', () => {
+    // Profiler.onRender fires for every commit that touches its position in
+    // the tree, even when React.memo bails a child out of actually
+    // re-rendering -- so a bailed-out card still gets called once, but with
+    // actualDuration 0 (no render work happened below it). A real
+    // re-render's actualDuration is never negative and, unlike the
+    // bailed-out case, is not driven to exactly 0.
+    const onRenderA = jest.fn();
+    const onRenderB = jest.fn();
+    render(<TwoCards onRenderA={onRenderA} onRenderB={onRenderB} />);
+    onRenderA.mockClear();
+    onRenderB.mockClear();
+
+    fireEvent(screen.getByTestId('trigger'), 'touchEnd');
+
+    expect(onRenderA).toHaveBeenCalled();
+    const [, , actualDurationA] = onRenderA.mock.calls[0];
+    expect(actualDurationA).toBeGreaterThan(0);
+
+    expect(onRenderB).toHaveBeenCalled();
+    const [, , actualDurationB] = onRenderB.mock.calls[0];
+    expect(actualDurationB).toBe(0);
   });
 });

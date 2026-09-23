@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Alert, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
@@ -83,7 +84,7 @@ interface Props {
 // exercises are separated by a hairline, so a long workout reads as one
 // list rather than a stack of boxes. No exercise image: every exercise is
 // text.
-export function ExerciseCard({
+function ExerciseCardComponent({
   exerciseName,
   muscleGroup,
   movementType,
@@ -276,3 +277,100 @@ export function ExerciseCard({
     </View>
   );
 }
+
+function setsEqual(a: ExerciseCardSet[], b: ExerciseCardSet[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((set, i) => {
+    const other = b[i];
+    return (
+      set.id === other.id &&
+      set.setIndex === other.setIndex &&
+      set.weight === other.weight &&
+      set.reps === other.reps &&
+      set.completed === other.completed &&
+      set.canComplete === other.canComplete
+    );
+  });
+}
+
+function unilateralSideEqual(
+  a: UnilateralExerciseCardSet['left'],
+  b: UnilateralExerciseCardSet['left'],
+): boolean {
+  return (
+    a.weight === b.weight &&
+    a.reps === b.reps &&
+    a.completed === b.completed &&
+    a.canComplete === b.canComplete
+  );
+}
+
+function unilateralSetsEqual(
+  a: UnilateralExerciseCardSet[],
+  b: UnilateralExerciseCardSet[],
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((set, i) => {
+    const other = b[i];
+    return (
+      set.setIndex === other.setIndex &&
+      unilateralSideEqual(set.left, other.left) &&
+      unilateralSideEqual(set.right, other.right)
+    );
+  });
+}
+
+function previousSessionEqual(
+  a: PreviousSessionDisplay | null | undefined,
+  b: PreviousSessionDisplay | null | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.dateDisplay !== b.dateDisplay) return false;
+  if (a.sets.length !== b.sets.length) return false;
+  return a.sets.every((set, i) => {
+    const other = b.sets[i];
+    return (
+      set.setNumber === other.setNumber &&
+      set.weightDisplay === other.weightDisplay &&
+      set.unit === other.unit &&
+      set.reps === other.reps &&
+      set.side === other.side
+    );
+  });
+}
+
+// ActiveWorkoutScreen rebuilds `sets`/`unilateralSets`/`previousSession` as
+// fresh array/object literals on every render (they're derived from a
+// single flat setInputs map covering every exercise in the workout), so a
+// default reference-equality memo would never actually skip a re-render --
+// typing into one exercise's set would still re-render every OTHER
+// exercise's card too. This comparator checks those three props by value
+// instead. The set-mutation callbacks (onChangeWeight, onToggleComplete,
+// onAddSet, ...) are deliberately not compared: each is either a pure
+// functional state update (reads no stale closure state) or closes over
+// this exercise/set, which the value checks above already confirm is
+// unchanged -- so an old closure reference behaves identically to a new
+// one. onMoveUp/onMoveDown are the one exception (see ActiveWorkoutScreen's
+// own comment on why they're kept genuinely stable per position) and ARE
+// compared, via React.memo's own default shallow check on every other prop.
+function arePropsEqual(prev: Props, next: Props): boolean {
+  return (
+    prev.exerciseName === next.exerciseName &&
+    prev.muscleGroup === next.muscleGroup &&
+    prev.movementType === next.movementType &&
+    prev.divider === next.divider &&
+    prev.accentColor === next.accentColor &&
+    prev.onAccentColor === next.onAccentColor &&
+    prev.testID === next.testID &&
+    prev.onMoveUp === next.onMoveUp &&
+    prev.onMoveDown === next.onMoveDown &&
+    previousSessionEqual(prev.previousSession, next.previousSession) &&
+    setsEqual(prev.sets, next.sets) &&
+    unilateralSetsEqual(prev.unilateralSets, next.unilateralSets)
+  );
+}
+
+export const ExerciseCard = memo(ExerciseCardComponent, arePropsEqual);
