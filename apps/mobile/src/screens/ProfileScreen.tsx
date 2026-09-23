@@ -14,6 +14,7 @@ import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
+import { UnderlineTabs } from '../design/UnderlineTabs';
 import { greetingName } from '../dashboard/greeting';
 import { getMyProfile, updateMyProfile, type ProfileResponse } from '../lib/api';
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
@@ -34,7 +35,6 @@ import {
 } from '../progress/trainingOverTime';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { WeeklyTrendChart } from '../progress/WeeklyTrendChart';
-import { CategoryTabs } from '../settings/CategoryTabs';
 import {
   fetchAllExerciseHistory,
   type HistoricalSetWithExercise,
@@ -451,7 +451,7 @@ export function ProfileScreen({ navigation }: Props) {
         </AppCard>
 
         <View style={styles.tabsWrap}>
-          <CategoryTabs
+          <UnderlineTabs
             testID="profile-tabs"
             categories={PROFILE_TABS}
             active={tab}
