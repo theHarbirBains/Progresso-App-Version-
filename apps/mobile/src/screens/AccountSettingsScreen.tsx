@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { LoadingState } from '../design/LoadingState';
+import { Screen } from '../design/Screen';
 import { getMyProfile, updateMyProfile } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -104,7 +105,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
     if (!accessToken) return;
     Alert.alert(
       'Reset Theme Colors',
-      'This will restore Workout to Electric Blue and Nutrition to Emerald.',
+      'This will restore Workout and Nutrition to the default Pure White.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -163,90 +164,91 @@ export function AccountSettingsScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={styles.screen} testID="settings-screen">
-      <AppHeader
-        testID="settings-header"
-        title="Settings"
-        subtitle="Customize your experience."
-        onBack={() => navigation.goBack()}
-      />
-
-      <CategoryTabs
-        testID="settings-tabs"
-        categories={[...SETTINGS_CATEGORIES]}
-        active={activeCategory}
-        onSelect={setActiveCategory}
-        accentColor={theme.accent}
-      />
-
-      <ScrollView
-        style={styles.contentScroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        testID="settings-scroll"
-      >
-        {loadError ? (
-          <Text testID="account-load-error" style={styles.errorText}>
-            {loadError}
-          </Text>
-        ) : null}
-
-        {activeCategory === 'Account' ? (
-          <AccountCategory
-            email={user?.email ?? ''}
-            avatarUrl={avatarUrl}
-            displayName={displayName}
-            onChangeDisplayName={setDisplayName}
-            username={username}
-            onChangeUsername={setUsername}
-            weightUnit={weightUnit}
-            onChangeWeightUnit={setWeightUnit}
-            saving={saving}
-            saveError={saveError}
-            savedMessage={savedMessage}
-            onSave={handleSave}
-            onSignOut={() => signOut()}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
+    <Screen
+      testID="settings-screen"
+      scrollTestID="settings-scroll"
+      contentContainerStyle={styles.scrollContent}
+      header={
+        <View>
+          <AppHeader
+            testID="settings-header"
+            title="Settings"
+            subtitle="Customize your experience."
+            onBack={() => navigation.goBack()}
           />
-        ) : null}
+          <View style={styles.tabsWrap}>
+            <CategoryTabs
+              testID="settings-tabs"
+              categories={[...SETTINGS_CATEGORIES]}
+              active={activeCategory}
+              onSelect={setActiveCategory}
+              accentColor={theme.accent}
+            />
+          </View>
+        </View>
+      }
+    >
+      {loadError ? (
+        <Text testID="account-load-error" style={styles.errorText}>
+          {loadError}
+        </Text>
+      ) : null}
 
-        {activeCategory === 'Appearance' ? (
-          <AppearanceCategory
-            workoutAccentColor={workoutAccentColor}
-            nutritionAccentColor={nutritionAccentColor}
-            resetting={resetting}
-            onNavigateWorkoutColor={() => navigation.navigate('WorkoutColorSettings')}
-            onNavigateNutritionColor={() => navigation.navigate('NutritionColorSettings')}
-            onNavigateBackgroundTheme={() => navigation.navigate('BackgroundThemeSettings')}
-            onResetThemeColors={handleResetThemeColors}
-          />
-        ) : null}
+      {activeCategory === 'Account' ? (
+        <AccountCategory
+          email={user?.email ?? ''}
+          avatarUrl={avatarUrl}
+          displayName={displayName}
+          onChangeDisplayName={setDisplayName}
+          username={username}
+          onChangeUsername={setUsername}
+          weightUnit={weightUnit}
+          onChangeWeightUnit={setWeightUnit}
+          saving={saving}
+          saveError={saveError}
+          savedMessage={savedMessage}
+          onSave={handleSave}
+          onSignOut={() => signOut()}
+          accentColor={theme.accent}
+          onAccentColor={theme.onAccent}
+        />
+      ) : null}
 
-        {activeCategory === 'App' ? (
-          <AppCategory
-            onNavigateWorkoutSplits={() => navigation.navigate('WorkoutSplits')}
-            onNavigateWorkoutHistory={() => navigation.navigate('WorkoutHistory')}
-            onNavigateExerciseLibrary={() => navigation.navigate('ExerciseLibrary')}
-            onNavigateNutrition={() => navigation.navigate('Nutrition')}
-          />
-        ) : null}
+      {activeCategory === 'Appearance' ? (
+        <AppearanceCategory
+          workoutAccentColor={workoutAccentColor}
+          nutritionAccentColor={nutritionAccentColor}
+          resetting={resetting}
+          onNavigateWorkoutColor={() => navigation.navigate('WorkoutColorSettings')}
+          onNavigateNutritionColor={() => navigation.navigate('NutritionColorSettings')}
+          onNavigateBackgroundTheme={() => navigation.navigate('BackgroundThemeSettings')}
+          onResetThemeColors={handleResetThemeColors}
+        />
+      ) : null}
 
-        {activeCategory === 'Notifications' ? (
-          <NotificationsCategory
-            pushNotificationsOptIn={pushNotificationsOptIn}
-            onTogglePush={handleTogglePush}
-            emailOptIn={emailOptIn}
-            onToggleEmail={handleToggleEmail}
-            saving={notifSaving}
-            accentColor={theme.accent}
-          />
-        ) : null}
+      {activeCategory === 'App' ? (
+        <AppCategory
+          onNavigateWorkoutSplits={() => navigation.navigate('WorkoutSplits')}
+          onNavigateWorkoutHistory={() => navigation.navigate('WorkoutHistory')}
+          onNavigateExerciseLibrary={() => navigation.navigate('ExerciseLibrary')}
+          onNavigateNutrition={() => navigation.navigate('Nutrition')}
+        />
+      ) : null}
 
-        {activeCategory === 'Privacy' ? <PrivacyCategory /> : null}
+      {activeCategory === 'Notifications' ? (
+        <NotificationsCategory
+          pushNotificationsOptIn={pushNotificationsOptIn}
+          onTogglePush={handleTogglePush}
+          emailOptIn={emailOptIn}
+          onToggleEmail={handleToggleEmail}
+          saving={notifSaving}
+          accentColor={theme.accent}
+        />
+      ) : null}
 
-        {activeCategory === 'Help' ? <HelpCategory /> : null}
-      </ScrollView>
-    </View>
+      {activeCategory === 'Privacy' ? <PrivacyCategory /> : null}
+
+      {activeCategory === 'Help' ? <HelpCategory /> : null}
+    </Screen>
   );
 }

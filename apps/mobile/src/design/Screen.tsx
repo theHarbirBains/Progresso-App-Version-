@@ -20,7 +20,7 @@ interface Props {
   scroll?: boolean;
   /** Default false. Wraps the body so the on-screen keyboard pushes content up instead of covering an input. */
   keyboardAvoiding?: boolean;
-  /** Default true: the standard horizontal screen padding (`spacing.xxl`). Set false for edge-to-edge content such as a full-bleed list. */
+  /** Default true: the standard horizontal screen padding (`spacing.sm`) -- kept deliberately tight so widgets run close to the screen edge (see DESIGN.md's Feed section). Set false for edge-to-edge content such as a full-bleed list. */
   padded?: boolean;
   contentContainerStyle?: StyleProp<ViewStyle>;
   refreshControl?: ReactElement<RefreshControlProps>;
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   padded: {
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: spacing.sm,
   },
   scrollContent: {
     paddingBottom: spacing.xxl,

@@ -1,4 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { AppCard } from '../design/AppCard';
+import { PrimaryButton } from '../design/Button';
+import { colors } from '../design/theme';
+import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { Alert, StyleSheet } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
@@ -311,8 +315,8 @@ describe('AccountSettingsScreen Appearance category', () => {
     await screen.findByTestId('account-email');
     goToCategory('Appearance');
 
-    expect(screen.getByTestId('open-workout-color-settings')).toHaveTextContent(/Electric Blue/);
-    expect(screen.getByTestId('open-nutrition-color-settings')).toHaveTextContent(/Emerald/);
+    expect(screen.getByTestId('open-workout-color-settings')).toHaveTextContent(/Pure White/);
+    expect(screen.getByTestId('open-nutrition-color-settings')).toHaveTextContent(/Pure White/);
   });
 
   it("shows 'Custom' when the saved color doesn't match any preset", async () => {
@@ -434,9 +438,9 @@ describe('AccountSettingsScreen Appearance category', () => {
       nutritionAccentColor: DEFAULT_NUTRITION_COLOR,
     });
     expect(await screen.findByTestId('open-workout-color-settings')).toHaveTextContent(
-      /Electric Blue/,
+      /Pure White/,
     );
-    expect(screen.getByTestId('open-nutrition-color-settings')).toHaveTextContent(/Emerald/);
+    expect(screen.getByTestId('open-nutrition-color-settings')).toHaveTextContent(/Pure White/);
     alertSpy.mockRestore();
   });
 });
@@ -603,6 +607,75 @@ describe('AccountSettingsScreen Help category', () => {
       'help-privacy-policy',
     ]) {
       expect(screen.getByTestId(testID)).toHaveTextContent(/Coming Soon/);
+    }
+  });
+});
+
+describe('AccountSettingsScreen -- sections and rows, no cards', () => {
+  async function ready() {
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+    );
+    await screen.findByTestId('account-email');
+  }
+
+  it('draws no cards on any category', async () => {
+    await ready();
+    for (const category of ['Account', 'Appearance', 'App', 'Notifications', 'Privacy', 'Help']) {
+      goToCategory(category);
+      expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    }
+  });
+
+  it('names each category tab and marks the selected one', async () => {
+    await ready();
+
+    const account = screen.getByTestId('settings-tabs-Account');
+    expect(account.props.accessibilityLabel).toBe('Account');
+    expect(account.props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('settings-tabs-Help').props.accessibilityState.selected).toBe(false);
+  });
+
+  it('has one filled button on the Account tab -- Save Changes -- with the actions as plain rows', async () => {
+    await ready();
+
+    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
+    for (const id of ['account-change-password', 'sign-out-button', 'account-delete-account']) {
+      expect(screen.getByTestId(id).props.accessibilityRole).toBe('button');
+    }
+  });
+
+  it('shows Delete Account in the destructive colour, as a row, not a red button', async () => {
+    await ready();
+
+    const title = within(screen.getByTestId('account-delete-account')).getByText('Delete Account');
+    expect(StyleSheet.flatten(title.props.style).color).toBe(colors.destructive);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('account-delete-account').props.style).borderWidth,
+    ).toBeUndefined();
+  });
+
+  it('shows the appearance choices as rows and Reset as quiet destructive text', async () => {
+    await ready();
+    goToCategory('Appearance');
+
+    expect(screen.getByTestId('open-background-theme-settings').props.accessibilityRole).toBe(
+      'button',
+    );
+    const reset = screen.getByTestId('reset-theme-colors');
+    expect(StyleSheet.flatten(reset.props.style).borderWidth).toBeUndefined();
+    expect(
+      StyleSheet.flatten(within(reset).getByText('Reset Theme Colors').props.style).color,
+    ).toBe(colors.destructive);
+  });
+
+  it('renders no bare text outside <Text> on any category', async () => {
+    await ready();
+    for (const category of ['Account', 'Appearance', 'App', 'Notifications', 'Privacy', 'Help']) {
+      goToCategory(category);
+      expectNoBareText();
     }
   });
 });

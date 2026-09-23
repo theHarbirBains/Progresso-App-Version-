@@ -12,7 +12,7 @@ interface NavItem {
   label: string;
   icon: keyof typeof Feather.glyphMap;
   onPress: () => void;
-  /** This tab's own accent when it's the active one -- Train is always blue, Nutrition always green. Omit for a neutral tab (Feed/Progress/You), which uses `neutralAccentColor` instead. */
+  /** This tab's own accent when it's the active one -- Train and Nutrition each carry their mode's accent (the same neutral white by default since the black-and-white redesign, or the user's own custom choice per mode). Omit for a neutral tab (Feed/Progress/You), which uses `neutralAccentColor` instead. */
   accentColor?: string;
 }
 

@@ -9,11 +9,12 @@ import { withAlpha } from '../theme/accentColor';
 
 interface Props {
   /**
-   * The current mode's accent (Workout blue / Nutrition green, the user's own
-   * choice), which tints the soft glow. App.tsx picks it from the mode --
-   * Dashboard's own Workout/Nutrition toggle for Dashboard itself, or whichever
-   * mode the current route belongs to (see isNutritionRoute). Omit for no glow
-   * (sign-in and the other screens shown before a mode exists).
+   * The current mode's accent (Workout/Nutrition share the same neutral
+   * default since the app-wide black-and-white redesign, but each can still
+   * be the user's own custom choice), which tints the soft glow. App.tsx
+   * picks it from whichever mode the current route belongs to (see
+   * isNutritionRoute). Omit for no glow (sign-in and the other screens
+   * shown before a mode exists).
    */
   accentColor?: string;
   /**
@@ -73,7 +74,7 @@ export function ScreenBackdrop({
   accentColor,
 }: {
   children: ReactNode;
-  /** The screen's mode accent (Workout blue / Nutrition green). Tints a soft glow in the top corner; omit for none. */
+  /** The screen's mode accent (neutral white by default since the black-and-white redesign, or the user's own custom choice). Tints a soft glow in the top corner; omit for none. */
   accentColor?: string;
 }) {
   const { theme } = useBackgroundTheme();

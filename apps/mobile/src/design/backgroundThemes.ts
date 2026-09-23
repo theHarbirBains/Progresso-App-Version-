@@ -57,9 +57,11 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
   obsidian: {
     id: 'obsidian',
     name: 'Obsidian',
-    description: 'Clean, neutral near-black',
+    description: 'Clean, pitch-black',
     colors: {
-      background: '#0B0D0F',
+      // Pitch black -- the app-wide black-and-white redesign's own explicit
+      // call, over the earlier near-black #0B0D0F.
+      background: '#000000',
       surface: '#131719',
       surfaceRaised: '#1A2023',
       border: '#212B2D',
@@ -143,7 +145,7 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     name: 'Topographic',
     description: 'Subtle contour-line texture',
     colors: {
-      background: '#0B0D0F',
+      background: '#000000',
       surface: '#131719',
       surfaceRaised: '#1A2023',
       border: '#212B2D',
@@ -171,7 +173,7 @@ export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinit
     name: 'Particles',
     description: 'Extremely sparse ambient particles',
     colors: {
-      background: '#0B0D0F',
+      background: '#000000',
       surface: '#131719',
       surfaceRaised: '#1A2023',
       border: '#212B2D',

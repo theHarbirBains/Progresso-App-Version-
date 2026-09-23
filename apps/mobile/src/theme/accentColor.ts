@@ -99,8 +99,15 @@ export function buildAccentTheme(hex: string): AccentTheme {
   };
 }
 
-export const DEFAULT_WORKOUT_COLOR = '#2F80FF';
-export const DEFAULT_NUTRITION_COLOR = '#10B981';
+// Both defaults are the same neutral "Pure White" preset (accentPalette.ts's
+// Monochrome group, matching colors.accent) -- the app-wide black-and-white
+// redesign's own explicit call, replacing the earlier Workout blue /
+// Nutrition green. Train and Nutrition are told apart by label and icon
+// now, not by color (the same approach Feed's cards already use -- see
+// DESIGN.md's Feed section). A user who picks a custom color via
+// AccentColorPickerScreen still overrides this per-mode, same as before.
+export const DEFAULT_WORKOUT_COLOR = '#FFFFFF';
+export const DEFAULT_NUTRITION_COLOR = '#FFFFFF';
 
 export const DEFAULT_WORKOUT_THEME = buildAccentTheme(DEFAULT_WORKOUT_COLOR);
 export const DEFAULT_NUTRITION_THEME = buildAccentTheme(DEFAULT_NUTRITION_COLOR);

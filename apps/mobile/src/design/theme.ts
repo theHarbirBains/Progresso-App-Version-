@@ -1,10 +1,14 @@
-// Progresso "Dark + Electric" design tokens -- approved direction for the
-// Design & Product Polish phase. Every screen's styling should derive from
-// these values rather than hand-picking colors/sizes, so the visual system
-// stays coherent as it's propagated screen by screen.
+// Progresso design tokens. Pitch-black/monochrome ("black and white") is
+// the current direction, replacing the earlier "Dark + Electric" teal
+// accent -- see DESIGN.md. Every screen's styling should derive from these
+// values rather than hand-picking colors/sizes, so the visual system stays
+// coherent as it's propagated screen by screen.
 
 export const colors = {
-  background: '#0B0D0F',
+  // Pitch black -- the app-wide black-and-white redesign's own explicit
+  // call, over the earlier near-black #0B0D0F. Surfaces (below) stay
+  // distinct so cards still read as raised against it.
+  background: '#000000',
   surface: '#131719',
   surfaceRaised: '#1A2023',
   // Used only for the single "hero" card per screen (Dashboard's Recent
@@ -28,16 +32,20 @@ export const colors = {
   textMuted: '#5E7072',
 
   // The single Progresso brand accent. Used for: primary CTA, active states,
-  // key performance numbers, chart line, and PR indicators -- per the
-  // approved Concept B direction, PR reuses this accent rather than a
-  // separate success color.
-  accent: '#29E3C7',
-  onAccent: '#06201C',
+  // key performance numbers, chart line, and PR indicators. Neutral
+  // (matches textPrimary) rather than a hue -- the app-wide black-and-white
+  // redesign's own explicit call, replacing the earlier teal. `onAccent`
+  // below is computed per-accent by buildAccentTheme for the two mode
+  // accents (accentColor.ts); this literal only backs direct `colors.accent`
+  // consumers (Button, Toggle, SegmentedControl, Badge, etc.), so it stays
+  // hand-picked for the same near-black-on-near-white contrast.
+  accent: '#FFFFFF',
+  onAccent: '#000000',
 
   destructive: '#F0555C',
   destructiveBorder: '#3A2226',
 
-  chartAccent: '#29E3C7',
+  chartAccent: '#FFFFFF',
   chartMuted: '#212B2D',
 
   // Glass-surface hairline borders (see GlassBackground.tsx) -- a neutral

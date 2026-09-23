@@ -101,7 +101,7 @@ describe('Screen', () => {
       </Screen>,
     );
     const paddedBody = screen.getByTestId('body').parent!.parent!;
-    expect(StyleSheet.flatten(paddedBody.props.style).paddingHorizontal).toBe(spacing.xxl);
+    expect(StyleSheet.flatten(paddedBody.props.style).paddingHorizontal).toBe(spacing.sm);
 
     rerender(
       <Screen scroll={false} padded={false} testID="screen">

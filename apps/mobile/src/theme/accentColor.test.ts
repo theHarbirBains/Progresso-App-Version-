@@ -104,8 +104,8 @@ describe('buildAccentTheme', () => {
 });
 
 describe('default colors', () => {
-  it('are Electric Blue and Emerald respectively', () => {
-    expect(DEFAULT_WORKOUT_COLOR).toBe('#2F80FF');
-    expect(DEFAULT_NUTRITION_COLOR).toBe('#10B981');
+  it('are both the same neutral white -- the app-wide black-and-white redesign', () => {
+    expect(DEFAULT_WORKOUT_COLOR).toBe('#FFFFFF');
+    expect(DEFAULT_NUTRITION_COLOR).toBe('#FFFFFF');
   });
 });

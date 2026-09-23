@@ -99,7 +99,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingHorizontal: spacing.xxl,
+    // Matches Screen's own tightened horizontal gutter (spacing.sm) so a
+    // header's title/icons line up with the card edges below it.
+    paddingHorizontal: spacing.sm,
     paddingBottom: spacing.lg,
   },
   spacer: {
