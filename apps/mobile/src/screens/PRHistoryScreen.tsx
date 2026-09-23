@@ -8,7 +8,6 @@ import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { colors } from '../design/theme';
-import { getMyProfile } from '../lib/api';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -39,11 +38,10 @@ export function PRHistoryScreen({ route, navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
-  const { theme } = useProgressTheme();
+  const { theme, weightUnit } = useProgressTheme();
 
   const [repPRs, setRepPRs] = useState<RepPR[]>([]);
   const [oneRepMax, setOneRepMax] = useState<OneRepMax | null>(null);
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,15 +52,13 @@ export function PRHistoryScreen({ route, navigation }: Props) {
       setLoading(true);
       setError(null);
       try {
-        const [prs, orm, profile] = await Promise.all([
+        const [prs, orm] = await Promise.all([
           fetchRepPRs(userId, exerciseId),
           fetchOneRepMax(userId, exerciseId),
-          getMyProfile(accessToken),
         ]);
         if (cancelled) return;
         setRepPRs(prs);
         setOneRepMax(orm);
-        setWeightUnit(profile.weightUnit);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load PR history');
       } finally {

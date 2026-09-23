@@ -10,6 +10,7 @@ import { AppMenuContext } from '../navigation/AppMenuContext';
 import { uploadFoodPhoto } from '../lib/foodPhotoUpload';
 import { logFood } from '../nutrition/foodLogQueries';
 import { createFood, fetchAllFoods, updateFood } from '../nutrition/foodQueries';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { FoodLibraryScreen } from './FoodLibraryScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -92,11 +93,13 @@ function renderScreen(
   params?: any,
 ) {
   return render(
-    <AppMenuContext.Provider
-      value={{ openMenu: mockOpenMenu, currentMode }}
-    >
-      <FoodLibraryScreen navigation={navigation} route={{ params } as never} />
-    </AppMenuContext.Provider>,
+    <ProfileProvider>
+      <AppMenuContext.Provider
+        value={{ openMenu: mockOpenMenu, currentMode }}
+      >
+        <FoodLibraryScreen navigation={navigation} route={{ params } as never} />
+      </AppMenuContext.Provider>
+    </ProfileProvider>,
   );
 }
 

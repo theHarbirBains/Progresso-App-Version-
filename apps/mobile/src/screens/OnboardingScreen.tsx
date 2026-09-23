@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,16 +6,16 @@ import { useAuth } from '../auth/AuthProvider';
 import { IconButton } from '../design/IconButton';
 import { LoadingState } from '../design/LoadingState';
 import { PrimaryButton } from '../design/Button';
-import {
-  getMyProfile,
-  updateMyProfile,
-  type AppleHealthPreference,
-  type FitnessGoal,
-  type Gender,
-  type TrainingExperience,
-  type TrainingStylePreference,
+import type {
+  AppleHealthPreference,
+  FitnessGoal,
+  Gender,
+  TrainingExperience,
+  TrainingStylePreference,
+  UpdateProfileInput,
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { toDateStringUTC } from '../onboarding/dateWheelValues';
 import { DateWheelPicker } from '../onboarding/DateWheelPicker';
@@ -71,13 +71,12 @@ const WHEEL_PICKER_STEPS = new Set<OnboardingStep>(['birthday', 'weight', 'heigh
 const DEFAULT_BIRTH_YEAR = new Date().getFullYear() - 25;
 
 export function OnboardingScreen({ navigation }: Props) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const userId = user?.id ?? '';
-  const accessToken = session?.access_token;
-  const { theme } = useProgressTheme();
+  const { theme, activeWorkoutSplitId } = useProgressTheme();
+  const { profile, loading: profileLoading, error: profileError, updateProfile } = useProfile();
   const insets = useSafeAreaInsets();
 
-  const [loading, setLoading] = useState(true);
   const [stepIndex, setStepIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,53 +97,49 @@ export function OnboardingScreen({ navigation }: Props) {
   const [emailOptIn, setEmailOptIn] = useState<boolean | null>(null);
 
   const awaitingSplitCreationRef = useRef(false);
-
-  const load = useCallback(async () => {
-    if (!accessToken) return;
-    try {
-      const profile = await getMyProfile(accessToken);
-      setGender(profile.gender);
-      if (profile.birthday) {
-        const [y, m, d] = profile.birthday.split('-').map(Number);
-        setBirthdayYear(y);
-        setBirthdayMonth(m - 1);
-        setBirthdayDay(d);
-      }
-      if (profile.weightValue != null) setWeightKg(profile.weightValue);
-      setWeightUnit(profile.weightUnit);
-      if (profile.heightValue != null) setHeightCm(profile.heightValue);
-      setHeightUnit(profile.heightUnit);
-      setFitnessGoal(profile.fitnessGoal);
-      setTrainingExperience(profile.trainingExperience);
-      setWorkoutFrequencyDays(profile.workoutFrequencyDays);
-      setTrainingStylePreference(profile.trainingStylePreference);
-      setEmailOptIn(profile.emailOptIn);
-      setStepIndex(computeStartStepIndex(profile));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load your profile');
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken]);
+  // Seeds the local draft fields, and the step to resume at, from the
+  // shared profile cache exactly once, the first time it resolves -- not on
+  // every later change to `profile` (e.g. after this screen's own saves
+  // below), which would otherwise fight the step-by-step local edits this
+  // screen makes as the user answers each question.
+  const hasSeededRef = useRef(false);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!profile || hasSeededRef.current) return;
+    hasSeededRef.current = true;
+    setGender(profile.gender);
+    if (profile.birthday) {
+      const [y, m, d] = profile.birthday.split('-').map(Number);
+      setBirthdayYear(y);
+      setBirthdayMonth(m - 1);
+      setBirthdayDay(d);
+    }
+    if (profile.weightValue != null) setWeightKg(profile.weightValue);
+    setWeightUnit(profile.weightUnit);
+    if (profile.heightValue != null) setHeightCm(profile.heightValue);
+    setHeightUnit(profile.heightUnit);
+    setFitnessGoal(profile.fitnessGoal);
+    setTrainingExperience(profile.trainingExperience);
+    setWorkoutFrequencyDays(profile.workoutFrequencyDays);
+    setTrainingStylePreference(profile.trainingStylePreference);
+    setEmailOptIn(profile.emailOptIn);
+    setStepIndex(computeStartStepIndex(profile));
+  }, [profile]);
 
+  // Returning here from WorkoutSplitFormScreen (Create Your Own): that
+  // screen's own save already went through the same shared updateProfile
+  // below, so activeWorkoutSplitId above is already current by the time
+  // this focus fires -- no fetch of its own needed.
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      if (!awaitingSplitCreationRef.current || !accessToken) return;
+      if (!awaitingSplitCreationRef.current) return;
       awaitingSplitCreationRef.current = false;
-      getMyProfile(accessToken)
-        .then((profile) => {
-          if (profile.activeWorkoutSplitId) {
-            goToStep(STEP_ORDER.indexOf('workoutSplit') + 1);
-          }
-        })
-        .catch(() => {});
+      if (activeWorkoutSplitId) {
+        goToStep(STEP_ORDER.indexOf('workoutSplit') + 1);
+      }
     });
     return unsubscribe;
-  }, [navigation, accessToken]);
+  }, [navigation, activeWorkoutSplitId]);
 
   function goToStep(index: number) {
     setStepIndex(Math.min(STEP_ORDER.length - 1, Math.max(0, index)));
@@ -154,12 +149,11 @@ export function OnboardingScreen({ navigation }: Props) {
     goToStep(stepIndex - 1);
   }
 
-  async function saveAndAdvance(updates: Parameters<typeof updateMyProfile>[1]) {
-    if (!accessToken) return;
+  async function saveAndAdvance(updates: UpdateProfileInput) {
     setSaving(true);
     setError(null);
     try {
-      await updateMyProfile(accessToken, updates);
+      await updateProfile(updates);
       goToStep(stepIndex + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
@@ -177,8 +171,7 @@ export function OnboardingScreen({ navigation }: Props) {
   }
 
   async function handleSplitPresetActivated(splitId: string) {
-    if (!accessToken) return;
-    await updateMyProfile(accessToken, { activeWorkoutSplitId: splitId });
+    await updateProfile({ activeWorkoutSplitId: splitId });
     goToStep(stepIndex + 1);
   }
 
@@ -188,11 +181,10 @@ export function OnboardingScreen({ navigation }: Props) {
   }
 
   async function handleStartTraining() {
-    if (!accessToken) return;
     setSaving(true);
     setError(null);
     try {
-      await updateMyProfile(accessToken, { onboardingCompleted: true });
+      await updateProfile({ onboardingCompleted: true });
       navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to complete onboarding');
@@ -246,10 +238,11 @@ export function OnboardingScreen({ navigation }: Props) {
     }
   }
 
-  if (loading) {
+  if (profileLoading) {
     return <LoadingState testID="onboarding-loading" />;
   }
 
+  const displayError = error ?? profileError;
   const step = STEP_ORDER[stepIndex];
 
   if (step === 'completion') {
@@ -261,9 +254,9 @@ export function OnboardingScreen({ navigation }: Props) {
         <View style={styles.completionContainer}>
           <Text style={styles.completionTitle}>You&apos;re all set.</Text>
           <Text style={styles.completionSubtitle}>Let&apos;s get to work.</Text>
-          {error ? (
+          {displayError ? (
             <Text testID="onboarding-error" style={styles.errorText}>
-              {error}
+              {displayError}
             </Text>
           ) : null}
           <PrimaryButton
@@ -299,9 +292,9 @@ export function OnboardingScreen({ navigation }: Props) {
         </View>
       </View>
 
-      {error ? (
+      {displayError ? (
         <Text testID="onboarding-error" style={styles.errorText}>
-          {error}
+          {displayError}
         </Text>
       ) : null}
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Linking, View } from 'react-native';
 import { Text } from '../design/Text';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
@@ -10,11 +10,11 @@ import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
-import { getFoodByBarcode, getMyProfile, type FoodSearchResult } from '../lib/api';
+import { getFoodByBarcode, type FoodSearchResult } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { FoodFacts } from '../nutrition/FoodFacts';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
-import { buildAccentTheme, DEFAULT_NUTRITION_THEME, type AccentTheme } from '../theme/accentColor';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { barcodeScannerStyles as styles } from './barcodeScannerStyles';
 
 type Props = RootStackScreenProps<'BarcodeScanner'>;
@@ -52,35 +52,13 @@ export function BarcodeScannerScreen({ navigation }: Props) {
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
 
-  const [theme, setTheme] = useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
+  const { nutritionTheme: theme } = useProgressTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<ScanState>({ status: 'scanning' });
   // onBarcodeScanned keeps firing for every frame a barcode is visible in --
   // this guards a single scan from triggering multiple lookups until the
   // user explicitly returns to 'scanning' (Scan Again).
   const hasScannedRef = useRef(false);
-
-  useEffect(() => {
-    let mounted = true;
-    async function loadTheme() {
-      if (!accessToken) return;
-      try {
-        const profile = await getMyProfile(accessToken);
-        if (!mounted) return;
-        setTheme(
-          profile.nutritionAccentColor
-            ? buildAccentTheme(profile.nutritionAccentColor)
-            : DEFAULT_NUTRITION_THEME,
-        );
-      } catch {
-        // Keep the default nutrition theme -- non-fatal.
-      }
-    }
-    void loadTheme();
-    return () => {
-      mounted = false;
-    };
-  }, [accessToken]);
 
   const lookUp = useCallback(
     async (barcode: string) => {

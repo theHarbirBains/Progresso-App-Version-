@@ -13,7 +13,6 @@ import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
-import { getMyProfile } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
@@ -47,10 +46,9 @@ function musclesLabel(day: WorkoutSplitDay): string {
 // else as plain rows -- the split's other days, then "Do a Different
 // Workout" -- rather than a card per option.
 export function NewWorkoutScreen({ navigation }: Props) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const userId = user?.id ?? '';
-  const accessToken = session?.access_token;
-  const { theme } = useProgressTheme();
+  const { theme, activeWorkoutSplitId } = useProgressTheme();
 
   const [loading, setLoading] = useState(true);
   const [hasActiveSplitId, setHasActiveSplitId] = useState(false);
@@ -70,43 +68,41 @@ export function NewWorkoutScreen({ navigation }: Props) {
   // refresh, same pattern as DashboardScreen/ProfileScreen.
   const hasLoadedOnce = useRef(false);
 
-  // Re-checked on every focus (not just mount) so returning here after
-  // picking a split in ChooseWorkoutSplitScreen immediately unblocks this
-  // screen, matching the previous screen's existing behavior.
+  // The split-detail fetch itself is re-checked on every focus (not just
+  // mount/on activeWorkoutSplitId change) since the active split's own DAYS
+  // can change (e.g. edited via WorkoutSplitsScreen) without its id
+  // changing -- activeWorkoutSplitId itself comes from the shared profile
+  // cache (useProgressTheme) below, reactively, so a split picked in
+  // ChooseWorkoutSplitScreen (which writes through that same shared cache)
+  // unblocks this screen immediately, with no extra profile fetch here.
   useEffect(() => {
-    if (!userId || !accessToken) return;
+    if (!userId) return;
     let cancelled = false;
     async function load() {
       if (!hasLoadedOnce.current) setLoading(true);
       setSplitError(null);
+      if (!activeWorkoutSplitId) {
+        setHasActiveSplitId(false);
+        setLoading(false);
+        hasLoadedOnce.current = true;
+        return;
+      }
+      setHasActiveSplitId(true);
       try {
-        const profile = await getMyProfile(accessToken!);
+        const [detail, lastDayId] = await Promise.all([
+          fetchWorkoutSplitDetail(activeWorkoutSplitId),
+          fetchLastWorkoutSplitDayId(userId),
+        ]);
         if (cancelled) return;
-        if (!profile.activeWorkoutSplitId) {
-          setHasActiveSplitId(false);
-          return;
+        setActiveSplit(detail);
+        setNextPlan(computeNextWorkout(detail, lastDayId));
+      } catch (err) {
+        // Non-critical: the user does have an active split, a failed
+        // detail fetch just means we can't show it right now -- "Do a
+        // Different Workout" still lets them start something.
+        if (!cancelled) {
+          setSplitError(err instanceof Error ? err.message : 'Failed to load your split');
         }
-        setHasActiveSplitId(true);
-        try {
-          const [detail, lastDayId] = await Promise.all([
-            fetchWorkoutSplitDetail(profile.activeWorkoutSplitId),
-            fetchLastWorkoutSplitDayId(userId),
-          ]);
-          if (cancelled) return;
-          setActiveSplit(detail);
-          setNextPlan(computeNextWorkout(detail, lastDayId));
-        } catch (err) {
-          // Non-critical: the user does have an active split, a failed
-          // detail fetch just means we can't show it right now -- "Do a
-          // Different Workout" still lets them start something.
-          if (!cancelled) {
-            setSplitError(err instanceof Error ? err.message : 'Failed to load your split');
-          }
-        }
-      } catch {
-        // Profile fetch itself failing is treated the same as "no split"
-        // rather than leaving the screen stuck loading forever.
-        if (!cancelled) setHasActiveSplitId(false);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -119,7 +115,7 @@ export function NewWorkoutScreen({ navigation }: Props) {
       cancelled = true;
       unsubscribe();
     };
-  }, [userId, accessToken, navigation]);
+  }, [userId, activeWorkoutSplitId, navigation]);
 
   const startWorkout = useCallback(
     async (key: string, name: string, dayId: string | undefined) => {

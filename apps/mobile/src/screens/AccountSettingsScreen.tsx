@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
-import { getMyProfile, updateMyProfile } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { AccountCategory } from '../settings/AccountCategory';
 import { AppCategory } from '../settings/AppCategory';
@@ -30,69 +30,55 @@ type Props = RootStackScreenProps<'AccountSettings'>;
 // internal identifier only) so nothing elsewhere in the navigation needs to
 // change.
 export function AccountSettingsScreen({ navigation }: Props) {
-  const { user, session, signOut } = useAuth();
-  const accessToken = session?.access_token;
+  const { user, signOut } = useAuth();
   const { theme, themeLoading } = useProgressTheme();
+  const { profile, loading, error: loadError, updateProfile } = useProfile();
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('Account');
 
+  // Only the fields this screen's own form actually edits get local state --
+  // avatarUrl/workoutAccentColor/nutritionAccentColor are read straight off
+  // the shared profile cache below instead, since they're only ever changed
+  // elsewhere (the avatar picker on Profile, the two color-picker screens).
   const [displayName, setDisplayName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
-  const [workoutAccentColor, setWorkoutAccentColor] = useState<string | null>(null);
-  const [nutritionAccentColor, setNutritionAccentColor] = useState<string | null>(null);
   const [pushNotificationsOptIn, setPushNotificationsOptIn] = useState(false);
   const [emailOptIn, setEmailOptIn] = useState(false);
 
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
   const [notifSaving, setNotifSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!accessToken) return;
-    try {
-      const profile = await getMyProfile(accessToken);
-      setDisplayName(profile.displayName ?? '');
-      setAvatarUrl(profile.avatarUrl);
-      setUsername(profile.username ?? '');
-      setWeightUnit(profile.weightUnit);
-      setWorkoutAccentColor(profile.workoutAccentColor);
-      setNutritionAccentColor(profile.nutritionAccentColor);
-      setPushNotificationsOptIn(profile.pushNotificationsOptIn ?? false);
-      setEmailOptIn(profile.emailOptIn ?? false);
-    } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Failed to load profile');
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken]);
-
+  // Seeds the editable fields from the shared profile cache exactly once,
+  // the first time it resolves -- not on every later change to `profile`
+  // (e.g. a color reset elsewhere), which would silently blow away text the
+  // user is actively editing in this screen's own form.
+  const hasSeededRef = useRef(false);
   useEffect(() => {
-    load();
-    // Re-load on every focus (not just mount) so Appearance reflects a color
-    // just saved from WorkoutColorScreen/NutritionColorScreen.
-    const unsubscribe = navigation.addListener('focus', load);
-    return unsubscribe;
-  }, [navigation, load]);
+    if (!profile || hasSeededRef.current) return;
+    hasSeededRef.current = true;
+    setDisplayName(profile.displayName ?? '');
+    setUsername(profile.username ?? '');
+    setWeightUnit(profile.weightUnit);
+    setPushNotificationsOptIn(profile.pushNotificationsOptIn ?? false);
+    setEmailOptIn(profile.emailOptIn ?? false);
+  }, [profile]);
 
   async function handleSave() {
-    if (!accessToken) return;
     setSaveError(null);
     setSavedMessage(null);
     setSaving(true);
     try {
-      const profile = await updateMyProfile(accessToken, {
+      const updated = await updateProfile({
         displayName: displayName.trim(),
         username: username.trim() || undefined,
         weightUnit,
       });
-      setDisplayName(profile.displayName ?? '');
-      setUsername(profile.username ?? '');
+      setDisplayName(updated.displayName ?? '');
+      setUsername(updated.username ?? '');
       setSavedMessage('Saved');
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save');
@@ -101,8 +87,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
     }
   }
 
-  async function handleResetThemeColors() {
-    if (!accessToken) return;
+  function handleResetThemeColors() {
     Alert.alert(
       'Reset Theme Colors',
       'This will restore Workout and Nutrition to the default Pure White.',
@@ -114,12 +99,10 @@ export function AccountSettingsScreen({ navigation }: Props) {
           onPress: async () => {
             setResetting(true);
             try {
-              const profile = await updateMyProfile(accessToken, {
+              await updateProfile({
                 workoutAccentColor: DEFAULT_WORKOUT_COLOR,
                 nutritionAccentColor: DEFAULT_NUTRITION_COLOR,
               });
-              setWorkoutAccentColor(profile.workoutAccentColor);
-              setNutritionAccentColor(profile.nutritionAccentColor);
             } catch (err) {
               setSaveError(err instanceof Error ? err.message : 'Failed to reset theme colors');
             } finally {
@@ -132,12 +115,11 @@ export function AccountSettingsScreen({ navigation }: Props) {
   }
 
   async function handleTogglePush(value: boolean) {
-    if (!accessToken) return;
     const previous = pushNotificationsOptIn;
     setPushNotificationsOptIn(value);
     setNotifSaving(true);
     try {
-      await updateMyProfile(accessToken, { pushNotificationsOptIn: value });
+      await updateProfile({ pushNotificationsOptIn: value });
     } catch {
       setPushNotificationsOptIn(previous);
     } finally {
@@ -146,12 +128,11 @@ export function AccountSettingsScreen({ navigation }: Props) {
   }
 
   async function handleToggleEmail(value: boolean) {
-    if (!accessToken) return;
     const previous = emailOptIn;
     setEmailOptIn(value);
     setNotifSaving(true);
     try {
-      await updateMyProfile(accessToken, { emailOptIn: value });
+      await updateProfile({ emailOptIn: value });
     } catch {
       setEmailOptIn(previous);
     } finally {
@@ -197,7 +178,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
       {activeCategory === 'Account' ? (
         <AccountCategory
           email={user?.email ?? ''}
-          avatarUrl={avatarUrl}
+          avatarUrl={profile?.avatarUrl ?? null}
           displayName={displayName}
           onChangeDisplayName={setDisplayName}
           username={username}
@@ -216,8 +197,8 @@ export function AccountSettingsScreen({ navigation }: Props) {
 
       {activeCategory === 'Appearance' ? (
         <AppearanceCategory
-          workoutAccentColor={workoutAccentColor}
-          nutritionAccentColor={nutritionAccentColor}
+          workoutAccentColor={profile?.workoutAccentColor ?? null}
+          nutritionAccentColor={profile?.nutritionAccentColor ?? null}
           resetting={resetting}
           onNavigateWorkoutColor={() => navigation.navigate('WorkoutColorSettings')}
           onNavigateNutritionColor={() => navigation.navigate('NutritionColorSettings')}

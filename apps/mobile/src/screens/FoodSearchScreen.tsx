@@ -12,12 +12,12 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
-import { getMyProfile, searchFoods, type FoodSearchResult } from '../lib/api';
+import { searchFoods, type FoodSearchResult } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { FoodFacts } from '../nutrition/FoodFacts';
 import { FoodImage } from '../nutrition/FoodImage';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
-import { buildAccentTheme, DEFAULT_NUTRITION_THEME, type AccentTheme } from '../theme/accentColor';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { foodSearchStyles as styles } from './foodSearchStyles';
 
 type Props = RootStackScreenProps<'FoodSearch'>;
@@ -46,10 +46,10 @@ export function FoodSearchScreen({ navigation }: Props) {
   const accessToken = session?.access_token;
   const [logging, setLogging] = useState(false);
 
-  // Follows the existing Nutrition accent/theme system (same
-  // nutritionAccentColor-or-default derivation DashboardScreen uses) rather
-  // than introducing a new color.
-  const [theme, setTheme] = useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
+  // Follows the existing Nutrition accent/theme system (the shared,
+  // app-wide-unconditional default -- see useProgressTheme's own comment)
+  // rather than introducing a new color.
+  const { nutritionTheme: theme } = useProgressTheme();
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -57,28 +57,6 @@ export function FoodSearchScreen({ navigation }: Props) {
   const [selected, setSelected] = useState<FoodSearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    async function loadTheme() {
-      if (!accessToken) return;
-      try {
-        const profile = await getMyProfile(accessToken);
-        if (!mounted) return;
-        setTheme(
-          profile.nutritionAccentColor
-            ? buildAccentTheme(profile.nutritionAccentColor)
-            : DEFAULT_NUTRITION_THEME,
-        );
-      } catch {
-        // Keep the default nutrition theme -- non-fatal.
-      }
-    }
-    void loadTheme();
-    return () => {
-      mounted = false;
-    };
-  }, [accessToken]);
 
   // Debounce free-text input before it drives a query, so every keystroke
   // doesn't fire its own request -- same pattern as FoodLibraryScreen.

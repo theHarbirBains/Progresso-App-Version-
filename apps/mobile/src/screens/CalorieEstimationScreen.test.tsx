@@ -6,6 +6,7 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { CalorieEstimationScreen } from './CalorieEstimationScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -63,9 +64,11 @@ async function flush() {
 
 async function renderScreen() {
   render(
-    <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-      <CalorieEstimationScreen navigation={navigation} route={route} />
-    </AppMenuContext.Provider>,
+    <ProfileProvider>
+      <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+        <CalorieEstimationScreen navigation={navigation} route={route} />
+      </AppMenuContext.Provider>
+    </ProfileProvider>,
   );
   await screen.findByTestId('calorie-estimation-scroll');
 }

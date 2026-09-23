@@ -8,7 +8,7 @@ import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import type { RootStackScreenProps } from '../navigation/types';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchWorkoutSplits, materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { WORKOUT_SPLIT_PRESETS, type WorkoutSplitPreset } from '../workouts/workoutSplitPresets';
@@ -46,7 +46,8 @@ export function ChooseWorkoutSplitScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
-  const { theme } = useProgressTheme();
+  const { theme, activeWorkoutSplitId } = useProgressTheme();
+  const { updateProfile } = useProfile();
 
   const [busyPresetId, setBusyPresetId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,18 +60,16 @@ export function ChooseWorkoutSplitScreen({ navigation }: Props) {
   const [activeSplitName, setActiveSplitName] = useState<string | null>(null);
 
   const loadActiveSplitName = useCallback(async () => {
-    if (!userId || !accessToken) return;
+    if (!userId || !activeWorkoutSplitId) return;
     try {
-      const profile = await getMyProfile(accessToken);
-      if (!profile.activeWorkoutSplitId) return;
       const splits = await fetchWorkoutSplits(userId);
-      const active = splits.find((s) => s.id === profile.activeWorkoutSplitId);
+      const active = splits.find((s) => s.id === activeWorkoutSplitId);
       setActiveSplitName(active?.name ?? null);
     } catch {
       // Selection highlighting is a nice-to-have -- a failed lookup just
       // means no row shows as selected, not a screen-level error.
     }
-  }, [userId, accessToken]);
+  }, [userId, activeWorkoutSplitId]);
 
   useEffect(() => {
     loadActiveSplitName();
@@ -82,7 +81,11 @@ export function ChooseWorkoutSplitScreen({ navigation }: Props) {
     setBusyPresetId(preset.id);
     try {
       const split = await materializeWorkoutSplitPreset(userId, preset);
-      await updateMyProfile(accessToken, { activeWorkoutSplitId: split.id });
+      // Through the shared cache's own write path, not updateMyProfile
+      // directly -- so every other screen reading activeWorkoutSplitId
+      // (NewWorkoutScreen, WorkoutSplitsScreen, ...) sees the new active
+      // split immediately, with no second fetch.
+      await updateProfile({ activeWorkoutSplitId: split.id });
       navigation.goBack();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to select workout split');

@@ -16,13 +16,13 @@ import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
 import { UnderlineTabs } from '../design/UnderlineTabs';
 import { greetingName } from '../dashboard/greeting';
-import { getMyProfile, updateMyProfile, type ProfileResponse } from '../lib/api';
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { fromKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { fetchTodaysFoodLogs, type FoodLogRow } from '../nutrition/foodLogQueries';
 import { sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { fetchNutritionGoals, type NutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { useProfile } from '../profile/ProfileProvider';
 import { computeLifetimeStats, computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 import { computeMuscleGroupSetCounts } from '../progress/muscleGroupProgress';
 import { PRsSection } from '../progress/PRsSection';
@@ -130,15 +130,12 @@ function ProfileWorkoutRow({ workout, weightUnit, divider, onPress }: ProfileWor
 // same accent-tinted initial-letter/icon avatar used elsewhere -- there is
 // still no bio/location field, this is a fitness profile, not a social one.
 export function ProfileScreen({ navigation }: Props) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const userId = user?.id ?? '';
-  const accessToken = session?.access_token;
   const { theme, nutritionTheme, weightUnit, themeLoading } = useProgressTheme();
+  const { profile, error: profileError, updateProfile } = useProfile();
 
   const [tab, setTab] = useState<ProfileTab>('Workouts');
-
-  const [profile, setProfile] = useState<ProfileResponse | null>(null);
-  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [allWorkouts, setAllWorkouts] = useState<WorkoutSummary[]>([]);
   const [allSetHistory, setAllSetHistory] = useState<HistoricalSetWithExercise[]>([]);
@@ -168,30 +165,21 @@ export function ProfileScreen({ navigation }: Props) {
   const hasLoadedOnce = useRef(false);
 
   const load = useCallback(async () => {
-    if (!userId || !accessToken) return;
+    if (!userId) return;
     if (!hasLoadedOnce.current) setLoading(true);
-    setProfileError(null);
     setStatsError(null);
     setPrsError(null);
     setWorkoutsError(null);
     setNutritionError(null);
 
-    const [profileResult, statsResult, prsResult, historyResult, nutritionResult] =
-      await Promise.allSettled([
-        getMyProfile(accessToken),
-        Promise.all([fetchAllCompletedWorkouts(userId), fetchAllExerciseHistory(userId)]),
-        Promise.all([fetchAllRepPRs(userId), fetchAllOneRepMaxes(userId)]),
-        fetchWorkoutHistory(userId, 0, RECENT_WORKOUTS_LIMIT).then((result) =>
-          enrichWorkoutSummaries(result.rows),
-        ),
-        Promise.all([fetchTodaysFoodLogs(userId), fetchNutritionGoals(userId)]),
-      ]);
-
-    if (profileResult.status === 'fulfilled') {
-      setProfile(profileResult.value);
-    } else {
-      setProfileError(errorMessage(profileResult.reason));
-    }
+    const [statsResult, prsResult, historyResult, nutritionResult] = await Promise.allSettled([
+      Promise.all([fetchAllCompletedWorkouts(userId), fetchAllExerciseHistory(userId)]),
+      Promise.all([fetchAllRepPRs(userId), fetchAllOneRepMaxes(userId)]),
+      fetchWorkoutHistory(userId, 0, RECENT_WORKOUTS_LIMIT).then((result) =>
+        enrichWorkoutSummaries(result.rows),
+      ),
+      Promise.all([fetchTodaysFoodLogs(userId), fetchNutritionGoals(userId)]),
+    ]);
 
     if (statsResult.status === 'fulfilled') {
       setAllWorkouts(statsResult.value[0]);
@@ -222,7 +210,7 @@ export function ProfileScreen({ navigation }: Props) {
 
     setLoading(false);
     hasLoadedOnce.current = true;
-  }, [userId, accessToken]);
+  }, [userId]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', load);
@@ -231,7 +219,7 @@ export function ProfileScreen({ navigation }: Props) {
 
   async function handleChoosePhoto() {
     setAvatarSheetOpen(false);
-    if (!userId || !accessToken) return;
+    if (!userId) return;
     setAvatarError(null);
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -251,8 +239,7 @@ export function ProfileScreen({ navigation }: Props) {
     setAvatarSaving(true);
     try {
       const publicUrl = await uploadAvatar(userId, result.assets[0].uri);
-      const updated = await updateMyProfile(accessToken, { avatarUrl: publicUrl });
-      setProfile((prev) => (prev ? { ...prev, avatarUrl: updated.avatarUrl } : prev));
+      await updateProfile({ avatarUrl: publicUrl });
     } catch (err) {
       setAvatarError(err instanceof Error ? err.message : 'Failed to update profile picture');
     } finally {
@@ -262,13 +249,12 @@ export function ProfileScreen({ navigation }: Props) {
 
   async function handleRemovePhoto() {
     setAvatarSheetOpen(false);
-    if (!userId || !accessToken) return;
+    if (!userId) return;
     setAvatarError(null);
     setAvatarSaving(true);
     try {
       await removeAvatarFile(userId);
-      const updated = await updateMyProfile(accessToken, { avatarUrl: null });
-      setProfile((prev) => (prev ? { ...prev, avatarUrl: updated.avatarUrl } : prev));
+      await updateProfile({ avatarUrl: null });
     } catch (err) {
       setAvatarError(err instanceof Error ? err.message : 'Failed to remove profile picture');
     } finally {

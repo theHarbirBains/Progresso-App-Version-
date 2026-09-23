@@ -5,10 +5,11 @@ import { PrimaryButton } from '../design/Button';
 import { fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile } from '../lib/api';
+import { getMyProfile, updateMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals, saveNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { computeCalorieTargets } from '../nutrition/calorieTargets';
+import { ProfileProvider, useProfile, type ProfileContextValue } from '../profile/ProfileProvider';
 import { NutritionGoalsScreen } from './NutritionGoalsScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -17,6 +18,7 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../lib/api', () => ({
   getMyProfile: jest.fn(),
+  updateMyProfile: jest.fn(),
 }));
 
 jest.mock('../nutrition/nutritionGoalQueries', () => ({
@@ -26,6 +28,7 @@ jest.mock('../nutrition/nutritionGoalQueries', () => ({
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 const mockSaveNutritionGoals = saveNutritionGoals as jest.Mock;
 
@@ -68,9 +71,11 @@ const emptyGoals = { calories: null, proteinG: null, carbsG: null, fatG: null };
 
 function renderScreen() {
   return render(
-    <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-      <NutritionGoalsScreen navigation={navigation} route={route} />
-    </AppMenuContext.Provider>,
+    <ProfileProvider>
+      <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+        <NutritionGoalsScreen navigation={navigation} route={route} />
+      </AppMenuContext.Provider>
+    </ProfileProvider>,
   );
 }
 
@@ -80,6 +85,10 @@ beforeEach(() => {
     session: { access_token: 'token-123' },
   });
   mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockUpdateMyProfile.mockReset().mockImplementation(async (_token: string, updates: object) => ({
+    ...baseProfile,
+    ...updates,
+  }));
   mockFetchNutritionGoals.mockReset().mockResolvedValue(emptyGoals);
   mockSaveNutritionGoals.mockReset();
   mockNavigate.mockClear();
@@ -258,11 +267,36 @@ describe('NutritionGoalsScreen', () => {
     expect(await screen.findByTestId('nutrition-goals-error')).toHaveTextContent('network error');
   });
 
-  it('re-fetches and recalculates whenever the screen regains focus', async () => {
-    renderScreen();
+  it('recalculates whenever the shared profile cache updates elsewhere', async () => {
+    // Simulates CalorieEstimationScreen -- a different screen, not rendered
+    // here -- saving a weight change via the same shared updateProfile. No
+    // focus event and no re-fetch of its own: the reactive cache is what
+    // keeps this screen's summary and targets current.
+    let capturedUpdateProfile: ProfileContextValue['updateProfile'] | undefined;
+    function CaptureUpdateProfile() {
+      capturedUpdateProfile = useProfile().updateProfile;
+      return null;
+    }
+
+    render(
+      <ProfileProvider>
+        <CaptureUpdateProfile />
+        <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+          <NutritionGoalsScreen navigation={navigation} route={route} />
+        </AppMenuContext.Provider>
+      </ProfileProvider>,
+    );
     await screen.findByTestId('nutrition-goals-scroll');
 
-    expect(mockAddListener).toHaveBeenCalledWith('focus', expect.any(Function));
+    const initialSummary = screen.getByTestId('nutrition-goals-summary').props.children;
+
+    await act(async () => {
+      await capturedUpdateProfile?.({ weightValue: 95 });
+    });
+
+    expect(screen.getByTestId('nutrition-goals-summary').props.children).not.toEqual(
+      initialSummary,
+    );
   });
 
   it('shows a concise Important Notes section', async () => {

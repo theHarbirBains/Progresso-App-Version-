@@ -10,7 +10,6 @@ import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
-import { getMyProfile } from '../lib/api';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -51,10 +50,9 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
-  const { theme } = useProgressTheme();
+  const { theme, weightUnit } = useProgressTheme();
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [repPRs, setRepPRs] = useState<Record<string, RepPR[]>>({});
   const [oneRepMaxes, setOneRepMaxes] = useState<Record<string, OneRepMax | null>>({});
   const [loading, setLoading] = useState(true);
@@ -67,13 +65,9 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
       setLoading(true);
       setError(null);
       try {
-        const [detail, profile] = await Promise.all([
-          fetchWorkoutDetail(workoutId),
-          getMyProfile(accessToken),
-        ]);
+        const detail = await fetchWorkoutDetail(workoutId);
         if (cancelled) return;
         setWorkout(detail);
-        setWeightUnit(profile.weightUnit);
 
         // Whether each historical set is *still* the live PR/1RM record, not
         // whether it was one at the time it was logged -- always re-read

@@ -9,9 +9,9 @@ import { EmptyState } from '../design/EmptyState';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
-import { updateMyProfile } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import {
   deleteWorkoutSplit,
@@ -29,10 +29,10 @@ type Props = RootStackScreenProps<'WorkoutSplits'>;
 // opens its read-only view; Edit / Duplicate / Delete sit quietly beneath it
 // inside the widget, and "Create Workout Split" is the one primary action.
 export function WorkoutSplitsScreen({ navigation }: Props) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const userId = user?.id ?? '';
-  const accessToken = session?.access_token;
   const { theme, activeWorkoutSplitId, themeLoading } = useProgressTheme();
+  const { updateProfile } = useProfile();
   const { openMenu } = useAppMenu();
 
   const [splits, setSplits] = useState<WorkoutSplitSummary[]>([]);
@@ -72,10 +72,9 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
   }, [activeWorkoutSplitId]);
 
   async function makeActive(split: WorkoutSplitSummary) {
-    if (!accessToken) return;
     setBusySplitId(split.id);
     try {
-      await updateMyProfile(accessToken, { activeWorkoutSplitId: split.id });
+      await updateProfile({ activeWorkoutSplitId: split.id });
       setActiveId(split.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to set active split');

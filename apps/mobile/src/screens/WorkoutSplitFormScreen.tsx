@@ -10,8 +10,8 @@ import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
-import { updateMyProfile } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import {
   SPLIT_MUSCLE_GROUPS,
@@ -39,10 +39,10 @@ type Props = RootStackScreenProps<'WorkoutSplitForm'>;
 // than holding a whole draft split in local state and diffing it against
 // the server on a single final "Save".
 export function WorkoutSplitFormScreen({ navigation, route }: Props) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const userId = user?.id ?? '';
-  const accessToken = session?.access_token;
   const { theme, themeLoading } = useProgressTheme();
+  const { updateProfile } = useProfile();
   const splitId = route.params?.splitId;
   const activateOnCreate = route.params?.activateOnCreate ?? false;
 
@@ -86,8 +86,8 @@ export function WorkoutSplitFormScreen({ navigation, route }: Props) {
     setError(null);
     try {
       const created = await createWorkoutSplit(userId, splitName.trim());
-      if (activateOnCreate && accessToken) {
-        await updateMyProfile(accessToken, { activeWorkoutSplitId: created.id });
+      if (activateOnCreate) {
+        await updateProfile({ activeWorkoutSplitId: created.id });
       }
       navigation.setParams({ splitId: created.id });
     } catch (err) {

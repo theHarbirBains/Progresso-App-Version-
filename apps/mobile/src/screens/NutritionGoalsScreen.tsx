@@ -9,7 +9,6 @@ import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { TextInput } from '../design/TextInput';
-import { getMyProfile, type ProfileResponse } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { ACTIVITY_LEVELS, ageFromBirthday } from '../nutrition/calorieEstimationInput';
@@ -24,7 +23,8 @@ import {
   type NutritionGoals,
 } from '../nutrition/nutritionGoalQueries';
 import { feetAndInchesFromCm, kgToLb } from '../onboarding/weightHeightConversion';
-import { buildAccentTheme, DEFAULT_NUTRITION_THEME, type AccentTheme } from '../theme/accentColor';
+import { useProfile } from '../profile/ProfileProvider';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { nutritionGoalsStyles as styles } from './nutritionGoalsStyles';
 
 type Props = RootStackScreenProps<'NutritionGoals'>;
@@ -76,20 +76,23 @@ function parseWholeCalories(text: string): number | null {
 // Dashboard already reads). Personal data (gender/birthday/height/weight/
 // activity level) is never edited here -- CalorieEstimationScreen is the
 // one place that happens; "Edit" just navigates there, and this screen
-// re-fetches + recalculates whenever it regains focus, so an edit there is
-// reflected the moment the user comes back.
+// reads personal info from the shared profile cache, so an edit there is
+// reflected here the moment the user comes back -- no re-fetch needed.
 //
 // Layout: a plain summary line with Edit, the four estimates as rows (name,
 // how they differ from maintenance, and the calories as a mono readout), the
 // custom target as one labelled field, one filled Save, then the notes.
 export function NutritionGoalsScreen({ navigation }: Props) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const userId = user?.id ?? '';
-  const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
+  const { nutritionTheme: theme } = useProgressTheme();
+  // Personal info (gender/birthday/height/weight/activity level) is only
+  // ever edited on CalorieEstimationScreen, never here -- reading it off
+  // the shared profile cache means an edit there is reflected here the
+  // moment this screen re-renders, with no re-fetch of its own needed.
+  const { profile, loading: profileLoading, error: profileError } = useProfile();
 
-  const [theme, setTheme] = useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
-  const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [existingGoals, setExistingGoals] = useState<NutritionGoals>({
     calories: null,
     proteinG: null,
@@ -97,64 +100,54 @@ export function NutritionGoalsScreen({ navigation }: Props) {
     fatG: null,
   });
   const [customInput, setCustomInput] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [goalsLoading, setGoalsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  // Only the very first load shows the full-screen spinner -- returning
-  // here after editing personal info on CalorieEstimation is a background
-  // refresh, same convention as Dashboard/ProfileScreen.
-  const hasLoadedOnce = useRef(false);
 
-  const load = useCallback(async () => {
-    if (!userId || !accessToken) return;
-    if (!hasLoadedOnce.current) setLoading(true);
+  const loadGoals = useCallback(async () => {
+    if (!userId) return;
     setError(null);
     try {
-      const [fetchedProfile, goals] = await Promise.all([
-        getMyProfile(accessToken),
-        fetchNutritionGoals(userId),
-      ]);
-      setProfile(fetchedProfile);
-      setExistingGoals(goals);
-      setTheme(
-        fetchedProfile.nutritionAccentColor
-          ? buildAccentTheme(fetchedProfile.nutritionAccentColor)
-          : DEFAULT_NUTRITION_THEME,
-      );
-
-      // Prefill the custom target from whatever's actually saved -- never
-      // silently replace an existing target with a freshly-calculated one
-      // (see the screen's own comment on this). Only when nothing has ever
-      // been saved does a real calculated maintenance value seed the field,
-      // purely as a starting point the user can still change before saving.
-      if (goals.calories !== null) {
-        setCustomInput(String(goals.calories));
-      } else {
-        const calorieInput = buildCalorieProfileInput({
-          gender: fetchedProfile.gender,
-          birthday: fetchedProfile.birthday,
-          heightCm: fetchedProfile.heightValue,
-          weightKg: fetchedProfile.weightValue,
-          activityLevel: fetchedProfile.activityLevel,
-        });
-        if (calorieInput) {
-          setCustomInput(String(computeCalorieTargets(calorieInput).maintenance));
-        }
-      }
+      setExistingGoals(await fetchNutritionGoals(userId));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load nutrition goals');
     } finally {
-      setLoading(false);
-      hasLoadedOnce.current = true;
+      setGoalsLoading(false);
     }
-  }, [userId, accessToken]);
+  }, [userId]);
 
   useEffect(() => {
-    load();
-    const unsubscribe = navigation.addListener('focus', load);
-    return unsubscribe;
-  }, [navigation, load]);
+    loadGoals();
+  }, [loadGoals]);
+
+  // Prefills the custom target once both the profile and the saved goals
+  // have loaded -- never silently replace an existing target with a
+  // freshly-calculated one (see the screen's own comment on this). Only
+  // when nothing has ever been saved does a real calculated maintenance
+  // value seed the field, purely as a starting point the user can still
+  // change before saving. Seeds exactly once -- not on every later change
+  // to `profile` or `existingGoals` (this screen's own Save updates the
+  // latter), which would otherwise overwrite the user's in-progress edit.
+  const hasSeededRef = useRef(false);
+  useEffect(() => {
+    if (!profile || goalsLoading || hasSeededRef.current) return;
+    hasSeededRef.current = true;
+    if (existingGoals.calories !== null) {
+      setCustomInput(String(existingGoals.calories));
+    } else {
+      const calorieInput = buildCalorieProfileInput({
+        gender: profile.gender,
+        birthday: profile.birthday,
+        heightCm: profile.heightValue,
+        weightKg: profile.weightValue,
+        activityLevel: profile.activityLevel,
+      });
+      if (calorieInput) {
+        setCustomInput(String(computeCalorieTargets(calorieInput).maintenance));
+      }
+    }
+  }, [profile, goalsLoading, existingGoals]);
 
   async function handleSave() {
     if (!userId) return;
@@ -179,7 +172,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
     }
   }
 
-  if (loading) {
+  if (profileLoading || goalsLoading) {
     return <LoadingState testID="nutrition-goals-loading" />;
   }
 
@@ -213,6 +206,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
 
   const parsedCustom = parseWholeCalories(customInput);
   const canSave = parsedCustom !== null && !saving;
+  const displayError = error ?? profileError;
 
   return (
     <Screen
@@ -315,9 +309,9 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         </Section>
 
         <View style={styles.actions}>
-          {error ? (
+          {displayError ? (
             <Text testID="nutrition-goals-error" style={styles.errorText}>
-              {error}
+              {displayError}
             </Text>
           ) : null}
           {saved ? (

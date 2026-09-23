@@ -15,14 +15,13 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
-import { getMyProfile } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { FoodImage } from '../nutrition/FoodImage';
 import { ALPHABET_INDEX_LETTERS, groupFoodsByLetter } from '../nutrition/foodLibraryGrouping';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { fetchAllFoods, type FoodRow } from '../nutrition/foodQueries';
-import { buildAccentTheme, DEFAULT_NUTRITION_THEME, type AccentTheme } from '../theme/accentColor';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { foodLibraryStyles as styles } from './foodLibraryStyles';
 import { FoodFormScreen } from './FoodFormScreen';
 
@@ -53,12 +52,11 @@ type Mode =
 // food -- so a scanned item nobody has a record of goes from unknown to
 // logged in one pass.
 export function FoodLibraryScreen({ navigation, route }: Props) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const userId = user?.id ?? '';
-  const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
 
-  const [theme, setTheme] = useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
+  const { nutritionTheme: theme } = useProgressTheme();
   // Opens straight into "create a custom food" when reached from the Scan
   // Barcode flow's "Product not found" fallback (see BarcodeScannerScreen),
   // prefilled with the barcode that had no match -- the user never has to
@@ -76,28 +74,6 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [activeLetter, setActiveLetter] = useState<string | undefined>(undefined);
   const sectionListRef = useRef<SectionList<FoodRow>>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    async function loadTheme() {
-      if (!accessToken) return;
-      try {
-        const profile = await getMyProfile(accessToken);
-        if (!mounted) return;
-        setTheme(
-          profile.nutritionAccentColor
-            ? buildAccentTheme(profile.nutritionAccentColor)
-            : DEFAULT_NUTRITION_THEME,
-        );
-      } catch {
-        // Keep the default theme -- non-fatal.
-      }
-    }
-    void loadTheme();
-    return () => {
-      mounted = false;
-    };
-  }, [accessToken]);
 
   // Debounce free-text input before it drives a query, so every keystroke
   // doesn't fire its own request -- same pattern as FoodSearchScreen.

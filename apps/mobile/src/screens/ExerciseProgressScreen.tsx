@@ -10,7 +10,6 @@ import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { Section } from '../design/Section';
 import { colors } from '../design/theme';
-import { getMyProfile } from '../lib/api';
 import { fromKg, formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -76,12 +75,11 @@ export function ExerciseProgressScreen({ route, navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
-  const { theme } = useProgressTheme();
+  const { theme, weightUnit } = useProgressTheme();
 
   const [history, setHistory] = useState<HistoricalSet[]>([]);
   const [repPRs, setRepPRs] = useState<RepPR[]>([]);
   const [oneRepMax, setOneRepMax] = useState<OneRepMax | null>(null);
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [range, setRange] = useState<TimeRange>('3m');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,17 +91,15 @@ export function ExerciseProgressScreen({ route, navigation }: Props) {
       setLoading(true);
       setError(null);
       try {
-        const [fetchedHistory, prs, orm, profile] = await Promise.all([
+        const [fetchedHistory, prs, orm] = await Promise.all([
           fetchExerciseSetHistory(userId, exerciseId),
           fetchRepPRs(userId, exerciseId),
           fetchOneRepMax(userId, exerciseId),
-          getMyProfile(accessToken),
         ]);
         if (cancelled) return;
         setHistory(fetchedHistory);
         setRepPRs(prs);
         setOneRepMax(orm);
-        setWeightUnit(profile.weightUnit);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load progress');
       } finally {

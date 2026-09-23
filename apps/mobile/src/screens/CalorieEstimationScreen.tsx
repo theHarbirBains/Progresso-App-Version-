@@ -1,8 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { BottomSheet } from '../design/BottomSheet';
@@ -11,7 +10,7 @@ import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { colors } from '../design/theme';
-import { getMyProfile, updateMyProfile, type Gender, type HeightUnit } from '../lib/api';
+import type { Gender, HeightUnit } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import {
@@ -27,7 +26,8 @@ import { HeightWheelPicker } from '../onboarding/HeightWheelPicker';
 import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
 import { WeightWheelPicker } from '../onboarding/WeightWheelPicker';
 import { feetAndInchesFromCm, kgToLb } from '../onboarding/weightHeightConversion';
-import { buildAccentTheme, DEFAULT_NUTRITION_THEME, type AccentTheme } from '../theme/accentColor';
+import { useProfile } from '../profile/ProfileProvider';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { calorieEstimationStyles as styles } from './calorieEstimationStyles';
 
 type Props = RootStackScreenProps<'CalorieEstimation'>;
@@ -137,12 +137,10 @@ function ValueButton({
 // field (label left, control right) separated by hairlines, then one filled
 // Save.
 export function CalorieEstimationScreen({ navigation }: Props) {
-  const { session } = useAuth();
-  const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
+  const { nutritionTheme: theme } = useProgressTheme();
+  const { profile, loading, updateProfile } = useProfile();
 
-  const [theme, setTheme] = useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -162,44 +160,26 @@ export function CalorieEstimationScreen({ navigation }: Props) {
   const [weightSheetOpen, setWeightSheetOpen] = useState(false);
   const [activitySheetOpen, setActivitySheetOpen] = useState(false);
 
+  // Seeds the form from the shared profile cache exactly once, the first
+  // time it resolves -- not on every later change to `profile` (e.g. this
+  // screen's own Save below), which would fight the user's in-progress edits.
+  const hasSeededRef = useRef(false);
   useEffect(() => {
-    let mounted = true;
-    async function load() {
-      if (!accessToken) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const profile = await getMyProfile(accessToken);
-        if (!mounted) return;
-        setTheme(
-          profile.nutritionAccentColor
-            ? buildAccentTheme(profile.nutritionAccentColor)
-            : DEFAULT_NUTRITION_THEME,
-        );
-        setGender(toFormGender(profile.gender));
-        if (profile.birthday) {
-          const [y, m, d] = profile.birthday.split('-').map(Number);
-          setBirthdayYear(y);
-          setBirthdayMonth(m - 1);
-          setBirthdayDay(d);
-        }
-        if (profile.heightValue !== null) setHeightCm(profile.heightValue);
-        setHeightUnit(profile.heightUnit);
-        if (profile.weightValue !== null) setWeightKg(profile.weightValue);
-        setWeightUnit(profile.weightUnit);
-        setActivityLevel(profile.activityLevel);
-      } catch {
-        // Keep the defaults -- non-fatal, the user can still fill in the form.
-      } finally {
-        if (mounted) setLoading(false);
-      }
+    if (!profile || hasSeededRef.current) return;
+    hasSeededRef.current = true;
+    setGender(toFormGender(profile.gender));
+    if (profile.birthday) {
+      const [y, m, d] = profile.birthday.split('-').map(Number);
+      setBirthdayYear(y);
+      setBirthdayMonth(m - 1);
+      setBirthdayDay(d);
     }
-    void load();
-    return () => {
-      mounted = false;
-    };
-  }, [accessToken]);
+    if (profile.heightValue !== null) setHeightCm(profile.heightValue);
+    setHeightUnit(profile.heightUnit);
+    if (profile.weightValue !== null) setWeightKg(profile.weightValue);
+    setWeightUnit(profile.weightUnit);
+    setActivityLevel(profile.activityLevel);
+  }, [profile]);
 
   const age = ageFromBirthday(toDateStringUTC(birthdayMonth, birthdayDay, birthdayYear));
   const errors: FormErrors = {};
@@ -215,11 +195,11 @@ export function CalorieEstimationScreen({ navigation }: Props) {
       setSubmitted(true);
       return;
     }
-    if (!accessToken || !gender || !activityLevel) return;
+    if (!gender || !activityLevel) return;
     setSaveError(null);
     setSaving(true);
     try {
-      await updateMyProfile(accessToken, {
+      await updateProfile({
         gender,
         birthday: toDateStringUTC(birthdayMonth, birthdayDay, birthdayYear),
         heightValue: heightCm,
@@ -228,8 +208,8 @@ export function CalorieEstimationScreen({ navigation }: Props) {
         weightUnit,
         activityLevel,
       });
-      // Nutrition Goals re-fetches the profile on focus, so it picks up
-      // these new values and recalculates automatically -- nothing more to
+      // Nutrition Goals reads these values reactively off the same shared
+      // profile cache, so it recalculates automatically -- nothing more to
       // pass back through navigation.
       navigation.goBack();
     } catch (err) {

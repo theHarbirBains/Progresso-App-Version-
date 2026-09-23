@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile, type ProfileResponse } from '../lib/api';
-import { ProfileProvider } from '../profile/ProfileProvider';
+import { ProfileProvider, useProfile, type ProfileContextValue } from '../profile/ProfileProvider';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { OnboardingScreen } from './OnboardingScreen';
 
@@ -319,15 +319,36 @@ describe('OnboardingScreen', () => {
       }),
     };
 
-    render(<OnboardingScreen navigation={navWithCapturedFocus} route={route} />, { wrapper: ProfileProvider });
+    // Captures the SAME shared ProfileProvider instance's updateProfile --
+    // WorkoutSplitFormScreen is a different screen, not rendered here, but
+    // it goes through this exact shared function in the real app, which is
+    // what actually keeps OnboardingScreen's own activeWorkoutSplitId (read
+    // reactively via useProgressTheme) current with no fetch of its own.
+    let capturedUpdateProfile: ProfileContextValue['updateProfile'] | undefined;
+    function CaptureUpdateProfile() {
+      capturedUpdateProfile = useProfile().updateProfile;
+      return null;
+    }
+
+    render(
+      <>
+        <CaptureUpdateProfile />
+        <OnboardingScreen navigation={navWithCapturedFocus} route={route} />
+      </>,
+      { wrapper: ProfileProvider },
+    );
     await screen.findByTestId('onboarding-step-workout-split');
 
     fireEvent.press(screen.getByTestId('onboarding-step-workout-split-create-own'));
     expect(mockNavigate).toHaveBeenCalledWith('WorkoutSplitForm', { activateOnCreate: true });
 
     // Simulates WorkoutSplitFormScreen having created+activated a split,
-    // then the user pressing Back to return here.
-    currentProfile = { ...currentProfile, activeWorkoutSplitId: 'split-from-form' };
+    // then the user pressing Back to return here. mockUpdateMyProfile's own
+    // implementation (see beforeEach) merges this into currentProfile and
+    // returns it, exactly like the real endpoint.
+    await act(async () => {
+      await capturedUpdateProfile?.({ activeWorkoutSplitId: 'split-from-form' });
+    });
     focusCallback?.();
 
     expect(await screen.findByTestId('onboarding-step-email-preference')).toBeTruthy();

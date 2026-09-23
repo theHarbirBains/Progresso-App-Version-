@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile } from '../lib/api';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 import { WorkoutColorScreen } from './WorkoutColorScreen';
 
@@ -40,7 +41,7 @@ beforeEach(() => {
 
 describe('WorkoutColorScreen', () => {
   it('falls back to the default Workout color when the profile has none saved', async () => {
-    render(<WorkoutColorScreen navigation={navigation} route={route} />);
+    render(<WorkoutColorScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId(`preset-swatch-${DEFAULT_WORKOUT_COLOR}`)).toBeTruthy();
     expect(
@@ -61,7 +62,7 @@ describe('WorkoutColorScreen', () => {
       nutritionAccentColor: null,
     });
 
-    render(<WorkoutColorScreen navigation={navigation} route={route} />);
+    render(<WorkoutColorScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
 
     expect(await screen.findByTestId('preset-swatch-#EF4444')).toBeTruthy();
     expect(screen.getByTestId('preset-swatch-#EF4444').props.accessibilityState.selected).toBe(
@@ -72,7 +73,7 @@ describe('WorkoutColorScreen', () => {
   it('saves only workoutAccentColor and goes back on success', async () => {
     mockUpdateMyProfile.mockResolvedValue({});
 
-    render(<WorkoutColorScreen navigation={navigation} route={route} />);
+    render(<WorkoutColorScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('accent-color-save');
 
     fireEvent.press(screen.getByTestId('preset-swatch-#EF4444'));
@@ -88,7 +89,7 @@ describe('WorkoutColorScreen', () => {
   it('shows a save error and does not navigate back on failure', async () => {
     mockUpdateMyProfile.mockRejectedValue(new Error('Network down'));
 
-    render(<WorkoutColorScreen navigation={navigation} route={route} />);
+    render(<WorkoutColorScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('accent-color-save');
 
     fireEvent.press(screen.getByTestId('accent-color-save'));
@@ -98,7 +99,7 @@ describe('WorkoutColorScreen', () => {
   });
 
   it('goes back without saving when the back button is pressed', async () => {
-    render(<WorkoutColorScreen navigation={navigation} route={route} />);
+    render(<WorkoutColorScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('accent-color-picker-back');
 
     fireEvent.press(screen.getByTestId('accent-color-picker-back'));
