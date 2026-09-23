@@ -219,34 +219,64 @@ export class FoodsService {
       return [];
     }
 
-    const cached = await Promise.all(result.foods.map((food) => this.upsertExternalFood(food)));
-    return cached.filter((food): food is FoodRecord => food !== null);
+    return this.upsertExternalFoods(result.foods);
   }
 
-  /** Upserts on (provider, provider_food_id) -- re-searching the same product refreshes its cached nutrition data instead of inserting a duplicate row. */
-  private async upsertExternalFood(food: NormalizedFood): Promise<FoodRecord | null> {
+  private toUpsertRow(food: NormalizedFood) {
+    return {
+      name: food.name,
+      brand: food.brand,
+      image_url: food.imageUrl,
+      serving_size: food.servingSize,
+      serving_unit: food.servingUnit,
+      calories: food.calories,
+      protein_g: food.proteinG,
+      carbs_g: food.carbsG,
+      fat_g: food.fatG,
+      provider: food.provider,
+      provider_food_id: food.providerFoodId,
+      barcode: food.barcode,
+      created_by: null,
+      is_active: true,
+    };
+  }
+
+  /**
+   * Upserts a whole search page in one round trip -- on (provider,
+   * provider_food_id), so re-searching the same product refreshes its
+   * cached nutrition data instead of inserting a duplicate row. A single
+   * batch upsert either applies entirely or not at all, so one malformed
+   * row would otherwise silently drop an entire, mostly-good page of
+   * results; falls back to one upsert per food (the old behavior, which
+   * degrades a single bad row rather than the whole page) only if the
+   * batch itself fails.
+   */
+  private async upsertExternalFoods(foods: NormalizedFood[]): Promise<FoodRecord[]> {
+    if (foods.length === 0) return [];
+
     const { data, error } = await this.supabaseService
       .getClient()
       .from('foods')
       .upsert(
-        {
-          name: food.name,
-          brand: food.brand,
-          image_url: food.imageUrl,
-          serving_size: food.servingSize,
-          serving_unit: food.servingUnit,
-          calories: food.calories,
-          protein_g: food.proteinG,
-          carbs_g: food.carbsG,
-          fat_g: food.fatG,
-          provider: food.provider,
-          provider_food_id: food.providerFoodId,
-          barcode: food.barcode,
-          created_by: null,
-          is_active: true,
-        },
+        foods.map((food) => this.toUpsertRow(food)),
         { onConflict: 'provider,provider_food_id' },
       )
+      .select(FOOD_COLUMNS);
+
+    if (!error && data) {
+      return data.map((row) => toFoodRecord(row));
+    }
+
+    this.logger.warn(`Batch external food cache upsert failed, falling back per-item: ${error?.message}`);
+    const cached = await Promise.all(foods.map((food) => this.upsertExternalFood(food)));
+    return cached.filter((food): food is FoodRecord => food !== null);
+  }
+
+  private async upsertExternalFood(food: NormalizedFood): Promise<FoodRecord | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('foods')
+      .upsert(this.toUpsertRow(food), { onConflict: 'provider,provider_food_id' })
       .select(FOOD_COLUMNS)
       .maybeSingle();
 
@@ -258,7 +288,7 @@ export class FoodsService {
   }
 }
 
-/** Escapes ILIKE's own wildcard characters so a literal "%"/"_" a user typed is matched literally, same convention as the mobile searchDefaultFoods. */
+/** Escapes ILIKE's own wildcard characters so a literal "%"/"_" a user typed is matched literally, same convention as the mobile app's own lib/ilike.ts. */
 function escapeIlike(value: string): string {
   return value.replace(/[%_\\]/g, (match) => `\\${match}`);
 }

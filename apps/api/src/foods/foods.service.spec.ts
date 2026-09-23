@@ -124,7 +124,7 @@ describe('FoodsService', () => {
     const { supabaseService, instances } = mockSupabaseSequence([
       { data: [localFoodRow], error: null }, // local search by name
       { data: [], error: null }, // local search by brand
-      { data: cachedExternalFoodRow, error: null }, // upsert of the external result
+      { data: [cachedExternalFoodRow], error: null }, // batch upsert of the external results
     ]);
     const provider = mockProvider({
       searchFoods: jest.fn().mockResolvedValue({ foods: [normalizedOreo], hasMore: false }),
@@ -141,9 +141,11 @@ describe('FoodsService', () => {
       provider: 'open_food_facts',
       barcode: '0066721016123',
     });
-    // The upsert call is the 3rd builder in the sequence.
+    // The upsert call is the 3rd builder in the sequence; the batch upsert's
+    // first argument is the whole page of rows, not one row.
     const upsertArgs: unknown[] = instances[2]!.calls.upsert?.[0] ?? [];
-    expect(upsertArgs[0]).toMatchObject({
+    const upsertRows = upsertArgs[0] as unknown[];
+    expect(upsertRows[0]).toMatchObject({
       provider: 'open_food_facts',
       provider_food_id: '0066721016123',
       image_url: 'https://images.openfoodfacts.org/oreo-front.jpg',
@@ -154,7 +156,7 @@ describe('FoodsService', () => {
     const { supabaseService, instances } = mockSupabaseSequence([
       { data: [], error: null },
       { data: [], error: null },
-      { data: cachedExternalFoodRow, error: null },
+      { data: [cachedExternalFoodRow], error: null },
     ]);
     const provider = mockProvider({
       searchFoods: jest.fn().mockResolvedValue({ foods: [normalizedOreo], hasMore: false }),
@@ -165,7 +167,7 @@ describe('FoodsService', () => {
 
     const upsertBuilder = instances[2]!.builder as { upsert: jest.Mock };
     expect(upsertBuilder.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ provider_food_id: '0066721016123' }),
+      [expect.objectContaining({ provider_food_id: '0066721016123' })],
       { onConflict: 'provider,provider_food_id' },
     );
   });
@@ -196,6 +198,37 @@ describe('FoodsService', () => {
     const result = await service.search('food', 0, 20);
 
     expect(result.foods.map((f) => f.id)).toEqual(['food-1']);
+  });
+
+  it('falls back to one upsert per food when the batch upsert itself fails, keeping whichever ones succeed', async () => {
+    const normalizedChicken: NormalizedFood = {
+      ...normalizedOreo,
+      providerFoodId: 'chicken-id',
+      barcode: null,
+      name: 'Chicken Breast (cooked)',
+      brand: null,
+    };
+    const { supabaseService, instances } = mockSupabaseSequence([
+      { data: [], error: null }, // local search by name
+      { data: [], error: null }, // local search by brand
+      { data: null, error: { message: 'batch db error' } }, // the batch upsert itself
+      { data: cachedExternalFoodRow, error: null }, // fallback: oreo succeeds
+      { data: null, error: { message: 'db error' } }, // fallback: chicken fails
+    ]);
+    const provider = mockProvider({
+      searchFoods: jest
+        .fn()
+        .mockResolvedValue({ foods: [normalizedOreo, normalizedChicken], hasMore: false }),
+    });
+    const service = new FoodsService(supabaseService, provider);
+
+    const result = await service.search('food', 0, 20);
+
+    expect(result.foods.map((f) => f.id)).toEqual(['food-2']);
+    // Both fallback upserts go through the per-item path (a single object,
+    // not the batch's array), unlike the batch upsert itself.
+    expect(instances[3]!.calls.upsert?.[0]?.[0]).not.toBeInstanceOf(Array);
+    expect(instances[4]!.calls.upsert?.[0]?.[0]).not.toBeInstanceOf(Array);
   });
 
   it('skips caching a food whose upsert fails, without failing the whole search', async () => {
