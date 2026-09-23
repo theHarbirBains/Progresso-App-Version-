@@ -184,7 +184,7 @@ describe('AccountSettingsScreen Account category', () => {
     expect(mockGetMyProfile).toHaveBeenCalledWith('token-123');
   });
 
-  it("colors Save Changes with the user's own Workout accent, not the static brand color", async () => {
+  it('colors Save Changes with the fixed Workout accent, even when the profile still has a saved custom color', async () => {
     mockGetMyProfile.mockResolvedValue({ ...baseProfile, workoutAccentColor: '#EF4444' });
 
     render(
@@ -195,7 +195,7 @@ describe('AccountSettingsScreen Account category', () => {
     await screen.findByTestId('account-email');
 
     const style = StyleSheet.flatten(screen.getByTestId('account-save').props.style);
-    expect(style.backgroundColor).toBe('#EF4444');
+    expect(style.backgroundColor).toBe(DEFAULT_WORKOUT_COLOR);
   });
 
   it('lowercases username input as the user types', async () => {

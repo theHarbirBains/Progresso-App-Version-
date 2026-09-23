@@ -1,30 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
-import {
-  buildAccentTheme,
-  DEFAULT_NUTRITION_THEME,
-  DEFAULT_WORKOUT_THEME,
-  type AccentTheme,
-} from '../theme/accentColor';
+import { DEFAULT_NUTRITION_THEME, DEFAULT_WORKOUT_THEME, type AccentTheme } from '../theme/accentColor';
 
 /**
- * Progress is workout-performance analytics, so its own content always
- * follows the user's Workout Mode accent color (never Nutrition's), read
- * the exact same way DashboardScreen.tsx does -- fetch the profile, build
- * the theme from workoutAccentColor if set, else the default. Centralized
- * here so every Progress screen shares one implementation instead of
- * repeating it.
- *
- * Also exposes `nutritionTheme`, built from the same already-fetched
- * profile at no extra query cost -- needed by any screen that renders the
- * shared `ModeToggle` (its crossfade needs both themes, not just its own),
- * not by every caller of this hook.
+ * `theme`/`nutritionTheme` are always the app's one fixed neutral default
+ * (`DEFAULT_WORKOUT_THEME`/`DEFAULT_NUTRITION_THEME`, both the same white --
+ * see accentColor.ts) -- the app-wide black-and-white redesign's own
+ * explicit, unconditional call, deliberately NOT overridden by any
+ * `workoutAccentColor`/`nutritionAccentColor` a profile might still have
+ * saved from before that redesign (or via the still-functional-but-now-
+ * visually-inert accent picker, AccentColorPickerScreen -- see its own
+ * comment). Kept as a hook (rather than importing the constants directly)
+ * so every existing call site's shape stays unchanged.
  *
  * Also exposes the identity fields (`displayName`, `username`,
- * `avatarUrl`) off that same already-fetched profile -- no second request
- * -- for any screen that needs to show "who this is" (e.g. Feed's
- * per-item byline) without re-fetching what this hook already has.
+ * `avatarUrl`) off the profile fetch this hook already makes for
+ * `weightUnit`/`activeWorkoutSplitId` -- no second request -- for any
+ * screen that needs to show "who this is" (e.g. Feed's per-item byline).
  */
 export function useProgressTheme(): {
   theme: AccentTheme;
@@ -38,8 +31,9 @@ export function useProgressTheme(): {
 } {
   const { session } = useAuth();
   const accessToken = session?.access_token;
-  const [theme, setTheme] = useState<AccentTheme>(DEFAULT_WORKOUT_THEME);
-  const [nutritionTheme, setNutritionTheme] = useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
+  // Fixed, not state -- see the hook comment above.
+  const theme = DEFAULT_WORKOUT_THEME;
+  const nutritionTheme = DEFAULT_NUTRITION_THEME;
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [activeWorkoutSplitId, setActiveWorkoutSplitId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -54,16 +48,6 @@ export function useProgressTheme(): {
       try {
         const profile = await getMyProfile(accessToken);
         if (!mounted) return;
-        setTheme(
-          profile.workoutAccentColor
-            ? buildAccentTheme(profile.workoutAccentColor)
-            : DEFAULT_WORKOUT_THEME,
-        );
-        setNutritionTheme(
-          profile.nutritionAccentColor
-            ? buildAccentTheme(profile.nutritionAccentColor)
-            : DEFAULT_NUTRITION_THEME,
-        );
         setWeightUnit(profile.weightUnit);
         setActiveWorkoutSplitId(profile.activeWorkoutSplitId);
         setDisplayName(profile.displayName);

@@ -61,11 +61,7 @@ import { WorkoutHistoryScreen } from './src/screens/WorkoutHistoryScreen';
 import { WorkoutSplitFormScreen } from './src/screens/WorkoutSplitFormScreen';
 import { WorkoutSplitsScreen } from './src/screens/WorkoutSplitsScreen';
 import { WorkoutSplitViewScreen } from './src/screens/WorkoutSplitViewScreen';
-import {
-  buildAccentTheme,
-  DEFAULT_NUTRITION_THEME,
-  type AccentTheme,
-} from './src/theme/accentColor';
+import { DEFAULT_NUTRITION_THEME, type AccentTheme } from './src/theme/accentColor';
 
 type AuthMode = 'signIn' | 'signUp' | 'forgotPassword';
 
@@ -129,30 +125,12 @@ function Root() {
   // AppSideMenu's own accent/section content follows whichever mode the
   // current screen belongs to (see isNutritionRoute) -- menuTheme above
   // stays Workout-only (per useProgressTheme's own scope) and still drives
-  // the global BottomNavBar's Train accent; this is a second, separate
-  // theme fetch, following the same pattern FoodSearchScreen uses for its
-  // own Nutrition accent.
-  const [nutritionMenuTheme, setNutritionMenuTheme] =
-    useState<AccentTheme>(DEFAULT_NUTRITION_THEME);
-  useEffect(() => {
-    let mounted = true;
-    if (!accessToken) return;
-    getMyProfile(accessToken)
-      .then((profile) => {
-        if (!mounted) return;
-        setNutritionMenuTheme(
-          profile.nutritionAccentColor
-            ? buildAccentTheme(profile.nutritionAccentColor)
-            : DEFAULT_NUTRITION_THEME,
-        );
-      })
-      .catch(() => {
-        // Keep the default nutrition theme -- non-fatal.
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [accessToken]);
+  // the global BottomNavBar's Train accent. nutritionMenuTheme is its
+  // Nutrition counterpart -- always the fixed default now (the app-wide
+  // black-and-white redesign, unconditional regardless of any saved
+  // nutritionAccentColor -- see useProgressTheme's own comment), so no
+  // longer needs its own profile fetch/effect.
+  const nutritionMenuTheme: AccentTheme = DEFAULT_NUTRITION_THEME;
   // The persistent bottom nav (BottomNavBar) is mounted here for the same
   // reason AppSideMenu is: as a sibling of the navigator so it survives
   // every push/pop instead of being owned by (and disappearing with) an

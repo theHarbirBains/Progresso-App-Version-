@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
-import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
+import { DEFAULT_NUTRITION_THEME, DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { useProgressTheme } from './useProgressTheme';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -21,9 +21,10 @@ beforeEach(() => {
 });
 
 describe('useProgressTheme', () => {
-  it('resolves to the workout accent theme from the profile', async () => {
+  it('resolves other profile fields normally, but always keeps the fixed default theme -- app-wide black-and-white, unconditional even when the profile still has a saved custom accent', async () => {
     mockGetMyProfile.mockResolvedValue({
       workoutAccentColor: '#EF4444',
+      nutritionAccentColor: '#EF4444',
       weightUnit: 'lb',
       activeWorkoutSplitId: 'split-1',
       displayName: 'Harbir Bains',
@@ -34,7 +35,8 @@ describe('useProgressTheme', () => {
     const { result } = renderHook(() => useProgressTheme());
 
     await waitFor(() => expect(result.current.themeLoading).toBe(false));
-    expect(result.current.theme.accent).toBe('#EF4444');
+    expect(result.current.theme).toBe(DEFAULT_WORKOUT_THEME);
+    expect(result.current.nutritionTheme).toBe(DEFAULT_NUTRITION_THEME);
     expect(result.current.weightUnit).toBe('lb');
     expect(result.current.activeWorkoutSplitId).toBe('split-1');
     expect(result.current.displayName).toBe('Harbir Bains');
