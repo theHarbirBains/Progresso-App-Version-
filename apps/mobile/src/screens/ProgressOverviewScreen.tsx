@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
+import { UnderlineTabs } from '../design/UnderlineTabs';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { AllTimeSection } from '../progress/AllTimeSection';
@@ -17,7 +18,6 @@ import { progressStyles as styles } from '../progress/progressStyles';
 import { StrengthProgressSection } from '../progress/StrengthProgressSection';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { CategoryTabs } from '../settings/CategoryTabs';
 import {
   fetchAllExerciseHistory,
   groupByExercise,
@@ -29,15 +29,16 @@ import type { WorkoutSummary } from '../workouts/workoutQueries';
 
 type Props = RootStackScreenProps<'ProgressOverview'>;
 
-// Progress's shell: header + the horizontal section navigation (reusing
-// Settings' own CategoryTabs component, not a second implementation) +
-// whichever section is active, in its own widget (an AppCard filling the
-// remaining screen height, matching the workout/nutrition tabs' AppCard-
-// per-widget language). All Progress data is fetched once here and passed
-// down as props -- switching sections never re-fetches, and no section
-// duplicates another's data-loading logic. Individual exercise detail still
-// opens its own dedicated screen (ProgressExerciseDetail), unaffected by
-// this restructuring.
+// Progress's shell: header + the section navigation (`UnderlineTabs` --
+// Strava's own icon-over-label, underline-selected tab treatment, the same
+// component Profile's Workouts/Stats/PRs switcher uses -- see DESIGN.md's
+// You/Profile section) + whichever section is active, in its own widget
+// (an AppCard filling the remaining screen height, matching the workout/
+// nutrition tabs' AppCard-per-widget language). All Progress data is
+// fetched once here and passed down as props -- switching sections never
+// re-fetches, and no section duplicates another's data-loading logic.
+// Individual exercise detail still opens its own dedicated screen
+// (ProgressExerciseDetail), unaffected by this restructuring.
 export function ProgressOverviewScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
@@ -122,7 +123,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
       }
     >
       <View style={styles.tabsWrap}>
-        <CategoryTabs
+        <UnderlineTabs
           testID="progress-tabs"
           categories={[...PROGRESS_SECTIONS]}
           active={activeSection}

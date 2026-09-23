@@ -20,15 +20,15 @@ interface Props<T extends string> {
  * `CategoryTabs`' own pill styling for this one spot.
  *
  * Deliberately a separate component from `CategoryTabs`
- * (settings/CategoryTabs.tsx, the scrollable pill row Settings/Progress
- * use) rather than a variant of it: the two are built for different
- * shapes of tab set. `CategoryTabs` scrolls horizontally because Settings'
+ * (settings/CategoryTabs.tsx, the scrollable pill row Settings uses)
+ * rather than a variant of it: the two are built for different shapes of
+ * tab set. `CategoryTabs` scrolls horizontally because Settings'
  * categories don't all have to fit on screen at once; `UnderlineTabs`
  * divides the full row evenly and never scrolls, which only makes sense
  * for a small, fixed set of tabs that should always all be visible (like
- * Profile's Workouts/Stats/PRs). Reach for whichever shape actually
- * matches the tab set at hand -- this is not a universal replacement for
- * `CategoryTabs`.
+ * Profile's Workouts/Stats/PRs, or Progress's Overview/Top Sets/Strength/
+ * All Time). Reach for whichever shape actually matches the tab set at
+ * hand -- this is not a universal replacement for `CategoryTabs`.
  */
 export function UnderlineTabs<T extends string>({
   categories,
