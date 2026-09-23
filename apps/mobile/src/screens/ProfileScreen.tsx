@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
@@ -216,36 +216,76 @@ export function ProfileScreen({ navigation }: Props) {
     }
   }
 
+  // Shown in the summary card regardless of which tab is active, so always
+  // computed -- but memoized so toggling avatarSheetOpen, switching tabs, or
+  // any other unrelated re-render doesn't re-run this over the user's whole
+  // history every time.
+  const { lifetimeStats, totalVolumeKg, totalSets } = useMemo(
+    () => ({
+      lifetimeStats: computeLifetimeStats(allWorkouts),
+      totalVolumeKg: computeLifetimeVolumeKg(allSetHistory),
+      totalSets: allSetHistory.length,
+    }),
+    [allWorkouts, allSetHistory],
+  );
+
+  // Stats-tab-only figures -- only actually computed while that tab is
+  // active, not on every render regardless of tab (see ProgressExerciseDetailScreen
+  // for the same pattern applied elsewhere).
+  const {
+    muscleGroupCounts,
+    maxMuscleGroupCount,
+    weeklyWorkoutPoints,
+    weeklyVolumePoints,
+    weeklySetPoints,
+    thisWeekWorkouts,
+    thisWeekSets,
+    thisWeekVolume,
+  } = useMemo(() => {
+    if (tab !== 'Stats') {
+      return {
+        muscleGroupCounts: [] as ReturnType<typeof computeMuscleGroupSetCounts>,
+        maxMuscleGroupCount: 0,
+        weeklyWorkoutPoints: [] as ReturnType<typeof computeWeeklyWorkoutCounts>,
+        weeklyVolumePoints: [] as { weekStart: string; value: number }[],
+        weeklySetPoints: [] as ReturnType<typeof computeWeeklySetCounts>,
+        thisWeekWorkouts: 0,
+        thisWeekSets: 0,
+        thisWeekVolume: 0,
+      };
+    }
+    const muscleGroupCounts = computeMuscleGroupSetCounts(allSetHistory).slice(
+      0,
+      TOP_MUSCLE_GROUPS_LIMIT,
+    );
+    const weeklyWorkoutPoints = computeWeeklyWorkoutCounts(allWorkouts, TREND_WEEKS);
+    const weeklyVolumePoints = computeWeeklyVolumeKg(allSetHistory, TREND_WEEKS).map((p) => ({
+      ...p,
+      value: fromKg(p.value, weightUnit),
+    }));
+    const weeklySetPoints = computeWeeklySetCounts(allSetHistory, TREND_WEEKS);
+    // computeWeekly*'s own contract: oldest first, always including the
+    // current week -- so the last point is "this week".
+    return {
+      muscleGroupCounts,
+      maxMuscleGroupCount: muscleGroupCounts[0]?.count ?? 0,
+      weeklyWorkoutPoints,
+      weeklyVolumePoints,
+      weeklySetPoints,
+      thisWeekWorkouts: weeklyWorkoutPoints[weeklyWorkoutPoints.length - 1]?.value ?? 0,
+      thisWeekSets: weeklySetPoints[weeklySetPoints.length - 1]?.value ?? 0,
+      thisWeekVolume: weeklyVolumePoints[weeklyVolumePoints.length - 1]?.value ?? 0,
+    };
+  }, [tab, allWorkouts, allSetHistory, weightUnit]);
+
+  const todaysNutritionTotals = useMemo(() => sumDailyTotals(todaysFoodLogs), [todaysFoodLogs]);
+
   if (loading || themeLoading || nutritionGoalsLoading || statsLoading || prsLoading || logsLoading) {
     return <LoadingState testID="profile-loading" />;
   }
 
   const name = greetingName(profile?.displayName, profile?.username);
   const avatarInitial = name ? name.charAt(0).toUpperCase() : null;
-
-  const lifetimeStats = computeLifetimeStats(allWorkouts);
-  const totalVolumeKg = computeLifetimeVolumeKg(allSetHistory);
-  const totalSets = allSetHistory.length;
-
-  const muscleGroupCounts = computeMuscleGroupSetCounts(allSetHistory).slice(
-    0,
-    TOP_MUSCLE_GROUPS_LIMIT,
-  );
-  const maxMuscleGroupCount = muscleGroupCounts[0]?.count ?? 0;
-
-  const weeklyWorkoutPoints = computeWeeklyWorkoutCounts(allWorkouts, TREND_WEEKS);
-  const weeklyVolumePoints = computeWeeklyVolumeKg(allSetHistory, TREND_WEEKS).map((p) => ({
-    ...p,
-    value: fromKg(p.value, weightUnit),
-  }));
-  const weeklySetPoints = computeWeeklySetCounts(allSetHistory, TREND_WEEKS);
-  // computeWeekly*'s own contract: oldest first, always including the
-  // current week -- so the last point is "this week".
-  const thisWeekWorkouts = weeklyWorkoutPoints[weeklyWorkoutPoints.length - 1]?.value ?? 0;
-  const thisWeekSets = weeklySetPoints[weeklySetPoints.length - 1]?.value ?? 0;
-  const thisWeekVolume = weeklyVolumePoints[weeklyVolumePoints.length - 1]?.value ?? 0;
-
-  const todaysNutritionTotals = sumDailyTotals(todaysFoodLogs);
 
   return (
     <>
