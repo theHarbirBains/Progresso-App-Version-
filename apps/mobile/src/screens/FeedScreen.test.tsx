@@ -55,6 +55,7 @@ const workoutItem = {
     completedSetCount: 12,
     totalVolumeKg: 1000,
     durationMinutes: 60,
+    exerciseCount: 4,
   },
 };
 
@@ -73,6 +74,7 @@ const olderWorkoutItem = {
     completedSetCount: 10,
     totalVolumeKg: 800,
     durationMinutes: 45,
+    exerciseCount: 3,
   },
 };
 
@@ -155,7 +157,7 @@ describe('FeedScreen', () => {
     expect(await screen.findByTestId('feed-empty')).toHaveTextContent('Nothing here yet');
   });
 
-  it('shows a completed workout as a card: split day, muscles, sets and volume', async () => {
+  it('shows a completed workout as a card: split day, muscles, duration, exercises, sets and volume', async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
     renderScreen();
 
@@ -163,6 +165,7 @@ describe('FeedScreen', () => {
     expect(card.getByText('Push')).toBeTruthy();
     expect(card.getByText(/Chest.*Shoulders/)).toBeTruthy();
     expect(screen.getByTestId('feed-item-workout-w1-duration')).toHaveTextContent(/1h/);
+    expect(screen.getByTestId('feed-item-workout-w1-exercises')).toHaveTextContent(/4/);
     expect(screen.getByTestId('feed-item-workout-w1-sets')).toHaveTextContent(/12/);
     expect(screen.getByTestId('feed-item-workout-w1-volume')).toHaveTextContent(/1000/);
   });
@@ -175,7 +178,7 @@ describe('FeedScreen', () => {
     expect(await card.findByText('Harbir Bains')).toBeTruthy();
   });
 
-  it('shows a logged food as a card: name, meal, and calories', async () => {
+  it('shows a logged food as a card: name, meal, calories, and all three macros', async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([foodLogItem]));
     renderScreen();
 
@@ -184,6 +187,9 @@ describe('FeedScreen', () => {
     expect(card.getByText(/Lunch/)).toBeTruthy();
     expect(screen.getByTestId('feed-item-foodlog-log-1-calories')).toHaveTextContent(/165/);
     expect(screen.getByTestId('feed-item-foodlog-log-1-protein')).toHaveTextContent(/31/);
+    expect(screen.getByTestId('feed-item-foodlog-log-1-carbs')).toHaveTextContent(/0/);
+    // fatG is 3.6 in the fixture, rounded for display -> "4g".
+    expect(screen.getByTestId('feed-item-foodlog-log-1-fat')).toHaveTextContent(/4/);
   });
 
   it('navigates to the workout on tap, and to Nutrition on a food log tap', async () => {

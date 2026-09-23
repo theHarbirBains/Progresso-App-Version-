@@ -77,17 +77,34 @@ export const feedStyles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
-  statRow: {
-    flexDirection: 'row',
+  // A workout card's stat area: two rows of two StatBlocks (Duration/
+  // Exercises, Sets/Volume) -- the same 2x2 grid WorkoutDetailScreen's own
+  // hero summary uses, rather than a single cramped 3-across row, so a
+  // fourth genuinely useful number (Exercises) fits without crowding.
+  statGrid: {
     gap: widgetGap,
     marginTop: spacing.md,
   },
+  statRow: {
+    flexDirection: 'row',
+    gap: widgetGap,
+  },
 
-  // The food-log title row: the photo stands in for Strava's route map --
-  // a real image where one exists, rather than fabricated location data.
+  // The food-log title row: a real hero-sized photo (FoodFacts.tsx's own
+  // "found a food" sizing) where one exists, rather than fabricated
+  // location data standing in for Strava's route map.
   foodTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  foodTitleBody: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  foodTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
   },
 });

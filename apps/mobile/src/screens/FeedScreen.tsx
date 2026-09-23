@@ -13,6 +13,7 @@ import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
+import { StatValue } from '../design/StatValue';
 import { colors } from '../design/theme';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
 import { formatWeightKg } from '../lib/units';
@@ -44,6 +45,13 @@ type Props = RootStackScreenProps<'Feed'>;
 // (no kudos/social prompts) since there's no social graph yet. `topAccent`
 // is a neutral top band on every card; which activity a card is comes
 // across via its byline icon, not a color.
+//
+// Each card's own numbers are the most relevant ones actually available: a
+// workout's stat area is a 2x2 grid (Duration/Exercises, Sets/Volume) --
+// the same shape WorkoutDetailScreen's own hero uses, not a cramped 3-up
+// row -- and a food card leads with a hero-sized photo (FoodFacts.tsx's own
+// sizing) beside its name and calorie readout, then all three macros
+// (Protein/Carbs/Fat), not just Protein.
 //
 // The header's "+" mirrors Strava's own top-bar button: a shortcut sheet
 // (Start Workout / Log Food) to the same destinations Train's and
@@ -223,22 +231,31 @@ export function FeedScreen({ navigation }: Props) {
                   </Text>
                 ) : null}
 
-                <View style={styles.statRow}>
-                  <StatBlock
-                    testID={`feed-item-workout-${item.workout.id}-duration`}
-                    value={formatCardDuration(item.workout.durationMinutes)}
-                    label="Duration"
-                  />
-                  <StatBlock
-                    testID={`feed-item-workout-${item.workout.id}-sets`}
-                    value={String(item.workout.completedSetCount)}
-                    label="Sets"
-                  />
-                  <StatBlock
-                    testID={`feed-item-workout-${item.workout.id}-volume`}
-                    value={formatWeightKg(item.workout.totalVolumeKg, weightUnit)}
-                    label={`Volume (${weightUnit})`}
-                  />
+                <View style={styles.statGrid}>
+                  <View style={styles.statRow}>
+                    <StatBlock
+                      testID={`feed-item-workout-${item.workout.id}-duration`}
+                      value={formatCardDuration(item.workout.durationMinutes)}
+                      label="Duration"
+                    />
+                    <StatBlock
+                      testID={`feed-item-workout-${item.workout.id}-exercises`}
+                      value={String(item.workout.exerciseCount)}
+                      label={item.workout.exerciseCount === 1 ? 'Exercise' : 'Exercises'}
+                    />
+                  </View>
+                  <View style={styles.statRow}>
+                    <StatBlock
+                      testID={`feed-item-workout-${item.workout.id}-sets`}
+                      value={String(item.workout.completedSetCount)}
+                      label="Sets"
+                    />
+                    <StatBlock
+                      testID={`feed-item-workout-${item.workout.id}-volume`}
+                      value={formatWeightKg(item.workout.totalVolumeKg, weightUnit)}
+                      label={`Volume (${weightUnit})`}
+                    />
+                  </View>
                 </View>
               </AppCard>
             ) : (
@@ -274,22 +291,35 @@ export function FeedScreen({ navigation }: Props) {
                 </View>
 
                 <View style={styles.foodTitleRow}>
-                  <FoodImage uri={item.log.imageUrl} name={item.log.foodNameSnapshot} size={56} />
-                  <Text style={styles.itemTitle} numberOfLines={2}>
-                    {item.log.foodNameSnapshot}
-                  </Text>
+                  <FoodImage uri={item.log.imageUrl} name={item.log.foodNameSnapshot} size={88} />
+                  <View style={styles.foodTitleBody}>
+                    <Text style={styles.foodTitle} numberOfLines={2}>
+                      {item.log.foodNameSnapshot}
+                    </Text>
+                    <StatValue
+                      testID={`feed-item-foodlog-${item.log.id}-calories`}
+                      value={String(item.log.calories)}
+                      unit=" cal"
+                      color={colors.textPrimary}
+                    />
+                  </View>
                 </View>
 
                 <View style={styles.statRow}>
                   <StatBlock
-                    testID={`feed-item-foodlog-${item.log.id}-calories`}
-                    value={String(item.log.calories)}
-                    label="Calories"
-                  />
-                  <StatBlock
                     testID={`feed-item-foodlog-${item.log.id}-protein`}
                     value={`${Math.round(item.log.proteinG)}g`}
                     label="Protein"
+                  />
+                  <StatBlock
+                    testID={`feed-item-foodlog-${item.log.id}-carbs`}
+                    value={`${Math.round(item.log.carbsG)}g`}
+                    label="Carbs"
+                  />
+                  <StatBlock
+                    testID={`feed-item-foodlog-${item.log.id}-fat`}
+                    value={`${Math.round(item.log.fatG)}g`}
+                    label="Fat"
                   />
                 </View>
               </AppCard>

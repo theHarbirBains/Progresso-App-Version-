@@ -12,6 +12,8 @@ export interface EnrichedWorkoutSummary extends WorkoutSummary {
   totalVolumeKg: number;
   /** Null if somehow still incomplete (shouldn't happen for a completed-workout query, but avoids a NaN if it ever does). */
   durationMinutes: number | null;
+  /** Distinct (non-deleted) workout_exercise rows -- free from the same workout_exercises fetch completedSetCount/totalVolumeKg already join through, no second query. */
+  exerciseCount: number;
 }
 
 function computeCompletedDurationMinutes(
@@ -27,10 +29,13 @@ function computeCompletedDurationMinutes(
 /**
  * Batch-joins a list of workout summaries (already fetched via
  * fetchWorkoutHistory/fetchWorkoutsForMonth) up to their split day's
- * name/muscle groups and down to their completed-set count -- three
- * queries total regardless of how many workouts are in the list, never one
- * request per workout, matching the existing fetchWorkoutDetail pattern of
- * batching a per-parent-row Supabase request into a single grouped fetch.
+ * name/muscle groups and down to their completed-set count and volume --
+ * three queries total regardless of how many workouts are in the list,
+ * never one request per workout, matching the existing fetchWorkoutDetail
+ * pattern of batching a per-parent-row Supabase request into a single
+ * grouped fetch. exerciseCount rides along on the same workout_exercises
+ * fetch completedSetCount/totalVolumeKg already join through -- not a
+ * fourth query.
  */
 export async function enrichWorkoutSummaries(
   workouts: WorkoutSummary[],
@@ -66,8 +71,13 @@ export async function enrichWorkoutSummaries(
   if (weError) throw new Error(weError.message);
 
   const workoutIdByExerciseId = new Map<string, string>();
+  const exerciseCountByWorkoutId = new Map<string, number>();
   for (const we of workoutExercises ?? []) {
     workoutIdByExerciseId.set(we.id, we.workout_id);
+    exerciseCountByWorkoutId.set(
+      we.workout_id,
+      (exerciseCountByWorkoutId.get(we.workout_id) ?? 0) + 1,
+    );
   }
 
   const completedSetCountByWorkoutId = new Map<string, number>();
@@ -107,6 +117,7 @@ export async function enrichWorkoutSummaries(
       completedSetCount: completedSetCountByWorkoutId.get(workout.id) ?? 0,
       totalVolumeKg: totalVolumeKgByWorkoutId.get(workout.id) ?? 0,
       durationMinutes: computeCompletedDurationMinutes(workout.performedAt, workout.completedAt),
+      exerciseCount: exerciseCountByWorkoutId.get(workout.id) ?? 0,
     };
   });
 }

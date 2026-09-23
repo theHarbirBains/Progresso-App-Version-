@@ -105,8 +105,30 @@ describe('enrichWorkoutSummaries', () => {
         // 100*5 + 80*8 + 60*10 = 500 + 640 + 600 = 1740
         totalVolumeKg: 1740,
         durationMinutes: 60,
+        exerciseCount: 2,
       },
     ]);
+  });
+
+  it('counts exerciseCount as distinct workout_exercise rows, independent of how many sets each has', async () => {
+    mockTables({
+      workout_exercises: {
+        data: [
+          { id: 'we1', workout_id: 'w1' },
+          { id: 'we2', workout_id: 'w1' },
+          { id: 'we3', workout_id: 'w1' },
+        ],
+        error: null,
+      },
+      sets: {
+        data: [{ workout_exercise_id: 'we1', weight_kg: 100, reps: 5 }],
+        error: null,
+      },
+    });
+
+    const result = await enrichWorkoutSummaries([workout({})]);
+
+    expect(result[0].exerciseCount).toBe(3);
   });
 
   it('leaves splitDayName null and muscleGroups empty when no split day is tagged', async () => {
