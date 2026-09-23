@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
@@ -9,23 +8,16 @@ import { UnderlineTabs } from '../design/UnderlineTabs';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { AllTimeSection } from '../progress/AllTimeSection';
+import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { OverviewSection } from '../progress/OverviewSection';
 import { ProgressHeader } from '../progress/ProgressHeader';
 import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
-import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { progressStyles as styles } from '../progress/progressStyles';
 import { StrengthProgressSection } from '../progress/StrengthProgressSection';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import {
-  fetchAllExerciseHistory,
-  groupByExercise,
-  type HistoricalSetWithExercise,
-} from '../workouts/allExerciseHistoryQueries';
-import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
-import type { OneRepMaxWithExercise, RepPRWithExercise } from '../workouts/prSummaryQueries';
-import type { WorkoutSummary } from '../workouts/workoutQueries';
+import { groupByExercise } from '../workouts/allExerciseHistoryQueries';
 
 type Props = RootStackScreenProps<'ProgressOverview'>;
 
@@ -40,8 +32,6 @@ type Props = RootStackScreenProps<'ProgressOverview'>;
 // Individual exercise detail still opens its own dedicated screen
 // (ProgressExerciseDetail), unaffected by this restructuring.
 export function ProgressOverviewScreen({ navigation }: Props) {
-  const { user } = useAuth();
-  const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
   // Progress always shows the same real content (Overview/Strength/Top
   // Sets/All-Time, all Workout-performance analytics) regardless of which
@@ -51,50 +41,24 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   // ever built, would be its own destination reachable from the app menu,
   // not a conditional variant of this one).
   const { openMenu } = useAppMenu();
+  // The user's whole workout/set/PR history, shared with ProfileScreen via
+  // AllTimeStatsProvider -- fetched once (refreshed only after a workout is
+  // completed, not on every visit to this tab), same pattern as
+  // profile/nutrition goals.
+  const {
+    allSetHistory: history,
+    allWorkouts: completedWorkouts,
+    repPRs,
+    oneRepMaxes,
+    statsLoading,
+    statsError,
+    prsLoading,
+    prsError,
+  } = useAllTimeStats();
+  const loading = statsLoading || prsLoading;
+  const error = statsError ?? prsError;
 
   const [activeSection, setActiveSection] = useState<ProgressSection>('Overview');
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoricalSetWithExercise[]>([]);
-  const [repPRs, setRepPRs] = useState<RepPRWithExercise[]>([]);
-  const [oneRepMaxes, setOneRepMaxes] = useState<OneRepMaxWithExercise[]>([]);
-  const [completedWorkouts, setCompletedWorkouts] = useState<WorkoutSummary[]>([]);
-  // Only the very first load should replace the whole screen with
-  // LoadingState -- every later call (the focus listener below, firing each
-  // time the user returns to this screen) is a background refresh: the
-  // already-loaded screen stays on screen while it re-fetches, same pattern
-  // as DashboardScreen/ProfileScreen.
-  const hasLoadedOnce = useRef(false);
-
-  const load = useCallback(async () => {
-    if (!userId) return;
-    if (!hasLoadedOnce.current) setLoading(true);
-    setError(null);
-    try {
-      const [allHistory, allRepPRs, allOneRepMaxes, allWorkouts] = await Promise.all([
-        fetchAllExerciseHistory(userId),
-        fetchAllRepPRs(userId),
-        fetchAllOneRepMaxes(userId),
-        fetchAllCompletedWorkouts(userId),
-      ]);
-      setHistory(allHistory);
-      setRepPRs(allRepPRs);
-      setOneRepMaxes(allOneRepMaxes);
-      setCompletedWorkouts(allWorkouts);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load progress');
-    } finally {
-      setLoading(false);
-      hasLoadedOnce.current = true;
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    load();
-    const unsubscribe = navigation.addListener('focus', load);
-    return unsubscribe;
-  }, [navigation, load]);
 
   const groups = useMemo(() => groupByExercise(history), [history]);
   const lifetimeStats = useMemo(() => computeLifetimeStats(completedWorkouts), [completedWorkouts]);

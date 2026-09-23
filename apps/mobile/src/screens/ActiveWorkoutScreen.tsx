@@ -11,6 +11,7 @@ import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { isValidWeightIncrement, roundWeight, toKg, formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
@@ -144,6 +145,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
+  const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -457,6 +459,12 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     setCompleting(true);
     try {
       await completeWorkout(workout.id);
+      // The only thing that changes what AllTimeStatsProvider's cache holds
+      // -- refreshes it now so Profile/Progress already have this workout's
+      // stats and PRs the moment they're next visited, instead of a stale
+      // cache from before it was completed. Not awaited: the provider
+      // outlives this screen, so the fetch keeps going after the reset below.
+      void refetchAllTimeStats();
       // Land on the Share screen -- the natural moment to share -- with Workout
       // History underneath, so Back (or finishing there) still ends in History.
       navigation.reset({

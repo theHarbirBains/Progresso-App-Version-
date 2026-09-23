@@ -5,6 +5,11 @@ import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
+import {
+  AllTimeStatsProvider,
+  useAllTimeStats,
+  type AllTimeStatsContextValue,
+} from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
@@ -59,11 +64,13 @@ const mockOpenMenu = jest.fn();
 function renderScreen(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
     <ProfileProvider>
-      <AppMenuContext.Provider
-        value={{ openMenu: mockOpenMenu, currentMode }}
-      >
-        <ProgressOverviewScreen navigation={navigation} route={route} />
-      </AppMenuContext.Provider>
+      <AllTimeStatsProvider>
+        <AppMenuContext.Provider
+          value={{ openMenu: mockOpenMenu, currentMode }}
+        >
+          <ProgressOverviewScreen navigation={navigation} route={route} />
+        </AppMenuContext.Provider>
+      </AllTimeStatsProvider>
     </ProfileProvider>,
   );
 }
@@ -258,9 +265,6 @@ describe('ProgressOverviewScreen shell', () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     renderScreen();
     await screen.findByTestId('progress-overview-scroll');
-    // The navigation mock's addListener fires its callback once immediately
-    // on registration (simulating the initial focus) on top of the effect's
-    // own direct call -- this is the real baseline for one mount, not a bug.
     const callsAfterMount = mockFetchAllExerciseHistory.mock.calls.length;
 
     goToSection('Strength');
@@ -345,39 +349,42 @@ describe('ProgressOverviewScreen shell', () => {
 
 // Regression coverage for a reported bug: returning to this screen briefly
 // blanked it with a full-screen spinner before the refreshed data arrived.
-// `load()` only sets `loading` true on the very first call now (see
-// `hasLoadedOnce`) -- every later focus-triggered call is a silent
-// background refresh.
-describe('ProgressOverviewScreen background refresh on focus', () => {
-  function deferred<T>() {
-    let resolve!: (value: T) => void;
-    const promise = new Promise<T>((r) => {
-      resolve = r;
-    });
-    return { promise, resolve };
-  }
-
-  it('does not show the full-screen loading indicator on a focus-triggered refresh', async () => {
+// This screen no longer fetches on its own focus at all -- its data comes
+// from the shared AllTimeStatsProvider cache (see that provider's own
+// comment), refreshed only when ActiveWorkoutScreen completes a workout --
+// so the regression is now structurally impossible: nothing here ever
+// re-enters a loading state after the first successful load.
+describe('ProgressOverviewScreen background refresh from the shared cache', () => {
+  it('does not show the full-screen loading indicator when the shared cache refetches elsewhere', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
-    renderScreen();
+
+    // Simulates ActiveWorkoutScreen -- a different screen, not rendered
+    // here -- calling the same shared refetch() after completing a workout.
+    let capturedRefetch: AllTimeStatsContextValue['refetch'] | undefined;
+    function CaptureRefetch() {
+      capturedRefetch = useAllTimeStats().refetch;
+      return null;
+    }
+
+    render(
+      <ProfileProvider>
+        <AllTimeStatsProvider>
+          <CaptureRefetch />
+          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
+            <ProgressOverviewScreen navigation={navigation} route={route} />
+          </AppMenuContext.Provider>
+        </AllTimeStatsProvider>
+      </ProfileProvider>,
+    );
     await screen.findByTestId('progress-overview-scroll');
 
-    const refresh = deferred<unknown[]>();
-    mockFetchAllExerciseHistory.mockReturnValue(refresh.promise);
-
-    const calls = navigation.addListener.mock.calls;
-    const [, focusCallback] = calls[calls.length - 1];
-    act(() => {
-      focusCallback();
+    mockFetchAllExerciseHistory.mockResolvedValue([...benchHistory, benchHistory[0]]);
+    await act(async () => {
+      await capturedRefetch?.();
     });
 
     expect(screen.queryByTestId('progress-overview-loading')).toBeNull();
     expect(screen.getByTestId('progress-overview-scroll')).toBeTruthy();
-
-    await act(async () => {
-      refresh.resolve([]);
-      await refresh.promise;
-    });
   });
 });
 

@@ -23,10 +23,10 @@ import { fetchTodaysFoodLogs, type FoodLogRow } from '../nutrition/foodLogQuerie
 import { sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { useProfile } from '../profile/ProfileProvider';
+import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { computeLifetimeStats, computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 import { computeMuscleGroupSetCounts } from '../progress/muscleGroupProgress';
 import { PRsSection } from '../progress/PRsSection';
-import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { StatTile } from '../progress/StatTile';
 import {
   computeWeeklySetCounts,
@@ -35,19 +35,9 @@ import {
 } from '../progress/trainingOverTime';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { WeeklyTrendChart } from '../progress/WeeklyTrendChart';
-import {
-  fetchAllExerciseHistory,
-  type HistoricalSetWithExercise,
-} from '../workouts/allExerciseHistoryQueries';
-import {
-  fetchAllOneRepMaxes,
-  fetchAllRepPRs,
-  type OneRepMaxWithExercise,
-  type RepPRWithExercise,
-} from '../workouts/prSummaryQueries';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { formatTotalTime } from '../workouts/workoutMonthSummary';
-import { fetchWorkoutHistory, type WorkoutSummary } from '../workouts/workoutQueries';
+import { fetchWorkoutHistory } from '../workouts/workoutQueries';
 import {
   enrichWorkoutSummaries,
   type EnrichedWorkoutSummary,
@@ -139,20 +129,17 @@ export function ProfileScreen({ navigation }: Props) {
     loading: nutritionGoalsLoading,
     error: nutritionGoalsError,
   } = useNutritionGoals();
+  // The user's whole workout/set/PR history, shared with ProgressOverviewScreen
+  // via AllTimeStatsProvider -- fetched once (refreshed only after a workout
+  // is completed, not on every visit to this tab).
+  const { allWorkouts, allSetHistory, repPRs, oneRepMaxes, statsLoading, statsError, prsLoading, prsError } =
+    useAllTimeStats();
 
   const [tab, setTab] = useState<ProfileTab>('Workouts');
-
-  const [allWorkouts, setAllWorkouts] = useState<WorkoutSummary[]>([]);
-  const [allSetHistory, setAllSetHistory] = useState<HistoricalSetWithExercise[]>([]);
-  const [statsError, setStatsError] = useState<string | null>(null);
 
   const [todaysFoodLogs, setTodaysFoodLogs] = useState<FoodLogRow[]>([]);
   const [nutritionError, setNutritionError] = useState<string | null>(null);
   const displayNutritionError = nutritionError ?? nutritionGoalsError;
-
-  const [repPRs, setRepPRs] = useState<RepPRWithExercise[]>([]);
-  const [oneRepMaxes, setOneRepMaxes] = useState<OneRepMaxWithExercise[]>([]);
-  const [prsError, setPrsError] = useState<string | null>(null);
 
   const [recentWorkouts, setRecentWorkouts] = useState<EnrichedWorkoutSummary[]>([]);
   const [workoutsError, setWorkoutsError] = useState<string | null>(null);
@@ -167,33 +154,15 @@ export function ProfileScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     if (!userId) return;
     if (!hasLoadedOnce.current) setLoading(true);
-    setStatsError(null);
-    setPrsError(null);
     setWorkoutsError(null);
     setNutritionError(null);
 
-    const [statsResult, prsResult, historyResult, nutritionResult] = await Promise.allSettled([
-      Promise.all([fetchAllCompletedWorkouts(userId), fetchAllExerciseHistory(userId)]),
-      Promise.all([fetchAllRepPRs(userId), fetchAllOneRepMaxes(userId)]),
+    const [historyResult, nutritionResult] = await Promise.allSettled([
       fetchWorkoutHistory(userId, 0, RECENT_WORKOUTS_LIMIT).then((result) =>
         enrichWorkoutSummaries(result.rows),
       ),
       fetchTodaysFoodLogs(userId),
     ]);
-
-    if (statsResult.status === 'fulfilled') {
-      setAllWorkouts(statsResult.value[0]);
-      setAllSetHistory(statsResult.value[1]);
-    } else {
-      setStatsError(errorMessage(statsResult.reason));
-    }
-
-    if (prsResult.status === 'fulfilled') {
-      setRepPRs(prsResult.value[0]);
-      setOneRepMaxes(prsResult.value[1]);
-    } else {
-      setPrsError(errorMessage(prsResult.reason));
-    }
 
     if (historyResult.status === 'fulfilled') {
       setRecentWorkouts(historyResult.value);
@@ -261,7 +230,7 @@ export function ProfileScreen({ navigation }: Props) {
     }
   }
 
-  if (loading || themeLoading || nutritionGoalsLoading) {
+  if (loading || themeLoading || nutritionGoalsLoading || statsLoading || prsLoading) {
     return <LoadingState testID="profile-loading" />;
   }
 

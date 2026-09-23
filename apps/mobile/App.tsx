@@ -29,6 +29,7 @@ import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
 import { NutritionGoalsProvider } from './src/nutrition/NutritionGoalsProvider';
 import { ProfileProvider } from './src/profile/ProfileProvider';
+import { AllTimeStatsProvider } from './src/progress/AllTimeStatsProvider';
 import { useProgressTheme } from './src/progress/useProgressTheme';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
 import { ActiveWorkoutScreen } from './src/screens/ActiveWorkoutScreen';
@@ -409,10 +410,12 @@ function App() {
       <AuthProvider>
         <ProfileProvider>
           <NutritionGoalsProvider>
-            <BackgroundThemeProvider>
-              <AppShell fontsLoaded={fontsLoaded} />
-              <StatusBar style="light" />
-            </BackgroundThemeProvider>
+            <AllTimeStatsProvider>
+              <BackgroundThemeProvider>
+                <AppShell fontsLoaded={fontsLoaded} />
+                <StatusBar style="light" />
+              </BackgroundThemeProvider>
+            </AllTimeStatsProvider>
           </NutritionGoalsProvider>
         </ProfileProvider>
       </AuthProvider>
