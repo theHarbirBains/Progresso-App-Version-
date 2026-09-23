@@ -72,6 +72,13 @@ export const profileStyles = StyleSheet.create({
     ...typeScale.screenTitle,
     color: colors.textPrimary,
   },
+  // "N workouts" under the display name -- Strava's own "3 activities" line,
+  // between the name and the (optional) @username.
+  activityCount: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   username: {
     ...typeScale.callout,
     color: colors.textSecondary,
@@ -85,6 +92,26 @@ export const profileStyles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: widgetGap,
+  },
+
+  // Calories & Macros widget (always visible, above the tabs -- not gated
+  // behind a tab, same prominence as the lifetime stats card above it).
+  nutritionTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+
+  // Stats tab's "This Week" row, above the lifetime StatTile grid.
+  thisWeekTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  thisWeekRow: {
+    flexDirection: 'row',
+    gap: widgetGap,
+    marginBottom: spacing.xl,
   },
 
   section: {

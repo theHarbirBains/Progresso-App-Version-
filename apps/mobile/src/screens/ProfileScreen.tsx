@@ -19,6 +19,9 @@ import { getMyProfile, updateMyProfile, type ProfileResponse } from '../lib/api'
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { fromKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
+import { fetchTodaysFoodLogs, type FoodLogRow } from '../nutrition/foodLogQueries';
+import { sumDailyTotals } from '../nutrition/nutritionCalculations';
+import { fetchNutritionGoals, type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { computeLifetimeStats, computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 import { computeMuscleGroupSetCounts } from '../progress/muscleGroupProgress';
 import { PRsSection } from '../progress/PRsSection';
@@ -55,18 +58,24 @@ import { profileStyles as styles } from './profileStyles';
 type Props = RootStackScreenProps<'Profile'>;
 type ProfileTab = 'Workouts' | 'Stats' | 'PRs';
 
-const PROFILE_TABS: { key: ProfileTab; label: string }[] = [
-  { key: 'Workouts', label: 'Workouts' },
-  { key: 'Stats', label: 'Stats' },
-  { key: 'PRs', label: 'PRs' },
+const PROFILE_TABS: { key: ProfileTab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: 'Workouts', label: 'Workouts', icon: 'list' },
+  { key: 'Stats', label: 'Stats', icon: 'bar-chart-2' },
+  { key: 'PRs', label: 'PRs', icon: 'award' },
 ];
 
 const RECENT_WORKOUTS_LIMIT = 10;
-const TREND_WEEKS = 8;
+const TREND_WEEKS = 12;
 const TOP_MUSCLE_GROUPS_LIMIT = 5;
 
 function formatCount(n: number): string {
   return Math.round(n).toLocaleString();
+}
+
+/** "1,850 / 2,200 cal" when a goal is set, else just "1,850 cal". Shared by every macro in the Calories & Macros widget. */
+function formatMacro(consumed: number, goal: number | null, unit: string): string {
+  const consumedText = `${formatCount(consumed)}${unit}`;
+  return goal !== null ? `${consumedText} / ${formatCount(goal)}${unit}` : consumedText;
 }
 
 function errorMessage(reason: unknown): string {
@@ -124,7 +133,7 @@ export function ProfileScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
-  const { theme, weightUnit, themeLoading } = useProgressTheme();
+  const { theme, nutritionTheme, weightUnit, themeLoading } = useProgressTheme();
 
   const [tab, setTab] = useState<ProfileTab>('Workouts');
 
@@ -134,6 +143,15 @@ export function ProfileScreen({ navigation }: Props) {
   const [allWorkouts, setAllWorkouts] = useState<WorkoutSummary[]>([]);
   const [allSetHistory, setAllSetHistory] = useState<HistoricalSetWithExercise[]>([]);
   const [statsError, setStatsError] = useState<string | null>(null);
+
+  const [todaysFoodLogs, setTodaysFoodLogs] = useState<FoodLogRow[]>([]);
+  const [nutritionGoals, setNutritionGoals] = useState<NutritionGoals>({
+    calories: null,
+    proteinG: null,
+    carbsG: null,
+    fatG: null,
+  });
+  const [nutritionError, setNutritionError] = useState<string | null>(null);
 
   const [repPRs, setRepPRs] = useState<RepPRWithExercise[]>([]);
   const [oneRepMaxes, setOneRepMaxes] = useState<OneRepMaxWithExercise[]>([]);
@@ -156,15 +174,18 @@ export function ProfileScreen({ navigation }: Props) {
     setStatsError(null);
     setPrsError(null);
     setWorkoutsError(null);
+    setNutritionError(null);
 
-    const [profileResult, statsResult, prsResult, historyResult] = await Promise.allSettled([
-      getMyProfile(accessToken),
-      Promise.all([fetchAllCompletedWorkouts(userId), fetchAllExerciseHistory(userId)]),
-      Promise.all([fetchAllRepPRs(userId), fetchAllOneRepMaxes(userId)]),
-      fetchWorkoutHistory(userId, 0, RECENT_WORKOUTS_LIMIT).then((result) =>
-        enrichWorkoutSummaries(result.rows),
-      ),
-    ]);
+    const [profileResult, statsResult, prsResult, historyResult, nutritionResult] =
+      await Promise.allSettled([
+        getMyProfile(accessToken),
+        Promise.all([fetchAllCompletedWorkouts(userId), fetchAllExerciseHistory(userId)]),
+        Promise.all([fetchAllRepPRs(userId), fetchAllOneRepMaxes(userId)]),
+        fetchWorkoutHistory(userId, 0, RECENT_WORKOUTS_LIMIT).then((result) =>
+          enrichWorkoutSummaries(result.rows),
+        ),
+        Promise.all([fetchTodaysFoodLogs(userId), fetchNutritionGoals(userId)]),
+      ]);
 
     if (profileResult.status === 'fulfilled') {
       setProfile(profileResult.value);
@@ -190,6 +211,13 @@ export function ProfileScreen({ navigation }: Props) {
       setRecentWorkouts(historyResult.value);
     } else {
       setWorkoutsError(errorMessage(historyResult.reason));
+    }
+
+    if (nutritionResult.status === 'fulfilled') {
+      setTodaysFoodLogs(nutritionResult.value[0]);
+      setNutritionGoals(nutritionResult.value[1]);
+    } else {
+      setNutritionError(errorMessage(nutritionResult.reason));
     }
 
     setLoading(false);
@@ -271,6 +299,13 @@ export function ProfileScreen({ navigation }: Props) {
     value: fromKg(p.value, weightUnit),
   }));
   const weeklySetPoints = computeWeeklySetCounts(allSetHistory, TREND_WEEKS);
+  // computeWeekly*'s own contract: oldest first, always including the
+  // current week -- so the last point is "this week".
+  const thisWeekWorkouts = weeklyWorkoutPoints[weeklyWorkoutPoints.length - 1]?.value ?? 0;
+  const thisWeekSets = weeklySetPoints[weeklySetPoints.length - 1]?.value ?? 0;
+  const thisWeekVolume = weeklyVolumePoints[weeklyVolumePoints.length - 1]?.value ?? 0;
+
+  const todaysNutritionTotals = sumDailyTotals(todaysFoodLogs);
 
   return (
     <>
@@ -334,6 +369,10 @@ export function ProfileScreen({ navigation }: Props) {
               <Text testID="profile-display-name" style={styles.displayName}>
                 {name ?? 'Your Profile'}
               </Text>
+              <Text testID="profile-activity-count" style={styles.activityCount}>
+                {formatCount(lifetimeStats.totalWorkouts)}{' '}
+                {lifetimeStats.totalWorkouts === 1 ? 'workout' : 'workouts'}
+              </Text>
               {profile?.username ? (
                 <Text testID="profile-username" style={styles.username}>
                   @{profile.username}
@@ -372,6 +411,41 @@ export function ProfileScreen({ navigation }: Props) {
               testID="profile-stat-volume"
               value={formatCount(fromKg(totalVolumeKg, weightUnit))}
               label={`Total Volume (${weightUnit})`}
+            />
+          </View>
+        </AppCard>
+
+        <AppCard
+          testID="profile-nutrition"
+          topAccent={nutritionTheme.accent}
+          onPress={() => navigation.navigate('Nutrition')}
+        >
+          <Text style={styles.nutritionTitle}>Today&apos;s Calories & Macros</Text>
+          {nutritionError ? (
+            <Text testID="profile-nutrition-error" style={styles.errorText}>
+              {nutritionError}
+            </Text>
+          ) : null}
+          <View style={styles.statTileGrid}>
+            <StatTile
+              testID="profile-nutrition-calories"
+              label="Calories"
+              value={formatMacro(todaysNutritionTotals.calories, nutritionGoals.calories, '')}
+            />
+            <StatTile
+              testID="profile-nutrition-protein"
+              label="Protein"
+              value={formatMacro(todaysNutritionTotals.proteinG, nutritionGoals.proteinG, 'g')}
+            />
+            <StatTile
+              testID="profile-nutrition-carbs"
+              label="Carbs"
+              value={formatMacro(todaysNutritionTotals.carbsG, nutritionGoals.carbsG, 'g')}
+            />
+            <StatTile
+              testID="profile-nutrition-fat"
+              label="Fat"
+              value={formatMacro(todaysNutritionTotals.fatG, nutritionGoals.fatG, 'g')}
             />
           </View>
         </AppCard>
@@ -421,6 +495,25 @@ export function ProfileScreen({ navigation }: Props) {
 
         {tab === 'Stats' ? (
           <AppCard testID="profile-tab-content">
+            <Text style={styles.thisWeekTitle}>This Week</Text>
+            <View style={styles.thisWeekRow}>
+              <StatBlock
+                testID="profile-this-week-workouts"
+                value={formatCount(thisWeekWorkouts)}
+                label="Workouts"
+              />
+              <StatBlock
+                testID="profile-this-week-sets"
+                value={formatCount(thisWeekSets)}
+                label="Sets"
+              />
+              <StatBlock
+                testID="profile-this-week-volume"
+                value={formatCount(thisWeekVolume)}
+                label={`Volume (${weightUnit})`}
+              />
+            </View>
+
             <View style={styles.statTileGrid}>
               <StatTile
                 testID="profile-stat-tile-workouts"

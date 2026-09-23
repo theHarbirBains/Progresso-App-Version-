@@ -9,6 +9,8 @@ import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { getMyProfile, updateMyProfile } from '../lib/api';
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { fetchTodaysFoodLogs } from '../nutrition/foodLogQueries';
+import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
@@ -32,6 +34,14 @@ jest.mock('../lib/avatarUpload', () => ({
 
 jest.mock('../progress/progressStatsQueries', () => ({
   fetchAllCompletedWorkouts: jest.fn(),
+}));
+
+jest.mock('../nutrition/foodLogQueries', () => ({
+  fetchTodaysFoodLogs: jest.fn(),
+}));
+
+jest.mock('../nutrition/nutritionGoalQueries', () => ({
+  fetchNutritionGoals: jest.fn(),
 }));
 
 jest.mock('../workouts/allExerciseHistoryQueries', () => ({
@@ -60,6 +70,8 @@ const mockRequestMediaLibraryPermissionsAsync =
   ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock;
 const mockLaunchImageLibraryAsync = ImagePicker.launchImageLibraryAsync as jest.Mock;
 const mockFetchAllCompletedWorkouts = fetchAllCompletedWorkouts as jest.Mock;
+const mockFetchTodaysFoodLogs = fetchTodaysFoodLogs as jest.Mock;
+const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
 const mockFetchAllRepPRs = fetchAllRepPRs as jest.Mock;
 const mockFetchAllOneRepMaxes = fetchAllOneRepMaxes as jest.Mock;
@@ -157,13 +169,15 @@ beforeEach(() => {
   mockFetchAllOneRepMaxes.mockReset().mockResolvedValue([]);
   mockFetchWorkoutHistory.mockReset().mockResolvedValue({ rows: [{ id: 'w1' }], hasMore: false });
   mockEnrichWorkoutSummaries.mockReset().mockResolvedValue([enrichedWorkout()]);
+  mockFetchTodaysFoodLogs.mockReset().mockResolvedValue([]);
+  mockFetchNutritionGoals
+    .mockReset()
+    .mockResolvedValue({ calories: null, proteinG: null, carbsG: null, fatG: null });
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
-  mockReportMode.mockClear();
 });
 
 const mockOpenMenu = jest.fn();
-const mockReportMode = jest.fn();
 
 // ProfileScreen now renders the shared ModeToggle (via AppMenuContext) --
 // this stands in for that root-level provider.
@@ -171,7 +185,7 @@ function renderProfile(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
     <BackgroundThemeProvider>
       <AppMenuContext.Provider
-        value={{ openMenu: mockOpenMenu, reportMode: mockReportMode, currentMode }}
+        value={{ openMenu: mockOpenMenu, currentMode }}
       >
         <ProfileScreen navigation={navigation} route={route} />
       </AppMenuContext.Provider>
@@ -207,6 +221,13 @@ describe('ProfileScreen identity', () => {
     expect(await screen.findByTestId('profile-display-name')).toHaveTextContent('harbir');
   });
 
+  it("shows the account's total workout count as an activity-count subtitle under the name", async () => {
+    // The default mock resolves 2 completed workouts (see beforeEach).
+    renderProfile();
+
+    expect(await screen.findByTestId('profile-activity-count')).toHaveTextContent('2 workouts');
+  });
+
   it('navigates to AccountSettings from both the settings icon and Edit Profile', async () => {
     renderProfile();
     await screen.findByTestId('profile-display-name');
@@ -217,6 +238,47 @@ describe('ProfileScreen identity', () => {
     mockNavigate.mockClear();
     fireEvent.press(screen.getByTestId('profile-edit'));
     expect(mockNavigate).toHaveBeenCalledWith('AccountSettings');
+  });
+});
+
+describe('ProfileScreen -- Calories & Macros widget', () => {
+  it("shows today's calories and macros against goals, and navigates to Nutrition on tap", async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([
+      { id: 'l1', foodId: 'f1', foodNameSnapshot: 'Chicken', servingSize: 100, servingUnit: 'g', quantity: 1, calories: 400, proteinG: 40, carbsG: 10, fatG: 8, mealType: 'lunch', loggedAt: '2026-09-01T12:00:00Z' },
+    ]);
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: 2200,
+      proteinG: 180,
+      carbsG: 200,
+      fatG: 70,
+    });
+    renderProfile();
+
+    expect(await screen.findByTestId('profile-nutrition-calories')).toHaveTextContent(
+      /400 \/ 2,200/,
+    );
+    expect(screen.getByTestId('profile-nutrition-protein')).toHaveTextContent(/40g \/ 180g/);
+    expect(screen.getByTestId('profile-nutrition-carbs')).toHaveTextContent(/10g \/ 200g/);
+    expect(screen.getByTestId('profile-nutrition-fat')).toHaveTextContent(/8g \/ 70g/);
+
+    fireEvent.press(screen.getByTestId('profile-nutrition'));
+    expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
+  });
+
+  it('shows just the consumed amount, with no "/ goal", when no goal is set', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([]);
+    renderProfile();
+
+    expect(await screen.findByTestId('profile-nutrition-calories')).toHaveTextContent(/^0/);
+    expect(screen.getByTestId('profile-nutrition-calories')).not.toHaveTextContent('/');
+  });
+
+  it('shows a nutrition load error without crashing the rest of the screen', async () => {
+    mockFetchNutritionGoals.mockRejectedValue(new Error('nutrition down'));
+    renderProfile();
+
+    expect(await screen.findByTestId('profile-nutrition-error')).toHaveTextContent('nutrition down');
+    expect(screen.getByTestId('profile-display-name')).toBeTruthy();
   });
 });
 
@@ -519,6 +581,26 @@ describe('ProfileScreen Stats tab', () => {
     expect(screen.getByTestId('profile-trend-sets-total')).toBeTruthy();
   });
 
+  it("shows This Week's real workout count -- the current (most recent) week's bucket, not a lifetime total", async () => {
+    // Same "performed now" reasoning as the trend-chart test above.
+    const now = new Date();
+    mockFetchAllCompletedWorkouts.mockResolvedValue([
+      {
+        id: 'w1',
+        name: 'Push',
+        performedAt: now.toISOString(),
+        completedAt: now.toISOString(),
+        workoutSplitDayId: null,
+      },
+    ]);
+    renderProfile();
+    await screen.findByTestId('profile-workout-w1');
+
+    fireEvent.press(screen.getByTestId('profile-tabs-Stats'));
+
+    expect(await screen.findByTestId('profile-this-week-workouts')).toHaveTextContent(/^1/);
+  });
+
   it('shows an empty message instead of an empty chart when there is no training data at all', async () => {
     mockFetchAllCompletedWorkouts.mockResolvedValue([]);
     mockFetchAllExerciseHistory.mockResolvedValue([]);
@@ -612,12 +694,12 @@ describe('ProfileScreen navigation', () => {
 });
 
 describe('ProfileScreen -- header, widgets, one primary action', () => {
-  it('is a stack of widgets: the identity hero, the stats card, and the active tab in its own card', async () => {
+  it('is a stack of widgets: the identity hero, the stats card, the nutrition card, and the active tab in its own card', async () => {
     renderProfile();
     await screen.findByTestId('profile-workout-w1');
 
     let cards = screen.UNSAFE_queryAllByType(AppCard);
-    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false]);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false]);
     expect(
       within(screen.getByTestId('profile-tab-content')).getByTestId('profile-workout-w1'),
     ).toBeTruthy();
@@ -625,7 +707,7 @@ describe('ProfileScreen -- header, widgets, one primary action', () => {
     for (const tab of ['Stats', 'PRs']) {
       fireEvent.press(screen.getByTestId(`profile-tabs-${tab}`));
       cards = screen.UNSAFE_queryAllByType(AppCard);
-      expect(cards).toHaveLength(3);
+      expect(cards).toHaveLength(4);
     }
   });
 
