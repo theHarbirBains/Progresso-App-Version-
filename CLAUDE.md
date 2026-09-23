@@ -46,7 +46,7 @@ Some areas remain intentionally incomplete rather than hidden — do not treat t
 - **Subscriptions:** RevenueCat is the authoritative source of entitlement; our subscription table is a projection/cache only
 - **Admin dashboard:** React web app
 - **Mobile builds:** Expo EAS
-- **Backend pattern:** Hybrid — simple RLS-protected reads may go direct to Supabase; anything with business logic or side effects (set writes, PR recomputation, workout delete/restore, nutrition snapshots, admin ops, RevenueCat webhooks, account export/deletion) goes through the NestJS API.
+- **Backend pattern:** Hybrid — simple RLS-protected reads/writes may go direct to Supabase; anything needing server-side business logic, cross-user-trusted computation, or a third-party integration (exercise/equipment-profile/food-library writes, admin ops, RevenueCat webhooks, account export/deletion) goes through the NestJS API. Workout/set CRUD and nutrition logging are direct-to-Supabase from the client, own-row RLS-protected — this is intentional, not a gap: PR/1RM recomputation is enforced entirely by a security-definer Postgres trigger chain (`recompute_prs_for_exercise`, see `supabase/migrations/20260823100008_pr_infrastructure.sql`) with client write access to `rep_prs`/`one_rep_maxes` revoked, so correctness holds regardless of which client path wrote the set. Nutrition log totals are computed client-side at log time and are not server-verified against the live food row — a deliberate simplicity tradeoff, not an oversight.
 
 ## Key Domain Concepts (do not conflate these)
 
@@ -56,7 +56,7 @@ Some areas remain intentionally incomplete rather than hidden — do not treat t
 
 Weights are stored canonically in kilograms; lb/kg is a display/input preference only.
 
-PR correctness must be maintained across set create/edit/soft-delete/restore and workout delete/restore/date-change. No stale PR records.
+PR correctness must be maintained across set create/edit/soft-delete/restore and workout delete/restore/date-change. No stale PR records. This is enforced by DB triggers, not application code — see the Architecture Summary's backend pattern note. If a future change reassigns a `workout_exercises.exercise_id` after sets were already logged against it (no current code path does this), extend the trigger chain to cover it; the existing triggers do not fire on that column changing.
 
 Nutrition logs must snapshot the nutrition data at the time of logging — later edits to a food database entry must not retroactively change historical logs.
 
