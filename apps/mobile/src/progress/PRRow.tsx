@@ -3,6 +3,8 @@ import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { withAlpha } from '../theme/accentColor';
 import { progressStyles as styles } from './progressStyles';
+import { formatWeight } from '../lib/units';
+import { formatMonthDay } from '../workouts/workoutFormat';
 
 interface Props {
   exerciseName: string;
@@ -17,14 +19,6 @@ interface Props {
   onPress?: () => void;
   showDivider?: boolean;
   testID?: string;
-}
-
-function formatWeight(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 /** One row on the PRs page -- a rep-count PR or a true 1RM, both real database-maintained records. */
@@ -54,7 +48,7 @@ export function PRRow({
       <View style={styles.recordRowBody}>
         <Text style={styles.recordRowTitle}>{exerciseName}</Text>
         <Text style={styles.recordRowMeta}>
-          {recordType} · {formatDate(achievedAt)}
+          {recordType} · {formatMonthDay(achievedAt)}
         </Text>
       </View>
       <Text style={[styles.recordRowValue, { color: accentColor }]}>

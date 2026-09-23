@@ -5,6 +5,8 @@ import { Feather } from '@expo/vector-icons';
 import { colors } from '../design/theme';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { progressStyles as styles } from './progressStyles';
+import { formatWeight } from '../lib/units';
+import { formatShortDate } from '../workouts/workoutFormat';
 
 export interface ChartPointDetailData {
   exerciseName: string;
@@ -17,18 +19,6 @@ export interface ChartPointDetailData {
   previous: { weightDisplay: number; reps: number } | null;
   /** Only present when this point is itself a real 1-rep set -- never an estimate. */
   trueOneRepMaxDisplay: number | null;
-}
-
-function formatWeight(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
 }
 
 interface Props {
@@ -75,7 +65,7 @@ export function ChartPointDetail({ data, accentColor, onDismiss, testID }: Props
             {data.unit} × {data.reps}
           </Text>
           <Text style={styles.pointDetailMeta}>
-            {formatDate(data.performedAt)} · {data.exerciseName}
+            {formatShortDate(data.performedAt)} · {data.exerciseName}
           </Text>
         </View>
         <TouchableOpacity

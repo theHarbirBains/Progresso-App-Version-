@@ -2,8 +2,7 @@ import { useMemo } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { AppCard } from '../design/AppCard';
-import { fromKg, roundWeight } from '../lib/units';
+import { fromKg, formatWeightKg } from '../lib/units';
 import { withAlpha } from '../theme/accentColor';
 import type { RootStackScreenProps } from '../navigation/types';
 import type {
@@ -11,6 +10,7 @@ import type {
   HistoricalSetWithExercise,
 } from '../workouts/allExerciseHistoryQueries';
 import type { OneRepMaxWithExercise, RepPRWithExercise } from '../workouts/prSummaryQueries';
+import { formatShortDate } from '../workouts/workoutFormat';
 import type { WorkoutSummary } from '../workouts/workoutQueries';
 import { computeLifetimeMilestones } from './allTimeMilestones';
 import { computeLifetimeVolumeKg, rankExercisesByVolume } from './lifetimeStats';
@@ -39,22 +39,9 @@ interface Props {
   navigation: Navigation;
 }
 
-function formatWeight(kg: number, unit: 'kg' | 'lb'): string {
-  const value = roundWeight(fromKg(kg, unit));
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
 function formatVolume(kg: number, unit: 'kg' | 'lb'): string {
   const value = Math.round(fromKg(kg, unit));
   return value.toLocaleString();
-}
-
-function formatMilestoneDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
 }
 
 function AllTimeStat({
@@ -71,13 +58,13 @@ function AllTimeStat({
   testID: string;
 }) {
   return (
-    <AppCard testID={testID} style={styles.allTimeStatCard}>
+    <View testID={testID} style={styles.allTimeStatCard}>
       <View style={[styles.allTimeStatIcon, { backgroundColor: withAlpha(accentColor, 0.14) }]}>
         <Feather name={icon} size={16} color={accentColor} />
       </View>
       <Text style={styles.allTimeStatValue}>{value}</Text>
       <Text style={styles.allTimeStatLabel}>{label}</Text>
-    </AppCard>
+    </View>
   );
 }
 
@@ -137,10 +124,10 @@ export function AllTimeSection({
       contentContainerStyle={{ paddingBottom: 32 }}
       showsVerticalScrollIndicator={false}
     >
-      <AppCard hero testID="progress-all-time-hero" style={styles.allTimeHero}>
+      <View testID="progress-all-time-hero" style={styles.allTimeHero}>
         <Text style={styles.allTimeHeroTitle}>All Time</Text>
         <Text style={styles.allTimeHeroSubtitle}>A record of your work. Keep going.</Text>
-      </AppCard>
+      </View>
 
       <View style={styles.allTimeStatGrid}>
         <AllTimeStat
@@ -174,16 +161,8 @@ export function AllTimeSection({
       </View>
 
       {topRecords.length > 0 ? (
-        <AppCard testID="progress-all-time-prs" style={styles.overviewCard}>
+        <View testID="progress-all-time-prs" style={styles.overviewCard}>
           <View style={styles.overviewCardHeader}>
-            <View
-              style={[
-                styles.overviewCardIconWrap,
-                { backgroundColor: withAlpha(accentColor, 0.14) },
-              ]}
-            >
-              <Feather name="award" size={18} color={accentColor} />
-            </View>
             <View style={styles.overviewCardTitleColumn}>
               <Text style={styles.overviewCardTitle}>All Time Personal Records</Text>
               <Text style={styles.overviewCardSubtitle}>See your strongest lifts</Text>
@@ -206,26 +185,18 @@ export function AllTimeSection({
                   {record.exerciseName}
                 </Text>
                 <Text style={styles.allTimePrValue}>
-                  {formatWeight(record.weightKg, weightUnit)} {weightUnit}
+                  {formatWeightKg(record.weightKg, weightUnit)} {weightUnit}
                 </Text>
                 <Text style={styles.allTimePrCaption}>x {record.reps} reps</Text>
               </TouchableOpacity>
             ))}
           </View>
-        </AppCard>
+        </View>
       ) : null}
 
       {muscleGroupVolume.length > 0 ? (
-        <AppCard testID="progress-all-time-muscle-volume" style={styles.overviewCard}>
+        <View testID="progress-all-time-muscle-volume" style={styles.overviewCard}>
           <View style={styles.overviewCardHeader}>
-            <View
-              style={[
-                styles.overviewCardIconWrap,
-                { backgroundColor: withAlpha(accentColor, 0.14) },
-              ]}
-            >
-              <Feather name="activity" size={18} color={accentColor} />
-            </View>
             <View style={styles.overviewCardTitleColumn}>
               <Text style={styles.overviewCardTitle}>Muscle Group Volume</Text>
               <Text style={styles.overviewCardSubtitle}>All time total volume by muscle group</Text>
@@ -256,7 +227,7 @@ export function AllTimeSection({
               </View>
             );
           })}
-        </AppCard>
+        </View>
       ) : null}
 
       <View style={styles.allTimeStatGrid}>
@@ -277,16 +248,8 @@ export function AllTimeSection({
       </View>
 
       {topExercises.length > 0 ? (
-        <AppCard testID="progress-all-time-top-exercises" style={styles.overviewCard}>
+        <View testID="progress-all-time-top-exercises" style={styles.overviewCard}>
           <View style={styles.overviewCardHeader}>
-            <View
-              style={[
-                styles.overviewCardIconWrap,
-                { backgroundColor: withAlpha(accentColor, 0.14) },
-              ]}
-            >
-              <Feather name="bar-chart-2" size={18} color={accentColor} />
-            </View>
             <View style={styles.overviewCardTitleColumn}>
               <Text style={styles.overviewCardTitle}>Top Exercises</Text>
               <Text style={styles.overviewCardSubtitle}>By total volume</Text>
@@ -309,20 +272,12 @@ export function AllTimeSection({
               </Text>
             </View>
           ))}
-        </AppCard>
+        </View>
       ) : null}
 
       {milestones.length > 0 ? (
-        <AppCard testID="progress-all-time-milestones" style={styles.overviewCard}>
+        <View testID="progress-all-time-milestones" style={styles.overviewCard}>
           <View style={styles.overviewCardHeader}>
-            <View
-              style={[
-                styles.overviewCardIconWrap,
-                { backgroundColor: withAlpha(accentColor, 0.14) },
-              ]}
-            >
-              <Feather name="flag" size={18} color={accentColor} />
-            </View>
             <View style={styles.overviewCardTitleColumn}>
               <Text style={styles.overviewCardTitle}>Progress Highlights</Text>
               <Text style={styles.overviewCardSubtitle}>All time milestones</Text>
@@ -336,11 +291,11 @@ export function AllTimeSection({
             >
               <Text style={styles.allTimeMilestoneLabel}>{milestone.label}</Text>
               <Text style={styles.allTimeMilestoneDate}>
-                {formatMilestoneDate(milestone.achievedAt)}
+                {formatShortDate(milestone.achievedAt)}
               </Text>
             </View>
           ))}
-        </AppCard>
+        </View>
       ) : null}
 
       {/* Relative Strength: replaces the reference's motivational quote
@@ -353,14 +308,14 @@ export function AllTimeSection({
           sample gate, a backend aggregate endpoint, an approved
           normalization algorithm) -- this card is the placeholder the real
           feature would slot into once that exists. */}
-      <AppCard testID="progress-all-time-relative-strength">
+      <View testID="progress-all-time-relative-strength">
         <Text style={styles.relativeStrengthTitle}>Relative Strength</Text>
         <Text style={styles.relativeStrengthBody}>
           Comparing your strength with other users of the same sex needs a larger, active user base
           to produce a statistically meaningful result. This is not available yet -- check back as
           Progresso grows.
         </Text>
-      </AppCard>
+      </View>
     </ScrollView>
   );
 }

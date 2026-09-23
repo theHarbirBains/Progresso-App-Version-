@@ -12,17 +12,10 @@ import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
+import { formatShortDate } from '../workouts/workoutFormat';
 import { exerciseProgressStyles as styles } from './exerciseProgressStyles';
 
 type Props = RootStackScreenProps<'PRHistory'>;
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 // Read-only view over the database-maintained rep_prs/one_rep_maxes tables
 // (see supabase/migrations/20260823100008_pr_infrastructure.sql) -- nothing
@@ -120,7 +113,7 @@ export function PRHistoryScreen({ route, navigation }: Props) {
                     {formatWeightKg(oneRepMax.weightKg, weightUnit)}
                     {weightUnit}
                   </Text>
-                  <Text style={styles.oneRepMaxDate}>{formatDate(oneRepMax.achievedAt)}</Text>
+                  <Text style={styles.oneRepMaxDate}>{formatShortDate(oneRepMax.achievedAt)}</Text>
                 </View>
               ) : (
                 <Text testID="one-rep-max-empty" style={styles.emptyText}>
@@ -143,7 +136,7 @@ export function PRHistoryScreen({ route, navigation }: Props) {
                     testID={`pr-row-${pr.reps}`}
                     divider={index > 0}
                     title={`${pr.reps} Rep`}
-                    subtitle={formatDate(pr.achievedAt)}
+                    subtitle={formatShortDate(pr.achievedAt)}
                     value={`${formatWeightKg(pr.bestWeightKg, weightUnit)}${weightUnit}`}
                   />
                 ))

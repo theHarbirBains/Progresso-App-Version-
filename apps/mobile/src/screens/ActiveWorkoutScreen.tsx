@@ -13,6 +13,7 @@ import { isValidWeightIncrement, roundWeight, toKg, formatWeightKg } from '../li
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
+import { formatShortDate } from '../workouts/workoutFormat';
 import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
 import {
@@ -47,14 +48,6 @@ interface SetInputDraft {
   reps: string;
 }
 
-function formatSessionDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
 /** Every set from the user's last completed session with this exercise, in
  * the order they were logged -- never just the heaviest one. */
 function buildPreviousSessionDisplay(
@@ -63,7 +56,7 @@ function buildPreviousSessionDisplay(
 ): PreviousSessionDisplay | null {
   if (!previous || previous.sets.length === 0) return null;
   return {
-    dateDisplay: formatSessionDate(previous.performedAt),
+    dateDisplay: formatShortDate(previous.performedAt),
     sets: previous.sets.map((s, i) => ({
       setNumber: i + 1,
       weightDisplay: formatWeightKg(s.weightKg ?? 0, unit),

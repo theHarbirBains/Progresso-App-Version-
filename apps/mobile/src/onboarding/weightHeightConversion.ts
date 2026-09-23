@@ -1,12 +1,17 @@
-const KG_PER_LB = 0.45359237;
+import { fromKg, toKg } from '../lib/units';
+
 const CM_PER_INCH = 2.54;
 
+// kg<->lb conversion itself is never redefined here -- lib/units.ts is the
+// one place that constant/formula lives; these are just its lb-specific
+// callers, kept for this file's own onboarding-specific callers (wheel
+// picker ranges, feet/inches math) that only ever work in one direction.
 export function kgToLb(kg: number): number {
-  return kg / KG_PER_LB;
+  return fromKg(kg, 'lb');
 }
 
 export function lbToKg(lb: number): number {
-  return lb * KG_PER_LB;
+  return toKg(lb, 'lb');
 }
 
 export function cmToInches(cm: number): number {
