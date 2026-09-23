@@ -19,7 +19,7 @@ import { greetingName } from '../dashboard/greeting';
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { fromKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
-import { fetchTodaysFoodLogs, type FoodLogRow } from '../nutrition/foodLogQueries';
+import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { useProfile } from '../profile/ProfileProvider';
@@ -135,11 +135,10 @@ export function ProfileScreen({ navigation }: Props) {
   const { allWorkouts, allSetHistory, repPRs, oneRepMaxes, statsLoading, statsError, prsLoading, prsError } =
     useAllTimeStats();
 
-  const [tab, setTab] = useState<ProfileTab>('Workouts');
+  const { logs: todaysFoodLogs, loading: logsLoading, error: logsError } = useFoodLog();
+  const displayNutritionError = nutritionGoalsError ?? logsError;
 
-  const [todaysFoodLogs, setTodaysFoodLogs] = useState<FoodLogRow[]>([]);
-  const [nutritionError, setNutritionError] = useState<string | null>(null);
-  const displayNutritionError = nutritionError ?? nutritionGoalsError;
+  const [tab, setTab] = useState<ProfileTab>('Workouts');
 
   const [recentWorkouts, setRecentWorkouts] = useState<EnrichedWorkoutSummary[]>([]);
   const [workoutsError, setWorkoutsError] = useState<string | null>(null);
@@ -155,25 +154,12 @@ export function ProfileScreen({ navigation }: Props) {
     if (!userId) return;
     if (!hasLoadedOnce.current) setLoading(true);
     setWorkoutsError(null);
-    setNutritionError(null);
 
-    const [historyResult, nutritionResult] = await Promise.allSettled([
-      fetchWorkoutHistory(userId, 0, RECENT_WORKOUTS_LIMIT).then((result) =>
-        enrichWorkoutSummaries(result.rows),
-      ),
-      fetchTodaysFoodLogs(userId),
-    ]);
-
-    if (historyResult.status === 'fulfilled') {
-      setRecentWorkouts(historyResult.value);
-    } else {
-      setWorkoutsError(errorMessage(historyResult.reason));
-    }
-
-    if (nutritionResult.status === 'fulfilled') {
-      setTodaysFoodLogs(nutritionResult.value);
-    } else {
-      setNutritionError(errorMessage(nutritionResult.reason));
+    try {
+      const result = await fetchWorkoutHistory(userId, 0, RECENT_WORKOUTS_LIMIT);
+      setRecentWorkouts(await enrichWorkoutSummaries(result.rows));
+    } catch (err) {
+      setWorkoutsError(errorMessage(err));
     }
 
     setLoading(false);
@@ -230,7 +216,7 @@ export function ProfileScreen({ navigation }: Props) {
     }
   }
 
-  if (loading || themeLoading || nutritionGoalsLoading || statsLoading || prsLoading) {
+  if (loading || themeLoading || nutritionGoalsLoading || statsLoading || prsLoading || logsLoading) {
     return <LoadingState testID="profile-loading" />;
   }
 

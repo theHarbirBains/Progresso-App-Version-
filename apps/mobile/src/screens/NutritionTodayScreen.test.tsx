@@ -8,8 +8,10 @@ import { AppMenuContext } from '../navigation/AppMenuContext';
 import {
   deleteFoodLog,
   fetchTodaysFoodLogs,
+  logFood,
   updateFoodLogQuantity,
 } from '../nutrition/foodLogQueries';
+import { FoodLogProvider, useFoodLog, type FoodLogContextValue } from '../nutrition/FoodLogProvider';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
@@ -23,6 +25,7 @@ jest.mock('../nutrition/foodLogQueries', () => ({
   fetchTodaysFoodLogs: jest.fn(),
   updateFoodLogQuantity: jest.fn(),
   deleteFoodLog: jest.fn(),
+  logFood: jest.fn(),
 }));
 
 jest.mock('../nutrition/nutritionGoalQueries', () => ({
@@ -34,6 +37,7 @@ const mockFetchTodaysFoodLogs = fetchTodaysFoodLogs as jest.Mock;
 const mockUpdateFoodLogQuantity = updateFoodLogQuantity as jest.Mock;
 const mockDeleteFoodLog = deleteFoodLog as jest.Mock;
 const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
+const mockLogFood = logFood as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
@@ -56,9 +60,11 @@ function renderScreen() {
   return render(
     <ProfileProvider>
       <NutritionGoalsProvider>
-        <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-          <NutritionTodayScreen navigation={navigation} route={route} />
-        </AppMenuContext.Provider>
+        <FoodLogProvider>
+          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+            <NutritionTodayScreen navigation={navigation} route={route} />
+          </AppMenuContext.Provider>
+        </FoodLogProvider>
       </NutritionGoalsProvider>
     </ProfileProvider>,
   );
@@ -89,6 +95,7 @@ beforeEach(() => {
   });
   mockUpdateFoodLogQuantity.mockReset();
   mockDeleteFoodLog.mockReset();
+  mockLogFood.mockReset();
   mockGoBack.mockClear();
   mockNavigate.mockClear();
 });
@@ -225,38 +232,55 @@ describe('NutritionTodayScreen', () => {
 
 // Regression coverage for a reported bug: returning to this screen briefly
 // blanked it with a full-screen spinner before the refreshed data arrived.
-// `load()` only sets `loading` true on the very first call now (see
-// `hasLoadedOnce`) -- every later focus-triggered call is a silent
-// background refresh.
-describe('NutritionTodayScreen background refresh on focus', () => {
-  function deferred<T>() {
-    let resolve!: (value: T) => void;
-    const promise = new Promise<T>((r) => {
-      resolve = r;
-    });
-    return { promise, resolve };
-  }
+// This screen no longer fetches on its own focus at all -- today's logs
+// come from the shared FoodLogProvider cache, write-through from wherever a
+// food is actually logged, edited or deleted (see that provider's own
+// comment) -- so the regression is now structurally impossible.
+describe('NutritionTodayScreen background refresh from the shared cache', () => {
+  it('does not show the loading indicator when a food is logged elsewhere and the shared cache updates', async () => {
+    // Simulates LogFoodStep -- reached from FoodLibrary/FoodSearch/Barcode
+    // Scanner, not rendered here -- logging a food via the same shared
+    // logFoodEntry.
+    let capturedLogFoodEntry: FoodLogContextValue['logFoodEntry'] | undefined;
+    function CaptureLogFoodEntry() {
+      capturedLogFoodEntry = useFoodLog().logFoodEntry;
+      return null;
+    }
 
-  it('does not show the loading indicator on a focus-triggered refresh', async () => {
-    renderScreen();
+    render(
+      <ProfileProvider>
+        <NutritionGoalsProvider>
+          <FoodLogProvider>
+            <CaptureLogFoodEntry />
+            <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+              <NutritionTodayScreen navigation={navigation} route={route} />
+            </AppMenuContext.Provider>
+          </FoodLogProvider>
+        </NutritionGoalsProvider>
+      </ProfileProvider>,
+    );
     await screen.findByTestId('food-log-empty');
 
-    const refresh = deferred<unknown[]>();
-    mockFetchTodaysFoodLogs.mockReturnValue(refresh.promise);
-
-    const calls = navigation.addListener.mock.calls;
-    const [, focusCallback] = calls[calls.length - 1];
-    act(() => {
-      focusCallback();
+    mockLogFood.mockResolvedValue({ ...sampleLog, id: 'log-2' });
+    await act(async () => {
+      await capturedLogFoodEntry?.(
+        {
+          id: 'food-1',
+          name: 'Chicken Breast',
+          servingSize: 100,
+          servingUnit: 'g',
+          calories: 330,
+          proteinG: 62,
+          carbsG: 0,
+          fatG: 7.2,
+        },
+        2,
+        'lunch',
+      );
     });
 
     expect(screen.queryByTestId('nutrition-today-loading')).toBeNull();
-    expect(screen.getByTestId('nutrition-today-open-menu')).toBeTruthy();
-
-    await act(async () => {
-      refresh.resolve([]);
-      await refresh.promise;
-    });
+    expect(await screen.findByTestId('food-log-row-log-2')).toBeTruthy();
   });
 });
 

@@ -1,3 +1,4 @@
+import type { PropsWithChildren } from 'react';
 import { Image, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
@@ -6,7 +7,8 @@ import { fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, searchFoods } from '../lib/api';
-import { logFood } from '../nutrition/foodLogQueries';
+import { fetchTodaysFoodLogs, logFood } from '../nutrition/foodLogQueries';
+import { FoodLogProvider } from '../nutrition/FoodLogProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { FoodSearchScreen } from './FoodSearchScreen';
 
@@ -21,12 +23,22 @@ jest.mock('../lib/api', () => ({
 
 jest.mock('../nutrition/foodLogQueries', () => ({
   logFood: jest.fn(),
+  fetchTodaysFoodLogs: jest.fn(),
 }));
+
+function TestProviders({ children }: PropsWithChildren) {
+  return (
+    <ProfileProvider>
+      <FoodLogProvider>{children}</FoodLogProvider>
+    </ProfileProvider>
+  );
+}
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockSearchFoods = searchFoods as jest.Mock;
 const mockLogFood = logFood as jest.Mock;
+const mockFetchTodaysFoodLogs = fetchTodaysFoodLogs as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
@@ -102,6 +114,7 @@ beforeEach(() => {
   mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockSearchFoods.mockReset().mockResolvedValue({ foods: [chickenBreast], hasMore: false });
   mockLogFood.mockReset();
+  mockFetchTodaysFoodLogs.mockReset().mockResolvedValue([]);
   mockGoBack.mockClear();
   mockNavigate.mockClear();
 });
@@ -112,7 +125,7 @@ afterEach(() => {
 
 describe('FoodSearchScreen', () => {
   it('shows an initial prompt before anything has been searched', async () => {
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
     await flush();
 
     expect(screen.getByTestId('food-search-empty-initial')).toBeTruthy();
@@ -120,7 +133,7 @@ describe('FoodSearchScreen', () => {
   });
 
   it('debounces input and searches via the backend (real branded + generic foods)', async () => {
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('chicken');
 
@@ -132,7 +145,7 @@ describe('FoodSearchScreen', () => {
 
   it('searches and displays a real branded grocery product', async () => {
     mockSearchFoods.mockResolvedValue({ foods: [oreoOriginal], hasMore: false });
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('oreo');
 
@@ -143,7 +156,7 @@ describe('FoodSearchScreen', () => {
 
   it('shows an empty state when no foods match', async () => {
     mockSearchFoods.mockResolvedValue({ foods: [], hasMore: false });
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('zzz');
 
@@ -154,7 +167,7 @@ describe('FoodSearchScreen', () => {
 
   it('shows an error state with a working retry', async () => {
     mockSearchFoods.mockRejectedValueOnce(new Error('network error'));
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('chicken');
 
@@ -170,7 +183,7 @@ describe('FoodSearchScreen', () => {
   });
 
   it('selecting a result shows its nutrition info and serving size', async () => {
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('chicken');
     fireEvent.press(await screen.findByTestId('food-search-result-food-1'));
@@ -184,7 +197,7 @@ describe('FoodSearchScreen', () => {
 
   it('shows a dash (never a fabricated 0) for a macro the provider did not report', async () => {
     mockSearchFoods.mockResolvedValue({ foods: [oreoOriginal], hasMore: false });
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('oreo');
     fireEvent.press(await screen.findByTestId('food-search-result-food-2'));
@@ -194,7 +207,7 @@ describe('FoodSearchScreen', () => {
 
   it('credits Open Food Facts on the detail view for a branded product, never on generic foods', async () => {
     mockSearchFoods.mockResolvedValue({ foods: [oreoOriginal, chickenBreast], hasMore: false });
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
     await typeSearch('food');
 
     fireEvent.press(await screen.findByTestId('food-search-result-food-2'));
@@ -208,7 +221,7 @@ describe('FoodSearchScreen', () => {
   });
 
   it('returns from the detail view back to the results list', async () => {
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('chicken');
     fireEvent.press(await screen.findByTestId('food-search-result-food-1'));
@@ -220,7 +233,7 @@ describe('FoodSearchScreen', () => {
   });
 
   it('goes back when Back is pressed on the search screen', async () => {
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
     await flush();
 
     fireEvent.press(screen.getByTestId('app-header-back'));
@@ -230,7 +243,7 @@ describe('FoodSearchScreen', () => {
 
   it('logs a food from a search result via the shared LogFoodStep, then navigates to the daily log', async () => {
     mockLogFood.mockResolvedValue({});
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('chicken');
     fireEvent.press(await screen.findByTestId('food-search-result-food-1'));
@@ -264,7 +277,7 @@ describe('FoodSearchScreen', () => {
   it('logs a macro the provider did not report as 0 (never fabricated for display, but food_logs requires a real number)', async () => {
     mockSearchFoods.mockResolvedValue({ foods: [oreoOriginal], hasMore: false });
     mockLogFood.mockResolvedValue({});
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('oreo');
     fireEvent.press(await screen.findByTestId('food-search-result-food-2'));
@@ -284,7 +297,7 @@ describe('FoodSearchScreen', () => {
   });
 
   it('cancelling the log step returns to the detail view, not all the way to results', async () => {
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('chicken');
     fireEvent.press(await screen.findByTestId('food-search-result-food-1'));
@@ -300,7 +313,7 @@ describe('FoodSearchScreen', () => {
 describe('FoodSearchScreen -- rows, shared nutrition view, one primary action', () => {
   async function searchTwo() {
     mockSearchFoods.mockResolvedValue({ foods: [chickenBreast, oreoOriginal], hasMore: false });
-    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
     await typeSearch('food');
     await screen.findByTestId('food-search-result-food-2');
   }

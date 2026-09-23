@@ -8,7 +8,7 @@ import { Screen } from '../design/Screen';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import { FoodImage } from './FoodImage';
-import { logFood } from './foodLogQueries';
+import { useFoodLog } from './FoodLogProvider';
 import { defaultMealTypeForTime } from './mealTypes';
 import { calculateLogTotals } from './nutritionCalculations';
 import type { FoodRow } from './foodQueries';
@@ -23,7 +23,6 @@ export type LoggableFood = Pick<
 
 interface LogFoodStepProps {
   food: LoggableFood;
-  userId: string;
   accentColor: string;
   onAccentColor: string;
   onDone: () => void;
@@ -46,12 +45,12 @@ interface LogFoodStepProps {
  */
 export function LogFoodStep({
   food,
-  userId,
   accentColor,
   onAccentColor,
   onDone,
   onCancel,
 }: LogFoodStepProps) {
+  const { logFoodEntry } = useFoodLog();
   const [quantity, setQuantity] = useState('1');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +64,10 @@ export function LogFoodStep({
     setError(null);
     setSaving(true);
     try {
-      await logFood(userId, food, quantityNum, defaultMealTypeForTime());
+      // Through the shared cache's own write path -- NutritionTodayScreen and
+      // ProfileScreen, wherever they're mounted, see this the instant it
+      // resolves, with no re-fetch of their own.
+      await logFoodEntry(food, quantityNum, defaultMealTypeForTime());
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to log food');

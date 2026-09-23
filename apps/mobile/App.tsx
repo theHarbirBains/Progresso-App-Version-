@@ -27,6 +27,7 @@ import { routeToBottomNavTab } from './src/navigation/bottomNavRouting';
 import { getDefaultScreenOptions } from './src/navigation/navigationTransitions';
 import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
+import { FoodLogProvider } from './src/nutrition/FoodLogProvider';
 import { NutritionGoalsProvider } from './src/nutrition/NutritionGoalsProvider';
 import { ProfileProvider } from './src/profile/ProfileProvider';
 import { AllTimeStatsProvider } from './src/progress/AllTimeStatsProvider';
@@ -410,12 +411,14 @@ function App() {
       <AuthProvider>
         <ProfileProvider>
           <NutritionGoalsProvider>
-            <AllTimeStatsProvider>
-              <BackgroundThemeProvider>
-                <AppShell fontsLoaded={fontsLoaded} />
-                <StatusBar style="light" />
-              </BackgroundThemeProvider>
-            </AllTimeStatsProvider>
+            <FoodLogProvider>
+              <AllTimeStatsProvider>
+                <BackgroundThemeProvider>
+                  <AppShell fontsLoaded={fontsLoaded} />
+                  <StatusBar style="light" />
+                </BackgroundThemeProvider>
+              </AllTimeStatsProvider>
+            </FoodLogProvider>
           </NutritionGoalsProvider>
         </ProfileProvider>
       </AuthProvider>

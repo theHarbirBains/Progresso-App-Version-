@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '../design/Text';
-import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
@@ -12,12 +11,8 @@ import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { FoodImage } from '../nutrition/FoodImage';
-import {
-  deleteFoodLog,
-  fetchTodaysFoodLogs,
-  updateFoodLogQuantity,
-  type FoodLogRow,
-} from '../nutrition/foodLogQueries';
+import { useFoodLog } from '../nutrition/FoodLogProvider';
+import type { FoodLogRow } from '../nutrition/foodLogQueries';
 import { calculateRemaining, sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
@@ -36,53 +31,40 @@ const EMPTY_GOALS: NutritionGoals = { calories: null, proteinG: null, carbsG: nu
 // name, the values snapshotted when it was logged, an editable quantity and a
 // quiet Delete).
 export function NutritionTodayScreen({ navigation }: Props) {
-  const { user } = useAuth();
-  const userId = user?.id ?? '';
   const { nutritionTheme } = useProgressTheme();
   const { openMenu } = useAppMenu();
   // Goals rarely change and are shared with ProfileScreen/NutritionGoalsScreen
-  // via the same cache -- only today's logs, which genuinely change within a
-  // session (logging/editing/deleting), still refetch on every focus here.
+  // via the same cache; today's logs are shared too (FoodLogProvider), write-
+  // through from here, LogFoodStep (Food Library/Search/Barcode Scanner) and
+  // Delete/quantity edits below -- none of that needs a re-fetch of its own
+  // any more, from this screen or any other.
   const { goals: cachedGoals, loading: goalsLoading, error: goalsError } = useNutritionGoals();
   const goals = cachedGoals ?? EMPTY_GOALS;
+  const { logs, loading: logsLoading, error: logsError, updateQuantity, removeLog } = useFoodLog();
 
-  const [logs, setLogs] = useState<FoodLogRow[]>([]);
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Only the very first load should replace the whole screen with a
-  // spinner -- every later call (the focus listener below) is a background
-  // refresh, same pattern as DashboardScreen/ProfileScreen.
-  const hasLoadedOnce = useRef(false);
 
-  const load = useCallback(async () => {
-    if (!userId) return;
-    if (!hasLoadedOnce.current) setLoading(true);
-    setError(null);
-    try {
-      const todaysLogs = await fetchTodaysFoodLogs(userId);
-      setLogs(todaysLogs);
-      setQuantityInputs(
-        Object.fromEntries(todaysLogs.map((log) => [log.id, String(log.quantity)])),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load nutrition');
-    } finally {
-      setLoading(false);
-      hasLoadedOnce.current = true;
-    }
-  }, [userId]);
-
+  // Seeds a draft input for any log not already tracked (a fresh load, or a
+  // food logged elsewhere while this screen is mounted) without touching an
+  // entry the user is already editing.
   useEffect(() => {
-    // Re-load on every focus, not just mount, so logging/editing/deleting a
-    // food from FoodLibrary and coming back shows current data.
-    const unsubscribe = navigation.addListener('focus', load);
-    return unsubscribe;
-  }, [navigation, load]);
+    setQuantityInputs((prev) => {
+      const next: Record<string, string> = { ...prev };
+      let changed = false;
+      for (const log of logs) {
+        if (!(log.id in next)) {
+          next[log.id] = String(log.quantity);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [logs]);
 
   const consumed = useMemo(() => sumDailyTotals(logs), [logs]);
   const remaining = useMemo(() => calculateRemaining(consumed, goals), [consumed, goals]);
-  const displayError = error ?? goalsError;
+  const displayError = error ?? goalsError ?? logsError;
 
   async function handleUpdateQuantity(log: FoodLogRow) {
     const raw = quantityInputs[log.id];
@@ -90,11 +72,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
     if (!Number.isFinite(newQuantity) || newQuantity <= 0 || newQuantity === log.quantity) return;
     setError(null);
     try {
-      const updated = await updateFoodLogQuantity(log, newQuantity);
-      // The update returns the log without its picture; keep the one already shown.
-      setLogs((prev) =>
-        prev.map((l) => (l.id === log.id ? { ...updated, imageUrl: l.imageUrl } : l)),
-      );
+      const updated = await updateQuantity(log, newQuantity);
       setQuantityInputs((prev) => ({ ...prev, [log.id]: String(updated.quantity) }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update quantity');
@@ -104,8 +82,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
   async function handleDelete(logId: string) {
     setError(null);
     try {
-      await deleteFoodLog(logId);
-      setLogs((prev) => prev.filter((l) => l.id !== logId));
+      await removeLog(logId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete food log');
     }
@@ -124,7 +101,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
     />
   );
 
-  if (loading || goalsLoading) {
+  if (goalsLoading || logsLoading) {
     return (
       <Screen scroll={false} header={header}>
         <View style={styles.loading}>

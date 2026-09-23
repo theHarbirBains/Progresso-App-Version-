@@ -48,8 +48,7 @@ type ScanState =
 // FoodLibraryScreen), and the next scan of that code finds the user's own entry.
 // Scan Again and Search Food are outlined.
 export function BarcodeScannerScreen({ navigation }: Props) {
-  const { user, session } = useAuth();
-  const userId = user?.id ?? '';
+  const { session } = useAuth();
   const accessToken = session?.access_token;
 
   const { nutritionTheme: theme } = useProgressTheme();
@@ -159,7 +158,6 @@ export function BarcodeScannerScreen({ navigation }: Props) {
           fatG: state.product.fatG ?? 0,
           imageUrl: state.product.imageUrl,
         }}
-        userId={userId}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
         onDone={() => navigation.navigate('Nutrition')}

@@ -8,7 +8,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { uploadFoodPhoto } from '../lib/foodPhotoUpload';
-import { logFood } from '../nutrition/foodLogQueries';
+import { fetchTodaysFoodLogs, logFood } from '../nutrition/foodLogQueries';
+import { FoodLogProvider } from '../nutrition/FoodLogProvider';
 import { createFood, fetchAllFoods, updateFood } from '../nutrition/foodQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { FoodLibraryScreen } from './FoodLibraryScreen';
@@ -33,6 +34,7 @@ jest.mock('../lib/foodPhotoUpload', () => ({
 
 jest.mock('../nutrition/foodLogQueries', () => ({
   logFood: jest.fn(),
+  fetchTodaysFoodLogs: jest.fn(),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
@@ -41,6 +43,7 @@ const mockFetchAllFoods = fetchAllFoods as jest.Mock;
 const mockCreateFood = createFood as jest.Mock;
 const mockUpdateFood = updateFood as jest.Mock;
 const mockLogFood = logFood as jest.Mock;
+const mockFetchTodaysFoodLogs = fetchTodaysFoodLogs as jest.Mock;
 const mockUploadFoodPhoto = uploadFoodPhoto as jest.Mock;
 
 const mockGoBack = jest.fn();
@@ -94,11 +97,13 @@ function renderScreen(
 ) {
   return render(
     <ProfileProvider>
-      <AppMenuContext.Provider
-        value={{ openMenu: mockOpenMenu, currentMode }}
-      >
-        <FoodLibraryScreen navigation={navigation} route={{ params } as never} />
-      </AppMenuContext.Provider>
+      <FoodLogProvider>
+        <AppMenuContext.Provider
+          value={{ openMenu: mockOpenMenu, currentMode }}
+        >
+          <FoodLibraryScreen navigation={navigation} route={{ params } as never} />
+        </AppMenuContext.Provider>
+      </FoodLogProvider>
     </ProfileProvider>,
   );
 }
@@ -110,6 +115,7 @@ beforeEach(() => {
   mockCreateFood.mockReset();
   mockUpdateFood.mockReset();
   mockLogFood.mockReset();
+  mockFetchTodaysFoodLogs.mockReset().mockResolvedValue([]);
   mockUploadFoodPhoto.mockReset();
   mockGoBack.mockClear();
   mockNavigate.mockClear();

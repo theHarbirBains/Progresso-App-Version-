@@ -140,7 +140,6 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
     return (
       <LogFoodStep
         food={mode.food}
-        userId={userId}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
         onDone={() => (mode.fromScan ? navigation.navigate('Nutrition') : navigation.goBack())}

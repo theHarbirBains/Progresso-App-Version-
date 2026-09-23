@@ -12,6 +12,7 @@ import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchTodaysFoodLogs } from '../nutrition/foodLogQueries';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
+import { FoodLogProvider } from '../nutrition/FoodLogProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
@@ -188,15 +189,17 @@ function renderProfile(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
     <ProfileProvider>
       <NutritionGoalsProvider>
-        <AllTimeStatsProvider>
-          <BackgroundThemeProvider>
-            <AppMenuContext.Provider
-              value={{ openMenu: mockOpenMenu, currentMode }}
-            >
-              <ProfileScreen navigation={navigation} route={route} />
-            </AppMenuContext.Provider>
-          </BackgroundThemeProvider>
-        </AllTimeStatsProvider>
+        <FoodLogProvider>
+          <AllTimeStatsProvider>
+            <BackgroundThemeProvider>
+              <AppMenuContext.Provider
+                value={{ openMenu: mockOpenMenu, currentMode }}
+              >
+                <ProfileScreen navigation={navigation} route={route} />
+              </AppMenuContext.Provider>
+            </BackgroundThemeProvider>
+          </AllTimeStatsProvider>
+        </FoodLogProvider>
       </NutritionGoalsProvider>
     </ProfileProvider>,
   );
