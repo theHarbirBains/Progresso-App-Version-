@@ -22,7 +22,7 @@ export const progressStyles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 0,
     paddingBottom: spacing.xxxl,
   },
 
@@ -74,7 +74,7 @@ export const progressStyles = StyleSheet.create({
   // prominent, matching the reference, while still built from the same
   // typeScale/spacing tokens rather than a one-off size.
   headingBlock: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 0,
     marginBottom: spacing.xl,
   },
   eyebrow: {
@@ -106,18 +106,18 @@ export const progressStyles = StyleSheet.create({
   // of the app's primary/root screens, so it keeps this the same way
   // Dashboard does; deeper detail screens reached from here don't.
   modeToggleWrap: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 0,
     marginBottom: spacing.lg,
   },
   // Section tabs + error, under the header.
   tabsWrap: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 0,
   },
   // The active section's widget: a card filling the remaining height below
   // the tabs, inset to the same screen margin the tabs use.
   sectionCard: {
     flex: 1,
-    marginHorizontal: spacing.sm,
+    marginHorizontal: 0,
     marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },

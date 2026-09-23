@@ -67,7 +67,7 @@ export const startWorkoutStyles = StyleSheet.create({
 
   emptyWrap: {
     paddingVertical: spacing.xxxl,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 0,
     gap: spacing.lg,
   },
 });

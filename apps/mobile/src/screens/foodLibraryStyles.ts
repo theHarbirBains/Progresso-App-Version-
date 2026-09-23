@@ -16,7 +16,7 @@ export const foodLibraryStyles = StyleSheet.create({
   page: {
     flex: 1,
     gap: widgetGap,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 0,
     paddingBottom: spacing.lg,
   },
   modeToggleWrap: {
@@ -38,7 +38,7 @@ export const foodLibraryStyles = StyleSheet.create({
     color: colors.textSecondary,
   },
   padded: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 0,
   },
   loading: {
     paddingVertical: spacing.xxl,

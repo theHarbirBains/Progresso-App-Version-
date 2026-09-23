@@ -94,14 +94,14 @@ describe('Screen', () => {
     expect(screen.UNSAFE_queryAllByType(ScrollView)).toHaveLength(0);
   });
 
-  it('applies the standard horizontal padding, and none when padded is false', () => {
+  it('applies the standard (edge-to-edge, 0) horizontal padding, and none at all when padded is false', () => {
     const { rerender } = render(
       <Screen scroll={false} testID="screen">
         <RNText testID="body">x</RNText>
       </Screen>,
     );
     const paddedBody = screen.getByTestId('body').parent!.parent!;
-    expect(StyleSheet.flatten(paddedBody.props.style).paddingHorizontal).toBe(spacing.sm);
+    expect(StyleSheet.flatten(paddedBody.props.style).paddingHorizontal).toBe(0);
 
     rerender(
       <Screen scroll={false} padded={false} testID="screen">
