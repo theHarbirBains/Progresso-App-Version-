@@ -1,6 +1,7 @@
 import { fromKg, roundWeight } from '../lib/units';
 import type { HistoricalSetWithExercise } from '../workouts/allExerciseHistoryQueries';
 import type { WorkoutSummary } from '../workouts/workoutQueries';
+import { setVolumeKg } from '../workouts/workoutSummary';
 
 // Pure derivation over already-fetched, real lifetime data -- no new query,
 // no fabricated achievements/gamification. Two kinds of milestone, both
@@ -68,7 +69,7 @@ export function computeLifetimeMilestones(
   let thresholdIndex = 0;
   let highestCrossed: { threshold: number; achievedAt: string } | null = null;
   for (const set of chronological) {
-    cumulativeKg += set.weightKg * set.reps;
+    cumulativeKg += setVolumeKg(set);
     const cumulativeDisplay = roundWeight(fromKg(cumulativeKg, weightUnit));
     while (thresholdIndex < thresholds.length && cumulativeDisplay >= thresholds[thresholdIndex]) {
       highestCrossed = { threshold: thresholds[thresholdIndex], achievedAt: set.performedAt };

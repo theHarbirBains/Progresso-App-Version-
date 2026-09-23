@@ -12,8 +12,10 @@ import { colors } from '../design/theme';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
+import { computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
+import { computeDurationMinutes } from '../workouts/topSetSummary';
 import {
   completedSetsOnly,
   fetchWorkoutDetail,
@@ -135,12 +137,8 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     sets: completedSetsOnly(exercise.sets),
   }));
   const allLogged = loggedByExercise.flatMap((entry) => entry.sets);
-  const totalVolumeKg = allLogged.reduce((sum, set) => sum + set.weightKg * set.reps, 0);
-  const durationMinutes = workout.completedAt
-    ? Math.round(
-        (new Date(workout.completedAt).getTime() - new Date(workout.performedAt).getTime()) / 60000,
-      )
-    : null;
+  const totalVolumeKg = computeLifetimeVolumeKg(allLogged);
+  const durationMinutes = computeDurationMinutes(workout.performedAt, workout.completedAt);
   const isRecord = (exerciseId: string, set: CompletedSetRecord, reps: number) =>
     Boolean(repPRs[exerciseId]?.some((pr) => pr.reps === reps && pr.sourceSetId === set.id)) ||
     oneRepMaxes[exerciseId]?.sourceSetId === set.id;

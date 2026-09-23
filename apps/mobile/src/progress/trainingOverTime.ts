@@ -4,6 +4,8 @@
 // week; duplicated here in miniature rather than importing across the
 // dashboard/progress folder boundary for 3 lines of date math).
 
+import { setVolumeKg } from '../workouts/workoutSummary';
+
 export interface WeeklyPoint {
   /** ISO string for the Monday 00:00 (local) this bucket covers. */
   weekStart: string;
@@ -76,13 +78,7 @@ export function computeWeeklyVolumeKg(
   weeks = 8,
   now: Date = new Date(),
 ): WeeklyPoint[] {
-  return bucketByWeek(
-    sets,
-    (s) => s.performedAt,
-    (s) => s.weightKg * s.reps,
-    weeks,
-    now,
-  );
+  return bucketByWeek(sets, (s) => s.performedAt, setVolumeKg, weeks, now);
 }
 
 /** One point per week: how many completed sets were logged that week. */

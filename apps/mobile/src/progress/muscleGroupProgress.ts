@@ -1,5 +1,6 @@
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import type { HistoricalSetWithExercise } from '../workouts/exerciseHistoryGrouping';
+import { setVolumeKg } from '../workouts/workoutSummary';
 
 // Each exercise already declares which single muscle group it trains
 // (exercises.muscle_group, required for both built-in and custom exercises --
@@ -39,7 +40,7 @@ export function computeMuscleGroupVolumeKg(
 ): MuscleGroupVolume[] {
   const totals = new Map<MuscleGroup, number>();
   for (const set of history) {
-    totals.set(set.muscleGroup, (totals.get(set.muscleGroup) ?? 0) + set.weightKg * set.reps);
+    totals.set(set.muscleGroup, (totals.get(set.muscleGroup) ?? 0) + setVolumeKg(set));
   }
   return Array.from(totals.entries())
     .map(([group, volumeKg]) => ({ group, label: MUSCLE_GROUP_LABELS[group], volumeKg }))

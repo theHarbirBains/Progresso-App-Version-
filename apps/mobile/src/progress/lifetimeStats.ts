@@ -1,4 +1,5 @@
 import type { ExerciseHistoryGroup } from '../workouts/exerciseHistoryGrouping';
+import { setVolumeKg } from '../workouts/workoutSummary';
 import type { WorkoutSummary } from '../workouts/workoutQueries';
 
 // Pure aggregation over already-fetched, real workout history -- no query of
@@ -63,7 +64,7 @@ export function computeLifetimeStats(
  * than querying anything itself.
  */
 export function computeLifetimeVolumeKg(sets: { weightKg: number; reps: number }[]): number {
-  return sets.reduce((sum, set) => sum + set.weightKg * set.reps, 0);
+  return sets.reduce((sum, set) => sum + setVolumeKg(set), 0);
 }
 
 export interface ExerciseVolume {

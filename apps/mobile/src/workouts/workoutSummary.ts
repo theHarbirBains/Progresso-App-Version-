@@ -12,9 +12,17 @@ export function computeTotalSets(exercises: WorkoutExerciseWithSets[]): number {
   return exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
 }
 
+/** One set's own volume (weight x reps) -- the single authoritative
+ * definition every other volume calculation in the app (lifetime,
+ * per-muscle-group, weekly, milestone thresholds) is built from, rather
+ * than each re-deriving `weightKg * reps` independently. */
+export function setVolumeKg(set: { weightKg: number; reps: number }): number {
+  return set.weightKg * set.reps;
+}
+
 export function computeTotalVolumeKg(exercises: WorkoutExerciseWithSets[]): number {
   return exercises.reduce((sum, exercise) => {
     const logged = completedSetsOnly(exercise.sets);
-    return sum + logged.reduce((setSum, set) => setSum + set.weightKg * set.reps, 0);
+    return sum + logged.reduce((setSum, set) => setSum + setVolumeKg(set), 0);
   }, 0);
 }

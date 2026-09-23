@@ -1,10 +1,8 @@
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
-import {
-  completedSetsOnly,
-  fetchWorkoutDetail,
-  type CompletedSetRecord,
-} from '../workouts/workoutQueries';
+import { computeDurationMinutes, heaviestSet, resolveTopSetPrLabel } from '../workouts/topSetSummary';
+import { completedSetsOnly, fetchWorkoutDetail } from '../workouts/workoutQueries';
+import { computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 
 // Pure data assembly for the workout share card. Every value here comes from
 // an existing query/definition (workoutQueries.ts, prQueries.ts,
@@ -27,25 +25,15 @@ export interface ShareCardData {
   performedAt: string;
   musclesTrained: string;
   durationMinutes: number | null;
+  /** Sets actually logged (completed) -- never planned or blank ones. */
+  totalSets: number;
+  /** Sum of weight x reps over the logged sets, in canonical kilograms; the card converts it to the user's unit. Never estimated. */
+  totalVolumeKg: number;
   /** Up to 5 exercises, in the workout's existing order -- never re-sorted by weight. */
   topSets: ShareTopSet[];
 }
 
 const MAX_EXERCISES = 5;
-
-function heaviestSet(sets: CompletedSetRecord[]): CompletedSetRecord | null {
-  return sets.reduce<CompletedSetRecord | null>(
-    (max, s) => (!max || s.weightKg > max.weightKg ? s : max),
-    null,
-  );
-}
-
-function computeDurationMinutes(performedAt: string, completedAt: string | null): number | null {
-  if (!completedAt) return null;
-  const ms = new Date(completedAt).getTime() - new Date(performedAt).getTime();
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-  return Math.round(ms / 60000);
-}
 
 /**
  * Assembles the share card's data. Throws if the workout is not completed --
@@ -79,13 +67,7 @@ export async function fetchShareCardData(
           fetchOneRepMax(userId, exercise.exerciseId),
         ]);
 
-        let prLabel: string | null = null;
-        if (topSet.reps === 1) {
-          if (oneRepMax?.sourceSetId === topSet.id) prLabel = '1RM';
-        } else {
-          const matching = repPRs.find((pr) => pr.reps === topSet.reps);
-          if (matching?.sourceSetId === topSet.id) prLabel = `${topSet.reps} Rep PR`;
-        }
+        const prLabel = resolveTopSetPrLabel(topSet, repPRs, oneRepMax);
 
         return {
           exerciseName: exercise.exerciseName,
@@ -97,11 +79,15 @@ export async function fetchShareCardData(
     )
   ).filter((entry): entry is ShareTopSet => entry !== null);
 
+  const loggedSets = detail.exercises.flatMap((e) => completedSetsOnly(e.sets));
+
   return {
     workoutName: detail.name,
     performedAt: detail.performedAt,
     musclesTrained,
     durationMinutes,
+    totalSets: loggedSets.length,
+    totalVolumeKg: computeLifetimeVolumeKg(loggedSets),
     topSets,
   };
 }

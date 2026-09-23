@@ -1,5 +1,6 @@
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
+import { computeDurationMinutes, heaviestSet, resolveTopSetPrLabel } from '../workouts/topSetSummary';
 import {
   completedSetsOnly,
   fetchPreviousPerformance,
@@ -30,20 +31,6 @@ export interface RecentWorkoutInfo {
   topSet: SetRecord | null;
   /** "8 Rep PR" / "1RM" when the top set is CURRENTLY the record -- never "estimated". */
   prLabel: string | null;
-}
-
-function heaviestSet(sets: CompletedSetRecord[]): CompletedSetRecord | null {
-  return sets.reduce<CompletedSetRecord | null>(
-    (max, s) => (!max || s.weightKg > max.weightKg ? s : max),
-    null,
-  );
-}
-
-function computeDurationMinutes(performedAt: string, completedAt: string | null): number | null {
-  if (!completedAt) return null;
-  const ms = new Date(completedAt).getTime() - new Date(performedAt).getTime();
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-  return Math.round(ms / 60000);
 }
 
 /**
@@ -88,12 +75,7 @@ export async function fetchRecentWorkoutInfo(userId: string): Promise<RecentWork
       fetchPreviousPerformance(userId, topExerciseId, summary.id),
     ]);
 
-    if (topSet.reps === 1) {
-      if (oneRepMax?.sourceSetId === topSet.id) prLabel = '1RM';
-    } else {
-      const matching = repPRs.find((pr) => pr.reps === topSet!.reps);
-      if (matching?.sourceSetId === topSet.id) prLabel = `${topSet.reps} Rep PR`;
-    }
+    prLabel = resolveTopSetPrLabel(topSet, repPRs, oneRepMax);
 
     if (previous) previousExerciseSets = previous.sets;
   }
