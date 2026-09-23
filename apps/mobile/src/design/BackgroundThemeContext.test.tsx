@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile, updateMyProfile } from '../lib/api';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_BACKGROUND_THEME } from './backgroundThemes';
 import { BackgroundThemeProvider, useBackgroundTheme } from './BackgroundThemeContext';
 
@@ -29,7 +30,11 @@ beforeEach(async () => {
 
 function renderInProvider() {
   return renderHook(() => useBackgroundTheme(), {
-    wrapper: ({ children }) => <BackgroundThemeProvider>{children}</BackgroundThemeProvider>,
+    wrapper: ({ children }) => (
+      <ProfileProvider>
+        <BackgroundThemeProvider>{children}</BackgroundThemeProvider>
+      </ProfileProvider>
+    ),
   });
 }
 

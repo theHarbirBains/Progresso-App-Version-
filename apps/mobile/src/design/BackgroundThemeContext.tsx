@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { useProfile } from '../profile/ProfileProvider';
 import { BackgroundThemeContext, type BackgroundThemeContextValue } from './backgroundThemeStore';
 import {
   BACKGROUND_THEMES,
@@ -15,20 +15,20 @@ const STORAGE_KEY = '@progresso/backgroundTheme';
 
 export function BackgroundThemeProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
-  const accessToken = session?.access_token;
+  const { profile, updateProfile } = useProfile();
 
   const [themeId, setThemeIdState] = useState<BackgroundThemeId>(DEFAULT_BACKGROUND_THEME);
   const [cacheChecked, setCacheChecked] = useState(false);
   // Guards against the cache-restore effect clobbering a value the profile
   // reconciliation effect already applied -- the two run independently and
   // aren't sequenced relative to each other, so without this a slow cache
-  // read resolving *after* a fast profile fetch could overwrite the correct
+  // read resolving *after* a fast profile load could overwrite the correct
   // (profile) value with a stale cached one.
   const profileAppliedRef = useRef(false);
 
-  // Instant local restore, before any network round trip -- this is what
-  // lets startup skip ever painting the default theme for a signed-in user
-  // who already has a different one saved.
+  // Instant local restore, before the shared profile cache resolves -- this
+  // is what lets startup skip ever painting the default theme for a
+  // signed-in user who already has a different one saved.
   useEffect(() => {
     let mounted = true;
     AsyncStorage.getItem(STORAGE_KEY)
@@ -45,39 +45,26 @@ export function BackgroundThemeProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Backend profile is the long-term source of truth (e.g. a theme picked
-  // on another device) -- reconciled once per sign-in, without blocking the
-  // instant local restore above.
+  // The shared profile cache is the long-term source of truth (e.g. a theme
+  // picked on another device) -- reconciled reactively whenever it changes,
+  // with no fetch of its own, and it's what setThemeId's own write below
+  // flows back through, so a save here is immediately reflected too.
   useEffect(() => {
-    if (!accessToken) return;
-    let mounted = true;
-    getMyProfile(accessToken)
-      .then((profile) => {
-        if (!mounted) return;
-        if (isBackgroundThemeId(profile.backgroundTheme)) {
-          profileAppliedRef.current = true;
-          setThemeIdState(profile.backgroundTheme);
-          AsyncStorage.setItem(STORAGE_KEY, profile.backgroundTheme).catch(() => {});
-        }
-      })
-      .catch(() => {
-        // Network/auth failure -- keep whatever the local cache already
-        // resolved rather than surfacing an error for a purely cosmetic
-        // preference.
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [accessToken]);
+    const backendTheme = profile?.backgroundTheme;
+    if (!isBackgroundThemeId(backendTheme)) return;
+    profileAppliedRef.current = true;
+    setThemeIdState(backendTheme);
+    AsyncStorage.setItem(STORAGE_KEY, backendTheme).catch(() => {});
+  }, [profile?.backgroundTheme]);
 
   const setThemeId = useCallback(
     async (id: BackgroundThemeId) => {
       setThemeIdState(id);
       AsyncStorage.setItem(STORAGE_KEY, id).catch(() => {});
-      if (!accessToken) return;
-      await updateMyProfile(accessToken, { backgroundTheme: id });
+      if (!session) return;
+      await updateProfile({ backgroundTheme: id });
     },
-    [accessToken],
+    [session, updateProfile],
   );
 
   const value = useMemo<BackgroundThemeContextValue>(
