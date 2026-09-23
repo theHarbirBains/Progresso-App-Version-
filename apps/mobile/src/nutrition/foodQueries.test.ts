@@ -100,6 +100,14 @@ describe('fetchFoods', () => {
     expect(calls.ilike).toEqual([['name', '%chicken%']]);
   });
 
+  it('escapes a literal % or _ in the search term instead of treating it as a wildcard', async () => {
+    const { calls } = mockTable({ data: [], error: null });
+
+    await fetchFoods({ userId: 'user-1', search: '100%_snack', page: 0, pageSize: 20 });
+
+    expect(calls.ilike).toEqual([['name', '%100\\%\\_snack%']]);
+  });
+
   it('reports hasMore when a full page is returned', async () => {
     const rows = Array.from({ length: 20 }, (_, i) => ({ ...dbRow, id: `food-${i}` }));
     mockTable({ data: rows, error: null });

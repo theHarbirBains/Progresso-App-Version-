@@ -1,3 +1,4 @@
+import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
 import type { LoggingStyle, MovementType } from './movementTypes';
 import type { MuscleGroup } from './muscleGroups';
@@ -59,7 +60,7 @@ export async function fetchExercises(params: FetchExercisesParams): Promise<Fetc
 
   const trimmedSearch = search.trim();
   if (trimmedSearch) {
-    query = query.ilike('name', `%${trimmedSearch}%`);
+    query = query.ilike('name', `%${escapeIlike(trimmedSearch)}%`);
   }
   if (muscleGroup) {
     query = query.eq('muscle_group', muscleGroup);

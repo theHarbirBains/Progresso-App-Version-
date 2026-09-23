@@ -1,3 +1,4 @@
+import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
 
 // fetchFoods/fetchAllFoods/createFood/updateFood are the user's own custom
@@ -85,7 +86,7 @@ export async function fetchFoods(params: FetchFoodsParams): Promise<FetchFoodsRe
 
   const trimmedSearch = search.trim();
   if (trimmedSearch) {
-    query = query.ilike('name', `%${trimmedSearch}%`);
+    query = query.ilike('name', `%${escapeIlike(trimmedSearch)}%`);
   }
 
   const from = page * pageSize;
@@ -124,7 +125,7 @@ export async function fetchAllFoods(params: FetchAllFoodsParams): Promise<FoodRo
 
   const trimmedSearch = search.trim();
   if (trimmedSearch) {
-    query = query.ilike('name', `%${trimmedSearch}%`);
+    query = query.ilike('name', `%${escapeIlike(trimmedSearch)}%`);
   }
 
   const { data, error } = await query;
