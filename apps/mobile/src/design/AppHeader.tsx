@@ -99,10 +99,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    // Matches Screen's own edge-to-edge gutter (0 -- no space between a
-    // widget and the screen edge) so a header's title/icons line up with
-    // the card edges below it.
-    paddingHorizontal: 0,
+    // Unlike Screen's widgets (deliberately edge-to-edge, see DESIGN.md's
+    // Feed section), a header's title text and icons (the hamburger/side
+    // menu, a '+', Back) read as cramped flush against the screen edge --
+    // this keeps its own standard screen gutter instead.
+    paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.lg,
   },
   spacer: {
