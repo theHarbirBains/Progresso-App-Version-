@@ -132,8 +132,16 @@ export function ProfileScreen({ navigation }: Props) {
   // The user's whole workout/set/PR history, shared with ProgressOverviewScreen
   // via AllTimeStatsProvider -- fetched once (refreshed only after a workout
   // is completed, not on every visit to this tab).
-  const { allWorkouts, allSetHistory, repPRs, oneRepMaxes, statsLoading, statsError, prsLoading, prsError } =
-    useAllTimeStats();
+  const {
+    allWorkouts,
+    allSetHistory,
+    repPRs,
+    oneRepMaxes,
+    statsLoading,
+    statsError,
+    prsLoading,
+    prsError,
+  } = useAllTimeStats();
 
   const { logs: todaysFoodLogs, loading: logsLoading, error: logsError } = useFoodLog();
   const displayNutritionError = nutritionGoalsError ?? logsError;
@@ -280,7 +288,14 @@ export function ProfileScreen({ navigation }: Props) {
 
   const todaysNutritionTotals = useMemo(() => sumDailyTotals(todaysFoodLogs), [todaysFoodLogs]);
 
-  if (loading || themeLoading || nutritionGoalsLoading || statsLoading || prsLoading || logsLoading) {
+  if (
+    loading ||
+    themeLoading ||
+    nutritionGoalsLoading ||
+    statsLoading ||
+    prsLoading ||
+    logsLoading
+  ) {
     return <LoadingState testID="profile-loading" />;
   }
 

@@ -83,9 +83,7 @@ describe('FoodFormScreen (create mode)', () => {
     render(<FoodFormScreen mode="create" onDone={onDone} onCancel={jest.fn()} />);
 
     fillRequiredFields();
-    await waitFor(() =>
-      fireEvent.press(screen.getByTestId('food-form-save')),
-    );
+    await waitFor(() => fireEvent.press(screen.getByTestId('food-form-save')));
 
     await waitFor(() =>
       expect(mockCreateFood).toHaveBeenCalledWith('user-1', {
@@ -203,9 +201,7 @@ describe('FoodFormScreen (edit mode)', () => {
     expect(screen.getByTestId('food-form-toggle-active')).toHaveTextContent('Deactivate');
     fireEvent.press(screen.getByTestId('food-form-toggle-active'));
 
-    await waitFor(() =>
-      expect(mockUpdateFood).toHaveBeenCalledWith('food-1', { isActive: false }),
-    );
+    await waitFor(() => expect(mockUpdateFood).toHaveBeenCalledWith('food-1', { isActive: false }));
     expect(onDone).toHaveBeenCalled();
   });
 

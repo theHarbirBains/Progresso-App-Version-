@@ -461,7 +461,9 @@ describe('ExerciseCard.arePropsEqual', () => {
     const prev = { ...baseProps, unilateralSets: oneUnilateralSet };
     const next = {
       ...baseProps,
-      unilateralSets: [{ ...oneUnilateralSet[0], left: { ...oneUnilateralSet[0].left, weight: '50' } }],
+      unilateralSets: [
+        { ...oneUnilateralSet[0], left: { ...oneUnilateralSet[0].left, weight: '50' } },
+      ],
     };
 
     expect(arePropsEqual(prev, next)).toBe(false);

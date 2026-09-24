@@ -1,7 +1,11 @@
 import { createContext, useContext, useMemo, type PropsWithChildren } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useSignedInResource } from '../lib/useSignedInResource';
-import { fetchNutritionGoals, saveNutritionGoals, type NutritionGoals } from './nutritionGoalQueries';
+import {
+  fetchNutritionGoals,
+  saveNutritionGoals,
+  type NutritionGoals,
+} from './nutritionGoalQueries';
 
 export interface NutritionGoalsContextValue {
   goals: NutritionGoals | null;
@@ -20,7 +24,13 @@ const NutritionGoalsContext = createContext<NutritionGoalsContextValue | undefin
 export function NutritionGoalsProvider({ children }: PropsWithChildren) {
   const { user } = useAuth();
   const userId = user?.id;
-  const { data: goals, loading, error, refetch, setData: setGoals } = useSignedInResource(
+  const {
+    data: goals,
+    loading,
+    error,
+    refetch,
+    setData: setGoals,
+  } = useSignedInResource(
     userId,
     fetchNutritionGoals,
     null as NutritionGoals | null,
@@ -43,9 +53,7 @@ export function NutritionGoalsProvider({ children }: PropsWithChildren) {
     [goals, loading, error, refetch, setGoals, userId],
   );
 
-  return (
-    <NutritionGoalsContext.Provider value={value}>{children}</NutritionGoalsContext.Provider>
-  );
+  return <NutritionGoalsContext.Provider value={value}>{children}</NutritionGoalsContext.Provider>;
 }
 
 export function useNutritionGoals(): NutritionGoalsContextValue {

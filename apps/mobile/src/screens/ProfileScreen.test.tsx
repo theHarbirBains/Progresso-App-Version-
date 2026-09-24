@@ -192,9 +192,7 @@ function renderProfile(currentMode: 'workout' | 'nutrition' = 'workout') {
         <FoodLogProvider>
           <AllTimeStatsProvider>
             <BackgroundThemeProvider>
-              <AppMenuContext.Provider
-                value={{ openMenu: mockOpenMenu, currentMode }}
-              >
+              <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
                 <ProfileScreen navigation={navigation} route={route} />
               </AppMenuContext.Provider>
             </BackgroundThemeProvider>
@@ -256,7 +254,20 @@ describe('ProfileScreen identity', () => {
 describe('ProfileScreen -- Calories & Macros widget', () => {
   it("shows today's calories and macros against goals, and navigates to Nutrition on tap", async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([
-      { id: 'l1', foodId: 'f1', foodNameSnapshot: 'Chicken', servingSize: 100, servingUnit: 'g', quantity: 1, calories: 400, proteinG: 40, carbsG: 10, fatG: 8, mealType: 'lunch', loggedAt: '2026-09-01T12:00:00Z' },
+      {
+        id: 'l1',
+        foodId: 'f1',
+        foodNameSnapshot: 'Chicken',
+        servingSize: 100,
+        servingUnit: 'g',
+        quantity: 1,
+        calories: 400,
+        proteinG: 40,
+        carbsG: 10,
+        fatG: 8,
+        mealType: 'lunch',
+        loggedAt: '2026-09-01T12:00:00Z',
+      },
     ]);
     mockFetchNutritionGoals.mockResolvedValue({
       calories: 2200,
@@ -289,7 +300,9 @@ describe('ProfileScreen -- Calories & Macros widget', () => {
     mockFetchNutritionGoals.mockRejectedValue(new Error('nutrition down'));
     renderProfile();
 
-    expect(await screen.findByTestId('profile-nutrition-error')).toHaveTextContent('nutrition down');
+    expect(await screen.findByTestId('profile-nutrition-error')).toHaveTextContent(
+      'nutrition down',
+    );
     expect(screen.getByTestId('profile-display-name')).toBeTruthy();
   });
 });

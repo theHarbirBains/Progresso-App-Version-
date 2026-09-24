@@ -55,9 +55,7 @@ const mockOpenMenu = jest.fn();
 function renderScreen(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
     <ProfileProvider>
-      <AppMenuContext.Provider
-        value={{ openMenu: mockOpenMenu, currentMode }}
-      >
+      <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
         <WorkoutHistoryScreen navigation={navigation} route={{} as never} />
       </AppMenuContext.Provider>
     </ProfileProvider>,

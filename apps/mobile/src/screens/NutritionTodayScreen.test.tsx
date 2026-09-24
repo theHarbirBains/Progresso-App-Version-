@@ -11,7 +11,11 @@ import {
   logFood,
   updateFoodLogQuantity,
 } from '../nutrition/foodLogQueries';
-import { FoodLogProvider, useFoodLog, type FoodLogContextValue } from '../nutrition/FoodLogProvider';
+import {
+  FoodLogProvider,
+  useFoodLog,
+  type FoodLogContextValue,
+} from '../nutrition/FoodLogProvider';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';

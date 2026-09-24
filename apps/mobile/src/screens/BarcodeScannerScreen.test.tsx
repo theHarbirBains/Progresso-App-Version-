@@ -123,20 +123,26 @@ beforeEach(() => {
 describe('BarcodeScannerScreen permission states', () => {
   it('shows a loading state while permission status is still resolving', () => {
     mockPermission = null;
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     expect(screen.getByTestId('barcode-scanner-permission-loading')).toBeTruthy();
   });
 
   it('shows the live camera once permission is granted', async () => {
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     expect(await screen.findByTestId('barcode-scanner-camera')).toBeTruthy();
   });
 
   it('offers to request permission when not yet granted but can still ask', async () => {
     mockPermission = { granted: false, canAskAgain: true };
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     expect(await screen.findByTestId('barcode-scanner-permission-denied')).toBeTruthy();
     expect(screen.getByTestId('barcode-scanner-request-permission')).toBeTruthy();
@@ -148,7 +154,9 @@ describe('BarcodeScannerScreen permission states', () => {
 
   it('offers to open Settings when permission was previously denied and cannot be asked again', async () => {
     mockPermission = { granted: false, canAskAgain: false };
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     expect(await screen.findByTestId('barcode-scanner-open-settings')).toBeTruthy();
     expect(screen.queryByTestId('barcode-scanner-request-permission')).toBeNull();
@@ -159,7 +167,9 @@ describe('BarcodeScannerScreen permission states', () => {
 
   it('always offers a manual search fallback when the camera is unavailable', async () => {
     mockPermission = { granted: false, canAskAgain: true };
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-permission-denied');
 
     fireEvent.press(screen.getByTestId('barcode-scanner-search-instead'));
@@ -171,7 +181,9 @@ describe('BarcodeScannerScreen permission states', () => {
 describe('BarcodeScannerScreen scan -> lookup flow', () => {
   it('looks up the scanned barcode via the backend and shows the found product', async () => {
     mockGetFoodByBarcode.mockResolvedValue(oreo);
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
 
     await scan('0066721016123');
@@ -190,7 +202,9 @@ describe('BarcodeScannerScreen scan -> lookup flow', () => {
         resolveLookup = resolve;
       }),
     );
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
 
     await scan('0066721016123');
@@ -206,7 +220,9 @@ describe('BarcodeScannerScreen scan -> lookup flow', () => {
 
   it('shows a friendly "Product not found" state, never a technical error, when the barcode has no match', async () => {
     mockGetFoodByBarcode.mockResolvedValue(null);
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
 
     await scan('0000000000000');
@@ -219,7 +235,9 @@ describe('BarcodeScannerScreen scan -> lookup flow', () => {
 
   it('lets the user scan again from the not-found state', async () => {
     mockGetFoodByBarcode.mockResolvedValue(null);
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
     await scan('0000000000000');
     await screen.findByTestId('barcode-scanner-not-found');
@@ -237,7 +255,9 @@ describe('BarcodeScannerScreen scan -> lookup flow', () => {
 
   it('opens manual entry, carrying the scanned barcode, from the not-found state', async () => {
     mockGetFoodByBarcode.mockResolvedValue(null);
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
     await scan('0000000000000');
     await screen.findByTestId('barcode-scanner-not-found');
@@ -252,7 +272,9 @@ describe('BarcodeScannerScreen scan -> lookup flow', () => {
 
   it('shows a real error state (distinct from not-found) when the lookup itself fails, with a working retry', async () => {
     mockGetFoodByBarcode.mockRejectedValueOnce(new Error('network down'));
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
 
     await scan('0066721016123');
@@ -274,7 +296,9 @@ describe('BarcodeScannerScreen logging', () => {
   it('logs the found product via the shared LogFoodStep, then navigates to the daily log', async () => {
     mockGetFoodByBarcode.mockResolvedValue(oreo);
     mockLogFood.mockResolvedValue({});
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
     await scan('0066721016123');
     await screen.findByTestId('barcode-scanner-found-header');
@@ -307,7 +331,9 @@ describe('BarcodeScannerScreen logging', () => {
 
   it('credits Open Food Facts on the found product, matching Search Food and Food Library', async () => {
     mockGetFoodByBarcode.mockResolvedValue(oreo);
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
     await scan('0066721016123');
 
@@ -320,7 +346,9 @@ describe('BarcodeScannerScreen logging', () => {
 describe('BarcodeScannerScreen -- one primary action per state', () => {
   it('shows the found product as the shared fact widgets and one filled button', async () => {
     mockGetFoodByBarcode.mockResolvedValue(oreo);
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
     await scan();
 
@@ -333,7 +361,9 @@ describe('BarcodeScannerScreen -- one primary action per state', () => {
 
   it('on not-found, makes Enter Manually the one filled button, with Scan Again and Search Food outlined', async () => {
     mockGetFoodByBarcode.mockResolvedValue(null);
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
     await scan('0000000000000');
     await screen.findByTestId('barcode-scanner-not-found');
@@ -353,7 +383,9 @@ describe('BarcodeScannerScreen -- one primary action per state', () => {
 
   it('shows which barcode had no match, so it can be checked against the packaging', async () => {
     mockGetFoodByBarcode.mockResolvedValue(null);
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
     await scan('0012345678905');
 
@@ -363,13 +395,17 @@ describe('BarcodeScannerScreen -- one primary action per state', () => {
   });
 
   it('renders no bare text on the camera and permission states', async () => {
-    const { unmount } = render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    const { unmount } = render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-camera');
     expectNoBareText();
     unmount();
 
     mockPermission = { granted: false, canAskAgain: true };
-    render(<BarcodeScannerScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('barcode-scanner-permission-denied');
     expectNoBareText();
   });

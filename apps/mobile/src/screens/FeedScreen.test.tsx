@@ -275,7 +275,7 @@ describe('FeedScreen', () => {
 });
 
 describe('FeedScreen -- Strava-style activity cards', () => {
-  it("gives every card the same neutral top accent band -- Feed is black-and-white, kind comes across via icon, not color", async () => {
+  it('gives every card the same neutral top accent band -- Feed is black-and-white, kind comes across via icon, not color', async () => {
     mockGetMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',

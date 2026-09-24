@@ -65,9 +65,7 @@ function renderScreen(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
     <ProfileProvider>
       <AllTimeStatsProvider>
-        <AppMenuContext.Provider
-          value={{ openMenu: mockOpenMenu, currentMode }}
-        >
+        <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
           <ProgressOverviewScreen navigation={navigation} route={route} />
         </AppMenuContext.Provider>
       </AllTimeStatsProvider>

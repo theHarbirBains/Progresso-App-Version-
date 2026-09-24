@@ -250,7 +250,10 @@ export function OnboardingScreen({ navigation }: Props) {
     return (
       <View
         testID="onboarding-step-completion"
-        style={[styles.screen, { paddingTop: insets.top + spacing.xxl, paddingHorizontal: spacing.xxl }]}
+        style={[
+          styles.screen,
+          { paddingTop: insets.top + spacing.xxl, paddingHorizontal: spacing.xxl },
+        ]}
       >
         <View style={styles.completionContainer}>
           <Text style={styles.completionTitle}>You&apos;re all set.</Text>

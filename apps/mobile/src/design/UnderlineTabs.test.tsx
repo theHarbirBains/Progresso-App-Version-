@@ -94,9 +94,7 @@ describe('UnderlineTabs', () => {
       />,
     );
 
-    expect(StyleSheet.flatten(screen.getByText('PRs').props.style).color).toBe(
-      colors.textPrimary,
-    );
+    expect(StyleSheet.flatten(screen.getByText('PRs').props.style).color).toBe(colors.textPrimary);
     expect(StyleSheet.flatten(screen.getByText('Workouts').props.style).color).toBe(
       colors.textSecondary,
     );

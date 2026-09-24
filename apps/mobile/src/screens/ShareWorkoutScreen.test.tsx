@@ -94,7 +94,9 @@ beforeEach(() => {
 
 describe('ShareWorkoutScreen loading and preview', () => {
   it('shows a loading indicator while fetching', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(screen.getByTestId('share-workout-loading')).toBeTruthy();
 
@@ -103,7 +105,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
   });
 
   it('renders the workout name, date, muscles, and top sets on the card', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('share-card-workout-name')).toHaveTextContent('Push Day');
     expect(screen.getByTestId('share-card-muscles')).toHaveTextContent('Chest, Shoulders');
@@ -113,7 +117,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
   });
 
   it('shows duration when it is non-null', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('share-card-duration')).toHaveTextContent('45 min');
     await settle();
@@ -122,7 +128,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
   it('hides duration when it is null', async () => {
     mockFetchShareCardData.mockResolvedValue({ ...cardData, durationMinutes: null });
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     expect(screen.queryByTestId('share-card-duration')).toBeNull();
@@ -130,7 +138,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
   });
 
   it('shows a PR highlight only for the exercise that actually achieved one', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     const prSection = await screen.findByTestId('share-card-pr-section');
     expect(prSection).toHaveTextContent(/Bench Press.*8 Rep PR/);
@@ -144,7 +154,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
       topSets: cardData.topSets.map((s) => ({ ...s, prLabel: null })),
     });
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     expect(screen.queryByTestId('share-card-pr-section')).toBeNull();
@@ -154,7 +166,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
   it('renders a single-exercise workout correctly', async () => {
     mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: [cardData.topSets[0]] });
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     expect(screen.getByTestId('share-card-top-set-0')).toBeTruthy();
@@ -169,7 +183,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
       topSets: [{ exerciseName: 'B'.repeat(120), weightKg: 999, reps: 999, prLabel: null }],
     });
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('share-card-workout-name')).toHaveTextContent('A'.repeat(120));
     expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('999kg×999');
@@ -177,7 +193,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
   });
 
   it('never renders email, user id, or nutrition information', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     const card = screen.getByTestId('share-card');
@@ -191,7 +209,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
   it('shows an error state with retry when loading fails', async () => {
     mockFetchShareCardData.mockRejectedValue(new Error('Only completed workouts can be shared'));
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('share-workout-load-error')).toHaveTextContent(
       'Only completed workouts can be shared',
@@ -205,7 +225,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
   });
 
   it('goes back when Back is pressed', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-back'));
@@ -217,7 +239,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
 
 describe('ShareWorkoutScreen share action', () => {
   it('captures the card and opens the native share sheet', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-share'));
@@ -238,7 +262,9 @@ describe('ShareWorkoutScreen share action', () => {
   it('shows an error and does not crash when capture fails', async () => {
     mockCaptureRef.mockRejectedValue(new Error('capture failed'));
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-share'));
@@ -254,7 +280,9 @@ describe('ShareWorkoutScreen share action', () => {
   it('allows retrying after a share failure', async () => {
     mockCaptureRef.mockRejectedValueOnce(new Error('capture failed'));
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-share'));
@@ -270,7 +298,9 @@ describe('ShareWorkoutScreen share action', () => {
 
 describe('ShareWorkoutScreen save action', () => {
   it('saves the captured image to the device after granted permission', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-save'));
@@ -284,7 +314,9 @@ describe('ShareWorkoutScreen save action', () => {
     mockGetPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: true });
     mockRequestPermissionsAsync.mockResolvedValue({ granted: true, canAskAgain: true });
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-save'));
@@ -298,7 +330,9 @@ describe('ShareWorkoutScreen save action', () => {
     mockGetPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: true });
     mockRequestPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false });
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-save'));
@@ -314,7 +348,9 @@ describe('ShareWorkoutScreen save action', () => {
   it('does not re-prompt when permission cannot be asked again', async () => {
     mockGetPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false });
 
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card-workout-name');
 
     fireEvent.press(screen.getByTestId('share-workout-save'));
@@ -327,7 +363,9 @@ describe('ShareWorkoutScreen save action', () => {
 
 describe('ShareWorkoutScreen -- the card, then one primary action', () => {
   it('has one filled button -- Share -- with Save to Photos as the outlined secondary', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card');
 
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
@@ -339,7 +377,9 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
   });
 
   it('draws the card from the brand palette and app typography, not hardcoded colours', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     const card = StyleSheet.flatten((await screen.findByTestId('share-card')).props.style);
 
     expect(card.backgroundColor).toBe(colors.background);
@@ -352,7 +392,9 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
   });
 
   it('names the back control for assistive tech', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card');
 
     expect(screen.getByTestId('share-workout-back').props.accessibilityLabel).toBe('Back');
@@ -361,7 +403,9 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
 
   it('shows Share as busy while the card is being captured', async () => {
     mockCaptureRef.mockReturnValue(new Promise(() => undefined));
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card');
 
     fireEvent.press(screen.getByTestId('share-workout-share'));
@@ -376,7 +420,9 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
 
   it('shows the load error with a Retry button that reloads', async () => {
     mockFetchShareCardData.mockRejectedValueOnce(new Error('boom'));
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('share-workout-load-error')).toHaveTextContent('boom');
     fireEvent.press(screen.getByTestId('share-workout-retry'));
@@ -386,7 +432,9 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
   });
 
   it('renders no bare text outside <Text>', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('share-card');
 
     expectNoBareText();

@@ -281,7 +281,9 @@ export class FoodsService {
         .filter((record): record is FoodRecord => record !== undefined);
     }
 
-    this.logger.warn(`Batch external food cache upsert failed, falling back per-item: ${error?.message}`);
+    this.logger.warn(
+      `Batch external food cache upsert failed, falling back per-item: ${error?.message}`,
+    );
     const cached = await Promise.all(foods.map((food) => this.upsertExternalFood(food)));
     return cached.filter((food): food is FoodRecord => food !== null);
   }

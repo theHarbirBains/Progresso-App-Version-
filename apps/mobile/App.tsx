@@ -338,7 +338,9 @@ function Root() {
               navigationRef.current?.navigate(route);
             }}
             onClose={() => setMenuOpen(false)}
-            accentColor={backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent}
+            accentColor={
+              backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
+            }
           />
         </View>
       </AppMenuContext.Provider>

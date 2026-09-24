@@ -1,6 +1,10 @@
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
-import { computeDurationMinutes, heaviestSet, resolveTopSetPrLabel } from '../workouts/topSetSummary';
+import {
+  computeDurationMinutes,
+  heaviestSet,
+  resolveTopSetPrLabel,
+} from '../workouts/topSetSummary';
 import { completedSetsOnly, fetchWorkoutDetail } from '../workouts/workoutQueries';
 import { computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 

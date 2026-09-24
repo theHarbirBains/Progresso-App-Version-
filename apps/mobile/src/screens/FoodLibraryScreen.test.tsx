@@ -98,9 +98,7 @@ function renderScreen(
   return render(
     <ProfileProvider>
       <FoodLogProvider>
-        <AppMenuContext.Provider
-          value={{ openMenu: mockOpenMenu, currentMode }}
-        >
+        <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
           <FoodLibraryScreen navigation={navigation} route={{ params } as never} />
         </AppMenuContext.Provider>
       </FoodLogProvider>

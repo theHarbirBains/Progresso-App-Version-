@@ -75,7 +75,9 @@ afterEach(() => {
 
 describe('ExerciseProgressScreen', () => {
   it('shows a loading indicator, then the loaded content', async () => {
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(screen.getByTestId('exercise-progress-loading')).toBeTruthy();
     expect(await screen.findByTestId('top-set-chart-empty')).toBeTruthy();
@@ -84,13 +86,17 @@ describe('ExerciseProgressScreen', () => {
   it('shows an error message when loading fails', async () => {
     mockFetchExerciseSetHistory.mockRejectedValue(new Error('network error'));
 
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('exercise-progress-error')).toHaveTextContent('network error');
   });
 
   it('shows empty states when there is no history at all', async () => {
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('top-set-chart-empty')).toBeTruthy();
     expect(screen.getByTestId('rep-pr-chart-empty')).toBeTruthy();
@@ -103,7 +109,9 @@ describe('ExerciseProgressScreen', () => {
   it('renders the top-set and rep-PR charts with real data, in the default 3-month range', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
 
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('top-set-chart')).toBeTruthy();
     expect(screen.getByTestId('rep-pr-chart')).toBeTruthy();
@@ -116,7 +124,9 @@ describe('ExerciseProgressScreen', () => {
   it('excludes out-of-range sessions when a narrower time range is selected', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
 
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('top-set-chart');
 
     fireEvent.press(screen.getByTestId('range-4w'));
@@ -130,7 +140,9 @@ describe('ExerciseProgressScreen', () => {
   it('includes the old session once "All Time" is selected', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
 
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('top-set-chart');
 
     fireEvent.press(screen.getByTestId('range-all'));
@@ -151,7 +163,9 @@ describe('ExerciseProgressScreen', () => {
       achievedAt: '2026-05-01T00:00:00Z',
     });
 
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('best-one-rm-value')).toHaveTextContent(/150kg/);
     expect(screen.getByTestId('best-rep-pr-value')).toHaveTextContent(/110kg/);
@@ -172,13 +186,17 @@ describe('ExerciseProgressScreen', () => {
       achievedAt: '2026-05-01T00:00:00Z',
     });
 
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('best-one-rm-value')).toHaveTextContent(/lb/);
   });
 
   it('goes back when Back is pressed', async () => {
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByText('Bench Press');
 
     fireEvent.press(screen.getByTestId('exercise-progress-back'));
@@ -190,14 +208,18 @@ describe('ExerciseProgressScreen', () => {
 describe('ExerciseProgressScreen -- a stack of widgets', () => {
   it('is five widgets: three charts, best performances and consistency', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('top-set-chart');
 
     expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(5);
   });
 
   it('offers the time range as one segmented control, short labels each read out in full', async () => {
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     const threeMonths = await screen.findByTestId('range-3m');
     expect(threeMonths).toHaveTextContent('3M');
@@ -207,7 +229,9 @@ describe('ExerciseProgressScreen -- a stack of widgets', () => {
   });
 
   it('marks the selected range, defaulting to 3 months, and moves the mark when another is pressed', async () => {
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect((await screen.findByTestId('range-3m')).props.accessibilityState.selected).toBe(true);
     expect(screen.getByTestId('range-4w').props.accessibilityState.selected).toBe(false);
@@ -223,7 +247,9 @@ describe('ExerciseProgressScreen -- a stack of widgets', () => {
 
   it('plots each chart in the Workout accent colour', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('top-set-chart');
 
     const lines = screen.UNSAFE_getAllByType(Polyline);
@@ -241,21 +267,27 @@ describe('ExerciseProgressScreen -- a stack of widgets', () => {
       sourceSetId: 's1',
       achievedAt: '2026-05-01T00:00:00Z',
     });
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('best-one-rm-value')).toHaveTextContent(/^1RM.*150kg$/);
     expect(screen.getByTestId('best-rep-pr-value')).toHaveTextContent(/^8-Rep PR.*110kg$/);
   });
 
   it('says so, in the same row, when there is no 1RM or rep PR yet -- never an estimate', async () => {
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('best-one-rm-empty')).toHaveTextContent(/No 1RM recorded yet/);
     expect(screen.getByTestId('best-rep-pr-empty')).toHaveTextContent(/No rep PR recorded yet/);
   });
 
   it('names the back control for assistive tech', async () => {
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('range-3m');
 
     expect(screen.getByTestId('exercise-progress-back').props.accessibilityLabel).toBe('Back');
@@ -268,7 +300,9 @@ describe('ExerciseProgressScreen -- a stack of widgets', () => {
       sourceSetId: 's1',
       achievedAt: '2026-05-01T00:00:00Z',
     });
-    render(<ExerciseProgressScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<ExerciseProgressScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('top-set-chart');
 
     expectNoBareText();

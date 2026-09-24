@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useMemo, useRef, type PropsWithChildren } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  type PropsWithChildren,
+} from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { useSignedInResource } from '../lib/useSignedInResource';
@@ -37,7 +44,13 @@ const FoodLogContext = createContext<FoodLogContextValue | undefined>(undefined)
 export function FoodLogProvider({ children }: PropsWithChildren) {
   const { user } = useAuth();
   const userId = user?.id;
-  const { data: logs, loading, error, refetch, setData: setLogs } = useSignedInResource(
+  const {
+    data: logs,
+    loading,
+    error,
+    refetch,
+    setData: setLogs,
+  } = useSignedInResource(
     userId,
     fetchTodaysFoodLogs,
     [] as FoodLogRow[],

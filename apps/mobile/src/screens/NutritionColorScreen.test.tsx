@@ -41,7 +41,9 @@ beforeEach(() => {
 
 describe('NutritionColorScreen', () => {
   it('falls back to the default Nutrition color when the profile has none saved', async () => {
-    render(<NutritionColorScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<NutritionColorScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId(`preset-swatch-${DEFAULT_NUTRITION_COLOR}`)).toBeTruthy();
     expect(
@@ -62,7 +64,9 @@ describe('NutritionColorScreen', () => {
       nutritionAccentColor: '#8B5CF6',
     });
 
-    render(<NutritionColorScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<NutritionColorScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('preset-swatch-#8B5CF6')).toBeTruthy();
     expect(screen.getByTestId('preset-swatch-#8B5CF6').props.accessibilityState.selected).toBe(
@@ -73,7 +77,9 @@ describe('NutritionColorScreen', () => {
   it('saves only nutritionAccentColor and goes back on success, independent of workout color', async () => {
     mockUpdateMyProfile.mockResolvedValue({});
 
-    render(<NutritionColorScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<NutritionColorScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('accent-color-save');
 
     fireEvent.press(screen.getByTestId('preset-swatch-#8B5CF6'));
@@ -90,7 +96,9 @@ describe('NutritionColorScreen', () => {
   it('shows a save error and does not navigate back on failure', async () => {
     mockUpdateMyProfile.mockRejectedValue(new Error('Network down'));
 
-    render(<NutritionColorScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<NutritionColorScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('accent-color-save');
 
     fireEvent.press(screen.getByTestId('accent-color-save'));

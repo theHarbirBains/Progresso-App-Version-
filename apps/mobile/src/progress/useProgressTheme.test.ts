@@ -22,7 +22,7 @@ function profileContext(overrides: Partial<ProfileContextValue> = {}): ProfileCo
 }
 
 describe('useProgressTheme', () => {
-  it("derives its fields from the shared ProfileProvider cache -- no fetch of its own", () => {
+  it('derives its fields from the shared ProfileProvider cache -- no fetch of its own', () => {
     mockUseProfile.mockReturnValue(
       profileContext({
         profile: {

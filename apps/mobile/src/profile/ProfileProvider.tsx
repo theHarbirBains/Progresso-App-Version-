@@ -1,7 +1,12 @@
 import { createContext, useContext, useMemo, type PropsWithChildren } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useSignedInResource } from '../lib/useSignedInResource';
-import { getMyProfile, updateMyProfile, type ProfileResponse, type UpdateProfileInput } from '../lib/api';
+import {
+  getMyProfile,
+  updateMyProfile,
+  type ProfileResponse,
+  type UpdateProfileInput,
+} from '../lib/api';
 
 export interface ProfileContextValue {
   /** Null until the first fetch resolves, or if it fails before ever succeeding once. */
@@ -42,7 +47,13 @@ export function ProfileProvider({ children }: PropsWithChildren) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
 
-  const { data: profile, loading, error, refetch, setData: setProfile } = useSignedInResource(
+  const {
+    data: profile,
+    loading,
+    error,
+    refetch,
+    setData: setProfile,
+  } = useSignedInResource(
     accessToken,
     getMyProfile,
     null as ProfileResponse | null,

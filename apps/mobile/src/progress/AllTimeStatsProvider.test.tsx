@@ -111,7 +111,10 @@ describe('AllTimeStatsProvider', () => {
     const { result } = renderHook(() => useAllTimeStats(), { wrapper: AllTimeStatsProvider });
     await waitFor(() => expect(result.current.statsLoading).toBe(false));
 
-    mockFetchAllCompletedWorkouts.mockResolvedValue([sampleWorkout, { ...sampleWorkout, id: 'w2' }]);
+    mockFetchAllCompletedWorkouts.mockResolvedValue([
+      sampleWorkout,
+      { ...sampleWorkout, id: 'w2' },
+    ]);
     await act(async () => {
       await result.current.refetch();
     });

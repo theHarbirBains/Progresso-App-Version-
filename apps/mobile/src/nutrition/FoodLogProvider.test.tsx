@@ -1,7 +1,12 @@
 import { act, render, renderHook, waitFor } from '@testing-library/react-native';
 import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { deleteFoodLog, fetchTodaysFoodLogs, logFood, updateFoodLogQuantity } from './foodLogQueries';
+import {
+  deleteFoodLog,
+  fetchTodaysFoodLogs,
+  logFood,
+  updateFoodLogQuantity,
+} from './foodLogQueries';
 import { FoodLogProvider, useFoodLog } from './FoodLogProvider';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -57,7 +62,7 @@ beforeEach(() => {
 });
 
 describe('FoodLogProvider', () => {
-  it('fetches today\'s logs once and exposes them', async () => {
+  it("fetches today's logs once and exposes them", async () => {
     const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
 
     expect(result.current.loading).toBe(true);
@@ -111,7 +116,7 @@ describe('FoodLogProvider', () => {
     expect(result.current.logs).toEqual([]);
   });
 
-  it('logFoodEntry saves via logFood, appends to the cache with the food\'s photo carried over, and never re-fetches', async () => {
+  it("logFoodEntry saves via logFood, appends to the cache with the food's photo carried over, and never re-fetches", async () => {
     mockLogFood.mockResolvedValue({
       id: 'log-2',
       foodId: 'food-2',
@@ -149,7 +154,10 @@ describe('FoodLogProvider', () => {
     mockFetchTodaysFoodLogs.mockClear();
 
     await act(async () => {
-      await result.current.updateQuantity({ ...sampleLog, imageUrl: 'https://images.example/a.jpg' }, 3);
+      await result.current.updateQuantity(
+        { ...sampleLog, imageUrl: 'https://images.example/a.jpg' },
+        3,
+      );
     });
 
     expect(mockUpdateFoodLogQuantity).toHaveBeenCalledWith(

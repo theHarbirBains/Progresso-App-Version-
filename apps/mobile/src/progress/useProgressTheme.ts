@@ -1,5 +1,9 @@
 import { useProfile } from '../profile/ProfileProvider';
-import { DEFAULT_NUTRITION_THEME, DEFAULT_WORKOUT_THEME, type AccentTheme } from '../theme/accentColor';
+import {
+  DEFAULT_NUTRITION_THEME,
+  DEFAULT_WORKOUT_THEME,
+  type AccentTheme,
+} from '../theme/accentColor';
 
 /**
  * `theme`/`nutritionTheme` are always the app's one fixed neutral default

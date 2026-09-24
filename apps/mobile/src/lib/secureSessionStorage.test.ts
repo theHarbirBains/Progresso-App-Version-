@@ -23,7 +23,7 @@ describe('SecureSessionStorage', () => {
   // exceeded by a real Supabase session (JWT access + refresh token + full
   // user object). Only the small AES key goes into SecureStore; the
   // unbounded encrypted blob goes into AsyncStorage.
-  it('round-trips a value larger than SecureStore\'s 2048-byte limit', async () => {
+  it("round-trips a value larger than SecureStore's 2048-byte limit", async () => {
     const largeValue = JSON.stringify({
       access_token: 'x'.repeat(1500),
       refresh_token: 'y'.repeat(800),

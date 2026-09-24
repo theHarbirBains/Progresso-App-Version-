@@ -84,7 +84,9 @@ beforeEach(() => {
 
 describe('WorkoutDetailScreen', () => {
   it('loads and displays the workout with its exercises and sets', async () => {
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByText('Push Day')).toBeTruthy();
     expect(screen.getByTestId('exercise-card-we1')).toHaveTextContent(/Bench Press/);
@@ -95,7 +97,9 @@ describe('WorkoutDetailScreen', () => {
   });
 
   it('shows the computed top set', async () => {
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('top-set-we1')).toHaveTextContent('Top set: 110kg×8');
   });
@@ -114,7 +118,9 @@ describe('WorkoutDetailScreen', () => {
       ],
     });
 
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('top-set-we1')).toHaveTextContent('Top set: 110kg×8');
     expect(screen.queryByText(/999/)).toBeNull();
@@ -130,7 +136,9 @@ describe('WorkoutDetailScreen', () => {
       weightUnit: 'lb',
     });
 
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('top-set-we1')).toHaveTextContent(/lb/);
   });
@@ -138,13 +146,17 @@ describe('WorkoutDetailScreen', () => {
   it('shows an error message when loading fails', async () => {
     mockFetchWorkoutDetail.mockRejectedValue(new Error('network error'));
 
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('workout-detail-error')).toHaveTextContent('network error');
   });
 
   it('goes back when Back is pressed', async () => {
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByText('Push Day');
 
     fireEvent.press(screen.getByTestId('workout-detail-back'));
@@ -153,7 +165,9 @@ describe('WorkoutDetailScreen', () => {
   });
 
   it('shows a Share action for a completed workout and navigates to ShareWorkout', async () => {
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByText('Push Day');
 
     fireEvent.press(screen.getByTestId('workout-detail-share'));
@@ -164,7 +178,9 @@ describe('WorkoutDetailScreen', () => {
   it('hides the Share action for an incomplete (active) workout', async () => {
     mockFetchWorkoutDetail.mockResolvedValue({ ...workout, completedAt: null });
 
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByText('Push Day');
 
     expect(screen.queryByTestId('workout-detail-share')).toBeNull();
@@ -177,7 +193,9 @@ describe('WorkoutDetailScreen current PR/1RM indicators', () => {
       { reps: 8, bestWeightKg: 110, sourceSetId: 's2', achievedAt: '2026-01-01T00:00:00Z' },
     ]);
 
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('pr-tag-s2')).toHaveTextContent(/PR/);
     expect(screen.queryByTestId('pr-tag-s1')).toBeNull();
@@ -190,7 +208,9 @@ describe('WorkoutDetailScreen current PR/1RM indicators', () => {
       { reps: 8, bestWeightKg: 120, sourceSetId: 'later-set', achievedAt: '2026-02-01T00:00:00Z' },
     ]);
 
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByText('Push Day');
 
     expect(screen.queryByTestId('pr-tag-s2')).toBeNull();
@@ -203,13 +223,17 @@ describe('WorkoutDetailScreen current PR/1RM indicators', () => {
       achievedAt: '2026-01-01T00:00:00Z',
     });
 
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('pr-tag-s2')).toHaveTextContent(/1RM/);
   });
 
   it('navigates to PRHistory when an exercise title is pressed', async () => {
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByText('Push Day');
 
     fireEvent.press(screen.getByTestId('exercise-title-we1'));
@@ -241,7 +265,9 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
 
   async function ready(detail = twoExercises) {
     mockFetchWorkoutDetail.mockResolvedValue(detail);
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('exercise-card-we2');
   }
 

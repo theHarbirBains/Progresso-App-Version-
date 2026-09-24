@@ -95,7 +95,9 @@ beforeEach(() => {
 
 describe('OnboardingScreen', () => {
   it('starts at the Apple Health step for a brand-new profile', async () => {
-    render(<OnboardingScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<OnboardingScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('onboarding-step-apple-health')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-back')).toBeNull();
@@ -108,13 +110,17 @@ describe('OnboardingScreen', () => {
       birthday: '1998-01-01',
     });
 
-    render(<OnboardingScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<OnboardingScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('onboarding-step-weight')).toBeTruthy();
   });
 
   it('walks through the entire onboarding flow end-to-end', async () => {
-    render(<OnboardingScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<OnboardingScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     // Apple Health -- preference-only, no separate Continue button.
     await screen.findByTestId('onboarding-step-apple-health');
@@ -243,7 +249,9 @@ describe('OnboardingScreen', () => {
 
   it('does not nest the wheel picker inside the outer ScrollView (avoids the VirtualizedList nesting warning)', async () => {
     currentProfile = blankProfile({ appleHealthPreference: 'not_now', gender: 'male' });
-    render(<OnboardingScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<OnboardingScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('onboarding-step-birthday')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-scroll')).toBeNull();
@@ -259,7 +267,9 @@ describe('OnboardingScreen', () => {
 
   it('keeps the outer ScrollView for a plain option-list step', async () => {
     currentProfile = blankProfile({ appleHealthPreference: 'not_now' });
-    render(<OnboardingScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<OnboardingScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('onboarding-step-gender')).toBeTruthy();
     expect(screen.getByTestId('onboarding-scroll')).toBeTruthy();
@@ -267,7 +277,9 @@ describe('OnboardingScreen', () => {
 
   it('Back moves to the previous step without persisting anything', async () => {
     currentProfile = blankProfile({ appleHealthPreference: 'not_now' });
-    render(<OnboardingScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<OnboardingScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     await screen.findByTestId('onboarding-step-gender');
     mockUpdateMyProfile.mockClear();
@@ -289,7 +301,9 @@ describe('OnboardingScreen', () => {
       workoutFrequencyDays: 5,
       trainingStylePreference: 'guided',
     });
-    render(<OnboardingScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
+    render(<OnboardingScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     await screen.findByTestId('onboarding-step-workout-split');
     fireEvent.press(screen.getByTestId('onboarding-step-workout-split-create-own'));
