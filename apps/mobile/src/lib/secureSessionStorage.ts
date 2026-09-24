@@ -37,11 +37,23 @@ export class SecureSessionStorage {
   async getItem(key: string): Promise<string | null> {
     const encrypted = await AsyncStorage.getItem(key);
     if (!encrypted) return null;
-    // A missing SecureStore key (e.g. a pre-migration plaintext session, or
-    // the Keychain/Keystore entry was cleared independently of AsyncStorage)
-    // means this blob can never be decrypted -- treated as no session
-    // rather than throwing, so Supabase just falls back to signed-out.
-    return this.decrypt(key, encrypted);
+    try {
+      // A missing SecureStore key (e.g. a pre-migration plaintext session,
+      // or the Keychain/Keystore entry was cleared independently of
+      // AsyncStorage) means this blob can never be decrypted. A *present
+      // but mismatched* key is also possible: setItem's two writes (the
+      // SecureStore key, then the AsyncStorage blob) aren't atomic, so a
+      // process kill between them can leave AsyncStorage holding a blob
+      // encrypted under the *previous* key while SecureStore already holds
+      // the new one -- decrypting then produces garbage bytes, which
+      // either aesjs or the UTF-8 conversion below throws on. Both cases
+      // are treated as no session rather than propagating a throw into
+      // Supabase's own session-restore path, which would otherwise crash
+      // app boot instead of just falling back to signed-out.
+      return await this.decrypt(key, encrypted);
+    } catch {
+      return null;
+    }
   }
 
   async removeItem(key: string): Promise<void> {

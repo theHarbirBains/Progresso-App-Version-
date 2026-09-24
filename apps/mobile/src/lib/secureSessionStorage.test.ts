@@ -59,6 +59,21 @@ describe('SecureSessionStorage', () => {
     await expect(storage.getItem('sb-session')).resolves.toBeNull();
   });
 
+  // setItem's two writes (the SecureStore key, then the AsyncStorage blob)
+  // aren't atomic -- a process kill between them can leave AsyncStorage
+  // holding a blob encrypted under the *previous* key while SecureStore
+  // already holds a new one. Decrypting garbage bytes with AES-CTR doesn't
+  // reliably throw (no built-in integrity check), so this forces the
+  // failure deterministically instead of depending on which garbage bytes
+  // a real mismatched key happens to produce.
+  it('returns null (not a throw) when decryption itself fails, e.g. a present but mismatched key', async () => {
+    await storage.setItem('sb-session', 'some value');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    jest.spyOn(storage as any, 'decrypt').mockRejectedValue(new Error('bad utf-8'));
+
+    await expect(storage.getItem('sb-session')).resolves.toBeNull();
+  });
+
   it('removeItem clears both the encrypted blob and the encryption key', async () => {
     await storage.setItem('sb-session', 'some value');
 
