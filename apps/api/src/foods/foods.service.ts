@@ -27,6 +27,11 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const FOOD_COLUMNS =
   'id, name, brand, image_url, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, provider, barcode';
 
+// provider_food_id is never part of FoodRecord (toFoodRecord doesn't read
+// it) -- selected only so upsertExternalFoods can re-match a batch
+// upsert's returned rows back to the provider's own result order.
+const FOOD_COLUMNS_WITH_PROVIDER_ID = `${FOOD_COLUMNS}, provider_food_id`;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toFoodRecord(row: any): FoodRecord {
   return {
@@ -261,10 +266,19 @@ export class FoodsService {
         foods.map((food) => this.toUpsertRow(food)),
         { onConflict: 'provider,provider_food_id' },
       )
-      .select(FOOD_COLUMNS);
+      .select(FOOD_COLUMNS_WITH_PROVIDER_ID);
 
     if (!error && data) {
-      return data.map((row) => toFoodRecord(row));
+      // A multi-row upsert's returned rows aren't guaranteed to preserve
+      // input order (no ORDER BY on an upsert) -- re-matched back onto the
+      // provider's own relevance ranking (foods) rather than whatever
+      // order Postgres happened to return.
+      const byProviderFoodId = new Map(
+        data.map((row) => [row.provider_food_id as string, toFoodRecord(row)]),
+      );
+      return foods
+        .map((food) => byProviderFoodId.get(food.providerFoodId))
+        .filter((record): record is FoodRecord => record !== undefined);
     }
 
     this.logger.warn(`Batch external food cache upsert failed, falling back per-item: ${error?.message}`);

@@ -91,6 +91,10 @@ const cachedExternalFoodRow = {
   fat_g: '7.00',
   provider: 'open_food_facts',
   barcode: '0066721016123',
+  // Selected only for upsertExternalFoods' own re-ordering of a batch
+  // upsert's returned rows -- must match normalizedOreo.providerFoodId
+  // below for these fixtures to represent the same food.
+  provider_food_id: '0066721016123',
 };
 
 const normalizedOreo: NormalizedFood = {
@@ -170,6 +174,43 @@ describe('FoodsService', () => {
       [expect.objectContaining({ provider_food_id: '0066721016123' })],
       { onConflict: 'provider,provider_food_id' },
     );
+  });
+
+  it("preserves the provider's own relevance order, even when the batch upsert returns rows in a different order", async () => {
+    const normalizedChicken: NormalizedFood = {
+      ...normalizedOreo,
+      providerFoodId: 'chicken-id',
+      barcode: null,
+      name: 'Chicken Breast (cooked)',
+      brand: null,
+    };
+    const chickenRow = {
+      ...cachedExternalFoodRow,
+      id: 'food-3',
+      name: 'Chicken Breast (cooked)',
+      brand: null,
+      provider_food_id: 'chicken-id',
+    };
+    // Postgres/PostgREST gives no ordering guarantee for a multi-row
+    // upsert's returned rows -- deliberately returned here in the OPPOSITE
+    // order from the provider's own result (normalizedOreo first, then
+    // normalizedChicken) to prove the service re-orders by input, not by
+    // whatever order the database happened to hand back.
+    const { supabaseService } = mockSupabaseSequence([
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: [chickenRow, cachedExternalFoodRow], error: null },
+    ]);
+    const provider = mockProvider({
+      searchFoods: jest
+        .fn()
+        .mockResolvedValue({ foods: [normalizedOreo, normalizedChicken], hasMore: false }),
+    });
+    const service = new FoodsService(supabaseService, provider);
+
+    const result = await service.search('food', 0, 20);
+
+    expect(result.foods.map((f) => f.id)).toEqual(['food-2', 'food-3']);
   });
 
   it('only calls the external provider on the first page', async () => {
