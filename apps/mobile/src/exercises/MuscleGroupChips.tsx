@@ -2,7 +2,6 @@ import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text } from '../design/Text';
 import { GlassBackground } from '../design/GlassBackground';
 import { spacing } from '../design/theme';
-import { exerciseStyles as styles } from '../screens/exerciseStyles';
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
 
 interface Props {
@@ -108,6 +107,37 @@ export function MuscleGroupChips({
 //    smaller than the font's actual rendered line height would clip the
 //    label just as badly as the original bug, so this only ever adds
 //    headroom, never restricts it.
+// Restored inline after screens/exerciseStyles.ts was deleted in fd21bd8
+// without updating this file's import -- this component was left as the
+// module's only remaining consumer, so these five keys (with their exact
+// prior values) are restored here rather than recreating the whole shared
+// file. Not a redesign: this keeps the chip's existing look unchanged.
+const styles = StyleSheet.create({
+  chipRow: {
+    gap: 8,
+    paddingBottom: 12,
+  },
+  chip: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2A2A32',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  chipSelected: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+  },
+  chipText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  chipTextSelected: {
+    color: '#0B0B0F',
+  },
+});
+
 const localStyles = StyleSheet.create({
   scroll: {
     flexGrow: 0,
