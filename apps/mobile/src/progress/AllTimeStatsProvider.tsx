@@ -1,13 +1,6 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type PropsWithChildren,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, type PropsWithChildren } from 'react';
 import { useAuth } from '../auth/AuthProvider';
+import { useSignedInResource } from '../lib/useSignedInResource';
 import {
   fetchAllExerciseHistory,
   type HistoricalSetWithExercise,
@@ -32,13 +25,38 @@ export interface AllTimeStatsContextValue {
   prsLoading: boolean;
   prsError: string | null;
 
-  refetch: () => Promise<void>;
+  refetch: () => Promise<boolean>;
 }
 
 const AllTimeStatsContext = createContext<AllTimeStatsContextValue | undefined>(undefined);
 
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : 'Something went wrong';
+interface StatsGroup {
+  allWorkouts: WorkoutSummary[];
+  allSetHistory: HistoricalSetWithExercise[];
+}
+
+interface PrsGroup {
+  repPRs: RepPRWithExercise[];
+  oneRepMaxes: OneRepMaxWithExercise[];
+}
+
+const EMPTY_STATS: StatsGroup = { allWorkouts: [], allSetHistory: [] };
+const EMPTY_PRS: PrsGroup = { repPRs: [], oneRepMaxes: [] };
+
+async function fetchStatsGroup(userId: string): Promise<StatsGroup> {
+  const [allWorkouts, allSetHistory] = await Promise.all([
+    fetchAllCompletedWorkouts(userId),
+    fetchAllExerciseHistory(userId),
+  ]);
+  return { allWorkouts, allSetHistory };
+}
+
+async function fetchPrsGroup(userId: string): Promise<PrsGroup> {
+  const [repPRs, oneRepMaxes] = await Promise.all([
+    fetchAllRepPRs(userId),
+    fetchAllOneRepMaxes(userId),
+  ]);
+  return { repPRs, oneRepMaxes };
 }
 
 // The user's entire completed-workout/set/PR history -- unbounded, and
@@ -65,81 +83,42 @@ export function AllTimeStatsProvider({ children }: PropsWithChildren) {
   const { user } = useAuth();
   const userId = user?.id;
 
-  const [allWorkouts, setAllWorkouts] = useState<WorkoutSummary[]>([]);
-  const [allSetHistory, setAllSetHistory] = useState<HistoricalSetWithExercise[]>([]);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [statsError, setStatsError] = useState<string | null>(null);
+  const {
+    data: stats,
+    loading: statsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useSignedInResource(userId, fetchStatsGroup, EMPTY_STATS, 'Something went wrong');
 
-  const [repPRs, setRepPRs] = useState<RepPRWithExercise[]>([]);
-  const [oneRepMaxes, setOneRepMaxes] = useState<OneRepMaxWithExercise[]>([]);
-  const [prsLoading, setPrsLoading] = useState(true);
-  const [prsError, setPrsError] = useState<string | null>(null);
+  const {
+    data: prs,
+    loading: prsLoading,
+    error: prsError,
+    refetch: refetchPrs,
+  } = useSignedInResource(userId, fetchPrsGroup, EMPTY_PRS, 'Something went wrong');
 
-  const load = useCallback(async () => {
-    if (!userId) return;
-    setStatsError(null);
-    setPrsError(null);
-
-    const [statsResult, prsResult] = await Promise.allSettled([
-      Promise.all([fetchAllCompletedWorkouts(userId), fetchAllExerciseHistory(userId)]),
-      Promise.all([fetchAllRepPRs(userId), fetchAllOneRepMaxes(userId)]),
-    ]);
-
-    if (statsResult.status === 'fulfilled') {
-      setAllWorkouts(statsResult.value[0]);
-      setAllSetHistory(statsResult.value[1]);
-    } else {
-      setStatsError(errorMessage(statsResult.reason));
-    }
-    setStatsLoading(false);
-
-    if (prsResult.status === 'fulfilled') {
-      setRepPRs(prsResult.value[0]);
-      setOneRepMaxes(prsResult.value[1]);
-    } else {
-      setPrsError(errorMessage(prsResult.reason));
-    }
-    setPrsLoading(false);
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId) {
-      setAllWorkouts([]);
-      setAllSetHistory([]);
-      setRepPRs([]);
-      setOneRepMaxes([]);
-      setStatsError(null);
-      setPrsError(null);
-      setStatsLoading(true);
-      setPrsLoading(true);
-      return;
-    }
-    void load();
-  }, [userId, load]);
+  // Both groups fetch independently (a failure in one doesn't block the
+  // other, matching ProfileScreen's separate Stats/PRs tabs), but
+  // ActiveWorkoutScreen only knows about "the user's history changed" after
+  // completing a workout, not which group -- so this refetches both.
+  const refetch = useCallback(async () => {
+    const [statsOk, prsOk] = await Promise.all([refetchStats(), refetchPrs()]);
+    return statsOk && prsOk;
+  }, [refetchStats, refetchPrs]);
 
   const value = useMemo<AllTimeStatsContextValue>(
     () => ({
-      allWorkouts,
-      allSetHistory,
+      allWorkouts: stats.allWorkouts,
+      allSetHistory: stats.allSetHistory,
       statsLoading,
       statsError,
-      repPRs,
-      oneRepMaxes,
+      repPRs: prs.repPRs,
+      oneRepMaxes: prs.oneRepMaxes,
       prsLoading,
       prsError,
-      refetch: load,
+      refetch,
     }),
-    [
-      allWorkouts,
-      allSetHistory,
-      statsLoading,
-      statsError,
-      repPRs,
-      oneRepMaxes,
-      prsLoading,
-      prsError,
-      load,
-    ],
+    [stats, statsLoading, statsError, prs, prsLoading, prsError, refetch],
   );
 
   return <AllTimeStatsContext.Provider value={value}>{children}</AllTimeStatsContext.Provider>;
