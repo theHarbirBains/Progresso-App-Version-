@@ -1,4 +1,5 @@
 import { act, render, renderHook, waitFor } from '@testing-library/react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { deleteFoodLog, fetchTodaysFoodLogs, logFood, updateFoodLogQuantity } from './foodLogQueries';
 import { FoodLogProvider, useFoodLog } from './FoodLogProvider';
@@ -192,5 +193,68 @@ describe('FoodLogProvider', () => {
       'useFoodLog must be used within a FoodLogProvider',
     );
     consoleError.mockRestore();
+  });
+
+  // Regression coverage: the cache used to be fetched exactly once per
+  // sign-in and never revalidated, so logging food at 11:50pm and
+  // backgrounding the app overnight (routine mobile behavior -- the JS
+  // context stays alive) meant "today's" logs/totals were still yesterday's
+  // the next time the app came to the foreground. Controls the local-day
+  // key directly (Date.prototype.toDateString) rather than faking the
+  // system clock -- RTL's waitFor polls on real timers internally, which
+  // fake timers block from ever re-checking.
+  describe('day rollover', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('refetches when the app returns to the foreground after local midnight has passed', async () => {
+      const dayKey = jest.spyOn(Date.prototype, 'toDateString').mockReturnValue('Day 1');
+      const addEventListenerSpy = jest.spyOn(AppState, 'addEventListener');
+
+      const { result, unmount } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(mockFetchTodaysFoodLogs).toHaveBeenCalledTimes(1);
+
+      const changeCalls = addEventListenerSpy.mock.calls.filter(([event]) => event === 'change');
+      const [, handler] = changeCalls[changeCalls.length - 1]!;
+
+      dayKey.mockReturnValue('Day 2');
+      mockFetchTodaysFoodLogs.mockResolvedValue([{ ...sampleLog, id: 'log-new-day' }]);
+      act(() => {
+        (handler as (state: AppStateStatus) => void)('active');
+      });
+
+      // Waits for the fetch's own resolution to actually commit -- the
+      // mock being *called* (a synchronous fact) says nothing about
+      // whether its promise has resolved and setLogs has run yet.
+      await waitFor(() => expect(result.current.logs[0]?.id).toBe('log-new-day'));
+      expect(mockFetchTodaysFoodLogs).toHaveBeenCalledTimes(2);
+
+      // Explicit, not relying on auto-cleanup timing -- this test's own
+      // 'change' listener must be gone before the next test registers (and
+      // captures, via the same "first change listener" lookup) its own.
+      unmount();
+    });
+
+    it('does not refetch on a same-day foreground transition', async () => {
+      jest.spyOn(Date.prototype, 'toDateString').mockReturnValue('Day 1');
+      const addEventListenerSpy = jest.spyOn(AppState, 'addEventListener');
+
+      const { result, unmount } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(mockFetchTodaysFoodLogs).toHaveBeenCalledTimes(1);
+
+      const changeCalls = addEventListenerSpy.mock.calls.filter(([event]) => event === 'change');
+      const [, handler] = changeCalls[changeCalls.length - 1]!;
+
+      // The mocked day key is deliberately left unchanged -- still "Day 1".
+      act(() => {
+        (handler as (state: AppStateStatus) => void)('active');
+      });
+
+      expect(mockFetchTodaysFoodLogs).toHaveBeenCalledTimes(1);
+      unmount();
+    });
   });
 });

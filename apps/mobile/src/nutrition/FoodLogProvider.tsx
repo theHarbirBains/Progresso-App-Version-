@@ -4,9 +4,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import {
   deleteFoodLog,
@@ -46,6 +48,12 @@ export function FoodLogProvider({ children }: PropsWithChildren) {
   const [logs, setLogs] = useState<FoodLogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // "Today" is a moving target this cache doesn't otherwise notice --
+  // unlike profile/nutrition goals, fetched-once-and-cached is wrong once
+  // local midnight passes while the app stays open (backgrounded or not).
+  // Tracks the local calendar day this cache actually reflects, so a
+  // day-rollover can be detected without polling.
+  const cachedDayRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -53,6 +61,7 @@ export function FoodLogProvider({ children }: PropsWithChildren) {
     try {
       const result = await fetchTodaysFoodLogs(userId);
       setLogs(result);
+      cachedDayRef.current = new Date().toDateString();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load nutrition');
     } finally {
@@ -65,10 +74,27 @@ export function FoodLogProvider({ children }: PropsWithChildren) {
       setLogs([]);
       setError(null);
       setLoading(true);
+      cachedDayRef.current = null;
       return;
     }
     void load();
   }, [userId, load]);
+
+  // The app is far more likely to be backgrounded overnight than to sit
+  // foregrounded and idle across midnight, so refetching on return-to-
+  // foreground (rather than a timer) is what actually catches the reported
+  // case -- log food at 11:50pm, background the app, reopen after
+  // midnight -- without polling while the app is in active use.
+  useEffect(() => {
+    function handleAppStateChange(nextState: AppStateStatus) {
+      if (nextState !== 'active') return;
+      if (cachedDayRef.current !== null && cachedDayRef.current !== new Date().toDateString()) {
+        void load();
+      }
+    }
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [load]);
 
   const value = useMemo<FoodLogContextValue>(
     () => ({
