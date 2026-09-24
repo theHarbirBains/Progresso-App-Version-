@@ -1,15 +1,7 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PropsWithChildren,
-} from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, type PropsWithChildren } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { useSignedInResource } from '../lib/useSignedInResource';
 import {
   deleteFoodLog,
   fetchTodaysFoodLogs,
@@ -24,7 +16,7 @@ export interface FoodLogContextValue {
   logs: FoodLogRow[];
   loading: boolean;
   error: string | null;
-  refetch: () => Promise<void>;
+  refetch: () => Promise<boolean>;
   logFoodEntry: (food: LoggableFood, quantity: number, mealType: MealType) => Promise<FoodLogRow>;
   updateQuantity: (log: FoodLogRow, newQuantity: number) => Promise<FoodLogRow>;
   removeLog: (logId: string) => Promise<void>;
@@ -45,40 +37,32 @@ const FoodLogContext = createContext<FoodLogContextValue | undefined>(undefined)
 export function FoodLogProvider({ children }: PropsWithChildren) {
   const { user } = useAuth();
   const userId = user?.id;
-  const [logs, setLogs] = useState<FoodLogRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: logs, loading, error, refetch, setData: setLogs } = useSignedInResource(
+    userId,
+    fetchTodaysFoodLogs,
+    [] as FoodLogRow[],
+    'Failed to load nutrition',
+  );
+
   // "Today" is a moving target this cache doesn't otherwise notice --
   // unlike profile/nutrition goals, fetched-once-and-cached is wrong once
   // local midnight passes while the app stays open (backgrounded or not).
   // Tracks the local calendar day this cache actually reflects, so a
-  // day-rollover can be detected without polling.
+  // day-rollover can be detected without polling. Stamped reactively off
+  // useSignedInResource's own loading/error transitions -- not by calling
+  // refetch() here -- since the hook already fetches once on sign-in by
+  // itself; calling refetch() again on that same transition would fetch
+  // twice.
   const cachedDayRef = useRef<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!userId) return;
-    setError(null);
-    try {
-      const result = await fetchTodaysFoodLogs(userId);
-      setLogs(result);
-      cachedDayRef.current = new Date().toDateString();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load nutrition');
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
-
   useEffect(() => {
     if (!userId) {
-      setLogs([]);
-      setError(null);
-      setLoading(true);
       cachedDayRef.current = null;
       return;
     }
-    void load();
-  }, [userId, load]);
+    if (!loading && !error) {
+      cachedDayRef.current = new Date().toDateString();
+    }
+  }, [userId, loading, error]);
 
   // The app is far more likely to be backgrounded overnight than to sit
   // foregrounded and idle across midnight, so refetching on return-to-
@@ -89,19 +73,21 @@ export function FoodLogProvider({ children }: PropsWithChildren) {
     function handleAppStateChange(nextState: AppStateStatus) {
       if (nextState !== 'active') return;
       if (cachedDayRef.current !== null && cachedDayRef.current !== new Date().toDateString()) {
-        void load();
+        void refetch().then((succeeded) => {
+          if (succeeded) cachedDayRef.current = new Date().toDateString();
+        });
       }
     }
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
-  }, [load]);
+  }, [refetch]);
 
   const value = useMemo<FoodLogContextValue>(
     () => ({
       logs,
       loading,
       error,
-      refetch: load,
+      refetch,
       logFoodEntry: async (food, quantity, mealType) => {
         if (!userId) throw new Error('Not signed in');
         const created = await logFood(userId, food, quantity, mealType);
@@ -124,7 +110,7 @@ export function FoodLogProvider({ children }: PropsWithChildren) {
         setLogs((prev) => prev.filter((l) => l.id !== logId));
       },
     }),
-    [logs, loading, error, load, userId],
+    [logs, loading, error, refetch, setLogs, userId],
   );
 
   return <FoodLogContext.Provider value={value}>{children}</FoodLogContext.Provider>;
