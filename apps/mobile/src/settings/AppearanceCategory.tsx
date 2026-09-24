@@ -1,10 +1,8 @@
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { AppCard } from '../design/AppCard';
+import { View } from 'react-native';
+import { TextButton } from '../design/Button';
 import { useBackgroundTheme } from '../design/BackgroundThemeContext';
-import { SectionHeader } from '../design/SectionHeader';
-import { colors, spacing } from '../design/theme';
+import { ListRow } from '../design/ListRow';
+import { Section } from '../design/Section';
 import { BACKGROUND_THEMES } from '../design/backgroundThemes';
 import { DEFAULT_NUTRITION_COLOR, DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 import { findPresetName } from '../theme/accentPalette';
@@ -20,15 +18,13 @@ interface Props {
   onResetThemeColors: () => void;
 }
 
-// Appearance is app-level/global (Settings, not "Workout Settings"), which is
-// exactly why the Nutrition accent lives here alongside Workout's -- both
-// are theme configuration, reusing the existing accentColor.ts/
-// accentPalette.ts/buildAccentTheme() architecture unchanged. Background
-// Theme (the app's environment/backdrop) is a third, independent
-// configuration layer -- see design/BackgroundThemeContext.tsx -- listed in
-// its own card so it reads as a separate choice from the two accent colors.
-// Dark variants only for now: there is still no light/dark/system mode
-// concept (Progresso's UI itself stays a single dark theme).
+// A colour swatch as a row's leading element -- the one bit of colour on the
+// row, so it shows the actual value being chosen.
+function Swatch({ color }: { color: string }) {
+  return <View style={[styles.swatch, { backgroundColor: color }]} />;
+}
+
+/** Appearance category: the Background Theme and the two mode accent colours, each a row that opens its own picker, plus a quiet destructive Reset. */
 export function AppearanceCategory({
   workoutAccentColor,
   nutritionAccentColor,
@@ -39,93 +35,46 @@ export function AppearanceCategory({
   onResetThemeColors,
 }: Props) {
   const { theme: backgroundTheme } = useBackgroundTheme();
+  const workoutColor = workoutAccentColor ?? DEFAULT_WORKOUT_COLOR;
+  const nutritionColor = nutritionAccentColor ?? DEFAULT_NUTRITION_COLOR;
 
   return (
-    <View style={styles.section}>
-      <SectionHeader label="Background Theme" />
-      <AppCard>
-        <TouchableOpacity
+    <View style={styles.categoryGap}>
+      <Section title="Background Theme">
+        <ListRow
           testID="open-background-theme-settings"
-          style={styles.row}
+          leading={<Swatch color={backgroundTheme.colors.background} />}
+          title="Background Theme"
+          value={BACKGROUND_THEMES[backgroundTheme.id].name}
           onPress={onNavigateBackgroundTheme}
-        >
-          <View style={[styles.swatch, { backgroundColor: backgroundTheme.colors.background }]} />
-          <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>Background Theme</Text>
-            <Text style={styles.rowValue}>{BACKGROUND_THEMES[backgroundTheme.id].name}</Text>
-          </View>
-          <Feather name="chevron-right" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-      </AppCard>
+        />
+      </Section>
 
-      <SectionHeader label="Theme Colors" />
-      <AppCard>
-        <TouchableOpacity
+      <Section title="Theme Colors">
+        <ListRow
           testID="open-workout-color-settings"
-          style={styles.row}
+          leading={<Swatch color={workoutColor} />}
+          title="Workout Mode"
+          value={findPresetName(workoutColor) ?? 'Custom'}
           onPress={onNavigateWorkoutColor}
-        >
-          <View
-            style={[
-              styles.swatch,
-              { backgroundColor: workoutAccentColor ?? DEFAULT_WORKOUT_COLOR },
-            ]}
-          />
-          <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>Workout Mode</Text>
-            <Text style={styles.rowValue}>
-              {findPresetName(workoutAccentColor ?? DEFAULT_WORKOUT_COLOR) ?? 'Custom'}
-            </Text>
-          </View>
-          <Feather name="chevron-right" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
+        />
+        <ListRow
           testID="open-nutrition-color-settings"
-          style={[styles.row, styles.rowDivider]}
+          leading={<Swatch color={nutritionColor} />}
+          title="Nutrition Mode"
+          value={findPresetName(nutritionColor) ?? 'Custom'}
+          divider
           onPress={onNavigateNutritionColor}
-        >
-          <View
-            style={[
-              styles.swatch,
-              { backgroundColor: nutritionAccentColor ?? DEFAULT_NUTRITION_COLOR },
-            ]}
-          />
-          <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>Nutrition Mode</Text>
-            <Text style={styles.rowValue}>
-              {findPresetName(nutritionAccentColor ?? DEFAULT_NUTRITION_COLOR) ?? 'Custom'}
-            </Text>
-          </View>
-          <Feather name="chevron-right" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-      </AppCard>
+        />
+      </Section>
 
-      <TouchableOpacity
+      <TextButton
         testID="reset-theme-colors"
-        style={localStyles.resetButton}
+        label="Reset Theme Colors"
+        destructive
+        loading={resetting}
         onPress={onResetThemeColors}
-        disabled={resetting}
-      >
-        {resetting ? (
-          <ActivityIndicator color={colors.destructive} />
-        ) : (
-          <Text style={localStyles.resetButtonText}>Reset Theme Colors</Text>
-        )}
-      </TouchableOpacity>
+      />
     </View>
   );
 }
-
-const localStyles = StyleSheet.create({
-  resetButton: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
-  },
-  resetButtonText: {
-    color: colors.destructive,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});

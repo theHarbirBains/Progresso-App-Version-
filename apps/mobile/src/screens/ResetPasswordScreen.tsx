@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ActivityIndicator, TextInput, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
-import { colors } from '../design/theme';
+import { PrimaryButton } from '../design/Button';
+import { TextInput } from '../design/TextInput';
+import { AuthFrame } from './AuthFrame';
 import { authStyles as styles } from './authStyles';
 
 // Shown when AuthProvider's status is 'passwordRecovery' — reached only via
@@ -36,24 +37,20 @@ export function ResetPasswordScreen() {
 
   if (success) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Password Updated</Text>
+      <AuthFrame title="Password Updated">
         <Text testID="reset-password-success" style={styles.info}>
           Your password has been changed.
         </Text>
-      </View>
+      </AuthFrame>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Set New Password</Text>
-
+    <AuthFrame title="Set New Password">
       <TextInput
         testID="reset-password-new"
-        style={styles.input}
-        placeholder="New password"
-        placeholderTextColor={colors.textMuted}
+        label="New password"
+        placeholder="At least 6 characters"
         secureTextEntry
         autoComplete="password-new"
         value={password}
@@ -61,9 +58,8 @@ export function ResetPasswordScreen() {
       />
       <TextInput
         testID="reset-password-confirm"
-        style={styles.input}
-        placeholder="Confirm new password"
-        placeholderTextColor={colors.textMuted}
+        label="Confirm new password"
+        placeholder="Re-enter your password"
         secureTextEntry
         autoComplete="password-new"
         value={confirmPassword}
@@ -71,23 +67,18 @@ export function ResetPasswordScreen() {
       />
 
       {error ? (
-        <Text testID="reset-password-error" style={styles.error}>
+        <Text testID="reset-password-error" style={styles.errorText}>
           {error}
         </Text>
       ) : null}
 
-      <TouchableOpacity
+      <PrimaryButton
         testID="reset-password-submit"
-        style={[styles.button, !canSubmit && styles.buttonDisabled]}
+        label="Update Password"
         onPress={handleSubmit}
-        disabled={!canSubmit}
-      >
-        {submitting ? (
-          <ActivityIndicator color={colors.background} />
-        ) : (
-          <Text style={styles.buttonText}>Update Password</Text>
-        )}
-      </TouchableOpacity>
-    </View>
+        loading={submitting}
+        disabled={!canSubmit && !submitting}
+      />
+    </AuthFrame>
   );
 }

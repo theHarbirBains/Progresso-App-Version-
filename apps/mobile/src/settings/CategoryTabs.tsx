@@ -53,7 +53,9 @@ export function CategoryTabs<T extends string>({
             ]}
             onPress={() => onSelect(category.key)}
             activeOpacity={0.8}
+            hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
             accessibilityRole="button"
+            accessibilityLabel={category.label}
             accessibilityState={{ selected }}
           >
             {!selected ? <GlassBackground bordered={false} /> : null}

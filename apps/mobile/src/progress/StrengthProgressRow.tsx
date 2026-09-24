@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { colors } from '../design/theme';
 import { PROGRESS_LEVEL_LABELS, type ProgressLevel } from './strengthProgress';
 import { progressStyles as styles } from './progressStyles';
+import { formatWeight } from '../lib/units';
 
 interface Props {
   testID?: string;
@@ -15,10 +16,6 @@ interface Props {
   accentColor: string;
   onPress: () => void;
   showDivider?: boolean;
-}
-
-function formatWeight(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 /** One row in the "other exercises" list below the featured Strength Progress card -- only ever a real, meaningful gain (never a zero/negative row, see strengthProgress.ts). */

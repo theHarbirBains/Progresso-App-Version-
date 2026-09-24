@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { Circle, Svg } from 'react-native-svg';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppHeader } from '../design/AppHeader';
+import { PrimaryButton } from '../design/Button';
+import { Screen } from '../design/Screen';
 import { colors, spacing } from '../design/theme';
 import { ACCENT_PRESET_GROUPS, findPresetName } from '../theme/accentPalette';
 import { buildAccentTheme, type AccentTheme } from '../theme/accentColor';
@@ -169,133 +171,120 @@ export function AccentColorPickerScreen({
   onSave,
   onBack,
 }: Props) {
-  const insets = useSafeAreaInsets();
   const [selectedColor, setSelectedColor] = useState(initialColor);
   const [customMode, setCustomMode] = useState(findPresetName(initialColor) === null);
 
   const theme = buildAccentTheme(selectedColor);
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <ScrollView
-        testID="accent-color-picker-scroll"
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + spacing.xxxl },
-        ]}
-      >
-        <View style={styles.headerRow}>
-          <TouchableOpacity
-            testID="accent-color-picker-back"
-            style={styles.backButton}
-            onPress={onBack}
-            accessibilityLabel="Back"
-            accessibilityRole="button"
-          >
-            <Feather name="arrow-left" size={18} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <View>
-            <Text style={styles.title}>{title}</Text>
-          </View>
-        </View>
-        <Text style={styles.subtitle}>{subtitle}</Text>
+    <Screen
+      scrollTestID="accent-color-picker-scroll"
+      contentContainerStyle={styles.scrollContent}
+      header={
+        <AppHeader
+          title={title}
+          leftAction={{
+            icon: 'arrow-left',
+            onPress: onBack,
+            accessibilityLabel: 'Back',
+            testID: 'accent-color-picker-back',
+          }}
+        />
+      }
+    >
+      <Text style={styles.subtitle}>{subtitle}</Text>
 
-        <View style={styles.section}>
-          <Text style={styles.groupLabel}>Preview</Text>
-          <AccentPreview theme={theme} kind={previewKind} />
-        </View>
+      <View style={styles.section}>
+        <Text style={styles.groupLabel}>Preview</Text>
+        <AccentPreview theme={theme} kind={previewKind} />
+      </View>
 
-        {ACCENT_PRESET_GROUPS.map((group) => (
-          <View key={group.label} style={styles.section}>
-            <Text style={styles.groupLabel}>{group.label}</Text>
-            <View style={styles.swatchGrid}>
-              {group.colors.map((preset) => {
-                const isSelected = !customMode && preset.hex.toUpperCase() === selectedColor;
-                const presetTheme = buildAccentTheme(preset.hex);
-                return (
-                  <TouchableOpacity
-                    key={preset.hex}
-                    testID={`preset-swatch-${preset.hex}`}
-                    style={styles.swatchItem}
-                    onPress={() => {
-                      setSelectedColor(preset.hex.toUpperCase());
-                      setCustomMode(false);
-                    }}
-                    accessibilityLabel={preset.name}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isSelected }}
-                  >
-                    <View
-                      style={[
-                        styles.swatchCircle,
-                        { backgroundColor: preset.hex },
-                        isSelected && styles.swatchCircleSelected,
-                      ]}
-                    >
-                      {isSelected ? (
-                        <Feather name="check" size={16} color={presetTheme.onAccent} />
-                      ) : null}
-                    </View>
-                    <Text style={styles.swatchName} numberOfLines={1}>
-                      {preset.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        ))}
-
-        <View style={styles.section}>
-          <Text style={styles.groupLabel}>Custom Color</Text>
+      {ACCENT_PRESET_GROUPS.map((group) => (
+        <View key={group.label} style={styles.section}>
+          <Text style={styles.groupLabel}>{group.label}</Text>
           <View style={styles.swatchGrid}>
-            <TouchableOpacity
-              testID="open-custom-color"
-              style={styles.swatchItem}
-              onPress={() => setCustomMode(true)}
-              accessibilityLabel="Custom Color"
-              accessibilityRole="button"
-              accessibilityState={{ selected: customMode }}
-            >
-              <View
-                style={[
-                  styles.swatchCircle,
-                  styles.customSwatchCircle,
-                  customMode && styles.swatchCircleSelected,
-                ]}
-              >
-                <Feather name="droplet" size={16} color={colors.textPrimary} />
-              </View>
-              <Text style={styles.swatchName}>Custom</Text>
-            </TouchableOpacity>
+            {group.colors.map((preset) => {
+              const isSelected = !customMode && preset.hex.toUpperCase() === selectedColor;
+              const presetTheme = buildAccentTheme(preset.hex);
+              return (
+                <TouchableOpacity
+                  key={preset.hex}
+                  testID={`preset-swatch-${preset.hex}`}
+                  style={styles.swatchItem}
+                  onPress={() => {
+                    setSelectedColor(preset.hex.toUpperCase());
+                    setCustomMode(false);
+                  }}
+                  accessibilityLabel={preset.name}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                >
+                  <View
+                    style={[
+                      styles.swatchCircle,
+                      { backgroundColor: preset.hex },
+                      isSelected && styles.swatchCircleSelected,
+                    ]}
+                  >
+                    {isSelected ? (
+                      <Feather name="check" size={16} color={presetTheme.onAccent} />
+                    ) : null}
+                  </View>
+                  <Text style={styles.swatchName} numberOfLines={1}>
+                    {preset.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
+        </View>
+      ))}
 
-          {customMode ? (
-            <View style={styles.customColorCard}>
-              <RgbSliderPicker value={selectedColor} onChange={(hex) => setSelectedColor(hex)} />
+      <View style={styles.section}>
+        <Text style={styles.groupLabel}>Custom Color</Text>
+        <View style={styles.swatchGrid}>
+          <TouchableOpacity
+            testID="open-custom-color"
+            style={styles.swatchItem}
+            onPress={() => setCustomMode(true)}
+            accessibilityLabel="Custom Color"
+            accessibilityRole="button"
+            accessibilityState={{ selected: customMode }}
+          >
+            <View
+              style={[
+                styles.swatchCircle,
+                styles.customSwatchCircle,
+                customMode && styles.swatchCircleSelected,
+              ]}
+            >
+              <Feather name="droplet" size={16} color={colors.textPrimary} />
             </View>
-          ) : null}
+            <Text style={styles.swatchName}>Custom</Text>
+          </TouchableOpacity>
         </View>
 
-        {saveError ? (
-          <Text testID="accent-color-save-error" style={styles.saveError}>
-            {saveError}
-          </Text>
+        {customMode ? (
+          <View style={styles.customColorCard}>
+            <RgbSliderPicker value={selectedColor} onChange={(hex) => setSelectedColor(hex)} />
+          </View>
         ) : null}
+      </View>
 
-        <TouchableOpacity
-          testID="accent-color-save"
-          style={[styles.saveButton, { backgroundColor: theme.accent }]}
-          onPress={() => onSave(selectedColor)}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator color={theme.onAccent} />
-          ) : (
-            <Text style={[styles.saveButtonText, { color: theme.onAccent }]}>Save</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+      {saveError ? (
+        <Text testID="accent-color-save-error" style={styles.saveError}>
+          {saveError}
+        </Text>
+      ) : null}
+
+      <PrimaryButton
+        testID="accent-color-save"
+        label="Save"
+        onPress={() => onSave(selectedColor)}
+        loading={saving}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+      />
+    </Screen>
   );
 }

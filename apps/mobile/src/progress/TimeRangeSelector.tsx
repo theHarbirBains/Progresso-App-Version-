@@ -25,7 +25,9 @@ export function TimeRangeSelector({ value, onChange, accentColor, onAccentColor 
               selected && { backgroundColor: accentColor, borderColor: accentColor },
             ]}
             onPress={() => onChange(range.value)}
+            hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
             accessibilityRole="button"
+            accessibilityLabel={range.label}
             accessibilityState={{ selected }}
           >
             <Text style={[styles.chipText, selected && { color: onAccentColor }]}>

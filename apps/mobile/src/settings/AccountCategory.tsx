@@ -1,13 +1,12 @@
-import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { AppCard } from '../design/AppCard';
 import { Avatar } from '../design/Avatar';
 import { PrimaryButton } from '../design/Button';
-import { SectionHeader } from '../design/SectionHeader';
+import { ListRow } from '../design/ListRow';
+import { Section } from '../design/Section';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { TextInput } from '../design/TextInput';
-import { colors, radii, spacing } from '../design/theme';
+import { colors, radii, spacing, typeScale } from '../design/theme';
 import { settingsStyles as styles } from './settingsStyles';
 
 interface Props {
@@ -60,31 +59,27 @@ export function AccountCategory({
   }
 
   return (
-    <>
-      <View style={styles.section}>
-        <SectionHeader label="Account Information" />
-        <Text style={styles.cardSubtitle}>Manage your profile details.</Text>
-        <AppCard>
-          <View style={accountAvatarStyles.row}>
-            <View style={[accountAvatarStyles.avatar, { backgroundColor: accentColor }]}>
+    <View style={styles.categoryGap}>
+      <Section title="Account Information">
+        <View style={localStyles.form}>
+          <View style={localStyles.identity}>
+            <View style={[localStyles.avatar, { backgroundColor: accentColor }]}>
               <Avatar
                 uri={avatarUrl}
                 initial={avatarInitial}
                 size={48}
                 iconSize={20}
                 iconColor={onAccentColor}
-                initialStyle={[accountAvatarStyles.avatarInitial, { color: onAccentColor }]}
+                initialStyle={[localStyles.avatarInitial, { color: onAccentColor }]}
               />
             </View>
-            <View style={styles.rowBody}>
+            <View style={localStyles.identityBody}>
               <Text testID="account-email" style={styles.rowTitle}>
                 {email}
               </Text>
               <Text style={styles.rowSubtitle}>Your account email</Text>
             </View>
           </View>
-
-          <View style={styles.fieldSpacer} />
 
           <TextInput
             testID="account-display-name"
@@ -93,8 +88,6 @@ export function AccountCategory({
             value={displayName}
             onChangeText={onChangeDisplayName}
           />
-
-          <View style={styles.fieldSpacer} />
 
           <TextInput
             testID="account-username"
@@ -105,97 +98,77 @@ export function AccountCategory({
             onChangeText={(text) => onChangeUsername(text.toLowerCase())}
           />
 
-          <View style={styles.fieldSpacer} />
-
-          <Text style={[styles.rowTitle, { marginBottom: spacing.sm }]}>Weight unit</Text>
-          <SegmentedControl
-            testID="account-unit"
-            options={[
-              { label: 'KG', value: 'kg' as const },
-              { label: 'LB', value: 'lb' as const },
-            ]}
-            value={weightUnit}
-            onChange={onChangeWeightUnit}
-            accentColor={accentColor}
-            onAccentColor={onAccentColor}
-          />
+          <View>
+            <Text style={localStyles.fieldLabel}>Weight unit</Text>
+            <SegmentedControl
+              testID="account-unit"
+              options={[
+                { label: 'KG', value: 'kg' as const },
+                { label: 'LB', value: 'lb' as const },
+              ]}
+              value={weightUnit}
+              onChange={onChangeWeightUnit}
+              accentColor={accentColor}
+              onAccentColor={onAccentColor}
+            />
+          </View>
 
           {saveError ? (
-            <Text testID="account-save-error" style={[styles.errorText, { marginTop: spacing.lg }]}>
+            <Text testID="account-save-error" style={styles.errorText}>
               {saveError}
             </Text>
           ) : null}
           {savedMessage ? (
-            <Text testID="account-saved" style={[styles.rowSubtitle, { marginTop: spacing.lg }]}>
+            <Text testID="account-saved" style={styles.rowSubtitle}>
               {savedMessage}
             </Text>
           ) : null}
 
-          <View style={styles.fieldSpacer} />
           <PrimaryButton
             testID="account-save"
-            label={saving ? 'Saving…' : 'Save Changes'}
+            label="Save Changes"
             onPress={onSave}
-            disabled={saving}
+            loading={saving}
             accentColor={accentColor}
             onAccentColor={onAccentColor}
           />
-        </AppCard>
-      </View>
+        </View>
+      </Section>
 
-      <View style={styles.section}>
-        <SectionHeader label="Account Actions" />
-        <AppCard>
-          <TouchableOpacity
-            testID="account-change-password"
-            style={styles.row}
-            onPress={() => handleNotYetAvailable('Change Password')}
-            accessibilityRole="button"
-          >
-            <View style={styles.rowIconWrap}>
-              <Feather name="lock" size={16} color={colors.textSecondary} />
-            </View>
-            <View style={styles.rowBody}>
-              <Text style={styles.rowTitle}>Change Password</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            testID="sign-out-button"
-            style={[styles.row, styles.rowDivider]}
-            onPress={onSignOut}
-            accessibilityRole="button"
-          >
-            <View style={styles.rowIconWrap}>
-              <Feather name="log-out" size={16} color={colors.textSecondary} />
-            </View>
-            <View style={styles.rowBody}>
-              <Text style={styles.rowTitle}>Sign Out</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            testID="account-delete-account"
-            style={[styles.row, styles.rowDivider]}
-            onPress={handleDeleteAccount}
-            accessibilityRole="button"
-          >
-            <View style={[styles.rowIconWrap, { backgroundColor: colors.destructiveBorder }]}>
-              <Feather name="trash-2" size={16} color={colors.destructive} />
-            </View>
-            <View style={styles.rowBody}>
-              <Text style={[styles.rowTitle, styles.rowTitleDestructive]}>Delete Account</Text>
-            </View>
-          </TouchableOpacity>
-        </AppCard>
-      </View>
-    </>
+      <Section title="Account Actions">
+        <ListRow
+          testID="account-change-password"
+          icon="lock"
+          title="Change Password"
+          onPress={() => handleNotYetAvailable('Change Password')}
+        />
+        <ListRow
+          testID="sign-out-button"
+          icon="log-out"
+          title="Sign Out"
+          chevron={false}
+          divider
+          onPress={onSignOut}
+        />
+        <ListRow
+          testID="account-delete-account"
+          icon="trash-2"
+          title="Delete Account"
+          destructive
+          chevron={false}
+          divider
+          onPress={handleDeleteAccount}
+        />
+      </Section>
+    </View>
   );
 }
 
-const accountAvatarStyles = StyleSheet.create({
-  row: {
+const localStyles = StyleSheet.create({
+  form: {
+    gap: spacing.lg,
+  },
+  identity: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
@@ -209,7 +182,14 @@ const accountAvatarStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarInitial: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...typeScale.cardTitle,
+  },
+  identityBody: {
+    flex: 1,
+  },
+  fieldLabel: {
+    ...typeScale.label,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
 });

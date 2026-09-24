@@ -1,6 +1,6 @@
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from './Text';
-import { colors } from './theme';
+import { colors, fonts, typeScale } from './theme';
 
 interface Props {
   /** Every letter to display, in display order (e.g. ALPHABET_INDEX_LETTERS from foodLibraryGrouping.ts). */
@@ -51,7 +51,7 @@ export function AlphabetIndexRail({
               style={[
                 styles.letter,
                 { color: available ? colors.textSecondary : colors.textMuted },
-                active && { color: accentColor, fontWeight: '700' },
+                active && { color: accentColor, fontFamily: fonts.display },
               ]}
             >
               {letter}
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   letter: {
-    fontSize: 11,
-    fontWeight: '600',
+    ...typeScale.caption,
+    fontFamily: fonts.semibold,
   },
 });

@@ -1,9 +1,9 @@
-import { View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { AppCard } from '../design/AppCard';
 import { colors } from '../design/theme';
 import { progressStyles as styles } from './progressStyles';
+import { formatWeight } from '../lib/units';
 
 interface Props {
   exerciseName: string;
@@ -16,13 +16,9 @@ interface Props {
   testID?: string;
 }
 
-function formatWeight(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
 /**
  * One row on the Top Sets page: an exercise's single best qualifying set
- * (see topSets.ts) as its own glass card -- left side identifies the
+ * (see topSets.ts) as a plain row -- left side identifies the
  * exercise (name + muscle group), right side is the number that matters
  * (weight x reps) plus the "Top Set" label and a chevron. Deliberately no
  * icon, date, badge, or streak -- clean and data-focused, per the page's
@@ -39,7 +35,15 @@ export function TopSetRow({
   testID,
 }: Props) {
   return (
-    <AppCard testID={testID} style={styles.topSetCard} onPress={onPress}>
+    <TouchableOpacity
+      testID={testID}
+      style={styles.topSetCard}
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={0.7}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={`${exerciseName}, ${muscleGroupLabel}, top set ${formatWeight(weightDisplay)}${unit} times ${reps}`}
+    >
       <View style={styles.topSetRowContent}>
         <View style={styles.topSetRowLeft}>
           <Text style={styles.topSetExerciseName} numberOfLines={1}>
@@ -58,6 +62,6 @@ export function TopSetRow({
           <Feather name="chevron-right" size={20} color={colors.textMuted} />
         </View>
       </View>
-    </AppCard>
+    </TouchableOpacity>
   );
 }

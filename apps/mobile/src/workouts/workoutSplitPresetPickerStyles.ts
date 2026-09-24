@@ -6,8 +6,8 @@ import { colors, radii, spacing, typeScale } from '../design/theme';
 // which WorkoutSplitsScreen/WorkoutSplitFormScreen also depend on.
 export const workoutSplitPresetPickerStyles = StyleSheet.create({
   errorText: {
+    ...typeScale.callout,
     color: colors.destructive,
-    fontSize: 14,
     marginBottom: spacing.lg,
   },
   presetList: {
@@ -57,7 +57,7 @@ export const workoutSplitPresetPickerStyles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   createSplitButtonText: {
+    ...typeScale.cardTitle,
     fontFamily: 'Manrope_700Bold',
-    fontSize: 16,
   },
 });

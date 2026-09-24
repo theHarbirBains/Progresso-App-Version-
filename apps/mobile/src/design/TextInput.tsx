@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import {
   StyleSheet,
   TextInput as RNTextInput,
@@ -30,7 +30,11 @@ interface Props {
   leftAccessory?: ReactNode;
   rightAccessory?: ReactNode;
   testID?: string;
+  /** testID for the error text. Defaults to `${testID}-error`. */
+  errorTestID?: string;
   accessibilityLabel?: string;
+  /** Ref to the native input, for moving focus to the next field on submit. */
+  inputRef?: Ref<RNTextInput>;
 }
 
 // Component Logic: one bordered row (label above, helper/error text below,
@@ -56,7 +60,9 @@ export function TextInput({
   leftAccessory,
   rightAccessory,
   testID,
+  errorTestID,
   accessibilityLabel,
+  inputRef,
 }: Props) {
   const [focused, setFocused] = useState(false);
 
@@ -68,6 +74,7 @@ export function TextInput({
       <View style={[styles.row, { borderColor }, disabled && styles.rowDisabled]}>
         {leftAccessory}
         <RNTextInput
+          ref={inputRef}
           testID={testID}
           style={styles.input}
           placeholder={placeholder}
@@ -91,7 +98,10 @@ export function TextInput({
         {rightAccessory}
       </View>
       {error ? (
-        <Text testID={testID ? `${testID}-error` : undefined} style={styles.errorText}>
+        <Text
+          testID={errorTestID ?? (testID ? `${testID}-error` : undefined)}
+          style={styles.errorText}
+        >
           {error}
         </Text>
       ) : helperText ? (

@@ -1,127 +1,75 @@
 import { StyleSheet } from 'react-native';
+import { colors, spacing, typeScale } from '../design/theme';
 
-// Shared by SignInScreen/SignUpScreen: same form layout, same dark palette
-// as the rest of the Phase 0 shell. Not the final Progresso visual design.
+// Every signed-out screen (Sign In, Sign Up, Forgot/Reset Password, Welcome),
+// via AuthFrame. Token-only; inputs and buttons are the shared design
+// components, so this holds only the frame and a few text blocks.
 export const authStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0B0B0F',
+  // The Screen's scrolling body: centred vertically when the form is short.
+  content: {
+    flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    gap: 12,
+    paddingVertical: spacing.xxl,
   },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 16,
+  frame: {
+    gap: spacing.lg,
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  backLink: {
-    color: '#9A9AA5',
-    fontSize: 14,
+  logo: {
+    width: 64,
+    height: 64,
+    marginBottom: spacing.md,
   },
-  input: {
-    backgroundColor: '#17171C',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A32',
-    color: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
+  title: {
+    ...typeScale.screenTitle,
+    color: colors.textPrimary,
+    textAlign: 'center',
   },
-  button: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: '#0B0B0F',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  error: {
-    color: '#FF6B6B',
-    fontSize: 14,
+  subtitle: {
+    ...typeScale.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   info: {
-    color: '#9A9AA5',
-    fontSize: 14,
-  },
-  link: {
-    color: '#9A9AA5',
-    fontSize: 14,
+    ...typeScale.body,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginTop: 20,
   },
-  label: {
-    color: '#9A9AA5',
-    fontSize: 13,
-    marginTop: 8,
+  errorText: {
+    ...typeScale.callout,
+    color: colors.destructive,
   },
-  divider: {
-    color: '#6B6B75',
-    fontSize: 13,
-    textAlign: 'center',
-    marginVertical: 4,
+  actions: {
+    gap: spacing.sm,
   },
-  oauthButton: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A32',
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  oauthButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  unitToggleRow: {
+  // "or" between the password form and the OAuth buttons, flanked by hairlines.
+  dividerRow: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  unitOption: {
+  dividerLine: {
     flex: 1,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A32',
-    paddingVertical: 12,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.divider,
+  },
+  dividerText: {
+    ...typeScale.secondary,
+    color: colors.textMuted,
+  },
+  // "Already have an account? Sign In"
+  footer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
   },
-  unitOptionSelected: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  unitOptionText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  unitOptionTextSelected: {
-    color: '#0B0B0F',
-  },
-  signOutButton: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3A2A2A',
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  signOutButtonText: {
-    color: '#FF6B6B',
-    fontSize: 16,
-    fontWeight: '600',
+  footerText: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
   },
 });

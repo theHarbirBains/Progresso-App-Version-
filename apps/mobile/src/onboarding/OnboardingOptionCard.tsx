@@ -1,7 +1,7 @@
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { colors, fonts, radii, spacing } from '../design/theme';
+import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 
 interface Props {
   testID: string;
@@ -57,13 +57,13 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   label: {
+    ...typeScale.body,
     color: colors.textPrimary,
     fontFamily: fonts.display,
-    fontSize: 15,
   },
   description: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
     marginTop: spacing.xs,
   },
 });

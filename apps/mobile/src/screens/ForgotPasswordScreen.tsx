@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ActivityIndicator, TextInput, TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
-import { colors } from '../design/theme';
+import { PrimaryButton, TextButton } from '../design/Button';
+import { TextInput } from '../design/TextInput';
+import { AuthFrame } from './AuthFrame';
 import { authStyles as styles } from './authStyles';
 
 interface Props {
@@ -32,30 +34,28 @@ export function ForgotPasswordScreen({ onBackToSignIn }: Props) {
 
   if (submitted) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Check your email</Text>
+      <AuthFrame title="Check your email">
         <Text testID="forgot-password-confirmation" style={styles.info}>
           If an account exists for {email.trim()}, we sent a link to reset your password.
         </Text>
-        <TouchableOpacity testID="forgot-password-back" onPress={onBackToSignIn}>
-          <Text style={styles.link}>Back to sign in</Text>
-        </TouchableOpacity>
-      </View>
+        <TextButton
+          testID="forgot-password-back"
+          label="Back to sign in"
+          onPress={onBackToSignIn}
+        />
+      </AuthFrame>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Reset Password</Text>
-      <Text style={styles.info}>
-        Enter your email and we&apos;ll send you a link to reset your password.
-      </Text>
-
+    <AuthFrame
+      title="Reset Password"
+      subtitle="Enter your email and we'll send you a link to reset your password."
+    >
       <TextInput
         testID="forgot-password-email"
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor={colors.textMuted}
+        label="Email"
+        placeholder="you@example.com"
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -64,27 +64,25 @@ export function ForgotPasswordScreen({ onBackToSignIn }: Props) {
       />
 
       {error ? (
-        <Text testID="forgot-password-error" style={styles.error}>
+        <Text testID="forgot-password-error" style={styles.errorText}>
           {error}
         </Text>
       ) : null}
 
-      <TouchableOpacity
-        testID="forgot-password-submit"
-        style={[styles.button, !canSubmit && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={!canSubmit}
-      >
-        {submitting ? (
-          <ActivityIndicator color={colors.background} />
-        ) : (
-          <Text style={styles.buttonText}>Send Reset Link</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity testID="forgot-password-back" onPress={onBackToSignIn}>
-        <Text style={styles.link}>Back to sign in</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.actions}>
+        <PrimaryButton
+          testID="forgot-password-submit"
+          label="Send Reset Link"
+          onPress={handleSubmit}
+          loading={submitting}
+          disabled={!canSubmit && !submitting}
+        />
+        <TextButton
+          testID="forgot-password-back"
+          label="Back to sign in"
+          onPress={onBackToSignIn}
+        />
+      </View>
+    </AuthFrame>
   );
 }

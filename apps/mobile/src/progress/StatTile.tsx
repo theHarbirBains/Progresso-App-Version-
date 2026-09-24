@@ -1,29 +1,19 @@
 import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { AppCard } from '../design/AppCard';
-import { withAlpha } from '../theme/accentColor';
 import { progressStyles as styles } from './progressStyles';
 
 interface Props {
-  icon: keyof typeof Feather.glyphMap;
   label: string;
   value: string;
-  accentColor: string;
   testID?: string;
 }
 
-/** One compact stat (lifetime overview stats, Training Momentum) -- deliberately small, never a giant metric card. */
-export function StatTile({ icon, label, value, accentColor, testID }: Props) {
+/** One compact stat (lifetime overview stats, Training Momentum): a neutral mono number over a quiet label. Plain content, not a card and not decorated with an icon. */
+export function StatTile({ label, value, testID }: Props) {
   return (
-    <AppCard testID={testID} style={styles.statTile}>
-      <View style={[styles.statTileIcon, { backgroundColor: withAlpha(accentColor, 0.14) }]}>
-        <Feather name={icon} size={16} color={accentColor} />
-      </View>
-      <View>
-        <Text style={styles.statTileValue}>{value}</Text>
-        <Text style={styles.statTileLabel}>{label}</Text>
-      </View>
-    </AppCard>
+    <View testID={testID} style={styles.statTile}>
+      <Text style={styles.statTileValue}>{value}</Text>
+      <Text style={styles.statTileLabel}>{label}</Text>
+    </View>
   );
 }

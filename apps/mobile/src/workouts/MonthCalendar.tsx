@@ -18,12 +18,7 @@ interface Props {
   onNextMonth: () => void;
 }
 
-// Component Logic: one 7-column grid of fixed-size day cells, each deriving
-// its visual state (today/selected/completed/dimmed) from three plain
-// booleans rather than a combinatorial style-variant prop -- no per-cell
-// wrapper beyond the single TouchableOpacity + its dot. Each day is named for
-// assistive tech ("September 5, workout completed"), and the month arrows are
-// full 44pt targets.
+// "September 5" / "September 5, workout completed" -- a day's accessible name.
 function describeDay(dateKey: string, completed: boolean): string {
   const [y, m, d] = dateKey.split('-').map(Number);
   const label = new Date(y, m - 1, d).toLocaleDateString(undefined, {
@@ -33,6 +28,11 @@ function describeDay(dateKey: string, completed: boolean): string {
   return completed ? `${label}, workout completed` : label;
 }
 
+// Component Logic: one 7-column grid of fixed-size day cells, each deriving
+// its visual state (today/selected/completed/dimmed) from three plain
+// booleans rather than a combinatorial style-variant prop -- no per-cell
+// wrapper beyond the single TouchableOpacity + its dot. Each day is named for
+// assistive tech, and the month arrows are full 44pt targets.
 export function MonthCalendar({
   testID,
   year,

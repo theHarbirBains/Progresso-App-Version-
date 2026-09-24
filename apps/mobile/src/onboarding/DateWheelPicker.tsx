@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { Text } from '../design/Text';
-import { colors, fonts, spacing } from '../design/theme';
+import { colors, fonts, spacing, typeScale } from '../design/theme';
 import { WheelPicker } from '../design/WheelPicker';
 import { clampDay, daysInMonth, MONTH_NAMES, yearRange } from './dateWheelValues';
 
@@ -75,6 +75,7 @@ const styles = StyleSheet.create({
   dayColumn: { flex: 2 },
   yearColumn: { flex: 2 },
   preview: {
+    ...typeScale.secondary,
     position: 'absolute',
     bottom: -spacing.xl,
     left: 0,
@@ -82,6 +83,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textSecondary,
     fontFamily: fonts.displayMedium,
-    fontSize: 13,
   },
 });

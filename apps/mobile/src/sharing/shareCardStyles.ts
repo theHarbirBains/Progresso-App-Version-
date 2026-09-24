@@ -1,109 +1,38 @@
 import { StyleSheet } from 'react-native';
 import { colors, radii, spacing, typeScale } from '../design/theme';
 
-// The Share Workout screen and the card it captures. Token-only.
+// The shareable workout image (ShareCard) and the screen around it. Token-only.
 //
-// The card is deliberately brand-coloured rather than following the user's
-// accent or Background Theme: it becomes a PNG shared outside the app, so it
-// always uses the static Progresso palette (`colors.background`, the brand
-// `colors.accent` for PRs) and the same typography as the app. The screen
-// around it (frame, header, buttons) is the shared design system.
+// The card is deliberately minimal and clinical: near-black, Manrope, mono
+// numerals, hairlines, one accent colour (the user's Workout accent, supplied
+// per render) used only for personal records. It is a PNG that leaves the app,
+// so it always paints the static Progresso palette rather than a Background
+// Theme.
 export const shareCardStyles = StyleSheet.create({
+  // ---- The screen ----------------------------------------------------------
   content: {
-    alignItems: 'stretch',
-    gap: spacing.xl,
+    gap: spacing.xxl,
     paddingBottom: spacing.xxl,
   },
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,
     textAlign: 'center',
-    marginBottom: spacing.md,
   },
   loading: {
     paddingVertical: spacing.xxl,
   },
-
-  // 9:16 -- the same aspect ratio the card is captured at (1080x1920), just
-  // rendered at a screen-friendly width. The preview IS the captured view,
-  // not a separate representation of it.
-  cardWrapper: {
+  previewWrap: {
     alignItems: 'center',
   },
-  card: {
-    width: 320,
-    aspectRatio: 1080 / 1920,
-    backgroundColor: colors.background,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.xl,
-    justifyContent: 'space-between',
+  formatWrap: {
+    alignItems: 'center',
   },
-  wordmark: {
-    ...typeScale.label,
-    color: colors.textSecondary,
-    letterSpacing: 3,
-  },
-  cardTop: {
-    gap: spacing.xs,
-  },
-  workoutName: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
-    marginTop: spacing.md,
-  },
-  workoutDate: {
-    ...typeScale.label,
-    color: colors.textSecondary,
-  },
-  musclesTrained: {
-    ...typeScale.label,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  topSetsSection: {
-    marginTop: spacing.xl,
-    gap: spacing.sm,
-  },
-  sectionLabel: {
-    ...typeScale.sectionHeading,
+  privacyNote: {
+    ...typeScale.caption,
     color: colors.textMuted,
-    marginBottom: 2,
+    marginTop: spacing.sm,
   },
-  topSetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  topSetExercise: {
-    ...typeScale.callout,
-    fontFamily: typeScale.cardTitle.fontFamily,
-    color: colors.textPrimary,
-    flexShrink: 1,
-    paddingRight: spacing.sm,
-  },
-  topSetValue: {
-    ...typeScale.statSmall,
-    color: colors.textPrimary,
-  },
-  prSection: {
-    marginTop: spacing.lg,
-    gap: spacing.xs,
-  },
-  prLine: {
-    ...typeScale.label,
-    fontFamily: typeScale.cardTitle.fontFamily,
-    color: colors.accent,
-  },
-  footer: {
-    ...typeScale.statSmall,
-    color: colors.textSecondary,
-    marginTop: spacing.lg,
-  },
-
-  // Below the card: Share is the one filled button, Save to Photos the quiet
-  // secondary.
   actions: {
     gap: spacing.md,
   },
@@ -116,5 +45,129 @@ export const shareCardStyles = StyleSheet.create({
     ...typeScale.callout,
     color: colors.destructive,
     textAlign: 'center',
+  },
+
+  // ---- The card ------------------------------------------------------------
+  card: {
+    width: 320,
+    backgroundColor: colors.background,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  // Dims a user's own photo so the type stays legible whatever it is.
+  photo: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  scrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  body: {
+    flex: 1,
+    padding: spacing.xl,
+    justifyContent: 'space-between',
+    gap: spacing.lg,
+  },
+
+  // The shorter feed card packs the same blocks a little tighter.
+  bodyCompact: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  blocks: {
+    gap: spacing.lg,
+  },
+  blocksCompact: {
+    gap: spacing.md,
+  },
+
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  wordmark: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+    letterSpacing: 3,
+  },
+  date: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
+  workoutName: {
+    ...typeScale.screenTitle,
+    color: colors.textPrimary,
+    marginTop: spacing.md,
+  },
+  muscles: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+
+  section: {
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  sectionLabel: {
+    ...typeScale.caption,
+    letterSpacing: 2,
+    color: colors.textMuted,
+  },
+  // Personal records: the one place the accent appears.
+  recordName: {
+    ...typeScale.callout,
+    fontFamily: typeScale.cardTitle.fontFamily,
+    color: colors.textPrimary,
+  },
+  recordLabel: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+  },
+  recordValue: {
+    ...typeScale.statLarge,
+  },
+  recordValueCompact: {
+    ...typeScale.statMedium,
+  },
+
+  row: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  rowLabel: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
+    flexShrink: 1,
+  },
+  rowValue: {
+    ...typeScale.statMedium,
+    color: colors.textPrimary,
+  },
+  rowValueCompact: {
+    ...typeScale.statSmall,
+  },
+  liftName: {
+    ...typeScale.callout,
+    color: colors.textPrimary,
+    flexShrink: 1,
+  },
+  liftValue: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
   },
 });

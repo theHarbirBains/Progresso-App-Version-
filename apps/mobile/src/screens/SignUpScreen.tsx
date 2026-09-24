@@ -1,24 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  AccessibilityInfo,
-  Animated,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useRef, useState } from 'react';
+import { TextInput as RNTextInput, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
-import { updateMyProfile } from '../lib/api';
+import { PrimaryButton, TextButton } from '../design/Button';
+import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
-import { signUpStyles as styles } from './signUpStyles';
-
-const logo = require('../../assets/progresso-mark.png');
+import { updateMyProfile } from '../lib/api';
+import { AuthFrame } from './AuthFrame';
+import { authStyles as styles } from './authStyles';
 
 interface Props {
   onSwitchToSignIn: () => void;
@@ -28,16 +18,6 @@ interface Props {
   onAccountCreated?: () => void;
 }
 
-type FocusedField =
-  | 'firstName'
-  | 'lastName'
-  | 'displayName'
-  | 'username'
-  | 'email'
-  | 'password'
-  | 'confirmPassword'
-  | null;
-
 // Mirrors the backend's own username rule exactly (update-user.dto.ts /
 // 20260825100001_username.sql): lowercase letters, digits, underscores,
 // 3-20 characters. Client-side validation is a UX nicety only -- the
@@ -45,9 +25,10 @@ type FocusedField =
 // that can know whether a given username is actually taken).
 const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
+// Every field is the shared labelled TextInput, in the order the user fills
+// them (Return moves to the next); Create Account is the one filled button.
 export function SignUpScreen({ onSwitchToSignIn, onAccountCreated }: Props) {
   const { signUpWithPassword } = useAuth();
-  const insets = useSafeAreaInsets();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -58,17 +39,16 @@ export function SignUpScreen({ onSwitchToSignIn, onAccountCreated }: Props) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
-  const [focusedField, setFocusedField] = useState<FocusedField>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmationSent, setConfirmationSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const lastNameRef = useRef<TextInput>(null);
-  const displayNameRef = useRef<TextInput>(null);
-  const usernameRef = useRef<TextInput>(null);
-  const emailRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
-  const confirmRef = useRef<TextInput>(null);
+  const lastNameRef = useRef<RNTextInput>(null);
+  const displayNameRef = useRef<RNTextInput>(null);
+  const usernameRef = useRef<RNTextInput>(null);
+  const emailRef = useRef<RNTextInput>(null);
+  const passwordRef = useRef<RNTextInput>(null);
+  const confirmRef = useRef<RNTextInput>(null);
 
   // Set once the Supabase Auth account itself exists, so a retry after a
   // profile-save failure (e.g. a taken username) re-attempts only the
@@ -76,23 +56,6 @@ export function SignUpScreen({ onSwitchToSignIn, onAccountCreated }: Props) {
   // just fail with "already exists".
   const accountCreatedRef = useRef(false);
   const accessTokenRef = useRef<string | null>(null);
-
-  const contentOpacity = useRef(new Animated.Value(0)).current;
-  const contentTranslateY = useRef(new Animated.Value(12)).current;
-
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
-      if (reduceMotion) {
-        contentOpacity.setValue(1);
-        contentTranslateY.setValue(0);
-        return;
-      }
-      Animated.parallel([
-        Animated.timing(contentOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(contentTranslateY, { toValue: 0, duration: 400, useNativeDriver: true }),
-      ]).start();
-    });
-  }, [contentOpacity, contentTranslateY]);
 
   const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password;
   const canSubmit =
@@ -199,249 +162,156 @@ export function SignUpScreen({ onSwitchToSignIn, onAccountCreated }: Props) {
 
   if (confirmationSent) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top + 24, paddingHorizontal: 24 }]}>
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          <Image
-            source={logo}
-            style={[styles.logo, { alignSelf: 'center' }]}
-            resizeMode="contain"
-          />
-          <Text style={styles.confirmationTitle}>Check your email</Text>
-          <Text testID="sign-up-confirmation" style={styles.confirmationText}>
-            We sent a confirmation link to {email.trim()}. Confirm your email, then sign in.
-          </Text>
-          <TouchableOpacity testID="sign-up-switch" onPress={onSwitchToSignIn}>
-            <Text style={[styles.footerLink, { textAlign: 'center' }]}>Back to sign in</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <AuthFrame showLogo title="Check your email">
+        <Text testID="sign-up-confirmation" style={styles.info}>
+          We sent a confirmation link to {email.trim()}. Confirm your email, then sign in.
+        </Text>
+        <TextButton testID="sign-up-switch" label="Back to sign in" onPress={onSwitchToSignIn} />
+      </AuthFrame>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top}
+    <AuthFrame showLogo title="Create your account" subtitle="Start tracking your progress.">
+      {error ? (
+        <Text testID="sign-up-error" style={styles.errorText}>
+          {error}
+        </Text>
+      ) : null}
+
+      <TextInput
+        testID="sign-up-first-name"
+        label="First Name"
+        placeholder="Enter your first name"
+        autoComplete="given-name"
+        returnKeyType="next"
+        value={firstName}
+        onChangeText={setFirstName}
+        onSubmitEditing={() => lastNameRef.current?.focus()}
+      />
+      <TextInput
+        inputRef={lastNameRef}
+        testID="sign-up-last-name"
+        label="Last Name"
+        placeholder="Enter your last name"
+        autoComplete="family-name"
+        returnKeyType="next"
+        value={lastName}
+        onChangeText={setLastName}
+        onSubmitEditing={() => displayNameRef.current?.focus()}
+      />
+      <TextInput
+        inputRef={displayNameRef}
+        testID="sign-up-display-name"
+        label="Display Name"
+        placeholder="Enter your display name"
+        returnKeyType="next"
+        value={displayName}
+        onChangeText={setDisplayName}
+        onSubmitEditing={() => usernameRef.current?.focus()}
+      />
+      <TextInput
+        inputRef={usernameRef}
+        testID="sign-up-username"
+        label="Username"
+        placeholder="@username"
+        autoCapitalize="none"
+        autoComplete="username-new"
+        returnKeyType="next"
+        value={username}
+        onChangeText={(text) => setUsername(text.toLowerCase())}
+        onSubmitEditing={() => emailRef.current?.focus()}
+      />
+      <TextInput
+        inputRef={emailRef}
+        testID="sign-up-email"
+        label="Email"
+        placeholder="you@example.com"
+        autoCapitalize="none"
+        autoComplete="email"
+        keyboardType="email-address"
+        returnKeyType="next"
+        value={email}
+        onChangeText={setEmail}
+        onSubmitEditing={() => passwordRef.current?.focus()}
+      />
+      <TextInput
+        inputRef={passwordRef}
+        testID="sign-up-password"
+        label="Password"
+        placeholder="At least 6 characters"
+        secureTextEntry={!passwordVisible}
+        autoCapitalize="none"
+        autoComplete="password-new"
+        returnKeyType="next"
+        value={password}
+        onChangeText={setPassword}
+        onSubmitEditing={() => confirmRef.current?.focus()}
+        rightAccessory={
+          <VisibilityToggle
+            testID="sign-up-password-toggle"
+            visible={passwordVisible}
+            onToggle={() => setPasswordVisible((v) => !v)}
+          />
+        }
+      />
+      <TextInput
+        inputRef={confirmRef}
+        testID="sign-up-confirm-password"
+        label="Confirm Password"
+        placeholder="Re-enter your password"
+        secureTextEntry={!confirmVisible}
+        autoCapitalize="none"
+        autoComplete="password-new"
+        returnKeyType="done"
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+        onSubmitEditing={handleSubmit}
+        error={passwordsMismatch ? "Passwords don't match" : undefined}
+        errorTestID="sign-up-password-mismatch"
+        rightAccessory={
+          <VisibilityToggle
+            testID="sign-up-confirm-password-toggle"
+            visible={confirmVisible}
+            onToggle={() => setConfirmVisible((v) => !v)}
+          />
+        }
+      />
+
+      <PrimaryButton
+        testID="sign-up-submit"
+        label={submitting ? 'Creating Account...' : 'Create Account'}
+        onPress={handleSubmit}
+        disabled={!canSubmit}
+      />
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Already have an account?</Text>
+        <TextButton testID="sign-up-switch" label="Sign In" onPress={onSwitchToSignIn} />
+      </View>
+    </AuthFrame>
+  );
+}
+
+// The show/hide eye on a password field: a 44pt target, named for what it will do.
+function VisibilityToggle({
+  testID,
+  visible,
+  onToggle,
+}: {
+  testID: string;
+  visible: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      testID={testID}
+      onPress={onToggle}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={visible ? 'Hide password' : 'Show password'}
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <Animated.View
-          style={{ opacity: contentOpacity, transform: [{ translateY: contentTranslateY }] }}
-        >
-          <View style={styles.header}>
-            <Image source={logo} style={styles.logo} resizeMode="contain" />
-            <Text style={styles.title}>Create your account</Text>
-            <Text style={styles.subtitle}>Start tracking your progress.</Text>
-          </View>
-
-          {error ? (
-            <Text testID="sign-up-error" style={styles.formError}>
-              {error}
-            </Text>
-          ) : null}
-
-          <View style={styles.field}>
-            <Text style={styles.label}>First Name</Text>
-            <View style={[styles.inputRow, focusedField === 'firstName' && styles.inputRowFocused]}>
-              <TextInput
-                testID="sign-up-first-name"
-                style={styles.input}
-                placeholder="Enter your first name"
-                placeholderTextColor={colors.textMuted}
-                autoComplete="given-name"
-                returnKeyType="next"
-                value={firstName}
-                onChangeText={setFirstName}
-                onFocus={() => setFocusedField('firstName')}
-                onBlur={() => setFocusedField(null)}
-                onSubmitEditing={() => lastNameRef.current?.focus()}
-              />
-            </View>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Last Name</Text>
-            <View style={[styles.inputRow, focusedField === 'lastName' && styles.inputRowFocused]}>
-              <TextInput
-                ref={lastNameRef}
-                testID="sign-up-last-name"
-                style={styles.input}
-                placeholder="Enter your last name"
-                placeholderTextColor={colors.textMuted}
-                autoComplete="family-name"
-                returnKeyType="next"
-                value={lastName}
-                onChangeText={setLastName}
-                onFocus={() => setFocusedField('lastName')}
-                onBlur={() => setFocusedField(null)}
-                onSubmitEditing={() => displayNameRef.current?.focus()}
-              />
-            </View>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Display Name</Text>
-            <View
-              style={[styles.inputRow, focusedField === 'displayName' && styles.inputRowFocused]}
-            >
-              <TextInput
-                ref={displayNameRef}
-                testID="sign-up-display-name"
-                style={styles.input}
-                placeholder="Enter your display name"
-                placeholderTextColor={colors.textMuted}
-                returnKeyType="next"
-                value={displayName}
-                onChangeText={setDisplayName}
-                onFocus={() => setFocusedField('displayName')}
-                onBlur={() => setFocusedField(null)}
-                onSubmitEditing={() => usernameRef.current?.focus()}
-              />
-            </View>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Username</Text>
-            <View style={[styles.inputRow, focusedField === 'username' && styles.inputRowFocused]}>
-              <TextInput
-                ref={usernameRef}
-                testID="sign-up-username"
-                style={styles.input}
-                placeholder="@username"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-                autoComplete="username-new"
-                returnKeyType="next"
-                value={username}
-                onChangeText={(text) => setUsername(text.toLowerCase())}
-                onFocus={() => setFocusedField('username')}
-                onBlur={() => setFocusedField(null)}
-                onSubmitEditing={() => emailRef.current?.focus()}
-              />
-            </View>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
-            <View style={[styles.inputRow, focusedField === 'email' && styles.inputRowFocused]}>
-              <TextInput
-                ref={emailRef}
-                testID="sign-up-email"
-                style={styles.input}
-                placeholder="you@example.com"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                returnKeyType="next"
-                value={email}
-                onChangeText={setEmail}
-                onFocus={() => setFocusedField('email')}
-                onBlur={() => setFocusedField(null)}
-                onSubmitEditing={() => passwordRef.current?.focus()}
-              />
-            </View>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
-            <View style={[styles.inputRow, focusedField === 'password' && styles.inputRowFocused]}>
-              <TextInput
-                ref={passwordRef}
-                testID="sign-up-password"
-                style={styles.input}
-                placeholder="At least 6 characters"
-                placeholderTextColor={colors.textMuted}
-                secureTextEntry={!passwordVisible}
-                autoCapitalize="none"
-                autoComplete="password-new"
-                returnKeyType="next"
-                value={password}
-                onChangeText={setPassword}
-                onFocus={() => setFocusedField('password')}
-                onBlur={() => setFocusedField(null)}
-                onSubmitEditing={() => confirmRef.current?.focus()}
-              />
-              <TouchableOpacity
-                testID="sign-up-password-toggle"
-                style={styles.visibilityToggle}
-                onPress={() => setPasswordVisible((v) => !v)}
-                accessibilityRole="button"
-                accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
-              >
-                <Feather name={passwordVisible ? 'eye-off' : 'eye'} size={20} color="#9A9AA5" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Confirm Password</Text>
-            <View
-              style={[
-                styles.inputRow,
-                focusedField === 'confirmPassword' && styles.inputRowFocused,
-                passwordsMismatch && styles.inputRowError,
-              ]}
-            >
-              <TextInput
-                ref={confirmRef}
-                testID="sign-up-confirm-password"
-                style={styles.input}
-                placeholder="Re-enter your password"
-                placeholderTextColor={colors.textMuted}
-                secureTextEntry={!confirmVisible}
-                autoCapitalize="none"
-                autoComplete="password-new"
-                returnKeyType="done"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                onFocus={() => setFocusedField('confirmPassword')}
-                onBlur={() => setFocusedField(null)}
-                onSubmitEditing={handleSubmit}
-              />
-              <TouchableOpacity
-                testID="sign-up-confirm-password-toggle"
-                style={styles.visibilityToggle}
-                onPress={() => setConfirmVisible((v) => !v)}
-                accessibilityRole="button"
-                accessibilityLabel={confirmVisible ? 'Hide password' : 'Show password'}
-              >
-                <Feather name={confirmVisible ? 'eye-off' : 'eye'} size={20} color="#9A9AA5" />
-              </TouchableOpacity>
-            </View>
-            {passwordsMismatch ? (
-              <Text testID="sign-up-password-mismatch" style={styles.fieldError}>
-                Passwords don&apos;t match
-              </Text>
-            ) : null}
-          </View>
-
-          <TouchableOpacity
-            testID="sign-up-submit"
-            style={[styles.button, !canSubmit && styles.buttonDisabled]}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-          >
-            <Text style={styles.buttonText}>
-              {submitting ? 'Creating Account...' : 'Create Account'}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account?</Text>
-            <TouchableOpacity testID="sign-up-switch" onPress={onSwitchToSignIn}>
-              <Text style={styles.footerLink}>Sign In</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <Feather name={visible ? 'eye-off' : 'eye'} size={20} color={colors.textSecondary} />
+    </TouchableOpacity>
   );
 }

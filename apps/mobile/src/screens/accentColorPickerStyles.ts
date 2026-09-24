@@ -9,32 +9,11 @@ export const accentColorPickerStyles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   scrollContent: {
-    paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.xxxl,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.xs,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
-  },
   subtitle: {
+    ...typeScale.callout,
     color: colors.textSecondary,
-    fontSize: 14,
     marginTop: 2,
     marginBottom: spacing.xl,
   },
@@ -67,8 +46,8 @@ export const accentColorPickerStyles = StyleSheet.create({
     borderRadius: radii.sm,
   },
   previewSegmentText: {
-    fontSize: 12,
-    fontWeight: '700',
+    ...typeScale.secondary,
+    fontFamily: fonts.display,
     color: colors.textSecondary,
   },
   previewIconBox: {
@@ -91,8 +70,8 @@ export const accentColorPickerStyles = StyleSheet.create({
     alignItems: 'center',
   },
   previewButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
+    ...typeScale.callout,
+    fontFamily: fonts.display,
   },
   previewCard: {
     flex: 1,
@@ -102,14 +81,14 @@ export const accentColorPickerStyles = StyleSheet.create({
     padding: spacing.md,
   },
   previewCardLabel: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 12,
     marginTop: spacing.sm,
   },
 
   previewProgressLabel: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 12,
     marginBottom: spacing.xs,
   },
   previewProgressTrack: {
@@ -130,8 +109,8 @@ export const accentColorPickerStyles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   previewRingCenterLabel: {
+    ...typeScale.caption,
     color: colors.textSecondary,
-    fontSize: 10,
   },
 
   previewNavRow: {
@@ -145,8 +124,8 @@ export const accentColorPickerStyles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   previewNavLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    ...typeScale.secondary,
+    fontFamily: fonts.semibold,
   },
 
   // Preset palette.
@@ -183,8 +162,8 @@ export const accentColorPickerStyles = StyleSheet.create({
     borderColor: colors.border,
   },
   swatchName: {
+    ...typeScale.caption,
     color: colors.textSecondary,
-    fontSize: 11,
     marginTop: spacing.xs,
     textAlign: 'center',
   },
@@ -195,19 +174,9 @@ export const accentColorPickerStyles = StyleSheet.create({
   },
 
   saveError: {
+    ...typeScale.secondary,
     color: colors.destructive,
-    fontSize: 13,
     marginBottom: spacing.md,
-  },
-  saveButton: {
-    borderRadius: radii.lg,
-    paddingVertical: spacing.md + 2,
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
   },
   monoValue: {
     fontFamily: fonts.monoBold,

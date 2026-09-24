@@ -1,6 +1,5 @@
 import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { AppCard } from '../design/AppCard';
 import { progressStyles as styles } from './progressStyles';
 
 interface Props {
@@ -14,7 +13,7 @@ interface Props {
 /** One of the "Progress Metrics" row cards (Top Set / 1RM / Volume / PRs) on Overview. */
 export function MetricCard({ label, value, unit, emptyLabel = 'No data yet', testID }: Props) {
   return (
-    <AppCard testID={testID} style={styles.metricCard}>
+    <View testID={testID} style={styles.metricCard}>
       <Text style={styles.metricLabel}>{label}</Text>
       {value !== null ? (
         <View>
@@ -26,6 +25,6 @@ export function MetricCard({ label, value, unit, emptyLabel = 'No data yet', tes
       ) : (
         <Text style={styles.metricEmpty}>{emptyLabel}</Text>
       )}
-    </AppCard>
+    </View>
   );
 }

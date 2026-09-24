@@ -1,9 +1,6 @@
-import { TouchableOpacity, View } from 'react-native';
-import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { AppCard } from '../design/AppCard';
-import { SectionHeader } from '../design/SectionHeader';
-import { colors } from '../design/theme';
+import { View } from 'react-native';
+import { ListRow } from '../design/ListRow';
+import { Section } from '../design/Section';
 import { settingsStyles as styles } from './settingsStyles';
 
 interface Props {
@@ -21,77 +18,40 @@ export function AppCategory({
   onNavigateNutrition,
 }: Props) {
   return (
-    <View style={styles.section}>
-      <SectionHeader label="Workouts" />
-      <Text style={styles.cardSubtitle}>Manage workouts and workout splits.</Text>
-      <AppCard>
-        <TouchableOpacity
+    <View style={styles.categoryGap}>
+      <Section title="Workouts">
+        <ListRow
           testID="open-workouts"
-          style={styles.row}
+          icon="activity"
+          title="Workout History"
           onPress={onNavigateWorkoutHistory}
-        >
-          <View style={styles.rowIconWrap}>
-            <Feather name="activity" size={16} color={colors.textSecondary} />
-          </View>
-          <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>Workout History</Text>
-          </View>
-          <Feather name="chevron-right" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
+        />
+        <ListRow
           testID="open-workout-splits"
-          style={[styles.row, styles.rowDivider]}
+          icon="layers"
+          title="Workout Splits"
+          divider
           onPress={onNavigateWorkoutSplits}
-        >
-          <View style={styles.rowIconWrap}>
-            <Feather name="layers" size={16} color={colors.textSecondary} />
-          </View>
-          <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>Workout Splits</Text>
-          </View>
-          <Feather name="chevron-right" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-      </AppCard>
+        />
+      </Section>
 
-      <View style={styles.section}>
-        <SectionHeader label="Exercise Library" />
-        <Text style={styles.cardSubtitle}>View and manage exercises.</Text>
-        <AppCard>
-          <TouchableOpacity
-            testID="open-exercise-library"
-            style={styles.row}
-            onPress={onNavigateExerciseLibrary}
-          >
-            <View style={styles.rowIconWrap}>
-              <Feather name="list" size={16} color={colors.textSecondary} />
-            </View>
-            <View style={styles.rowBody}>
-              <Text style={styles.rowTitle}>Exercise Library</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        </AppCard>
-      </View>
+      <Section title="Exercise Library">
+        <ListRow
+          testID="open-exercise-library"
+          icon="list"
+          title="Exercise Library"
+          onPress={onNavigateExerciseLibrary}
+        />
+      </Section>
 
-      <View style={styles.section}>
-        <SectionHeader label="Nutrition" />
-        <AppCard>
-          <TouchableOpacity
-            testID="open-nutrition"
-            style={styles.row}
-            onPress={onNavigateNutrition}
-          >
-            <View style={styles.rowIconWrap}>
-              <Feather name="pie-chart" size={16} color={colors.textSecondary} />
-            </View>
-            <View style={styles.rowBody}>
-              <Text style={styles.rowTitle}>Nutrition</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        </AppCard>
-      </View>
+      <Section title="Nutrition">
+        <ListRow
+          testID="open-nutrition"
+          icon="pie-chart"
+          title="Nutrition"
+          onPress={onNavigateNutrition}
+        />
+      </Section>
     </View>
   );
 }

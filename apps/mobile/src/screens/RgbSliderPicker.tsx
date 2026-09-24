@@ -7,7 +7,7 @@ import {
   type GestureResponderEvent,
 } from 'react-native';
 import { Text } from '../design/Text';
-import { colors, radii, spacing } from '../design/theme';
+import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 import { hexToRgb, normalizeHex, rgbToHex } from '../theme/accentColor';
 
 interface ChannelSliderProps {
@@ -161,6 +161,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   hexInput: {
+    ...typeScale.body,
     flex: 1,
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -169,7 +170,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     color: colors.textPrimary,
-    fontSize: 15,
     letterSpacing: 1,
   },
   channelRow: {
@@ -179,10 +179,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   channelLabel: {
+    ...typeScale.secondary,
+    fontFamily: fonts.display,
     width: 14,
     color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
   },
   channelTrack: {
     flex: 1,
@@ -217,9 +217,9 @@ const styles = StyleSheet.create({
     marginLeft: -10,
   },
   channelValue: {
+    ...typeScale.secondary,
     width: 32,
     textAlign: 'right',
     color: colors.textSecondary,
-    fontSize: 13,
   },
 });

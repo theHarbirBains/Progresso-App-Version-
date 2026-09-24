@@ -1,19 +1,13 @@
 import { View } from 'react-native';
-import { AppCard } from '../design/AppCard';
-import { SectionHeader } from '../design/SectionHeader';
+import { Section } from '../design/Section';
 import { ComingSoonRow } from './ComingSoonRow';
 import { settingsStyles as styles } from './settingsStyles';
 
-// No help/support/legal destination exists anywhere in this app today -- no
-// FAQ content, no support contact address, no About screen, no Terms of
-// Service or Privacy Policy URL. Per the task's explicit rule ("do not
-// fabricate URLs"), every row here is a real, visible "Coming Soon" rather
-// than a link to a page or address that doesn't exist yet.
+/** Help category: every entry is a visible "Coming Soon" row -- nothing here pretends to work yet. */
 export function HelpCategory() {
   return (
-    <View style={styles.section}>
-      <SectionHeader label="Help" />
-      <AppCard>
+    <View style={styles.categoryGap}>
+      <Section title="Help">
         <ComingSoonRow testID="help-faq" icon="help-circle" title="Help & FAQ" />
         <ComingSoonRow
           testID="help-contact-support"
@@ -35,7 +29,7 @@ export function HelpCategory() {
           title="Privacy Policy"
           showDivider
         />
-      </AppCard>
+      </Section>
     </View>
   );
 }

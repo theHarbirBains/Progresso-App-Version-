@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { PrimaryButton, TextButton } from '../design/Button';
 import { Text } from '../design/Text';
-import { colors, fonts, radii, spacing } from '../design/theme';
+import { colors, radii, spacing, typeScale } from '../design/theme';
 
 interface Props {
   testID: string;
@@ -41,17 +42,10 @@ export function PermissionStep({
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.description}>{description}</Text>
 
-      <TouchableOpacity
-        testID={`${testID}-connect`}
-        style={styles.connectButton}
-        onPress={onConnect}
-      >
-        <Text style={styles.connectButtonText}>{connectLabel}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity testID={`${testID}-skip`} style={styles.skipButton} onPress={onSkip}>
-        <Text style={styles.skipButtonText}>{skipLabel}</Text>
-      </TouchableOpacity>
+      <View style={styles.actions}>
+        <PrimaryButton testID={`${testID}-connect`} label={connectLabel} onPress={onConnect} />
+        <TextButton testID={`${testID}-skip`} label={skipLabel} onPress={onSkip} />
+      </View>
     </View>
   );
 }
@@ -73,40 +67,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   title: {
+    ...typeScale.cardTitle,
     color: colors.textPrimary,
-    fontFamily: fonts.display,
-    fontSize: 20,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
   description: {
+    ...typeScale.callout,
     color: colors.textSecondary,
-    fontSize: 14,
     textAlign: 'center',
     marginBottom: spacing.xxl,
     paddingHorizontal: spacing.lg,
   },
-  connectButton: {
+  actions: {
     alignSelf: 'stretch',
-    backgroundColor: colors.accent,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  connectButtonText: {
-    color: colors.onAccent,
-    fontFamily: fonts.display,
-    fontSize: 15,
-  },
-  skipButton: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  skipButtonText: {
-    color: colors.textSecondary,
-    fontFamily: fonts.displayMedium,
-    fontSize: 14,
+    gap: spacing.sm,
   },
 });

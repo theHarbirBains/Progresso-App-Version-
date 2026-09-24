@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 
 // Shared styles for the Settings hub (shell + every category). Settings is
 // app-level/global, not a per-mode screen, so unlike Dashboard/Progress it
@@ -22,8 +22,15 @@ export const settingsStyles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    paddingBottom: spacing.xxl,
+  },
+  // Category tabs, inset to the screen margin under the header.
+  tabsWrap: {
     paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxxl,
+  },
+  // Vertical rhythm between a category's sections.
+  categoryGap: {
+    gap: spacing.xxl,
   },
   loadingWrap: {
     flex: 1,
@@ -31,8 +38,8 @@ export const settingsStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   errorText: {
+    ...typeScale.callout,
     color: colors.destructive,
-    fontSize: 14,
     marginBottom: spacing.md,
   },
 
@@ -67,8 +74,8 @@ export const settingsStyles = StyleSheet.create({
     gap: spacing.xs,
   },
   tabLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
     color: colors.textSecondary,
   },
   // Selection changes color only -- never size, weight, padding, or border
@@ -82,17 +89,11 @@ export const settingsStyles = StyleSheet.create({
     marginBottom: spacing.xxl,
   },
   cardLabel: {
+    ...typeScale.secondary,
+    fontFamily: fonts.display,
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: spacing.md,
-  },
-  cardSubtitle: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: -spacing.sm,
     marginBottom: spacing.md,
   },
   fieldSpacer: {
@@ -122,21 +123,21 @@ export const settingsStyles = StyleSheet.create({
     flex: 1,
   },
   rowTitle: {
+    ...typeScale.body,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
   },
   rowTitleDestructive: {
     color: colors.destructive,
   },
   rowSubtitle: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
   rowValue: {
+    ...typeScale.secondary,
     color: colors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
   swatch: {

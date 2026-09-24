@@ -1,4 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { AppCard } from '../design/AppCard';
 import { TopSetRow } from './TopSetRow';
 
 describe('TopSetRow', () => {
@@ -39,5 +41,33 @@ describe('TopSetRow', () => {
     fireEvent.press(screen.getByTestId('row'));
 
     expect(onPress).toHaveBeenCalled();
+  });
+});
+
+describe('TopSetRow -- a plain, named row', () => {
+  const props = {
+    exerciseName: 'Bench Press',
+    muscleGroupLabel: 'Chest',
+    weightDisplay: 225,
+    reps: 8,
+    unit: 'lb' as const,
+    accentColor: '#2F80FF',
+    testID: 'row',
+  };
+
+  it('is not a card, and is a named button when pressable', () => {
+    render(<TopSetRow {...props} onPress={jest.fn()} />);
+
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    const row = screen.getByTestId('row');
+    expect(row.props.accessibilityRole).toBe('button');
+    expect(row.props.accessibilityLabel).toBe('Bench Press, Chest, top set 225lb times 8');
+    expect(StyleSheet.flatten(row.props.style).minHeight).toBeGreaterThanOrEqual(44);
+  });
+
+  it('is not announced as a button when it has nothing to open', () => {
+    render(<TopSetRow {...props} />);
+
+    expect(screen.getByTestId('row').props.accessibilityRole).toBeUndefined();
   });
 });

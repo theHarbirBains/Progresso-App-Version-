@@ -1,6 +1,6 @@
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
-import { colors, fonts, radii, spacing } from '../design/theme';
+import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 import { WheelPicker } from '../design/WheelPicker';
 import {
   cmFromFeetAndInches,
@@ -129,9 +129,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   unitText: {
+    ...typeScale.callout,
     color: colors.textSecondary,
     fontFamily: fonts.display,
-    fontSize: 14,
   },
   unitTextSelected: {
     color: colors.onAccent,
@@ -143,9 +143,9 @@ const styles = StyleSheet.create({
     width: 100,
   },
   preview: {
+    ...typeScale.secondary,
     marginTop: spacing.md,
     color: colors.textSecondary,
     fontFamily: fonts.displayMedium,
-    fontSize: 13,
   },
 });

@@ -2,9 +2,7 @@ import { useMemo } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { AppCard } from '../design/AppCard';
 import { fromKg, roundWeight } from '../lib/units';
-import { withAlpha } from '../theme/accentColor';
 import type { RootStackScreenProps } from '../navigation/types';
 import type { ExerciseHistoryGroup } from '../workouts/allExerciseHistoryQueries';
 import type { OneRepMaxWithExercise, RepPRWithExercise } from '../workouts/prSummaryQueries';
@@ -52,9 +50,6 @@ function OverviewStat({
   // nested inside another card (see progressStyles.ts's own note on this).
   return (
     <View testID={testID} style={styles.statTile}>
-      <View style={[styles.statTileIcon, { backgroundColor: withAlpha(accentColor, 0.14) }]}>
-        <Feather name={icon} size={16} color={accentColor} />
-      </View>
       <View>
         <Text style={styles.statTileValue}>{value}</Text>
         <Text style={styles.statTileLabel}>{label}</Text>
@@ -105,13 +100,8 @@ export function OverviewSection({
       contentContainerStyle={{ paddingBottom: 32 }}
       showsVerticalScrollIndicator={false}
     >
-      <AppCard style={styles.overviewCard}>
+      <View style={styles.overviewCard}>
         <View style={styles.overviewCardHeader}>
-          <View
-            style={[styles.overviewCardIconWrap, { backgroundColor: withAlpha(accentColor, 0.14) }]}
-          >
-            <Feather name="bar-chart-2" size={18} color={accentColor} />
-          </View>
           <View style={styles.overviewCardTitleColumn}>
             <Text style={styles.overviewCardTitle}>Your Progress</Text>
             <Text style={styles.overviewCardSubtitle}>
@@ -153,19 +143,11 @@ export function OverviewSection({
             accentColor={accentColor}
           />
         </View>
-      </AppCard>
+      </View>
 
       {recentMilestones.length > 0 ? (
-        <AppCard style={styles.overviewCard}>
+        <View style={styles.overviewCard}>
           <View style={styles.overviewCardHeader}>
-            <View
-              style={[
-                styles.overviewCardIconWrap,
-                { backgroundColor: withAlpha(accentColor, 0.14) },
-              ]}
-            >
-              <Feather name="flag" size={18} color={accentColor} />
-            </View>
             <View style={styles.overviewCardTitleColumn}>
               <Text style={styles.overviewCardTitle}>Recent Milestones</Text>
               <Text style={styles.overviewCardSubtitle}>Your latest achievements.</Text>
@@ -197,7 +179,7 @@ export function OverviewSection({
               }
             />
           ))}
-        </AppCard>
+        </View>
       ) : null}
     </ScrollView>
   );

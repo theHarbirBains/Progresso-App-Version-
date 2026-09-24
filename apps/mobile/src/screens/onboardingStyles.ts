@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, spacing, typeScale } from '../design/theme';
 
 export const onboardingStyles = StyleSheet.create({
   screen: {
@@ -20,16 +20,6 @@ export const onboardingStyles = StyleSheet.create({
     gap: spacing.md,
     paddingBottom: spacing.xl,
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   progress: {
     flex: 1,
   },
@@ -43,8 +33,8 @@ export const onboardingStyles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   stepExplanation: {
+    ...typeScale.callout,
     color: colors.textSecondary,
-    fontSize: 14,
     marginBottom: spacing.xl,
   },
   wheelArea: {
@@ -52,26 +42,12 @@ export const onboardingStyles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   errorText: {
+    ...typeScale.callout,
     color: colors.destructive,
-    fontSize: 14,
     marginBottom: spacing.md,
   },
   footer: {
     paddingTop: spacing.lg,
-  },
-  continueButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  continueButtonDisabled: {
-    opacity: 0.5,
-  },
-  continueButtonText: {
-    color: colors.onAccent,
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 15,
   },
   completionContainer: {
     flex: 1,
@@ -85,21 +61,9 @@ export const onboardingStyles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   completionSubtitle: {
+    ...typeScale.body,
     color: colors.textSecondary,
-    fontSize: 15,
     textAlign: 'center',
     marginBottom: spacing.xxxl,
-  },
-  startButton: {
-    alignSelf: 'stretch',
-    backgroundColor: colors.accent,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  startButtonText: {
-    color: colors.onAccent,
-    fontFamily: 'Manrope_700Bold',
-    fontSize: 16,
   },
 });

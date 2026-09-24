@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
+import { AppHeader } from '../design/AppHeader';
 import { LoadingState } from '../design/LoadingState';
+import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { colors } from '../design/theme';
-import { fromKg, roundWeight } from '../lib/units';
+import { fromKg, roundWeight, formatWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { ChartPointDetail } from '../progress/ChartPointDetail';
 import { MetricCard } from '../progress/MetricCard';
@@ -28,10 +28,6 @@ import { deriveMilestones } from '../workouts/progressMilestones';
 
 type Props = RootStackScreenProps<'ProgressExerciseDetail'>;
 
-function formatWeight(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
 // The shared "how has this one exercise progressed" destination, reached
 // from Overview's "Exercises Improving", Top Sets, 1 Rep Max, PRs, and
 // Exercises -- one implementation, reusing the exact same ProgressionChart
@@ -41,7 +37,6 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
-  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,149 +119,145 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
       : null;
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        testID="progress-exercise-detail-scroll"
-      >
-        <View style={styles.header}>
-          <TouchableOpacity
-            testID="progress-exercise-detail-back"
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Back"
-            accessibilityRole="button"
-            style={styles.menuButton}
-          >
-            <Feather name="arrow-left" size={18} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{exerciseName}</Text>
-        </View>
+    <Screen
+      scrollTestID="progress-exercise-detail-scroll"
+      contentContainerStyle={styles.detailContent}
+      header={
+        <AppHeader
+          title={exerciseName}
+          leftAction={{
+            icon: 'arrow-left',
+            onPress: () => navigation.goBack(),
+            accessibilityLabel: 'Back',
+            testID: 'progress-exercise-detail-back',
+          }}
+        />
+      }
+    >
+      {error ? (
+        <Text testID="progress-exercise-detail-error" style={styles.errorText}>
+          {error}
+        </Text>
+      ) : null}
 
-        {error ? (
-          <Text testID="progress-exercise-detail-error" style={styles.errorText}>
-            {error}
-          </Text>
-        ) : null}
+      {allTimePoints.length === 0 ? (
+        <ProgressEmptyState
+          testID="progress-exercise-detail-empty"
+          title="Complete a workout to start tracking this exercise."
+          icon="trending-up"
+        />
+      ) : (
+        <>
+          {latest ? (
+            <Text testID="progress-exercise-detail-current" style={styles.featuredCurrent}>
+              {formatWeight(roundWeight(fromKg(latest.weightKg, weightUnit)))}
+              {weightUnit} × {latest.reps}
+            </Text>
+          ) : null}
+          {summary ? (
+            <Text
+              testID="progress-exercise-detail-delta"
+              style={[
+                styles.featuredDelta,
+                { color: summary.deltaKg >= 0 ? theme.accent : colors.destructive },
+              ]}
+            >
+              {summary.deltaKg >= 0 ? '+' : ''}
+              {formatWeight(roundWeight(fromKg(summary.deltaKg, weightUnit)))}
+              {weightUnit} since first recorded
+            </Text>
+          ) : null}
 
-        {allTimePoints.length === 0 ? (
-          <ProgressEmptyState
-            testID="progress-exercise-detail-empty"
-            title="Complete a workout to start tracking this exercise."
-            icon="trending-up"
+          <TimeRangeSelector
+            value={range}
+            onChange={setRange}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
           />
-        ) : (
-          <>
-            {latest ? (
-              <Text testID="progress-exercise-detail-current" style={styles.featuredCurrent}>
-                {formatWeight(roundWeight(fromKg(latest.weightKg, weightUnit)))}
-                {weightUnit} × {latest.reps}
-              </Text>
-            ) : null}
-            {summary ? (
-              <Text
-                testID="progress-exercise-detail-delta"
-                style={[
-                  styles.featuredDelta,
-                  { color: summary.deltaKg >= 0 ? theme.accent : colors.destructive },
-                ]}
-              >
-                {summary.deltaKg >= 0 ? '+' : ''}
-                {formatWeight(roundWeight(fromKg(summary.deltaKg, weightUnit)))}
-                {weightUnit} since first recorded
-              </Text>
-            ) : null}
 
-            <TimeRangeSelector
-              value={range}
-              onChange={setRange}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
+          {chartPoints.length > 0 ? (
+            <ProgressionChart
+              testID="progress-exercise-detail-chart"
+              points={chartPoints}
+              color={theme.accent}
+              selectedIndex={selectedPointIndex}
+              onSelectIndex={setSelectedPointIndex}
             />
+          ) : (
+            <ProgressEmptyState
+              testID="progress-exercise-detail-chart-empty"
+              title="Not enough data yet"
+            />
+          )}
 
-            {chartPoints.length > 0 ? (
-              <ProgressionChart
-                testID="progress-exercise-detail-chart"
-                points={chartPoints}
-                color={theme.accent}
-                selectedIndex={selectedPointIndex}
-                onSelectIndex={setSelectedPointIndex}
-              />
-            ) : (
-              <ProgressEmptyState
-                testID="progress-exercise-detail-chart-empty"
-                title="Not enough data yet"
-              />
-            )}
-
-            {selectedDetail ? (
-              <ChartPointDetail
-                testID="progress-exercise-detail-point-detail"
-                accentColor={theme.accent}
-                onDismiss={() => setSelectedPointIndex(null)}
-                data={{
-                  exerciseName,
-                  weightDisplay: roundWeight(fromKg(selectedDetail.weightKg, weightUnit)),
-                  reps: selectedDetail.reps,
-                  performedAt: selectedDetail.performedAt,
-                  unit: weightUnit,
-                  volumeDisplay: roundWeight(
-                    fromKg(selectedDetail.weightKg, weightUnit) * selectedDetail.reps,
-                  ),
-                  previous: previousDetail
-                    ? {
-                        weightDisplay: roundWeight(fromKg(previousDetail.weightKg, weightUnit)),
-                        reps: previousDetail.reps,
-                      }
+          {selectedDetail ? (
+            <ChartPointDetail
+              testID="progress-exercise-detail-point-detail"
+              accentColor={theme.accent}
+              onDismiss={() => setSelectedPointIndex(null)}
+              data={{
+                exerciseName,
+                weightDisplay: roundWeight(fromKg(selectedDetail.weightKg, weightUnit)),
+                reps: selectedDetail.reps,
+                performedAt: selectedDetail.performedAt,
+                unit: weightUnit,
+                volumeDisplay: roundWeight(
+                  fromKg(selectedDetail.weightKg, weightUnit) * selectedDetail.reps,
+                ),
+                previous: previousDetail
+                  ? {
+                      weightDisplay: roundWeight(fromKg(previousDetail.weightKg, weightUnit)),
+                      reps: previousDetail.reps,
+                    }
+                  : null,
+                trueOneRepMaxDisplay:
+                  selectedDetail.reps === 1
+                    ? roundWeight(fromKg(selectedDetail.weightKg, weightUnit))
                     : null,
-                  trueOneRepMaxDisplay:
-                    selectedDetail.reps === 1
-                      ? roundWeight(fromKg(selectedDetail.weightKg, weightUnit))
-                      : null,
-                }}
+              }}
+            />
+          ) : null}
+
+          <View style={styles.section}>
+            <SectionHeader label="Best Performances" />
+            <View style={styles.metricsGrid}>
+              <MetricCard
+                testID="progress-exercise-detail-metric-1rm"
+                label="1RM"
+                value={oneRepMax ? roundWeight(fromKg(oneRepMax.weightKg, weightUnit)) : null}
+                unit={weightUnit}
+                emptyLabel="No 1RM recorded yet"
               />
-            ) : null}
-
-            <View style={styles.section}>
-              <SectionHeader label="Best Performances" />
-              <View style={styles.metricsGrid}>
-                <MetricCard
-                  testID="progress-exercise-detail-metric-1rm"
-                  label="1RM"
-                  value={oneRepMax ? roundWeight(fromKg(oneRepMax.weightKg, weightUnit)) : null}
-                  unit={weightUnit}
-                  emptyLabel="No 1RM recorded yet"
-                />
-                <MetricCard
-                  testID="progress-exercise-detail-metric-prs"
-                  label="Rep PRs"
-                  value={repPRs.length}
-                />
-              </View>
+              <MetricCard
+                testID="progress-exercise-detail-metric-prs"
+                label="Rep PRs"
+                value={repPRs.length}
+              />
             </View>
+          </View>
 
-            {milestones.length > 0 ? (
-              <View style={styles.section}>
-                <SectionHeader label="Progression Journey" />
-                {milestones.map((m, i) => (
-                  <View
-                    key={`${m.kind}-${m.achievedAt}-${i}`}
-                    testID={`progress-exercise-detail-milestone-${i}`}
-                    style={styles.milestoneRow}
-                  >
-                    <View style={[styles.milestoneDot, { backgroundColor: theme.accent }]} />
-                    <View>
-                      <Text style={styles.milestoneLabel}>{m.label}</Text>
-                      <Text style={styles.milestoneDate}>
-                        {new Date(m.achievedAt).toLocaleDateString()}
-                      </Text>
-                    </View>
+          {milestones.length > 0 ? (
+            <View style={styles.section}>
+              <SectionHeader label="Progression Journey" />
+              {milestones.map((m, i) => (
+                <View
+                  key={`${m.kind}-${m.achievedAt}-${i}`}
+                  testID={`progress-exercise-detail-milestone-${i}`}
+                  style={styles.milestoneRow}
+                >
+                  <View style={[styles.milestoneDot, { backgroundColor: theme.accent }]} />
+                  <View>
+                    <Text style={styles.milestoneLabel}>{m.label}</Text>
+                    <Text style={styles.milestoneDate}>
+                      {new Date(m.achievedAt).toLocaleDateString()}
+                    </Text>
                   </View>
-                ))}
-              </View>
-            ) : null}
-          </>
-        )}
-      </ScrollView>
-    </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </>
+      )}
+    </Screen>
   );
 }

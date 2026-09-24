@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ActivityIndicator, TextInput, TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
-import { colors } from '../design/theme';
+import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
+import { TextInput } from '../design/TextInput';
+import { AuthFrame } from './AuthFrame';
 import { authStyles as styles } from './authStyles';
 
 interface Props {
@@ -12,6 +14,8 @@ interface Props {
 
 type OAuthSubmitting = 'google' | 'apple' | null;
 
+// Email + password, with Google and Apple as the two outlined alternatives
+// beneath: Sign In is the one filled button.
 export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
   const { signInWithPassword, signInWithProvider } = useAuth();
   const [email, setEmail] = useState('');
@@ -44,14 +48,11 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Sign In</Text>
-
+    <AuthFrame title="Sign In">
       <TextInput
         testID="sign-in-email"
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor={colors.textMuted}
+        label="Email"
+        placeholder="you@example.com"
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -60,9 +61,8 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
       />
       <TextInput
         testID="sign-in-password"
-        style={styles.input}
+        label="Password"
         placeholder="Password"
-        placeholderTextColor={colors.textMuted}
         secureTextEntry
         autoComplete="password"
         value={password}
@@ -70,59 +70,53 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
       />
 
       {error ? (
-        <Text testID="sign-in-error" style={styles.error}>
+        <Text testID="sign-in-error" style={styles.errorText}>
           {error}
         </Text>
       ) : null}
 
-      <TouchableOpacity
-        testID="sign-in-submit"
-        style={[styles.button, !canSubmit && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={!canSubmit}
-      >
-        {submitting ? (
-          <ActivityIndicator color={colors.background} />
-        ) : (
-          <Text style={styles.buttonText}>Sign In</Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.actions}>
+        <PrimaryButton
+          testID="sign-in-submit"
+          label="Sign In"
+          onPress={handleSubmit}
+          loading={submitting}
+          disabled={!canSubmit && !submitting}
+        />
+        <TextButton
+          testID="sign-in-forgot-password"
+          label="Forgot password?"
+          onPress={onForgotPassword}
+        />
+      </View>
 
-      <TouchableOpacity testID="sign-in-forgot-password" onPress={onForgotPassword}>
-        <Text style={styles.link}>Forgot password?</Text>
-      </TouchableOpacity>
+      <View style={styles.dividerRow}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>or</Text>
+        <View style={styles.dividerLine} />
+      </View>
 
-      <Text style={styles.divider}>or</Text>
-
-      <TouchableOpacity
-        testID="sign-in-google"
-        style={styles.oauthButton}
-        onPress={() => handleOAuth('google')}
-        disabled={oauthDisabled}
-      >
-        {oauthSubmitting === 'google' ? (
-          <ActivityIndicator color={colors.textPrimary} />
-        ) : (
-          <Text style={styles.oauthButtonText}>Continue with Google</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        testID="sign-in-apple"
-        style={styles.oauthButton}
-        onPress={() => handleOAuth('apple')}
-        disabled={oauthDisabled}
-      >
-        {oauthSubmitting === 'apple' ? (
-          <ActivityIndicator color={colors.textPrimary} />
-        ) : (
-          <Text style={styles.oauthButtonText}>Continue with Apple</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity testID="sign-in-switch" onPress={onSwitchToSignUp}>
-        <Text style={styles.link}>Don&apos;t have an account? Sign up</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.actions}>
+        <SecondaryButton
+          testID="sign-in-google"
+          label="Continue with Google"
+          onPress={() => handleOAuth('google')}
+          loading={oauthSubmitting === 'google'}
+          disabled={oauthDisabled && oauthSubmitting !== 'google'}
+        />
+        <SecondaryButton
+          testID="sign-in-apple"
+          label="Continue with Apple"
+          onPress={() => handleOAuth('apple')}
+          loading={oauthSubmitting === 'apple'}
+          disabled={oauthDisabled && oauthSubmitting !== 'apple'}
+        />
+        <TextButton
+          testID="sign-in-switch"
+          label="Don't have an account? Sign up"
+          onPress={onSwitchToSignUp}
+        />
+      </View>
+    </AuthFrame>
   );
 }

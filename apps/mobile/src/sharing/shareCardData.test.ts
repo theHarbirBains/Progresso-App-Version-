@@ -222,3 +222,61 @@ describe('fetchShareCardData', () => {
     });
   });
 });
+
+describe('fetchShareCardData totals', () => {
+  it('counts only logged sets and sums weight x reps over them, across every exercise', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(
+      workoutDetail({
+        exercises: [
+          exercise({
+            sets: [
+              {
+                id: 's1',
+                setIndex: 1,
+                weightKg: 100,
+                reps: 5,
+                completedAt: '2026-01-01T10:05:00Z',
+              },
+              {
+                id: 's2',
+                setIndex: 2,
+                weightKg: 100,
+                reps: 5,
+                completedAt: '2026-01-01T10:10:00Z',
+              },
+              { id: 's3', setIndex: 3, weightKg: null, reps: null, completedAt: null },
+            ],
+          }),
+          exercise({
+            id: 'we2',
+            exerciseId: 'ex2',
+            exerciseName: 'Row',
+            sets: [
+              {
+                id: 's4',
+                setIndex: 1,
+                weightKg: 60,
+                reps: 10,
+                completedAt: '2026-01-01T10:20:00Z',
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    const result = await fetchShareCardData('w1', 'user-1');
+
+    expect(result.totalSets).toBe(3);
+    expect(result.totalVolumeKg).toBe(100 * 5 + 100 * 5 + 60 * 10);
+  });
+
+  it('reports zero sets and zero volume for a workout with nothing logged', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(workoutDetail({ exercises: [] }));
+
+    const result = await fetchShareCardData('w1', 'user-1');
+
+    expect(result.totalSets).toBe(0);
+    expect(result.totalVolumeKg).toBe(0);
+  });
+});

@@ -8,7 +8,7 @@ import {
   type NativeScrollEvent,
 } from 'react-native';
 import { Text } from './Text';
-import { colors, fonts, radii, spacing } from '../design/theme';
+import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 
 const ITEM_HEIGHT = 44;
 const VISIBLE_ITEMS = 5;
@@ -108,8 +108,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemText: {
+    ...typeScale.statMedium,
     color: colors.textMuted,
-    fontSize: 17,
     fontFamily: fonts.mono,
     paddingHorizontal: spacing.md,
   },

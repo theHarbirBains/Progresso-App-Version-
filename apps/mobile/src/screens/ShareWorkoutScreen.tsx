@@ -1,58 +1,72 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Text } from '../design/Text';
+import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
+import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
+import { SegmentedControl } from '../design/SegmentedControl';
+import { Section } from '../design/Section';
+import { Toggle } from '../design/Toggle';
 import { colors } from '../design/theme';
-import { getMyProfile } from '../lib/api';
-import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useProgressTheme } from '../progress/useProgressTheme';
+import { ShareCard } from '../sharing/ShareCard';
 import { fetchShareCardData, type ShareCardData } from '../sharing/shareCardData';
+import {
+  DEFAULT_SHARE_OPTIONS,
+  SHARE_FORMATS,
+  type ShareFormat,
+  type ShareOptions,
+} from '../sharing/shareCardOptions';
 import { shareCardStyles as styles } from '../sharing/shareCardStyles';
 
 type Props = RootStackScreenProps<'ShareWorkout'>;
 
-// Final image resolution -- independent of the on-screen card's dp size.
-// react-native-view-shot resizes the capture to these dimensions regardless
-// of the rendered View's bounds, so the preview below can stay a comfortable
-// screen size while the shared/saved file is always a clean 9:16 story image.
-const CAPTURE_WIDTH = 1080;
-const CAPTURE_HEIGHT = 1920;
+const FORMAT_OPTIONS = (Object.keys(SHARE_FORMATS) as ShareFormat[]).map((value) => ({
+  label: SHARE_FORMATS[value].label,
+  value,
+}));
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
+// The blocks the user can hide, in the order they appear on the card.
+const OPTION_ROWS: { key: keyof ShareOptions; label: string; subtitle?: string }[] = [
+  { key: 'date', label: 'Date', subtitle: 'Shown without the year' },
+  { key: 'duration', label: 'Duration' },
+  { key: 'sets', label: 'Sets' },
+  { key: 'volume', label: 'Total volume', subtitle: 'The total weight you lifted' },
+  { key: 'lifts', label: 'Top lifts' },
+  { key: 'records', label: 'Personal records' },
+];
 
-function formatWeight(kg: number, unit: 'kg' | 'lb'): string {
-  const value = roundWeight(fromKg(kg, unit));
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
-// The on-screen card below IS the view that gets captured (via cardRef) --
-// there is no separate image drawn for sharing than what the user previews.
-// Around it: Share (the one filled button) and Save to Photos (secondary).
+// A finished workout as a shareable image. The card on screen IS the view that
+// gets captured (via cardRef) -- there is no separate image drawn for sharing
+// than what the user previews. Everything about it is the user's to control:
+// Story or Feed size, which blocks show (total volume starts hidden), and an
+// optional photo of their own behind it. The image is made on the phone and
+// only leaves through the system share sheet or Save to Photos -- nothing is
+// uploaded, and the photo is used for this image only, never stored.
 export function ShareWorkoutScreen({ route, navigation }: Props) {
   const { workoutId } = route.params;
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
+  const { theme, weightUnit } = useProgressTheme();
 
   const cardRef = useRef<View>(null);
 
   const [cardData, setCardData] = useState<ShareCardData | null>(null);
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [format, setFormat] = useState<ShareFormat>('story');
+  const [options, setOptions] = useState<ShareOptions>(DEFAULT_SHARE_OPTIONS);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -65,12 +79,8 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
     setLoading(true);
     setLoadError(null);
     try {
-      const [data, profile] = await Promise.all([
-        fetchShareCardData(workoutId, userId),
-        getMyProfile(accessToken),
-      ]);
+      const data = await fetchShareCardData(workoutId, userId);
       setCardData(data);
-      setWeightUnit(profile.weightUnit);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to load workout');
     } finally {
@@ -84,12 +94,38 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
 
   async function captureCard(): Promise<string> {
     if (!cardRef.current) throw new Error('Card is not ready yet');
+    const spec = SHARE_FORMATS[format];
     return captureRef(cardRef, {
-      width: CAPTURE_WIDTH,
-      height: CAPTURE_HEIGHT,
+      width: spec.captureWidth,
+      height: spec.captureHeight,
       format: 'png',
       quality: 1,
     });
+  }
+
+  function setOption(key: keyof ShareOptions, value: boolean) {
+    setSaved(false);
+    setOptions((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleChoosePhoto() {
+    setPhotoError(null);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setPhotoError('Photo library permission is required to choose a background photo.');
+      return;
+    }
+    const spec = SHARE_FORMATS[format];
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      // The picker's own crop step frames the photo to the card.
+      allowsEditing: true,
+      aspect: [spec.captureWidth, spec.captureHeight],
+      quality: 0.9,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    setSaved(false);
+    setPhotoUri(result.assets[0].uri);
   }
 
   async function handleShare() {
@@ -176,62 +212,87 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
     );
   }
 
-  const prTopSets = cardData.topSets.filter((s) => s.prLabel !== null);
-
   return (
     <Screen contentContainerStyle={styles.content} header={header}>
-      <View style={styles.cardWrapper}>
-        <View ref={cardRef} collapsable={false} testID="share-card" style={styles.card}>
-          <View style={styles.cardTop}>
-            <Text style={styles.wordmark}>PROGRESSO</Text>
-            <Text testID="share-card-workout-name" style={styles.workoutName} numberOfLines={2}>
-              {cardData.workoutName}
-            </Text>
-            <Text testID="share-card-date" style={styles.workoutDate}>
-              {formatDate(cardData.performedAt)}
-            </Text>
-            {cardData.musclesTrained ? (
-              <Text testID="share-card-muscles" style={styles.musclesTrained}>
-                {cardData.musclesTrained}
-              </Text>
-            ) : null}
-          </View>
-
-          {cardData.topSets.length > 0 ? (
-            <View style={styles.topSetsSection}>
-              <Text style={styles.sectionLabel}>TOP SETS</Text>
-              {cardData.topSets.map((set, index) => (
-                <View key={`${set.exerciseName}-${index}`} style={styles.topSetRow}>
-                  <Text style={styles.topSetExercise} numberOfLines={1}>
-                    {set.exerciseName}
-                  </Text>
-                  <Text testID={`share-card-top-set-${index}`} style={styles.topSetValue}>
-                    {formatWeight(set.weightKg, weightUnit)}
-                    {weightUnit}×{set.reps}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          {prTopSets.length > 0 ? (
-            <View testID="share-card-pr-section" style={styles.prSection}>
-              <Text style={styles.sectionLabel}>PRS ACHIEVED</Text>
-              {prTopSets.map((set, index) => (
-                <Text key={`${set.exerciseName}-pr-${index}`} style={styles.prLine}>
-                  {set.exerciseName} · {set.prLabel}
-                </Text>
-              ))}
-            </View>
-          ) : null}
-
-          {cardData.durationMinutes !== null ? (
-            <Text testID="share-card-duration" style={styles.footer}>
-              {cardData.durationMinutes} min
-            </Text>
-          ) : null}
-        </View>
+      <View style={styles.formatWrap}>
+        <SegmentedControl
+          testID="share-format"
+          options={FORMAT_OPTIONS}
+          value={format}
+          onChange={(next) => {
+            setSaved(false);
+            setFormat(next);
+          }}
+          accentColor={theme.accent}
+          onAccentColor={theme.onAccent}
+        />
       </View>
+
+      <View style={styles.previewWrap}>
+        <ShareCard
+          cardRef={cardRef}
+          data={cardData}
+          weightUnit={weightUnit}
+          format={format}
+          options={options}
+          accentColor={theme.accent}
+          photoUri={photoUri}
+        />
+      </View>
+
+      <Section title="Background">
+        <ListRow
+          testID="share-photo-choose"
+          icon="image"
+          title="Background photo"
+          value={photoUri ? 'Custom' : 'None'}
+          onPress={handleChoosePhoto}
+        />
+        {photoUri ? (
+          <ListRow
+            testID="share-photo-remove"
+            icon="trash-2"
+            title="Remove photo"
+            destructive
+            chevron={false}
+            divider
+            onPress={() => {
+              setSaved(false);
+              setPhotoUri(null);
+            }}
+          />
+        ) : null}
+        {photoError ? (
+          <Text testID="share-photo-error" style={styles.actionError}>
+            {photoError}
+          </Text>
+        ) : null}
+      </Section>
+
+      <Section title="Show on card">
+        {OPTION_ROWS.map((row, index) => (
+          <ListRow
+            key={row.key}
+            testID={`share-option-${row.key}`}
+            title={row.label}
+            subtitle={row.subtitle}
+            divider={index > 0}
+            trailing={
+              <Toggle
+                testID={`share-toggle-${row.key}`}
+                value={options[row.key]}
+                onValueChange={(value) => setOption(row.key, value)}
+                accentColor={theme.accent}
+                accessibilityLabel={row.label}
+              />
+            }
+          />
+        ))}
+        <Text style={styles.privacyNote}>
+          Made on your phone and only shared if you tap Share. Your name, email and location are
+          never included.
+        </Text>
+      </Section>
 
       <View style={styles.actions}>
         <PrimaryButton
@@ -239,6 +300,8 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
           label="Share"
           loading={sharing}
           onPress={handleShare}
+          accentColor={theme.accent}
+          onAccentColor={theme.onAccent}
         />
         {shareError ? (
           <Text testID="share-workout-share-error" style={styles.actionError}>

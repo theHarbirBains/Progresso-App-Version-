@@ -1,5 +1,6 @@
 import { ScrollView, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { colors } from '../design/theme';
 import { MuscleGroupChips } from './MuscleGroupChips';
 
 describe('MuscleGroupChips', () => {
@@ -73,12 +74,12 @@ describe('MuscleGroupChips', () => {
     expect(screen.getByTestId('muscle-group-chip-all')).toBeTruthy();
   });
 
-  it('uses the existing static selected look when no accentColor is given', () => {
+  it('falls back to the brand accent for the selected chip when no accentColor is given', () => {
     render(<MuscleGroupChips value="chest" onChange={jest.fn()} />);
 
     const chip = screen.getByTestId('muscle-group-chip-chest');
     const flat = StyleSheet.flatten(chip.props.style);
-    expect(flat.backgroundColor).toBe('#FFFFFF');
+    expect(flat.backgroundColor).toBe(colors.accent);
   });
 
   it('follows the given accentColor/onAccentColor for the selected chip instead of the static color', () => {
@@ -115,10 +116,10 @@ describe('MuscleGroupChips', () => {
     expect(StyleSheet.flatten(unselected.props.style).borderColor).toBe('#212B2D');
     expect(StyleSheet.flatten(screen.getByText('Back').props.style).color).toBe('#8FA0A2');
 
-    // The selected chip keeps its own (static, in this case) selected look --
+    // The selected chip keeps its own (brand-accent, in this case) selected look --
     // chipBorderColor/chipTextColor only ever apply to unselected chips.
     const selected = screen.getByTestId('muscle-group-chip-chest');
-    expect(StyleSheet.flatten(selected.props.style).backgroundColor).toBe('#FFFFFF');
+    expect(StyleSheet.flatten(selected.props.style).backgroundColor).toBe(colors.accent);
   });
 
   it('marks the selected chip with accessibilityState', () => {

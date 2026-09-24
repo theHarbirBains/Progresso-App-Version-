@@ -1,10 +1,7 @@
 import { View } from 'react-native';
-import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { AppCard } from '../design/AppCard';
-import { SectionHeader } from '../design/SectionHeader';
+import { ListRow } from '../design/ListRow';
+import { Section } from '../design/Section';
 import { Toggle } from '../design/Toggle';
-import { colors } from '../design/theme';
 import { ComingSoonRow } from './ComingSoonRow';
 import { settingsStyles as styles } from './settingsStyles';
 
@@ -17,15 +14,7 @@ interface Props {
   accentColor: string;
 }
 
-// Only two settings here are real: push and email opt-in, both the exact
-// same profile fields (pushNotificationsOptIn/emailOptIn) already collected
-// during onboarding via updateMyProfile -- onboarding's own copy promises
-// "You can change this later from Settings," so this is that promise kept,
-// not new functionality. The more granular categories the reference
-// suggests (workout reminders, PR notifications, weekly summaries, social
-// notifications) have no backing preference field or delivery mechanism
-// anywhere in the app today, so they show as real "Coming Soon" rows rather
-// than toggles that would silently do nothing.
+/** Notifications category: the two real opt-in preferences as toggle rows, then the not-yet-built kinds as visible "Coming Soon" rows (never a toggle that silently does nothing). */
 export function NotificationsCategory({
   pushNotificationsOptIn,
   onTogglePush,
@@ -35,45 +24,39 @@ export function NotificationsCategory({
   accentColor,
 }: Props) {
   return (
-    <View style={styles.section}>
-      <SectionHeader label="Notifications" />
-      <AppCard>
-        <View style={styles.row}>
-          <View style={styles.rowIconWrap}>
-            <Feather name="bell" size={16} color={colors.textSecondary} />
-          </View>
-          <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>Push Notifications</Text>
-            <Text style={styles.rowSubtitle}>General notifications from Progresso.</Text>
-          </View>
-          <Toggle
-            testID="notif-push-toggle"
-            value={pushNotificationsOptIn}
-            onValueChange={onTogglePush}
-            disabled={saving}
-            accentColor={accentColor}
-            accessibilityLabel="Push Notifications"
-          />
-        </View>
-
-        <View style={[styles.row, styles.rowDivider]}>
-          <View style={styles.rowIconWrap}>
-            <Feather name="mail" size={16} color={colors.textSecondary} />
-          </View>
-          <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>Email Notifications</Text>
-            <Text style={styles.rowSubtitle}>Emails from Progresso.</Text>
-          </View>
-          <Toggle
-            testID="notif-email-toggle"
-            value={emailOptIn}
-            onValueChange={onToggleEmail}
-            disabled={saving}
-            accentColor={accentColor}
-            accessibilityLabel="Email Notifications"
-          />
-        </View>
-
+    <View style={styles.categoryGap}>
+      <Section title="Notifications">
+        <ListRow
+          icon="bell"
+          title="Push Notifications"
+          subtitle="General notifications from Progresso."
+          trailing={
+            <Toggle
+              testID="notif-push-toggle"
+              value={pushNotificationsOptIn}
+              onValueChange={onTogglePush}
+              disabled={saving}
+              accentColor={accentColor}
+              accessibilityLabel="Push Notifications"
+            />
+          }
+        />
+        <ListRow
+          icon="mail"
+          title="Email Notifications"
+          subtitle="Emails from Progresso."
+          divider
+          trailing={
+            <Toggle
+              testID="notif-email-toggle"
+              value={emailOptIn}
+              onValueChange={onToggleEmail}
+              disabled={saving}
+              accentColor={accentColor}
+              accessibilityLabel="Email Notifications"
+            />
+          }
+        />
         <ComingSoonRow
           testID="notif-workout-reminders"
           icon="clock"
@@ -98,7 +81,7 @@ export function NotificationsCategory({
           title="Social Notifications"
           showDivider
         />
-      </AppCard>
+      </Section>
     </View>
   );
 }

@@ -7,28 +7,7 @@ export const backgroundThemeScreenStyles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   scrollContent: {
-    paddingHorizontal: spacing.xxl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.xs,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    ...typeScale.screenTitle,
-    fontSize: 20,
-    color: colors.textPrimary,
+    paddingBottom: spacing.xxl,
   },
   subtitle: {
     ...typeScale.secondary,
@@ -61,7 +40,6 @@ export const backgroundThemeScreenStyles = StyleSheet.create({
   tileName: {
     ...typeScale.label,
     color: colors.textPrimary,
-    fontSize: 14,
   },
   tileDescription: {
     ...typeScale.caption,
@@ -79,8 +57,8 @@ export const backgroundThemeScreenStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveError: {
+    ...typeScale.callout,
     color: colors.destructive,
-    fontSize: 14,
     marginBottom: spacing.md,
   },
   saveButtonWrap: {

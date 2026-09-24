@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { FlatList, TextInput, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { Text } from '../design/Text';
-import { colors, spacing } from '../design/theme';
+import { spacing } from '../design/theme';
+import { TextInput } from '../design/TextInput';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { fromKg, roundWeight } from '../lib/units';
@@ -22,7 +23,7 @@ interface Props {
   navigation: Navigation;
 }
 
-const ItemSeparator = () => <View style={{ height: spacing.sm }} />;
+const ItemSeparator = () => <View style={styles.separator} />;
 
 // One row per exercise -- its single best qualifying set (see topSets.ts),
 // alphabetical by exercise name, searchable and filterable by the same
@@ -73,14 +74,15 @@ export function TopSetsSection({
         Your best set for each exercise within the rep range.
       </Text>
 
-      <TextInput
-        testID="progress-topsets-search"
-        style={styles.searchInput}
-        placeholder="Search exercises..."
-        placeholderTextColor={colors.textMuted}
-        value={search}
-        onChangeText={setSearch}
-      />
+      <View style={styles.searchWrap}>
+        <TextInput
+          testID="progress-topsets-search"
+          placeholder="Search exercises..."
+          accessibilityLabel="Search exercises"
+          value={search}
+          onChangeText={setSearch}
+        />
+      </View>
 
       <MuscleGroupChips
         value={muscleGroup}
