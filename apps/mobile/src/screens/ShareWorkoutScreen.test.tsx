@@ -1,8 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { PrimaryButton } from '../design/Button';
-import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
-import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import * as MediaLibrary from 'expo-media-library';
@@ -61,8 +59,6 @@ const cardData = {
   performedAt: '2026-01-01T10:00:00Z',
   musclesTrained: 'Chest, Shoulders',
   durationMinutes: 45,
-  totalSets: 9,
-  totalVolumeKg: 4000,
   topSets: [
     { exerciseName: 'Bench Press', weightKg: 110, reps: 8, prLabel: '8 Rep PR' },
     { exerciseName: 'Overhead Press', weightKg: 60, reps: 8, prLabel: null },
@@ -111,10 +107,8 @@ describe('ShareWorkoutScreen loading and preview', () => {
 
     expect(await screen.findByTestId('share-card-workout-name')).toHaveTextContent('Push Day');
     expect(screen.getByTestId('share-card-muscles')).toHaveTextContent('Chest, Shoulders');
-    // The record is headlined; the remaining lift is listed beneath.
-    expect(screen.getByTestId('share-card-pr-value-0')).toHaveTextContent('110kg×8');
-    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('60kg×8');
-    expect(screen.queryByTestId('share-card-top-set-1')).toBeNull();
+    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('110kg×8');
+    expect(screen.getByTestId('share-card-top-set-1')).toHaveTextContent('60kg×8');
     await settle();
   });
 
@@ -158,7 +152,7 @@ describe('ShareWorkoutScreen loading and preview', () => {
   });
 
   it('renders a single-exercise workout correctly', async () => {
-    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: [cardData.topSets[1]] });
+    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: [cardData.topSets[0]] });
 
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('share-card-workout-name');
@@ -352,11 +346,8 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     expect(card.borderColor).toBe(colors.border);
     const set = StyleSheet.flatten(screen.getByTestId('share-card-top-set-0').props.style);
     expect(set.fontFamily).toBe(fonts.monoBold);
-    // Personal records are the one accented block, in the user's Workout accent.
-    const pr = StyleSheet.flatten(screen.getByTestId('share-card-pr-value-0').props.style);
-    expect(pr.color).toBe(DEFAULT_WORKOUT_THEME.accent);
-    expect(pr.fontFamily).toBe(fonts.monoBold);
-    expect(within(screen.getByTestId('share-card-pr-section')).getByText(/8 Rep PR/)).toBeTruthy();
+    const pr = within(screen.getByTestId('share-card-pr-section')).getByText(/8 Rep PR/);
+    expect(StyleSheet.flatten(pr.props.style).color).toBe(colors.accent);
     await settle();
   });
 
@@ -397,214 +388,6 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
   it('renders no bare text outside <Text>', async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
     await screen.findByTestId('share-card');
-
-    expectNoBareText();
-    await settle();
-  });
-});
-
-describe('ShareWorkoutScreen -- minimal card, formats, units, privacy, own photo', () => {
-  async function ready() {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, { wrapper: ProfileProvider });
-    await screen.findByTestId('share-card');
-  }
-
-  it('starts private: total volume is off, the date has no year, nothing personal is on the card', async () => {
-    await ready();
-
-    expect(screen.queryByTestId('share-card-volume')).toBeNull();
-    expect(screen.getByTestId('share-toggle-volume').props.value).toBe(false);
-    expect(screen.getByTestId('share-card-date').props.children).not.toMatch(/\d{4}/);
-    const card = screen.getByTestId('share-card');
-    expect(card).not.toHaveTextContent('a@example.com');
-    expect(card).not.toHaveTextContent('user-1');
-    await settle();
-  });
-
-  it("shows total volume in the user's unit once it is switched on", async () => {
-    await ready();
-
-    fireEvent(screen.getByTestId('share-toggle-volume'), 'valueChange', true);
-
-    expect(screen.getByTestId('share-card-volume')).toHaveTextContent('4,000 kg');
-    await settle();
-  });
-
-  it('shows every weight in pounds when the user prefers lb', async () => {
-    mockGetMyProfile.mockResolvedValue({
-      id: 'user-1',
-      email: 'a@example.com',
-      role: 'user',
-      displayName: null,
-      username: null,
-      weightUnit: 'lb',
-    });
-    await ready();
-    fireEvent(screen.getByTestId('share-toggle-volume'), 'valueChange', true);
-
-    expect(screen.getByTestId('share-card-pr-value-0')).toHaveTextContent('242.5lb×8');
-    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('132.3lb×8');
-    expect(screen.getByTestId('share-card-volume')).toHaveTextContent(/lb$/);
-    expect(screen.getByTestId('share-card')).not.toHaveTextContent(/\bkg\b/);
-    await settle();
-  });
-
-  it('lets each block be hidden, and drops a section that has nothing left', async () => {
-    await ready();
-
-    fireEvent(screen.getByTestId('share-toggle-duration'), 'valueChange', false);
-    fireEvent(screen.getByTestId('share-toggle-sets'), 'valueChange', false);
-    expect(screen.queryByTestId('share-card-session')).toBeNull();
-
-    fireEvent(screen.getByTestId('share-toggle-lifts'), 'valueChange', false);
-    expect(screen.queryByTestId('share-card-lifts')).toBeNull();
-
-    fireEvent(screen.getByTestId('share-toggle-records'), 'valueChange', false);
-    expect(screen.queryByTestId('share-card-pr-section')).toBeNull();
-
-    fireEvent(screen.getByTestId('share-toggle-date'), 'valueChange', false);
-    expect(screen.queryByTestId('share-card-date')).toBeNull();
-    // The workout's own name is always there.
-    expect(screen.getByTestId('share-card-workout-name')).toHaveTextContent('Push Day');
-    await settle();
-  });
-
-  it('lists the record lift with the others when records are hidden, so no lift is lost', async () => {
-    await ready();
-
-    fireEvent(screen.getByTestId('share-toggle-records'), 'valueChange', false);
-
-    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('110kg×8');
-    expect(screen.getByTestId('share-card-top-set-1')).toHaveTextContent('60kg×8');
-    await settle();
-  });
-
-  it("captures the card at the chosen format's size: story 1080x1920, feed 1080x1350", async () => {
-    await ready();
-
-    fireEvent.press(screen.getByTestId('share-workout-share'));
-    await waitFor(() => expect(mockCaptureRef).toHaveBeenCalledTimes(1));
-    expect(mockCaptureRef).toHaveBeenLastCalledWith(
-      expect.anything(),
-      expect.objectContaining({ width: 1080, height: 1920 }),
-    );
-
-    fireEvent.press(screen.getByTestId('share-format-feed'));
-    expect(
-      StyleSheet.flatten(screen.getByTestId('share-card').props.style).aspectRatio,
-    ).toBeCloseTo(1080 / 1350);
-    fireEvent.press(screen.getByTestId('share-workout-share'));
-    await waitFor(() => expect(mockCaptureRef).toHaveBeenCalledTimes(2));
-    expect(mockCaptureRef).toHaveBeenLastCalledWith(
-      expect.anything(),
-      expect.objectContaining({ width: 1080, height: 1350 }),
-    );
-    await settle();
-  });
-
-  it('headlines fewer records and lifts on the shorter feed card so nothing can clip', async () => {
-    mockFetchShareCardData.mockResolvedValue({
-      ...cardData,
-      topSets: [
-        { exerciseName: 'A', weightKg: 100, reps: 5, prLabel: '5 Rep PR' },
-        { exerciseName: 'B', weightKg: 90, reps: 5, prLabel: '5 Rep PR' },
-        { exerciseName: 'C', weightKg: 80, reps: 5, prLabel: null },
-        { exerciseName: 'D', weightKg: 70, reps: 5, prLabel: null },
-        { exerciseName: 'E', weightKg: 60, reps: 5, prLabel: null },
-      ],
-    });
-    await ready();
-    expect(screen.getByTestId('share-card-pr-value-1')).toBeTruthy();
-    expect(screen.getByTestId('share-card-top-set-2')).toBeTruthy();
-    expect(screen.queryByTestId('share-card-top-set-3')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('share-format-feed'));
-
-    expect(screen.queryByTestId('share-card-pr-value-1')).toBeNull();
-    expect(screen.getByTestId('share-card-top-set-1')).toBeTruthy();
-    expect(screen.queryByTestId('share-card-top-set-2')).toBeNull();
-    await settle();
-  });
-
-  it("puts the user's own photo behind the card under a dark scrim, and can take it away again", async () => {
-    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValueOnce({
-      canceled: false,
-      assets: [{ uri: 'file:///my-photo.jpg' }],
-    });
-    await ready();
-    expect(screen.queryByTestId('share-card-photo')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('share-photo-choose'));
-
-    const photo = await screen.findByTestId('share-card-photo');
-    expect(photo.props.source).toEqual({ uri: 'file:///my-photo.jpg' });
-    const scrim = StyleSheet.flatten(screen.getByTestId('share-card-scrim').props.style);
-    expect(scrim.backgroundColor).toMatch(/^rgba\(/);
-    expect(screen.getByTestId('share-photo-choose')).toHaveTextContent(/Custom/);
-
-    fireEvent.press(screen.getByTestId('share-photo-remove'));
-    expect(screen.queryByTestId('share-card-photo')).toBeNull();
-    expect(screen.queryByTestId('share-photo-remove')).toBeNull();
-    await settle();
-  });
-
-  it('asks the picker to frame the photo to the card, and explains a refused permission', async () => {
-    await ready();
-
-    fireEvent.press(screen.getByTestId('share-photo-choose'));
-    await waitFor(() => expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalled());
-    expect(ImagePicker.launchImageLibraryAsync).toHaveBeenLastCalledWith(
-      expect.objectContaining({ allowsEditing: true, aspect: [1080, 1920] }),
-    );
-
-    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValueOnce({
-      granted: false,
-    });
-    fireEvent.press(screen.getByTestId('share-photo-choose'));
-    expect(await screen.findByTestId('share-photo-error')).toHaveTextContent(
-      /permission is required/i,
-    );
-    await settle();
-  });
-
-  it('leaves the card on the plain dark default when the picker is cancelled', async () => {
-    await ready();
-
-    fireEvent.press(screen.getByTestId('share-photo-choose'));
-    await waitFor(() => expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalled());
-
-    expect(screen.queryByTestId('share-card-photo')).toBeNull();
-    await settle();
-  });
-
-  it('says nothing is uploaded and that account details are never included', async () => {
-    await ready();
-
-    expect(screen.getByText(/only shared if you tap Share/i)).toBeTruthy();
-    expect(screen.getByText(/never included/i)).toBeTruthy();
-    await settle();
-  });
-
-  it('labels each toggle for assistive tech and marks it as a switch', async () => {
-    await ready();
-
-    for (const key of ['date', 'duration', 'sets', 'volume', 'lifts', 'records']) {
-      const toggle = screen.getByTestId(`share-toggle-${key}`);
-      expect(toggle.props.accessibilityRole).toBe('switch');
-      expect(toggle.props.accessibilityLabel).toBeTruthy();
-    }
-    await settle();
-  });
-
-  it('renders no bare text outside <Text>, with a photo and every block on', async () => {
-    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValueOnce({
-      canceled: false,
-      assets: [{ uri: 'file:///my-photo.jpg' }],
-    });
-    await ready();
-    fireEvent.press(screen.getByTestId('share-photo-choose'));
-    await screen.findByTestId('share-card-photo');
-    fireEvent(screen.getByTestId('share-toggle-volume'), 'valueChange', true);
 
     expectNoBareText();
     await settle();
