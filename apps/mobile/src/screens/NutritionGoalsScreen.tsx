@@ -95,20 +95,25 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Prefills the custom target once both the profile and the saved goals
-  // have loaded -- never silently replace an existing target with a
-  // freshly-calculated one (see the screen's own comment on this). Only
-  // when nothing has ever been saved does a real calculated maintenance
-  // value seed the field, purely as a starting point the user can still
-  // change before saving. Seeds exactly once -- not on every later change
-  // to `profile` or `goals` (this screen's own Save updates the latter),
-  // which would otherwise overwrite the user's in-progress edit.
-  const hasSeededRef = useRef(false);
+  // Prefills the custom target from the saved goal, or -- when nothing has
+  // ever been saved -- a calculated maintenance estimate the user can still
+  // change before saving. Never overwrites an in-progress edit: it only
+  // (re)seeds when the field still holds exactly what this effect itself
+  // last put there (lastAutoSeedRef), so a value the user actually typed is
+  // always left alone. This still means it reseeds automatically when
+  // `profile` changes (e.g. the user edited weight/activity level on
+  // CalorieEstimationScreen and came back to an unmodified estimate) --
+  // NutritionGoalsScreen stays mounted under that navigation, so a one-shot
+  // "seed once" guard would otherwise leave the field stuck on the
+  // estimate computed from the OLD profile.
+  const lastAutoSeedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!profile || !goals || hasSeededRef.current) return;
-    hasSeededRef.current = true;
+    if (!profile || !goals) return;
+    if (lastAutoSeedRef.current !== null && customInput !== lastAutoSeedRef.current) return;
+
+    let next: string | null;
     if (goals.calories !== null) {
-      setCustomInput(String(goals.calories));
+      next = String(goals.calories);
     } else {
       const calorieInput = buildCalorieProfileInput({
         gender: profile.gender,
@@ -117,11 +122,13 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         weightKg: profile.weightValue,
         activityLevel: profile.activityLevel,
       });
-      if (calorieInput) {
-        setCustomInput(String(computeCalorieTargets(calorieInput).maintenance));
-      }
+      next = calorieInput ? String(computeCalorieTargets(calorieInput).maintenance) : null;
     }
-  }, [profile, goals]);
+    if (next !== null && next !== lastAutoSeedRef.current) {
+      lastAutoSeedRef.current = next;
+      setCustomInput(next);
+    }
+  }, [profile, goals, customInput]);
 
   async function handleSave() {
     const calories = parseWholeCalories(customInput);

@@ -304,6 +304,88 @@ describe('NutritionGoalsScreen', () => {
     );
   });
 
+  // Regression coverage: NutritionGoalsScreen stays mounted underneath
+  // CalorieEstimationScreen when the user taps Edit (a navigate, not a
+  // remount), so a one-shot "seed once" guard on the custom-target field
+  // would leave it stuck on the estimate computed from the OLD profile
+  // after the user corrects their weight/activity level and comes back.
+  it('reseeds the untouched custom target field itself when the shared profile cache updates elsewhere', async () => {
+    let capturedUpdateProfile: ProfileContextValue['updateProfile'] | undefined;
+    function CaptureUpdateProfile() {
+      capturedUpdateProfile = useProfile().updateProfile;
+      return null;
+    }
+
+    render(
+      <ProfileProvider>
+        <NutritionGoalsProvider>
+          <CaptureUpdateProfile />
+          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+            <NutritionGoalsScreen navigation={navigation} route={route} />
+          </AppMenuContext.Provider>
+        </NutritionGoalsProvider>
+      </ProfileProvider>,
+    );
+    await screen.findByTestId('nutrition-goals-scroll');
+
+    const initialTargets = computeCalorieTargets({
+      gender: 'male',
+      age: 24,
+      heightCm: 180,
+      weightKg: 78,
+      activityLevel: 'moderately_active',
+    });
+    expect(screen.getByTestId('nutrition-goals-custom-input')).toHaveProp(
+      'value',
+      String(initialTargets.maintenance),
+    );
+
+    await act(async () => {
+      await capturedUpdateProfile?.({ weightValue: 95 });
+    });
+
+    const updatedTargets = computeCalorieTargets({
+      gender: 'male',
+      age: 24,
+      heightCm: 180,
+      weightKg: 95,
+      activityLevel: 'moderately_active',
+    });
+    expect(updatedTargets.maintenance).not.toBe(initialTargets.maintenance);
+    expect(screen.getByTestId('nutrition-goals-custom-input')).toHaveProp(
+      'value',
+      String(updatedTargets.maintenance),
+    );
+  });
+
+  it('never overwrites a custom target the user already typed, even when the profile changes afterward', async () => {
+    let capturedUpdateProfile: ProfileContextValue['updateProfile'] | undefined;
+    function CaptureUpdateProfile() {
+      capturedUpdateProfile = useProfile().updateProfile;
+      return null;
+    }
+
+    render(
+      <ProfileProvider>
+        <NutritionGoalsProvider>
+          <CaptureUpdateProfile />
+          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+            <NutritionGoalsScreen navigation={navigation} route={route} />
+          </AppMenuContext.Provider>
+        </NutritionGoalsProvider>
+      </ProfileProvider>,
+    );
+    await screen.findByTestId('nutrition-goals-scroll');
+
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-custom-input'), '1850');
+
+    await act(async () => {
+      await capturedUpdateProfile?.({ weightValue: 95 });
+    });
+
+    expect(screen.getByTestId('nutrition-goals-custom-input')).toHaveProp('value', '1850');
+  });
+
   it('shows a concise Important Notes section', async () => {
     renderScreen();
     await screen.findByTestId('nutrition-goals-scroll');
