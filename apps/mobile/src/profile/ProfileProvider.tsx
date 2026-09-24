@@ -1,13 +1,6 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type PropsWithChildren,
-} from 'react';
+import { createContext, useContext, useMemo, type PropsWithChildren } from 'react';
 import { useAuth } from '../auth/AuthProvider';
+import { useSignedInResource } from '../lib/useSignedInResource';
 import { getMyProfile, updateMyProfile, type ProfileResponse, type UpdateProfileInput } from '../lib/api';
 
 export interface ProfileContextValue {
@@ -17,7 +10,7 @@ export interface ProfileContextValue {
   loading: boolean;
   error: string | null;
   /** Re-fetches from the server. Rarely needed directly -- prefer `updateProfile` after a write, which updates the cache from that write's own response instead of a second round trip. */
-  refetch: () => Promise<void>;
+  refetch: () => Promise<boolean>;
   /** Saves via the same PATCH updateMyProfile already used, then updates the shared cache from the response -- every other screen reading `profile` sees the change immediately, with no extra fetch. */
   updateProfile: (updates: UpdateProfileInput) => Promise<ProfileResponse>;
 }
@@ -49,42 +42,19 @@ export function ProfileProvider({ children }: PropsWithChildren) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
 
-  const [profile, setProfile] = useState<ProfileResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!accessToken) return;
-    setError(null);
-    try {
-      const result = await getMyProfile(accessToken);
-      setProfile(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load profile');
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken]);
-
-  useEffect(() => {
-    if (!accessToken) {
-      // Signed out -- clear the previous account's cached profile rather
-      // than leaving it readable, and reset to loading so a later sign-in
-      // (a different account) doesn't briefly flash stale data.
-      setProfile(null);
-      setError(null);
-      setLoading(true);
-      return;
-    }
-    void load();
-  }, [accessToken, load]);
+  const { data: profile, loading, error, refetch, setData: setProfile } = useSignedInResource(
+    accessToken,
+    getMyProfile,
+    null as ProfileResponse | null,
+    'Failed to load profile',
+  );
 
   const value = useMemo<ProfileContextValue>(
     () => ({
       profile,
       loading,
       error,
-      refetch: load,
+      refetch,
       updateProfile: async (updates: UpdateProfileInput) => {
         if (!accessToken) throw new Error('Not signed in');
         const updated = await updateMyProfile(accessToken, updates);
@@ -92,7 +62,7 @@ export function ProfileProvider({ children }: PropsWithChildren) {
         return updated;
       },
     }),
-    [profile, loading, error, load, accessToken],
+    [profile, loading, error, refetch, setProfile, accessToken],
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
