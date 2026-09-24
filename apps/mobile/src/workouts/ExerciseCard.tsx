@@ -278,20 +278,24 @@ function ExerciseCardComponent({
   );
 }
 
-function setsEqual(a: ExerciseCardSet[], b: ExerciseCardSet[]): boolean {
+function arraysEqual<T>(a: T[], b: T[], elementEqual: (x: T, y: T) => boolean): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
-  return a.every((set, i) => {
-    const other = b[i];
-    return (
+  return a.every((item, i) => elementEqual(item, b[i]));
+}
+
+function setsEqual(a: ExerciseCardSet[], b: ExerciseCardSet[]): boolean {
+  return arraysEqual(
+    a,
+    b,
+    (set, other) =>
       set.id === other.id &&
       set.setIndex === other.setIndex &&
       set.weight === other.weight &&
       set.reps === other.reps &&
       set.completed === other.completed &&
-      set.canComplete === other.canComplete
-    );
-  });
+      set.canComplete === other.canComplete,
+  );
 }
 
 function unilateralSideEqual(
@@ -310,16 +314,14 @@ function unilateralSetsEqual(
   a: UnilateralExerciseCardSet[],
   b: UnilateralExerciseCardSet[],
 ): boolean {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  return a.every((set, i) => {
-    const other = b[i];
-    return (
+  return arraysEqual(
+    a,
+    b,
+    (set, other) =>
       set.setIndex === other.setIndex &&
       unilateralSideEqual(set.left, other.left) &&
-      unilateralSideEqual(set.right, other.right)
-    );
-  });
+      unilateralSideEqual(set.right, other.right),
+  );
 }
 
 function previousSessionEqual(
@@ -329,17 +331,16 @@ function previousSessionEqual(
   if (a === b) return true;
   if (!a || !b) return false;
   if (a.dateDisplay !== b.dateDisplay) return false;
-  if (a.sets.length !== b.sets.length) return false;
-  return a.sets.every((set, i) => {
-    const other = b.sets[i];
-    return (
+  return arraysEqual(
+    a.sets,
+    b.sets,
+    (set, other) =>
       set.setNumber === other.setNumber &&
       set.weightDisplay === other.weightDisplay &&
       set.unit === other.unit &&
       set.reps === other.reps &&
-      set.side === other.side
-    );
-  });
+      set.side === other.side,
+  );
 }
 
 // ActiveWorkoutScreen rebuilds `sets`/`unilateralSets`/`previousSession` as
