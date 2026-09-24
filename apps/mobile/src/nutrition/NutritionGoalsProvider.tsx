@@ -1,20 +1,13 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type PropsWithChildren,
-} from 'react';
+import { createContext, useContext, useMemo, type PropsWithChildren } from 'react';
 import { useAuth } from '../auth/AuthProvider';
+import { useSignedInResource } from '../lib/useSignedInResource';
 import { fetchNutritionGoals, saveNutritionGoals, type NutritionGoals } from './nutritionGoalQueries';
 
 export interface NutritionGoalsContextValue {
   goals: NutritionGoals | null;
   loading: boolean;
   error: string | null;
-  refetch: () => Promise<void>;
+  refetch: () => Promise<boolean>;
   saveGoals: (goals: NutritionGoals) => Promise<NutritionGoals>;
 }
 
@@ -27,39 +20,19 @@ const NutritionGoalsContext = createContext<NutritionGoalsContextValue | undefin
 export function NutritionGoalsProvider({ children }: PropsWithChildren) {
   const { user } = useAuth();
   const userId = user?.id;
-  const [goals, setGoals] = useState<NutritionGoals | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!userId) return;
-    setError(null);
-    try {
-      const result = await fetchNutritionGoals(userId);
-      setGoals(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load nutrition goals');
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId) {
-      setGoals(null);
-      setError(null);
-      setLoading(true);
-      return;
-    }
-    void load();
-  }, [userId, load]);
+  const { data: goals, loading, error, refetch, setData: setGoals } = useSignedInResource(
+    userId,
+    fetchNutritionGoals,
+    null as NutritionGoals | null,
+    'Failed to load nutrition goals',
+  );
 
   const value = useMemo<NutritionGoalsContextValue>(
     () => ({
       goals,
       loading,
       error,
-      refetch: load,
+      refetch,
       saveGoals: async (updates) => {
         if (!userId) throw new Error('Not signed in');
         const saved = await saveNutritionGoals(userId, updates);
@@ -67,7 +40,7 @@ export function NutritionGoalsProvider({ children }: PropsWithChildren) {
         return saved;
       },
     }),
-    [goals, loading, error, load, userId],
+    [goals, loading, error, refetch, setGoals, userId],
   );
 
   return (
