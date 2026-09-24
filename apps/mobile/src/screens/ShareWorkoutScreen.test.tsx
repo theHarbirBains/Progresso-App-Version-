@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { PrimaryButton } from '../design/Button';
 import { colors, fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
@@ -111,8 +111,10 @@ describe('ShareWorkoutScreen loading and preview', () => {
 
     expect(await screen.findByTestId('share-card-workout-name')).toHaveTextContent('Push Day');
     expect(screen.getByTestId('share-card-muscles')).toHaveTextContent('Chest, Shoulders');
-    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('110kg×8');
-    expect(screen.getByTestId('share-card-top-set-1')).toHaveTextContent('60kg×8');
+    // Bench Press is a PR, so it's headlined in the PR section, not repeated
+    // in TOP LIFTS -- only Overhead Press (no PR) lands there.
+    expect(screen.getByTestId('share-card-pr-value-0')).toHaveTextContent('110kg×8');
+    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('60kg×8');
     await settle();
   });
 
@@ -164,6 +166,8 @@ describe('ShareWorkoutScreen loading and preview', () => {
   });
 
   it('renders a single-exercise workout correctly', async () => {
+    // cardData's first set (Bench Press) is a PR, so it renders in the PR
+    // section, not TOP LIFTS.
     mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: [cardData.topSets[0]] });
 
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
@@ -171,8 +175,8 @@ describe('ShareWorkoutScreen loading and preview', () => {
     });
     await screen.findByTestId('share-card-workout-name');
 
-    expect(screen.getByTestId('share-card-top-set-0')).toBeTruthy();
-    expect(screen.queryByTestId('share-card-top-set-1')).toBeNull();
+    expect(screen.getByTestId('share-card-pr-value-0')).toBeTruthy();
+    expect(screen.queryByTestId('share-card-pr-value-1')).toBeNull();
     await settle();
   });
 
@@ -386,8 +390,10 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     expect(card.borderColor).toBe(colors.border);
     const set = StyleSheet.flatten(screen.getByTestId('share-card-top-set-0').props.style);
     expect(set.fontFamily).toBe(fonts.monoBold);
-    const pr = within(screen.getByTestId('share-card-pr-section')).getByText(/8 Rep PR/);
-    expect(StyleSheet.flatten(pr.props.style).color).toBe(colors.accent);
+    // The PR *value* (not its name/label line, which stays plain text) is
+    // the one accented element on the card.
+    const prValue = screen.getByTestId('share-card-pr-value-0');
+    expect(StyleSheet.flatten(prValue.props.style).color).toBe(colors.accent);
     await settle();
   });
 
