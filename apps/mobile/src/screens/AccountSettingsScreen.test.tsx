@@ -1,13 +1,14 @@
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
-import { colors } from '../design/theme';
+import { colors, spacing } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { Alert, StyleSheet } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { getMyProfile, updateMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
+import { settingsStyles } from '../settings/settingsStyles';
 import { DEFAULT_NUTRITION_COLOR, DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 import { AccountSettingsScreen } from './AccountSettingsScreen';
 
@@ -175,6 +176,20 @@ describe('AccountSettingsScreen shell', () => {
       ) as Record<string, unknown>;
       expect(contentStyle.flex).toBe(1);
     }
+  });
+
+  // Settings deliberately stays flat rows, not AppCard widgets (see
+  // DESIGN.md's own Settings entry) -- so unlike a card's own internal
+  // padding, nothing else gives a category's row text/icons a gutter from
+  // the physical screen edge except this. Regression coverage for the
+  // "rows touching the screen edge" bug: every category wraps its content
+  // in this one shared style, so fixing it here fixes all six at once.
+  it("gives every category's rows the same screen gutter as the tabs above them", () => {
+    const style = StyleSheet.flatten(settingsStyles.categoryGap) as Record<string, unknown>;
+    expect(style.paddingHorizontal).toBe(spacing.xxl);
+    expect(style.paddingHorizontal).toBe(
+      StyleSheet.flatten(settingsStyles.tabsWrap).paddingHorizontal,
+    );
   });
 });
 

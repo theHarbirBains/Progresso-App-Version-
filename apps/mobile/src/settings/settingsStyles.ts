@@ -28,9 +28,17 @@ export const settingsStyles = StyleSheet.create({
   tabsWrap: {
     paddingHorizontal: spacing.xxl,
   },
-  // Vertical rhythm between a category's sections.
+  // Vertical rhythm between a category's sections, plus the screen gutter
+  // every category needs -- Settings deliberately stays flat rows, not
+  // AppCard widgets (see DESIGN.md's own Settings entry), so unlike a
+  // card's own spacing.lg internal padding, nothing else in the chain
+  // (Screen's intentionally edge-to-edge body, Section, ListRow) was ever
+  // giving row text/icons a gutter of their own -- same class of bug as
+  // AppHeader's, fixed the same way: match tabsWrap's spacing.xxl so a
+  // category's rows line up with the tabs above them.
   categoryGap: {
     gap: spacing.xxl,
+    paddingHorizontal: spacing.xxl,
   },
   loadingWrap: {
     flex: 1,
