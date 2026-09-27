@@ -43,25 +43,19 @@ export interface AppMenuSection {
  * -- Feed (Home) is already one tap away via the bottom nav, same reasoning
  * as Profile never appearing here.
  *
- * Previously split into this (Workout Mode) and a separate
- * NUTRITION_MENU_SECTIONS, switched by which mode the app was in -- merged
- * into one list once the Workout/Nutrition toggle was removed (see
- * DESIGN.md §11): there is no more "mode" for the menu to switch on, so
- * every destination -- workout and nutrition alike -- belongs in the one
- * menu every screen opens.
+ * Exactly two sections -- Training and Nutrition, the app's two real
+ * domains -- rather than the finer PROGRESSO/TRAINING·TOOLS/NUTRITION/MORE
+ * split this used to have. Settings isn't a Training or Nutrition
+ * destination, so it isn't a third section here at all -- see
+ * APP_MENU_FOOTER_ITEM below, rendered by AppSideMenu as a standalone final
+ * row with no section header of its own.
  */
 export const APP_MENU_SECTIONS: AppMenuSection[] = [
   {
-    title: 'PROGRESSO',
+    title: 'TRAINING',
     items: [
       { route: 'WorkoutHistory', label: 'Workouts', icon: 'activity' },
       { route: 'ProgressOverview', label: 'Progress', icon: 'trending-up' },
-      { route: 'FoodLibrary', label: 'Food', icon: 'pie-chart' },
-    ],
-  },
-  {
-    title: 'TRAINING / TOOLS',
-    items: [
       { route: 'WorkoutSplits', label: 'Workout Splits', icon: 'layers' },
       { route: 'ExerciseLibrary', label: 'Exercise Library', icon: 'list' },
     ],
@@ -69,13 +63,19 @@ export const APP_MENU_SECTIONS: AppMenuSection[] = [
   {
     title: 'NUTRITION',
     items: [
+      { route: 'FoodLibrary', label: 'Food Library', icon: 'pie-chart' },
       { route: 'NutritionGoals', label: 'Nutrition Goals', icon: 'target' },
       { label: 'Nutrition History', icon: 'clock', comingSoon: true },
       { label: 'Recipes', icon: 'book-open', comingSoon: true },
     ],
   },
-  {
-    title: 'MORE',
-    items: [{ route: 'AccountSettings', label: 'Settings', icon: 'settings' }],
-  },
 ];
+
+/** Rendered by AppSideMenu as a standalone row below every section, with no
+ * section header -- Settings applies to the whole app, not to Training or
+ * Nutrition specifically, so it doesn't belong grouped under either one. */
+export const APP_MENU_FOOTER_ITEM: AppMenuItem = {
+  route: 'AccountSettings',
+  label: 'Settings',
+  icon: 'settings',
+};

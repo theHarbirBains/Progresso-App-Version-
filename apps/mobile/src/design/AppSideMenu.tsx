@@ -12,7 +12,10 @@ import { Text } from './Text';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  APP_MENU_FOOTER_ITEM,
   APP_MENU_SECTIONS,
+  type AppMenuEntry,
+  type AppMenuItem,
   type AppMenuRoute,
   type AppMenuSection,
 } from '../navigation/appMenuSections';
@@ -32,6 +35,9 @@ interface Props {
   accentColor: string;
   /** Defaults to APP_MENU_SECTIONS -- the one universal menu, the same regardless of which screen opened it. A test/story can still override it; App.tsx itself no longer does. */
   sections?: AppMenuSection[];
+  /** Defaults to APP_MENU_FOOTER_ITEM (Settings), rendered below every
+   * section with no header of its own. Pass null to omit it entirely. */
+  footerItem?: AppMenuItem | null;
   /** Defaults to "Progresso". */
   title?: string;
 }
@@ -52,6 +58,7 @@ export function AppSideMenu({
   onClose,
   accentColor,
   sections = APP_MENU_SECTIONS,
+  footerItem = APP_MENU_FOOTER_ITEM,
   title = 'Progresso',
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -84,6 +91,48 @@ export function AppSideMenu({
     return () => subscription.remove();
   }, [visible, onClose]);
 
+  function renderEntry(item: AppMenuEntry) {
+    if ('comingSoon' in item) {
+      return (
+        <View
+          key={item.label}
+          testID={`app-menu-item-${item.label}`}
+          style={[styles.item, styles.itemDisabled]}
+        >
+          <Feather name={item.icon} size={18} color={colors.textMuted} />
+          <Text style={[styles.itemLabel, styles.itemLabelDisabled]}>{item.label}</Text>
+          <Badge
+            label="Coming Soon"
+            color={colors.textMuted}
+            backgroundColor={colors.surfaceRaised}
+          />
+        </View>
+      );
+    }
+
+    const isActive = item.route === activeRoute;
+    return (
+      <Pressable
+        key={item.route}
+        testID={`app-menu-item-${item.route}`}
+        style={[styles.item, isActive && { backgroundColor: colors.surfaceRaised }]}
+        onPress={() => onNavigate(item.route)}
+        accessibilityRole="button"
+        accessibilityState={{ selected: isActive }}
+      >
+        <Feather name={item.icon} size={18} color={isActive ? accentColor : colors.textSecondary} />
+        <Text
+          style={[
+            styles.itemLabel,
+            isActive && { color: colors.textPrimary, fontFamily: fonts.display },
+          ]}
+        >
+          {item.label}
+        </Text>
+      </Pressable>
+    );
+  }
+
   return (
     <>
       {visible ? (
@@ -109,53 +158,10 @@ export function AppSideMenu({
           {sections.map((section) => (
             <View key={section.title} style={styles.section}>
               <SectionHeader label={section.title} />
-              {section.items.map((item) => {
-                if ('comingSoon' in item) {
-                  return (
-                    <View
-                      key={item.label}
-                      testID={`app-menu-item-${item.label}`}
-                      style={[styles.item, styles.itemDisabled]}
-                    >
-                      <Feather name={item.icon} size={18} color={colors.textMuted} />
-                      <Text style={[styles.itemLabel, styles.itemLabelDisabled]}>{item.label}</Text>
-                      <Badge
-                        label="Coming Soon"
-                        color={colors.textMuted}
-                        backgroundColor={colors.surfaceRaised}
-                      />
-                    </View>
-                  );
-                }
-
-                const isActive = item.route === activeRoute;
-                return (
-                  <Pressable
-                    key={item.route}
-                    testID={`app-menu-item-${item.route}`}
-                    style={[styles.item, isActive && { backgroundColor: colors.surfaceRaised }]}
-                    onPress={() => onNavigate(item.route)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isActive }}
-                  >
-                    <Feather
-                      name={item.icon}
-                      size={18}
-                      color={isActive ? accentColor : colors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.itemLabel,
-                        isActive && { color: colors.textPrimary, fontFamily: fonts.display },
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {section.items.map(renderEntry)}
             </View>
           ))}
+          {footerItem ? <View style={styles.footer}>{renderEntry(footerItem)}</View> : null}
         </ScrollView>
       </Animated.View>
     </>
@@ -193,6 +199,14 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: spacing.xl,
+  },
+  // No SectionHeader of its own -- a hairline stands in for one, separating
+  // Settings from Training/Nutrition without implying it's a third domain
+  // alongside them.
+  footer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+    paddingTop: spacing.md,
   },
   item: {
     flexDirection: 'row',

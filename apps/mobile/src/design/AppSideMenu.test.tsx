@@ -10,27 +10,35 @@ const baseProps = {
 };
 
 describe('AppSideMenu', () => {
-  it('renders every configured destination, grouped by section', () => {
+  it('renders every configured destination, grouped into Training and Nutrition, with Settings as a footer row', () => {
     render(<AppSideMenu {...baseProps} visible={true} />);
 
-    expect(screen.getByText('PROGRESSO')).toBeTruthy();
-    expect(screen.getByText('TRAINING / TOOLS')).toBeTruthy();
-    expect(screen.getByText('MORE')).toBeTruthy();
+    expect(screen.getByText('TRAINING')).toBeTruthy();
+    expect(screen.getByText('NUTRITION')).toBeTruthy();
 
-    // No Home entry -- Dashboard is already one tap away via the bottom nav.
+    // No Home entry -- Feed is already one tap away via the bottom nav.
     expect(screen.queryByTestId('app-menu-item-Dashboard')).toBeNull();
     expect(screen.getByTestId('app-menu-item-WorkoutHistory')).toHaveTextContent(/Workouts/);
     expect(screen.getByTestId('app-menu-item-ProgressOverview')).toHaveTextContent(/Progress/);
-    // Workout mode's menu is workout-only -- no Nutrition or Profile item
-    // (Nutrition mode has its own, separate section list; Profile stays
-    // reachable via the bottom nav either way).
-    expect(screen.queryByTestId('app-menu-item-Nutrition')).toBeNull();
-    expect(screen.queryByTestId('app-menu-item-Profile')).toBeNull();
     expect(screen.getByTestId('app-menu-item-WorkoutSplits')).toHaveTextContent(/Workout Splits/);
     expect(screen.getByTestId('app-menu-item-ExerciseLibrary')).toHaveTextContent(
       /Exercise Library/,
     );
+    expect(screen.getByTestId('app-menu-item-FoodLibrary')).toHaveTextContent(/Food Library/);
+    expect(screen.getByTestId('app-menu-item-NutritionGoals')).toHaveTextContent(/Nutrition Goals/);
+    // Profile stays reachable via the bottom nav, not this menu.
+    expect(screen.queryByTestId('app-menu-item-Profile')).toBeNull();
+    // Settings is a standalone footer row, not inside either section, and no
+    // section header of its own precedes it.
     expect(screen.getByTestId('app-menu-item-AccountSettings')).toHaveTextContent(/Settings/);
+    expect(screen.queryByText('MORE')).toBeNull();
+    expect(screen.queryByText('SETTINGS')).toBeNull();
+  });
+
+  it('omits the footer row entirely when footerItem is null', () => {
+    render(<AppSideMenu {...baseProps} visible={true} footerItem={null} />);
+
+    expect(screen.queryByTestId('app-menu-item-AccountSettings')).toBeNull();
   });
 
   it('marks the active route as selected', () => {
