@@ -54,11 +54,14 @@ type Props = RootStackScreenProps<'Feed'>;
 // (Protein/Carbs/Fat), not just Protein.
 //
 // The header's "+" mirrors Strava's own top-bar button: a shortcut sheet
-// (Start Workout / Log Food) to the same destinations Train's and
-// Nutrition's own primary buttons already open. It's an addition, not a
-// replacement -- those tab-root buttons are still how starting a workout
-// or logging food normally happens (see the "option A" decision this
-// redesign made); this is just a faster path from Feed itself.
+// (Start Workout / Log Food / Scan Barcode) to the same destinations
+// Train's and Nutrition's own primary buttons already open. It's an
+// addition, not a replacement -- those tab-root buttons are still how
+// starting a workout or logging food normally happens (see the "option A"
+// decision this redesign made); this is just a faster path from Feed
+// itself. Scan Barcode is the one exception with no other entry point at
+// all today -- BarcodeScannerScreen has existed since the barcode-lookup
+// feature shipped, but nothing navigated to it until this sheet.
 export function FeedScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
@@ -172,6 +175,16 @@ export function FeedScreen({ navigation }: Props) {
           onPress={() => {
             setQuickActionsOpen(false);
             navigation.navigate('FoodLibrary');
+          }}
+        />
+        <ListRow
+          testID="feed-quick-action-scan-barcode"
+          icon="camera"
+          title="Scan Barcode"
+          divider
+          onPress={() => {
+            setQuickActionsOpen(false);
+            navigation.navigate('BarcodeScanner');
           }}
         />
       </BottomSheet>
