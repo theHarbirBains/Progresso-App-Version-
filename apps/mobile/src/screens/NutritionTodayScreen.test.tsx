@@ -235,6 +235,24 @@ describe('NutritionTodayScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('NutritionGoals');
   });
 
+  it('navigates to the barcode scanner when Scan Barcode is pressed', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    fireEvent.press(screen.getByTestId('scan-barcode-button'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('BarcodeScanner');
+  });
+
+  it('navigates to FoodSearch when Search Food is pressed', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    fireEvent.press(screen.getByTestId('search-food-button'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('FoodSearch');
+  });
+
   it('opens the app-level side menu when the header button is pressed', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');

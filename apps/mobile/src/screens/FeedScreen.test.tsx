@@ -216,7 +216,7 @@ describe('FeedScreen', () => {
     expect(mockOpenMenu).toHaveBeenCalledWith();
   });
 
-  it('opens a quick-actions sheet from the header "+", offering Start Workout, Log Food, and Scan Barcode', async () => {
+  it('opens a quick-actions sheet from the header "+", offering Start Workout and Log Food', async () => {
     renderScreen();
     await screen.findByTestId('feed-empty');
 
@@ -225,7 +225,8 @@ describe('FeedScreen', () => {
 
     expect(screen.getByTestId('feed-quick-action-start-workout')).toBeTruthy();
     expect(screen.getByTestId('feed-quick-action-log-food')).toBeTruthy();
-    expect(screen.getByTestId('feed-quick-action-scan-barcode')).toBeTruthy();
+    // Scan Barcode moved to Nutrition's own actions -- see NutritionTodayScreen.test.tsx.
+    expect(screen.queryByTestId('feed-quick-action-scan-barcode')).toBeNull();
   });
 
   it('starting a workout from the quick-actions sheet navigates to New Workout and closes the sheet', async () => {
@@ -248,17 +249,6 @@ describe('FeedScreen', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
     expect(screen.queryByTestId('feed-quick-action-log-food')).toBeNull();
-  });
-
-  it('scanning a barcode from the quick-actions sheet navigates to the barcode scanner and closes the sheet', async () => {
-    renderScreen();
-    await screen.findByTestId('feed-empty');
-    fireEvent.press(screen.getByTestId('feed-quick-actions'));
-
-    fireEvent.press(screen.getByTestId('feed-quick-action-scan-barcode'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('BarcodeScanner');
-    expect(screen.queryByTestId('feed-quick-action-scan-barcode')).toBeNull();
   });
 
   it('reloads on focus without showing the loading indicator again', async () => {
