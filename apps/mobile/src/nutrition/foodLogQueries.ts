@@ -130,6 +130,34 @@ export async function fetchWeeklyFoodLogs(
   return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
 }
 
+/**
+ * Every food log within the given local-time calendar month -- same
+ * single-month-boundary pattern as workoutQueries.ts's own
+ * fetchWorkoutsForMonth, so Nutrition History's calendar dots and its
+ * selected day's list both derive from one fetch per month shown, the same
+ * way Workout History already does (see WorkoutHistoryScreen's own
+ * markedDateKeys/selectedDayWorkouts, both built from monthWorkouts).
+ */
+export async function fetchFoodLogsForMonth(
+  userId: string,
+  year: number,
+  month: number,
+): Promise<FoodLogRow[]> {
+  const startOfMonth = new Date(year, month - 1, 1).toISOString();
+  const startOfNextMonth = new Date(year, month, 1).toISOString();
+
+  const { data, error } = await supabase
+    .from('food_logs')
+    .select(TODAYS_FOOD_LOG_COLUMNS)
+    .eq('user_id', userId)
+    .gte('logged_at', startOfMonth)
+    .lt('logged_at', startOfNextMonth)
+    .order('logged_at', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
+}
+
 /** Logs `quantity` servings of `food` now, under `mealType`. Snapshot totals are computed once, at log time, and stored -- never re-derived from foods afterward. */
 export async function logFood(
   userId: string,

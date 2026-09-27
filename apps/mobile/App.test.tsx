@@ -69,6 +69,7 @@ jest.mock('./src/dashboard/recentWorkoutInfo', () => ({
 jest.mock('./src/nutrition/foodLogQueries', () => ({
   fetchTodaysFoodLogs: jest.fn().mockResolvedValue([]),
   fetchWeeklyFoodLogs: jest.fn().mockResolvedValue([]),
+  fetchFoodLogsForMonth: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('./src/nutrition/nutritionGoalQueries', () => ({
   fetchNutritionGoals: jest.fn().mockResolvedValue({
@@ -597,7 +598,9 @@ describe('Universal side menu', () => {
     expect(screen.queryByTestId('app-menu-item-Nutrition')).toBeNull();
     expect(screen.getByTestId('app-menu-item-FoodLibrary')).toHaveTextContent(/Food/);
     expect(screen.getByTestId('app-menu-item-NutritionGoals')).toHaveTextContent(/Nutrition Goals/);
-    expect(screen.getByTestId('app-menu-item-Nutrition History')).toHaveTextContent(/Coming Soon/);
+    expect(screen.getByTestId('app-menu-item-NutritionHistory')).toHaveTextContent(
+      /Nutrition History/,
+    );
     expect(screen.getByTestId('app-menu-item-Recipes')).toHaveTextContent(/Coming Soon/);
     expect(screen.getByTestId('app-menu-item-AccountSettings')).toHaveTextContent(/Settings/);
     // The Workout destinations are still there too -- one universal list.
@@ -615,6 +618,18 @@ describe('Universal side menu', () => {
 
     expect(await screen.findByTestId('nutrition-goals-scroll')).toBeTruthy();
     expect(screen.getByTestId('nutrition-goals-header')).toBeTruthy();
+    expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
+  });
+
+  it("navigates to the Nutrition History page via the Nutrition menu's Nutrition History item", async () => {
+    await signIn();
+    fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
+    await screen.findByTestId('nutrition-today-open-menu');
+    fireEvent.press(screen.getByTestId('nutrition-today-open-menu'));
+
+    fireEvent.press(screen.getByTestId('app-menu-item-NutritionHistory'));
+
+    expect(await screen.findByTestId('nutrition-history-header')).toBeTruthy();
     expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
   });
 

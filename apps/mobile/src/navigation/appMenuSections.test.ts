@@ -39,12 +39,15 @@ describe('APP_MENU_SECTIONS', () => {
     expect(findItem('Nutrition Goals')).toMatchObject({ route: 'NutritionGoals' });
   });
 
-  it('marks Nutrition History and Recipes as coming-soon placeholders, not routes to a nonexistent screen', () => {
+  it("routes the 'Nutrition History' item to the NutritionHistory screen", () => {
     expect(findItem('Nutrition History')).toEqual({
+      route: 'NutritionHistory',
       label: 'Nutrition History',
       icon: 'clock',
-      comingSoon: true,
     });
+  });
+
+  it('marks Recipes as a coming-soon placeholder, not a route to a nonexistent screen', () => {
     expect(findItem('Recipes')).toEqual({ label: 'Recipes', icon: 'book-open', comingSoon: true });
   });
 });

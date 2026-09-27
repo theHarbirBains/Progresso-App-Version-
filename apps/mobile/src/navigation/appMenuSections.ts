@@ -65,7 +65,7 @@ export const APP_MENU_SECTIONS: AppMenuSection[] = [
     items: [
       { route: 'FoodLibrary', label: 'Food Library', icon: 'pie-chart' },
       { route: 'NutritionGoals', label: 'Nutrition Goals', icon: 'target' },
-      { label: 'Nutrition History', icon: 'clock', comingSoon: true },
+      { route: 'NutritionHistory', label: 'Nutrition History', icon: 'clock' },
       { label: 'Recipes', icon: 'book-open', comingSoon: true },
     ],
   },

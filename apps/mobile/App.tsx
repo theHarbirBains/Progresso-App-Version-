@@ -47,6 +47,7 @@ import { LaunchScreen } from './src/screens/LaunchScreen';
 import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
 import { NutritionColorScreen } from './src/screens/NutritionColorScreen';
 import { NutritionGoalsScreen } from './src/screens/NutritionGoalsScreen';
+import { NutritionHistoryScreen } from './src/screens/NutritionHistoryScreen';
 import { NutritionTodayScreen } from './src/screens/NutritionTodayScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { PRHistoryScreen } from './src/screens/PRHistoryScreen';
@@ -290,6 +291,7 @@ function Root() {
                 <Stack.Screen name="FoodSearch" component={FoodSearchScreen} />
                 <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
                 <Stack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
+                <Stack.Screen name="NutritionHistory" component={NutritionHistoryScreen} />
                 <Stack.Screen name="CalorieEstimation" component={CalorieEstimationScreen} />
                 <Stack.Screen name="WorkoutColorSettings" component={WorkoutColorScreen} />
                 <Stack.Screen name="NutritionColorSettings" component={NutritionColorScreen} />

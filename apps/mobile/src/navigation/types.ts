@@ -23,6 +23,7 @@ export type RootStackParamList = {
   FoodSearch: undefined;
   BarcodeScanner: undefined;
   NutritionGoals: undefined;
+  NutritionHistory: undefined;
   CalorieEstimation: undefined;
   WorkoutColorSettings: undefined;
   NutritionColorSettings: undefined;

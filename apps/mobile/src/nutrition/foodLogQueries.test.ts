@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import {
   deleteFoodLog,
+  fetchFoodLogsForMonth,
   fetchTodaysFoodLogs,
   getLocalDayRange,
   logFood,
@@ -161,6 +162,52 @@ describe('fetchTodaysFoodLogs', () => {
     mockTable({ data: null, error: { message: 'boom' } });
 
     await expect(fetchTodaysFoodLogs('user-1')).rejects.toThrow('boom');
+  });
+});
+
+describe('fetchFoodLogsForMonth', () => {
+  it('queries by user and local-month logged_at boundaries, chronological', async () => {
+    const { calls } = mockTable({ data: [dbRow], error: null });
+
+    const result = await fetchFoodLogsForMonth('user-1', 2026, 2);
+
+    expect(result).toEqual([
+      {
+        id: 'log-1',
+        foodId: 'food-1',
+        foodNameSnapshot: 'Chicken Breast',
+        servingSize: 100,
+        servingUnit: 'g',
+        quantity: 1,
+        calories: 165,
+        proteinG: 31,
+        carbsG: 0,
+        fatG: 3.6,
+        loggedAt: '2026-01-01T12:00:00Z',
+      },
+    ]);
+    expect(calls.eq).toEqual([['user_id', 'user-1']]);
+    expect(calls.gte).toEqual([['logged_at', new Date(2026, 1, 1).toISOString()]]);
+    expect(calls.lt).toEqual([['logged_at', new Date(2026, 2, 1).toISOString()]]);
+    expect(calls.order).toEqual([['logged_at', { ascending: true }]]);
+  });
+
+  it("also reads each food's photo through the food link", async () => {
+    const { calls } = mockTable({
+      data: [{ ...dbRow, foods: { image_url: 'https://images.example/a.jpg' } }],
+      error: null,
+    });
+
+    const result = await fetchFoodLogsForMonth('user-1', 2026, 2);
+
+    expect(calls.select?.[0]?.[0]).toContain('foods(image_url)');
+    expect(result[0]?.imageUrl).toBe('https://images.example/a.jpg');
+  });
+
+  it('throws on a query error', async () => {
+    mockTable({ data: null, error: { message: 'boom' } });
+
+    await expect(fetchFoodLogsForMonth('user-1', 2026, 2)).rejects.toThrow('boom');
   });
 });
 

@@ -14,6 +14,7 @@ const NUTRITION_ROUTE_NAMES = new Set([
   'FoodSearch',
   'BarcodeScanner',
   'NutritionGoals',
+  'NutritionHistory',
   'CalorieEstimation',
   'NutritionColorSettings',
 ]);

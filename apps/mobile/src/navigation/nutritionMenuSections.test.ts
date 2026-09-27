@@ -7,6 +7,7 @@ describe('isNutritionRoute', () => {
     'FoodSearch',
     'BarcodeScanner',
     'NutritionGoals',
+    'NutritionHistory',
     'CalorieEstimation',
     'NutritionColorSettings',
   ])('treats %s as a Nutrition Mode route', (route) => {
