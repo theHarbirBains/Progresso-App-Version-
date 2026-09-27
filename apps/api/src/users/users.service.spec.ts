@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import type { SupabaseService } from '../supabase/supabase.service';
 import { UsersService } from './users.service';
 
@@ -62,6 +62,22 @@ describe('UsersService', () => {
       const service = serviceWith(client);
 
       await expect(service.getProfile('user-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // A real query error (a bad column, connectivity, RLS) used to be
+    // reported identically to "no row for this user" -- the exact same 404
+    // either way, which misleadingly reads as a missing-account problem
+    // even when the real cause is e.g. a migration not yet applied.
+    it('throws a real server error, not NotFoundException, when the query itself errors', async () => {
+      const client = createMockClient({
+        selectData: null,
+        selectError: { message: 'column users.country does not exist' },
+      });
+      const service = serviceWith(client);
+
+      await expect(service.getProfile('user-1')).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
     });
   });
 

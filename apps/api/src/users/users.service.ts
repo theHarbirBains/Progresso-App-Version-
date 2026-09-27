@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -78,6 +79,8 @@ function toProfile(data: any): UserProfile {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(private readonly supabaseService: SupabaseService) {}
 
   async getProfile(userId: string): Promise<UserProfile> {
@@ -88,7 +91,17 @@ export class UsersService {
       .eq('id', userId)
       .maybeSingle();
 
-    if (error || !data) {
+    // A real query error (bad column, connectivity, RLS misconfiguration)
+    // used to be reported identically to "no row for this user" -- the
+    // exact same 404 "User profile not found" either way, which reads as a
+    // missing-account problem even when the actual cause is a schema
+    // mismatch (e.g. a migration not yet applied to this database). Logged
+    // and surfaced as a real 500 now so the two are never confused again.
+    if (error) {
+      this.logger.error(`Failed to load profile for ${userId}: ${error.message}`);
+      throw new InternalServerErrorException('Failed to load profile');
+    }
+    if (!data) {
       throw new NotFoundException('User profile not found');
     }
 
