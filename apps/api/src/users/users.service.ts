@@ -30,6 +30,9 @@ export interface UserProfile {
   pushNotificationsOptIn: boolean | null;
   appleHealthPreference: string | null;
   onboardingCompletedAt: string | null;
+  referralSource: string | null;
+  country: string | null;
+  averageWorkoutLength: string | null;
 }
 
 const USERNAME_UNIQUE_VIOLATION = '23505';
@@ -39,7 +42,8 @@ const PROFILE_COLUMNS =
   'background_theme, avatar_url, active_workout_split_id, gender, birthday, weight_value, ' +
   'height_value, height_unit, fitness_goal, training_experience, workout_frequency_days, ' +
   'training_style_preference, email_opt_in, push_notifications_opt_in, ' +
-  'apple_health_preference, onboarding_completed_at, activity_level';
+  'apple_health_preference, onboarding_completed_at, activity_level, ' +
+  'referral_source, country, average_workout_length';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
@@ -66,6 +70,9 @@ function toProfile(data: any): UserProfile {
     pushNotificationsOptIn: data.push_notifications_opt_in,
     appleHealthPreference: data.apple_health_preference,
     onboardingCompletedAt: data.onboarding_completed_at,
+    referralSource: data.referral_source,
+    country: data.country,
+    averageWorkoutLength: data.average_workout_length,
   };
 }
 
@@ -136,6 +143,11 @@ export class UsersService {
       updatePayload.onboarding_completed_at = dto.onboardingCompleted
         ? new Date().toISOString()
         : null;
+    }
+    if (dto.referralSource !== undefined) updatePayload.referral_source = dto.referralSource;
+    if (dto.country !== undefined) updatePayload.country = dto.country;
+    if (dto.averageWorkoutLength !== undefined) {
+      updatePayload.average_workout_length = dto.averageWorkoutLength;
     }
 
     if (Object.keys(updatePayload).length === 0) {

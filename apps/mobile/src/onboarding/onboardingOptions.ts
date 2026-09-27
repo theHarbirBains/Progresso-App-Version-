@@ -1,7 +1,9 @@
 import type {
   AppleHealthPreference,
+  AverageWorkoutLength,
   FitnessGoal,
   Gender,
+  ReferralSource,
   TrainingExperience,
   TrainingStylePreference,
 } from '../lib/api';
@@ -57,3 +59,20 @@ export const TRAINING_STYLE_OPTIONS: {
 ];
 
 export const APPLE_HEALTH_PREFERENCE_VALUES: AppleHealthPreference[] = ['connected', 'not_now'];
+
+export const REFERRAL_SOURCE_OPTIONS: { value: ReferralSource; label: string }[] = [
+  { value: 'tiktok', label: 'TikTok' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'friend', label: 'A friend' },
+  { value: 'app_store', label: 'App Store' },
+  { value: 'google_search', label: 'Google Search' },
+  { value: 'creator', label: 'A creator' },
+  { value: 'other', label: 'Somewhere else' },
+];
+
+export const AVERAGE_WORKOUT_LENGTH_OPTIONS: { value: AverageWorkoutLength; label: string }[] = [
+  { value: '20_30', label: '20-30 min' },
+  { value: '30_45', label: '30-45 min' },
+  { value: '45_60', label: '45-60 min' },
+  { value: '60_plus', label: '60+ min' },
+];

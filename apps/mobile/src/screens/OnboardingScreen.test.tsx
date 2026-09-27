@@ -1,7 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile, type ProfileResponse } from '../lib/api';
-import { ProfileProvider, useProfile, type ProfileContextValue } from '../profile/ProfileProvider';
+import { updateMyProfile } from '../lib/api';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { OnboardingScreen } from './OnboardingScreen';
 
@@ -10,7 +10,6 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
 }));
 
@@ -19,352 +18,274 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockSignUpWithPassword = jest.fn();
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
-const mockMaterializeWorkoutSplitPreset = materializeWorkoutSplitPreset as jest.Mock;
+const mockMaterialize = materializeWorkoutSplitPreset as jest.Mock;
+const mockSwitchToSignIn = jest.fn();
 
-const mockNavigate = jest.fn();
-const mockReset = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = {
-  navigate: mockNavigate,
-  reset: mockReset,
-  addListener: jest.fn((event: string, cb: () => void) => {
-    if (event === 'focus') cb();
-    return jest.fn();
-  }),
-};
-const route = {} as never;
-
-function blankProfile(overrides: Partial<ProfileResponse> = {}): ProfileResponse {
-  return {
-    id: 'user-1',
-    email: 'a@example.com',
-    role: 'user',
-    displayName: null,
-    username: null,
-    weightUnit: 'kg',
-    workoutAccentColor: null,
-    nutritionAccentColor: null,
-    backgroundTheme: null,
-    avatarUrl: null,
-    activeWorkoutSplitId: null,
-    gender: null,
-    birthday: null,
-    weightValue: null,
-    heightValue: null,
-    heightUnit: 'cm',
-    fitnessGoal: null,
-    trainingExperience: null,
-    workoutFrequencyDays: null,
-    trainingStylePreference: null,
-    emailOptIn: null,
-    pushNotificationsOptIn: null,
-    appleHealthPreference: null,
-    onboardingCompletedAt: null,
-    activityLevel: null,
-    ...overrides,
-  };
-}
-
-// Both OnboardingScreen's own load() AND ProfileProvider's own fetch (via
-// useProgressTheme -> useProfile) call the shared getMyProfile mock
-// independently, in an order the test can't assume -- a mutable variable
-// read fresh inside a persistent mockImplementation avoids the call-order
-// race that mockResolvedValueOnce chaining would hit here (see prior
-// session precedent).
-let currentProfile: ProfileResponse = blankProfile();
-
-beforeEach(() => {
-  currentProfile = blankProfile();
-  mockUseAuth.mockReturnValue({
-    user: { id: 'user-1' },
-    session: { access_token: 'token-123' },
+beforeEach(async () => {
+  await AsyncStorage.clear();
+  mockUseAuth.mockReturnValue({ signUpWithPassword: mockSignUpWithPassword });
+  mockSignUpWithPassword.mockReset().mockResolvedValue({
+    error: null,
+    requiresEmailConfirmation: false,
+    accessToken: 'token-123',
+    userId: 'user-1',
   });
-  mockGetMyProfile.mockReset().mockImplementation(async () => currentProfile);
-  mockUpdateMyProfile.mockReset().mockImplementation(async (_token: string, updates: object) => {
-    currentProfile = { ...currentProfile, ...updates } as ProfileResponse;
-    return currentProfile;
-  });
-  mockMaterializeWorkoutSplitPreset
-    .mockReset()
-    .mockResolvedValue({ id: 'split-new', name: 'Push / Pull / Legs' });
-  mockNavigate.mockClear();
-  mockReset.mockClear();
+  mockUpdateMyProfile.mockReset().mockResolvedValue({ id: 'user-1' });
+  mockMaterialize.mockReset().mockResolvedValue({ id: 'split-new', name: 'Push / Pull / Legs' });
+  mockSwitchToSignIn.mockClear();
 });
 
-describe('OnboardingScreen', () => {
-  it('starts at the Apple Health step for a brand-new profile', async () => {
-    render(<OnboardingScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+function renderScreen() {
+  return render(<OnboardingScreen onSwitchToSignIn={mockSwitchToSignIn} />);
+}
 
-    expect(await screen.findByTestId('onboarding-step-apple-health')).toBeTruthy();
+async function settle() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+describe('OnboardingScreen', () => {
+  it('starts at the referral-source step for a brand-new draft', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('onboarding-step-referral-source')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-back')).toBeNull();
   });
 
-  it('resumes at the first unanswered step for a partially-completed profile', async () => {
-    currentProfile = blankProfile({
-      appleHealthPreference: 'not_now',
-      gender: 'male',
-      birthday: '1998-01-01',
-    });
+  it('offers a Sign In link only on the first step', async () => {
+    renderScreen();
+    await screen.findByTestId('onboarding-step-referral-source');
 
-    render(<OnboardingScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+    fireEvent.press(screen.getByTestId('onboarding-switch-to-sign-in'));
+    expect(mockSwitchToSignIn).toHaveBeenCalled();
 
-    expect(await screen.findByTestId('onboarding-step-weight')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('onboarding-referral-source-tiktok'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    expect(await screen.findByTestId('onboarding-step-country')).toBeTruthy();
+    expect(screen.queryByTestId('onboarding-switch-to-sign-in')).toBeNull();
   });
 
-  it('walks through the entire onboarding flow end-to-end', async () => {
-    render(<OnboardingScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    // Apple Health -- preference-only, no separate Continue button.
-    await screen.findByTestId('onboarding-step-apple-health');
-    fireEvent.press(screen.getByTestId('onboarding-step-apple-health-skip'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-        appleHealthPreference: 'not_now',
+  it('resumes at the first unanswered step for a partially-completed draft', async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: 2,
+        draft: { referralSource: 'tiktok', country: 'CA', gender: null },
       }),
     );
 
-    // Gender
-    await screen.findByTestId('onboarding-step-gender');
-    expect(screen.getByTestId('onboarding-continue').props.accessibilityState.disabled).toBe(true);
-    fireEvent.press(screen.getByTestId('onboarding-gender-other'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', { gender: 'other' }),
-    );
+    renderScreen();
 
-    // Birthday
-    await screen.findByTestId('onboarding-step-birthday');
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-        birthday: expect.any(String),
-      }),
-    );
-
-    // Weight
-    await screen.findByTestId('onboarding-step-weight');
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-        weightValue: expect.any(Number),
-        weightUnit: 'kg',
-      }),
-    );
-
-    // Height
-    await screen.findByTestId('onboarding-step-height');
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-        heightValue: expect.any(Number),
-        heightUnit: 'cm',
-      }),
-    );
-
-    // Fitness goal
-    await screen.findByTestId('onboarding-step-fitness-goal');
-    fireEvent.press(screen.getByTestId('onboarding-step-fitness-goal-build_muscle'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-        fitnessGoal: 'build_muscle',
-      }),
-    );
-
-    // Training experience
-    await screen.findByTestId('onboarding-step-training-experience');
-    fireEvent.press(screen.getByTestId('onboarding-experience-intermediate'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-        trainingExperience: 'intermediate',
-      }),
-    );
-
-    // Workout frequency
-    await screen.findByTestId('onboarding-step-workout-frequency');
-    fireEvent.press(screen.getByTestId('onboarding-frequency-4'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-        workoutFrequencyDays: 4,
-      }),
-    );
-
-    // Training style
-    await screen.findByTestId('onboarding-step-training-style');
-    fireEvent.press(screen.getByTestId('onboarding-step-training-style-build_your_own'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-        trainingStylePreference: 'build_your_own',
-      }),
-    );
-
-    // Workout split -- pressing a preset both materializes and activates it
-    // directly (no separate footer Continue), matching ChooseWorkoutSplitScreen.
-    await screen.findByTestId('onboarding-step-workout-split');
-    expect(screen.queryByTestId('onboarding-continue')).toBeNull();
-    fireEvent.press(screen.getByTestId('onboarding-step-workout-split-preset-ppl'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-        activeWorkoutSplitId: 'split-new',
-      }),
-    );
-
-    // Email preference
-    await screen.findByTestId('onboarding-step-email-preference');
-    fireEvent.press(screen.getByTestId('onboarding-email-yes'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', { emailOptIn: true }),
-    );
-
-    // Push notifications
-    await screen.findByTestId('onboarding-step-push-notifications');
-    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-connect'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-        pushNotificationsOptIn: true,
-      }),
-    );
-
-    // Completion
-    await screen.findByTestId('onboarding-step-completion');
-    expect(screen.getByText("You're all set.")).toBeTruthy();
-    fireEvent.press(screen.getByTestId('onboarding-start-training'));
-    await waitFor(() =>
-      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', { onboardingCompleted: true }),
-    );
-    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Feed' }] });
+    expect(await screen.findByTestId('onboarding-step-gender')).toBeTruthy();
   });
 
-  it('does not nest the wheel picker inside the outer ScrollView (avoids the VirtualizedList nesting warning)', async () => {
-    currentProfile = blankProfile({ appleHealthPreference: 'not_now', gender: 'male' });
-    render(<OnboardingScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+  it('does not nest the country list or a wheel picker inside the outer ScrollView', async () => {
+    renderScreen();
+    await screen.findByTestId('onboarding-step-referral-source');
 
-    expect(await screen.findByTestId('onboarding-step-birthday')).toBeTruthy();
-    expect(screen.queryByTestId('onboarding-scroll')).toBeNull();
-
+    fireEvent.press(screen.getByTestId('onboarding-referral-source-tiktok'));
     fireEvent.press(screen.getByTestId('onboarding-continue'));
-    expect(await screen.findByTestId('onboarding-step-weight')).toBeTruthy();
-    expect(screen.queryByTestId('onboarding-scroll')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    expect(await screen.findByTestId('onboarding-step-height')).toBeTruthy();
+    expect(await screen.findByTestId('onboarding-step-country')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-scroll')).toBeNull();
   });
 
   it('keeps the outer ScrollView for a plain option-list step', async () => {
-    currentProfile = blankProfile({ appleHealthPreference: 'not_now' });
-    render(<OnboardingScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    expect(await screen.findByTestId('onboarding-step-gender')).toBeTruthy();
-    expect(screen.getByTestId('onboarding-scroll')).toBeTruthy();
+    renderScreen();
+    expect(await screen.findByTestId('onboarding-scroll')).toBeTruthy();
   });
 
-  it('Back moves to the previous step without persisting anything', async () => {
-    currentProfile = blankProfile({ appleHealthPreference: 'not_now' });
-    render(<OnboardingScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+  it('Back moves to the previous step', async () => {
+    renderScreen();
+    await screen.findByTestId('onboarding-step-referral-source');
+    fireEvent.press(screen.getByTestId('onboarding-referral-source-tiktok'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+    await screen.findByTestId('onboarding-step-country');
 
-    await screen.findByTestId('onboarding-step-gender');
-    mockUpdateMyProfile.mockClear();
     fireEvent.press(screen.getByTestId('onboarding-back'));
 
-    expect(await screen.findByTestId('onboarding-step-apple-health')).toBeTruthy();
-    expect(mockUpdateMyProfile).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('onboarding-step-referral-source')).toBeTruthy();
   });
 
-  it('navigates to WorkoutSplitForm with activateOnCreate when Create Your Own is pressed', async () => {
-    currentProfile = blankProfile({
-      appleHealthPreference: 'not_now',
-      gender: 'male',
-      birthday: '1998-01-01',
-      weightValue: 80,
-      heightValue: 180,
-      fitnessGoal: 'get_stronger',
-      trainingExperience: 'advanced',
-      workoutFrequencyDays: 5,
-      trainingStylePreference: 'guided',
-    });
-    render(<OnboardingScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
+  it('walks through the entire onboarding flow end-to-end, creating the account only at the very end', async () => {
+    renderScreen();
+
+    await screen.findByTestId('onboarding-step-referral-source');
+    fireEvent.press(screen.getByTestId('onboarding-referral-source-tiktok'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    await screen.findByTestId('onboarding-step-country');
+    fireEvent.changeText(screen.getByTestId('onboarding-step-country-search'), 'Canada');
+    fireEvent.press(await screen.findByTestId('onboarding-step-country-option-CA'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    await screen.findByTestId('onboarding-step-gender');
+    fireEvent.press(screen.getByTestId('onboarding-gender-male'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    await screen.findByTestId('onboarding-step-birthday');
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    await screen.findByTestId('onboarding-step-weight');
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    await screen.findByTestId('onboarding-step-height');
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    await screen.findByTestId('onboarding-step-fitness-goal');
+    fireEvent.press(screen.getByTestId('onboarding-step-fitness-goal-build_muscle'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    await screen.findByTestId('onboarding-step-training-experience');
+    fireEvent.press(screen.getByTestId('onboarding-experience-intermediate'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    await screen.findByTestId('onboarding-step-workout-frequency');
+    fireEvent.press(screen.getByTestId('onboarding-frequency-4'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    await screen.findByTestId('onboarding-step-average-workout-length');
+    fireEvent.press(screen.getByTestId('onboarding-workout-length-45_60'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    await screen.findByTestId('onboarding-step-training-style');
+    fireEvent.press(screen.getByTestId('onboarding-step-training-style-guided'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-workout-split');
-    fireEvent.press(screen.getByTestId('onboarding-step-workout-split-create-own'));
+    fireEvent.press(screen.getByTestId('onboarding-step-workout-split-preset-ppl'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('WorkoutSplitForm', { activateOnCreate: true });
-  });
+    await screen.findByTestId('onboarding-step-apple-health');
+    fireEvent.press(screen.getByTestId('onboarding-step-apple-health-skip'));
 
-  it('advances past the split step on refocus once a split was created via Create Your Own', async () => {
-    currentProfile = blankProfile({
-      appleHealthPreference: 'not_now',
-      gender: 'male',
-      birthday: '1998-01-01',
-      weightValue: 80,
-      heightValue: 180,
-      fitnessGoal: 'get_stronger',
-      trainingExperience: 'advanced',
-      workoutFrequencyDays: 5,
-      trainingStylePreference: 'guided',
-    });
-    let focusCallback: (() => void) | undefined;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const navWithCapturedFocus: any = {
-      ...navigation,
-      addListener: jest.fn((event: string, cb: () => void) => {
-        if (event === 'focus') focusCallback = cb;
-        return jest.fn();
-      }),
-    };
+    await screen.findByTestId('onboarding-step-email-preference');
+    fireEvent.press(screen.getByTestId('onboarding-email-yes'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
-    // Captures the SAME shared ProfileProvider instance's updateProfile --
-    // WorkoutSplitFormScreen is a different screen, not rendered here, but
-    // it goes through this exact shared function in the real app, which is
-    // what actually keeps OnboardingScreen's own activeWorkoutSplitId (read
-    // reactively via useProgressTheme) current with no fetch of its own.
-    let capturedUpdateProfile: ProfileContextValue['updateProfile'] | undefined;
-    function CaptureUpdateProfile() {
-      capturedUpdateProfile = useProfile().updateProfile;
-      return null;
-    }
+    await screen.findByTestId('onboarding-step-push-notifications');
+    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
 
-    render(
-      <>
-        <CaptureUpdateProfile />
-        <OnboardingScreen navigation={navWithCapturedFocus} route={route} />
-      </>,
-      { wrapper: ProfileProvider },
+    await screen.findByTestId('onboarding-step-create-account');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-display-name'),
+      'Harbir Bains',
     );
-    await screen.findByTestId('onboarding-step-workout-split');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-email'),
+      'harbir@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-confirm-password'),
+      'password123',
+    );
 
-    fireEvent.press(screen.getByTestId('onboarding-step-workout-split-create-own'));
-    expect(mockNavigate).toHaveBeenCalledWith('WorkoutSplitForm', { activateOnCreate: true });
-
-    // Simulates WorkoutSplitFormScreen having created+activated a split,
-    // then the user pressing Back to return here. mockUpdateMyProfile's own
-    // implementation (see beforeEach) merges this into currentProfile and
-    // returns it, exactly like the real endpoint.
     await act(async () => {
-      await capturedUpdateProfile?.({ activeWorkoutSplitId: 'split-from-form' });
+      fireEvent.press(screen.getByTestId('onboarding-create-account-submit'));
     });
-    focusCallback?.();
 
-    expect(await screen.findByTestId('onboarding-step-email-preference')).toBeTruthy();
+    expect(mockSignUpWithPassword).toHaveBeenCalledWith('harbir@example.com', 'password123');
+    expect(mockMaterialize).toHaveBeenCalledWith('user-1', expect.objectContaining({ id: 'ppl' }));
+    await waitFor(() =>
+      expect(mockUpdateMyProfile).toHaveBeenCalledWith(
+        'token-123',
+        expect.objectContaining({
+          referralSource: 'tiktok',
+          country: 'CA',
+          gender: 'male',
+          fitnessGoal: 'build_muscle',
+          trainingExperience: 'intermediate',
+          workoutFrequencyDays: 4,
+          averageWorkoutLength: '45_60',
+          trainingStylePreference: 'guided',
+          activeWorkoutSplitId: 'split-new',
+          appleHealthPreference: 'not_now',
+          emailOptIn: true,
+          pushNotificationsOptIn: false,
+          username: 'harbirb',
+          displayName: 'Harbir Bains',
+          onboardingCompleted: true,
+        }),
+      ),
+    );
+    expect(await AsyncStorage.getItem('@progresso/onboardingDraft')).toBeNull();
+    await settle();
+  });
+
+  it('keeps the draft on disk and shows a confirmation message when email confirmation is required', async () => {
+    mockSignUpWithPassword.mockResolvedValue({
+      error: null,
+      requiresEmailConfirmation: true,
+      accessToken: null,
+      userId: 'user-1',
+    });
+    // Seed a fully-answered draft so this test starts right at
+    // createAccount instead of re-walking every question -- it's only
+    // exercising the confirmation branch, already covered end-to-end above.
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: 15,
+        draft: {
+          referralSource: 'tiktok',
+          country: 'CA',
+          gender: 'male',
+          birthday: '2000-06-15',
+          weightValue: 80,
+          weightUnit: 'kg',
+          heightValue: 180,
+          heightUnit: 'cm',
+          fitnessGoal: 'build_muscle',
+          trainingExperience: 'intermediate',
+          workoutFrequencyDays: 4,
+          averageWorkoutLength: '45_60',
+          trainingStylePreference: 'guided',
+          selectedSplitPresetId: 'ppl',
+          appleHealthPreference: 'not_now',
+          emailOptIn: true,
+          pushNotificationsOptIn: false,
+        },
+      }),
+    );
+
+    renderScreen();
+    await screen.findByTestId('onboarding-step-create-account');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-display-name'),
+      'Harbir Bains',
+    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-email'),
+      'harbir@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-confirm-password'),
+      'password123',
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-create-account-submit'));
+    });
+
+    expect(
+      await screen.findByTestId('onboarding-step-create-account-confirmation'),
+    ).toHaveTextContent(/harbir@example\.com/);
+    expect(mockUpdateMyProfile).not.toHaveBeenCalled();
+    expect(mockMaterialize).not.toHaveBeenCalled();
+    // The draft (now including pendingUsername/pendingDisplayName) stays on
+    // disk -- App.tsx's Root finishes this once a real session appears.
+    const stored = await AsyncStorage.getItem('@progresso/onboardingDraft');
+    expect(stored).not.toBeNull();
+    expect(JSON.parse(stored as string).draft.pendingUsername).toBe('harbirb');
+
+    fireEvent.press(screen.getByTestId('onboarding-create-account-back-to-sign-in'));
+    expect(mockSwitchToSignIn).toHaveBeenCalled();
+    await settle();
   });
 });

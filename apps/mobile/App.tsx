@@ -18,7 +18,6 @@ import { AppBackgroundLayer, ScreenBackdrop } from './src/design/AppBackgroundLa
 import { AppSideMenu } from './src/design/AppSideMenu';
 import { BackgroundThemeProvider, useBackgroundTheme } from './src/design/BackgroundThemeContext';
 import { BottomNavBar } from './src/design/BottomNavBar';
-import { LoadingState } from './src/design/LoadingState';
 import { wrapApp } from './src/lib/sentry';
 import { AppMenuContext } from './src/navigation/AppMenuContext';
 import type { AppMenuRoute } from './src/navigation/appMenuSections';
@@ -28,6 +27,8 @@ import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
 import { FoodLogProvider } from './src/nutrition/FoodLogProvider';
 import { NutritionGoalsProvider } from './src/nutrition/NutritionGoalsProvider';
+import { submitOnboardingDraft } from './src/onboarding/onboardingDraft';
+import { clearOnboardingDraft, loadOnboardingDraft } from './src/onboarding/onboardingDraftStorage';
 import { ProfileProvider, useProfile } from './src/profile/ProfileProvider';
 import { AllTimeStatsProvider } from './src/progress/AllTimeStatsProvider';
 import { useProgressTheme } from './src/progress/useProgressTheme';
@@ -57,8 +58,6 @@ import { ProgressOverviewScreen } from './src/screens/ProgressOverviewScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { ShareWorkoutScreen } from './src/screens/ShareWorkoutScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
-import { SignUpScreen } from './src/screens/SignUpScreen';
-import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { WorkoutColorScreen } from './src/screens/WorkoutColorScreen';
 import { WorkoutDetailScreen } from './src/screens/WorkoutDetailScreen';
 import { WorkoutHistoryScreen } from './src/screens/WorkoutHistoryScreen';
@@ -78,27 +77,22 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const MODE_AGNOSTIC_ROUTES = new Set(['Feed', 'ProgressOverview', 'Profile']);
 
 // Sign-in/up/forgot-password/reset-password stay on the pre-existing local
-// screen-state pattern (untouched by Phase 3) -- only the signed-in app
-// graduates to a real navigator, since that's the part that actually needs
-// back-stack semantics now. Root only ever mounts once AppShell's `ready`
-// is true, so status is guaranteed resolved -- there is no 'loading' branch
-// to handle here.
+// screen-state pattern -- only the signed-in app graduates to a real
+// navigator, since that's the part that actually needs back-stack
+// semantics. Root only ever mounts once AppShell's `ready` is true, so
+// status is guaranteed resolved -- there is no 'loading' branch to handle
+// here.
 //
-// `justCreatedAccount` is deliberately plain in-memory state, never
-// persisted: it's set true only by SignUpScreen's own success callback in
-// this same app session, and cleared the moment Welcome's Get Started is
-// pressed -- at which point onboarding is known to be needed without a
-// profile fetch (a brand-new account can't have completed it yet).
-//
-// `onboardingStatus` is the persisted counterpart, backed by
-// users.onboarding_completed_at (see the onboarding/sign-up redesign): a
-// signed-in session that ISN'T a fresh signup (e.g. the app was closed
-// mid-onboarding and reopened later) still needs to land on Onboarding
-// rather than Feed, which a purely in-memory flag could never capture.
+// Account creation is now the LAST step of onboarding (see
+// onboarding/onboardingDraft.ts), not the first -- 'signUp' mode renders
+// OnboardingScreen itself, pre-auth, and a signed-in session is by
+// construction already fully onboarded (there is no other way to get one).
+// So unlike before, a signed-in session never needs to be routed to a
+// separate Onboarding screen or shown a one-time Welcome screen here.
 function Root() {
-  const { status } = useAuth();
+  const { status, session, user } = useAuth();
   const { theme: backgroundTheme } = useBackgroundTheme();
-  const { profile, loading: profileLoading, error: profileError } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   const [mode, setMode] = useState<AuthMode>('signIn');
   // Feed, Progress, and You (Profile) are the app's mode-agnostic root
   // screens -- reachable directly from the bottom nav, not by switching a
@@ -109,10 +103,6 @@ function Root() {
   // so the fallback always reflects "wherever you were a moment ago" rather
   // than a fixed default.
   const [sharedMode, setSharedMode] = useState<'workout' | 'nutrition'>('workout');
-  const [justCreatedAccount, setJustCreatedAccount] = useState(false);
-  const [onboardingStatus, setOnboardingStatus] = useState<'checking' | 'needed' | 'done'>(
-    'checking',
-  );
   // The app-level side menu (AppSideMenu) is mounted here, as a sibling of
   // the navigator, rather than inside any individual screen -- that's what
   // lets it render above the ENTIRE app (header, content, bottom nav) on
@@ -162,62 +152,45 @@ function Root() {
     if (currentRouteName === undefined || MODE_AGNOSTIC_ROUTES.has(currentRouteName)) return;
     setSharedMode(isNutritionRoute(currentRouteName) ? 'nutrition' : 'workout');
   }, [currentRouteName]);
-  // Set right before clearing justCreatedAccount (a fresh account obviously
-  // needs onboarding, no fetch required) so the generic profile-check effect
-  // below -- which also re-runs on that same justCreatedAccount transition --
-  // doesn't immediately overwrite that known-correct 'needed' status with a
-  // stale fetch result.
-  const skipNextOnboardingCheckRef = useRef(false);
-
-  // Reads the shared ProfileProvider cache instead of fetching profile
-  // again here -- this used to call getMyProfile directly, a second
-  // request racing ProfileProvider's own already-in-flight one for the
-  // exact same data, shown behind a second, plain (unbranded) loading
-  // screen right after LaunchScreen's branded one. Fails open to 'done'
-  // (never blocks a real account behind a broken profile fetch) the same
-  // way the old catch handler did.
+  // Handles exactly one edge case: a project that requires email
+  // confirmation returns no session from signUpWithPassword, so
+  // OnboardingScreen's own account-creation step can't submit the local
+  // draft it collected right there -- there's no access token yet. The
+  // draft stays on disk in that case (see onboardingDraftStorage) until a
+  // real signed-in session eventually appears (the user confirmed and
+  // signed in), which is what this reconciles: submit the pending draft
+  // once, then clear it. Guarded by a ref (once per app session) and by
+  // the profile's own onboardingCompletedAt, so this never re-applies a
+  // stale leftover draft to an already-onboarded account.
+  const pendingDraftCheckedRef = useRef(false);
   useEffect(() => {
-    if (status !== 'signedIn' || justCreatedAccount) return;
-    if (skipNextOnboardingCheckRef.current) {
-      skipNextOnboardingCheckRef.current = false;
+    if (status !== 'signedIn' || profileLoading) return;
+    if (!session?.access_token || !user?.id) return;
+    if (pendingDraftCheckedRef.current) return;
+    pendingDraftCheckedRef.current = true;
+
+    if (profile?.onboardingCompletedAt) {
+      void clearOnboardingDraft();
       return;
     }
-    if (profileError) {
-      setOnboardingStatus('done');
-      return;
-    }
-    if (profileLoading) {
-      setOnboardingStatus('checking');
-      return;
-    }
-    setOnboardingStatus(profile?.onboardingCompletedAt ? 'done' : 'needed');
-  }, [status, justCreatedAccount, profile, profileLoading, profileError]);
+    const accessToken = session.access_token;
+    const userId = user.id;
+    loadOnboardingDraft().then((stored) => {
+      if (!stored) return;
+      submitOnboardingDraft(accessToken, userId, stored.draft)
+        .then(() => clearOnboardingDraft())
+        .catch(() => {
+          // Leave the draft in place -- retried on the next sign-in.
+        });
+    });
+  }, [status, session, user, profile, profileLoading]);
 
   if (status === 'passwordRecovery') {
     return <ResetPasswordScreen />;
   }
 
   if (status === 'signedIn') {
-    if (justCreatedAccount) {
-      return (
-        <WelcomeScreen
-          onGetStarted={() => {
-            skipNextOnboardingCheckRef.current = true;
-            setJustCreatedAccount(false);
-            setOnboardingStatus('needed');
-          }}
-        />
-      );
-    }
-
-    if (onboardingStatus === 'checking') {
-      return <LoadingState testID="onboarding-status-loading" />;
-    }
-
-    // Onboarding shows no bottom nav at all -- every other screen gets this
-    // one persistent bar for free, with no per-screen wiring, since it's a
-    // sibling of the navigator rather than owned by any individual screen.
-    const showGlobalBottomNav = currentRouteName !== undefined && currentRouteName !== 'Onboarding';
+    const showGlobalBottomNav = currentRouteName !== undefined;
 
     // Every screen gets an opaque, themed backdrop that is part of the
     // screen itself, so a push/pop never depends on JS to paint what's
@@ -263,7 +236,7 @@ function Root() {
               }
             >
               <Stack.Navigator
-                initialRouteName={onboardingStatus === 'needed' ? 'Onboarding' : 'Feed'}
+                initialRouteName="Feed"
                 screenOptions={{
                   headerShown: false,
                   // Transparent so each screen's own (transparent) root
@@ -276,7 +249,6 @@ function Root() {
                 screenLayout={renderScreenLayout}
               >
                 <Stack.Screen name="Feed" component={FeedScreen} />
-                <Stack.Screen name="Onboarding" component={OnboardingScreen} />
                 <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
                 <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
                 <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
@@ -354,12 +326,7 @@ function Root() {
 
   switch (mode) {
     case 'signUp':
-      return (
-        <SignUpScreen
-          onSwitchToSignIn={() => setMode('signIn')}
-          onAccountCreated={() => setJustCreatedAccount(true)}
-        />
-      );
+      return <OnboardingScreen onSwitchToSignIn={() => setMode('signIn')} />;
     case 'forgotPassword':
       return <ForgotPasswordScreen onBackToSignIn={() => setMode('signIn')} />;
     case 'signIn':

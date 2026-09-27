@@ -1,13 +1,13 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-// The signed-in app's navigation structure. Sign-in/up/forgot-password/reset
-// stay on the pre-existing local-mode screen-state pattern (untouched by
-// Phase 3) since they're a separate, already-working flow with nothing to
-// gain from a stack navigator.
+// The signed-in app's navigation structure. Sign-in/forgot-password/reset
+// (and now onboarding, which ends in account creation -- see
+// onboarding/onboardingDraft.ts) stay on the pre-existing local-mode
+// screen-state pattern instead, since they're a separate flow with nothing
+// to gain from a stack navigator and no signed-in session to navigate yet.
 export type RootStackParamList = {
   /** The app's landing screen: a personal activity feed, replacing the old Dashboard + Workout/Nutrition toggle. */
   Feed: undefined;
-  Onboarding: undefined;
   AccountSettings: undefined;
   ExerciseLibrary: undefined;
   WorkoutHistory: undefined;

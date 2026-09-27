@@ -23,6 +23,9 @@ export type AppleHealthPreference = 'connected' | 'not_now';
  * described catalog built on this same type. */
 export type ActivityLevel =
   'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | 'extra_active';
+export type ReferralSource =
+  'tiktok' | 'instagram' | 'friend' | 'app_store' | 'google_search' | 'creator' | 'other';
+export type AverageWorkoutLength = '20_30' | '30_45' | '45_60' | '60_plus';
 
 export interface ProfileResponse {
   id: string;
@@ -50,6 +53,10 @@ export interface ProfileResponse {
   appleHealthPreference: AppleHealthPreference | null;
   onboardingCompletedAt: string | null;
   activityLevel: ActivityLevel | null;
+  referralSource: ReferralSource | null;
+  /** ISO 3166-1 alpha-2, e.g. "CA" -- purely informational, nothing else reads it. */
+  country: string | null;
+  averageWorkoutLength: AverageWorkoutLength | null;
 }
 
 export interface UpdateProfileInput {
@@ -76,6 +83,9 @@ export interface UpdateProfileInput {
   appleHealthPreference?: AppleHealthPreference;
   onboardingCompleted?: boolean;
   activityLevel?: ActivityLevel;
+  referralSource?: ReferralSource;
+  country?: string;
+  averageWorkoutLength?: AverageWorkoutLength;
 }
 
 function getApiBaseUrl(): string {

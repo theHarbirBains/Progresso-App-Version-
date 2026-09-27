@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { getMyProfile } from './src/lib/api';
@@ -227,10 +228,11 @@ const mockSentry = jest.requireMock('./src/lib/sentry') as {
 };
 const mockGetMyProfile = getMyProfile as jest.Mock;
 
-beforeEach(() => {
+beforeEach(async () => {
   mockAuth.reset();
   mockSentry.setSentryUser.mockClear();
   mockSentry.clearSentryUser.mockClear();
+  await AsyncStorage.clear();
 });
 
 describe('Authentication flow', () => {
@@ -297,64 +299,77 @@ describe('Authentication flow', () => {
     expect(screen.queryByTestId('feed-screen')).toBeNull();
   });
 
-  it('switches to sign-up and shows the email-confirmation message', async () => {
+  it('switching to sign-up enters onboarding at the first step, pre-auth', async () => {
     render(<App />);
     await screen.findByTestId('sign-in-email');
 
     fireEvent.press(screen.getByTestId('sign-in-switch'));
-    fireEvent.changeText(await screen.findByTestId('sign-up-first-name'), 'Harbir');
-    fireEvent.changeText(screen.getByTestId('sign-up-last-name'), 'Bains');
-    fireEvent.changeText(screen.getByTestId('sign-up-display-name'), 'Harbir Bains');
-    fireEvent.changeText(screen.getByTestId('sign-up-username'), 'harbirb');
-    fireEvent.changeText(screen.getByTestId('sign-up-email'), 'new@example.com');
-    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'password123');
-    fireEvent.changeText(screen.getByTestId('sign-up-confirm-password'), 'password123');
-    fireEvent.press(screen.getByTestId('sign-up-submit'));
 
-    expect(await screen.findByTestId('sign-up-confirmation')).toBeTruthy();
+    expect(await screen.findByTestId('onboarding-step-referral-source')).toBeTruthy();
+    // Onboarding is the one flow that never shows the bottom navigation.
+    expect(screen.queryByTestId('app-bottom-nav')).toBeNull();
+  });
+
+  it('creating the account at the end of onboarding shows the email-confirmation message (this mock always requires it), keeping the draft for later', async () => {
+    // Seeds a fully-answered draft so this test reaches createAccount
+    // directly instead of re-walking every question -- the full
+    // step-by-step flow itself is covered by OnboardingScreen.test.tsx.
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: 15,
+        draft: {
+          referralSource: 'tiktok',
+          country: 'CA',
+          gender: 'male',
+          birthday: '2000-06-15',
+          weightValue: 80,
+          weightUnit: 'kg',
+          heightValue: 180,
+          heightUnit: 'cm',
+          fitnessGoal: 'build_muscle',
+          trainingExperience: 'intermediate',
+          workoutFrequencyDays: 4,
+          averageWorkoutLength: '45_60',
+          trainingStylePreference: 'guided',
+          selectedSplitPresetId: 'ppl',
+          appleHealthPreference: 'not_now',
+          emailOptIn: true,
+          pushNotificationsOptIn: false,
+        },
+      }),
+    );
+
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+    fireEvent.press(screen.getByTestId('sign-in-switch'));
+
+    await screen.findByTestId('onboarding-step-create-account');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-display-name'),
+      'Harbir Bains',
+    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-email'), 'new@example.com');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-confirm-password'),
+      'password123',
+    );
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-create-account-submit'));
+    });
+
+    expect(await screen.findByTestId('onboarding-step-create-account-confirmation')).toBeTruthy();
     expect(mockAuth.signUp).toHaveBeenCalledWith({
       email: 'new@example.com',
       password: 'password123',
     });
-  });
-
-  it('shows Welcome after creating an account, then proceeds to Onboarding on Get Started', async () => {
-    render(<App />);
-    await screen.findByTestId('sign-in-email');
-
-    // Create the account (this mock always requires email confirmation).
-    fireEvent.press(screen.getByTestId('sign-in-switch'));
-    fireEvent.changeText(await screen.findByTestId('sign-up-first-name'), 'Harbir');
-    fireEvent.changeText(screen.getByTestId('sign-up-last-name'), 'Bains');
-    fireEvent.changeText(screen.getByTestId('sign-up-display-name'), 'Harbir Bains');
-    fireEvent.changeText(screen.getByTestId('sign-up-username'), 'harbirb');
-    fireEvent.changeText(screen.getByTestId('sign-up-email'), 'new@example.com');
-    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'password123');
-    fireEvent.changeText(screen.getByTestId('sign-up-confirm-password'), 'password123');
-    fireEvent.press(screen.getByTestId('sign-up-submit'));
-    await screen.findByTestId('sign-up-confirmation');
-
-    // Simulates confirming via email out-of-band, then returning to sign in
-    // normally -- the realistic path for a project that requires email
-    // confirmation.
-    fireEvent.press(screen.getByTestId('sign-up-switch'));
-    fireEvent.changeText(await screen.findByTestId('sign-in-email'), 'new@example.com');
-    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
-    fireEvent.press(screen.getByTestId('sign-in-submit'));
-
-    // Welcome, not Dashboard, immediately after this fresh account's first
-    // sign-in -- and Dashboard must not be reachable underneath it yet.
-    expect(await screen.findByTestId('welcome-get-started')).toBeTruthy();
+    expect(await AsyncStorage.getItem('@progresso/onboardingDraft')).not.toBeNull();
     expect(screen.queryByTestId('feed-screen')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('welcome-get-started'));
-
-    // A fresh account goes into onboarding next, not straight to Dashboard --
-    // the full step-by-step flow is covered by OnboardingScreen.test.tsx.
-    expect(await screen.findByTestId('onboarding-step-apple-health')).toBeTruthy();
-    expect(screen.queryByTestId('feed-screen')).toBeNull();
-    // Onboarding is the one route that never shows the bottom navigation.
-    expect(screen.queryByTestId('app-bottom-nav')).toBeNull();
+    fireEvent.press(screen.getByTestId('onboarding-create-account-back-to-sign-in'));
+    expect(await screen.findByTestId('sign-in-email')).toBeTruthy();
   });
 
   it('signs out and returns to the sign-in screen', async () => {

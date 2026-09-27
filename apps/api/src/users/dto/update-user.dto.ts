@@ -44,6 +44,17 @@ const ACTIVITY_LEVELS = [
 ] as const;
 const TRAINING_STYLE_PREFERENCES = ['guided', 'build_your_own'] as const;
 const APPLE_HEALTH_PREFERENCES = ['connected', 'not_now'] as const;
+const REFERRAL_SOURCES = [
+  'tiktok',
+  'instagram',
+  'friend',
+  'app_store',
+  'google_search',
+  'creator',
+  'other',
+] as const;
+const AVERAGE_WORKOUT_LENGTHS = ['20_30', '30_45', '45_60', '60_plus'] as const;
+const COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
 // Dark variants only for now -- light themes are a follow-up (see the
 // background_theme migration).
 const BACKGROUND_THEMES = [
@@ -180,4 +191,16 @@ export class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   onboardingCompleted?: boolean;
+
+  @IsOptional()
+  @IsIn(REFERRAL_SOURCES)
+  referralSource?: (typeof REFERRAL_SOURCES)[number];
+
+  @IsOptional()
+  @Matches(COUNTRY_CODE_PATTERN, { message: 'country must be an ISO 3166-1 alpha-2 code' })
+  country?: string;
+
+  @IsOptional()
+  @IsIn(AVERAGE_WORKOUT_LENGTHS)
+  averageWorkoutLength?: (typeof AVERAGE_WORKOUT_LENGTHS)[number];
 }

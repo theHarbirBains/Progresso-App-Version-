@@ -13,11 +13,26 @@ import { workoutSplitPresetPickerStyles as styles } from './workoutSplitPresetPi
 
 interface Props {
   testID: string;
-  userId: string;
+  /** Required when materializeImmediately is true (the default); unused otherwise. */
+  userId?: string;
   theme: AccentTheme;
-  /** Called with the newly materialized+activated split's id once selection succeeds. */
-  onPresetActivated: (splitId: string) => void;
-  onCreateOwn: () => void;
+  /** materializeImmediately (default): called with the newly
+   * materialized+activated split's id once selection succeeds. Select-only
+   * mode: called with the preset's own (local) id instead -- nothing is
+   * written yet. */
+  onPresetActivated: (id: string) => void;
+  /** Omit to hide "Create Custom Split" entirely -- see materializeImmediately. */
+  onCreateOwn?: () => void;
+  /** Default true: pressing a preset immediately creates a real, user-owned
+   * split (the existing behavior -- ChooseWorkoutSplitScreen). false: just
+   * reports the preset's id locally, no network call and no userId needed
+   * -- onboarding's own split step, which runs before an account (and
+   * therefore a userId to own a split) exists yet. The caller is
+   * responsible for actually materializing the choice once one does (see
+   * onboardingDraft.ts's submitOnboardingDraft). onCreateOwn is expected to
+   * be omitted in this mode: a custom split's own builder needs a real
+   * account too. */
+  materializeImmediately?: boolean;
 }
 
 /**
@@ -35,12 +50,18 @@ export function WorkoutSplitPresetPicker({
   theme,
   onPresetActivated,
   onCreateOwn,
+  materializeImmediately = true,
 }: Props) {
   const [busyPresetId, setBusyPresetId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSelectPreset(preset: WorkoutSplitPreset) {
-    if (!userId || busyPresetId) return;
+    if (busyPresetId) return;
+    if (!materializeImmediately) {
+      onPresetActivated(preset.id);
+      return;
+    }
+    if (!userId) return;
     setError(null);
     setBusyPresetId(preset.id);
     try {
@@ -115,18 +136,20 @@ export function WorkoutSplitPresetPicker({
         })}
       </View>
 
-      <TouchableOpacity
-        testID={`${testID}-create-own`}
-        style={[styles.createSplitButton, { backgroundColor: theme.accent }]}
-        onPress={onCreateOwn}
-        accessibilityRole="button"
-        accessibilityLabel="Create Custom Split"
-      >
-        <Feather name="edit-2" size={18} color={theme.onAccent} />
-        <Text style={[styles.createSplitButtonText, { color: theme.onAccent }]}>
-          Create Custom Split
-        </Text>
-      </TouchableOpacity>
+      {onCreateOwn ? (
+        <TouchableOpacity
+          testID={`${testID}-create-own`}
+          style={[styles.createSplitButton, { backgroundColor: theme.accent }]}
+          onPress={onCreateOwn}
+          accessibilityRole="button"
+          accessibilityLabel="Create Custom Split"
+        >
+          <Feather name="edit-2" size={18} color={theme.onAccent} />
+          <Text style={[styles.createSplitButtonText, { color: theme.onAccent }]}>
+            Create Custom Split
+          </Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
