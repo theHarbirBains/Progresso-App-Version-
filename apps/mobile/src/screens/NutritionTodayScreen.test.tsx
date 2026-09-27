@@ -104,6 +104,10 @@ beforeEach(() => {
   mockNavigate.mockClear();
 });
 
+// CalorieRing hides its own value text from the accessibility tree (its
+// single accessibilityLabel covers it) -- see CalorieRing.test.tsx.
+const includeHidden = { includeHiddenElements: true };
+
 describe('NutritionTodayScreen', () => {
   it('shows a loading indicator while fetching', async () => {
     renderScreen();
@@ -127,7 +131,9 @@ describe('NutritionTodayScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('food-log-empty')).toBeTruthy();
-    expect(screen.getByTestId('calories-consumed')).toHaveTextContent('Calories: 0');
+    expect(
+      screen.getByTestId('nutrition-today-calorie-ring-value', includeHidden),
+    ).toHaveTextContent('0');
   });
 
   it('shows consumed totals without targets/remaining when no goals are set', async () => {
@@ -136,7 +142,9 @@ describe('NutritionTodayScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('food-log-row-log-1')).toBeTruthy();
-    expect(screen.getByTestId('calories-consumed')).toHaveTextContent('Calories: 330');
+    expect(
+      screen.getByTestId('nutrition-today-calorie-ring-value', includeHidden),
+    ).toHaveTextContent('330');
     expect(screen.queryByTestId('calories-remaining')).toBeNull();
   });
 
@@ -151,10 +159,11 @@ describe('NutritionTodayScreen', () => {
 
     renderScreen();
 
-    expect(await screen.findByTestId('calories-consumed')).toHaveTextContent(
-      'Calories: 330 / 2000',
-    );
-    expect(screen.getByTestId('calories-remaining')).toHaveTextContent('1670 remaining');
+    expect(
+      await screen.findByTestId('nutrition-today-calorie-ring-value', includeHidden),
+    ).toHaveTextContent('330');
+    expect(screen.getByTestId('nutrition-today-calorie-ring')).toHaveTextContent(/of 2000 cal/);
+    expect(screen.getByTestId('calories-remaining')).toHaveTextContent('1670 cal remaining');
     expect(screen.getByTestId('protein-remaining')).toHaveTextContent('118g remaining');
   });
 
@@ -186,7 +195,9 @@ describe('NutritionTodayScreen', () => {
 
     expect(mockUpdateFoodLogQuantity).toHaveBeenCalledWith(sampleLog, 3);
     await waitFor(() =>
-      expect(screen.getByTestId('calories-consumed')).toHaveTextContent('Calories: 495'),
+      expect(
+        screen.getByTestId('nutrition-today-calorie-ring-value', includeHidden),
+      ).toHaveTextContent('495'),
     );
   });
 

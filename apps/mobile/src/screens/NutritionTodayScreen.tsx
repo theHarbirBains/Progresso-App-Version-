@@ -10,6 +10,7 @@ import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '..
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
+import { CalorieRing } from '../nutrition/CalorieRing';
 import { FoodImage } from '../nutrition/FoodImage';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import type { FoodLogRow } from '../nutrition/foodLogQueries';
@@ -115,15 +116,8 @@ export function NutritionTodayScreen({ navigation }: Props) {
     );
   }
 
+  // Calories gets the ring (see below); Protein/Carbs/Fat stay plain rows.
   const macros = [
-    {
-      key: 'calories',
-      label: 'Calories',
-      unit: '',
-      consumed: consumed.calories,
-      goal: goals.calories,
-      remaining: remaining.calories,
-    },
     {
       key: 'protein',
       label: 'Protein',
@@ -159,8 +153,21 @@ export function NutritionTodayScreen({ navigation }: Props) {
       ) : null}
 
       <AppCard hero topAccent={nutritionTheme.accent} testID="nutrition-today-macros">
-        {macros.map((macro, index) => (
-          <View key={macro.key} style={[styles.macro, index > 0 && styles.macroDivider]}>
+        <View style={styles.ringWrap}>
+          <CalorieRing
+            testID="nutrition-today-calorie-ring"
+            consumed={consumed.calories}
+            goal={goals.calories}
+            accentColor={nutritionTheme.accent}
+          />
+          {remaining.calories !== null ? (
+            <Text testID="calories-remaining" style={styles.macroRemaining}>
+              {remaining.calories} cal remaining
+            </Text>
+          ) : null}
+        </View>
+        {macros.map((macro) => (
+          <View key={macro.key} style={[styles.macro, styles.macroDivider]}>
             <Text testID={`${macro.key}-consumed`} style={styles.macroLine}>
               {macro.label}: {macro.consumed}
               {macro.unit}
@@ -252,6 +259,11 @@ const styles = StyleSheet.create({
     color: colors.destructive,
   },
 
+  ringWrap: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingBottom: spacing.lg,
+  },
   macro: {
     paddingVertical: spacing.md,
   },
