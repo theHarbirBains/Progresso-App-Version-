@@ -621,7 +621,7 @@ describe('AccountSettingsScreen Notifications category', () => {
 });
 
 describe('AccountSettingsScreen Privacy category', () => {
-  it('shows a real coming-soon state, no invented privacy controls', async () => {
+  it('shows Terms of Service and Privacy Policy as real coming-soon rows, no invented content', async () => {
     render(
       <BackgroundThemeProvider>
         <AccountSettingsScreen navigation={navigation} route={{} as never} />
@@ -631,7 +631,9 @@ describe('AccountSettingsScreen Privacy category', () => {
     await screen.findByTestId('account-email');
     goToCategory('Privacy');
 
-    expect(screen.getByTestId('settings-privacy-empty')).toHaveTextContent(/coming soon/i);
+    for (const testID of ['privacy-terms', 'privacy-policy']) {
+      expect(screen.getByTestId(testID)).toHaveTextContent(/Coming Soon/);
+    }
   });
 });
 
@@ -651,11 +653,12 @@ describe('AccountSettingsScreen Help category', () => {
       'help-contact-support',
       'help-report-problem',
       'help-about',
-      'help-terms',
-      'help-privacy-policy',
     ]) {
       expect(screen.getByTestId(testID)).toHaveTextContent(/Coming Soon/);
     }
+    // Terms of Service / Privacy Policy moved to the Privacy category.
+    expect(screen.queryByTestId('help-terms')).toBeNull();
+    expect(screen.queryByTestId('help-privacy-policy')).toBeNull();
   });
 });
 
