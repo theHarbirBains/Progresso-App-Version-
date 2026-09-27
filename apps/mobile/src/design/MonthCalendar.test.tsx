@@ -6,7 +6,8 @@ const baseProps = {
   testID: 'calendar',
   year: 2026,
   month: 9,
-  completedDateKeys: new Set<string>(),
+  markedDateKeys: new Set<string>(),
+  markedDescription: 'workout completed',
   selectedDateKey: null,
   todayKey: '2026-09-07',
   accentColor: '#2F80FF',
@@ -63,7 +64,7 @@ describe('MonthCalendar', () => {
     );
   });
 
-  it("marks today's cell distinctly from a day with no workout", () => {
+  it("marks today's cell distinctly from a day with no mark", () => {
     render(<MonthCalendar {...baseProps} />);
 
     // Today's day number renders in onAccentColor (white here) against the accent-filled circle.
@@ -73,11 +74,11 @@ describe('MonthCalendar', () => {
     );
   });
 
-  it('uses the dynamic accent color for a completed date, not a hardcoded color', () => {
+  it('uses the dynamic accent color for a marked date, not a hardcoded color', () => {
     render(
       <MonthCalendar
         {...baseProps}
-        completedDateKeys={new Set(['2026-09-05'])}
+        markedDateKeys={new Set(['2026-09-05'])}
         accentColor="#8B5CF6"
       />,
     );
@@ -105,8 +106,8 @@ describe('MonthCalendar -- named days, 44pt month arrows', () => {
     }
   });
 
-  it('names each day by its date, and says when a workout was completed', () => {
-    render(<MonthCalendar {...baseProps} completedDateKeys={new Set(['2026-09-05'])} />);
+  it('names each day by its date, and appends markedDescription for a marked day', () => {
+    render(<MonthCalendar {...baseProps} markedDateKeys={new Set(['2026-09-05'])} />);
 
     expect(screen.getByTestId('calendar-day-2026-09-05').props.accessibilityLabel).toMatch(
       /5, workout completed$/,

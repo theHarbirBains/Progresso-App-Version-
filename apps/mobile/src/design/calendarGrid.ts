@@ -1,8 +1,9 @@
-// Pure date-grid/local-date-key helpers for the Workouts tab's calendar --
-// no supabase import, fully unit-testable without mocking anything.
+// Pure date-grid/local-date-key helpers behind MonthCalendar -- no supabase
+// import, fully unit-testable without mocking anything. Shared by Workout
+// History and Nutrition History; nothing here is domain-specific.
 
 export interface CalendarDay {
-  /** "YYYY-MM-DD" in local time -- the key used to look up completed-workout dots and selection state. */
+  /** "YYYY-MM-DD" in local time -- the key used to look up marked-day dots and selection state. */
   dateKey: string;
   day: number;
   inCurrentMonth: boolean;

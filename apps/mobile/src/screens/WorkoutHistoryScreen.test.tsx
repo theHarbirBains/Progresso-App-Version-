@@ -8,7 +8,7 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
-import { addMonths, MONTH_LABELS, toLocalDateKey } from '../workouts/calendarGrid';
+import { addMonths, MONTH_LABELS, toLocalDateKey } from '../design/calendarGrid';
 import { enrichWorkoutSummaries } from '../workouts/workoutHistoryEnrichment';
 import {
   fetchActiveWorkout,

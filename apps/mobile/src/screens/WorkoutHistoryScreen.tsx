@@ -4,9 +4,11 @@ import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { addMonths, isoToLocalDateKey, toLocalDateKey } from '../design/calendarGrid';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
+import { MonthCalendar } from '../design/MonthCalendar';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
@@ -15,8 +17,6 @@ import { colors } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { addMonths, isoToLocalDateKey, toLocalDateKey } from '../workouts/calendarGrid';
-import { MonthCalendar } from '../workouts/MonthCalendar';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 import {
@@ -193,7 +193,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
     }
   }
 
-  const completedDateKeys = new Set(monthWorkouts.map((w) => isoToLocalDateKey(w.performedAt)));
+  const markedDateKeys = new Set(monthWorkouts.map((w) => isoToLocalDateKey(w.performedAt)));
   const monthSummary = computeMonthSummary(monthWorkouts);
   const selectedDayWorkouts = selectedDateKey
     ? monthWorkouts.filter((w) => isoToLocalDateKey(w.performedAt) === selectedDateKey)
@@ -247,7 +247,8 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
           testID="workout-calendar"
           year={year}
           month={month}
-          completedDateKeys={completedDateKeys}
+          markedDateKeys={markedDateKeys}
+          markedDescription="workout completed"
           selectedDateKey={selectedDateKey}
           todayKey={todayKey}
           accentColor={theme.accent}

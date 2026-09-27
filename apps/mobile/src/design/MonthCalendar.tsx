@@ -1,14 +1,19 @@
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Text } from '../design/Text';
+import { Text } from './Text';
 import { Feather } from '@expo/vector-icons';
-import { colors, fonts, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
+import { colors, fonts, minTouchTarget, radii, spacing, typeScale } from './theme';
 import { buildMonthGrid, MONTH_LABELS, WEEKDAY_LABELS } from './calendarGrid';
 
 interface Props {
   testID?: string;
   year: number;
   month: number;
-  completedDateKeys: Set<string>;
+  /** Dates that get a dot beneath them -- a completed workout, a day with a
+   * food log, whatever the caller's domain marks a day by. */
+  markedDateKeys: Set<string>;
+  /** Describes what a marked day's dot means, appended to its accessible
+   * name (e.g. "workout completed", "food logged"). */
+  markedDescription: string;
   selectedDateKey: string | null;
   todayKey: string;
   accentColor: string;
@@ -19,25 +24,28 @@ interface Props {
 }
 
 // "September 5" / "September 5, workout completed" -- a day's accessible name.
-function describeDay(dateKey: string, completed: boolean): string {
+function describeDay(dateKey: string, marked: boolean, markedDescription: string): string {
   const [y, m, d] = dateKey.split('-').map(Number);
   const label = new Date(y, m - 1, d).toLocaleDateString(undefined, {
     month: 'long',
     day: 'numeric',
   });
-  return completed ? `${label}, workout completed` : label;
+  return marked ? `${label}, ${markedDescription}` : label;
 }
 
 // Component Logic: one 7-column grid of fixed-size day cells, each deriving
-// its visual state (today/selected/completed/dimmed) from three plain
-// booleans rather than a combinatorial style-variant prop -- no per-cell
-// wrapper beyond the single TouchableOpacity + its dot. Each day is named for
-// assistive tech, and the month arrows are full 44pt targets.
+// its visual state (today/selected/marked/dimmed) from three plain booleans
+// rather than a combinatorial style-variant prop -- no per-cell wrapper
+// beyond the single TouchableOpacity + its dot. Each day is named for
+// assistive tech, and the month arrows are full 44pt targets. Shared by
+// Workout History and Nutrition History (markedDateKeys/markedDescription
+// are what each domain plugs in); nothing else here is domain-specific.
 export function MonthCalendar({
   testID,
   year,
   month,
-  completedDateKeys,
+  markedDateKeys,
+  markedDescription,
   selectedDateKey,
   todayKey,
   accentColor,
@@ -86,7 +94,7 @@ export function MonthCalendar({
         {days.map((day) => {
           const isToday = day.dateKey === todayKey;
           const isSelected = day.dateKey === selectedDateKey;
-          const isCompleted = completedDateKeys.has(day.dateKey);
+          const isMarked = markedDateKeys.has(day.dateKey);
 
           return (
             <TouchableOpacity
@@ -96,7 +104,7 @@ export function MonthCalendar({
               onPress={() => onSelectDate(day.dateKey)}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel={describeDay(day.dateKey, isCompleted)}
+              accessibilityLabel={describeDay(day.dateKey, isMarked, markedDescription)}
               accessibilityState={{ selected: isSelected }}
             >
               <View
@@ -118,7 +126,7 @@ export function MonthCalendar({
               </View>
               <View
                 testID={testID ? `${testID}-dot-${day.dateKey}` : undefined}
-                style={[styles.dot, isCompleted && { backgroundColor: accentColor, opacity: 1 }]}
+                style={[styles.dot, isMarked && { backgroundColor: accentColor, opacity: 1 }]}
               />
             </TouchableOpacity>
           );
