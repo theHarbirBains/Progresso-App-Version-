@@ -19,7 +19,6 @@ import { AppSideMenu } from './src/design/AppSideMenu';
 import { BackgroundThemeProvider, useBackgroundTheme } from './src/design/BackgroundThemeContext';
 import { BottomNavBar } from './src/design/BottomNavBar';
 import { LoadingState } from './src/design/LoadingState';
-import { getMyProfile } from './src/lib/api';
 import { wrapApp } from './src/lib/sentry';
 import { AppMenuContext } from './src/navigation/AppMenuContext';
 import type { AppMenuRoute } from './src/navigation/appMenuSections';
@@ -29,7 +28,7 @@ import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
 import { FoodLogProvider } from './src/nutrition/FoodLogProvider';
 import { NutritionGoalsProvider } from './src/nutrition/NutritionGoalsProvider';
-import { ProfileProvider } from './src/profile/ProfileProvider';
+import { ProfileProvider, useProfile } from './src/profile/ProfileProvider';
 import { AllTimeStatsProvider } from './src/progress/AllTimeStatsProvider';
 import { useProgressTheme } from './src/progress/useProgressTheme';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
@@ -96,9 +95,9 @@ const MODE_AGNOSTIC_ROUTES = new Set(['Feed', 'ProgressOverview', 'Profile']);
 // mid-onboarding and reopened later) still needs to land on Onboarding
 // rather than Feed, which a purely in-memory flag could never capture.
 function Root() {
-  const { status, session } = useAuth();
+  const { status } = useAuth();
   const { theme: backgroundTheme } = useBackgroundTheme();
-  const accessToken = session?.access_token;
+  const { profile, loading: profileLoading, error: profileError } = useProfile();
   const [mode, setMode] = useState<AuthMode>('signIn');
   // Feed, Progress, and You (Profile) are the app's mode-agnostic root
   // screens -- reachable directly from the bottom nav, not by switching a
@@ -169,25 +168,29 @@ function Root() {
   // stale fetch result.
   const skipNextOnboardingCheckRef = useRef(false);
 
+  // Reads the shared ProfileProvider cache instead of fetching profile
+  // again here -- this used to call getMyProfile directly, a second
+  // request racing ProfileProvider's own already-in-flight one for the
+  // exact same data, shown behind a second, plain (unbranded) loading
+  // screen right after LaunchScreen's branded one. Fails open to 'done'
+  // (never blocks a real account behind a broken profile fetch) the same
+  // way the old catch handler did.
   useEffect(() => {
-    if (status !== 'signedIn' || justCreatedAccount || !accessToken) return;
+    if (status !== 'signedIn' || justCreatedAccount) return;
     if (skipNextOnboardingCheckRef.current) {
       skipNextOnboardingCheckRef.current = false;
       return;
     }
-    let mounted = true;
-    setOnboardingStatus('checking');
-    getMyProfile(accessToken)
-      .then((profile) => {
-        if (mounted) setOnboardingStatus(profile.onboardingCompletedAt ? 'done' : 'needed');
-      })
-      .catch(() => {
-        if (mounted) setOnboardingStatus('done');
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [status, justCreatedAccount, accessToken]);
+    if (profileError) {
+      setOnboardingStatus('done');
+      return;
+    }
+    if (profileLoading) {
+      setOnboardingStatus('checking');
+      return;
+    }
+    setOnboardingStatus(profile?.onboardingCompletedAt ? 'done' : 'needed');
+  }, [status, justCreatedAccount, profile, profileLoading, profileError]);
 
   if (status === 'passwordRecovery') {
     return <ResetPasswordScreen />;
