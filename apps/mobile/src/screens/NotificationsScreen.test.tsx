@@ -93,11 +93,11 @@ describe('NotificationsScreen -- insights', () => {
     mockFetchAllExerciseHistory.mockResolvedValue([staleSet(15)]);
     renderScreen();
 
-    const row = await screen.findByTestId('notifications-insight-chest');
-    expect(row).toHaveTextContent(/15 days/);
-    expect(row).toHaveTextContent(/Chest/);
+    const card = await screen.findByTestId('notifications-insight-chest');
+    expect(card).toHaveTextContent(/15 days/);
+    expect(card).toHaveTextContent(/Chest/);
 
-    fireEvent.press(row);
+    fireEvent.press(card);
     expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
   });
 
