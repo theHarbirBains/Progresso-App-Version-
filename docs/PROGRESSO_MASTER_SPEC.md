@@ -59,9 +59,9 @@ Data-focused: no greeting or welcome header -- the widgets themselves lead. Visu
 
 ## 7. Social/Athlete Experience
 
-UI should have social-media-app engagement and visual language: athlete profile, athlete card, workout cards, performance stats, achievement cards, progress posts, workout summaries, leaderboards, shareable workout cards — these are **concepts for later**, not v1 requirements.
+UI should have social-media-app engagement and visual language: athlete profile, athlete card, workout cards, performance stats, achievement cards, progress posts, leaderboards, shareable workout cards — these remain **concepts for later**, not yet built.
 
-**Social features are not required for v1 and must not be implemented unless explicitly requested.** The social feeling in v1 should come from visual design/presentation of the user's own data only.
+**Social v1 (explicitly requested and implemented; see `apps/api/src/follows`/`apps/api/src/feed` and `apps/mobile/src/screens/FindPeopleScreen.tsx`):** a one-directional, accept-gated follow graph (Instagram-style follow requests, not a symmetric "friendship") plus a read-only Friends tab on Feed showing accepted followees' own completed workouts and logged foods, reusing the same card visual language as the self feed. No likes, no comments, no leaderboards yet — those, plus anything beyond this scope, still require explicit approval before being built.
 
 ## 8. Nutrition
 
@@ -149,7 +149,7 @@ Users should eventually be able to export their data and delete their account/da
 | 11    | Design Polish + Push Notifications | Partial — theme/accent design system is implemented; push/email notifications are opt-in preferences only, with no delivery mechanism                |
 | 12    | Beta Launch Preparation            | Not started                                                                                                                                          |
 
-**Post-v1:** social features, home screen widgets, Apple Watch/Wear OS, exercise form media, AI features, other advanced functionality. A front-end-only Social screen shell (no backend) exists ahead of schedule as an approved, explicitly-scoped exception — see Section 17.
+**Post-v1:** likes/comments/leaderboards and other deeper social features, home screen widgets, Apple Watch/Wear OS, exercise form media, AI features, other advanced functionality. Social v1 (follow graph + Friends feed) is implemented ahead of schedule as an approved, explicitly-scoped exception — see Section 17.
 
 ## 17. Current Implementation State
 
@@ -166,6 +166,7 @@ Progresso is **past the Phase 0 foundation** and has an implemented core loop, n
 - Nutrition: a basic food library and food log against user-set daily goals (calories/protein/carbs/fat). Manual entry only — no barcode scanning or external food database.
 - Settings: an app-wide Settings hub (Account, Appearance, App, Notifications, Privacy, Help) with theme/accent customization applied consistently across the app.
 - Backend: JWT-authenticated NestJS API with role-based authorization (`user`/`support_admin`/`full_admin`), user profile endpoints, exercise library endpoints, and RevenueCat webhook processing (signature verification, idempotent event handling, subscription projection).
+- Social v1: a one-directional, accept-gated follow graph (send/accept/reject/unfollow, user search) and a read-only Friends tab on Feed showing accepted followees' own completed workouts and logged foods. No likes, comments, or leaderboards yet.
 
 **In progress / partial (do not treat as complete):**
 
@@ -177,6 +178,5 @@ Progresso is **past the Phase 0 foundation** and has an implemented core loop, n
 
 - Change Password and Delete Account (Settings → Account).
 - Apple Health connection (onboarding) — no HealthKit integration.
-- Social screen — front-end-only shell (profile entry point, honest empty "Recent Activity" state), no posts/follows/activity-feed backend.
 
 **Not yet started:** nutrition analytics/trends, privacy tooling (data export, account deletion), full admin dashboard, design-polish pass beyond the current theme system, beta launch preparation, and everything listed under Post-v1 in Section 16.

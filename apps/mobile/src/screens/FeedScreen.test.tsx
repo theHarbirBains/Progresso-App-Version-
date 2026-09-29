@@ -4,7 +4,7 @@ import { AppCard } from '../design/AppCard';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchFeedItems } from '../feed/feedQueries';
-import { getMyProfile } from '../lib/api';
+import { fetchFriendsFeed, getMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { FeedScreen } from './FeedScreen';
@@ -15,6 +15,7 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../lib/api', () => ({
   getMyProfile: jest.fn(),
+  fetchFriendsFeed: jest.fn(),
 }));
 
 jest.mock('../feed/feedQueries', () => ({
@@ -24,6 +25,7 @@ jest.mock('../feed/feedQueries', () => ({
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockFetchFeedItems = fetchFeedItems as jest.Mock;
+const mockFetchFriendsFeed = fetchFriendsFeed as jest.Mock;
 
 function feedPage(items: unknown[], hasMore = false) {
   return { items, hasMore };
@@ -130,6 +132,7 @@ beforeEach(() => {
     avatarUrl: null,
   });
   mockFetchFeedItems.mockReset().mockResolvedValue(feedPage([]));
+  mockFetchFriendsFeed.mockReset().mockResolvedValue(feedPage([]));
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
 });
@@ -311,6 +314,101 @@ describe('FeedScreen -- Strava-style activity cards', () => {
     await screen.findByTestId('feed-item-foodlog-log-1');
 
     expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+  });
+});
+
+describe('FeedScreen -- Friends tab', () => {
+  const friendWorkoutItem = {
+    kind: 'workout' as const,
+    id: 'workout-fw1',
+    timestamp: '2026-01-02T13:00:00Z',
+    author: { id: 'user-2', username: 'jane', displayName: 'Jane Doe', avatarUrl: null },
+    workout: {
+      id: 'fw1',
+      name: 'Pull Day',
+      splitDayName: 'Pull',
+      muscleGroups: ['back' as const],
+      durationMinutes: 50,
+      exerciseCount: 5,
+      completedSetCount: 15,
+      totalVolumeKg: 1200,
+    },
+  };
+
+  const friendFoodLogItem = {
+    kind: 'foodLog' as const,
+    id: 'foodLog-flog-1',
+    timestamp: '2026-01-02T18:00:00Z',
+    author: { id: 'user-2', username: 'jane', displayName: 'Jane Doe', avatarUrl: null },
+    log: {
+      id: 'flog-1',
+      foodNameSnapshot: 'Oatmeal',
+      calories: 300,
+      proteinG: 10,
+      carbsG: 50,
+      fatG: 5,
+      mealType: 'breakfast' as const,
+      imageUrl: null,
+    },
+  };
+
+  it('starts on the You tab and switches to Friends on tap', async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
+    renderScreen();
+
+    await screen.findByTestId('feed-item-workout-w1');
+    expect(screen.queryByTestId('feed-item-workout-fw1')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('feed-tab-friends'));
+
+    expect(await screen.findByTestId('feed-item-workout-fw1')).toBeTruthy();
+    expect(screen.queryByTestId('feed-item-workout-w1')).toBeNull();
+  });
+
+  it("shows a friend's own name as the card byline, not the signed-in account's", async () => {
+    mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
+    renderScreen();
+    fireEvent.press(screen.getByTestId('feed-tab-friends'));
+
+    const card = within(await screen.findByTestId('feed-item-workout-fw1'));
+    expect(await card.findByText('Jane Doe')).toBeTruthy();
+  });
+
+  it("does not navigate on tap -- a friend's workout/food log isn't the signed-in user's to open", async () => {
+    mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem, friendFoodLogItem]));
+    renderScreen();
+    fireEvent.press(screen.getByTestId('feed-tab-friends'));
+    await screen.findByTestId('feed-item-foodlog-flog-1');
+
+    fireEvent.press(screen.getByTestId('feed-item-workout-fw1'));
+    fireEvent.press(screen.getByTestId('feed-item-foodlog-flog-1'));
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('shows a friends-specific empty state pointing at Find People', async () => {
+    renderScreen();
+    fireEvent.press(screen.getByTestId('feed-tab-friends'));
+
+    expect(await screen.findByTestId('feed-empty')).toHaveTextContent('No activity from friends yet');
+  });
+
+  it('paginates the Friends tab independently of the You tab', async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem], false));
+    mockFetchFriendsFeed.mockResolvedValueOnce(feedPage([friendWorkoutItem], true));
+    renderScreen();
+    fireEvent.press(screen.getByTestId('feed-tab-friends'));
+    await screen.findByTestId('feed-item-workout-fw1');
+    expect(screen.getByTestId('feed-load-more')).toBeTruthy();
+
+    mockFetchFriendsFeed.mockResolvedValueOnce(feedPage([friendFoodLogItem], false));
+    fireEvent.press(screen.getByTestId('feed-load-more'));
+
+    expect(mockFetchFriendsFeed).toHaveBeenLastCalledWith('token-123', 1);
+    expect(await screen.findByTestId('feed-item-foodlog-flog-1')).toBeTruthy();
+    expect(screen.getByTestId('feed-item-workout-fw1')).toBeTruthy();
+    expect(screen.queryByTestId('feed-load-more')).toBeNull();
   });
 });
 

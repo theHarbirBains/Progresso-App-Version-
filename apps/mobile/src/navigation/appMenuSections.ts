@@ -69,6 +69,10 @@ export const APP_MENU_SECTIONS: AppMenuSection[] = [
       { label: 'Recipes', icon: 'book-open', comingSoon: true },
     ],
   },
+  {
+    title: 'SOCIAL',
+    items: [{ route: 'FindPeople', label: 'Find People', icon: 'user-plus' }],
+  },
 ];
 
 /** Rendered by AppSideMenu as a standalone row below every section, with no

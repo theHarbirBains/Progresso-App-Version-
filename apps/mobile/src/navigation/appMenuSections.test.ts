@@ -1,9 +1,9 @@
 import { APP_MENU_FOOTER_ITEM, APP_MENU_SECTIONS } from './appMenuSections';
 
-// Exactly two sections -- Training and Nutrition, the app's two real
-// domains -- rather than the finer PROGRESSO/TRAINING·TOOLS/NUTRITION/MORE
-// split this used to have. Settings lives outside both, in
-// APP_MENU_FOOTER_ITEM, not as a third section.
+// Three sections -- Training, Nutrition, and (since Social v1) Social --
+// the app's real domains, rather than the finer PROGRESSO/TRAINING·TOOLS/
+// NUTRITION/MORE split this used to have. Settings lives outside all of
+// them, in APP_MENU_FOOTER_ITEM, not as a section of its own.
 describe('APP_MENU_SECTIONS', () => {
   function findItem(label: string) {
     for (const section of APP_MENU_SECTIONS) {
@@ -13,8 +13,8 @@ describe('APP_MENU_SECTIONS', () => {
     return undefined;
   }
 
-  it('groups every Training and Nutrition destination into exactly those two sections -- no Home entry, since Feed is already one tap away via the bottom nav', () => {
-    expect(APP_MENU_SECTIONS.map((s) => s.title)).toEqual(['TRAINING', 'NUTRITION']);
+  it('groups every Training, Nutrition and Social destination into exactly those sections -- no Home entry, since Feed is already one tap away via the bottom nav', () => {
+    expect(APP_MENU_SECTIONS.map((s) => s.title)).toEqual(['TRAINING', 'NUTRITION', 'SOCIAL']);
 
     const allLabels = APP_MENU_SECTIONS.flatMap((section) => section.items.map((i) => i.label));
     expect(allLabels).toEqual(
@@ -27,12 +27,21 @@ describe('APP_MENU_SECTIONS', () => {
         'Nutrition Goals',
         'Nutrition History',
         'Recipes',
+        'Find People',
       ]),
     );
     expect(allLabels).not.toContain('Home');
     expect(allLabels).not.toContain('Feed');
     // Settings is APP_MENU_FOOTER_ITEM, not a section item -- see below.
     expect(allLabels).not.toContain('Settings');
+  });
+
+  it("routes the 'Find People' item to the FindPeople screen", () => {
+    expect(findItem('Find People')).toEqual({
+      route: 'FindPeople',
+      label: 'Find People',
+      icon: 'user-plus',
+    });
   });
 
   it("routes the 'Nutrition Goals' item to the NutritionGoals screen (the calorie-target page) -- CalorieEstimation is its Edit sub-screen, not a primary menu destination", () => {

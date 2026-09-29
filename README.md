@@ -54,7 +54,9 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Social**
 
-- A front-end-only Social screen (profile entry point + an honest empty "Recent Activity" state) — no posts, follows, or activity feed backend exists yet
+- A one-directional, accept-gated follow graph (Instagram-style follow requests) — send/accept/reject a request, unfollow, search for people by name/username
+- A Friends tab on Feed showing accepted followees' own completed workouts and logged foods, reverse-chronological, reusing the same activity-card visual language as your own feed
+- No likes, comments, or leaderboards yet
 
 **Backend (NestJS API)**
 
@@ -174,8 +176,9 @@ Some areas are intentionally incomplete rather than hidden:
 - **Notifications**: opt-in preferences are real and saved; actual notification delivery (push or email) is not implemented.
 - **Account actions**: Change Password and Delete Account are visible in Settings but marked "Coming Soon."
 - **Apple Health**: onboarding shows a connect step, but it's a preference placeholder with no real HealthKit integration.
-- **Social**: the Social screen is a front-end-only shell with an honest empty state — no backend, posts, or activity feed exist yet.
 - **Admin**: role-based authorization is implemented and tested end to end, but the admin surface itself is a minimal placeholder route, not a full admin dashboard.
+
+Social v1 (a follow graph and a read-only Friends feed) is implemented and real, not a placeholder — see the Social section above. Likes, comments, and leaderboards are not built yet.
 
 ## Roadmap
 

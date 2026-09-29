@@ -12,39 +12,78 @@ import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
+import { SegmentedControl } from '../design/SegmentedControl';
 import { StatBlock } from '../design/StatBlock';
 import { StatValue } from '../design/StatValue';
 import { colors } from '../design/theme';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
+import { fetchFriendsFeed, type FriendsFeedItem } from '../lib/api';
 import { formatWeightKg } from '../lib/units';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
-import { mealTypeLabel } from '../nutrition/mealTypes';
+import { mealTypeLabel, type MealType } from '../nutrition/mealTypes';
 import { FoodImage } from '../nutrition/FoodImage';
 import { useProgressTheme } from '../progress/useProgressTheme';
+import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 import { feedStyles as styles } from './feedStyles';
 
 type Props = RootStackScreenProps<'Feed'>;
 
+type FeedTab = 'you' | 'friends';
+
+// A normalized shape both "You" (feedQueries.ts, self-only) and "Friends"
+// (lib/api.ts's fetchFriendsFeed, backend-merged followees' activity) map
+// into, so the card JSX below is written once rather than twice. `onPress`
+// is undefined for a friend's card -- WorkoutDetail/Nutrition both assume
+// ownership (direct-to-Supabase reads RLS-scoped to the signed-in user), so
+// a friend's item is informational only, not a navigation target, until
+// there's a real "someone else's read-only detail" screen to send it to.
+interface DisplayItem {
+  key: string;
+  kind: 'workout' | 'foodLog';
+  timestamp: string;
+  authorName: string;
+  avatarUrl: string | null;
+  onPress?: () => void;
+  workout?: {
+    id: string;
+    name: string;
+    splitDayName: string | null;
+    muscleGroups: SplitMuscleGroup[];
+    durationMinutes: number | null;
+    exerciseCount: number;
+    completedSetCount: number;
+    totalVolumeKg: number;
+  };
+  log?: {
+    id: string;
+    foodNameSnapshot: string;
+    calories: number;
+    proteinG: number;
+    carbsG: number;
+    fatG: number;
+    mealType: MealType | null;
+    imageUrl: string | null;
+  };
+}
+
 // The app's landing screen -- a personal activity feed, replacing the old
-// Dashboard + Workout/Nutrition toggle. There is no following/social graph
-// yet (see DESIGN.md), so this is "what did I actually do": your own
-// completed workouts and logged foods, most recent first, as one list of
-// widgets (see feedQueries.ts). Starting a workout and logging food live on
-// their own tabs (Train/Nutrition) now, not here. Load More pages in older
-// workouts (food logs stay bounded to the current week -- see
-// feedQueries.ts's own comment on why).
+// Dashboard + Workout/Nutrition toggle, plus (see Social v1: the
+// follows/feed backend modules) a second Friends tab showing accepted
+// followees' own activity the same way. There is no algorithmic ranking --
+// both tabs are strictly reverse-chronological, and Friends only ever shows
+// people who've accepted a follow request (see FindPeopleScreen).
 //
 // Card anatomy deliberately borrows Strava's activity-feed structure (a
 // byline row, a bold title, a stat strip) -- see DESIGN.md's Feed section
 // -- but stays black-and-white/monochrome rather than Strava's orange, and
 // has no GPS map or streak/"congratulate" banner: Progresso has no
 // location data to draw a route from, and Feed stays purely informational
-// (no kudos/social prompts) since there's no social graph yet. `topAccent`
-// is a neutral top band on every card; which activity a card is comes
-// across via its byline icon, not a color.
+// (no kudos/social prompts). `topAccent` is a neutral top band on every
+// card; which activity a card is comes across via its byline icon, not a
+// color.
 //
 // Each card's own numbers are the most relevant ones actually available: a
 // workout's stat area is a 2x2 grid (Duration/Exercises, Sets/Volume) --
@@ -61,12 +100,18 @@ type Props = RootStackScreenProps<'Feed'>;
 // made); this is just a faster path from Feed itself. Scan Barcode used to
 // live here too (it had no other entry point at all at the time), but now
 // belongs with Nutrition's own actions instead -- see
-// NutritionTodayScreen's Scan Barcode / Search Food buttons.
+// NutritionTodayScreen's Scan Barcode / Search Food buttons. Find People
+// (the Friends tab's own "add more people" action) lives in the app menu's
+// SOCIAL section instead of a third header icon -- AppHeader only has room
+// for one right-side action, and "+" already owns that slot.
 export function FeedScreen({ navigation }: Props) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const userId = user?.id ?? '';
+  const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
   const { weightUnit, displayName, username, avatarUrl } = useProgressTheme();
+
+  const [tab, setTab] = useState<FeedTab>('you');
 
   const [items, setItems] = useState<FeedItem[]>([]);
   const [page, setPage] = useState(0);
@@ -74,11 +119,20 @@ export function FeedScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [friendsItems, setFriendsItems] = useState<FriendsFeedItem[]>([]);
+  const [friendsPage, setFriendsPage] = useState(0);
+  const [friendsHasMore, setFriendsHasMore] = useState(false);
+  const [friendsLoading, setFriendsLoading] = useState(true);
+  const [friendsLoadingMore, setFriendsLoadingMore] = useState(false);
+  const [friendsError, setFriendsError] = useState<string | null>(null);
+
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   // Only the very first load should replace the whole screen with a
   // spinner -- every later focus is a background refresh, same pattern as
   // WorkoutHistoryScreen/ProfileScreen.
   const hasLoadedOnce = useRef(false);
+  const hasLoadedFriendsOnce = useRef(false);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -97,10 +151,30 @@ export function FeedScreen({ navigation }: Props) {
     }
   }, [userId]);
 
+  const loadFriends = useCallback(async () => {
+    if (!accessToken) return;
+    if (!hasLoadedFriendsOnce.current) setFriendsLoading(true);
+    setFriendsError(null);
+    try {
+      const result = await fetchFriendsFeed(accessToken, 0);
+      setFriendsItems(result.items);
+      setFriendsHasMore(result.hasMore);
+      setFriendsPage(0);
+    } catch (err) {
+      setFriendsError(err instanceof Error ? err.message : 'Failed to load your friends feed');
+    } finally {
+      setFriendsLoading(false);
+      hasLoadedFriendsOnce.current = true;
+    }
+  }, [accessToken]);
+
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', load);
+    const unsubscribe = navigation.addListener('focus', () => {
+      void load();
+      void loadFriends();
+    });
     return unsubscribe;
-  }, [navigation, load]);
+  }, [navigation, load, loadFriends]);
 
   async function handleLoadMore() {
     if (!userId || loadingMore || !hasMore) return;
@@ -125,8 +199,113 @@ export function FeedScreen({ navigation }: Props) {
     }
   }
 
+  async function handleLoadMoreFriends() {
+    if (!accessToken || friendsLoadingMore || !friendsHasMore) return;
+    setFriendsLoadingMore(true);
+    try {
+      const next = friendsPage + 1;
+      const result = await fetchFriendsFeed(accessToken, next);
+      setFriendsItems((prev) =>
+        [...prev, ...result.items].sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+        ),
+      );
+      setFriendsHasMore(result.hasMore);
+      setFriendsPage(next);
+    } catch (err) {
+      setFriendsError(err instanceof Error ? err.message : 'Failed to load more of your friends feed');
+    } finally {
+      setFriendsLoadingMore(false);
+    }
+  }
+
   const byline = displayName ?? username ?? 'You';
-  const avatarInitial = byline.charAt(0).toUpperCase();
+
+  const mineDisplayItems: DisplayItem[] = items.map((item) =>
+    item.kind === 'workout'
+      ? {
+          key: item.id,
+          kind: 'workout',
+          timestamp: item.timestamp,
+          authorName: byline,
+          avatarUrl,
+          onPress: () => navigation.navigate('WorkoutDetail', { workoutId: item.workout.id }),
+          workout: {
+            id: item.workout.id,
+            name: item.workout.splitDayName ?? item.workout.name,
+            splitDayName: item.workout.splitDayName,
+            muscleGroups: item.workout.muscleGroups,
+            durationMinutes: item.workout.durationMinutes,
+            exerciseCount: item.workout.exerciseCount,
+            completedSetCount: item.workout.completedSetCount,
+            totalVolumeKg: item.workout.totalVolumeKg,
+          },
+        }
+      : {
+          key: item.id,
+          kind: 'foodLog',
+          timestamp: item.timestamp,
+          authorName: byline,
+          avatarUrl,
+          onPress: () => navigation.navigate('Nutrition'),
+          log: {
+            id: item.log.id,
+            foodNameSnapshot: item.log.foodNameSnapshot,
+            calories: item.log.calories,
+            proteinG: item.log.proteinG,
+            carbsG: item.log.carbsG,
+            fatG: item.log.fatG,
+            mealType: item.log.mealType,
+            imageUrl: item.log.imageUrl ?? null,
+          },
+        },
+  );
+
+  const friendsDisplayItems: DisplayItem[] = friendsItems.map((item) =>
+    item.kind === 'workout'
+      ? {
+          key: item.id,
+          kind: 'workout',
+          timestamp: item.timestamp,
+          authorName: item.author.displayName ?? (item.author.username ? `@${item.author.username}` : 'Someone'),
+          avatarUrl: item.author.avatarUrl,
+          workout: {
+            id: item.workout.id,
+            name: item.workout.splitDayName ?? item.workout.name,
+            splitDayName: item.workout.splitDayName,
+            muscleGroups: item.workout.muscleGroups as SplitMuscleGroup[],
+            durationMinutes: item.workout.durationMinutes,
+            exerciseCount: item.workout.exerciseCount,
+            completedSetCount: item.workout.completedSetCount,
+            totalVolumeKg: item.workout.totalVolumeKg,
+          },
+        }
+      : {
+          key: item.id,
+          kind: 'foodLog',
+          timestamp: item.timestamp,
+          authorName: item.author.displayName ?? (item.author.username ? `@${item.author.username}` : 'Someone'),
+          avatarUrl: item.author.avatarUrl,
+          log: {
+            id: item.log.id,
+            foodNameSnapshot: item.log.foodNameSnapshot,
+            calories: item.log.calories,
+            proteinG: item.log.proteinG,
+            carbsG: item.log.carbsG,
+            fatG: item.log.fatG,
+            mealType: item.log.mealType as MealType | null,
+            imageUrl: item.log.imageUrl,
+          },
+        },
+  );
+
+  const displayItems = tab === 'you' ? mineDisplayItems : friendsDisplayItems;
+  const activeLoading = tab === 'you' ? loading : friendsLoading;
+  const activeError = tab === 'you' ? error : friendsError;
+  const activeHasMore = tab === 'you' ? hasMore : friendsHasMore;
+  const activeLoadingMore = tab === 'you' ? loadingMore : friendsLoadingMore;
+  const activeRetry = tab === 'you' ? load : loadFriends;
+  const activeLoadMore = tab === 'you' ? handleLoadMore : handleLoadMoreFriends;
 
   return (
     <Screen
@@ -179,33 +358,49 @@ export function FeedScreen({ navigation }: Props) {
         />
       </BottomSheet>
 
-      {error ? (
-        <ErrorState testID="feed-error" message={error} onRetry={load} />
-      ) : loading ? (
+      <View style={styles.tabWrap}>
+        <SegmentedControl
+          testID="feed-tab"
+          options={[
+            { label: 'You', value: 'you' },
+            { label: 'Friends', value: 'friends' },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+      </View>
+
+      {activeError ? (
+        <ErrorState testID="feed-error" message={activeError} onRetry={activeRetry} />
+      ) : activeLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator testID="feed-loading" size="large" color={colors.textPrimary} />
         </View>
-      ) : items.length === 0 ? (
+      ) : displayItems.length === 0 ? (
         <EmptyState
           testID="feed-empty"
-          title="Nothing here yet"
-          description="Finish a workout or log a food and it'll show up here."
+          title={tab === 'you' ? 'Nothing here yet' : 'No activity from friends yet'}
+          description={
+            tab === 'you'
+              ? "Finish a workout or log a food and it'll show up here."
+              : 'Follow people from Find People (see the menu) to see their activity here.'
+          }
         />
       ) : (
         <>
-          {items.map((item) =>
-            item.kind === 'workout' ? (
+          {displayItems.map((item) =>
+            item.kind === 'workout' && item.workout ? (
               <AppCard
-                key={item.id}
+                key={item.key}
                 testID={`feed-item-workout-${item.workout.id}`}
                 topAccent={colors.textPrimary}
-                onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.workout.id })}
+                onPress={item.onPress}
               >
                 <View style={styles.metaRow}>
                   <View style={styles.avatarWrap}>
                     <Avatar
-                      uri={avatarUrl}
-                      initial={avatarInitial}
+                      uri={item.avatarUrl}
+                      initial={item.authorName.charAt(0).toUpperCase()}
                       size={32}
                       iconSize={16}
                       iconColor={colors.textSecondary}
@@ -214,7 +409,7 @@ export function FeedScreen({ navigation }: Props) {
                   </View>
                   <View style={styles.metaBody}>
                     <Text style={styles.metaName} numberOfLines={1}>
-                      {byline}
+                      {item.authorName}
                     </Text>
                     <View style={styles.metaSubRow}>
                       <Feather name="activity" size={11} color={colors.textMuted} />
@@ -224,7 +419,7 @@ export function FeedScreen({ navigation }: Props) {
                 </View>
 
                 <Text style={styles.itemTitle} numberOfLines={1}>
-                  {item.workout.splitDayName ?? item.workout.name}
+                  {item.workout.name}
                 </Text>
                 {item.workout.muscleGroups.length > 0 ? (
                   <Text style={styles.itemSubtitle} numberOfLines={1}>
@@ -261,18 +456,18 @@ export function FeedScreen({ navigation }: Props) {
                   </View>
                 </View>
               </AppCard>
-            ) : (
+            ) : item.log ? (
               <AppCard
-                key={item.id}
+                key={item.key}
                 testID={`feed-item-foodlog-${item.log.id}`}
                 topAccent={colors.textPrimary}
-                onPress={() => navigation.navigate('Nutrition')}
+                onPress={item.onPress}
               >
                 <View style={styles.metaRow}>
                   <View style={styles.avatarWrap}>
                     <Avatar
-                      uri={avatarUrl}
-                      initial={avatarInitial}
+                      uri={item.avatarUrl}
+                      initial={item.authorName.charAt(0).toUpperCase()}
                       size={32}
                       iconSize={16}
                       iconColor={colors.textSecondary}
@@ -281,7 +476,7 @@ export function FeedScreen({ navigation }: Props) {
                   </View>
                   <View style={styles.metaBody}>
                     <Text style={styles.metaName} numberOfLines={1}>
-                      {byline}
+                      {item.authorName}
                     </Text>
                     <View style={styles.metaSubRow}>
                       <Feather name="coffee" size={11} color={colors.textMuted} />
@@ -326,15 +521,15 @@ export function FeedScreen({ navigation }: Props) {
                   />
                 </View>
               </AppCard>
-            ),
+            ) : null,
           )}
 
-          {hasMore ? (
+          {activeHasMore ? (
             <TextButton
               testID="feed-load-more"
               label="Load More"
-              loading={loadingMore}
-              onPress={handleLoadMore}
+              loading={activeLoadingMore}
+              onPress={activeLoadMore}
             />
           ) : null}
         </>

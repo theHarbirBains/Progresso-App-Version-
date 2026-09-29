@@ -8,7 +8,9 @@ import { validate } from './config/env.validation';
 import { RolesGuard } from './common/guards/roles.guard';
 import { EquipmentProfilesModule } from './equipment-profiles/equipment-profiles.module';
 import { ExercisesModule } from './exercises/exercises.module';
+import { FeedModule } from './feed/feed.module';
 import { FoodsModule } from './foods/foods.module';
+import { FollowsModule } from './follows/follows.module';
 import { HealthModule } from './health/health.module';
 import { RevenueCatModule } from './revenuecat/revenuecat.module';
 import { SupabaseModule } from './supabase/supabase.module';
@@ -28,6 +30,8 @@ import { UsersModule } from './users/users.module';
     ExercisesModule,
     EquipmentProfilesModule,
     FoodsModule,
+    FollowsModule,
+    FeedModule,
     AdminModule,
     RevenueCatModule,
   ],

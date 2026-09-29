@@ -41,6 +41,7 @@ import { BarcodeScannerScreen } from './src/screens/BarcodeScannerScreen';
 import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
 import { ExerciseProgressScreen } from './src/screens/ExerciseProgressScreen';
 import { FeedScreen } from './src/screens/FeedScreen';
+import { FindPeopleScreen } from './src/screens/FindPeopleScreen';
 import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
@@ -278,6 +279,7 @@ function Root() {
                 <Stack.Screen name="WorkoutSplitForm" component={WorkoutSplitFormScreen} />
                 <Stack.Screen name="ChooseWorkoutSplit" component={ChooseWorkoutSplitScreen} />
                 <Stack.Screen name="Profile" component={ProfileScreen} />
+                <Stack.Screen name="FindPeople" component={FindPeopleScreen} />
               </Stack.Navigator>
             </NavigationContainer>
           </View>

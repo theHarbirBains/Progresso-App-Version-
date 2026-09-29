@@ -288,3 +288,120 @@ export function getFoodByBarcode(
     accessToken,
   );
 }
+
+// Social v1: a one-directional, accept-gated follow graph -- see
+// apps/api/src/follows for why every call here goes through the backend
+// (reading another user's username/display name/workouts/food logs is
+// exactly the cross-user-trusted read direct-to-Supabase RLS doesn't allow).
+export type FollowStatus = 'none' | 'pending' | 'accepted';
+
+export interface FollowUser {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+}
+
+export interface FollowRequest {
+  followId: string;
+  user: FollowUser;
+  createdAt: string;
+}
+
+export interface FollowSearchResult {
+  user: FollowUser;
+  status: FollowStatus;
+}
+
+export function searchUsers(accessToken: string, query: string): Promise<FollowSearchResult[]> {
+  const params = new URLSearchParams({ query });
+  return request<FollowSearchResult[]>(`/api/v1/follows/search?${params.toString()}`, accessToken);
+}
+
+export function listFollowRequests(accessToken: string): Promise<FollowRequest[]> {
+  return request<FollowRequest[]>('/api/v1/follows/requests', accessToken);
+}
+
+export function listFollowing(accessToken: string): Promise<FollowUser[]> {
+  return request<FollowUser[]>('/api/v1/follows/following', accessToken);
+}
+
+export function sendFollowRequest(
+  accessToken: string,
+  targetUserId: string,
+): Promise<{ status: FollowStatus }> {
+  return request<{ status: FollowStatus }>(
+    `/api/v1/follows/${encodeURIComponent(targetUserId)}`,
+    accessToken,
+    { method: 'POST' },
+  );
+}
+
+export function respondToFollowRequest(
+  accessToken: string,
+  followId: string,
+  action: 'accept' | 'reject',
+): Promise<{ success: true }> {
+  return request<{ success: true }>(
+    `/api/v1/follows/requests/${encodeURIComponent(followId)}`,
+    accessToken,
+    { method: 'PATCH', body: JSON.stringify({ action }) },
+  );
+}
+
+export function unfollowUser(accessToken: string, targetUserId: string): Promise<{ success: true }> {
+  return request<{ success: true }>(
+    `/api/v1/follows/${encodeURIComponent(targetUserId)}`,
+    accessToken,
+    { method: 'DELETE' },
+  );
+}
+
+// The Friends tab of Feed -- accepted followees' own completed workouts and
+// logged foods, merged server-side (apps/api/src/feed) the same way
+// feedQueries.ts merges "my" feed client-side. Each item carries its
+// author's public profile fields, since (unlike the self-feed) the byline
+// isn't always the signed-in user.
+export type FriendsFeedItem =
+  | {
+      kind: 'workout';
+      id: string;
+      timestamp: string;
+      author: FollowUser;
+      workout: {
+        id: string;
+        name: string;
+        splitDayName: string | null;
+        muscleGroups: string[];
+        durationMinutes: number | null;
+        exerciseCount: number;
+        completedSetCount: number;
+        totalVolumeKg: number;
+      };
+    }
+  | {
+      kind: 'foodLog';
+      id: string;
+      timestamp: string;
+      author: FollowUser;
+      log: {
+        id: string;
+        foodNameSnapshot: string;
+        calories: number;
+        proteinG: number;
+        carbsG: number;
+        fatG: number;
+        mealType: string | null;
+        imageUrl: string | null;
+      };
+    };
+
+export interface FriendsFeedPage {
+  items: FriendsFeedItem[];
+  hasMore: boolean;
+}
+
+export function fetchFriendsFeed(accessToken: string, page = 0): Promise<FriendsFeedPage> {
+  const params = new URLSearchParams({ page: String(page) });
+  return request<FriendsFeedPage>(`/api/v1/feed/friends?${params.toString()}`, accessToken);
+}
