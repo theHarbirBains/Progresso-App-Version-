@@ -19,19 +19,24 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockSignUpWithPassword = jest.fn();
+const mockSignInWithProvider = jest.fn();
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 const mockMaterialize = materializeWorkoutSplitPreset as jest.Mock;
 const mockSwitchToSignIn = jest.fn();
 
 beforeEach(async () => {
   await AsyncStorage.clear();
-  mockUseAuth.mockReturnValue({ signUpWithPassword: mockSignUpWithPassword });
+  mockUseAuth.mockReturnValue({
+    signUpWithPassword: mockSignUpWithPassword,
+    signInWithProvider: mockSignInWithProvider,
+  });
   mockSignUpWithPassword.mockReset().mockResolvedValue({
     error: null,
     requiresEmailConfirmation: false,
     accessToken: 'token-123',
     userId: 'user-1',
   });
+  mockSignInWithProvider.mockReset().mockResolvedValue(null);
   mockUpdateMyProfile.mockReset().mockResolvedValue({ id: 'user-1' });
   mockMaterialize.mockReset().mockResolvedValue({ id: 'split-new', name: 'Push / Pull / Legs' });
   mockSwitchToSignIn.mockClear();
@@ -287,5 +292,122 @@ describe('OnboardingScreen', () => {
     fireEvent.press(screen.getByTestId('onboarding-create-account-back-to-sign-in'));
     expect(mockSwitchToSignIn).toHaveBeenCalled();
     await settle();
+  });
+
+  // Regression coverage for the real bug this fixes: Google sign-up used to
+  // only exist on the separate Sign In screen, so a brand-new user
+  // authenticating via Google there got a session with none of onboarding's
+  // profile data ever collected. Google now lives here instead, on the
+  // account-creation step itself.
+  it('persists the draft with pendingUsername/pendingDisplayName and starts Google OAuth, with no separate signUp call', async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: 15,
+        draft: {
+          referralSource: 'tiktok',
+          country: 'CA',
+          gender: 'male',
+          birthday: '2000-06-15',
+          weightValue: 80,
+          weightUnit: 'kg',
+          heightValue: 180,
+          heightUnit: 'cm',
+          fitnessGoal: 'build_muscle',
+          trainingExperience: 'intermediate',
+          workoutFrequencyDays: 4,
+          averageWorkoutLength: '45_60',
+          trainingStylePreference: 'guided',
+          selectedSplitPresetId: 'ppl',
+          appleHealthPreference: 'not_now',
+          emailOptIn: true,
+          pushNotificationsOptIn: false,
+        },
+      }),
+    );
+
+    renderScreen();
+    await screen.findByTestId('onboarding-step-create-account');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-display-name'),
+      'Harbir Bains',
+    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-create-account-google'));
+    });
+
+    expect(mockSignInWithProvider).toHaveBeenCalledWith('google');
+    expect(mockSignUpWithPassword).not.toHaveBeenCalled();
+
+    const stored = await AsyncStorage.getItem('@progresso/onboardingDraft');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored as string).draft;
+    expect(parsed.pendingUsername).toBe('harbirb');
+    expect(parsed.pendingDisplayName).toBe('Harbir Bains');
+    // App.tsx's Root -- not this screen -- submits the profile once the
+    // OAuth session actually appears, so nothing here calls updateMyProfile.
+    expect(mockUpdateMyProfile).not.toHaveBeenCalled();
+    await settle();
+  });
+
+  const fullyAnsweredDraft = {
+    referralSource: 'tiktok',
+    country: 'CA',
+    gender: 'male',
+    birthday: '2000-06-15',
+    weightValue: 80,
+    weightUnit: 'kg',
+    heightValue: 180,
+    heightUnit: 'cm',
+    fitnessGoal: 'build_muscle',
+    trainingExperience: 'intermediate',
+    workoutFrequencyDays: 4,
+    averageWorkoutLength: '45_60',
+    trainingStylePreference: 'guided',
+    selectedSplitPresetId: 'ppl',
+    appleHealthPreference: 'not_now',
+    emailOptIn: true,
+    pushNotificationsOptIn: false,
+  };
+
+  it('requires Display Name and Username before Google sign-up, same as the email path', async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({ stepIndex: 15, draft: fullyAnsweredDraft }),
+    );
+    renderScreen();
+    await screen.findByTestId('onboarding-step-create-account');
+
+    expect(screen.getByTestId('onboarding-create-account-google').props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+    expect(mockSignInWithProvider).not.toHaveBeenCalled();
+  });
+
+  it('shows an error and does not clear the draft when Google sign-in fails', async () => {
+    mockSignInWithProvider.mockResolvedValue('Google sign-in failed');
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({ stepIndex: 15, draft: fullyAnsweredDraft }),
+    );
+    renderScreen();
+    await screen.findByTestId('onboarding-step-create-account');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-display-name'),
+      'Harbir Bains',
+    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-create-account-google'));
+    });
+
+    expect(await screen.findByTestId('onboarding-create-account-error')).toHaveTextContent(
+      'Google sign-in failed',
+    );
+    const stored = await AsyncStorage.getItem('@progresso/onboardingDraft');
+    expect(stored).not.toBeNull();
   });
 });

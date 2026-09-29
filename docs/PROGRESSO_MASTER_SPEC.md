@@ -157,7 +157,7 @@ Progresso is **past the Phase 0 foundation** and has an implemented core loop, n
 
 **Implemented:**
 
-- Authentication: Supabase email/password sign up and sign in, password reset. (Google/Apple/MFA from Section 9 are not yet implemented.)
+- Authentication: Supabase email/password sign up and sign in, password reset, plus Google sign-in/sign-up via web-redirect OAuth (`apps/mobile/src/auth/oauth.ts`) -- Google sign-up lives on onboarding's account-creation step, Google sign-in on the Sign In screen. An Apple button exists on the same code path but isn't yet production-polished (real native Sign-In-with-Apple is a later, EAS-build-dependent milestone). MFA from Section 9 is not yet implemented.
 - Onboarding: a guided flow collecting profile basics (first name, last name, username, display name — each independent, none derived from another) and unit preference.
 - Workout splits: create, edit, view, duplicate, delete, plus built-in presets that copy into an editable user-owned split.
 - Workout tracking: live workout logging (exercises, sets, reps, weight) against a split, workout history with a month calendar, workout sharing.

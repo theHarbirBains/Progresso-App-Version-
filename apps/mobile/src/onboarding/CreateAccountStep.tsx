@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
-import { TextInput as RNTextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TextInput as RNTextInput, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { PrimaryButton } from '../design/Button';
+import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { TextInput } from '../design/TextInput';
-import { colors } from '../design/theme';
+import { colors, spacing, typeScale } from '../design/theme';
 
 // Mirrors the backend's own username rule exactly (update-user.dto.ts /
 // 20260825100001_username.sql): lowercase letters, digits, underscores,
@@ -19,11 +19,20 @@ export interface CreateAccountFields {
   password: string;
 }
 
+export interface GoogleSignUpFields {
+  displayName: string;
+  username: string;
+}
+
 interface Props {
   testID: string;
   submitting: boolean;
   error: string | null;
   onSubmit: (fields: CreateAccountFields) => void;
+  /** Continue with Google instead of email/password -- still needs Display Name/Username from this same step (Google doesn't supply a Progresso username), so it shares this step's fields rather than being a separate one. */
+  onGoogleSignUp: (fields: GoogleSignUpFields) => void;
+  /** Independent of `submitting`: the two are different actions on this one screen, and pressing one shouldn't show the other's button as busy. */
+  googleSubmitting: boolean;
 }
 
 // The final onboarding step: create the account with everything answered
@@ -32,7 +41,18 @@ interface Props {
 // SignUpScreen this replaces, there's no First/Last Name here: those
 // fields were collected there but never actually persisted anywhere (no
 // column backed them), so this doesn't carry that dead weight forward.
-export function CreateAccountStep({ testID, submitting, error, onSubmit }: Props) {
+// Google is the one alternative to typing an email/password (see
+// SignInScreen's own equivalent) -- Display Name/Username are still
+// required either way, since those are Progresso-specific, not something
+// Google's own profile supplies.
+export function CreateAccountStep({
+  testID,
+  submitting,
+  error,
+  onSubmit,
+  onGoogleSignUp,
+  googleSubmitting,
+}: Props) {
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -48,29 +68,41 @@ export function CreateAccountStep({ testID, submitting, error, onSubmit }: Props
   const confirmRef = useRef<RNTextInput>(null);
 
   const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password;
+  const anySubmitting = submitting || googleSubmitting;
   const canSubmit =
     displayName.trim().length > 0 &&
     USERNAME_PATTERN.test(username.trim().toLowerCase()) &&
     email.trim().length > 0 &&
     password.length >= 6 &&
     confirmPassword === password &&
-    !submitting;
+    !anySubmitting;
+  const canSubmitGoogle =
+    displayName.trim().length > 0 &&
+    USERNAME_PATTERN.test(username.trim().toLowerCase()) &&
+    !anySubmitting;
 
-  function handleSubmit() {
-    if (submitting) return;
+  function validateNameAndUsername(): { displayName: string; username: string } | null {
     const trimmedDisplayName = displayName.trim();
     const normalizedUsername = username.trim().toLowerCase();
 
     if (!trimmedDisplayName) {
       setLocalError('Display name is required.');
-      return;
+      return null;
     }
     if (!USERNAME_PATTERN.test(normalizedUsername)) {
       setLocalError(
         'Username may only contain lowercase letters, numbers, and underscores, and be 3-20 characters.',
       );
-      return;
+      return null;
     }
+    return { displayName: trimmedDisplayName, username: normalizedUsername };
+  }
+
+  function handleSubmit() {
+    if (anySubmitting) return;
+    const nameFields = validateNameAndUsername();
+    if (!nameFields) return;
+
     if (!email.trim()) {
       setLocalError('Email is required.');
       return;
@@ -84,12 +116,15 @@ export function CreateAccountStep({ testID, submitting, error, onSubmit }: Props
       return;
     }
     setLocalError(null);
-    onSubmit({
-      displayName: trimmedDisplayName,
-      username: normalizedUsername,
-      email: email.trim(),
-      password,
-    });
+    onSubmit({ ...nameFields, email: email.trim(), password });
+  }
+
+  function handleGoogleSignUp() {
+    if (anySubmitting) return;
+    const nameFields = validateNameAndUsername();
+    if (!nameFields) return;
+    setLocalError(null);
+    onGoogleSignUp(nameFields);
   }
 
   const displayError = localError ?? error;
@@ -183,11 +218,44 @@ export function CreateAccountStep({ testID, submitting, error, onSubmit }: Props
         testID="onboarding-create-account-submit"
         label={submitting ? 'Creating Account...' : 'Create Account'}
         onPress={handleSubmit}
+        loading={submitting}
         disabled={!canSubmit}
+      />
+
+      <View style={dividerStyles.row}>
+        <View style={dividerStyles.line} />
+        <Text style={dividerStyles.text}>or</Text>
+        <View style={dividerStyles.line} />
+      </View>
+
+      <SecondaryButton
+        testID="onboarding-create-account-google"
+        label="Continue with Google"
+        onPress={handleGoogleSignUp}
+        loading={googleSubmitting}
+        disabled={!canSubmitGoogle}
       />
     </View>
   );
 }
+
+const dividerStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginVertical: spacing.lg,
+  },
+  line: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.divider,
+  },
+  text: {
+    ...typeScale.secondary,
+    color: colors.textMuted,
+  },
+});
 
 function VisibilityToggle({
   testID,

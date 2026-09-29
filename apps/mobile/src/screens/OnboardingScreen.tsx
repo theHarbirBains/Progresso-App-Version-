@@ -7,7 +7,11 @@ import { IconButton } from '../design/IconButton';
 import { LoadingState } from '../design/LoadingState';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { CountryStep } from '../onboarding/CountryStep';
-import { CreateAccountStep, type CreateAccountFields } from '../onboarding/CreateAccountStep';
+import {
+  CreateAccountStep,
+  type CreateAccountFields,
+  type GoogleSignUpFields,
+} from '../onboarding/CreateAccountStep';
 import { toDateStringUTC } from '../onboarding/dateWheelValues';
 import { DateWheelPicker } from '../onboarding/DateWheelPicker';
 import { GoalSelector } from '../onboarding/GoalSelector';
@@ -83,13 +87,14 @@ const DEFAULT_BIRTH_YEAR = new Date().getFullYear() - 25;
 // onboardingDraftStorage) is what makes this resumable across an app kill,
 // the same guarantee the old profile-backed flow had.
 export function OnboardingScreen({ onSwitchToSignIn }: Props) {
-  const { signUpWithPassword } = useAuth();
+  const { signUpWithPassword, signInWithProvider } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [draft, setDraft] = useState<OnboardingDraft>(EMPTY_DRAFT);
   const [stepIndex, setStepIndex] = useState(0);
   const [restoringDraft, setRestoringDraft] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmationSent, setConfirmationSent] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState('');
@@ -210,6 +215,34 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to finish creating your account');
       setSaving(false);
+    }
+  }
+
+  // Google replaces typing an email/password, nothing else: Display
+  // Name/Username still come from this same step (Google's own profile
+  // doesn't supply a Progresso username). Unlike signUpWithPassword, OAuth
+  // establishes the session itself, so there's no separate "create the
+  // account" call here -- just persist the draft (now including
+  // pendingUsername/pendingDisplayName) and start the OAuth flow. App.tsx's
+  // Root already submits a pending draft the moment a signed-in session
+  // with no completed onboarding appears (see its own effect) -- the exact
+  // same mechanism handleCreateAccount's requiresEmailConfirmation branch
+  // relies on above, reused here rather than duplicated.
+  async function handleGoogleSignUp(fields: GoogleSignUpFields) {
+    setGoogleSubmitting(true);
+    setError(null);
+    const nextDraft: OnboardingDraft = {
+      ...draft,
+      pendingUsername: fields.username,
+      pendingDisplayName: fields.displayName,
+    };
+    updateDraft({ pendingUsername: fields.username, pendingDisplayName: fields.displayName });
+    await saveOnboardingDraft(nextDraft, stepIndex);
+
+    const errorMessage = await signInWithProvider('google');
+    if (errorMessage) {
+      setError(errorMessage);
+      setGoogleSubmitting(false);
     }
   }
 
@@ -521,6 +554,8 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 submitting={saving}
                 error={error}
                 onSubmit={handleCreateAccount}
+                onGoogleSignUp={handleGoogleSignUp}
+                googleSubmitting={googleSubmitting}
               />
             </>
           )
