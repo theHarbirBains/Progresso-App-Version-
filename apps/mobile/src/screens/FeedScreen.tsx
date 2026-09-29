@@ -7,7 +7,7 @@ import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
 import { BottomSheet } from '../design/BottomSheet';
-import { TextButton } from '../design/Button';
+import { SecondaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
@@ -371,6 +371,15 @@ export function FeedScreen({ navigation }: Props) {
           }}
         />
       </BottomSheet>
+
+      <View style={styles.findPeopleWrap}>
+        <SecondaryButton
+          testID="feed-find-people"
+          label="Find People"
+          size="sm"
+          onPress={() => navigation.navigate('FindPeople')}
+        />
+      </View>
 
       {blockingError ? (
         <ErrorState testID="feed-error" message={blockingError} onRetry={retryAll} />

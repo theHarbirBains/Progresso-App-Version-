@@ -210,6 +210,15 @@ describe('FeedScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
   });
 
+  it('navigates to Find People from its own button on Feed', async () => {
+    renderScreen();
+    await screen.findByTestId('feed-empty');
+
+    fireEvent.press(screen.getByTestId('feed-find-people'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('FindPeople');
+  });
+
   it('opens the app-level side menu when the header button is pressed', async () => {
     renderScreen();
     await screen.findByTestId('feed-empty');
