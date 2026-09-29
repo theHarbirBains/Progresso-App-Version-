@@ -317,7 +317,7 @@ describe('FeedScreen -- Strava-style activity cards', () => {
   });
 });
 
-describe('FeedScreen -- Friends tab', () => {
+describe('FeedScreen -- merged Friends activity', () => {
   const friendWorkoutItem = {
     kind: 'workout' as const,
     id: 'workout-fw1',
@@ -352,24 +352,31 @@ describe('FeedScreen -- Friends tab', () => {
     },
   };
 
-  it('starts on the You tab and switches to Friends on tap', async () => {
+  it('shows your own and friends\' activity together in one list, no tab needed', async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
     mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
     renderScreen();
 
-    await screen.findByTestId('feed-item-workout-w1');
-    expect(screen.queryByTestId('feed-item-workout-fw1')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('feed-tab-friends'));
-
+    expect(await screen.findByTestId('feed-item-workout-w1')).toBeTruthy();
     expect(await screen.findByTestId('feed-item-workout-fw1')).toBeTruthy();
-    expect(screen.queryByTestId('feed-item-workout-w1')).toBeNull();
+    expect(screen.queryByTestId('feed-tab-friends')).toBeNull();
+  });
+
+  it('sorts the merged list by recency regardless of source', async () => {
+    // friendWorkoutItem (2026-01-02) is newer than workoutItem (2026-01-01).
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
+    renderScreen();
+    await screen.findByTestId('feed-item-workout-fw1');
+
+    const cards = screen.UNSAFE_queryAllByType(AppCard);
+    expect(cards[0].props.testID).toBe('feed-item-workout-fw1');
+    expect(cards[1].props.testID).toBe('feed-item-workout-w1');
   });
 
   it("shows a friend's own name as the card byline, not the signed-in account's", async () => {
     mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
     renderScreen();
-    fireEvent.press(screen.getByTestId('feed-tab-friends'));
 
     const card = within(await screen.findByTestId('feed-item-workout-fw1'));
     expect(await card.findByText('Jane Doe')).toBeTruthy();
@@ -378,7 +385,6 @@ describe('FeedScreen -- Friends tab', () => {
   it("does not navigate on tap -- a friend's workout/food log isn't the signed-in user's to open", async () => {
     mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem, friendFoodLogItem]));
     renderScreen();
-    fireEvent.press(screen.getByTestId('feed-tab-friends'));
     await screen.findByTestId('feed-item-foodlog-flog-1');
 
     fireEvent.press(screen.getByTestId('feed-item-workout-fw1'));
@@ -387,18 +393,27 @@ describe('FeedScreen -- Friends tab', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('shows a friends-specific empty state pointing at Find People', async () => {
+  it("a friends-feed failure does not block your own activity from showing", async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    mockFetchFriendsFeed.mockRejectedValue(new Error('friends feed down'));
     renderScreen();
-    fireEvent.press(screen.getByTestId('feed-tab-friends'));
 
-    expect(await screen.findByTestId('feed-empty')).toHaveTextContent('No activity from friends yet');
+    expect(await screen.findByTestId('feed-item-workout-w1')).toBeTruthy();
+    expect(screen.queryByTestId('feed-error')).toBeNull();
   });
 
-  it('paginates the Friends tab independently of the You tab', async () => {
-    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem], false));
+  it('shows a blocking error only when there is nothing at all to show', async () => {
+    mockFetchFeedItems.mockRejectedValue(new Error('network error'));
+    mockFetchFriendsFeed.mockRejectedValue(new Error('friends feed down'));
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-error')).toBeTruthy();
+  });
+
+  it('paginates both sources together behind one Load More', async () => {
+    mockFetchFeedItems.mockResolvedValueOnce(feedPage([workoutItem], false));
     mockFetchFriendsFeed.mockResolvedValueOnce(feedPage([friendWorkoutItem], true));
     renderScreen();
-    fireEvent.press(screen.getByTestId('feed-tab-friends'));
     await screen.findByTestId('feed-item-workout-fw1');
     expect(screen.getByTestId('feed-load-more')).toBeTruthy();
 
@@ -408,6 +423,8 @@ describe('FeedScreen -- Friends tab', () => {
     expect(mockFetchFriendsFeed).toHaveBeenLastCalledWith('token-123', 1);
     expect(await screen.findByTestId('feed-item-foodlog-flog-1')).toBeTruthy();
     expect(screen.getByTestId('feed-item-workout-fw1')).toBeTruthy();
+    expect(screen.getByTestId('feed-item-workout-w1')).toBeTruthy();
+    // Neither source has more left, so the button is gone.
     expect(screen.queryByTestId('feed-load-more')).toBeNull();
   });
 });

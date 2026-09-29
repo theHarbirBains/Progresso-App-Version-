@@ -12,7 +12,6 @@ import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
-import { SegmentedControl } from '../design/SegmentedControl';
 import { StatBlock } from '../design/StatBlock';
 import { StatValue } from '../design/StatValue';
 import { colors } from '../design/theme';
@@ -30,8 +29,6 @@ import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 import { feedStyles as styles } from './feedStyles';
 
 type Props = RootStackScreenProps<'Feed'>;
-
-type FeedTab = 'you' | 'friends';
 
 // A normalized shape both "You" (feedQueries.ts, self-only) and "Friends"
 // (lib/api.ts's fetchFriendsFeed, backend-merged followees' activity) map
@@ -71,10 +68,13 @@ interface DisplayItem {
 
 // The app's landing screen -- a personal activity feed, replacing the old
 // Dashboard + Workout/Nutrition toggle, plus (see Social v1: the
-// follows/feed backend modules) a second Friends tab showing accepted
-// followees' own activity the same way. There is no algorithmic ranking --
-// both tabs are strictly reverse-chronological, and Friends only ever shows
-// people who've accepted a follow request (see FindPeopleScreen).
+// follows/feed backend modules) accepted followees' own activity merged
+// into the same single reverse-chronological list, not a separate tab --
+// one feed, "everyone whose activity you can see", the same way Strava's
+// own feed doesn't split "you" from "people you follow". A card's byline
+// (name + avatar) is what tells the two apart; Friends-sourced items only
+// ever come from people who've accepted a follow request (see
+// FindPeopleScreen). There is no algorithmic ranking, just recency.
 //
 // Card anatomy deliberately borrows Strava's activity-feed structure (a
 // byline row, a bold title, a stat strip) -- see DESIGN.md's Feed section
@@ -101,17 +101,15 @@ interface DisplayItem {
 // live here too (it had no other entry point at all at the time), but now
 // belongs with Nutrition's own actions instead -- see
 // NutritionTodayScreen's Scan Barcode / Search Food buttons. Find People
-// (the Friends tab's own "add more people" action) lives in the app menu's
-// SOCIAL section instead of a third header icon -- AppHeader only has room
-// for one right-side action, and "+" already owns that slot.
+// (following more people, to bring more activity into this feed) lives in
+// the app menu's SOCIAL section instead of a third header icon -- AppHeader
+// only has room for one right-side action, and "+" already owns that slot.
 export function FeedScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
   const { weightUnit, displayName, username, avatarUrl } = useProgressTheme();
-
-  const [tab, setTab] = useState<FeedTab>('you');
 
   const [items, setItems] = useState<FeedItem[]>([]);
   const [page, setPage] = useState(0);
@@ -299,13 +297,29 @@ export function FeedScreen({ navigation }: Props) {
         },
   );
 
-  const displayItems = tab === 'you' ? mineDisplayItems : friendsDisplayItems;
-  const activeLoading = tab === 'you' ? loading : friendsLoading;
-  const activeError = tab === 'you' ? error : friendsError;
-  const activeHasMore = tab === 'you' ? hasMore : friendsHasMore;
-  const activeLoadingMore = tab === 'you' ? loadingMore : friendsLoadingMore;
-  const activeRetry = tab === 'you' ? load : loadFriends;
-  const activeLoadMore = tab === 'you' ? handleLoadMore : handleLoadMoreFriends;
+  const displayItems = [...mineDisplayItems, ...friendsDisplayItems].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+  );
+  // Both sources load together on every focus (see the effect above), so
+  // the very first load is "in progress" until both have settled at least
+  // once -- same reasoning useSignedInResource's own loading flag uses.
+  const initialLoading = loading || friendsLoading;
+  // Graceful degradation, same philosophy as feedQueries.ts's own
+  // Promise.allSettled merge of workouts/food logs: a failure on one source
+  // only blocks the whole screen if there's genuinely nothing else to show;
+  // otherwise this quietly shows whatever the other source returned.
+  const blockingError = displayItems.length === 0 ? (error ?? friendsError) : null;
+  const hasMoreOfEither = hasMore || friendsHasMore;
+  const loadingMoreEither = loadingMore || friendsLoadingMore;
+
+  function retryAll() {
+    void load();
+    void loadFriends();
+  }
+
+  async function handleLoadMoreAll() {
+    await Promise.all([handleLoadMore(), handleLoadMoreFriends()]);
+  }
 
   return (
     <Screen
@@ -358,33 +372,17 @@ export function FeedScreen({ navigation }: Props) {
         />
       </BottomSheet>
 
-      <View style={styles.tabWrap}>
-        <SegmentedControl
-          testID="feed-tab"
-          options={[
-            { label: 'You', value: 'you' },
-            { label: 'Friends', value: 'friends' },
-          ]}
-          value={tab}
-          onChange={setTab}
-        />
-      </View>
-
-      {activeError ? (
-        <ErrorState testID="feed-error" message={activeError} onRetry={activeRetry} />
-      ) : activeLoading ? (
+      {blockingError ? (
+        <ErrorState testID="feed-error" message={blockingError} onRetry={retryAll} />
+      ) : initialLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator testID="feed-loading" size="large" color={colors.textPrimary} />
         </View>
       ) : displayItems.length === 0 ? (
         <EmptyState
           testID="feed-empty"
-          title={tab === 'you' ? 'Nothing here yet' : 'No activity from friends yet'}
-          description={
-            tab === 'you'
-              ? "Finish a workout or log a food and it'll show up here."
-              : 'Follow people from Find People (see the menu) to see their activity here.'
-          }
+          title="Nothing here yet"
+          description="Finish a workout or log a food, or follow people from Find People (see the menu), and it'll show up here."
         />
       ) : (
         <>
@@ -524,12 +522,12 @@ export function FeedScreen({ navigation }: Props) {
             ) : null,
           )}
 
-          {activeHasMore ? (
+          {hasMoreOfEither ? (
             <TextButton
               testID="feed-load-more"
               label="Load More"
-              loading={activeLoadingMore}
-              onPress={activeLoadMore}
+              loading={loadingMoreEither}
+              onPress={handleLoadMoreAll}
             />
           ) : null}
         </>
