@@ -7,7 +7,7 @@ import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
 import { BottomSheet } from '../design/BottomSheet';
-import { SecondaryButton, TextButton } from '../design/Button';
+import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
@@ -101,9 +101,10 @@ interface DisplayItem {
 // live here too (it had no other entry point at all at the time), but now
 // belongs with Nutrition's own actions instead -- see
 // NutritionTodayScreen's Scan Barcode / Search Food buttons. Find People
-// (following more people, to bring more activity into this feed) lives in
-// the app menu's SOCIAL section instead of a third header icon -- AppHeader
-// only has room for one right-side action, and "+" already owns that slot.
+// (following more people, to bring more activity into this feed) is the
+// header's search icon, next to the menu button (AppHeader's leftAction2)
+// -- still also reachable from the app menu's SOCIAL section, same as every
+// other menu destination.
 export function FeedScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -336,6 +337,12 @@ export function FeedScreen({ navigation }: Props) {
             accessibilityLabel: 'Open menu',
             testID: 'feed-open-menu',
           }}
+          leftAction2={{
+            icon: 'search',
+            onPress: () => navigation.navigate('FindPeople'),
+            accessibilityLabel: 'Find people',
+            testID: 'feed-find-people',
+          }}
           rightAction={{
             icon: 'plus',
             onPress: () => setQuickActionsOpen(true),
@@ -371,15 +378,6 @@ export function FeedScreen({ navigation }: Props) {
           }}
         />
       </BottomSheet>
-
-      <View style={styles.findPeopleWrap}>
-        <SecondaryButton
-          testID="feed-find-people"
-          label="Find People"
-          size="sm"
-          onPress={() => navigation.navigate('FindPeople')}
-        />
-      </View>
 
       {blockingError ? (
         <ErrorState testID="feed-error" message={blockingError} onRetry={retryAll} />

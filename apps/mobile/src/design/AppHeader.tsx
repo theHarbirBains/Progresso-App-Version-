@@ -20,6 +20,8 @@ interface Props {
   onBack?: () => void;
   /** A custom left action, for the rare screen that needs something other than Back. */
   leftAction?: HeaderAction;
+  /** A second icon immediately after `leftAction`/the Back button, for a screen that needs two left-side actions (e.g. Feed's menu + search). Ignored if there's no primary left action to sit next to. Pushes the title off true screen-center, same tradeoff `rightAction` alone already makes for a screen with only a right action. */
+  leftAction2?: HeaderAction;
   rightAction?: HeaderAction;
   /** Replaces `rightAction` with a spinner -- e.g. a header-level save in progress. */
   loading?: boolean;
@@ -39,6 +41,7 @@ export function AppHeader({
   subtitle,
   onBack,
   leftAction,
+  leftAction2,
   rightAction,
   loading,
   safeArea = true,
@@ -69,6 +72,16 @@ export function AppHeader({
       ) : (
         <View style={styles.spacer} />
       )}
+
+      {left && leftAction2 ? (
+        <IconButton
+          testID={leftAction2.testID}
+          icon={leftAction2.icon}
+          onPress={leftAction2.onPress}
+          accessibilityLabel={leftAction2.accessibilityLabel}
+          disabled={leftAction2.disabled}
+        />
+      ) : null}
 
       <View style={styles.titleColumn}>
         {title ? <Text style={styles.title}>{title}</Text> : null}

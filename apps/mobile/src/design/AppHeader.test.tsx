@@ -76,6 +76,37 @@ describe('AppHeader', () => {
     expect(screen.queryByTestId('header-options')).toBeNull();
   });
 
+  it('renders leftAction2 next to a primary leftAction and calls it when pressed', () => {
+    const onPress = jest.fn();
+    render(
+      <AppHeader
+        title="Feed"
+        leftAction={{ icon: 'menu', onPress: jest.fn(), accessibilityLabel: 'Open menu' }}
+        leftAction2={{ icon: 'search', onPress, accessibilityLabel: 'Find people', testID: 'header-search' }}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('header-search'));
+
+    expect(onPress).toHaveBeenCalled();
+  });
+
+  it('ignores leftAction2 when there is no primary left action to sit next to', () => {
+    render(
+      <AppHeader
+        title="Feed"
+        leftAction2={{
+          icon: 'search',
+          onPress: jest.fn(),
+          accessibilityLabel: 'Find people',
+          testID: 'header-search',
+        }}
+      />,
+    );
+
+    expect(screen.queryByTestId('header-search')).toBeNull();
+  });
+
   it('prefers a custom leftAction over the default Back button', () => {
     const onPress = jest.fn();
     render(

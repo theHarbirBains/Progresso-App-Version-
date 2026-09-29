@@ -18,15 +18,6 @@ export const feedStyles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
 
-  // The "Find People" button sits directly on the screen (not inside a
-  // card), so unlike a card -- whose own padding creates its inset from the
-  // edge-to-edge frame -- it needs an explicit gutter of its own, matching
-  // the screen gutter Settings' rows use (see AccountSettingsScreen).
-  findPeopleWrap: {
-    paddingHorizontal: spacing.xxl,
-    alignItems: 'flex-start',
-  },
-
   // The header "+" button's action sheet.
   sheetTitle: {
     ...typeScale.sectionHeading,
