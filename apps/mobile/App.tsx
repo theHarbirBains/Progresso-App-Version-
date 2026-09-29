@@ -280,8 +280,16 @@ function Root() {
                 <Stack.Screen name="WorkoutSplitForm" component={WorkoutSplitFormScreen} />
                 <Stack.Screen name="ChooseWorkoutSplit" component={ChooseWorkoutSplitScreen} />
                 <Stack.Screen name="Profile" component={ProfileScreen} />
-                <Stack.Screen name="FindPeople" component={FindPeopleScreen} />
-                <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                <Stack.Screen
+                  name="FindPeople"
+                  component={FindPeopleScreen}
+                  options={{ animation: 'slide_from_right' }}
+                />
+                <Stack.Screen
+                  name="Notifications"
+                  component={NotificationsScreen}
+                  options={{ animation: 'slide_from_right' }}
+                />
               </Stack.Navigator>
             </NavigationContainer>
           </View>

@@ -170,7 +170,6 @@ export function NotificationsScreen({ navigation }: Props) {
                 <AppCard
                   key={group.muscleGroup}
                   testID={`notifications-insight-${group.muscleGroup}`}
-                  topAccent={colors.textPrimary}
                   onPress={() => navigation.navigate('NewWorkout')}
                 >
                   <View style={styles.itemRow}>
@@ -216,7 +215,6 @@ export function NotificationsScreen({ navigation }: Props) {
                   <AppCard
                     key={`${item.kind}-${item.followId}`}
                     testID={`notifications-activity-${item.kind}-${item.followId}`}
-                    topAccent={colors.textPrimary}
                   >
                     <View style={styles.itemRow}>
                       <Avatar
