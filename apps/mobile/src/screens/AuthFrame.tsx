@@ -49,7 +49,12 @@ export function AuthFrame({ title, subtitle, showLogo, children }: Props) {
       <Animated.View style={[styles.frame, { opacity, transform: [{ translateY }] }]}>
         <View style={styles.header}>
           {showLogo ? (
-            <Image testID="auth-frame-logo" source={logo} style={styles.logo} resizeMode="contain" />
+            <Image
+              testID="auth-frame-logo"
+              source={logo}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           ) : null}
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}

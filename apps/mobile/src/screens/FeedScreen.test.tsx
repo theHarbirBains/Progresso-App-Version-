@@ -231,9 +231,24 @@ describe('FeedScreen', () => {
 
   it('badges the notifications bell with the pending request count (ignoring accepted items), and opens Notifications on tap', async () => {
     mockListFollowNotifications.mockResolvedValue([
-      { kind: 'request', followId: 'f1', at: '2026-01-01', user: { id: 'u2', username: 'a', displayName: null, avatarUrl: null } },
-      { kind: 'request', followId: 'f2', at: '2026-01-01', user: { id: 'u3', username: 'b', displayName: null, avatarUrl: null } },
-      { kind: 'accepted', followId: 'f3', at: '2026-01-01', user: { id: 'u4', username: 'c', displayName: null, avatarUrl: null } },
+      {
+        kind: 'request',
+        followId: 'f1',
+        at: '2026-01-01',
+        user: { id: 'u2', username: 'a', displayName: null, avatarUrl: null },
+      },
+      {
+        kind: 'request',
+        followId: 'f2',
+        at: '2026-01-01',
+        user: { id: 'u3', username: 'b', displayName: null, avatarUrl: null },
+      },
+      {
+        kind: 'accepted',
+        followId: 'f3',
+        at: '2026-01-01',
+        user: { id: 'u4', username: 'c', displayName: null, avatarUrl: null },
+      },
     ]);
     renderScreen();
 
@@ -385,7 +400,7 @@ describe('FeedScreen -- merged Friends activity', () => {
     },
   };
 
-  it('shows your own and friends\' activity together in one list, no tab needed', async () => {
+  it("shows your own and friends' activity together in one list, no tab needed", async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
     mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
     renderScreen();
@@ -426,7 +441,7 @@ describe('FeedScreen -- merged Friends activity', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("a friends-feed failure does not block your own activity from showing", async () => {
+  it('a friends-feed failure does not block your own activity from showing', async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
     mockFetchFriendsFeed.mockRejectedValue(new Error('friends feed down'));
     renderScreen();

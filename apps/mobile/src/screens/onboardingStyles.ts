@@ -9,6 +9,9 @@ export const onboardingStyles = StyleSheet.create({
     // unlike the rest of the app's screen containers.
     backgroundColor: colors.background,
   },
+  keyboardAvoiding: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: spacing.xxl,

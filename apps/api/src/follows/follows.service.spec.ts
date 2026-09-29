@@ -65,8 +65,10 @@ function createMockClient() {
       });
     }
     builder.maybeSingle = jest.fn(() => Promise.resolve(nextResult(table)));
-    builder.then = (onFulfilled: (r: QueuedResult) => unknown, onRejected?: (e: unknown) => unknown) =>
-      Promise.resolve(nextResult(table)).then(onFulfilled, onRejected);
+    builder.then = (
+      onFulfilled: (r: QueuedResult) => unknown,
+      onRejected?: (e: unknown) => unknown,
+    ) => Promise.resolve(nextResult(table)).then(onFulfilled, onRejected);
     return builder;
   }
 
@@ -137,9 +139,9 @@ describe('FollowsService', () => {
       client.queue('follows', { data: null, error: null });
       const service = serviceWith(client);
 
-      await expect(
-        service.respondToRequest('user-2', 'follow-1', 'accept'),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.respondToRequest('user-2', 'follow-1', 'accept')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
 
     it('only lets the recipient (followee) respond', async () => {
@@ -163,9 +165,9 @@ describe('FollowsService', () => {
       });
       const service = serviceWith(client);
 
-      await expect(
-        service.respondToRequest('user-2', 'follow-1', 'accept'),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.respondToRequest('user-2', 'follow-1', 'accept')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it('accepting sets status to accepted', async () => {
@@ -308,7 +310,12 @@ describe('FollowsService', () => {
       client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
       client.queue('users', {
         data: [
-          { id: 'user-2', username: 'already', display_name: 'Already Following', avatar_url: null },
+          {
+            id: 'user-2',
+            username: 'already',
+            display_name: 'Already Following',
+            avatar_url: null,
+          },
           { id: 'user-3', username: 'new', display_name: 'New Person', avatar_url: null },
         ],
         error: null,

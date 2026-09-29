@@ -198,8 +198,18 @@ export class FollowsService {
     ]);
 
     const items: FollowNotification[] = [
-      ...pending.map((r) => ({ kind: 'request' as const, followId: r.followId, user: r.user, at: r.createdAt })),
-      ...accepted.map((r) => ({ kind: 'accepted' as const, followId: r.followId, user: r.user, at: r.createdAt })),
+      ...pending.map((r) => ({
+        kind: 'request' as const,
+        followId: r.followId,
+        user: r.user,
+        at: r.createdAt,
+      })),
+      ...accepted.map((r) => ({
+        kind: 'accepted' as const,
+        followId: r.followId,
+        user: r.user,
+        at: r.createdAt,
+      })),
     ];
     items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
     return items;

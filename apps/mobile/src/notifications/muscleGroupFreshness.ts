@@ -38,7 +38,12 @@ export function computeStaleMuscleGroups(
   for (const [muscleGroup, lastAt] of lastTrainedAt) {
     const daysSince = Math.floor((now.getTime() - new Date(lastAt).getTime()) / MS_PER_DAY);
     if (daysSince >= thresholdDays) {
-      stale.push({ muscleGroup, label: MUSCLE_GROUP_LABELS[muscleGroup], lastTrainedAt: lastAt, daysSince });
+      stale.push({
+        muscleGroup,
+        label: MUSCLE_GROUP_LABELS[muscleGroup],
+        lastTrainedAt: lastAt,
+        daysSince,
+      });
     }
   }
 

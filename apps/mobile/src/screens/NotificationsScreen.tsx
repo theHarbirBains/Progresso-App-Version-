@@ -19,7 +19,10 @@ import {
   type FollowUser,
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
-import { computeStaleMuscleGroups, type StaleMuscleGroup } from '../notifications/muscleGroupFreshness';
+import {
+  computeStaleMuscleGroups,
+  type StaleMuscleGroup,
+} from '../notifications/muscleGroupFreshness';
 import { formatCardDate } from '../workouts/workoutFormat';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { notificationsStyles as styles } from './notificationsStyles';
@@ -136,7 +139,11 @@ export function NotificationsScreen({ navigation }: Props) {
       scrollTestID="notifications-scroll"
       contentContainerStyle={styles.content}
       header={
-        <AppHeader title="Notifications" onBack={() => navigation.goBack()} testID="notifications-header" />
+        <AppHeader
+          title="Notifications"
+          onBack={() => navigation.goBack()}
+          testID="notifications-header"
+        />
       }
     >
       {nothingAtAll ? (

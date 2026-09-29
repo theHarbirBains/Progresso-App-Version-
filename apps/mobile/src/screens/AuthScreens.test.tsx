@@ -36,6 +36,16 @@ describe('Signed-out screens -- one frame, shared inputs, one filled button', ()
     expectNoBareText();
   });
 
+  it('Sign In: the password field can be toggled visible/hidden', () => {
+    render(<SignInScreen onSwitchToSignUp={jest.fn()} onForgotPassword={jest.fn()} />);
+
+    expect(screen.getByTestId('sign-in-password').props.secureTextEntry).toBe(true);
+
+    fireEvent.press(screen.getByTestId('sign-in-password-toggle'));
+
+    expect(screen.getByTestId('sign-in-password').props.secureTextEntry).toBe(false);
+  });
+
   // Regression guard: showLogo existed but was never actually passed
   // true anywhere (Sign Up/Welcome, its only intended consumers, were
   // folded into onboarding) -- the app's mark never appeared at all.

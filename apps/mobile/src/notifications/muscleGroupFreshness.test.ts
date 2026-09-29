@@ -27,7 +27,12 @@ describe('computeStaleMuscleGroups', () => {
     const result = computeStaleMuscleGroups(history, NOW);
 
     expect(result).toEqual([
-      { muscleGroup: 'chest', label: 'Chest', lastTrainedAt: '2025-12-31T00:00:00Z', daysSince: 15 },
+      {
+        muscleGroup: 'chest',
+        label: 'Chest',
+        lastTrainedAt: '2025-12-31T00:00:00Z',
+        daysSince: 15,
+      },
     ]);
   });
 

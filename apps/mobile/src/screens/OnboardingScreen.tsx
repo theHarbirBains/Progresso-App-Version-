@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
@@ -595,17 +595,23 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      {isNoScrollStep ? (
-        <View style={styles.scrollContent}>{content}</View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          testID="onboarding-scroll"
-        >
-          {content}
-        </ScrollView>
-      )}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoiding}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {isNoScrollStep ? (
+          <View style={styles.scrollContent}>{content}</View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            testID="onboarding-scroll"
+          >
+            {content}
+          </ScrollView>
+        )}
+      </KeyboardAvoidingView>
     </View>
   );
 }

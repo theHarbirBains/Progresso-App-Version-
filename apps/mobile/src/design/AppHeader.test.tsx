@@ -82,7 +82,12 @@ describe('AppHeader', () => {
       <AppHeader
         title="Feed"
         leftAction={{ icon: 'menu', onPress: jest.fn(), accessibilityLabel: 'Open menu' }}
-        leftAction2={{ icon: 'search', onPress, accessibilityLabel: 'Find people', testID: 'header-search' }}
+        leftAction2={{
+          icon: 'search',
+          onPress,
+          accessibilityLabel: 'Find people',
+          testID: 'header-search',
+        }}
       />,
     );
 
@@ -112,7 +117,12 @@ describe('AppHeader', () => {
     render(
       <AppHeader
         title="Feed"
-        rightAction2={{ icon: 'bell', onPress, accessibilityLabel: 'Alerts', testID: 'header-bell' }}
+        rightAction2={{
+          icon: 'bell',
+          onPress,
+          accessibilityLabel: 'Alerts',
+          testID: 'header-bell',
+        }}
       />,
     );
 
@@ -143,9 +153,24 @@ describe('AppHeader', () => {
       <AppHeader
         title="Feed"
         leftAction={{ icon: 'menu', onPress: jest.fn(), accessibilityLabel: 'Open menu' }}
-        leftAction2={{ icon: 'search', onPress: jest.fn(), accessibilityLabel: 'Find people', testID: 'header-search' }}
-        rightAction={{ icon: 'plus', onPress: jest.fn(), accessibilityLabel: 'Quick actions', testID: 'header-plus' }}
-        rightAction2={{ icon: 'bell', onPress: jest.fn(), accessibilityLabel: 'Alerts', testID: 'header-bell' }}
+        leftAction2={{
+          icon: 'search',
+          onPress: jest.fn(),
+          accessibilityLabel: 'Find people',
+          testID: 'header-search',
+        }}
+        rightAction={{
+          icon: 'plus',
+          onPress: jest.fn(),
+          accessibilityLabel: 'Quick actions',
+          testID: 'header-plus',
+        }}
+        rightAction2={{
+          icon: 'bell',
+          onPress: jest.fn(),
+          accessibilityLabel: 'Alerts',
+          testID: 'header-bell',
+        }}
       />,
     );
 

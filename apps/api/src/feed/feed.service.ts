@@ -175,7 +175,9 @@ export class FeedService {
     }[],
   ) {
     const splitDayIds = Array.from(
-      new Set(workouts.map((w) => w.workout_split_day_id).filter((id): id is string => id !== null)),
+      new Set(
+        workouts.map((w) => w.workout_split_day_id).filter((id): id is string => id !== null),
+      ),
     );
     const splitDayInfo = new Map<string, { name: string; muscleGroups: string[] }>();
     if (splitDayIds.length > 0) {
@@ -186,8 +188,7 @@ export class FeedService {
       if (error) throw new InternalServerErrorException('Failed to load friends feed');
       for (const day of data ?? []) {
         const embedded = day.workout_split_day_muscle_groups as unknown as
-          | { muscle_group: string }[]
-          | null;
+          { muscle_group: string }[] | null;
         splitDayInfo.set(day.id as string, {
           name: day.name as string,
           muscleGroups: (embedded ?? []).map((m) => m.muscle_group),
@@ -236,8 +237,7 @@ export class FeedService {
         );
         totalVolumeKgByWorkoutId.set(
           workoutId,
-          (totalVolumeKgByWorkoutId.get(workoutId) ?? 0) +
-            Number(set.weight_kg) * Number(set.reps),
+          (totalVolumeKgByWorkoutId.get(workoutId) ?? 0) + Number(set.weight_kg) * Number(set.reps),
         );
       }
     }

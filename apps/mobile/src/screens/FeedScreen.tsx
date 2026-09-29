@@ -238,7 +238,9 @@ export function FeedScreen({ navigation }: Props) {
       setFriendsHasMore(result.hasMore);
       setFriendsPage(next);
     } catch (err) {
-      setFriendsError(err instanceof Error ? err.message : 'Failed to load more of your friends feed');
+      setFriendsError(
+        err instanceof Error ? err.message : 'Failed to load more of your friends feed',
+      );
     } finally {
       setFriendsLoadingMore(false);
     }
@@ -292,7 +294,9 @@ export function FeedScreen({ navigation }: Props) {
           key: item.id,
           kind: 'workout',
           timestamp: item.timestamp,
-          authorName: item.author.displayName ?? (item.author.username ? `@${item.author.username}` : 'Someone'),
+          authorName:
+            item.author.displayName ??
+            (item.author.username ? `@${item.author.username}` : 'Someone'),
           avatarUrl: item.author.avatarUrl,
           workout: {
             id: item.workout.id,
@@ -309,7 +313,9 @@ export function FeedScreen({ navigation }: Props) {
           key: item.id,
           kind: 'foodLog',
           timestamp: item.timestamp,
-          authorName: item.author.displayName ?? (item.author.username ? `@${item.author.username}` : 'Someone'),
+          authorName:
+            item.author.displayName ??
+            (item.author.username ? `@${item.author.username}` : 'Someone'),
           avatarUrl: item.author.avatarUrl,
           log: {
             id: item.log.id,

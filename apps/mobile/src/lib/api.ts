@@ -366,7 +366,10 @@ export function respondToFollowRequest(
   );
 }
 
-export function unfollowUser(accessToken: string, targetUserId: string): Promise<{ success: true }> {
+export function unfollowUser(
+  accessToken: string,
+  targetUserId: string,
+): Promise<{ success: true }> {
   return request<{ success: true }>(
     `/api/v1/follows/${encodeURIComponent(targetUserId)}`,
     accessToken,

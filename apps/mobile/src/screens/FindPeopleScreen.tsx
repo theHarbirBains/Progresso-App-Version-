@@ -270,7 +270,12 @@ export function FindPeopleScreen({ navigation }: Props) {
     );
   }
 
-  function renderResultRow(result: FollowSearchResult, testIDPrefix: string, index: number, trailing: ReactNode) {
+  function renderResultRow(
+    result: FollowSearchResult,
+    testIDPrefix: string,
+    index: number,
+    trailing: ReactNode,
+  ) {
     const { title, subtitle } = rowLabel(result.user);
     return (
       <ListRow

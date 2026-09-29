@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
-import { StyleSheet, TextInput as RNTextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TextInput as RNTextInput, View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
+import { PasswordVisibilityToggle } from '../design/PasswordVisibilityToggle';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale } from '../design/theme';
@@ -130,17 +130,18 @@ export function CreateAccountStep({
   const displayError = localError ?? error;
 
   return (
-    <View testID={testID}>
+    <View testID={testID} style={formStyles.root}>
       {displayError ? (
-        <Text testID="onboarding-create-account-error" style={{ color: colors.destructive }}>
+        <Text testID="onboarding-create-account-error" style={formStyles.errorText}>
           {displayError}
         </Text>
       ) : null}
 
       <TextInput
         testID="onboarding-create-account-display-name"
-        label="Display Name"
-        placeholder="Enter your display name"
+        label="First Name"
+        placeholder="Enter your first name"
+        autoComplete="name-given"
         returnKeyType="next"
         value={displayName}
         onChangeText={setDisplayName}
@@ -184,7 +185,7 @@ export function CreateAccountStep({
         onChangeText={setPassword}
         onSubmitEditing={() => confirmRef.current?.focus()}
         rightAccessory={
-          <VisibilityToggle
+          <PasswordVisibilityToggle
             testID="onboarding-create-account-password-toggle"
             visible={passwordVisible}
             onToggle={() => setPasswordVisible((v) => !v)}
@@ -206,7 +207,7 @@ export function CreateAccountStep({
         error={passwordsMismatch ? "Passwords don't match" : undefined}
         errorTestID="onboarding-create-account-password-mismatch"
         rightAccessory={
-          <VisibilityToggle
+          <PasswordVisibilityToggle
             testID="onboarding-create-account-confirm-password-toggle"
             visible={confirmVisible}
             onToggle={() => setConfirmVisible((v) => !v)}
@@ -239,12 +240,25 @@ export function CreateAccountStep({
   );
 }
 
+const formStyles = StyleSheet.create({
+  // Matches authStyles.ts's own `frame` gap (SignInScreen's equivalent
+  // multi-field form) -- TextInput has no external margin of its own (see
+  // design/TextInput.tsx), so without this every field/button/divider here
+  // sits flush against the next with no breathing room at all.
+  root: {
+    gap: spacing.xl,
+  },
+  errorText: {
+    ...typeScale.callout,
+    color: colors.destructive,
+  },
+});
+
 const dividerStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    marginVertical: spacing.lg,
   },
   line: {
     flex: 1,
@@ -256,25 +270,3 @@ const dividerStyles = StyleSheet.create({
     color: colors.textMuted,
   },
 });
-
-function VisibilityToggle({
-  testID,
-  visible,
-  onToggle,
-}: {
-  testID: string;
-  visible: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      testID={testID}
-      onPress={onToggle}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      accessibilityRole="button"
-      accessibilityLabel={visible ? 'Hide password' : 'Show password'}
-    >
-      <Feather name={visible ? 'eye-off' : 'eye'} size={20} color={colors.textSecondary} />
-    </TouchableOpacity>
-  );
-}

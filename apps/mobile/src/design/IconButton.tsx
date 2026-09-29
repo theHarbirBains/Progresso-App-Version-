@@ -77,7 +77,11 @@ export function IconButton({
       </TouchableOpacity>
 
       {badgeCount ? (
-        <View testID={testID ? `${testID}-badge` : undefined} style={styles.badge} pointerEvents="none">
+        <View
+          testID={testID ? `${testID}-badge` : undefined}
+          style={styles.badge}
+          pointerEvents="none"
+        >
           <Text style={styles.badgeText}>{badgeCount > 9 ? '9+' : String(badgeCount)}</Text>
         </View>
       ) : null}

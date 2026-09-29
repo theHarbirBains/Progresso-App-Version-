@@ -7,16 +7,7 @@ interface QueuedResult {
   error: { message: string } | null;
 }
 
-const CHAIN_METHODS = [
-  'select',
-  'eq',
-  'in',
-  'not',
-  'is',
-  'order',
-  'range',
-  'limit',
-] as const;
+const CHAIN_METHODS = ['select', 'eq', 'in', 'not', 'is', 'order', 'range', 'limit'] as const;
 
 /** Same generic per-table FIFO query-builder mock as follows.service.spec.ts -- see that file's comment for why a shape-agnostic mock is used here instead of hand-rolled exact chains. */
 function createMockClient() {
@@ -41,8 +32,10 @@ function createMockClient() {
     for (const method of CHAIN_METHODS) {
       builder[method] = jest.fn(() => builder);
     }
-    builder.then = (onFulfilled: (r: QueuedResult) => unknown, onRejected?: (e: unknown) => unknown) =>
-      Promise.resolve(nextResult(table)).then(onFulfilled, onRejected);
+    builder.then = (
+      onFulfilled: (r: QueuedResult) => unknown,
+      onRejected?: (e: unknown) => unknown,
+    ) => Promise.resolve(nextResult(table)).then(onFulfilled, onRejected);
     return builder;
   }
 
@@ -69,7 +62,7 @@ describe('FeedService', () => {
       });
     });
 
-    it('merges followees\' workouts and food logs, newest first, annotated with the author', async () => {
+    it("merges followees' workouts and food logs, newest first, annotated with the author", async () => {
       const client = createMockClient();
       client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
       client.queue('workouts', {

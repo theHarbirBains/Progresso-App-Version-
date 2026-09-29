@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { updateMyProfile } from '../lib/api';
@@ -102,6 +103,18 @@ describe('OnboardingScreen', () => {
   it('keeps the outer ScrollView for a plain option-list step', async () => {
     renderScreen();
     expect(await screen.findByTestId('onboarding-scroll')).toBeTruthy();
+  });
+
+  // Regression guard: with no KeyboardAvoidingView, the keyboard covered
+  // the lower half of a text-heavy step (create account) with no way to
+  // scroll the covered content -- e.g. never reaching "Create Account"
+  // itself once the keyboard was up.
+  it('wraps the scrolling body in a KeyboardAvoidingView with a platform-appropriate behavior', async () => {
+    renderScreen();
+    await screen.findByTestId('onboarding-scroll');
+
+    const avoider = screen.UNSAFE_getByType(KeyboardAvoidingView);
+    expect(avoider.props.behavior).toBe(Platform.OS === 'ios' ? 'padding' : undefined);
   });
 
   it('Back moves to the previous step', async () => {
@@ -220,6 +233,42 @@ describe('OnboardingScreen', () => {
     );
     expect(await AsyncStorage.getItem('@progresso/onboardingDraft')).toBeNull();
     await settle();
+  });
+
+  it('labels the name field "First Name", not "Display Name"', async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: 15,
+        draft: {
+          referralSource: 'tiktok',
+          country: 'CA',
+          gender: 'male',
+          birthday: '2000-06-15',
+          weightValue: 80,
+          weightUnit: 'kg',
+          heightValue: 180,
+          heightUnit: 'cm',
+          fitnessGoal: 'build_muscle',
+          trainingExperience: 'intermediate',
+          workoutFrequencyDays: 4,
+          averageWorkoutLength: '45_60',
+          trainingStylePreference: 'guided',
+          selectedSplitPresetId: 'ppl',
+          appleHealthPreference: 'not_now',
+          emailOptIn: true,
+          pushNotificationsOptIn: false,
+        },
+      }),
+    );
+
+    renderScreen();
+    await screen.findByTestId('onboarding-step-create-account');
+
+    expect(
+      screen.getByTestId('onboarding-create-account-display-name').props.accessibilityLabel,
+    ).toBe('First Name');
+    expect(screen.queryByText('Display Name')).toBeNull();
   });
 
   it('keeps the draft on disk and shows a confirmation message when email confirmation is required', async () => {

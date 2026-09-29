@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
+import { PasswordVisibilityToggle } from '../design/PasswordVisibilityToggle';
 import { TextInput } from '../design/TextInput';
 import { AuthFrame } from './AuthFrame';
 import { authStyles as styles } from './authStyles';
@@ -23,6 +24,7 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
   const { signInWithPassword, signInWithProvider } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [oauthSubmitting, setOauthSubmitting] = useState<OAuthSubmitting>(null);
@@ -66,10 +68,17 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
         testID="sign-in-password"
         label="Password"
         placeholder="Password"
-        secureTextEntry
+        secureTextEntry={!passwordVisible}
         autoComplete="password"
         value={password}
         onChangeText={setPassword}
+        rightAccessory={
+          <PasswordVisibilityToggle
+            testID="sign-in-password-toggle"
+            visible={passwordVisible}
+            onToggle={() => setPasswordVisible((v) => !v)}
+          />
+        }
       />
 
       {error ? (

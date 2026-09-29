@@ -51,7 +51,13 @@ export function BubbleMenu({ visible, onClose, children, testID }: Props) {
   const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} testID={testID}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      testID={testID}
+    >
       <Pressable
         testID={testID ? `${testID}-backdrop` : 'bubble-menu-backdrop'}
         style={styles.backdrop}
