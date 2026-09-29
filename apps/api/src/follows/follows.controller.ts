@@ -29,6 +29,15 @@ export class FollowsController {
     return this.followsService.listFollowing(user.id);
   }
 
+  // Pending requests + recently-accepted requests merged -- the bell's
+  // Activity section. `requests` above stays the full management list
+  // (Find People's Requests tab); this is the quick/recent view.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Get('notifications')
+  async notifications(@CurrentUser() user: AuthenticatedUser) {
+    return this.followsService.listNotifications(user.id);
+  }
+
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Post(':targetUserId')
   async sendRequest(

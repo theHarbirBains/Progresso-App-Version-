@@ -4,7 +4,7 @@ import { AppCard } from '../design/AppCard';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchFeedItems } from '../feed/feedQueries';
-import { fetchFriendsFeed, getMyProfile, listFollowRequests } from '../lib/api';
+import { fetchFriendsFeed, getMyProfile, listFollowNotifications } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { FeedScreen } from './FeedScreen';
@@ -16,7 +16,7 @@ jest.mock('../auth/AuthProvider', () => ({
 jest.mock('../lib/api', () => ({
   getMyProfile: jest.fn(),
   fetchFriendsFeed: jest.fn(),
-  listFollowRequests: jest.fn(),
+  listFollowNotifications: jest.fn(),
 }));
 
 jest.mock('../feed/feedQueries', () => ({
@@ -27,7 +27,7 @@ const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockFetchFeedItems = fetchFeedItems as jest.Mock;
 const mockFetchFriendsFeed = fetchFriendsFeed as jest.Mock;
-const mockListFollowRequests = listFollowRequests as jest.Mock;
+const mockListFollowNotifications = listFollowNotifications as jest.Mock;
 
 function feedPage(items: unknown[], hasMore = false) {
   return { items, hasMore };
@@ -135,7 +135,7 @@ beforeEach(() => {
   });
   mockFetchFeedItems.mockReset().mockResolvedValue(feedPage([]));
   mockFetchFriendsFeed.mockReset().mockResolvedValue(feedPage([]));
-  mockListFollowRequests.mockReset().mockResolvedValue([]);
+  mockListFollowNotifications.mockReset().mockResolvedValue([]);
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
 });
@@ -229,17 +229,18 @@ describe('FeedScreen', () => {
     expect(screen.queryByTestId('feed-notifications-badge')).toBeNull();
   });
 
-  it('badges the notifications bell with the pending follow request count, and opens Find People on tap', async () => {
-    mockListFollowRequests.mockResolvedValue([
-      { followId: 'f1', createdAt: '2026-01-01', user: { id: 'u2', username: 'a', displayName: null, avatarUrl: null } },
-      { followId: 'f2', createdAt: '2026-01-01', user: { id: 'u3', username: 'b', displayName: null, avatarUrl: null } },
+  it('badges the notifications bell with the pending request count (ignoring accepted items), and opens Notifications on tap', async () => {
+    mockListFollowNotifications.mockResolvedValue([
+      { kind: 'request', followId: 'f1', at: '2026-01-01', user: { id: 'u2', username: 'a', displayName: null, avatarUrl: null } },
+      { kind: 'request', followId: 'f2', at: '2026-01-01', user: { id: 'u3', username: 'b', displayName: null, avatarUrl: null } },
+      { kind: 'accepted', followId: 'f3', at: '2026-01-01', user: { id: 'u4', username: 'c', displayName: null, avatarUrl: null } },
     ]);
     renderScreen();
 
     expect(await screen.findByTestId('feed-notifications-badge')).toHaveTextContent('2');
 
     fireEvent.press(screen.getByTestId('feed-notifications'));
-    expect(mockNavigate).toHaveBeenCalledWith('FindPeople');
+    expect(mockNavigate).toHaveBeenCalledWith('Notifications');
   });
 
   it('opens the app-level side menu when the header button is pressed', async () => {

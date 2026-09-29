@@ -27,7 +27,13 @@ export interface FollowSearchResult {
   status: FollowStatus;
 }
 
+export type FollowNotification =
+  | { kind: 'request'; followId: string; user: FollowUserSummary; at: string }
+  | { kind: 'accepted'; followId: string; user: FollowUserSummary; at: string };
+
 const SEARCH_RESULT_LIMIT = 20;
+/** How far back an accepted request still counts as "recent" enough to notify about -- there's no read/unread tracking (no notifications table), so this window is what keeps the list from growing forever instead. */
+const RECENTLY_ACCEPTED_WINDOW_DAYS = 14;
 
 function toUserSummary(row: Record<string, unknown>): FollowUserSummary {
   return {
@@ -168,6 +174,61 @@ export class FollowsService {
       createdAt: r.created_at as string,
       user: users.get(r.follower_id as string) ?? {
         id: r.follower_id as string,
+        username: null,
+        displayName: null,
+        avatarUrl: null,
+      },
+    }));
+  }
+
+  /**
+   * Everything the notifications bell shows: incoming requests still
+   * awaiting a response, plus requests this user sent that were accepted
+   * within the last `RECENTLY_ACCEPTED_WINDOW_DAYS` days, merged and sorted
+   * newest first. Muscle-group staleness (the bell's other section) is
+   * computed entirely client-side from the user's own workout history --
+   * see apps/mobile/src/notifications -- since that's a same-user read with
+   * no cross-user trust concern, unlike everything here.
+   */
+  async listNotifications(userId: string): Promise<FollowNotification[]> {
+    const [pending, accepted] = await Promise.all([
+      this.listPendingRequests(userId),
+      this.listRecentlyAccepted(userId),
+    ]);
+
+    const items: FollowNotification[] = [
+      ...pending.map((r) => ({ kind: 'request' as const, followId: r.followId, user: r.user, at: r.createdAt })),
+      ...accepted.map((r) => ({ kind: 'accepted' as const, followId: r.followId, user: r.user, at: r.createdAt })),
+    ];
+    items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    return items;
+  }
+
+  private async listRecentlyAccepted(userId: string): Promise<FollowRequestSummary[]> {
+    const client = this.supabaseService.getClient();
+    const since = new Date(
+      Date.now() - RECENTLY_ACCEPTED_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const { data: rows, error } = await client
+      .from('follows')
+      .select('id, followee_id, responded_at')
+      .eq('follower_id', userId)
+      .eq('status', 'accepted')
+      .gte('responded_at', since)
+      .order('responded_at', { ascending: false });
+    if (error) throw new InternalServerErrorException('Failed to load recently accepted follows');
+    if (!rows || rows.length === 0) return [];
+
+    const users = await this.fetchUserSummaries(
+      client,
+      rows.map((r) => r.followee_id as string),
+    );
+    return rows.map((r) => ({
+      followId: r.id as string,
+      createdAt: r.responded_at as string,
+      user: users.get(r.followee_id as string) ?? {
+        id: r.followee_id as string,
         username: null,
         displayName: null,
         avatarUrl: null,

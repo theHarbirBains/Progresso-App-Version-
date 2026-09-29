@@ -16,7 +16,7 @@ import { StatBlock } from '../design/StatBlock';
 import { StatValue } from '../design/StatValue';
 import { colors } from '../design/theme';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
-import { fetchFriendsFeed, listFollowRequests, type FriendsFeedItem } from '../lib/api';
+import { fetchFriendsFeed, listFollowNotifications, type FriendsFeedItem } from '../lib/api';
 import { formatWeightKg } from '../lib/units';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -105,11 +105,12 @@ interface DisplayItem {
 // header's search icon, next to the menu button (AppHeader's leftAction2)
 // -- still also reachable from the app menu's SOCIAL section, same as every
 // other menu destination. The bell (rightAction2) is a real, working
-// notifications entry point, not a placeholder: it's badged with the
-// count of incoming follow requests and opens the same Find People screen
-// they're listed on -- there is no push/email delivery system to hang a
-// bigger notification center off yet (see CLAUDE.md), so this only ever
-// surfaces things the app can actually show, honestly.
+// notifications entry point, not a placeholder: it's badged with the count
+// of incoming follow requests and opens NotificationsScreen, which merges
+// real follow activity with training insights (stale muscle groups) -- see
+// that screen's own comment. There is no push/email delivery system (see
+// CLAUDE.md), so this only ever surfaces things the app can actually show,
+// honestly.
 export function FeedScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -132,9 +133,10 @@ export function FeedScreen({ navigation }: Props) {
   const [friendsError, setFriendsError] = useState<string | null>(null);
 
   // The header bell's badge -- incoming follow requests awaiting a
-  // response (see FindPeopleScreen). Not folded into the friends-feed
-  // error/loading state above: a failure here is silently a missing badge,
-  // never a reason to block the whole screen with an error.
+  // response (see NotificationsScreen, which the bell opens). Not folded
+  // into the friends-feed error/loading state above: a failure here is
+  // silently a missing badge, never a reason to block the whole screen
+  // with an error.
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
 
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
@@ -181,8 +183,8 @@ export function FeedScreen({ navigation }: Props) {
   const loadPendingRequestCount = useCallback(async () => {
     if (!accessToken) return;
     try {
-      const requests = await listFollowRequests(accessToken);
-      setPendingRequestCount(requests.length);
+      const notifications = await listFollowNotifications(accessToken);
+      setPendingRequestCount(notifications.filter((n) => n.kind === 'request').length);
     } catch {
       // A missing badge count isn't worth surfacing as a screen-level error.
     }
@@ -373,8 +375,8 @@ export function FeedScreen({ navigation }: Props) {
           }}
           rightAction2={{
             icon: 'bell',
-            onPress: () => navigation.navigate('FindPeople'),
-            accessibilityLabel: 'Follow requests',
+            onPress: () => navigation.navigate('Notifications'),
+            accessibilityLabel: 'Notifications',
             testID: 'feed-notifications',
             badgeCount: pendingRequestCount,
           }}

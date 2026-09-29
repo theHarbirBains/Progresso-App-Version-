@@ -81,10 +81,21 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-describe('FindPeopleScreen -- requests', () => {
-  it('shows an incoming follow request with Accept/Reject', async () => {
+describe('FindPeopleScreen -- requests tab', () => {
+  it('badges the Requests tab with the pending count', async () => {
     mockListFollowRequests.mockResolvedValue([janeRequest]);
     renderScreen();
+
+    expect(await screen.findByTestId('find-people-tab-requests')).toHaveTextContent(
+      'Requests (1)',
+    );
+  });
+
+  it('shows an incoming follow request with Accept/Reject once the tab is opened', async () => {
+    mockListFollowRequests.mockResolvedValue([janeRequest]);
+    renderScreen();
+    await screen.findByTestId('find-people-tab-requests');
+    fireEvent.press(screen.getByTestId('find-people-tab-requests'));
 
     const row = await screen.findByTestId('find-people-request-follow-1');
     expect(row).toHaveTextContent(/Jane Doe/);
@@ -95,6 +106,7 @@ describe('FindPeopleScreen -- requests', () => {
   it('accepting removes the request and calls the backend with "accept"', async () => {
     mockListFollowRequests.mockResolvedValue([janeRequest]);
     renderScreen();
+    fireEvent.press(screen.getByTestId('find-people-tab-requests'));
     await screen.findByTestId('find-people-request-follow-1');
 
     fireEvent.press(screen.getByTestId('find-people-request-follow-1-accept'));
@@ -109,6 +121,7 @@ describe('FindPeopleScreen -- requests', () => {
   it('rejecting removes the request and calls the backend with "reject"', async () => {
     mockListFollowRequests.mockResolvedValue([janeRequest]);
     renderScreen();
+    fireEvent.press(screen.getByTestId('find-people-tab-requests'));
     await screen.findByTestId('find-people-request-follow-1');
 
     fireEvent.press(screen.getByTestId('find-people-request-follow-1-reject'));
@@ -120,18 +133,17 @@ describe('FindPeopleScreen -- requests', () => {
     expect(screen.queryByTestId('find-people-request-follow-1')).toBeNull();
   });
 
-  it('shows nothing extra when there are no pending requests', async () => {
+  it('shows an honest empty state when there are no pending requests', async () => {
     renderScreen();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    fireEvent.press(screen.getByTestId('find-people-tab-requests'));
 
-    expect(screen.queryByTestId('find-people-requests-card')).toBeNull();
+    expect(await screen.findByTestId('find-people-requests-empty')).toBeTruthy();
   });
 
   it('shows an error state with a working retry when requests fail to load', async () => {
     mockListFollowRequests.mockRejectedValueOnce(new Error('network error'));
     renderScreen();
+    fireEvent.press(screen.getByTestId('find-people-tab-requests'));
 
     expect(await screen.findByTestId('find-people-requests-error')).toHaveTextContent(
       'network error',
@@ -242,10 +254,12 @@ describe('FindPeopleScreen -- misc', () => {
     mockListFollowRequests.mockResolvedValue([janeRequest]);
     mockSearchUsers.mockResolvedValue([bobResult]);
     renderScreen();
-    await screen.findByTestId('find-people-request-follow-1');
     await typeSearch('bob');
     await screen.findByTestId('find-people-result-user-3');
+    expectNoBareText();
 
+    fireEvent.press(screen.getByTestId('find-people-tab-requests'));
+    await screen.findByTestId('find-people-request-follow-1');
     expectNoBareText();
   });
 });

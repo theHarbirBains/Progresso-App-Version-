@@ -11,6 +11,7 @@ import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
+import { SegmentedControl } from '../design/SegmentedControl';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import {
@@ -27,6 +28,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { findPeopleStyles as styles } from './findPeopleStyles';
 
 type Props = RootStackScreenProps<'FindPeople'>;
+type FindPeopleTab = 'friends' | 'requests';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -39,20 +41,27 @@ function rowLabel(user: FollowUser): { title: string; subtitle: string | undefin
 
 /**
  * The entry point into Social v1 (see the follows/feed backend modules):
- * incoming follow requests to accept/reject, plus a search to find and
- * follow people. Reached from the app menu's SOCIAL section (see
- * appMenuSections.ts) rather than Feed's own header, since AppHeader only
- * has room for one right-side action and Feed's "+" quick-actions button
- * already owns that slot.
+ * a Friends tab to search and follow people, and a Requests tab to manage
+ * incoming follow requests -- two tabs, matching a familiar
+ * "search/follow" + "requests" split rather than one long scrolling mix of
+ * both. Reached from the app menu's SOCIAL section and Feed's own header
+ * search icon.
+ *
+ * The notifications bell (see NotificationsScreen) surfaces the same
+ * pending requests too, alongside recent acceptances -- that's the
+ * "what's new" quick view; this Requests tab is the full management list,
+ * same data, different framing.
  *
  * Following requires the other person's acceptance (see the follows
  * migration) -- there is no "search and immediately see their workouts"
- * path here; once accepted, their activity appears in Feed's Friends tab
- * instead.
+ * path here; once accepted, their activity appears in Feed's Friends
+ * section instead.
  */
 export function FindPeopleScreen({ navigation }: Props) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
+
+  const [tab, setTab] = useState<FindPeopleTab>('friends');
 
   const [requests, setRequests] = useState<FollowRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
@@ -213,105 +222,69 @@ export function FindPeopleScreen({ navigation }: Props) {
             onBack={() => navigation.goBack()}
             testID="find-people-header"
           />
-          <View style={styles.searchRow}>
-            <TextInput
-              testID="find-people-search-input"
-              placeholder="Search by name or username"
-              value={searchInput}
-              onChangeText={setSearchInput}
-              autoCapitalize="none"
-              leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
+          <View style={styles.tabWrap}>
+            <SegmentedControl
+              testID="find-people-tab"
+              options={[
+                { label: 'Friends', value: 'friends' },
+                {
+                  label: requests.length > 0 ? `Requests (${requests.length})` : 'Requests',
+                  value: 'requests',
+                },
+              ]}
+              value={tab}
+              onChange={setTab}
             />
           </View>
+          {tab === 'friends' ? (
+            <View style={styles.searchRow}>
+              <TextInput
+                testID="find-people-search-input"
+                placeholder="Search by name or username"
+                value={searchInput}
+                onChangeText={setSearchInput}
+                autoCapitalize="none"
+                leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
+              />
+            </View>
+          ) : null}
         </View>
       }
     >
-      {requestsLoading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator testID="find-people-requests-loading" size="large" color={colors.textPrimary} />
-        </View>
-      ) : requestsError ? (
-        <ErrorState testID="find-people-requests-error" message={requestsError} onRetry={loadRequests} />
-      ) : requests.length > 0 ? (
-        <AppCard testID="find-people-requests-card">
-          <SectionHeader label="Requests" />
-          {requests.map((request, index) => {
-            const { title, subtitle } = rowLabel(request.user);
-            const isPending = Boolean(pending[request.followId]);
-            return (
-              <ListRow
-                key={request.followId}
-                testID={`find-people-request-${request.followId}`}
-                divider={index > 0}
-                leading={
-                  <Avatar
-                    uri={request.user.avatarUrl}
-                    initial={title.charAt(0).toUpperCase()}
-                    size={40}
-                    iconSize={18}
-                    iconColor={colors.textSecondary}
-                  />
-                }
-                title={title}
-                subtitle={subtitle}
-                trailing={
-                  <View style={styles.requestActions}>
-                    <SecondaryButton
-                      testID={`find-people-request-${request.followId}-reject`}
-                      label="Reject"
-                      size="sm"
-                      loading={isPending}
-                      onPress={() => handleReject(request.followId)}
-                    />
-                    <PrimaryButton
-                      testID={`find-people-request-${request.followId}-accept`}
-                      label="Accept"
-                      size="sm"
-                      loading={isPending}
-                      onPress={() => handleAccept(request.followId)}
-                    />
-                  </View>
-                }
-              />
-            );
-          })}
-        </AppCard>
-      ) : null}
-
-      <AppCard testID="find-people-search-card">
-        {searchError ? (
-          <ErrorState
-            testID="find-people-search-error"
-            message={searchError}
-            onRetry={() => {
-              void runSearch();
-            }}
-          />
-        ) : searchLoading ? (
+      {tab === 'requests' ? (
+        requestsLoading ? (
           <View style={styles.loading}>
-            <ActivityIndicator testID="find-people-search-loading" size="large" color={colors.textPrimary} />
+            <ActivityIndicator
+              testID="find-people-requests-loading"
+              size="large"
+              color={colors.textPrimary}
+            />
           </View>
-        ) : search === '' ? (
-          <EmptyState
-            testID="find-people-empty-initial"
-            title="Search for someone to follow"
-            description="Their activity appears in your Friends feed once they accept."
+        ) : requestsError ? (
+          <ErrorState
+            testID="find-people-requests-error"
+            message={requestsError}
+            onRetry={loadRequests}
           />
-        ) : results.length === 0 ? (
-          <EmptyState testID="find-people-empty-results" title={`No one found for "${search}"`} />
+        ) : requests.length === 0 ? (
+          <EmptyState
+            testID="find-people-requests-empty"
+            title="No pending requests"
+            description="Follow requests you receive show up here."
+          />
         ) : (
-          <>
-            <SectionHeader label="Results" />
-            {results.map((result, index) => {
-              const { title, subtitle } = rowLabel(result.user);
+          <AppCard testID="find-people-requests-card">
+            {requests.map((request, index) => {
+              const { title, subtitle } = rowLabel(request.user);
+              const isPending = Boolean(pending[request.followId]);
               return (
                 <ListRow
-                  key={result.user.id}
-                  testID={`find-people-result-${result.user.id}`}
+                  key={request.followId}
+                  testID={`find-people-request-${request.followId}`}
                   divider={index > 0}
                   leading={
                     <Avatar
-                      uri={result.user.avatarUrl}
+                      uri={request.user.avatarUrl}
                       initial={title.charAt(0).toUpperCase()}
                       size={40}
                       iconSize={18}
@@ -320,13 +293,84 @@ export function FindPeopleScreen({ navigation }: Props) {
                   }
                   title={title}
                   subtitle={subtitle}
-                  trailing={renderSearchResultTrailing(result)}
+                  trailing={
+                    <View style={styles.requestActions}>
+                      <SecondaryButton
+                        testID={`find-people-request-${request.followId}-reject`}
+                        label="Reject"
+                        size="sm"
+                        loading={isPending}
+                        onPress={() => handleReject(request.followId)}
+                      />
+                      <PrimaryButton
+                        testID={`find-people-request-${request.followId}-accept`}
+                        label="Accept"
+                        size="sm"
+                        loading={isPending}
+                        onPress={() => handleAccept(request.followId)}
+                      />
+                    </View>
+                  }
                 />
               );
             })}
-          </>
-        )}
-      </AppCard>
+          </AppCard>
+        )
+      ) : (
+        <AppCard testID="find-people-search-card">
+          {searchError ? (
+            <ErrorState
+              testID="find-people-search-error"
+              message={searchError}
+              onRetry={() => {
+                void runSearch();
+              }}
+            />
+          ) : searchLoading ? (
+            <View style={styles.loading}>
+              <ActivityIndicator
+                testID="find-people-search-loading"
+                size="large"
+                color={colors.textPrimary}
+              />
+            </View>
+          ) : search === '' ? (
+            <EmptyState
+              testID="find-people-empty-initial"
+              title="Search for someone to follow"
+              description="Their activity appears in your Friends feed once they accept."
+            />
+          ) : results.length === 0 ? (
+            <EmptyState testID="find-people-empty-results" title={`No one found for "${search}"`} />
+          ) : (
+            <>
+              <SectionHeader label="Results" />
+              {results.map((result, index) => {
+                const { title, subtitle } = rowLabel(result.user);
+                return (
+                  <ListRow
+                    key={result.user.id}
+                    testID={`find-people-result-${result.user.id}`}
+                    divider={index > 0}
+                    leading={
+                      <Avatar
+                        uri={result.user.avatarUrl}
+                        initial={title.charAt(0).toUpperCase()}
+                        size={40}
+                        iconSize={18}
+                        iconColor={colors.textSecondary}
+                      />
+                    }
+                    title={title}
+                    subtitle={subtitle}
+                    trailing={renderSearchResultTrailing(result)}
+                  />
+                );
+              })}
+            </>
+          )}
+        </AppCard>
+      )}
     </Screen>
   );
 }

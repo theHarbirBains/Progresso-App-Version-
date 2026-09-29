@@ -18,6 +18,7 @@ const CHAIN_METHODS = [
   'in',
   'ilike',
   'neq',
+  'gte',
   'order',
   'limit',
   'insert',
@@ -249,6 +250,55 @@ describe('FollowsService', () => {
       await expect(service.search('user-1', 'harb')).rejects.toBeInstanceOf(
         InternalServerErrorException,
       );
+    });
+  });
+
+  describe('listNotifications', () => {
+    it('merges pending requests and recently-accepted follows, newest first', async () => {
+      const client = createMockClient();
+      client.queue('follows', {
+        data: [{ id: 'follow-1', follower_id: 'user-2', created_at: '2026-01-01T00:00:00Z' }],
+        error: null,
+      });
+      client.queue('follows', {
+        data: [{ id: 'follow-2', followee_id: 'user-3', responded_at: '2026-01-05T00:00:00Z' }],
+        error: null,
+      });
+      client.queue('users', {
+        data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
+        error: null,
+      });
+      client.queue('users', {
+        data: [{ id: 'user-3', username: 'bob', display_name: 'Bob', avatar_url: null }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const result = await service.listNotifications('user-1');
+
+      expect(result).toEqual([
+        {
+          kind: 'accepted',
+          followId: 'follow-2',
+          at: '2026-01-05T00:00:00Z',
+          user: { id: 'user-3', username: 'bob', displayName: 'Bob', avatarUrl: null },
+        },
+        {
+          kind: 'request',
+          followId: 'follow-1',
+          at: '2026-01-01T00:00:00Z',
+          user: { id: 'user-2', username: 'jane', displayName: 'Jane', avatarUrl: null },
+        },
+      ]);
+    });
+
+    it('returns an empty list when there is nothing pending or recently accepted', async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [], error: null });
+      client.queue('follows', { data: [], error: null });
+      const service = serviceWith(client);
+
+      await expect(service.listNotifications('user-1')).resolves.toEqual([]);
     });
   });
 

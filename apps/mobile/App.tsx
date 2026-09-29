@@ -47,6 +47,7 @@ import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { LaunchScreen } from './src/screens/LaunchScreen';
 import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
+import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { NutritionColorScreen } from './src/screens/NutritionColorScreen';
 import { NutritionGoalsScreen } from './src/screens/NutritionGoalsScreen';
 import { NutritionHistoryScreen } from './src/screens/NutritionHistoryScreen';
@@ -280,6 +281,7 @@ function Root() {
                 <Stack.Screen name="ChooseWorkoutSplit" component={ChooseWorkoutSplitScreen} />
                 <Stack.Screen name="Profile" component={ProfileScreen} />
                 <Stack.Screen name="FindPeople" component={FindPeopleScreen} />
+                <Stack.Screen name="Notifications" component={NotificationsScreen} />
               </Stack.Navigator>
             </NavigationContainer>
           </View>

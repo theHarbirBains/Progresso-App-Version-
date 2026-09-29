@@ -36,6 +36,7 @@ export type RootStackParamList = {
   ChooseWorkoutSplit: undefined;
   Profile: undefined;
   FindPeople: undefined;
+  Notifications: undefined;
 };
 
 export type RootStackScreenProps<Screen extends keyof RootStackParamList> = NativeStackScreenProps<
