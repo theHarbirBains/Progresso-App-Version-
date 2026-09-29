@@ -3,7 +3,6 @@ import { Animated, Modal, Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
-import { GlassBackground } from './GlassBackground';
 import { Text } from './Text';
 import { colors, fonts, minTouchTarget, spacing, typeScale, radii } from './theme';
 
@@ -76,7 +75,6 @@ export function BubbleMenu({ visible, onClose, children, testID }: Props) {
             style={styles.content}
             onPress={(event) => event?.stopPropagation?.()}
           >
-            <GlassBackground variant="chrome" bordered={false} />
             {children}
           </Pressable>
         </Animated.View>
@@ -138,6 +136,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: spacing.xxl,
     minWidth: 220,
+    // Flat solid black, not the glass tint+blur every other surface (cards,
+    // BottomSheet, AppSideMenu) uses -- explicit call, since the blur's own
+    // translucency read as two competing shades against the dimmed backdrop
+    // behind it rather than one clean surface.
+    backgroundColor: colors.background,
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.glassBorderStrong,
