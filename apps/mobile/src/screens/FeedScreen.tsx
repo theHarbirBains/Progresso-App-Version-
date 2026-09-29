@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
-import { BottomSheet } from '../design/BottomSheet';
+import { BubbleMenu } from '../design/BubbleMenu';
 import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
@@ -92,7 +92,7 @@ interface DisplayItem {
 // sizing) beside its name and calorie readout, then all three macros
 // (Protein/Carbs/Fat), not just Protein.
 //
-// The header's "+" mirrors Strava's own top-bar button: a shortcut sheet
+// The header's "+" mirrors Strava's own top-bar button: a shortcut menu
 // (Start Workout / Log Food) to the same destinations Train's and
 // Nutrition's own primary buttons already open. It's an addition, not a
 // replacement -- those tab-root buttons are still how starting a workout or
@@ -110,7 +110,10 @@ interface DisplayItem {
 // real follow activity with training insights (stale muscle groups) -- see
 // that screen's own comment. There is no push/email delivery system (see
 // CLAUDE.md), so this only ever surfaces things the app can actually show,
-// honestly.
+// honestly. The "+" menu itself opens via `BubbleMenu` (design/BubbleMenu.tsx)
+// rather than `BottomSheet` -- it grows out from the "+" button itself
+// instead of sliding up from the bottom edge, a deliberate different
+// entrance for a button-triggered menu vs. a full sheet of content.
 export function FeedScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -383,7 +386,7 @@ export function FeedScreen({ navigation }: Props) {
         />
       }
     >
-      <BottomSheet
+      <BubbleMenu
         testID="feed-quick-actions-sheet"
         visible={quickActionsOpen}
         onClose={() => setQuickActionsOpen(false)}
@@ -408,7 +411,7 @@ export function FeedScreen({ navigation }: Props) {
             navigation.navigate('FoodLibrary');
           }}
         />
-      </BottomSheet>
+      </BubbleMenu>
 
       {blockingError ? (
         <ErrorState testID="feed-error" message={blockingError} onRetry={retryAll} />
