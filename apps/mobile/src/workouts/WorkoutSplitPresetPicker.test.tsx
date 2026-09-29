@@ -91,6 +91,37 @@ describe('WorkoutSplitPresetPicker', () => {
     expect(onCreateOwn).toHaveBeenCalled();
   });
 
+  it('shows no helper caption under Create Custom Split by default', () => {
+    render(
+      <WorkoutSplitPresetPicker
+        testID="picker"
+        userId="user-1"
+        theme={DEFAULT_WORKOUT_THEME}
+        onPresetActivated={jest.fn()}
+        onCreateOwn={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId('picker-create-own-helper')).toBeNull();
+  });
+
+  it('shows a helper caption under Create Custom Split when given one', () => {
+    render(
+      <WorkoutSplitPresetPicker
+        testID="picker"
+        userId="user-1"
+        theme={DEFAULT_WORKOUT_THEME}
+        onPresetActivated={jest.fn()}
+        onCreateOwn={jest.fn()}
+        createOwnHelperText="You'll build this right after your account is created"
+      />,
+    );
+
+    expect(screen.getByTestId('picker-create-own-helper')).toHaveTextContent(
+      "You'll build this right after your account is created",
+    );
+  });
+
   it('shows a concise day-name chip per day instead of the full structured muscle-group list', () => {
     render(
       <WorkoutSplitPresetPicker

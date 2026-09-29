@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { updateMyProfile } from '../lib/api';
+import { STEP_ORDER } from '../onboarding/onboardingDraft';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { OnboardingScreen } from './OnboardingScreen';
 
@@ -291,6 +292,77 @@ describe('OnboardingScreen', () => {
 
     fireEvent.press(screen.getByTestId('onboarding-create-account-back-to-sign-in'));
     expect(mockSwitchToSignIn).toHaveBeenCalled();
+    await settle();
+  });
+
+  it('lets the user choose "Create Your Own" instead of a preset, and skips materializing a split', async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: STEP_ORDER.indexOf('workoutSplit'),
+        draft: {
+          referralSource: 'tiktok',
+          country: 'CA',
+          gender: 'male',
+          birthday: '2000-06-15',
+          weightValue: 80,
+          weightUnit: 'kg',
+          heightValue: 180,
+          heightUnit: 'cm',
+          fitnessGoal: 'build_muscle',
+          trainingExperience: 'intermediate',
+          workoutFrequencyDays: 4,
+          averageWorkoutLength: '45_60',
+          trainingStylePreference: 'guided',
+        },
+      }),
+    );
+
+    renderScreen();
+    await screen.findByTestId('onboarding-step-workout-split');
+
+    fireEvent.press(screen.getByTestId('onboarding-step-workout-split-create-own'));
+
+    expect(await screen.findByTestId('onboarding-step-apple-health')).toBeTruthy();
+    const stored = await AsyncStorage.getItem('@progresso/onboardingDraft');
+    const draft = JSON.parse(stored as string).draft;
+    expect(draft.wantsCustomSplit).toBe(true);
+    expect(draft.selectedSplitPresetId).toBeNull();
+
+    fireEvent.press(screen.getByTestId('onboarding-step-apple-health-skip'));
+    await screen.findByTestId('onboarding-step-email-preference');
+    fireEvent.press(screen.getByTestId('onboarding-email-yes'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+    await screen.findByTestId('onboarding-step-push-notifications');
+    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
+
+    await screen.findByTestId('onboarding-step-create-account');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-display-name'),
+      'Harbir Bains',
+    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-email'),
+      'harbir@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-confirm-password'),
+      'password123',
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-create-account-submit'));
+    });
+
+    expect(mockMaterialize).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(mockUpdateMyProfile).toHaveBeenCalledWith(
+        'token-123',
+        expect.not.objectContaining({ activeWorkoutSplitId: expect.anything() }),
+      ),
+    );
     await settle();
   });
 

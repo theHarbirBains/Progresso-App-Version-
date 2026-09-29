@@ -42,6 +42,15 @@ export interface OnboardingDraft {
    * user-owned split row (that needs a real user id, so it only happens
    * inside submitOnboardingDraft, after the account exists). */
   selectedSplitPresetId: string | null;
+  /** Set when the user picks "Create Your Own" instead of a preset --
+   * building a real custom split (naming days, adding exercises) needs a
+   * real account the same way materializing a preset does, so this only
+   * records the intent. submitOnboardingDraft does nothing with it: with no
+   * selectedSplitPresetId, the new profile simply has no active split yet,
+   * the same already-supported state NewWorkoutScreen's own "no active
+   * split" gate sends a user to ChooseWorkoutSplitScreen's real, working
+   * "Create Custom Split" from -- no separate post-signup routing needed. */
+  wantsCustomSplit: boolean;
   appleHealthPreference: AppleHealthPreference | null;
   emailOptIn: boolean | null;
   pushNotificationsOptIn: boolean | null;
@@ -78,6 +87,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   averageWorkoutLength: null,
   trainingStylePreference: null,
   selectedSplitPresetId: null,
+  wantsCustomSplit: false,
   appleHealthPreference: null,
   emailOptIn: null,
   pushNotificationsOptIn: null,
@@ -140,7 +150,7 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
     case 'trainingStyle':
       return draft.trainingStylePreference != null;
     case 'workoutSplit':
-      return draft.selectedSplitPresetId != null;
+      return draft.selectedSplitPresetId != null || draft.wantsCustomSplit;
     case 'appleHealth':
       return draft.appleHealthPreference != null;
     case 'emailPreference':

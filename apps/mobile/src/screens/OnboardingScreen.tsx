@@ -452,20 +452,28 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
           <>
             <Text style={styles.stepTitle}>Choose your workout split</Text>
             {/* select-only: no account exists yet to own a real split
-                against, so this only records which preset was chosen --
-                see submitOnboardingDraft, which materializes it for real
-                once the account does exist. "Create Custom Split" needs a
-                real account too, so it isn't offered here (onCreateOwn
-                omitted) -- still available any time after onboarding, from
-                Workout Splits. */}
+                against, so picking a preset only records which one was
+                chosen -- see submitOnboardingDraft, which materializes it
+                for real once the account does exist. "Create Custom Split"
+                can't actually build one here for the same reason, so it
+                just records the intent (wantsCustomSplit) and moves on;
+                with no active split set afterward, NewWorkoutScreen's
+                existing "no active split" gate gets them to a real, working
+                custom-split builder the first time they go to start a
+                workout. */}
             <WorkoutSplitPresetPicker
               testID="onboarding-step-workout-split"
               theme={DEFAULT_WORKOUT_THEME}
               materializeImmediately={false}
               onPresetActivated={(presetId) => {
-                updateDraft({ selectedSplitPresetId: presetId });
+                updateDraft({ selectedSplitPresetId: presetId, wantsCustomSplit: false });
                 advance();
               }}
+              onCreateOwn={() => {
+                updateDraft({ selectedSplitPresetId: null, wantsCustomSplit: true });
+                advance();
+              }}
+              createOwnHelperText="You'll build this right after your account is created"
             />
           </>
         ) : null}

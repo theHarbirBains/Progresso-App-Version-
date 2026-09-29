@@ -75,6 +75,16 @@ describe('isStepAnswered / computeStartStepIndex', () => {
     expect(computeStartStepIndex(draft)).toBe(STEP_ORDER.indexOf('fitnessGoal'));
   });
 
+  it('treats workoutSplit as answered when the user chose to create their own instead of a preset', () => {
+    const draft: OnboardingDraft = {
+      ...EMPTY_DRAFT,
+      selectedSplitPresetId: null,
+      wantsCustomSplit: true,
+    };
+
+    expect(isStepAnswered('workoutSplit', draft)).toBe(true);
+  });
+
   it('createAccount is never "answered" -- it is always the resume target once every question is done', () => {
     expect(isStepAnswered('createAccount', FULL_DRAFT)).toBe(false);
     expect(computeStartStepIndex(FULL_DRAFT)).toBe(STEP_ORDER.indexOf('createAccount'));

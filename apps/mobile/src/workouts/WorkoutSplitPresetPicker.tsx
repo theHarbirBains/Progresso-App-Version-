@@ -23,6 +23,8 @@ interface Props {
   onPresetActivated: (id: string) => void;
   /** Omit to hide "Create Custom Split" entirely -- see materializeImmediately. */
   onCreateOwn?: () => void;
+  /** A small muted caption under the "Create Custom Split" button -- e.g. onboarding's own "after your account is created", since the button itself can't build a real split yet in select-only mode. Ignored when onCreateOwn is omitted. */
+  createOwnHelperText?: string;
   /** Default true: pressing a preset immediately creates a real, user-owned
    * split (the existing behavior -- ChooseWorkoutSplitScreen). false: just
    * reports the preset's id locally, no network call and no userId needed
@@ -50,6 +52,7 @@ export function WorkoutSplitPresetPicker({
   theme,
   onPresetActivated,
   onCreateOwn,
+  createOwnHelperText,
   materializeImmediately = true,
 }: Props) {
   const [busyPresetId, setBusyPresetId] = useState<string | null>(null);
@@ -137,18 +140,25 @@ export function WorkoutSplitPresetPicker({
       </View>
 
       {onCreateOwn ? (
-        <TouchableOpacity
-          testID={`${testID}-create-own`}
-          style={[styles.createSplitButton, { backgroundColor: theme.accent }]}
-          onPress={onCreateOwn}
-          accessibilityRole="button"
-          accessibilityLabel="Create Custom Split"
-        >
-          <Feather name="edit-2" size={18} color={theme.onAccent} />
-          <Text style={[styles.createSplitButtonText, { color: theme.onAccent }]}>
-            Create Custom Split
-          </Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity
+            testID={`${testID}-create-own`}
+            style={[styles.createSplitButton, { backgroundColor: theme.accent }]}
+            onPress={onCreateOwn}
+            accessibilityRole="button"
+            accessibilityLabel="Create Custom Split"
+          >
+            <Feather name="edit-2" size={18} color={theme.onAccent} />
+            <Text style={[styles.createSplitButtonText, { color: theme.onAccent }]}>
+              Create Custom Split
+            </Text>
+          </TouchableOpacity>
+          {createOwnHelperText ? (
+            <Text testID={`${testID}-create-own-helper`} style={styles.createOwnHelperText}>
+              {createOwnHelperText}
+            </Text>
+          ) : null}
+        </>
       ) : null}
     </View>
   );

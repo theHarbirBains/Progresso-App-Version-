@@ -60,4 +60,10 @@ export const workoutSplitPresetPickerStyles = StyleSheet.create({
     ...typeScale.cardTitle,
     fontFamily: 'Manrope_700Bold',
   },
+  createOwnHelperText: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
 });
