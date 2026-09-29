@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { Share } from 'react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import {
   listFollowRequests,
+  listSuggestedUsers,
   respondToFollowRequest,
   searchUsers,
   sendFollowRequest,
@@ -16,6 +18,7 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../lib/api', () => ({
   listFollowRequests: jest.fn(),
+  listSuggestedUsers: jest.fn(),
   respondToFollowRequest: jest.fn(),
   searchUsers: jest.fn(),
   sendFollowRequest: jest.fn(),
@@ -24,6 +27,7 @@ jest.mock('../lib/api', () => ({
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockListFollowRequests = listFollowRequests as jest.Mock;
+const mockListSuggestedUsers = listSuggestedUsers as jest.Mock;
 const mockRespondToFollowRequest = respondToFollowRequest as jest.Mock;
 const mockSearchUsers = searchUsers as jest.Mock;
 const mockSendFollowRequest = sendFollowRequest as jest.Mock;
@@ -70,6 +74,7 @@ beforeEach(() => {
     session: { access_token: 'token-123' },
   });
   mockListFollowRequests.mockReset().mockResolvedValue([]);
+  mockListSuggestedUsers.mockReset().mockResolvedValue([]);
   mockRespondToFollowRequest.mockReset().mockResolvedValue({ success: true });
   mockSearchUsers.mockReset().mockResolvedValue([]);
   mockSendFollowRequest.mockReset().mockResolvedValue({ status: 'pending' });
@@ -87,7 +92,7 @@ describe('FindPeopleScreen -- requests tab', () => {
     renderScreen();
 
     expect(await screen.findByTestId('find-people-tab-requests')).toHaveTextContent(
-      'Requests (1)',
+      /Requests \(1\)/,
     );
   });
 
@@ -156,14 +161,79 @@ describe('FindPeopleScreen -- requests tab', () => {
   });
 });
 
+describe('FindPeopleScreen -- Suggested/Contacts (shown when search is empty)', () => {
+  it('defaults to the Suggested sub-tab and shows real suggested people, no search performed', async () => {
+    mockListSuggestedUsers.mockResolvedValue([bobResult]);
+    renderScreen();
+
+    expect(await screen.findByTestId('find-people-suggested-user-3')).toHaveTextContent(
+      /Bob Smith/,
+    );
+    expect(mockSearchUsers).not.toHaveBeenCalled();
+  });
+
+  it('shows a Follow button on a suggested row, independent of the search-results list', async () => {
+    mockListSuggestedUsers.mockResolvedValue([bobResult]);
+    mockSendFollowRequest.mockResolvedValue({ status: 'pending' });
+    renderScreen();
+    await screen.findByTestId('find-people-suggested-user-3-follow');
+
+    fireEvent.press(screen.getByTestId('find-people-suggested-user-3-follow'));
+
+    expect(mockSendFollowRequest).toHaveBeenCalledWith('token-123', 'user-3');
+    expect(await screen.findByTestId('find-people-suggested-user-3-requested')).toBeTruthy();
+  });
+
+  it('shows an empty state when there is nothing to suggest', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('find-people-suggested-empty')).toBeTruthy();
+  });
+
+  it('shows an error state with a working retry for suggested people', async () => {
+    mockListSuggestedUsers.mockRejectedValueOnce(new Error('network error'));
+    renderScreen();
+
+    expect(await screen.findByTestId('find-people-suggested-error')).toHaveTextContent(
+      'network error',
+    );
+
+    mockListSuggestedUsers.mockResolvedValue([bobResult]);
+    fireEvent.press(screen.getByTestId('find-people-suggested-error-retry'));
+
+    expect(await screen.findByTestId('find-people-suggested-user-3')).toBeTruthy();
+  });
+
+  it('shows Contacts as an honest Coming Soon row, not a broken tap', async () => {
+    renderScreen();
+    await screen.findByTestId('find-people-suggested-empty');
+
+    fireEvent.press(screen.getByTestId('find-people-subtab-contacts'));
+
+    expect(await screen.findByTestId('find-people-contacts-coming-soon-badge')).toHaveTextContent(
+      /Coming Soon/,
+    );
+  });
+
+  it('invites via the OS share sheet', async () => {
+    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    renderScreen();
+    await screen.findByTestId('find-people-invite');
+
+    fireEvent.press(screen.getByTestId('find-people-invite'));
+
+    expect(shareSpy).toHaveBeenCalledWith({ message: expect.stringContaining('Progresso') });
+    shareSpy.mockRestore();
+  });
+});
+
 describe('FindPeopleScreen -- search', () => {
-  it('shows an initial prompt before anything has been searched', async () => {
+  it('does not search before anything has been typed', async () => {
     renderScreen();
     await act(async () => {
       await Promise.resolve();
     });
 
-    expect(screen.getByTestId('find-people-empty-initial')).toBeTruthy();
     expect(mockSearchUsers).not.toHaveBeenCalled();
   });
 

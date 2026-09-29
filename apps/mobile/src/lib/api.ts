@@ -322,6 +322,11 @@ export function listFollowRequests(accessToken: string): Promise<FollowRequest[]
   return request<FollowRequest[]>('/api/v1/follows/requests', accessToken);
 }
 
+/** "N athletes to follow" -- see FollowsService.listSuggested. Recency-ranked, not a fabricated "you may know" algorithm. */
+export function listSuggestedUsers(accessToken: string): Promise<FollowSearchResult[]> {
+  return request<FollowSearchResult[]>('/api/v1/follows/suggested', accessToken);
+}
+
 export function listFollowing(accessToken: string): Promise<FollowUser[]> {
   return request<FollowUser[]>('/api/v1/follows/following', accessToken);
 }

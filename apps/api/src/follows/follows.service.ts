@@ -32,6 +32,7 @@ export type FollowNotification =
   | { kind: 'accepted'; followId: string; user: FollowUserSummary; at: string };
 
 const SEARCH_RESULT_LIMIT = 20;
+const SUGGESTED_LIMIT = 20;
 /** How far back an accepted request still counts as "recent" enough to notify about -- there's no read/unread tracking (no notifications table), so this window is what keeps the list from growing forever instead. */
 const RECENTLY_ACCEPTED_WINDOW_DAYS = 14;
 
@@ -319,6 +320,45 @@ export class FollowsService {
       user: toUserSummary(row),
       status: statusByUserId.get(row.id as string) ?? 'none',
     }));
+  }
+
+  /**
+   * "N athletes to follow" -- other users you have no existing follow row
+   * toward at all (never followed, never requested), most-recently-joined
+   * first. There's no mutual-connections graph to rank by yet, so recency
+   * is the one honest signal available -- not a fabricated "you may know"
+   * algorithm.
+   */
+  async listSuggested(userId: string): Promise<FollowSearchResult[]> {
+    const client = this.supabaseService.getClient();
+
+    const { data: existingRows, error: existingError } = await client
+      .from('follows')
+      .select('followee_id')
+      .eq('follower_id', userId);
+    if (existingError) throw new InternalServerErrorException('Failed to load suggested users');
+    const excluded = new Set((existingRows ?? []).map((r) => r.followee_id as string));
+
+    // Overfetch by the excluded count and filter in-memory rather than a
+    // PostgREST .not('id', 'in', ...) filter -- simpler and avoids that
+    // filter's fragile parenthesized-list string format for a set that's
+    // typically small anyway.
+    const { data, error } = await client
+      .from('users')
+      .select('id, username, display_name, avatar_url')
+      .neq('id', userId)
+      .order('created_at', { ascending: false })
+      .limit(SUGGESTED_LIMIT + excluded.size);
+    if (error) throw new InternalServerErrorException('Failed to load suggested users');
+
+    const results = (data ?? [])
+      .filter((row) => !excluded.has(row.id as string))
+      .slice(0, SUGGESTED_LIMIT);
+
+    // By construction every result here has no existing follow row from
+    // this user, so the status is always 'none' -- no second query needed
+    // (unlike search(), which can't assume that).
+    return results.map((row) => ({ user: toUserSummary(row), status: 'none' as const }));
   }
 
   /** Batch-fetches public profile fields for a list of user ids -- shared with FeedService, which annotates friends'-feed items with their author's name/avatar the same way. */

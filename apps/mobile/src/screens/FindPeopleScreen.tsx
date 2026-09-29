@@ -1,21 +1,30 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from 'react';
+import { ActivityIndicator, Share, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
+import { Badge } from '../design/Badge';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
-import { SegmentedControl } from '../design/SegmentedControl';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
+import { UnderlineTabs } from '../design/UnderlineTabs';
 import {
   listFollowRequests,
+  listSuggestedUsers,
   respondToFollowRequest,
   searchUsers,
   sendFollowRequest,
@@ -29,8 +38,10 @@ import { findPeopleStyles as styles } from './findPeopleStyles';
 
 type Props = RootStackScreenProps<'FindPeople'>;
 type FindPeopleTab = 'friends' | 'requests';
+type FriendsSubTab = 'suggested' | 'contacts';
 
 const SEARCH_DEBOUNCE_MS = 300;
+const INVITE_MESSAGE = 'Join me on Progresso — track your workouts and nutrition.';
 
 function rowLabel(user: FollowUser): { title: string; subtitle: string | undefined } {
   if (user.displayName) {
@@ -40,32 +51,40 @@ function rowLabel(user: FollowUser): { title: string; subtitle: string | undefin
 }
 
 /**
- * The entry point into Social v1 (see the follows/feed backend modules):
- * a Friends tab to search and follow people, and a Requests tab to manage
- * incoming follow requests -- two tabs, matching a familiar
- * "search/follow" + "requests" split rather than one long scrolling mix of
- * both. Reached from the app menu's SOCIAL section and Feed's own header
- * search icon.
+ * The entry point into Social v1 (see the follows/feed backend modules) --
+ * structured after a familiar "search for friends" pattern (tabs up top,
+ * a search field, a browsable default list below it) rather than one long
+ * scrolling mix of everything, while staying strictly within Progresso's
+ * own dark/monochrome theme and component set (AppCard/ListRow/Button),
+ * never the source app's own colors.
  *
- * The notifications bell (see NotificationsScreen) surfaces the same
- * pending requests too, alongside recent acceptances -- that's the
- * "what's new" quick view; this Requests tab is the full management list,
- * same data, different framing.
+ * Friends tab: search when typing; when empty, a Suggested/Contacts
+ * sub-row. Suggested is real (recency-ranked users you have no existing
+ * follow row toward -- see FollowsService.listSuggested); Contacts is
+ * visibly present but honestly "Coming Soon" -- it would need a phone
+ * number field and device-contacts permission that don't exist yet, so a
+ * working tab here isn't a small addition, and a silently-broken one
+ * would violate CLAUDE.md's placeholder rules.
  *
- * Following requires the other person's acceptance (see the follows
- * migration) -- there is no "search and immediately see their workouts"
- * path here; once accepted, their activity appears in Feed's Friends
- * section instead.
+ * Requests tab: the full follow-request management list. The
+ * notifications bell (NotificationsScreen) surfaces the same pending
+ * requests too, alongside recent acceptances -- that's the quick/recent
+ * view; this is the full list, same underlying data.
  */
 export function FindPeopleScreen({ navigation }: Props) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
 
   const [tab, setTab] = useState<FindPeopleTab>('friends');
+  const [friendsSubTab, setFriendsSubTab] = useState<FriendsSubTab>('suggested');
 
   const [requests, setRequests] = useState<FollowRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestsError, setRequestsError] = useState<string | null>(null);
+
+  const [suggested, setSuggested] = useState<FollowSearchResult[]>([]);
+  const [suggestedLoading, setSuggestedLoading] = useState(true);
+  const [suggestedError, setSuggestedError] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -73,9 +92,9 @@ export function FindPeopleScreen({ navigation }: Props) {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Keyed by followId (requests) or user id (search results) -- disables
-  // just the one row's button(s) while its action is in flight, rather than
-  // freezing the whole screen.
+  // Keyed by followId (requests) or user id (search/suggested results) --
+  // disables just the one row's button(s) while its action is in flight,
+  // rather than freezing the whole screen.
   const [pending, setPending] = useState<Record<string, boolean>>({});
 
   const loadRequests = useCallback(async () => {
@@ -91,10 +110,26 @@ export function FindPeopleScreen({ navigation }: Props) {
     }
   }, [accessToken]);
 
+  const loadSuggested = useCallback(async () => {
+    if (!accessToken) return;
+    setSuggestedLoading(true);
+    setSuggestedError(null);
+    try {
+      setSuggested(await listSuggestedUsers(accessToken));
+    } catch (err) {
+      setSuggestedError(err instanceof Error ? err.message : 'Failed to load suggested people');
+    } finally {
+      setSuggestedLoading(false);
+    }
+  }, [accessToken]);
+
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', loadRequests);
+    const unsubscribe = navigation.addListener('focus', () => {
+      void loadRequests();
+      void loadSuggested();
+    });
     return unsubscribe;
-  }, [navigation, loadRequests]);
+  }, [navigation, loadRequests, loadSuggested]);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
@@ -147,14 +182,22 @@ export function FindPeopleScreen({ navigation }: Props) {
     }
   }
 
-  async function handleFollow(userId: string) {
+  // Shared by the search-results list and the suggested-people list -- both
+  // are the same FollowSearchResult shape and Follow/Requested/Following
+  // lifecycle, just different data sources, so a follow/unfollow updates
+  // whichever list the row actually came from.
+  async function follow(
+    userId: string,
+    setList: Dispatch<SetStateAction<FollowSearchResult[]>>,
+    setError: Dispatch<SetStateAction<string | null>>,
+  ) {
     if (!accessToken) return;
     setPending((p) => ({ ...p, [userId]: true }));
     try {
       const { status } = await sendFollowRequest(accessToken, userId);
-      setResults((prev) => prev.map((r) => (r.user.id === userId ? { ...r, status } : r)));
+      setList((prev) => prev.map((r) => (r.user.id === userId ? { ...r, status } : r)));
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : 'Failed to send follow request');
+      setError(err instanceof Error ? err.message : 'Failed to send follow request');
     } finally {
       setPending((p) => ({ ...p, [userId]: false }));
     }
@@ -162,52 +205,90 @@ export function FindPeopleScreen({ navigation }: Props) {
 
   // Also cancels a still-pending outgoing request -- unfollow() removes the
   // follow row regardless of its status (see FollowsService.unfollow).
-  async function handleUnfollow(userId: string) {
+  async function unfollow(
+    userId: string,
+    setList: Dispatch<SetStateAction<FollowSearchResult[]>>,
+    setError: Dispatch<SetStateAction<string | null>>,
+  ) {
     if (!accessToken) return;
     setPending((p) => ({ ...p, [userId]: true }));
     try {
       await unfollowUser(accessToken, userId);
-      setResults((prev) =>
-        prev.map((r) => (r.user.id === userId ? { ...r, status: 'none' } : r)),
-      );
+      setList((prev) => prev.map((r) => (r.user.id === userId ? { ...r, status: 'none' } : r)));
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : 'Failed to unfollow');
+      setError(err instanceof Error ? err.message : 'Failed to unfollow');
     } finally {
       setPending((p) => ({ ...p, [userId]: false }));
     }
   }
 
-  function renderSearchResultTrailing(result: FollowSearchResult) {
+  async function handleInvite() {
+    try {
+      await Share.share({ message: INVITE_MESSAGE });
+    } catch {
+      // The OS share sheet handles its own cancel/error UI -- nothing more to do here.
+    }
+  }
+
+  function renderResultTrailing(
+    result: FollowSearchResult,
+    testIDPrefix: string,
+    onFollow: (userId: string) => void,
+    onUnfollow: (userId: string) => void,
+  ) {
     const isPending = Boolean(pending[result.user.id]);
     if (result.status === 'accepted') {
       return (
         <SecondaryButton
-          testID={`find-people-result-${result.user.id}-following`}
+          testID={`${testIDPrefix}-${result.user.id}-following`}
           label="Following"
           size="sm"
           loading={isPending}
-          onPress={() => handleUnfollow(result.user.id)}
+          onPress={() => onUnfollow(result.user.id)}
         />
       );
     }
     if (result.status === 'pending') {
       return (
         <SecondaryButton
-          testID={`find-people-result-${result.user.id}-requested`}
+          testID={`${testIDPrefix}-${result.user.id}-requested`}
           label="Requested"
           size="sm"
           loading={isPending}
-          onPress={() => handleUnfollow(result.user.id)}
+          onPress={() => onUnfollow(result.user.id)}
         />
       );
     }
     return (
       <PrimaryButton
-        testID={`find-people-result-${result.user.id}-follow`}
+        testID={`${testIDPrefix}-${result.user.id}-follow`}
         label="Follow"
         size="sm"
         loading={isPending}
-        onPress={() => handleFollow(result.user.id)}
+        onPress={() => onFollow(result.user.id)}
+      />
+    );
+  }
+
+  function renderResultRow(result: FollowSearchResult, testIDPrefix: string, index: number, trailing: ReactNode) {
+    const { title, subtitle } = rowLabel(result.user);
+    return (
+      <ListRow
+        key={result.user.id}
+        testID={`${testIDPrefix}-${result.user.id}`}
+        divider={index > 0}
+        leading={
+          <Avatar
+            uri={result.user.avatarUrl}
+            initial={title.charAt(0).toUpperCase()}
+            size={40}
+            iconSize={18}
+            iconColor={colors.textSecondary}
+          />
+        }
+        title={title}
+        subtitle={subtitle}
+        trailing={trailing}
       />
     );
   }
@@ -222,25 +303,25 @@ export function FindPeopleScreen({ navigation }: Props) {
             onBack={() => navigation.goBack()}
             testID="find-people-header"
           />
-          <View style={styles.tabWrap}>
-            <SegmentedControl
-              testID="find-people-tab"
-              options={[
-                { label: 'Friends', value: 'friends' },
-                {
-                  label: requests.length > 0 ? `Requests (${requests.length})` : 'Requests',
-                  value: 'requests',
-                },
-              ]}
-              value={tab}
-              onChange={setTab}
-            />
-          </View>
+          <UnderlineTabs
+            testID="find-people-tab"
+            categories={[
+              { key: 'friends', label: 'Friends', icon: 'users' },
+              {
+                key: 'requests',
+                label: requests.length > 0 ? `Requests (${requests.length})` : 'Requests',
+                icon: 'inbox',
+              },
+            ]}
+            active={tab}
+            onSelect={setTab}
+            accentColor={colors.accent}
+          />
           {tab === 'friends' ? (
             <View style={styles.searchRow}>
               <TextInput
                 testID="find-people-search-input"
-                placeholder="Search by name or username"
+                placeholder="Search for people on Progresso"
                 value={searchInput}
                 onChangeText={setSearchInput}
                 autoCapitalize="none"
@@ -316,7 +397,7 @@ export function FindPeopleScreen({ navigation }: Props) {
             })}
           </AppCard>
         )
-      ) : (
+      ) : search !== '' ? (
         <AppCard testID="find-people-search-card">
           {searchError ? (
             <ErrorState
@@ -334,42 +415,105 @@ export function FindPeopleScreen({ navigation }: Props) {
                 color={colors.textPrimary}
               />
             </View>
-          ) : search === '' ? (
-            <EmptyState
-              testID="find-people-empty-initial"
-              title="Search for someone to follow"
-              description="Their activity appears in your Friends feed once they accept."
-            />
           ) : results.length === 0 ? (
             <EmptyState testID="find-people-empty-results" title={`No one found for "${search}"`} />
           ) : (
             <>
               <SectionHeader label="Results" />
-              {results.map((result, index) => {
-                const { title, subtitle } = rowLabel(result.user);
-                return (
-                  <ListRow
-                    key={result.user.id}
-                    testID={`find-people-result-${result.user.id}`}
-                    divider={index > 0}
-                    leading={
-                      <Avatar
-                        uri={result.user.avatarUrl}
-                        initial={title.charAt(0).toUpperCase()}
-                        size={40}
-                        iconSize={18}
-                        iconColor={colors.textSecondary}
-                      />
-                    }
-                    title={title}
-                    subtitle={subtitle}
-                    trailing={renderSearchResultTrailing(result)}
-                  />
-                );
-              })}
+              {results.map((result, index) =>
+                renderResultRow(
+                  result,
+                  'find-people-result',
+                  index,
+                  renderResultTrailing(
+                    result,
+                    'find-people-result',
+                    (userId) => follow(userId, setResults, setSearchError),
+                    (userId) => unfollow(userId, setResults, setSearchError),
+                  ),
+                ),
+              )}
             </>
           )}
         </AppCard>
+      ) : (
+        <>
+          <View style={styles.subTabWrap}>
+            <UnderlineTabs
+              testID="find-people-subtab"
+              categories={[
+                { key: 'suggested', label: 'Suggested', icon: 'star' },
+                { key: 'contacts', label: 'Contacts', icon: 'phone' },
+              ]}
+              active={friendsSubTab}
+              onSelect={setFriendsSubTab}
+              accentColor={colors.accent}
+            />
+          </View>
+
+          {friendsSubTab === 'contacts' ? (
+            <AppCard testID="find-people-contacts-card">
+              <ListRow
+                testID="find-people-contacts-coming-soon"
+                icon="phone"
+                title="Find friends from your contacts"
+                subtitle="Match your phone contacts to people already on Progresso"
+                trailing={
+                  <Badge
+                    label="Coming Soon"
+                    color={colors.textMuted}
+                    backgroundColor={colors.surfaceRaised}
+                    testID="find-people-contacts-coming-soon-badge"
+                  />
+                }
+              />
+            </AppCard>
+          ) : suggestedLoading ? (
+            <View style={styles.loading}>
+              <ActivityIndicator
+                testID="find-people-suggested-loading"
+                size="large"
+                color={colors.textPrimary}
+              />
+            </View>
+          ) : suggestedError ? (
+            <ErrorState
+              testID="find-people-suggested-error"
+              message={suggestedError}
+              onRetry={loadSuggested}
+            />
+          ) : suggested.length === 0 ? (
+            <EmptyState
+              testID="find-people-suggested-empty"
+              title="No suggestions right now"
+              description="Check back once more people have joined Progresso."
+            />
+          ) : (
+            <AppCard testID="find-people-suggested-card">
+              <SectionHeader
+                label={`${suggested.length} ${suggested.length === 1 ? 'person' : 'people'} to follow`}
+              />
+              {suggested.map((result, index) =>
+                renderResultRow(
+                  result,
+                  'find-people-suggested',
+                  index,
+                  renderResultTrailing(
+                    result,
+                    'find-people-suggested',
+                    (userId) => follow(userId, setSuggested, setSuggestedError),
+                    (userId) => unfollow(userId, setSuggested, setSuggestedError),
+                  ),
+                ),
+              )}
+            </AppCard>
+          )}
+
+          <View style={styles.inviteWrap}>
+            <SectionHeader label="Invite friends who aren't on Progresso yet" />
+            <PrimaryButton testID="find-people-invite" label="Invite" onPress={handleInvite} />
+          </View>
+        </>
       )}
     </Screen>
   );

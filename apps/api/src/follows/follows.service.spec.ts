@@ -302,6 +302,54 @@ describe('FollowsService', () => {
     });
   });
 
+  describe('listSuggested', () => {
+    it('excludes users already followed or requested, and always reports status "none"', async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
+      client.queue('users', {
+        data: [
+          { id: 'user-2', username: 'already', display_name: 'Already Following', avatar_url: null },
+          { id: 'user-3', username: 'new', display_name: 'New Person', avatar_url: null },
+        ],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const results = await service.listSuggested('user-1');
+
+      expect(results).toEqual([
+        {
+          user: { id: 'user-3', username: 'new', displayName: 'New Person', avatarUrl: null },
+          status: 'none',
+        },
+      ]);
+    });
+
+    it('overfetches by the excluded count so the final list can still reach the limit', async () => {
+      const client = createMockClient();
+      client.queue('follows', {
+        data: [{ followee_id: 'user-2' }, { followee_id: 'user-3' }],
+        error: null,
+      });
+      client.queue('users', { data: [], error: null });
+      const service = serviceWith(client);
+
+      await service.listSuggested('user-1');
+
+      const limitCall = client.calls.find((c) => c.table === 'users' && c.method === 'limit');
+      expect(limitCall?.args[0]).toBe(22); // SUGGESTED_LIMIT (20) + 2 excluded
+    });
+
+    it('returns an empty list when there is nothing left to suggest', async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [], error: null });
+      client.queue('users', { data: [], error: null });
+      const service = serviceWith(client);
+
+      await expect(service.listSuggested('user-1')).resolves.toEqual([]);
+    });
+  });
+
   describe('listAcceptedFolloweeIds', () => {
     it('returns just the followee ids', async () => {
       const client = createMockClient();

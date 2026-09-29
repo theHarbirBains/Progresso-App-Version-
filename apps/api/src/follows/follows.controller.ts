@@ -24,6 +24,12 @@ export class FollowsController {
   }
 
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Get('suggested')
+  async suggested(@CurrentUser() user: AuthenticatedUser) {
+    return this.followsService.listSuggested(user.id);
+  }
+
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Get('following')
   async following(@CurrentUser() user: AuthenticatedUser) {
     return this.followsService.listFollowing(user.id);
