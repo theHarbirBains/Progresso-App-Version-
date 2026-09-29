@@ -4,7 +4,7 @@ import { AppCard } from '../design/AppCard';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchFeedItems } from '../feed/feedQueries';
-import { fetchFriendsFeed, getMyProfile } from '../lib/api';
+import { fetchFriendsFeed, getMyProfile, listFollowRequests } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { FeedScreen } from './FeedScreen';
@@ -16,6 +16,7 @@ jest.mock('../auth/AuthProvider', () => ({
 jest.mock('../lib/api', () => ({
   getMyProfile: jest.fn(),
   fetchFriendsFeed: jest.fn(),
+  listFollowRequests: jest.fn(),
 }));
 
 jest.mock('../feed/feedQueries', () => ({
@@ -26,6 +27,7 @@ const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockFetchFeedItems = fetchFeedItems as jest.Mock;
 const mockFetchFriendsFeed = fetchFriendsFeed as jest.Mock;
+const mockListFollowRequests = listFollowRequests as jest.Mock;
 
 function feedPage(items: unknown[], hasMore = false) {
   return { items, hasMore };
@@ -133,6 +135,7 @@ beforeEach(() => {
   });
   mockFetchFeedItems.mockReset().mockResolvedValue(feedPage([]));
   mockFetchFriendsFeed.mockReset().mockResolvedValue(feedPage([]));
+  mockListFollowRequests.mockReset().mockResolvedValue([]);
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
 });
@@ -210,12 +213,32 @@ describe('FeedScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
   });
 
-  it('navigates to Find People from its own button on Feed', async () => {
+  it('navigates to Find People from the header search icon', async () => {
     renderScreen();
     await screen.findByTestId('feed-empty');
 
     fireEvent.press(screen.getByTestId('feed-find-people'));
 
+    expect(mockNavigate).toHaveBeenCalledWith('FindPeople');
+  });
+
+  it('shows no badge on the notifications bell when there are no pending follow requests', async () => {
+    renderScreen();
+    await screen.findByTestId('feed-empty');
+
+    expect(screen.queryByTestId('feed-notifications-badge')).toBeNull();
+  });
+
+  it('badges the notifications bell with the pending follow request count, and opens Find People on tap', async () => {
+    mockListFollowRequests.mockResolvedValue([
+      { followId: 'f1', createdAt: '2026-01-01', user: { id: 'u2', username: 'a', displayName: null, avatarUrl: null } },
+      { followId: 'f2', createdAt: '2026-01-01', user: { id: 'u3', username: 'b', displayName: null, avatarUrl: null } },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-notifications-badge')).toHaveTextContent('2');
+
+    fireEvent.press(screen.getByTestId('feed-notifications'));
     expect(mockNavigate).toHaveBeenCalledWith('FindPeople');
   });
 
