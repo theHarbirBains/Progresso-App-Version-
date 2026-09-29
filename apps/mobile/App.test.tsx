@@ -364,6 +364,7 @@ describe('Authentication flow', () => {
     expect(mockAuth.signUp).toHaveBeenCalledWith({
       email: 'new@example.com',
       password: 'password123',
+      options: { emailRedirectTo: 'progresso://confirm-email' },
     });
     expect(await AsyncStorage.getItem('@progresso/onboardingDraft')).not.toBeNull();
     expect(screen.queryByTestId('feed-screen')).toBeNull();

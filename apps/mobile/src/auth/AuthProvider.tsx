@@ -114,7 +114,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return error?.message ?? null;
       },
       signUpWithPassword: async (email, password) => {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        // Without an explicit emailRedirectTo, Supabase's confirmation
+        // email links back to the project's default Site URL (a plain
+        // website, not this app) -- deep-linking back into Progresso
+        // instead, the same way requestPasswordReset and the OAuth flow
+        // already do, is what lets this global handleIncomingUrl listener
+        // (above) pick up the resulting session the moment the user taps
+        // "Confirm your email", exactly as OnboardingScreen's own "Check
+        // your email" copy already promises.
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: Linking.createURL('confirm-email') },
+        });
         return {
           error: error?.message ?? null,
           requiresEmailConfirmation: !error && !data.session,
