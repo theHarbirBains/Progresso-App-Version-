@@ -36,6 +36,16 @@ describe('Signed-out screens -- one frame, shared inputs, one filled button', ()
     expectNoBareText();
   });
 
+  // Regression guard: showLogo existed but was never actually passed
+  // true anywhere (Sign Up/Welcome, its only intended consumers, were
+  // folded into onboarding) -- the app's mark never appeared at all.
+  it('Sign In: shows the Progresso mark and a welcoming title', () => {
+    render(<SignInScreen onSwitchToSignUp={jest.fn()} onForgotPassword={jest.fn()} />);
+
+    expect(screen.getByTestId('auth-frame-logo')).toBeTruthy();
+    expect(screen.getByText('Welcome Back')).toBeTruthy();
+  });
+
   it('Sign In: the links are plain 44pt text actions', () => {
     render(<SignInScreen onSwitchToSignUp={jest.fn()} onForgotPassword={jest.fn()} />);
 

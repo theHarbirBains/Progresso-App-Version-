@@ -14,8 +14,11 @@ interface Props {
 
 type OAuthSubmitting = 'google' | 'apple' | null;
 
-// Email + password, with Google and Apple as the two outlined alternatives
-// beneath: Sign In is the one filled button.
+// The app's first impression: the Progresso mark, a warm welcome-back
+// title/subtitle (AuthFrame's showLogo, otherwise unused since Sign Up/
+// Welcome were folded into onboarding), then email + password, with Google
+// and Apple as the two outlined alternatives beneath -- Sign In is the one
+// filled button.
 export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
   const { signInWithPassword, signInWithProvider } = useAuth();
   const [email, setEmail] = useState('');
@@ -48,7 +51,7 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
   }
 
   return (
-    <AuthFrame title="Sign In">
+    <AuthFrame title="Welcome Back" subtitle="Sign in to keep training with Progresso" showLogo>
       <TextInput
         testID="sign-in-email"
         label="Email"

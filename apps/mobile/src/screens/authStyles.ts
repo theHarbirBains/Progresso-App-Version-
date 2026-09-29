@@ -6,26 +6,30 @@ import { colors, spacing, typeScale } from '../design/theme';
 // components, so this holds only the frame and a few text blocks.
 export const authStyles = StyleSheet.create({
   // The Screen's scrolling body: centred vertically when the form is short.
+  // Horizontal padding here (Screen itself is edge-to-edge by default, see
+  // DESIGN.md's Feed section) -- a form screen's inputs/buttons need a real
+  // gutter, unlike Feed's own full-bleed cards.
   content: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.xxxl,
   },
   frame: {
-    gap: spacing.lg,
+    gap: spacing.xl,
   },
   header: {
     alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   logo: {
-    width: 64,
-    height: 64,
+    width: 96,
+    height: 96,
     marginBottom: spacing.md,
   },
   title: {
-    ...typeScale.screenTitle,
+    ...typeScale.display,
     color: colors.textPrimary,
     textAlign: 'center',
   },
