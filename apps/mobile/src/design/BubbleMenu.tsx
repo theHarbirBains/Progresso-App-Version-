@@ -1,9 +1,11 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Modal, Pressable, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { GlassBackground } from './GlassBackground';
-import { colors, radii, spacing } from './theme';
+import { Text } from './Text';
+import { colors, fonts, minTouchTarget, spacing, typeScale, radii } from './theme';
 
 interface Props {
   visible: boolean;
@@ -71,6 +73,7 @@ export function BubbleMenu({ visible, onClose, children, testID }: Props) {
         >
           <Pressable
             testID={testID ? `${testID}-content` : 'bubble-menu-content'}
+            style={styles.content}
             onPress={(event) => event?.stopPropagation?.()}
           >
             <GlassBackground variant="chrome" bordered={false} />
@@ -82,10 +85,54 @@ export function BubbleMenu({ visible, onClose, children, testID }: Props) {
   );
 }
 
+interface BubbleMenuRowProps {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  onPress: () => void;
+  testID?: string;
+}
+
+// A plain icon + label row for BubbleMenu's own content -- deliberately not
+// `ListRow` here: this menu is meant to read as a quick, light popup (see
+// the source app's own equivalent), so its rows skip ListRow's icon-well
+// background and trailing chevron rather than looking like a list of
+// navigable settings.
+export function BubbleMenuRow({ icon, label, onPress, testID }: BubbleMenuRowProps) {
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      style={rowStyles.row}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Feather name={icon} size={18} color={colors.textPrimary} />
+      <Text style={rowStyles.label}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const rowStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: minTouchTarget,
+  },
+  label: {
+    ...typeScale.callout,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
+  },
+});
+
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  content: {
+    gap: spacing.xs,
   },
   bubble: {
     position: 'absolute',

@@ -6,11 +6,10 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
-import { BubbleMenu } from '../design/BubbleMenu';
+import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
 import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
-import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
 import { StatValue } from '../design/StatValue';
@@ -391,21 +390,19 @@ export function FeedScreen({ navigation }: Props) {
         visible={quickActionsOpen}
         onClose={() => setQuickActionsOpen(false)}
       >
-        <Text style={styles.sheetTitle}>Quick Actions</Text>
-        <ListRow
+        <BubbleMenuRow
           testID="feed-quick-action-start-workout"
           icon="activity"
-          title="Start Workout"
+          label="Start Workout"
           onPress={() => {
             setQuickActionsOpen(false);
             navigation.navigate('NewWorkout');
           }}
         />
-        <ListRow
+        <BubbleMenuRow
           testID="feed-quick-action-log-food"
           icon="coffee"
-          title="Log Food"
-          divider
+          label="Log Food"
           onPress={() => {
             setQuickActionsOpen(false);
             navigation.navigate('FoodLibrary');
