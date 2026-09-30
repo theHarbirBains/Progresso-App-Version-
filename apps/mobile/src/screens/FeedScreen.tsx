@@ -8,7 +8,6 @@ import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
 import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
 import { TextButton } from '../design/Button';
-import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
@@ -425,12 +424,7 @@ export function FeedScreen({ navigation }: Props) {
           <ActivityIndicator testID="feed-loading" size="large" color={colors.textPrimary} />
         </View>
       ) : displayItems.length === 0 ? (
-        <>
-          <EmptyState
-            testID="feed-empty"
-            title="Your feed is ready when you are"
-            description="Finish a workout or log a food, and it'll show up here -- or follow people to see theirs too."
-          />
+        <View testID="feed-empty">
           <View style={styles.sectionHeaderWrap}>
             <SectionHeader label="Get Started" />
           </View>
@@ -459,7 +453,7 @@ export function FeedScreen({ navigation }: Props) {
               divider
             />
           </AppCard>
-        </>
+        </View>
       ) : (
         <>
           {displayItems.map((item) =>

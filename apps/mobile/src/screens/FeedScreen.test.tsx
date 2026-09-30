@@ -160,12 +160,11 @@ describe('FeedScreen', () => {
     expect(await screen.findByTestId('feed-item-workout-w1')).toBeTruthy();
   });
 
-  it('shows a clean empty state when there is nothing to show', async () => {
+  it('shows the Get Started actions, with no other empty-state text, when there is nothing to show', async () => {
     renderScreen();
 
-    expect(await screen.findByTestId('feed-empty')).toHaveTextContent(
-      'Your feed is ready when you are',
-    );
+    expect(await screen.findByTestId('feed-empty-actions')).toBeTruthy();
+    expect(screen.queryByText(/ready when you are/i)).toBeNull();
   });
 
   it('fills the empty state with Get Started actions, each navigating to its own screen', async () => {
