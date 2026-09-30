@@ -17,6 +17,7 @@ export interface ExerciseRecord {
   muscleGroup: MuscleGroup;
   movementType: MovementType;
   loggingStyle: LoggingStyle | null;
+  photoUrl: string | null;
   isActive: boolean;
   createdBy: string | null;
   createdAt: string;
@@ -32,6 +33,7 @@ function toExerciseRecord(row: Record<string, unknown>): ExerciseRecord {
     muscleGroup: row.muscle_group as MuscleGroup,
     movementType: row.movement_type as MovementType,
     loggingStyle: (row.logging_style as LoggingStyle | null) ?? null,
+    photoUrl: (row.photo_url as string | null) ?? null,
     isActive: row.is_active as boolean,
     createdBy: (row.created_by as string | null) ?? null,
     createdAt: row.created_at as string,
@@ -60,6 +62,7 @@ export class ExercisesService {
         // movementType is 'unilateral', so this is never silently null for
         // a unilateral exercise.
         logging_style: dto.movementType === 'unilateral' ? dto.loggingStyle : null,
+        photo_url: dto.photoUrl ?? null,
       })
       .select('*')
       .single();
@@ -96,6 +99,7 @@ export class ExercisesService {
     } else if (dto.loggingStyle !== undefined) {
       updatePayload.logging_style = dto.loggingStyle;
     }
+    if (dto.photoUrl !== undefined) updatePayload.photo_url = dto.photoUrl;
 
     if (Object.keys(updatePayload).length === 0) {
       return existing;

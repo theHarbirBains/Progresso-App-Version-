@@ -43,4 +43,11 @@ export class UpdateExerciseDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // Editable at any time, independent of every other field -- omit to leave
+  // the stored photo alone, null to clear it, a string to set/replace it.
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  photoUrl?: string | null;
 }

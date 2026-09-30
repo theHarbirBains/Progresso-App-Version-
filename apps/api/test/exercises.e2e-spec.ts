@@ -111,6 +111,7 @@ describe('Exercises (e2e)', () => {
         muscleGroup: 'biceps',
         movementType: 'bilateral',
         loggingStyle: null,
+        photoUrl: null,
         isActive: true,
         createdBy: 'user-1',
         createdAt: '2026-01-02T00:00:00.000Z',

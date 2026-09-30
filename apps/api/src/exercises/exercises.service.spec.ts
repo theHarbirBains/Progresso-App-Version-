@@ -82,6 +82,7 @@ describe('ExercisesService', () => {
         created_by: 'user-1',
         movement_type: 'bilateral',
         logging_style: null,
+        photo_url: null,
       });
       expect(result).toEqual({
         id: 'ex-mine',
@@ -89,6 +90,7 @@ describe('ExercisesService', () => {
         muscleGroup: 'biceps',
         movementType: 'bilateral',
         loggingStyle: null,
+        photoUrl: null,
         isActive: true,
         createdBy: 'user-1',
         createdAt: '2026-01-02T00:00:00.000Z',
@@ -119,9 +121,29 @@ describe('ExercisesService', () => {
         created_by: 'user-1',
         movement_type: 'unilateral',
         logging_style: 'single_side',
+        photo_url: null,
       });
       expect(result.movementType).toBe('unilateral');
       expect(result.loggingStyle).toBe('single_side');
+    });
+
+    it('creates a custom exercise with a photo', async () => {
+      const client = createMockClient({
+        insertData: { ...ownCustomRow, photo_url: 'https://example.com/machine.jpg' },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.createCustom('user-1', {
+        name: 'My Curl Variation',
+        muscleGroup: 'biceps',
+        movementType: 'bilateral',
+        photoUrl: 'https://example.com/machine.jpg',
+      });
+
+      expect(client.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ photo_url: 'https://example.com/machine.jpg' }),
+      );
+      expect(result.photoUrl).toBe('https://example.com/machine.jpg');
     });
 
     it('never persists a stray loggingStyle for a bilateral exercise, even if one was somehow supplied', async () => {
@@ -252,6 +274,47 @@ describe('ExercisesService', () => {
         logging_style: null,
       });
       expect(result.loggingStyle).toBeNull();
+    });
+
+    it('adds a photo to an owned exercise, independent of every other field', async () => {
+      const client = createMockClient({
+        selectData: ownCustomRow,
+        updateData: { ...ownCustomRow, photo_url: 'https://example.com/machine.jpg' },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateCustom('user-1', 'ex-mine', {
+        photoUrl: 'https://example.com/machine.jpg',
+      });
+
+      expect(client.update).toHaveBeenCalledWith({ photo_url: 'https://example.com/machine.jpg' });
+      expect(result.photoUrl).toBe('https://example.com/machine.jpg');
+    });
+
+    it('clears a photo when photoUrl is explicitly set to null', async () => {
+      const withPhoto = { ...ownCustomRow, photo_url: 'https://example.com/machine.jpg' };
+      const client = createMockClient({
+        selectData: withPhoto,
+        updateData: { ...withPhoto, photo_url: null },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateCustom('user-1', 'ex-mine', { photoUrl: null });
+
+      expect(client.update).toHaveBeenCalledWith({ photo_url: null });
+      expect(result.photoUrl).toBeNull();
+    });
+
+    it('leaves the stored photo alone when photoUrl is omitted entirely', async () => {
+      const client = createMockClient({
+        selectData: ownCustomRow,
+        updateData: { ...ownCustomRow, is_active: false },
+      });
+      const service = serviceWith(client);
+
+      await service.updateCustom('user-1', 'ex-mine', { isActive: false });
+
+      expect(client.update).toHaveBeenCalledWith({ is_active: false });
     });
 
     it('is a no-op read when the dto is empty', async () => {

@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
 import {
   LOGGING_STYLES,
@@ -30,4 +30,12 @@ export class CreateExerciseDto {
   @ValidateIf((dto: CreateExerciseDto) => dto.movementType === 'unilateral')
   @IsIn(LOGGING_STYLES)
   loggingStyle?: LoggingStyle;
+
+  // Optional at create, and editable any time after -- see
+  // UpdateExerciseDto. Reuses the same equipment-photos bucket
+  // equipment_profiles' own photoUrl already uploads to.
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  photoUrl?: string;
 }
