@@ -11,11 +11,13 @@ import { EmptyState } from '../design/EmptyState';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
+import { SectionHeader } from '../design/SectionHeader';
 import { Toggle } from '../design/Toggle';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
+import { WorkoutSplitPresetPicker } from '../workouts/WorkoutSplitPresetPicker';
 import {
   deleteWorkoutSplit,
   duplicateWorkoutSplit,
@@ -125,6 +127,20 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => performDelete(split) },
     ]);
+  }
+
+  // WorkoutSplitPresetPicker (materializeImmediately) only creates the new
+  // split and hands back its id -- actually making it the active one, same
+  // as picking a preset from Choose Workout Split, is this screen's own job.
+  async function handlePresetActivated(newSplitId: string) {
+    setError(null);
+    try {
+      await updateProfile({ activeWorkoutSplitId: newSplitId });
+      setActiveId(newSplitId);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to select workout split');
+    }
   }
 
   if (loading || themeLoading) {
@@ -251,6 +267,16 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
         onPress={() => navigation.navigate('WorkoutSplitForm', {})}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
+      />
+
+      <View style={styles.presetsSectionWrap}>
+        <SectionHeader label="Browse Splits" />
+      </View>
+      <WorkoutSplitPresetPicker
+        testID="workout-splits-presets"
+        userId={userId}
+        theme={theme}
+        onPresetActivated={handlePresetActivated}
       />
     </Screen>
   );

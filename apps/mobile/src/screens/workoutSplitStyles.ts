@@ -60,6 +60,11 @@ export const workoutSplitStyles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
+  // "Browse Splits" sits directly on the screen, not inside a card -- same
+  // explicit 6px gutter call as NotificationsScreen's own section headers.
+  presetsSectionWrap: {
+    paddingHorizontal: 6,
+  },
 
   // ---- Split view (read-only) ----------------------------------------------
   dayBlock: {

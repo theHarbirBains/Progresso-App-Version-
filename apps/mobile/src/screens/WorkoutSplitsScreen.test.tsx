@@ -28,6 +28,26 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
   deleteWorkoutSplit: jest.fn(),
 }));
 
+// Isolates this screen's own split-list logic from the preset picker's own
+// (separately tested) rendering/materialize behavior. babel-plugin-jest-
+// hoist forbids referencing outer-scope variables inside jest.mock()
+// factories, so react-native/react are require()'d inside it instead of
+// relying on the file's top-level import.
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
+jest.mock('../workouts/WorkoutSplitPresetPicker', () => {
+  const react = require('react');
+  const { Text, TouchableOpacity } = require('react-native');
+  return {
+    WorkoutSplitPresetPicker: (props: any) =>
+      react.createElement(
+        TouchableOpacity,
+        { testID: props.testID, onPress: () => props.onPresetActivated('split-preset-new') },
+        react.createElement(Text, null, 'presets'),
+      ),
+  };
+});
+/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
@@ -177,6 +197,23 @@ describe('WorkoutSplitsScreen', () => {
     expect(mockDeleteWorkoutSplit).toHaveBeenCalledWith('split-2');
     await waitFor(() => expect(mockFetchWorkoutSplits).toHaveBeenCalledTimes(2));
     alertSpy.mockRestore();
+  });
+
+  it('shows Browse Splits below the create button, and activates a preset once materialized', async () => {
+    renderScreen();
+    await screen.findByTestId('workout-split-split-1');
+    const callsBeforePress = mockFetchWorkoutSplits.mock.calls.length;
+
+    fireEvent.press(screen.getByTestId('workout-splits-presets'));
+
+    await waitFor(() =>
+      expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
+        activeWorkoutSplitId: 'split-preset-new',
+      }),
+    );
+    await waitFor(() =>
+      expect(mockFetchWorkoutSplits.mock.calls.length).toBe(callsBeforePress + 1),
+    );
   });
 
   it('opens the app-level side menu when the header button is pressed', async () => {
