@@ -220,6 +220,15 @@ describe('FoodLibraryScreen', () => {
     expect(mockOpenMenu).toHaveBeenCalledWith();
   });
 
+  it('navigates to AI Food Search from the header, next to the create action', async () => {
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    fireEvent.press(screen.getByTestId('food-library-ai-search'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch');
+  });
+
   it('creates a food and returns to the list', async () => {
     mockCreateFood.mockResolvedValue({ ...apple, id: 'food-2', name: 'Cherry' });
 

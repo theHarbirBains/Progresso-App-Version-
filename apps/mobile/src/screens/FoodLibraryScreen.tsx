@@ -41,11 +41,13 @@ type Mode =
 // since a jump-to-letter index needs the whole set up front. Creating,
 // editing, and logging a food are unchanged from before, just restyled.
 //
-// Layout: the shared header (menu left, "+" right), then two widgets
-// `widgetGap` apart: search with a count and a quiet sort action, and the
-// foods -- each with its picture (or category glyph), name, serving and
-// calories as a mono value -- under letter headings, with the A-Z rail on
-// the right. Tapping a row logs it; the pencil edits it.
+// Layout: the shared header (menu left, "+" and a lightning bolt right --
+// add a food by hand, or describe it and let AI Food Search estimate it --
+// see AiFoodSearchScreen), then two widgets `widgetGap` apart: search with a
+// count and a quiet sort action, and the foods -- each with its picture (or
+// category glyph), name, serving and calories as a mono value -- under
+// letter headings, with the A-Z rail on the right. Tapping a row logs it;
+// the pencil edits it.
 //
 // Reached from the barcode scanner's "Enter Manually", it opens straight into
 // the create form (barcode prefilled) and, once saved, on into logging that
@@ -183,6 +185,12 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
             onPress: () => setMode({ type: 'create' }),
             accessibilityLabel: 'Add a new food',
             testID: 'food-create-button',
+          }}
+          rightAction2={{
+            icon: 'zap',
+            onPress: () => navigation.navigate('AiFoodSearch'),
+            accessibilityLabel: 'AI Food Search',
+            testID: 'food-library-ai-search',
           }}
         />
       }

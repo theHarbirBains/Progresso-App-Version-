@@ -226,13 +226,12 @@ describe('NutritionTodayScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
   });
 
-  it('navigates to NutritionGoals when the goals link is pressed', async () => {
+  it('does not show Nutrition Goals or AI Food Search as buttons -- Goals lives in the side menu only, AI Food Search inside Food Library', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
 
-    fireEvent.press(screen.getByTestId('nutrition-goals-link'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('NutritionGoals');
+    expect(screen.queryByTestId('nutrition-goals-link')).toBeNull();
+    expect(screen.queryByTestId('ai-food-search-button')).toBeNull();
   });
 
   it('navigates to the barcode scanner when Scan Barcode is pressed', async () => {
@@ -251,15 +250,6 @@ describe('NutritionTodayScreen', () => {
     fireEvent.press(screen.getByTestId('search-food-button'));
 
     expect(mockNavigate).toHaveBeenCalledWith('FoodSearch');
-  });
-
-  it('navigates to AI Food Search', async () => {
-    renderScreen();
-    await screen.findByTestId('food-log-empty');
-
-    fireEvent.press(screen.getByTestId('ai-food-search-button'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch');
   });
 
   it('opens the app-level side menu when the header button is pressed', async () => {
@@ -355,14 +345,14 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
     ).toHaveLength(0);
   });
 
-  it('has one filled button -- Log Food -- with Nutrition Goals outlined', async () => {
+  it('has one filled button -- Log Food -- with Search Food outlined', async () => {
     renderScreen();
     await screen.findByTestId('log-food-button');
 
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    const goals = StyleSheet.flatten(screen.getByTestId('nutrition-goals-link').props.style);
-    expect(goals.backgroundColor).toBeUndefined();
-    expect(goals.borderWidth).toBe(1);
+    const searchFood = StyleSheet.flatten(screen.getByTestId('search-food-button').props.style);
+    expect(searchFood.backgroundColor).toBeUndefined();
+    expect(searchFood.borderWidth).toBe(1);
   });
 
   it('names the menu control for assistive tech', async () => {

@@ -27,13 +27,15 @@ const EMPTY_GOALS: NutritionGoals = { calories: null, proteinG: null, carbsG: nu
 //
 // Layout: the shared Screen with a hamburger menu, then three widgets `widgetGap` apart:
 // the four macros (what was consumed, against the target when one is set, and
-// what remains); the one filled action -- Log Food -- with Scan Barcode, Search
-// Food, AI Food Search, and Nutrition Goals as outlined secondaries (three
-// ways into the same LogFoodStep-backed logging flow -- database search,
-// barcode, or a free-text description Claude estimates the nutrition for --
-// plus the one settings-like link); and Today's Foods as rows (the food's
+// what remains); the one filled action -- Log Food -- with Scan Barcode and
+// Search Food as outlined secondaries (two more ways into the same
+// LogFoodStep-backed logging flow); and Today's Foods as rows (the food's
 // picture, its name, the values snapshotted when it was logged, an editable
-// quantity and a quiet Delete).
+// quantity and a quiet Delete). AI Food Search lives inside Food Library
+// itself (Log Food's destination), next to that screen's own "add a food"
+// action, rather than as a fourth peer button here. Nutrition Goals is only
+// in the app-level side menu now (see appMenuSections.ts) -- not duplicated
+// as a button on every screen that touches nutrition.
 export function NutritionTodayScreen({ navigation }: Props) {
   const { nutritionTheme } = useProgressTheme();
   const { openMenu } = useAppMenu();
@@ -203,16 +205,6 @@ export function NutritionTodayScreen({ navigation }: Props) {
           testID="search-food-button"
           label="Search Food"
           onPress={() => navigation.navigate('FoodSearch')}
-        />
-        <SecondaryButton
-          testID="ai-food-search-button"
-          label="AI Food Search"
-          onPress={() => navigation.navigate('AiFoodSearch')}
-        />
-        <SecondaryButton
-          testID="nutrition-goals-link"
-          label="Nutrition Goals"
-          onPress={() => navigation.navigate('NutritionGoals')}
         />
       </AppCard>
 
