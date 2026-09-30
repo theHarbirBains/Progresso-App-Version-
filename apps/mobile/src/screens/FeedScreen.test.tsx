@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { fetchFeedItems } from '../feed/feedQueries';
 import { fetchFriendsFeed, getMyProfile, listFollowNotifications } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { FeedScreen } from './FeedScreen';
 
@@ -23,11 +24,16 @@ jest.mock('../feed/feedQueries', () => ({
   fetchFeedItems: jest.fn(),
 }));
 
+jest.mock('../nutrition/nutritionGoalQueries', () => ({
+  fetchNutritionGoals: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockFetchFeedItems = fetchFeedItems as jest.Mock;
 const mockFetchFriendsFeed = fetchFriendsFeed as jest.Mock;
 const mockListFollowNotifications = listFollowNotifications as jest.Mock;
+const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 
 function feedPage(items: unknown[], hasMore = false) {
   return { items, hasMore };
@@ -132,10 +138,17 @@ beforeEach(() => {
     workoutAccentColor: null,
     nutritionAccentColor: null,
     avatarUrl: null,
+    // Both setup reminders satisfied by default, so the bell's badge count
+    // in most tests reflects pending follow requests alone -- see the
+    // dedicated "notification badge" describe block for the reminder cases.
+    activeWorkoutSplitId: 'split-1',
   });
   mockFetchFeedItems.mockReset().mockResolvedValue(feedPage([]));
   mockFetchFriendsFeed.mockReset().mockResolvedValue(feedPage([]));
   mockListFollowNotifications.mockReset().mockResolvedValue([]);
+  mockFetchNutritionGoals
+    .mockReset()
+    .mockResolvedValue({ calories: 2400, proteinG: 180, carbsG: 250, fatG: 70 });
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
 });
@@ -271,6 +284,68 @@ describe('FeedScreen', () => {
 
     fireEvent.press(screen.getByTestId('feed-notifications'));
     expect(mockNavigate).toHaveBeenCalledWith('Notifications');
+  });
+
+  it('badges the bell for a user with no active workout split, even with zero pending requests', async () => {
+    mockGetMyProfile.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@example.com',
+      role: 'user',
+      displayName: 'Harbir Bains',
+      username: null,
+      weightUnit: 'kg',
+      workoutAccentColor: null,
+      nutritionAccentColor: null,
+      avatarUrl: null,
+      activeWorkoutSplitId: null,
+    });
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-notifications-badge')).toHaveTextContent('1');
+  });
+
+  it('badges the bell for a user with no saved nutrition goals', async () => {
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: null,
+      proteinG: null,
+      carbsG: null,
+      fatG: null,
+    });
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-notifications-badge')).toHaveTextContent('1');
+  });
+
+  it('adds pending requests and both setup reminders together into one total', async () => {
+    mockGetMyProfile.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@example.com',
+      role: 'user',
+      displayName: 'Harbir Bains',
+      username: null,
+      weightUnit: 'kg',
+      workoutAccentColor: null,
+      nutritionAccentColor: null,
+      avatarUrl: null,
+      activeWorkoutSplitId: null,
+    });
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: null,
+      proteinG: null,
+      carbsG: null,
+      fatG: null,
+    });
+    mockListFollowNotifications.mockResolvedValue([
+      {
+        kind: 'request',
+        followId: 'f1',
+        at: '2026-01-01',
+        user: { id: 'u2', username: 'a', displayName: null, avatarUrl: null },
+      },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-notifications-badge')).toHaveTextContent('3');
   });
 
   it('opens the app-level side menu when the header button is pressed', async () => {

@@ -22,6 +22,7 @@ import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { mealTypeLabel, type MealType } from '../nutrition/mealTypes';
 import { FoodImage } from '../nutrition/FoodImage';
+import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
@@ -119,7 +120,7 @@ export function FeedScreen({ navigation }: Props) {
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
-  const { weightUnit, displayName, username, avatarUrl } = useProgressTheme();
+  const { weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId } = useProgressTheme();
 
   const [items, setItems] = useState<FeedItem[]>([]);
   const [page, setPage] = useState(0);
@@ -135,12 +136,14 @@ export function FeedScreen({ navigation }: Props) {
   const [friendsLoadingMore, setFriendsLoadingMore] = useState(false);
   const [friendsError, setFriendsError] = useState<string | null>(null);
 
-  // The header bell's badge -- incoming follow requests awaiting a
-  // response (see NotificationsScreen, which the bell opens). Not folded
-  // into the friends-feed error/loading state above: a failure here is
-  // silently a missing badge, never a reason to block the whole screen
-  // with an error.
+  // The header bell's badge -- the same count of things NotificationsScreen
+  // itself would show right now: incoming follow requests plus its two
+  // setup reminders (no active split, no nutrition goals saved -- see that
+  // screen's own comment). Not folded into the friends-feed error/loading
+  // state above: a failure here is silently a missing badge, never a
+  // reason to block the whole screen with an error.
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const [nutritionGoalsMissing, setNutritionGoalsMissing] = useState(false);
 
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   // Only the very first load should replace the whole screen with a
@@ -183,24 +186,28 @@ export function FeedScreen({ navigation }: Props) {
     }
   }, [accessToken]);
 
-  const loadPendingRequestCount = useCallback(async () => {
-    if (!accessToken) return;
+  const loadNotificationBadgeCount = useCallback(async () => {
+    if (!accessToken || !userId) return;
     try {
-      const notifications = await listFollowNotifications(accessToken);
+      const [notifications, goals] = await Promise.all([
+        listFollowNotifications(accessToken),
+        fetchNutritionGoals(userId),
+      ]);
       setPendingRequestCount(notifications.filter((n) => n.kind === 'request').length);
+      setNutritionGoalsMissing(goals.calories === null);
     } catch {
       // A missing badge count isn't worth surfacing as a screen-level error.
     }
-  }, [accessToken]);
+  }, [accessToken, userId]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       void load();
       void loadFriends();
-      void loadPendingRequestCount();
+      void loadNotificationBadgeCount();
     });
     return unsubscribe;
-  }, [navigation, load, loadFriends, loadPendingRequestCount]);
+  }, [navigation, load, loadFriends, loadNotificationBadgeCount]);
 
   async function handleLoadMore() {
     if (!userId || loadingMore || !hasMore) return;
@@ -345,6 +352,14 @@ export function FeedScreen({ navigation }: Props) {
   const blockingError = displayItems.length === 0 ? (error ?? friendsError) : null;
   const hasMoreOfEither = hasMore || friendsHasMore;
   const loadingMoreEither = loadingMore || friendsLoadingMore;
+  // Matches NotificationsScreen's own total exactly: requests plus its two
+  // setup reminders. Stale-muscle-group insights are deliberately not
+  // counted here -- computing those needs the user's whole exercise
+  // history, real weight to add to every Feed focus just for a badge
+  // number, whereas activeWorkoutSplitId is already free (useProgressTheme)
+  // and nutrition goals is one lightweight row fetch.
+  const notificationBadgeCount =
+    pendingRequestCount + (activeWorkoutSplitId === null ? 1 : 0) + (nutritionGoalsMissing ? 1 : 0);
 
   function retryAll() {
     void load();
@@ -387,7 +402,7 @@ export function FeedScreen({ navigation }: Props) {
             onPress: () => navigation.navigate('Notifications'),
             accessibilityLabel: 'Notifications',
             testID: 'feed-notifications',
-            badgeCount: pendingRequestCount,
+            badgeCount: notificationBadgeCount,
           }}
         />
       }
