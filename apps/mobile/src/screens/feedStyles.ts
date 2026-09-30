@@ -17,6 +17,12 @@ export const feedStyles = StyleSheet.create({
   loading: {
     paddingVertical: spacing.xxl,
   },
+  // "Get Started" (the empty-state actions card's header) sits directly on
+  // the screen, not inside a card -- same explicit 6px gutter call as
+  // NotificationsScreen's own section headers.
+  sectionHeaderWrap: {
+    paddingHorizontal: 6,
+  },
 
   // The byline: a small avatar, the account's own name, and a quiet
   // icon+timestamp line underneath -- Strava's "who, when" row, without the

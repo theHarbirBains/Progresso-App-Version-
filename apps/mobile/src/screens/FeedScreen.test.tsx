@@ -163,7 +163,23 @@ describe('FeedScreen', () => {
   it('shows a clean empty state when there is nothing to show', async () => {
     renderScreen();
 
-    expect(await screen.findByTestId('feed-empty')).toHaveTextContent('Nothing here yet');
+    expect(await screen.findByTestId('feed-empty')).toHaveTextContent(
+      'Your feed is ready when you are',
+    );
+  });
+
+  it('fills the empty state with Get Started actions, each navigating to its own screen', async () => {
+    renderScreen();
+    await screen.findByTestId('feed-empty');
+
+    fireEvent.press(screen.getByTestId('feed-empty-action-start-workout'));
+    expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
+
+    fireEvent.press(screen.getByTestId('feed-empty-action-log-food'));
+    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
+
+    fireEvent.press(screen.getByTestId('feed-empty-action-find-people'));
+    expect(mockNavigate).toHaveBeenCalledWith('FindPeople');
   });
 
   it('shows a completed workout as a card: split day, muscles, duration, exercises, sets and volume', async () => {

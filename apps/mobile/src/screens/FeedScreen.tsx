@@ -10,7 +10,9 @@ import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
 import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
+import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
+import { SectionHeader } from '../design/SectionHeader';
 import { StatBlock } from '../design/StatBlock';
 import { StatValue } from '../design/StatValue';
 import { colors } from '../design/theme';
@@ -423,11 +425,41 @@ export function FeedScreen({ navigation }: Props) {
           <ActivityIndicator testID="feed-loading" size="large" color={colors.textPrimary} />
         </View>
       ) : displayItems.length === 0 ? (
-        <EmptyState
-          testID="feed-empty"
-          title="Nothing here yet"
-          description="Finish a workout or log a food, or follow people from Find People (see the menu), and it'll show up here."
-        />
+        <>
+          <EmptyState
+            testID="feed-empty"
+            title="Your feed is ready when you are"
+            description="Finish a workout or log a food, and it'll show up here -- or follow people to see theirs too."
+          />
+          <View style={styles.sectionHeaderWrap}>
+            <SectionHeader label="Get Started" />
+          </View>
+          <AppCard testID="feed-empty-actions">
+            <ListRow
+              testID="feed-empty-action-start-workout"
+              icon="activity"
+              title="Start a Workout"
+              subtitle="Track sets and reps as you train"
+              onPress={() => navigation.navigate('NewWorkout')}
+            />
+            <ListRow
+              testID="feed-empty-action-log-food"
+              icon="coffee"
+              title="Log Food"
+              subtitle="Search or scan something you ate"
+              onPress={() => navigation.navigate('FoodLibrary')}
+              divider
+            />
+            <ListRow
+              testID="feed-empty-action-find-people"
+              icon="search"
+              title="Find People to Follow"
+              subtitle="See their workouts and meals here too"
+              onPress={() => navigation.navigate('FindPeople')}
+              divider
+            />
+          </AppCard>
+        </>
       ) : (
         <>
           {displayItems.map((item) =>
