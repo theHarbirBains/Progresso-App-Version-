@@ -23,6 +23,8 @@ import {
   computeStaleMuscleGroups,
   type StaleMuscleGroup,
 } from '../notifications/muscleGroupFreshness';
+import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { formatCardDate } from '../workouts/workoutFormat';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { notificationsStyles as styles } from './notificationsStyles';
@@ -37,12 +39,17 @@ function displayName(user: FollowUser): string {
  * The bell's destination: two honest, real sections -- no fake "notification
  * center" placeholder (see CLAUDE.md, real notification delivery doesn't
  * exist yet). "Insights" is computed entirely client-side from the user's
- * own workout history (same data/attribution Progress's Muscle Group view
- * already uses -- see muscleGroupFreshness.ts), a same-user read with no
- * cross-user trust concern. "Activity" is the follows backend's merged
- * pending-requests + recently-accepted feed (see
- * FollowsService.listNotifications) -- the quick/recent view; Find People's
- * Requests tab is the full management list, same underlying data.
+ * own data, a same-user read with no cross-user trust concern: stale-muscle-
+ * group cards from workout history (same data/attribution Progress's Muscle
+ * Group view already uses -- see muscleGroupFreshness.ts), plus two simple
+ * setup reminders -- no active workout split (activeWorkoutSplitId, via
+ * useProgressTheme -- the same source WorkoutSplitsScreen reads) and no
+ * nutrition goals saved yet (fetchNutritionGoals returning a null calories
+ * field, i.e. no row) -- each tapping straight into the screen that fixes
+ * it. "Activity" is the follows backend's merged pending-requests +
+ * recently-accepted feed (see FollowsService.listNotifications) -- the
+ * quick/recent view; Find People's Requests tab is the full management
+ * list, same underlying data.
  *
  * Each item is its own full AppCard (Feed's own activity-card anatomy --
  * icon/avatar + title + subtitle, an accent band on top) rather than
@@ -54,8 +61,10 @@ export function NotificationsScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
+  const { activeWorkoutSplitId, themeLoading } = useProgressTheme();
 
   const [staleGroups, setStaleGroups] = useState<StaleMuscleGroup[]>([]);
+  const [nutritionGoalsMissing, setNutritionGoalsMissing] = useState(false);
   const [insightsLoading, setInsightsLoading] = useState(true);
   const [insightsError, setInsightsError] = useState<string | null>(null);
 
@@ -72,8 +81,12 @@ export function NotificationsScreen({ navigation }: Props) {
     setInsightsLoading(true);
     setInsightsError(null);
     try {
-      const history = await fetchAllExerciseHistory(userId);
+      const [history, goals] = await Promise.all([
+        fetchAllExerciseHistory(userId),
+        fetchNutritionGoals(userId),
+      ]);
       setStaleGroups(computeStaleMuscleGroups(history));
+      setNutritionGoalsMissing(goals.calories === null);
     } catch (err) {
       setInsightsError(err instanceof Error ? err.message : 'Failed to load insights');
     } finally {
@@ -126,12 +139,16 @@ export function NotificationsScreen({ navigation }: Props) {
     }
   }
 
+  const hasAnyInsight =
+    activeWorkoutSplitId === null || nutritionGoalsMissing || staleGroups.length > 0;
+
   const nothingAtAll =
     !insightsLoading &&
     !activityLoading &&
     !insightsError &&
     !activityError &&
-    staleGroups.length === 0 &&
+    !themeLoading &&
+    !hasAnyInsight &&
     activity.length === 0;
 
   return (
@@ -154,7 +171,7 @@ export function NotificationsScreen({ navigation }: Props) {
         />
       ) : (
         <>
-          {insightsLoading ? (
+          {insightsLoading || themeLoading ? (
             <View style={styles.loading}>
               <ActivityIndicator
                 testID="notifications-insights-loading"
@@ -168,11 +185,47 @@ export function NotificationsScreen({ navigation }: Props) {
               message={insightsError}
               onRetry={loadInsights}
             />
-          ) : staleGroups.length > 0 ? (
+          ) : hasAnyInsight ? (
             <>
               <View style={styles.sectionHeaderWrap}>
                 <SectionHeader label="Insights" />
               </View>
+              {activeWorkoutSplitId === null ? (
+                <AppCard
+                  testID="notifications-insight-no-split"
+                  onPress={() => navigation.navigate('ChooseWorkoutSplit')}
+                >
+                  <View style={styles.itemRow}>
+                    <View style={styles.iconWell}>
+                      <Feather name="layers" size={20} color={colors.textSecondary} />
+                    </View>
+                    <View style={styles.itemBody}>
+                      <Text style={styles.itemTitle}>Set up a workout split</Text>
+                      <Text style={styles.itemSubtitle}>
+                        Pick a split so your training days stay organized
+                      </Text>
+                    </View>
+                  </View>
+                </AppCard>
+              ) : null}
+              {nutritionGoalsMissing ? (
+                <AppCard
+                  testID="notifications-insight-no-nutrition-goals"
+                  onPress={() => navigation.navigate('NutritionGoals')}
+                >
+                  <View style={styles.itemRow}>
+                    <View style={styles.iconWell}>
+                      <Feather name="target" size={20} color={colors.textSecondary} />
+                    </View>
+                    <View style={styles.itemBody}>
+                      <Text style={styles.itemTitle}>Set your calorie target</Text>
+                      <Text style={styles.itemSubtitle}>
+                        Get a personalized daily calorie and macro goal
+                      </Text>
+                    </View>
+                  </View>
+                </AppCard>
+              ) : null}
               {staleGroups.map((group) => (
                 <AppCard
                   key={group.muscleGroup}

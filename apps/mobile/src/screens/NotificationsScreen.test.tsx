@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { listFollowNotifications, respondToFollowRequest } from '../lib/api';
+import { getMyProfile, listFollowNotifications, respondToFollowRequest } from '../lib/api';
+import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { NotificationsScreen } from './NotificationsScreen';
 
@@ -10,8 +12,13 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../lib/api', () => ({
+  getMyProfile: jest.fn(),
   listFollowNotifications: jest.fn(),
   respondToFollowRequest: jest.fn(),
+}));
+
+jest.mock('../nutrition/nutritionGoalQueries', () => ({
+  fetchNutritionGoals: jest.fn(),
 }));
 
 jest.mock('../workouts/allExerciseHistoryQueries', () => ({
@@ -19,9 +26,26 @@ jest.mock('../workouts/allExerciseHistoryQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
+const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockListFollowNotifications = listFollowNotifications as jest.Mock;
 const mockRespondToFollowRequest = respondToFollowRequest as jest.Mock;
+const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
+
+const baseProfile = {
+  id: 'user-1',
+  email: 'a@example.com',
+  role: 'user',
+  displayName: null,
+  username: null,
+  weightUnit: 'kg' as const,
+  workoutAccentColor: null,
+  nutritionAccentColor: null,
+  activeWorkoutSplitId: 'split-1',
+};
+
+const setGoals = { calories: 2400, proteinG: 180, carbsG: 250, fatG: 70 };
+const noGoals = { calories: null, proteinG: null, carbsG: null, fatG: null };
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
@@ -65,7 +89,11 @@ const bobAccepted = {
 };
 
 function renderScreen() {
-  return render(<NotificationsScreen navigation={navigation} route={route} />);
+  return render(
+    <ProfileProvider>
+      <NotificationsScreen navigation={navigation} route={route} />
+    </ProfileProvider>,
+  );
 }
 
 beforeEach(() => {
@@ -73,8 +101,13 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
+  // Defaults keep both new setup reminders quiet -- an active split and
+  // saved goals already -- so existing insight/activity tests, which don't
+  // care about either, see the same behavior as before these were added.
+  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockListFollowNotifications.mockReset().mockResolvedValue([]);
   mockRespondToFollowRequest.mockReset().mockResolvedValue({ success: true });
+  mockFetchNutritionGoals.mockReset().mockResolvedValue(setGoals);
   mockFetchAllExerciseHistory.mockReset().mockResolvedValue([]);
   mockGoBack.mockClear();
   mockNavigate.mockClear();
@@ -121,6 +154,47 @@ describe('NotificationsScreen -- insights', () => {
     fireEvent.press(screen.getByTestId('notifications-insights-error-retry'));
 
     expect(await screen.findByTestId('notifications-insight-chest')).toBeTruthy();
+  });
+});
+
+describe('NotificationsScreen -- setup reminders', () => {
+  it('reminds a user with no active split to set one up, and taps through to Choose Workout Split', async () => {
+    mockGetMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: null });
+    renderScreen();
+
+    const card = await screen.findByTestId('notifications-insight-no-split');
+    expect(card).toHaveTextContent(/Set up a workout split/);
+
+    fireEvent.press(card);
+    expect(mockNavigate).toHaveBeenCalledWith('ChooseWorkoutSplit');
+  });
+
+  it('reminds a user with no nutrition goals to set them, and taps through to Nutrition Goals', async () => {
+    mockFetchNutritionGoals.mockResolvedValue(noGoals);
+    renderScreen();
+
+    const card = await screen.findByTestId('notifications-insight-no-nutrition-goals');
+    expect(card).toHaveTextContent(/Set your calorie target/);
+
+    fireEvent.press(card);
+    expect(mockNavigate).toHaveBeenCalledWith('NutritionGoals');
+  });
+
+  it('does not show either reminder once a split is active and goals are saved', async () => {
+    renderScreen();
+
+    await screen.findByTestId('notifications-empty');
+    expect(screen.queryByTestId('notifications-insight-no-split')).toBeNull();
+    expect(screen.queryByTestId('notifications-insight-no-nutrition-goals')).toBeNull();
+  });
+
+  it('shows both reminders together for a brand-new user with neither set up', async () => {
+    mockGetMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: null });
+    mockFetchNutritionGoals.mockResolvedValue(noGoals);
+    renderScreen();
+
+    expect(await screen.findByTestId('notifications-insight-no-split')).toBeTruthy();
+    expect(screen.getByTestId('notifications-insight-no-nutrition-goals')).toBeTruthy();
   });
 });
 
