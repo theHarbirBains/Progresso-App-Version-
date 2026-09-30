@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { fetchExerciseSourceCounts, fetchExercises } from './exerciseQueries';
+import { fetchAllExercises, fetchExerciseSourceCounts, fetchExercises } from './exerciseQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
 
@@ -24,7 +24,8 @@ function mockQueryBuilder(result: MockResult) {
   // regardless of call order, matching @supabase/supabase-js's real
   // PostgrestFilterBuilder shape closely enough for these tests. range()
   // is always the last call in exerciseQueries, so it resolves directly.
-  const builder: Record<string, jest.Mock> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const builder: Record<string, any> = {};
   for (const method of ['select', 'eq', 'ilike', 'is', 'order'] as const) {
     builder[method] = jest.fn((...args: unknown[]) => {
       calls[method].push(args);
@@ -35,6 +36,11 @@ function mockQueryBuilder(result: MockResult) {
     calls.range.push(args);
     return Promise.resolve(result);
   });
+  // Thenable at any point in the chain too, matching real
+  // PostgrestFilterBuilder -- fetchAllExercises never calls .range(), it
+  // just awaits the query directly after .order().
+  builder.then = (resolve: (v: MockResult) => unknown, reject?: (e: unknown) => unknown) =>
+    Promise.resolve(result).then(resolve, reject);
   mockFrom.mockReturnValue(builder);
   return calls;
 }
@@ -198,6 +204,60 @@ describe('fetchExercises', () => {
     const result = await fetchExercises(baseParams);
 
     expect(result.totalCount).toBe(1);
+  });
+});
+
+describe('fetchAllExercises', () => {
+  const allParams = { userId: 'user-1', search: '', muscleGroup: null, source: 'all' as const };
+
+  it('queries active exercises ordered by name, with no range/pagination at all', async () => {
+    const calls = mockQueryBuilder({ data: [], error: null });
+
+    await fetchAllExercises(allParams);
+
+    expect(mockFrom).toHaveBeenCalledWith('exercises');
+    expect(calls.eq).toEqual([['is_active', true]]);
+    expect(calls.order).toEqual([['name', { ascending: true }]]);
+    expect(calls.range).toEqual([]);
+  });
+
+  it('applies the same search/muscle-group/source filters fetchExercises does', async () => {
+    const calls = mockQueryBuilder({ data: [], error: null });
+
+    await fetchAllExercises({
+      ...allParams,
+      search: 'bench',
+      muscleGroup: 'chest',
+      source: 'mine',
+    });
+
+    expect(calls.ilike).toEqual([['name', '%bench%']]);
+    expect(calls.eq).toContainEqual(['muscle_group', 'chest']);
+    expect(calls.eq).toContainEqual(['created_by', 'user-1']);
+  });
+
+  it('maps every returned row, with no pageSize-based truncation', async () => {
+    const rows = Array.from({ length: 50 }, (_, i) => ({
+      id: `ex-${i}`,
+      name: `Exercise ${i}`,
+      muscle_group: 'chest',
+      movement_type: 'bilateral',
+      logging_style: null,
+      photo_url: null,
+      is_active: true,
+      created_by: null,
+    }));
+    mockQueryBuilder({ data: rows, error: null });
+
+    const result = await fetchAllExercises(allParams);
+
+    expect(result).toHaveLength(50);
+  });
+
+  it('throws when the query returns an error', async () => {
+    mockQueryBuilder({ data: null, error: { message: 'network error' } });
+
+    await expect(fetchAllExercises(allParams)).rejects.toThrow('network error');
   });
 });
 

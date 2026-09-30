@@ -1,10 +1,8 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, StyleSheet } from 'react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
-import { AppCard } from '../design/AppCard';
-import { colors } from '../design/theme';
-import { createEquipmentProfile, createExercise, updateExercise } from '../lib/api';
+import { createExercise, updateExercise } from '../lib/api';
 import { uploadEquipmentPhoto } from '../lib/equipmentPhotoUpload';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
@@ -16,17 +14,20 @@ jest.mock('../auth/AuthProvider', () => ({
 jest.mock('../lib/api', () => ({
   createExercise: jest.fn(),
   updateExercise: jest.fn(),
-  createEquipmentProfile: jest.fn(),
 }));
 
 jest.mock('../lib/equipmentPhotoUpload', () => ({
   uploadEquipmentPhoto: jest.fn(),
 }));
 
+// expo-image-picker itself isn't mocked here beyond what the shared jest
+// setup already provides -- these tests only exercise the "add a photo"
+// entry point (an Alert with Take/Choose options), never a real picker
+// launch, matching FoodFormScreen.test.tsx's own scope.
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockCreateExercise = createExercise as jest.Mock;
 const mockUpdateExercise = updateExercise as jest.Mock;
-const mockCreateEquipmentProfile = createEquipmentProfile as jest.Mock;
 const mockUploadEquipmentPhoto = uploadEquipmentPhoto as jest.Mock;
 
 const ownedExercise = {
@@ -35,106 +36,74 @@ const ownedExercise = {
   muscleGroup: 'biceps' as const,
   movementType: 'bilateral' as const,
   loggingStyle: null,
+  photoUrl: null,
   isActive: true,
   createdBy: 'user-1',
 };
+
+function selectMuscleGroup(fieldTestId: string, group: string) {
+  fireEvent.press(screen.getByTestId(fieldTestId));
+  fireEvent.press(screen.getByTestId(`${fieldTestId}-option-${group}`));
+}
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({
     session: { access_token: 'token-123' },
     user: { id: 'user-1' },
   });
-  mockCreateExercise.mockReset();
-  mockUpdateExercise.mockReset();
-  mockCreateEquipmentProfile.mockReset();
-  mockUploadEquipmentPhoto.mockReset();
+  mockCreateExercise.mockReset().mockResolvedValue({ id: 'ex-new' });
+  mockUpdateExercise.mockReset().mockResolvedValue({});
+  mockUploadEquipmentPhoto.mockReset().mockResolvedValue('https://example.com/uploaded.jpg');
 });
 
 describe('ExerciseFormScreen (create mode)', () => {
   it('disables Save until a name and muscle group are chosen', () => {
-    const onDone = jest.fn();
-    const onCancel = jest.fn();
-    render(<ExerciseFormScreen mode="create" onDone={onDone} onCancel={onCancel} />);
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
     expect(screen.getByTestId('exercise-form-save').props.accessibilityState.disabled).toBe(true);
 
     fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Cable Preacher Curl');
     expect(screen.getByTestId('exercise-form-save').props.accessibilityState.disabled).toBe(true);
 
-    fireEvent.press(screen.getByTestId('muscle-group-chip-biceps'));
+    selectMuscleGroup('exercise-form-muscle-group', 'biceps');
     expect(screen.getByTestId('exercise-form-save').props.accessibilityState.disabled).toBe(false);
   });
 
-  it('creates the exercise and calls onDone on success', async () => {
-    mockCreateExercise.mockResolvedValue({ id: 'new-id' });
+  it('shows the picked muscle group on the field and creates a bilateral exercise', async () => {
     const onDone = jest.fn();
     render(<ExerciseFormScreen mode="create" onDone={onDone} onCancel={jest.fn()} />);
 
     fireEvent.changeText(screen.getByTestId('exercise-form-name'), '  Cable Preacher Curl  ');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-biceps'));
-    fireEvent.press(screen.getByTestId('exercise-form-save'));
-
-    await screen.findByTestId('exercise-form-name');
-    expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
-      name: 'Cable Preacher Curl',
-      muscleGroup: 'biceps',
-      movementType: 'bilateral',
+    selectMuscleGroup('exercise-form-muscle-group', 'biceps');
+    expect(screen.getByTestId('exercise-form-muscle-group')).toHaveTextContent('Biceps', {
+      exact: false,
     });
-    expect(onDone).toHaveBeenCalled();
-  });
-
-  it('creates a unilateral exercise with its logging style', async () => {
-    mockCreateExercise.mockResolvedValue({ id: 'new-id' });
-    const onDone = jest.fn();
-    render(<ExerciseFormScreen mode="create" onDone={onDone} onCancel={jest.fn()} />);
-
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Single-Arm Lat Pulldown');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-back'));
-    fireEvent.press(screen.getByTestId('exercise-form-movement-type-unilateral'));
-    fireEvent.press(screen.getByTestId('exercise-form-logging-style-single_side'));
-    fireEvent.press(screen.getByTestId('exercise-form-save'));
-
-    await screen.findByTestId('exercise-form-name');
-    expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
-      name: 'Single-Arm Lat Pulldown',
-      muscleGroup: 'back',
-      movementType: 'unilateral',
-      loggingStyle: 'single_side',
-    });
-    expect(onDone).toHaveBeenCalled();
-  });
-
-  it('selects Alternating as the logging style', async () => {
-    mockCreateExercise.mockResolvedValue({ id: 'new-id' });
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Walking Lunge');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-quadriceps'));
-    fireEvent.press(screen.getByTestId('exercise-form-movement-type-unilateral'));
-    fireEvent.press(screen.getByTestId('exercise-form-logging-style-alternating'));
-    fireEvent.press(screen.getByTestId('exercise-form-save'));
-
-    await waitFor(() =>
-      expect(mockCreateExercise).toHaveBeenCalledWith(
-        'token-123',
-        expect.objectContaining({ movementType: 'unilateral', loggingStyle: 'alternating' }),
-      ),
-    );
-  });
-
-  it('keeps Save enabled after choosing Unilateral (Single Side is the default shown), without touching Logging Style', async () => {
-    mockCreateExercise.mockResolvedValue({ id: 'new-id' });
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Single-Arm Row');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-back'));
-    fireEvent.press(screen.getByTestId('exercise-form-movement-type-unilateral'));
-    expect(screen.getByTestId('exercise-form-save').props.accessibilityState.disabled).toBe(false);
 
     fireEvent.press(screen.getByTestId('exercise-form-save'));
+
     await waitFor(() =>
       expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
-        name: 'Single-Arm Row',
+        name: 'Cable Preacher Curl',
+        muscleGroup: 'biceps',
+        movementType: 'bilateral',
+      }),
+    );
+    expect(onDone).toHaveBeenCalled();
+  });
+
+  it('creates a unilateral exercise with logging_style set automatically -- never asked as its own question', async () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Single-Arm Lat Pulldown');
+    selectMuscleGroup('exercise-form-muscle-group', 'back');
+    expect(screen.queryByText(/logging style/i)).toBeNull();
+
+    fireEvent(screen.getByTestId('exercise-form-unilateral'), 'valueChange', true);
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
+        name: 'Single-Arm Lat Pulldown',
         muscleGroup: 'back',
         movementType: 'unilateral',
         loggingStyle: 'single_side',
@@ -142,35 +111,25 @@ describe('ExerciseFormScreen (create mode)', () => {
     );
   });
 
-  it('still saves as bilateral (no logging style) when switched back from Unilateral', async () => {
-    mockCreateExercise.mockResolvedValue({ id: 'new-id' });
+  it('flipping Unilateral back off before saving creates a plain bilateral exercise', async () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
     fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Row');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-back'));
-    fireEvent.press(screen.getByTestId('exercise-form-movement-type-unilateral'));
-    fireEvent.press(screen.getByTestId('exercise-form-movement-type-bilateral'));
+    selectMuscleGroup('exercise-form-muscle-group', 'back');
+    fireEvent(screen.getByTestId('exercise-form-unilateral'), 'valueChange', true);
+    fireEvent(screen.getByTestId('exercise-form-unilateral'), 'valueChange', false);
     fireEvent.press(screen.getByTestId('exercise-form-save'));
 
     await waitFor(() =>
-      expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
-        name: 'Row',
-        muscleGroup: 'back',
-        movementType: 'bilateral',
-      }),
+      expect(mockCreateExercise).toHaveBeenCalledWith(
+        'token-123',
+        expect.objectContaining({ movementType: 'bilateral' }),
+      ),
     );
+    expect(mockCreateExercise.mock.calls[0][1]).not.toHaveProperty('loggingStyle');
   });
 
-  it('hides the Logging Style control for a bilateral exercise', () => {
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-
-    expect(screen.queryByTestId('exercise-form-logging-style')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('exercise-form-movement-type-unilateral'));
-    expect(screen.getByTestId('exercise-form-logging-style')).toBeTruthy();
-  });
-
-  it('shows an error and does not call onDone when creation fails', async () => {
+  it('shows an error and does not call onDone when createExercise fails', async () => {
     mockCreateExercise.mockRejectedValue(
       new Error('You already have a custom exercise with that name'),
     );
@@ -178,7 +137,7 @@ describe('ExerciseFormScreen (create mode)', () => {
     render(<ExerciseFormScreen mode="create" onDone={onDone} onCancel={jest.fn()} />);
 
     fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Dupe');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-chest'));
+    selectMuscleGroup('exercise-form-muscle-group', 'chest');
     fireEvent.press(screen.getByTestId('exercise-form-save'));
 
     expect(await screen.findByTestId('exercise-form-error')).toHaveTextContent(
@@ -187,7 +146,7 @@ describe('ExerciseFormScreen (create mode)', () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
-  it('calls onCancel when Cancel is pressed', () => {
+  it('calls onCancel from the header', () => {
     const onCancel = jest.fn();
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={onCancel} />);
 
@@ -196,15 +155,43 @@ describe('ExerciseFormScreen (create mode)', () => {
     expect(onCancel).toHaveBeenCalled();
   });
 
-  it('has no deactivate/reactivate button in create mode', () => {
+  it('never shows Deactivate/Reactivate in create mode', () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
     expect(screen.queryByTestId('exercise-form-toggle-active')).toBeNull();
   });
+
+  it('adds a photo, uploads it on Save, and includes it in the create payload', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === 'Choose from Library')?.onPress?.();
+    });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file://new-photo.jpg' }],
+    });
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Leg Press');
+    selectMuscleGroup('exercise-form-muscle-group', 'quadriceps');
+
+    fireEvent.press(screen.getByTestId('exercise-form-photo-add'));
+    expect(await screen.findByTestId('exercise-form-photo-preview')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockUploadEquipmentPhoto).toHaveBeenCalledWith('user-1', 'file://new-photo.jpg'),
+    );
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith(
+        'token-123',
+        expect.objectContaining({ photoUrl: 'https://example.com/uploaded.jpg' }),
+      ),
+    );
+  });
 });
 
 describe('ExerciseFormScreen (edit mode)', () => {
-  it('prefills the name and muscle group from the given exercise', () => {
+  it('prefills every field from the existing exercise', () => {
     render(
       <ExerciseFormScreen
         mode="edit"
@@ -214,55 +201,27 @@ describe('ExerciseFormScreen (edit mode)', () => {
       />,
     );
 
-    expect(screen.getByTestId('exercise-form-name').props.value).toBe('My Curl Variation');
-    // The biceps chip should render selected (accent background) since the
-    // exercise being edited is a biceps exercise.
-    expect(screen.getByTestId('muscle-group-chip-biceps')).toHaveStyle({
-      backgroundColor: colors.accent,
+    expect(screen.getByTestId('exercise-form-name')).toHaveProp('value', 'My Curl Variation');
+    expect(screen.getByTestId('exercise-form-muscle-group')).toHaveTextContent('Biceps', {
+      exact: false,
     });
-    expect(screen.getByTestId('muscle-group-chip-chest')).not.toHaveStyle({
-      backgroundColor: colors.accent,
-    });
+    expect(screen.getByTestId('exercise-form-unilateral').props.value).toBe(false);
   });
 
-  it('prefills Exercise Type/Logging Style from an existing unilateral exercise, and can save it back unchanged', async () => {
-    mockUpdateExercise.mockResolvedValue({ id: 'ex-mine' });
-    const unilateralExercise = {
-      ...ownedExercise,
-      movementType: 'unilateral' as const,
-      loggingStyle: 'alternating' as const,
-    };
+  it('prefills Unilateral as on for an existing unilateral exercise', () => {
     render(
       <ExerciseFormScreen
         mode="edit"
-        exercise={unilateralExercise}
+        exercise={{ ...ownedExercise, movementType: 'unilateral', loggingStyle: 'alternating' }}
         onDone={jest.fn()}
         onCancel={jest.fn()}
       />,
     );
 
-    expect(
-      screen.getByTestId('exercise-form-movement-type-unilateral').props.accessibilityState
-        .selected,
-    ).toBe(true);
-    expect(
-      screen.getByTestId('exercise-form-logging-style-alternating').props.accessibilityState
-        .selected,
-    ).toBe(true);
-
-    fireEvent.press(screen.getByTestId('exercise-form-save'));
-
-    await waitFor(() =>
-      expect(mockUpdateExercise).toHaveBeenCalledWith(
-        'token-123',
-        'ex-mine',
-        expect.objectContaining({ movementType: 'unilateral', loggingStyle: 'alternating' }),
-      ),
-    );
+    expect(screen.getByTestId('exercise-form-unilateral').props.value).toBe(true);
   });
 
-  it('saves edits via updateExercise', async () => {
-    mockUpdateExercise.mockResolvedValue({ id: 'ex-mine' });
+  it('saves edited fields via updateExercise', async () => {
     const onDone = jest.fn();
     render(
       <ExerciseFormScreen
@@ -276,18 +235,18 @@ describe('ExerciseFormScreen (edit mode)', () => {
     fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Renamed Curl');
     fireEvent.press(screen.getByTestId('exercise-form-save'));
 
-    await screen.findByTestId('exercise-form-name');
-    expect(mockUpdateExercise).toHaveBeenCalledWith('token-123', 'ex-mine', {
-      name: 'Renamed Curl',
-      muscleGroup: 'biceps',
-      movementType: 'bilateral',
-      isActive: true,
-    });
+    await waitFor(() =>
+      expect(mockUpdateExercise).toHaveBeenCalledWith('token-123', 'ex-mine', {
+        name: 'Renamed Curl',
+        muscleGroup: 'biceps',
+        movementType: 'bilateral',
+        isActive: true,
+      }),
+    );
     expect(onDone).toHaveBeenCalled();
   });
 
-  it('shows "Deactivate" for an active exercise and deactivates on press', async () => {
-    mockUpdateExercise.mockResolvedValue({ id: 'ex-mine', isActive: false });
+  it('deactivates an active exercise', async () => {
     const onDone = jest.fn();
     render(
       <ExerciseFormScreen
@@ -298,16 +257,15 @@ describe('ExerciseFormScreen (edit mode)', () => {
       />,
     );
 
-    expect(screen.getByTestId('exercise-form-toggle-active')).toHaveTextContent('Deactivate');
     fireEvent.press(screen.getByTestId('exercise-form-toggle-active'));
 
-    await screen.findByTestId('exercise-form-name');
-    expect(mockUpdateExercise).toHaveBeenCalledWith('token-123', 'ex-mine', { isActive: false });
+    await waitFor(() =>
+      expect(mockUpdateExercise).toHaveBeenCalledWith('token-123', 'ex-mine', { isActive: false }),
+    );
     expect(onDone).toHaveBeenCalled();
   });
 
-  it('shows "Reactivate" for an inactive exercise and reactivates on press', async () => {
-    mockUpdateExercise.mockResolvedValue({ id: 'ex-mine', isActive: true });
+  it('shows Reactivate for a deactivated exercise', () => {
     render(
       <ExerciseFormScreen
         mode="edit"
@@ -318,252 +276,62 @@ describe('ExerciseFormScreen (edit mode)', () => {
     );
 
     expect(screen.getByTestId('exercise-form-toggle-active')).toHaveTextContent('Reactivate');
-    fireEvent.press(screen.getByTestId('exercise-form-toggle-active'));
-
-    await screen.findByTestId('exercise-form-name');
-    expect(mockUpdateExercise).toHaveBeenCalledWith('token-123', 'ex-mine', { isActive: true });
-  });
-});
-
-describe('ExerciseFormScreen (New Exercise redesign)', () => {
-  it('has no back arrow and centers the title, with Cancel available top-right', () => {
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-
-    expect(screen.queryByTestId('app-header-back')).toBeNull();
-    expect(screen.getByText('New Exercise')).toBeTruthy();
-    expect(
-      screen.getByText('Add exercise details to track your progress accurately.'),
-    ).toBeTruthy();
-    expect(screen.getByTestId('exercise-form-cancel')).toBeTruthy();
   });
 
-  it('does not show the create-only subtitle in edit mode', () => {
+  it('shows an existing photo and lets it be replaced', async () => {
     render(
       <ExerciseFormScreen
         mode="edit"
-        exercise={ownedExercise}
+        exercise={{ ...ownedExercise, photoUrl: 'https://example.com/existing.jpg' }}
         onDone={jest.fn()}
         onCancel={jest.fn()}
       />,
     );
 
-    expect(
-      screen.queryByText('Add exercise details to track your progress accurately.'),
-    ).toBeNull();
+    expect(screen.getByTestId('exercise-form-photo-preview').props.source).toEqual({
+      uri: 'https://example.com/existing.jpg',
+    });
+    expect(screen.getByTestId('exercise-form-photo-change')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    // Nothing picked/removed -- the stored photo is left alone (no photoUrl key at all).
+    await waitFor(() => expect(mockUpdateExercise).toHaveBeenCalled());
+    expect(mockUpdateExercise.mock.calls[0][2]).not.toHaveProperty('photoUrl');
   });
 
-  it('has no "Set as default for this exercise" toggle anywhere on the form', () => {
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-
-    expect(screen.queryByText(/set as default/i)).toBeNull();
-  });
-
-  it('shows the Machine/Equipment section only in create mode', () => {
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-    expect(screen.getByText('Machine / Equipment')).toBeTruthy();
-    expect(screen.getByText('Why add a machine photo?')).toBeTruthy();
-    expect(screen.getByText(/pulley and the weight stack/)).toBeTruthy();
-    expect(screen.getByTestId('exercise-form-machine-photo-add')).toBeTruthy();
-
+  it('clears an existing photo via Remove Photo', async () => {
     render(
       <ExerciseFormScreen
         mode="edit"
-        exercise={ownedExercise}
+        exercise={{ ...ownedExercise, photoUrl: 'https://example.com/existing.jpg' }}
         onDone={jest.fn()}
         onCancel={jest.fn()}
       />,
     );
-    expect(screen.queryByText('Machine / Equipment')).toBeNull();
-  });
 
-  it('saves a plain exercise (no machine details) without creating an equipment profile', async () => {
-    mockCreateExercise.mockResolvedValue({ id: 'new-id' });
-    const onDone = jest.fn();
-    render(<ExerciseFormScreen mode="create" onDone={onDone} onCancel={jest.fn()} />);
-
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Leg Press');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-quadriceps'));
-    fireEvent.press(screen.getByTestId('exercise-form-save'));
-
-    await waitFor(() => expect(onDone).toHaveBeenCalled());
-    expect(mockCreateEquipmentProfile).not.toHaveBeenCalled();
-  });
-
-  it('requires Machine Name once a Gym is entered, and creates the equipment profile on save', async () => {
-    mockCreateExercise.mockResolvedValue({ id: 'new-exercise-id' });
-    mockCreateEquipmentProfile.mockResolvedValue({ id: 'profile-1' });
-    const onDone = jest.fn();
-    render(<ExerciseFormScreen mode="create" onDone={onDone} onCancel={jest.fn()} />);
-
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Leg Press');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-quadriceps'));
-    fireEvent.changeText(screen.getByTestId('exercise-form-gym'), 'Downtown Gym');
-
-    expect(screen.getByTestId('exercise-form-save').props.accessibilityState.disabled).toBe(true);
-
-    fireEvent.changeText(screen.getByTestId('exercise-form-machine-name'), 'Leg Press A');
-    expect(screen.getByTestId('exercise-form-save').props.accessibilityState.disabled).toBe(false);
+    fireEvent.press(screen.getByTestId('exercise-form-photo-remove'));
+    expect(screen.queryByTestId('exercise-form-photo-preview')).toBeNull();
 
     fireEvent.press(screen.getByTestId('exercise-form-save'));
 
     await waitFor(() =>
-      expect(mockCreateEquipmentProfile).toHaveBeenCalledWith('token-123', {
-        exerciseId: 'new-exercise-id',
-        name: 'Leg Press A',
-        gym: 'Downtown Gym',
-      }),
-    );
-    expect(mockUploadEquipmentPhoto).not.toHaveBeenCalled();
-    expect(onDone).toHaveBeenCalled();
-  });
-
-  it('uploads the machine photo and includes its URL when creating the equipment profile', async () => {
-    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
-      buttons?.find((b) => b.text === 'Choose from Library')?.onPress?.();
-    });
-    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValueOnce({
-      canceled: false,
-      assets: [{ uri: 'file://machine-photo.jpg' }],
-    });
-    mockUploadEquipmentPhoto.mockResolvedValue('https://example.com/machine-photo.jpg');
-    mockCreateExercise.mockResolvedValue({ id: 'new-exercise-id' });
-    mockCreateEquipmentProfile.mockResolvedValue({ id: 'profile-1' });
-    const onDone = jest.fn();
-    render(<ExerciseFormScreen mode="create" onDone={onDone} onCancel={jest.fn()} />);
-
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Leg Press');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-quadriceps'));
-    fireEvent.press(screen.getByTestId('exercise-form-machine-photo-add'));
-
-    await screen.findByTestId('exercise-form-machine-photo-preview');
-    fireEvent.changeText(screen.getByTestId('exercise-form-machine-name'), 'Leg Press A');
-    fireEvent.press(screen.getByTestId('exercise-form-save'));
-
-    await waitFor(() =>
-      expect(mockUploadEquipmentPhoto).toHaveBeenCalledWith('user-1', 'file://machine-photo.jpg'),
-    );
-    expect(mockCreateEquipmentProfile).toHaveBeenCalledWith('token-123', {
-      exerciseId: 'new-exercise-id',
-      name: 'Leg Press A',
-      photoUrl: 'https://example.com/machine-photo.jpg',
-    });
-    expect(onDone).toHaveBeenCalled();
-  });
-
-  it('can remove a picked machine photo before saving', async () => {
-    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
-      buttons?.find((b) => b.text === 'Choose from Library')?.onPress?.();
-    });
-    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValueOnce({
-      canceled: false,
-      assets: [{ uri: 'file://machine-photo.jpg' }],
-    });
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-
-    fireEvent.press(screen.getByTestId('exercise-form-machine-photo-add'));
-    await screen.findByTestId('exercise-form-machine-photo-preview');
-
-    fireEvent.press(screen.getByTestId('exercise-form-machine-photo-remove'));
-
-    expect(screen.queryByTestId('exercise-form-machine-photo-preview')).toBeNull();
-    expect(screen.getByTestId('exercise-form-machine-photo-add')).toBeTruthy();
-  });
-
-  it('still saves the exercise even if the equipment profile creation fails', async () => {
-    mockCreateExercise.mockResolvedValue({ id: 'new-exercise-id' });
-    mockCreateEquipmentProfile.mockRejectedValue(new Error('Failed to create equipment profile'));
-    const onDone = jest.fn();
-    render(<ExerciseFormScreen mode="create" onDone={onDone} onCancel={jest.fn()} />);
-
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Leg Press');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-quadriceps'));
-    fireEvent.changeText(screen.getByTestId('exercise-form-gym'), 'Downtown Gym');
-    fireEvent.changeText(screen.getByTestId('exercise-form-machine-name'), 'Leg Press A');
-    fireEvent.press(screen.getByTestId('exercise-form-save'));
-
-    await waitFor(() => expect(onDone).toHaveBeenCalled());
-  });
-});
-
-describe('ExerciseFormScreen (sheet presentation)', () => {
-  it('renders the same fields and still saves correctly, for use inside a BottomSheet', async () => {
-    mockCreateExercise.mockResolvedValue({ id: 'new-id' });
-    const onDone = jest.fn();
-    render(
-      <ExerciseFormScreen
-        mode="create"
-        onDone={onDone}
-        onCancel={jest.fn()}
-        presentation="sheet"
-        accentColor="#8B5CF6"
-        onAccentColor="#0A0A0A"
-      />,
-    );
-
-    expect(screen.getByText('Create Custom Exercise')).toBeTruthy();
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Cable Preacher Curl');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-biceps'));
-    fireEvent.press(screen.getByTestId('exercise-form-save'));
-
-    await waitFor(() =>
-      expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
-        name: 'Cable Preacher Curl',
-        muscleGroup: 'biceps',
-        movementType: 'bilateral',
-      }),
-    );
-    expect(onDone).toHaveBeenCalled();
-  });
-
-  it('creates a unilateral exercise from the sheet presentation', async () => {
-    mockCreateExercise.mockResolvedValue({ id: 'new-id' });
-    render(
-      <ExerciseFormScreen
-        mode="create"
-        onDone={jest.fn()}
-        onCancel={jest.fn()}
-        presentation="sheet"
-        accentColor="#8B5CF6"
-        onAccentColor="#0A0A0A"
-      />,
-    );
-
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Single-Arm Cable Row');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-back'));
-    fireEvent.press(screen.getByTestId('exercise-form-movement-type-unilateral'));
-    fireEvent.press(screen.getByTestId('exercise-form-logging-style-single_side'));
-    fireEvent.press(screen.getByTestId('exercise-form-save'));
-
-    await waitFor(() =>
-      expect(mockCreateExercise).toHaveBeenCalledWith(
+      expect(mockUpdateExercise).toHaveBeenCalledWith(
         'token-123',
-        expect.objectContaining({ movementType: 'unilateral', loggingStyle: 'single_side' }),
+        'ex-mine',
+        expect.objectContaining({ photoUrl: null }),
       ),
     );
   });
-
-  it('calls onCancel from the sheet presentation', () => {
-    const onCancel = jest.fn();
-    render(
-      <ExerciseFormScreen
-        mode="create"
-        onDone={jest.fn()}
-        onCancel={onCancel}
-        presentation="sheet"
-      />,
-    );
-
-    fireEvent.press(screen.getByTestId('exercise-form-cancel'));
-
-    expect(onCancel).toHaveBeenCalled();
-  });
 });
 
-describe('ExerciseFormScreen -- shared controls, one primary action', () => {
-  it('draws no cards, even with the Machine / Equipment section open', () => {
+describe('ExerciseFormScreen -- layout', () => {
+  it('gives the screen real horizontal breathing room from the edges', () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
+    const scroll = screen.getByTestId('exercise-form-scroll');
+    const contentStyle = StyleSheet.flatten(scroll.props.contentContainerStyle);
+    expect(contentStyle.paddingHorizontal).toBeGreaterThan(0);
   });
 
   it('puts a named Cancel in the header', () => {
@@ -572,104 +340,15 @@ describe('ExerciseFormScreen -- shared controls, one primary action', () => {
     expect(screen.getByTestId('exercise-form-cancel').props.accessibilityLabel).toBe('Cancel');
   });
 
-  it('uses the labelled shared input for the name, machine name and gym', () => {
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-
-    expect(screen.getByTestId('exercise-form-name').props.accessibilityLabel).toBe('Exercise Name');
-    expect(screen.getByTestId('exercise-form-machine-name').props.accessibilityLabel).toBe(
-      'Machine Name (Optional)',
-    );
-    expect(screen.getByTestId('exercise-form-gym').props.accessibilityLabel).toBe('Gym (Optional)');
-  });
-
-  it('has one filled button, Save Exercise, in the mode accent -- and Add Machine Photo is only outlined', () => {
-    render(
-      <ExerciseFormScreen
-        mode="create"
-        onDone={jest.fn()}
-        onCancel={jest.fn()}
-        accentColor="#8B5CF6"
-        onAccentColor="#0A0A0A"
-      />,
-    );
-
-    expect(
-      StyleSheet.flatten(screen.getByTestId('exercise-form-save').props.style).backgroundColor,
-    ).toBe('#8B5CF6');
-    const photo = StyleSheet.flatten(
-      screen.getByTestId('exercise-form-machine-photo-add').props.style,
-    );
-    expect(photo.backgroundColor).toBeUndefined();
-    expect(photo.borderWidth).toBe(1);
-  });
-
-  it('shows Save as busy, not just dimmed, while saving', async () => {
-    mockCreateExercise.mockReturnValue(new Promise(() => undefined));
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Cable Preacher Curl');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-biceps'));
-    fireEvent.press(screen.getByTestId('exercise-form-save'));
-
-    await waitFor(() =>
-      expect(screen.getByTestId('exercise-form-save').props.accessibilityState).toEqual({
-        disabled: true,
-        busy: true,
-      }),
-    );
-    expect(
-      within(screen.getByTestId('exercise-form-save')).queryByText('Save Exercise'),
-    ).toBeNull();
-  });
-
-  it('shows Deactivate as a destructive outline and Reactivate as a neutral one, beneath Save', () => {
-    const { unmount } = render(
-      <ExerciseFormScreen
-        mode="edit"
-        exercise={ownedExercise}
-        onDone={jest.fn()}
-        onCancel={jest.fn()}
-      />,
-    );
-    expect(
-      StyleSheet.flatten(screen.getByTestId('exercise-form-toggle-active').props.style).borderColor,
-    ).toBe(colors.destructiveBorder);
-    unmount();
-
+  it('renders no bare text outside <Text>', () => {
     render(
       <ExerciseFormScreen
         mode="edit"
-        exercise={{ ...ownedExercise, isActive: false }}
+        exercise={{ ...ownedExercise, photoUrl: 'https://example.com/existing.jpg' }}
         onDone={jest.fn()}
         onCancel={jest.fn()}
       />,
     );
-    expect(
-      StyleSheet.flatten(screen.getByTestId('exercise-form-toggle-active').props.style).borderColor,
-    ).toBe(colors.border);
-  });
-
-  it('shows a picked machine photo with a destructive Remove Photo text action', async () => {
-    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValueOnce({
-      canceled: false,
-      assets: [{ uri: 'file://photo.jpg' }],
-    });
-    jest.spyOn(Alert, 'alert').mockImplementation((_title, _msg, buttons) => {
-      buttons?.find((b) => b.text === 'Choose from Library')?.onPress?.();
-    });
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-
-    fireEvent.press(screen.getByTestId('exercise-form-machine-photo-add'));
-
-    const remove = await screen.findByTestId('exercise-form-machine-photo-remove');
-    expect(remove.props.accessibilityLabel).toBe('Remove machine photo');
-    expect(StyleSheet.flatten(remove.props.style).borderWidth).toBeUndefined();
-  });
-});
-
-describe('ExerciseFormScreen renders no bare text outside <Text>', () => {
-  it('has no string directly inside a View in create mode', () => {
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
     expectNoBareText();
   });

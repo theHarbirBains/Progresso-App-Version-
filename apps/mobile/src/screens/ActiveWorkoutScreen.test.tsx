@@ -899,11 +899,11 @@ describe('Create Custom Exercise from Add Exercise', () => {
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
     fireEvent.press(await screen.findByTestId('exercise-picker-create-custom'));
 
-    // The picker closes and the full New Exercise screen (with the
-    // Machine/Equipment section) replaces the active workout in its place.
+    // The picker closes and the full New Exercise screen (with its own
+    // Machine Photo section) replaces the active workout in its place.
     expect(screen.queryByTestId('exercise-picker-search')).toBeNull();
     expect(await screen.findByText('New Exercise')).toBeTruthy();
-    expect(screen.getByText('Machine / Equipment')).toBeTruthy();
+    expect(screen.getByText('Machine Photo (Optional)')).toBeTruthy();
 
     mockCreateExercise.mockResolvedValue({ id: 'ex-new' });
     mockFetchExercises.mockResolvedValue({
@@ -920,7 +920,8 @@ describe('Create Custom Exercise from Add Exercise', () => {
     });
 
     fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Cable Preacher Curl');
-    fireEvent.press(screen.getByTestId('muscle-group-chip-biceps'));
+    fireEvent.press(screen.getByTestId('exercise-form-muscle-group'));
+    fireEvent.press(screen.getByTestId('exercise-form-muscle-group-option-biceps'));
     fireEvent.press(screen.getByTestId('exercise-form-save'));
 
     // Back in the picker, immediately able to add the exercise just created.

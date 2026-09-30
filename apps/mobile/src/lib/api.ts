@@ -158,6 +158,7 @@ export interface ExerciseResponse {
   muscleGroup: MuscleGroup;
   movementType: MovementType;
   loggingStyle: LoggingStyle | null;
+  photoUrl: string | null;
   isActive: boolean;
   createdBy: string | null;
   createdAt: string;
@@ -170,6 +171,7 @@ export interface CreateExerciseInput {
   movementType: MovementType;
   /** Required when movementType is 'unilateral', omitted otherwise -- see ExerciseFormScreen. */
   loggingStyle?: LoggingStyle;
+  photoUrl?: string;
 }
 
 export interface UpdateExerciseInput {
@@ -178,6 +180,8 @@ export interface UpdateExerciseInput {
   movementType?: MovementType;
   loggingStyle?: LoggingStyle;
   isActive?: boolean;
+  /** Omit to leave the stored photo alone; null clears it, a string sets/replaces it -- editable any time, not just at create. */
+  photoUrl?: string | null;
 }
 
 export function createExercise(
