@@ -46,6 +46,7 @@ import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { LaunchScreen } from './src/screens/LaunchScreen';
+import { LogPastWorkoutScreen } from './src/screens/LogPastWorkoutScreen';
 import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { NutritionColorScreen } from './src/screens/NutritionColorScreen';
@@ -258,6 +259,7 @@ function Root() {
                 <Stack.Screen name="ShareWorkout" component={ShareWorkoutScreen} />
                 <Stack.Screen name="NewWorkout" component={NewWorkoutScreen} />
                 <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
+                <Stack.Screen name="LogPastWorkout" component={LogPastWorkoutScreen} />
                 <Stack.Screen name="PRHistory" component={PRHistoryScreen} />
                 <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
                 <Stack.Screen name="Nutrition" component={NutritionTodayScreen} />

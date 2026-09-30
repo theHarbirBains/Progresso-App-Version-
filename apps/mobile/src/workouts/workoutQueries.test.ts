@@ -4,6 +4,7 @@ import {
   cancelWorkout,
   completedSetsOnly,
   completeWorkout,
+  createLoggedWorkout,
   createSet,
   createWorkout,
   deleteSet,
@@ -470,6 +471,49 @@ describe('createWorkout', () => {
     mockTables({ workouts: { data: null, error: { message: 'connection lost', code: '08000' } } });
 
     await expect(createWorkout('user-1', 'Push Day')).rejects.toThrow('connection lost');
+  });
+});
+
+describe('createLoggedWorkout', () => {
+  it('inserts with completed_at already set to the given performedAt -- never a draft', async () => {
+    const tables = mockTables({
+      workouts: {
+        data: {
+          id: 'w1',
+          name: 'Leg Day',
+          performed_at: '2026-01-01T12:00:00.000Z',
+          completed_at: '2026-01-01T12:00:00.000Z',
+          workout_split_day_id: null,
+        },
+        error: null,
+      },
+    });
+
+    const result = await createLoggedWorkout('user-1', 'Leg Day', '2026-01-01T12:00:00.000Z');
+
+    expect(tables.workouts.calls.insert[0][0]).toEqual({
+      user_id: 'user-1',
+      name: 'Leg Day',
+      performed_at: '2026-01-01T12:00:00.000Z',
+      completed_at: '2026-01-01T12:00:00.000Z',
+    });
+    expect(result).toEqual({
+      id: 'w1',
+      name: 'Leg Day',
+      performedAt: '2026-01-01T12:00:00.000Z',
+      completedAt: '2026-01-01T12:00:00.000Z',
+      workoutSplitDayId: null,
+    });
+  });
+
+  it('throws on a database error', async () => {
+    mockTables({
+      workouts: { data: null, error: { message: 'connection lost' } },
+    });
+
+    await expect(
+      createLoggedWorkout('user-1', 'Leg Day', '2026-01-01T12:00:00.000Z'),
+    ).rejects.toThrow('connection lost');
   });
 });
 

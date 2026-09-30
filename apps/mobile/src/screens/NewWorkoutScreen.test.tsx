@@ -201,6 +201,19 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
     ).toBe(false);
   });
 
+  it('navigates to Log a Past Workout', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <NewWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
+    );
+
+    fireEvent.press(await screen.findByTestId('start-workout-log-past'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('LogPastWorkout');
+  });
+
   it('shows a resume option instead of creating a duplicate workout on conflict', async () => {
     mockCreateWorkout.mockResolvedValue({
       type: 'conflict',
@@ -427,7 +440,11 @@ describe('NewWorkoutScreen -- one primary action, everything else plain rows', (
 
   it('gives every row at least a 44pt target', async () => {
     renderScreen();
-    for (const id of ['start-workout-day-day-2', 'start-workout-custom']) {
+    for (const id of [
+      'start-workout-day-day-2',
+      'start-workout-custom',
+      'start-workout-log-past',
+    ]) {
       const row = await screen.findByTestId(id);
       expect(StyleSheet.flatten(row.props.style).minHeight).toBeGreaterThanOrEqual(44);
     }

@@ -15,6 +15,7 @@ export type RootStackParamList = {
   ShareWorkout: { workoutId: string };
   NewWorkout: undefined;
   ActiveWorkout: { workoutId: string };
+  LogPastWorkout: undefined;
   PRHistory: { exerciseId: string; exerciseName: string };
   ExerciseProgress: { exerciseId: string; exerciseName: string };
   Nutrition: undefined;

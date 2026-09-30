@@ -288,6 +288,14 @@ export function NewWorkoutScreen({ navigation }: Props) {
             onPress={() => setCustomSheetOpen(true)}
             accessibilityLabel="Do a Different Workout, not part of your split"
           />
+          <ListRow
+            testID="start-workout-log-past"
+            divider
+            title="Log a Past Workout"
+            subtitle="Already did it? Add it after the fact"
+            onPress={() => navigation.navigate('LogPastWorkout')}
+            accessibilityLabel="Log a Past Workout, already did it? Add it after the fact"
+          />
         </View>
       </Screen>
       <BottomSheet

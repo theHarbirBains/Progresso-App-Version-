@@ -288,6 +288,32 @@ export async function createWorkout(
   throw new Error(error.message);
 }
 
+/**
+ * Logs a workout that already happened -- created and completed in the same
+ * insert, with an explicit past `performedAt`, for LogPastWorkoutScreen's
+ * "no live tracking, no in-progress state" flow. Since completed_at is
+ * already set, this can never collide with the one-active-workout-per-user
+ * constraint (a partial index that only applies while completed_at is
+ * null -- see workouts_one_active_per_user) -- unlike createWorkout, there's
+ * no conflict case to handle here. The PR/1RM trigger chain reads whatever
+ * performed_at ends up in this row, so a backdated set still recomputes
+ * correctly against the real historical order of things.
+ */
+export async function createLoggedWorkout(
+  userId: string,
+  name: string,
+  performedAt: string,
+): Promise<WorkoutSummary> {
+  const { data, error } = await supabase
+    .from('workouts')
+    .insert({ user_id: userId, name, performed_at: performedAt, completed_at: performedAt })
+    .select('id, name, performed_at, completed_at, workout_split_day_id')
+    .single();
+
+  if (error) throw new Error(error.message);
+  return toWorkoutSummary(data);
+}
+
 export async function completeWorkout(workoutId: string): Promise<void> {
   const { error } = await supabase
     .from('workouts')
