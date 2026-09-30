@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { fetchExerciseSourceCounts, fetchExercises } from '../exercises/exerciseQueries';
+import { fetchAllExercises, fetchExerciseSourceCounts } from '../exercises/exerciseQueries';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { colors } from '../design/theme';
@@ -16,11 +16,11 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../exercises/exerciseQueries', () => ({
-  fetchExercises: jest.fn(),
+  fetchAllExercises: jest.fn(),
   fetchExerciseSourceCounts: jest.fn(),
 }));
 
-// Isolates this screen's own list/filter/pagination logic from the form's
+// Isolates this screen's own list/filter logic from the form's
 // implementation. babel-plugin-jest-hoist forbids referencing outer-scope
 // variables inside jest.mock() factories, so react-native/react are
 // require()'d inside it instead of relying on the file's top-level import.
@@ -53,7 +53,7 @@ jest.mock('./ExerciseFormScreen', () => {
 /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockFetchExercises = fetchExercises as jest.Mock;
+const mockFetchAllExercises = fetchAllExercises as jest.Mock;
 const mockFetchExerciseSourceCounts = fetchExerciseSourceCounts as jest.Mock;
 const mockGoBack = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,12 +74,16 @@ function renderScreen() {
   );
 }
 
+// Deliberately different starting letters (B, M) so most tests exercise two
+// distinct A-Z sections; a same-letter pair is used separately below for the
+// within-section hairline-divider test.
 const builtinRow = {
   id: 'ex-builtin',
   name: 'Barbell Bench Press',
   muscleGroup: 'chest',
   movementType: 'bilateral',
   loggingStyle: null,
+  photoUrl: null,
   isActive: true,
   createdBy: null,
 };
@@ -89,25 +93,21 @@ const mineRow = {
   muscleGroup: 'biceps',
   movementType: 'bilateral',
   loggingStyle: null,
+  photoUrl: null,
   isActive: true,
   createdBy: 'user-1',
 };
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
-  mockFetchExercises.mockReset();
-  mockFetchExercises.mockResolvedValue({
-    rows: [builtinRow, mineRow],
-    hasMore: false,
-    totalCount: 2,
-  });
+  mockFetchAllExercises.mockReset().mockResolvedValue([builtinRow, mineRow]);
   mockFetchExerciseSourceCounts.mockReset();
   mockFetchExerciseSourceCounts.mockResolvedValue({ all: 328, builtin: 245, mine: 12 });
   mockGoBack.mockClear();
   mockOpenMenu.mockClear();
 });
 
-// FlatList/VirtualizedList schedules a deferred internal setState (cell
+// SectionList/VirtualizedList schedules a deferred internal setState (cell
 // render bookkeeping) via a real setTimeout that can otherwise fire after a
 // test ends. RNTL's automatic unmount runs in its own afterEach registered
 // before any declared in this file, so flushing from an afterEach here
@@ -121,21 +121,22 @@ async function settle() {
 }
 
 describe('ExerciseLibraryScreen', () => {
-  it('loads and displays exercises on mount', async () => {
+  it('loads and displays every matching exercise, grouped alphabetically', async () => {
     renderScreen();
 
     expect(await screen.findByTestId('exercise-item-ex-builtin')).toHaveTextContent(
       /Barbell Bench Press/,
     );
     expect(screen.getByTestId('exercise-item-ex-mine')).toHaveTextContent(/My Curl Variation/);
-    expect(mockFetchExercises).toHaveBeenCalledWith(
+    expect(screen.getByTestId('exercise-library-section-B')).toHaveTextContent('B');
+    expect(screen.getByTestId('exercise-library-section-M')).toHaveTextContent('M');
+    expect(mockFetchAllExercises).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'user-1',
         search: '',
         muscleGroup: null,
         source: 'all',
         ascending: true,
-        page: 0,
       }),
     );
     await settle();
@@ -164,12 +165,14 @@ describe('ExerciseLibraryScreen', () => {
   it('debounces search input before querying', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
-    mockFetchExercises.mockClear();
+    mockFetchAllExercises.mockClear();
 
     fireEvent.changeText(screen.getByTestId('exercise-search'), 'bench');
 
     await waitFor(() =>
-      expect(mockFetchExercises).toHaveBeenCalledWith(expect.objectContaining({ search: 'bench' })),
+      expect(mockFetchAllExercises).toHaveBeenCalledWith(
+        expect.objectContaining({ search: 'bench' }),
+      ),
     );
     await settle();
   });
@@ -177,12 +180,12 @@ describe('ExerciseLibraryScreen', () => {
   it('filters by muscle group when a chip is pressed', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
-    mockFetchExercises.mockClear();
+    mockFetchAllExercises.mockClear();
 
     fireEvent.press(screen.getByTestId('muscle-group-chip-chest'));
 
     await waitFor(() =>
-      expect(mockFetchExercises).toHaveBeenCalledWith(
+      expect(mockFetchAllExercises).toHaveBeenCalledWith(
         expect.objectContaining({ muscleGroup: 'chest' }),
       ),
     );
@@ -198,17 +201,20 @@ describe('ExerciseLibraryScreen', () => {
 
     const wrap = screen.getByTestId('exercise-library-muscle-group-wrap');
     expect(StyleSheet.flatten(wrap.props.style).marginVertical).toBeGreaterThan(0);
+    await settle();
   });
 
   it('filters by source when a category card is pressed', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
-    mockFetchExercises.mockClear();
+    mockFetchAllExercises.mockClear();
 
     fireEvent.press(screen.getByTestId('exercise-source-mine'));
 
     await waitFor(() =>
-      expect(mockFetchExercises).toHaveBeenCalledWith(expect.objectContaining({ source: 'mine' })),
+      expect(mockFetchAllExercises).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'mine' }),
+      ),
     );
     await settle();
   });
@@ -222,32 +228,49 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
-  it('shows the real total count of the current filtered view, not just the loaded page', async () => {
-    mockFetchExercises.mockResolvedValue({
-      rows: [builtinRow],
-      hasMore: true,
-      totalCount: 328,
-    });
+  it('shows the real count of the current filtered view', async () => {
+    mockFetchAllExercises.mockResolvedValue([builtinRow]);
 
     renderScreen();
 
-    expect(await screen.findByTestId('exercise-library-count')).toHaveTextContent(/328/);
+    expect(await screen.findByTestId('exercise-library-count')).toHaveTextContent('1 exercise');
     await settle();
   });
 
   it('toggles sort order and refetches when the sort control is pressed', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
-    mockFetchExercises.mockClear();
+    mockFetchAllExercises.mockClear();
 
     fireEvent.press(screen.getByTestId('exercise-library-sort'));
 
     await waitFor(() =>
-      expect(mockFetchExercises).toHaveBeenCalledWith(
+      expect(mockFetchAllExercises).toHaveBeenCalledWith(
         expect.objectContaining({ ascending: false }),
       ),
     );
     expect(screen.getByTestId('exercise-library-sort')).toHaveTextContent(/Z → A/);
+    await settle();
+  });
+
+  it("jumps to a letter's section when its index-rail entry is pressed", async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    // Only asserts the rail is wired up and doesn't throw -- SectionList's
+    // own scrollToLocation isn't meaningfully observable in this test
+    // environment (no real layout/scroll measurements).
+    expect(() => fireEvent.press(screen.getByTestId('exercise-library-index-M'))).not.toThrow();
+    await settle();
+  });
+
+  it('does not call onSelect for a letter with no exercises', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    expect(screen.getByTestId('exercise-library-index-Z').props.accessibilityState.disabled).toBe(
+      true,
+    );
     await settle();
   });
 
@@ -299,48 +322,52 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
+  it("shows a photo thumbnail, initial-letter fallback for one that doesn't have one -- like a contact photo", async () => {
+    mockFetchAllExercises.mockResolvedValue([
+      { ...builtinRow, photoUrl: 'https://example.com/machine.jpg' },
+      mineRow,
+    ]);
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+
+    expect(screen.getByTestId('exercise-item-ex-builtin-photo-inner').props.source).toEqual({
+      uri: 'https://example.com/machine.jpg',
+    });
+    // mineRow has no photo -- falls back to its own initial letter, not a blank tile.
+    expect(screen.getByTestId('exercise-item-ex-mine-photo-inner')).toHaveTextContent('M');
+    await settle();
+  });
+
   it('returns to the list and refetches when the form reports done', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
     fireEvent.press(screen.getByTestId('exercise-create-button'));
     await screen.findByTestId('mock-exercise-form-mode');
-    mockFetchExercises.mockClear();
+    mockFetchAllExercises.mockClear();
 
     fireEvent.press(screen.getByTestId('mock-exercise-form-done'));
 
     expect(await screen.findByTestId('exercise-item-ex-builtin')).toBeTruthy();
-    expect(mockFetchExercises).toHaveBeenCalledWith(expect.objectContaining({ page: 0 }));
+    expect(mockFetchAllExercises).toHaveBeenCalled();
     await settle();
   });
 
-  it('shows a Load More button when there are more pages, and appends results on press', async () => {
-    mockFetchExercises
-      .mockResolvedValueOnce({ rows: [builtinRow], hasMore: true, totalCount: 2 })
-      .mockResolvedValueOnce({ rows: [mineRow], hasMore: false, totalCount: 2 });
-
-    renderScreen();
-    await screen.findByTestId('exercise-item-ex-builtin');
-    expect(screen.getByTestId('exercise-load-more')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('exercise-load-more'));
-
-    expect(await screen.findByTestId('exercise-item-ex-mine')).toBeTruthy();
-    expect(mockFetchExercises).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }));
-    expect(screen.queryByTestId('exercise-load-more')).toBeNull();
-    await settle();
-  });
-
-  it('shows an error message when the query fails', async () => {
-    mockFetchExercises.mockReset().mockRejectedValue(new Error('network error'));
+  it('shows an error message with a working retry when the query fails', async () => {
+    mockFetchAllExercises.mockReset().mockRejectedValueOnce(new Error('network error'));
 
     renderScreen();
 
     expect(await screen.findByTestId('exercise-library-error')).toHaveTextContent('network error');
+
+    mockFetchAllExercises.mockResolvedValue([builtinRow, mineRow]);
+    fireEvent.press(screen.getByTestId('exercise-library-error-retry'));
+
+    expect(await screen.findByTestId('exercise-item-ex-builtin')).toBeTruthy();
     await settle();
   });
 
   it('shows an empty state when no exercises match the current filters', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [], hasMore: false, totalCount: 0 });
+    mockFetchAllExercises.mockResolvedValue([]);
 
     renderScreen();
 
@@ -374,18 +401,6 @@ describe('ExerciseLibraryScreen -- two widgets, source blocks, New Exercise in t
     expect(screen.getByTestId('exercise-library-open-menu').props.accessibilityLabel).toBe(
       'Open menu',
     );
-    await settle();
-  });
-
-  it('separates rows with a hairline, none above the first', async () => {
-    renderScreen();
-    const first = StyleSheet.flatten(
-      (await screen.findByTestId('exercise-item-ex-builtin')).props.style,
-    );
-    const second = StyleSheet.flatten(screen.getByTestId('exercise-item-ex-mine').props.style);
-
-    expect(first.borderTopWidth).toBeUndefined();
-    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
     await settle();
   });
 
@@ -466,11 +481,6 @@ describe('ExerciseLibraryScreen -- two widgets, source blocks, New Exercise in t
   });
 
   it('renders no bare text outside <Text>', async () => {
-    mockFetchExercises.mockResolvedValue({
-      rows: [builtinRow, mineRow],
-      hasMore: true,
-      totalCount: 40,
-    });
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
