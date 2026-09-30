@@ -20,6 +20,7 @@ describe('APP_MENU_SECTIONS', () => {
     expect(allLabels).toEqual(
       expect.arrayContaining([
         'Workouts',
+        'Log a Past Workout',
         'Progress',
         'Workout Splits',
         'Exercise Library',
@@ -34,6 +35,14 @@ describe('APP_MENU_SECTIONS', () => {
     expect(allLabels).not.toContain('Feed');
     // Settings is APP_MENU_FOOTER_ITEM, not a section item -- see below.
     expect(allLabels).not.toContain('Settings');
+  });
+
+  it("routes the 'Log a Past Workout' item to the LogPastWorkout screen", () => {
+    expect(findItem('Log a Past Workout')).toEqual({
+      route: 'LogPastWorkout',
+      label: 'Log a Past Workout',
+      icon: 'edit-3',
+    });
   });
 
   it("routes the 'Find People' item to the FindPeople screen", () => {

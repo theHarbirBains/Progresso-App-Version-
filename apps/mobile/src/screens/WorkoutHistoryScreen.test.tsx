@@ -300,6 +300,16 @@ describe('WorkoutHistoryScreen', () => {
     await settle();
   });
 
+  it('navigates to Log a Past Workout, independent of whether a workout is in progress', async () => {
+    renderScreen();
+    await screen.findByTestId('workout-history-log-past');
+
+    fireEvent.press(screen.getByTestId('workout-history-log-past'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('LogPastWorkout');
+    await settle();
+  });
+
   it('loads more recent history on press and appends results', async () => {
     mockFetchWorkoutHistory
       .mockResolvedValueOnce({ rows: [enrichedFixture({ id: 'w1' })], hasMore: true })

@@ -242,6 +242,14 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
         </AppCard>
       )}
 
+      <View style={styles.logPastWorkoutWrap}>
+        <TextButton
+          testID="workout-history-log-past"
+          label="Log a Past Workout"
+          onPress={() => navigation.navigate('LogPastWorkout')}
+        />
+      </View>
+
       <AppCard testID="workout-history-calendar-card">
         <MonthCalendar
           testID="workout-calendar"

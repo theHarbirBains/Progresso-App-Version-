@@ -25,6 +25,12 @@ export const workoutHistoryStyles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
+  // A quiet secondary link, independent of whether there's an active
+  // workout in progress above it -- logging something that already
+  // happened is unrelated to resuming/starting a live one.
+  logPastWorkoutWrap: {
+    alignItems: 'center',
+  },
 
   // Calendar legend
   legendRow: {

@@ -55,6 +55,7 @@ export const APP_MENU_SECTIONS: AppMenuSection[] = [
     title: 'TRAINING',
     items: [
       { route: 'WorkoutHistory', label: 'Workouts', icon: 'activity' },
+      { route: 'LogPastWorkout', label: 'Log a Past Workout', icon: 'edit-3' },
       { route: 'ProgressOverview', label: 'Progress', icon: 'trending-up' },
       { route: 'WorkoutSplits', label: 'Workout Splits', icon: 'layers' },
       { route: 'ExerciseLibrary', label: 'Exercise Library', icon: 'list' },
