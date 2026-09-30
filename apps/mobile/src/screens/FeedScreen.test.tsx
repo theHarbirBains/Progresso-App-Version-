@@ -8,6 +8,10 @@ import { fetchFriendsFeed, getMyProfile, listFollowNotifications } from '../lib/
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
+import {
+  fetchLastWorkoutSplitDayId,
+  fetchWorkoutSplitDetail,
+} from '../workouts/workoutSplitQueries';
 import { FeedScreen } from './FeedScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -28,12 +32,19 @@ jest.mock('../nutrition/nutritionGoalQueries', () => ({
   fetchNutritionGoals: jest.fn(),
 }));
 
+jest.mock('../workouts/workoutSplitQueries', () => ({
+  fetchWorkoutSplitDetail: jest.fn(),
+  fetchLastWorkoutSplitDayId: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockFetchFeedItems = fetchFeedItems as jest.Mock;
 const mockFetchFriendsFeed = fetchFriendsFeed as jest.Mock;
 const mockListFollowNotifications = listFollowNotifications as jest.Mock;
 const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
+const mockFetchWorkoutSplitDetail = fetchWorkoutSplitDetail as jest.Mock;
+const mockFetchLastWorkoutSplitDayId = fetchLastWorkoutSplitDayId as jest.Mock;
 
 function feedPage(items: unknown[], hasMore = false) {
   return { items, hasMore };
@@ -149,6 +160,11 @@ beforeEach(() => {
   mockFetchNutritionGoals
     .mockReset()
     .mockResolvedValue({ calories: 2400, proteinG: 180, carbsG: 250, fatG: 70 });
+  // No successful default -- the Next Workout widget stays absent unless a
+  // test explicitly sets up a split detail, same "quietly nothing" fallback
+  // loadNextWorkout's own catch block gives a real fetch failure.
+  mockFetchWorkoutSplitDetail.mockReset().mockRejectedValue(new Error('not set up in this test'));
+  mockFetchLastWorkoutSplitDayId.mockReset().mockResolvedValue(null);
   mockNavigate.mockClear();
   mockOpenMenu.mockClear();
 });
@@ -603,5 +619,65 @@ describe('FeedScreen -- Load More', () => {
     fireEvent.press(screen.getByTestId('feed-load-more'));
 
     expect(mockFetchFeedItems).toHaveBeenCalledTimes(2);
+  });
+});
+
+const oneDaySplit = {
+  id: 'split-1',
+  name: 'PPL',
+  days: [{ id: 'day-push', name: 'Push', orderIndex: 1, muscleGroups: ['chest' as const] }],
+};
+
+describe('FeedScreen -- Next Workout widget', () => {
+  it("shows the next day in the active split's rotation, and taps through to Start Workout", async () => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
+    mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
+    renderScreen();
+
+    const card = await screen.findByTestId('feed-next-workout');
+    expect(card).toHaveTextContent('Push', { exact: false });
+    expect(mockFetchWorkoutSplitDetail).toHaveBeenCalledWith('split-1');
+
+    fireEvent.press(card);
+    expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
+  });
+
+  it('is absent for a user with no active workout split', async () => {
+    mockGetMyProfile.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@example.com',
+      role: 'user',
+      displayName: 'Harbir Bains',
+      username: null,
+      weightUnit: 'kg',
+      workoutAccentColor: null,
+      nutritionAccentColor: null,
+      avatarUrl: null,
+      activeWorkoutSplitId: null,
+    });
+    renderScreen();
+    await screen.findByTestId('feed-empty');
+
+    expect(screen.queryByTestId('feed-next-workout')).toBeNull();
+    expect(mockFetchWorkoutSplitDetail).not.toHaveBeenCalled();
+  });
+
+  it('is absent when the active split has no days', async () => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue({ id: 'split-1', name: 'Empty', days: [] });
+    mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
+    renderScreen();
+    await screen.findByTestId('feed-empty');
+
+    expect(screen.queryByTestId('feed-next-workout')).toBeNull();
+  });
+
+  it('shows up as soon as the active split loads, without needing a second focus', async () => {
+    // Regression guard: activeWorkoutSplitId arrives from ProfileProvider's
+    // own async fetch, after Feed's first focus event has already fired.
+    mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
+    mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-next-workout')).toBeTruthy();
   });
 });

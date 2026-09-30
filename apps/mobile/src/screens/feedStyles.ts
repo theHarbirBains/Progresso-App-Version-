@@ -24,6 +24,32 @@ export const feedStyles = StyleSheet.create({
     paddingHorizontal: 6,
   },
 
+  // The "Next Workout" widget pinned above everything else -- same hero
+  // anatomy as NewWorkoutScreen's own version of this card (eyebrow, day
+  // name, muscles, a meta line, a non-interactive "button" for the eye).
+  nextWorkoutEyebrow: {
+    ...typeScale.sectionHeading,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  nextWorkoutDayName: {
+    ...typeScale.screenTitle,
+    color: colors.textPrimary,
+  },
+  nextWorkoutMuscles: {
+    ...typeScale.secondary,
+    color: colors.textSecondaryBright,
+    marginTop: 2,
+  },
+  nextWorkoutMeta: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+  },
+  nextWorkoutAction: {
+    marginTop: spacing.lg,
+  },
+
   // The byline: a small avatar, the account's own name, and a quiet
   // icon+timestamp line underneath -- Strava's "who, when" row, without the
   // social graph (it's always the signed-in user).

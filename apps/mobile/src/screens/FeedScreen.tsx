@@ -7,7 +7,7 @@ import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
 import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
-import { TextButton } from '../design/Button';
+import { PrimaryButton, TextButton } from '../design/Button';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
@@ -24,12 +24,21 @@ import { mealTypeLabel, type MealType } from '../nutrition/mealTypes';
 import { FoodImage } from '../nutrition/FoodImage';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
+import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
+import {
+  fetchLastWorkoutSplitDayId,
+  fetchWorkoutSplitDetail,
+} from '../workouts/workoutSplitQueries';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 import { feedStyles as styles } from './feedStyles';
 
 type Props = RootStackScreenProps<'Feed'>;
+
+function musclesLabel(day: NextWorkoutPlan['day']): string {
+  return day.muscleGroups.map((g) => SPLIT_MUSCLE_GROUP_LABELS[g]).join(' • ');
+}
 
 // A normalized shape both "You" (feedQueries.ts, self-only) and "Friends"
 // (lib/api.ts's fetchFriendsFeed, backend-merged followees' activity) map
@@ -145,6 +154,18 @@ export function FeedScreen({ navigation }: Props) {
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [nutritionGoalsMissing, setNutritionGoalsMissing] = useState(false);
 
+  // The widget pinned above everything else on this screen -- the same
+  // "advance to the next day in the active split's rotation" preview
+  // NewWorkoutScreen's own hero card computes (see computeNextWorkout).
+  // Deliberately read-only here: tapping it opens NewWorkoutScreen rather
+  // than starting the workout directly, so the one place that actually
+  // creates a workout (with its one-active-workout conflict handling) stays
+  // the single source of truth, not duplicated onto Feed too. Absent
+  // entirely for a user with no active split, or an active split with no
+  // days -- never a "choose a split" prompt here, since Notifications
+  // already carries that reminder (see NotificationsScreen).
+  const [nextPlan, setNextPlan] = useState<NextWorkoutPlan | null>(null);
+
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   // Only the very first load should replace the whole screen with a
   // spinner -- every later focus is a background refresh, same pattern as
@@ -200,11 +221,51 @@ export function FeedScreen({ navigation }: Props) {
     }
   }, [accessToken, userId]);
 
+  const loadNextWorkout = useCallback(async () => {
+    if (!userId || !activeWorkoutSplitId) {
+      setNextPlan(null);
+      return;
+    }
+    try {
+      const [detail, lastDayId] = await Promise.all([
+        fetchWorkoutSplitDetail(activeWorkoutSplitId),
+        fetchLastWorkoutSplitDayId(userId),
+      ]);
+      setNextPlan(computeNextWorkout(detail, lastDayId));
+    } catch {
+      // A preview widget failing to load isn't worth a screen-level error --
+      // it just doesn't show, same as a missing badge count above.
+      setNextPlan(null);
+    }
+  }, [userId, activeWorkoutSplitId]);
+
+  // Runs as soon as the active split becomes known, not just on the next
+  // focus event -- activeWorkoutSplitId arrives asynchronously (it comes
+  // from ProfileProvider's own fetch), so without this the widget would
+  // stay absent through Feed's very first mount until the user left and
+  // came back. A plain effect, not folded into the focus-listener effect
+  // below, so this reactivity never touches that effect's own
+  // subscribe/unsubscribe lifecycle.
+  useEffect(() => {
+    void loadNextWorkout();
+  }, [loadNextWorkout]);
+
+  // loadNextWorkout is deliberately read via a ref, not a dependency, here:
+  // its own identity changes whenever activeWorkoutSplitId changes (see
+  // above), which would otherwise make this effect resubscribe to
+  // navigation's focus event every time that happens -- a real focus
+  // listener doesn't refire just from resubscribing, but it's still a
+  // needless churn this avoids entirely. The ref always calls the latest
+  // version, so a real focus event still reloads with current values.
+  const loadNextWorkoutRef = useRef(loadNextWorkout);
+  loadNextWorkoutRef.current = loadNextWorkout;
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       void load();
       void loadFriends();
       void loadNotificationBadgeCount();
+      void loadNextWorkoutRef.current();
     });
     return unsubscribe;
   }, [navigation, load, loadFriends, loadNotificationBadgeCount]);
@@ -431,6 +492,41 @@ export function FeedScreen({ navigation }: Props) {
           }}
         />
       </BubbleMenu>
+
+      {nextPlan ? (
+        <AppCard
+          hero
+          topAccent={colors.textPrimary}
+          testID="feed-next-workout"
+          onPress={() => navigation.navigate('NewWorkout')}
+          accessibilityLabel={`Next workout: ${nextPlan.day.name}${
+            nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
+          }`}
+        >
+          <Text style={styles.nextWorkoutEyebrow}>Next Workout</Text>
+          <Text style={styles.nextWorkoutDayName}>{nextPlan.day.name}</Text>
+          {nextPlan.day.muscleGroups.length > 0 ? (
+            <Text style={styles.nextWorkoutMuscles}>{musclesLabel(nextPlan.day)}</Text>
+          ) : null}
+          <Text style={styles.nextWorkoutMeta}>
+            {nextPlan.previousDayName
+              ? `Up next after ${nextPlan.previousDayName}`
+              : "Let's get started"}
+          </Text>
+          {/* The card is the one tap target (into NewWorkoutScreen, which
+              actually starts it); this is the real button, shown for the eye,
+              with its own touches off -- same convention as NewWorkoutScreen's
+              own hero card. */}
+          <View
+            style={styles.nextWorkoutAction}
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <PrimaryButton label="Start Workout" onPress={() => undefined} />
+          </View>
+        </AppCard>
+      ) : null}
 
       {blockingError ? (
         <ErrorState testID="feed-error" message={blockingError} onRetry={retryAll} />
