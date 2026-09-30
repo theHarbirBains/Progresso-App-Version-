@@ -12,6 +12,7 @@ import { FeedModule } from './feed/feed.module';
 import { FoodsModule } from './foods/foods.module';
 import { FollowsModule } from './follows/follows.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { RevenueCatModule } from './revenuecat/revenuecat.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { UsersModule } from './users/users.module';
@@ -34,6 +35,7 @@ import { UsersModule } from './users/users.module';
     FeedModule,
     AdminModule,
     RevenueCatModule,
+    NotificationsModule,
   ],
   providers: [
     {
