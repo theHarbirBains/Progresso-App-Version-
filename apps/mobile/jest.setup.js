@@ -115,6 +115,27 @@ jest.mock('expo-secure-store', () => {
   };
 });
 
+// expo-constants has no jest-expo auto-mock either (its native module
+// resolution crashes jest-expo's own mock lookup the same way expo-image-
+// picker/expo-camera do). pushNotifications.ts is the one place that reads
+// it (for the EAS project id passed to getExpoPushTokenAsync), now imported
+// transitively by AccountSettingsScreen.tsx.
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { extra: { eas: { projectId: 'test-project-id' } } } },
+}));
+
+// expo-notifications has no jest-expo auto-mock either. Only the
+// permission/token functions pushNotifications.ts actually calls are
+// exported here; permission defaults to granted and the token is a fixed
+// test value, matching expo-image-picker's own mock's "default to the
+// happy path, let a test that cares override it" convention.
+jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  getExpoPushTokenAsync: jest.fn().mockResolvedValue({ data: 'ExponentPushToken[test]' }),
+}));
+
 jest.mock('expo-crypto', () => {
   let callCount = 0;
   return {

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import * as Notifications from 'expo-notifications';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
 import { colors, spacing } from '../design/theme';
@@ -6,7 +7,7 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { Alert, StyleSheet } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { getMyProfile, registerPushToken, unregisterPushToken, updateMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { settingsStyles } from '../settings/settingsStyles';
 import { DEFAULT_NUTRITION_COLOR, DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
@@ -19,11 +20,15 @@ jest.mock('../auth/AuthProvider', () => ({
 jest.mock('../lib/api', () => ({
   getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
+  registerPushToken: jest.fn(),
+  unregisterPushToken: jest.fn(),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
+const mockRegisterPushToken = registerPushToken as jest.Mock;
+const mockUnregisterPushToken = unregisterPushToken as jest.Mock;
 
 const baseProfile = {
   id: 'user-1',
@@ -62,6 +67,8 @@ beforeEach(() => {
   });
   mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset();
+  mockRegisterPushToken.mockReset().mockResolvedValue({ registered: true });
+  mockUnregisterPushToken.mockReset().mockResolvedValue({ removed: true });
   mockNavigate.mockClear();
   mockGoBack.mockClear();
 });
@@ -581,6 +588,75 @@ describe('AccountSettingsScreen Notifications category', () => {
     fireEvent(screen.getByTestId('notif-push-toggle'), 'valueChange', true);
 
     expect(await screen.findByTestId('notif-push-toggle')).toHaveProp('value', true);
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
+      pushNotificationsOptIn: true,
+    });
+  });
+
+  it('registers this device for real push delivery when push is turned on', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, pushNotificationsOptIn: true });
+
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
+    );
+    await screen.findByTestId('account-email');
+    goToCategory('Notifications');
+
+    fireEvent(screen.getByTestId('notif-push-toggle'), 'valueChange', true);
+
+    await waitFor(() =>
+      expect(mockRegisterPushToken).toHaveBeenCalledWith(
+        'token-123',
+        'ExponentPushToken[test]',
+        'ios',
+      ),
+    );
+    expect(mockUnregisterPushToken).not.toHaveBeenCalled();
+  });
+
+  it('unregisters this device when push is turned back off', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, pushNotificationsOptIn: false });
+
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
+    );
+    await screen.findByTestId('account-email');
+    goToCategory('Notifications');
+
+    fireEvent(screen.getByTestId('notif-push-toggle'), 'valueChange', false);
+
+    await waitFor(() =>
+      expect(mockUnregisterPushToken).toHaveBeenCalledWith('token-123', 'ExponentPushToken[test]'),
+    );
+    expect(mockRegisterPushToken).not.toHaveBeenCalled();
+  });
+
+  it('still saves the preference even when permission is denied (no token to register)', async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({ status: 'denied' });
+    (Notifications.requestPermissionsAsync as jest.Mock).mockResolvedValueOnce({
+      status: 'denied',
+    });
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, pushNotificationsOptIn: true });
+
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
+    );
+    await screen.findByTestId('account-email');
+    goToCategory('Notifications');
+
+    fireEvent(screen.getByTestId('notif-push-toggle'), 'valueChange', true);
+
+    expect(await screen.findByTestId('notif-push-toggle')).toHaveProp('value', true);
+    expect(mockRegisterPushToken).not.toHaveBeenCalled();
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
       pushNotificationsOptIn: true,
     });

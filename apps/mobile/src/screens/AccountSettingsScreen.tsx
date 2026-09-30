@@ -5,6 +5,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
+import { registerPushToken, unregisterPushToken } from '../lib/api';
+import { requestPushToken } from '../lib/pushNotifications';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -30,7 +32,8 @@ type Props = RootStackScreenProps<'AccountSettings'>;
 // internal identifier only) so nothing elsewhere in the navigation needs to
 // change.
 export function AccountSettingsScreen({ navigation }: Props) {
-  const { user, signOut } = useAuth();
+  const { user, session, signOut } = useAuth();
+  const accessToken = session?.access_token;
   const { theme, themeLoading } = useProgressTheme();
   const { profile, loading, error: loadError, updateProfile } = useProfile();
 
@@ -119,6 +122,23 @@ export function AccountSettingsScreen({ navigation }: Props) {
     setPushNotificationsOptIn(value);
     setNotifSaving(true);
     try {
+      // requestPushToken() is iOS-only and returns the SAME token every
+      // call once permission is granted (no new prompt) -- so re-deriving
+      // it here rather than holding it in state also works for turning the
+      // preference back off, with no separate "remember the token" plumbing.
+      if (accessToken) {
+        const token = await requestPushToken();
+        if (token) {
+          if (value) {
+            await registerPushToken(accessToken, token, 'ios');
+          } else {
+            await unregisterPushToken(accessToken, token);
+          }
+        }
+        // A null token (denied permission, or Android for now) just means
+        // there's nothing to register/unregister yet -- the preference
+        // itself still saves below, same as it always has.
+      }
       await updateProfile({ pushNotificationsOptIn: value });
     } catch {
       setPushNotificationsOptIn(previous);

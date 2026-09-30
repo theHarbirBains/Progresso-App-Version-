@@ -55,7 +55,14 @@
           "cameraPermission": "Progresso uses your camera to scan food barcodes and let you take a profile or machine photo."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0B0B0F"
+        }
+      ]
     ]
   }
 }
