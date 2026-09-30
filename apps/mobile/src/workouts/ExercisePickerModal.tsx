@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, View } from 'react-native';
 import { Text } from '../design/Text';
 import { AppHeader } from '../design/AppHeader';
@@ -76,6 +76,27 @@ export function ExercisePickerModal({
     };
   }, [visible, userId, search, muscleGroup]);
 
+  const alreadyAddedIdSet = useMemo(() => new Set(alreadyAddedIds), [alreadyAddedIds]);
+
+  const renderItem = useCallback(
+    ({ item }: { item: ExerciseRow }) => {
+      const added = alreadyAddedIdSet.has(item.id);
+      return (
+        <ListRow
+          testID={`exercise-picker-item-${item.id}`}
+          title={`${item.name}${added ? ' (added)' : ''}`}
+          subtitle={MUSCLE_GROUP_LABELS[item.muscleGroup]}
+          chevron={false}
+          divider
+          disabled={added}
+          onPress={() => onSelect(item)}
+          accessibilityLabel={`${item.name}, ${MUSCLE_GROUP_LABELS[item.muscleGroup]}${added ? ', already added' : ''}`}
+        />
+      );
+    },
+    [alreadyAddedIdSet, onSelect],
+  );
+
   return (
     <Modal
       visible={visible}
@@ -148,21 +169,7 @@ export function ExercisePickerModal({
                 ) : null}
               </>
             }
-            renderItem={({ item }) => {
-              const added = alreadyAddedIds.includes(item.id);
-              return (
-                <ListRow
-                  testID={`exercise-picker-item-${item.id}`}
-                  title={`${item.name}${added ? ' (added)' : ''}`}
-                  subtitle={MUSCLE_GROUP_LABELS[item.muscleGroup]}
-                  chevron={false}
-                  divider
-                  disabled={added}
-                  onPress={() => onSelect(item)}
-                  accessibilityLabel={`${item.name}, ${MUSCLE_GROUP_LABELS[item.muscleGroup]}${added ? ', already added' : ''}`}
-                />
-              );
-            }}
+            renderItem={renderItem}
             ListEmptyComponent={
               !loading ? <Text style={styles.pickerEmptyText}>No exercises found</Text> : null
             }

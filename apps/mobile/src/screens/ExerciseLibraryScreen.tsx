@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, SectionList, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  SectionList,
+  TouchableOpacity,
+  View,
+  type SectionListData,
+} from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
@@ -81,7 +87,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeLetter, setActiveLetter] = useState<string | undefined>(undefined);
-  const sectionListRef = useRef<SectionList<ExerciseRow>>(null);
+  const sectionListRef = useRef<SectionList<ExerciseRow, { title: string }>>(null);
   // Real, independent per-source totals for the "All / Built-in / Mine"
   // category cards (see fetchExerciseSourceCounts) -- never fabricated, and
   // never derived from `rows`, which only reflects the CURRENT search/filter,
@@ -136,20 +142,75 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     void load();
   }
 
-  const sections = groupExercisesByLetter(rows);
-  const availableLetters = new Set(sections.map((section) => section.letter));
+  const sections = useMemo(() => groupExercisesByLetter(rows), [rows]);
+  const availableLetters = useMemo(
+    () => new Set(sections.map((section) => section.letter)),
+    [sections],
+  );
+  const listSections = useMemo(
+    () => sections.map((section) => ({ title: section.letter, data: section.data })),
+    [sections],
+  );
 
-  function jumpToLetter(letter: string) {
-    const sectionIndex = sections.findIndex((section) => section.letter === letter);
-    if (sectionIndex === -1) return;
-    setActiveLetter(letter);
-    sectionListRef.current?.scrollToLocation({
-      sectionIndex,
-      itemIndex: 0,
-      viewPosition: 0,
-      animated: true,
-    });
-  }
+  const jumpToLetter = useCallback(
+    (letter: string) => {
+      const sectionIndex = sections.findIndex((section) => section.letter === letter);
+      if (sectionIndex === -1) return;
+      setActiveLetter(letter);
+      sectionListRef.current?.scrollToLocation({
+        sectionIndex,
+        itemIndex: 0,
+        viewPosition: 0,
+        animated: true,
+      });
+    },
+    [sections],
+  );
+
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: SectionListData<ExerciseRow, { title: string }> }) => (
+      <View testID={`exercise-library-section-${section.title}`}>
+        <SectionHeader label={section.title} />
+      </View>
+    ),
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: ExerciseRow; index: number }) => {
+      const isMine = item.createdBy != null;
+      return (
+        <View style={[styles.row, index > 0 && styles.rowDivider]}>
+          <ListRow
+            testID={`exercise-item-${item.id}`}
+            leading={
+              <ExercisePhoto
+                testID={`exercise-item-${item.id}-photo`}
+                uri={item.photoUrl}
+                name={item.name}
+              />
+            }
+            title={item.name}
+            subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
+            onPress={isMine ? () => setMode({ type: 'edit', exercise: item }) : undefined}
+            trailing={
+              <>
+                <Text
+                  style={[styles.sourceLabel, { color: isMine ? theme.accent : colors.textMuted }]}
+                >
+                  {isMine ? 'Mine' : 'Built-in'}
+                </Text>
+                {isMine ? (
+                  <Feather name="chevron-right" size={18} color={colors.textMuted} />
+                ) : null}
+              </>
+            }
+          />
+        </View>
+      );
+    },
+    [theme.accent],
+  );
 
   if (mode.type === 'create') {
     return (
@@ -288,54 +349,13 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
             <SectionList
               ref={sectionListRef}
               testID="exercise-library-list-section"
-              sections={sections.map((section) => ({
-                title: section.letter,
-                data: section.data,
-              }))}
+              sections={listSections}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.listContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              renderSectionHeader={({ section }) => (
-                <View testID={`exercise-library-section-${section.title}`}>
-                  <SectionHeader label={section.title} />
-                </View>
-              )}
-              renderItem={({ item, index }) => {
-                const isMine = item.createdBy != null;
-                return (
-                  <View style={[styles.row, index > 0 && styles.rowDivider]}>
-                    <ListRow
-                      testID={`exercise-item-${item.id}`}
-                      leading={
-                        <ExercisePhoto
-                          testID={`exercise-item-${item.id}-photo`}
-                          uri={item.photoUrl}
-                          name={item.name}
-                        />
-                      }
-                      title={item.name}
-                      subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
-                      onPress={isMine ? () => setMode({ type: 'edit', exercise: item }) : undefined}
-                      trailing={
-                        <>
-                          <Text
-                            style={[
-                              styles.sourceLabel,
-                              { color: isMine ? theme.accent : colors.textMuted },
-                            ]}
-                          >
-                            {isMine ? 'Mine' : 'Built-in'}
-                          </Text>
-                          {isMine ? (
-                            <Feather name="chevron-right" size={18} color={colors.textMuted} />
-                          ) : null}
-                        </>
-                      }
-                    />
-                  </View>
-                );
-              }}
+              renderSectionHeader={renderSectionHeader}
+              renderItem={renderItem}
               onScrollToIndexFailed={() => {
                 // A section can be shorter than the viewport at the very end
                 // of the list; retry is unnecessary since scrollToLocation

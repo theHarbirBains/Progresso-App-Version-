@@ -10,7 +10,7 @@ import {
 } from '@expo-google-fonts/manrope';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
@@ -131,6 +131,33 @@ function Root() {
   // useProgressTheme's own comment), so no longer needs its own profile
   // fetch/effect.
   const nutritionMenuTheme: AccentTheme = DEFAULT_NUTRITION_THEME;
+  // Every screen gets an opaque, themed backdrop that is part of the screen
+  // itself, so a push/pop never depends on JS to paint what's behind the
+  // incoming page in time (see ScreenBackdrop). Its soft glow follows the
+  // mode of the screen it sits under: the mode-agnostic roots (Feed,
+  // Progress, You) follow the shared mode, everything else its own route's
+  // mode. Memoized (rather than a plain inline function) since it's passed
+  // as Stack.Navigator's `screenLayout` prop, which re-wraps every currently
+  // mounted screen's children whenever its identity changes -- and this
+  // component re-renders on every navigation event (see onStateChange
+  // below), so a fresh function each time would do that needlessly.
+  const renderScreenLayout = useCallback(
+    ({ route, children }: { route: { name: string }; children: ReactNode }) => {
+      const screenMode = MODE_AGNOSTIC_ROUTES.has(route.name)
+        ? sharedMode
+        : isNutritionRoute(route.name)
+          ? 'nutrition'
+          : 'workout';
+      return (
+        <ScreenBackdrop
+          accentColor={screenMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent}
+        >
+          {children}
+        </ScreenBackdrop>
+      );
+    },
+    [sharedMode, menuTheme.accent, nutritionMenuTheme.accent],
+  );
   // The persistent bottom nav (BottomNavBar) is mounted here for the same
   // reason AppSideMenu is: as a sibling of the navigator so it survives
   // every push/pop instead of being owned by (and disappearing with) an
@@ -195,33 +222,6 @@ function Root() {
 
   if (status === 'signedIn') {
     const showGlobalBottomNav = currentRouteName !== undefined;
-
-    // Every screen gets an opaque, themed backdrop that is part of the
-    // screen itself, so a push/pop never depends on JS to paint what's
-    // behind the incoming page in time (see ScreenBackdrop). Its soft glow
-    // follows the mode of the screen it sits under: the mode-agnostic roots
-    // (Feed, Progress, You) follow the shared mode, everything else its own
-    // route's mode.
-    const renderScreenLayout = ({
-      route,
-      children,
-    }: {
-      route: { name: string };
-      children: ReactNode;
-    }) => {
-      const screenMode = MODE_AGNOSTIC_ROUTES.has(route.name)
-        ? sharedMode
-        : isNutritionRoute(route.name)
-          ? 'nutrition'
-          : 'workout';
-      return (
-        <ScreenBackdrop
-          accentColor={screenMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent}
-        >
-          {children}
-        </ScreenBackdrop>
-      );
-    };
 
     return (
       <AppMenuContext.Provider

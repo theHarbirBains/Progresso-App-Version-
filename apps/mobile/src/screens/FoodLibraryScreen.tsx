@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, SectionList, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, SectionList, View, type SectionListData } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
@@ -75,7 +75,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeLetter, setActiveLetter] = useState<string | undefined>(undefined);
-  const sectionListRef = useRef<SectionList<FoodRow>>(null);
+  const sectionListRef = useRef<SectionList<FoodRow, { title: string }>>(null);
 
   // Debounce free-text input before it drives a query, so every keystroke
   // doesn't fire its own request -- same pattern as FoodSearchScreen.
@@ -111,6 +111,66 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
     }
     void load();
   }
+
+  const sections = useMemo(() => groupFoodsByLetter(rows), [rows]);
+  const availableLetters = useMemo(
+    () => new Set(sections.map((section) => section.letter)),
+    [sections],
+  );
+  const listSections = useMemo(
+    () => sections.map((section) => ({ title: section.letter, data: section.data })),
+    [sections],
+  );
+
+  const jumpToLetter = useCallback(
+    (letter: string) => {
+      const sectionIndex = sections.findIndex((section) => section.letter === letter);
+      if (sectionIndex === -1) return;
+      setActiveLetter(letter);
+      sectionListRef.current?.scrollToLocation({
+        sectionIndex,
+        itemIndex: 0,
+        viewPosition: 0,
+        animated: true,
+      });
+    },
+    [sections],
+  );
+
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: SectionListData<FoodRow, { title: string }> }) => (
+      <View testID={`food-library-section-${section.title}`}>
+        <SectionHeader label={section.title} />
+      </View>
+    ),
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: FoodRow; index: number }) => (
+      <View style={[styles.row, index > 0 && styles.rowDivider]}>
+        <View style={styles.flex}>
+          <ListRow
+            testID={`food-item-${item.id}`}
+            leading={<FoodImage uri={item.imageUrl} name={item.name} size={44} />}
+            title={item.name}
+            subtitle={`${item.servingSize}${item.servingUnit}`}
+            value={`${item.calories} cal`}
+            chevron={false}
+            onPress={() => setMode({ type: 'log', food: item })}
+          />
+        </View>
+        <IconButton
+          testID={`food-edit-${item.id}`}
+          icon="edit-2"
+          onPress={() => setMode({ type: 'edit', food: item })}
+          accessibilityLabel={`Edit ${item.name}`}
+          color={colors.textSecondary}
+        />
+      </View>
+    ),
+    [],
+  );
 
   if (mode.type === 'create') {
     return (
@@ -148,21 +208,6 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         onCancel={() => setMode({ type: 'list' })}
       />
     );
-  }
-
-  const sections = groupFoodsByLetter(rows);
-  const availableLetters = new Set(sections.map((section) => section.letter));
-
-  function jumpToLetter(letter: string) {
-    const sectionIndex = sections.findIndex((section) => section.letter === letter);
-    if (sectionIndex === -1) return;
-    setActiveLetter(letter);
-    sectionListRef.current?.scrollToLocation({
-      sectionIndex,
-      itemIndex: 0,
-      viewPosition: 0,
-      animated: true,
-    });
   }
 
   return (
@@ -261,41 +306,13 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
               <SectionList
                 ref={sectionListRef}
                 testID="food-library-list"
-                sections={sections.map((section) => ({
-                  title: section.letter,
-                  data: section.data,
-                }))}
+                sections={listSections}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
-                renderSectionHeader={({ section }) => (
-                  <View testID={`food-library-section-${section.title}`}>
-                    <SectionHeader label={section.title} />
-                  </View>
-                )}
-                renderItem={({ item, index }) => (
-                  <View style={[styles.row, index > 0 && styles.rowDivider]}>
-                    <View style={styles.flex}>
-                      <ListRow
-                        testID={`food-item-${item.id}`}
-                        leading={<FoodImage uri={item.imageUrl} name={item.name} size={44} />}
-                        title={item.name}
-                        subtitle={`${item.servingSize}${item.servingUnit}`}
-                        value={`${item.calories} cal`}
-                        chevron={false}
-                        onPress={() => setMode({ type: 'log', food: item })}
-                      />
-                    </View>
-                    <IconButton
-                      testID={`food-edit-${item.id}`}
-                      icon="edit-2"
-                      onPress={() => setMode({ type: 'edit', food: item })}
-                      accessibilityLabel={`Edit ${item.name}`}
-                      color={colors.textSecondary}
-                    />
-                  </View>
-                )}
+                renderSectionHeader={renderSectionHeader}
+                renderItem={renderItem}
                 onScrollToIndexFailed={() => {
                   // A section can be shorter than the viewport at the very end
                   // of the list; retry is unnecessary since scrollToLocation
