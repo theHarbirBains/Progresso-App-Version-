@@ -22,11 +22,32 @@ export const workoutSplitStyles = StyleSheet.create({
   listContent: {
     gap: widgetGap,
   },
-  // Edit / Duplicate / Delete, beneath a split's row inside its widget.
+  // Edit / Duplicate / Delete, beneath a split's row inside its widget -- an
+  // even 3-up row of icon+label buttons (Strava-style quiet actions, not
+  // text links), separated from the name/toggle row above by a hairline so
+  // the card reads as two clear bands rather than one run-on stack.
   splitActions: {
     flexDirection: 'row',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  splitAction: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xl,
+    justifyContent: 'center',
+    gap: spacing.xs,
+    minHeight: minTouchTarget,
+  },
+  splitActionLabel: {
+    ...typeScale.secondary,
+    fontFamily: typeScale.label.fontFamily,
+    color: colors.textSecondary,
+  },
+  splitActionDestructive: {
+    color: colors.destructive,
   },
   // The "this is your active split" marker. Uppercase caption, in the mode
   // accent (colour supplied per render).

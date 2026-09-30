@@ -283,6 +283,7 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
                 value={options[row.key]}
                 onValueChange={(value) => setOption(row.key, value)}
                 accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
                 accessibilityLabel={row.label}
               />
             }

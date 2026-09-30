@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { PrimaryButton, TextButton } from '../design/Button';
+import { PrimaryButton } from '../design/Button';
+import { colors } from '../design/theme';
 import { EmptyState } from '../design/EmptyState';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
@@ -191,6 +193,7 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
                         if (next) confirmSelectActive(split);
                       }}
                       accentColor={theme.accent}
+                      onAccentColor={theme.onAccent}
                       accessibilityLabel={isActive ? 'Active workout split' : 'Set as active split'}
                       disabled={busy || isActive}
                     />
@@ -198,24 +201,44 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
                 }
               />
               <View style={styles.splitActions}>
-                <TextButton
+                <TouchableOpacity
                   testID={`workout-split-edit-${split.id}`}
-                  label="Edit"
+                  style={styles.splitAction}
                   onPress={() => navigation.navigate('WorkoutSplitForm', { splitId: split.id })}
-                />
-                <TextButton
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit split"
+                  hitSlop={8}
+                >
+                  <Feather name="edit-2" size={18} color={colors.textSecondary} />
+                  <Text style={styles.splitActionLabel}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   testID={`workout-split-duplicate-${split.id}`}
-                  label="Duplicate"
+                  style={styles.splitAction}
                   onPress={() => handleDuplicate(split)}
                   disabled={busy}
-                />
-                <TextButton
+                  accessibilityRole="button"
+                  accessibilityLabel="Duplicate split"
+                  hitSlop={8}
+                >
+                  <Feather name="copy" size={18} color={colors.textSecondary} />
+                  <Text style={styles.splitActionLabel}>Duplicate</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   testID={`workout-split-delete-${split.id}`}
-                  label="Delete"
-                  destructive
+                  style={styles.splitAction}
                   onPress={() => confirmDelete(split)}
                   disabled={busy}
-                />
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete split"
+                  hitSlop={8}
+                >
+                  <Feather name="trash-2" size={18} color={colors.destructive} />
+                  <Text style={[styles.splitActionLabel, styles.splitActionDestructive]}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
               </View>
             </AppCard>
           );

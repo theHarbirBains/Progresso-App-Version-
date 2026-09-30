@@ -59,4 +59,43 @@ describe('Toggle', () => {
 
     expect(screen.getByTestId('toggle').props.disabled).toBe(true);
   });
+
+  // Regression guard: a white/near-white accentColor (the app's own default
+  // Workout/Nutrition theme -- see accentColor.ts) makes an ON track white.
+  // Without a contrast-safe thumb, the thumb -- default colors.textPrimary,
+  // itself white -- disappears into that track entirely. onAccentColor
+  // (computed to contrast against accentColor by buildAccentTheme) fixes
+  // this; the default (colors.background, a plain dark dot) is the safe
+  // fallback for a caller that hasn't been updated to pass one yet.
+  it("uses onAccentColor for the ON thumb, so a white accent's toggle still shows a visible dot", () => {
+    render(
+      <Toggle
+        testID="toggle"
+        value={true}
+        onValueChange={jest.fn()}
+        accessibilityLabel="x"
+        accentColor="#FFFFFF"
+        onAccentColor="#0A0A0A"
+      />,
+    );
+
+    // RN's Switch renders thumbColor down as the native thumbTintColor prop
+    // on both platforms -- see Switch.js.
+    expect(screen.getByTestId('toggle').props.thumbTintColor).toBe('#0A0A0A');
+  });
+
+  it('ignores onAccentColor while OFF -- the off-thumb never needs to match the on-accent', () => {
+    render(
+      <Toggle
+        testID="toggle"
+        value={false}
+        onValueChange={jest.fn()}
+        accessibilityLabel="x"
+        accentColor="#FFFFFF"
+        onAccentColor="#0A0A0A"
+      />,
+    );
+
+    expect(screen.getByTestId('toggle').props.thumbTintColor).not.toBe('#0A0A0A');
+  });
 });
