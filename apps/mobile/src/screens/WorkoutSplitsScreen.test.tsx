@@ -138,7 +138,7 @@ describe('WorkoutSplitsScreen', () => {
     });
 
     renderScreen();
-    fireEvent.press(await screen.findByTestId('workout-split-activate-split-2'));
+    fireEvent(await screen.findByTestId('workout-split-activate-split-2'), 'valueChange', true);
 
     expect(alertSpy).toHaveBeenCalled();
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
@@ -148,12 +148,14 @@ describe('WorkoutSplitsScreen', () => {
     alertSpy.mockRestore();
   });
 
-  it('shows an explicit "Set Active" control only for inactive splits, never the already-active one', async () => {
+  it("disables the active split's own toggle -- it can only be superseded by activating another, never turned off in place", async () => {
     renderScreen();
     await screen.findByTestId('workout-split-split-1');
 
-    expect(screen.queryByTestId('workout-split-activate-split-1')).toBeNull();
-    expect(screen.getByTestId('workout-split-activate-split-2')).toBeTruthy();
+    expect(screen.getByTestId('workout-split-activate-split-1').props.value).toBe(true);
+    expect(screen.getByTestId('workout-split-activate-split-1').props.disabled).toBe(true);
+    expect(screen.getByTestId('workout-split-activate-split-2').props.value).toBe(false);
+    expect(screen.getByTestId('workout-split-activate-split-2').props.disabled).toBe(false);
   });
 
   it('duplicates a split and reloads the list', async () => {
@@ -288,11 +290,13 @@ describe('WorkoutSplitsScreen -- one widget per split', () => {
       ).color;
     expect(color('workout-split-delete-split-1')).toBe('#F0555C');
     expect(color('workout-split-edit-split-1')).not.toBe('#F0555C');
+    // workout-split-activate-* is a native Switch now, not a TextButton --
+    // its touch target is the platform's own fixed switch size, not
+    // measured via a style.minHeight the way a text button's is.
     for (const id of [
       'workout-split-edit-split-1',
       'workout-split-duplicate-split-1',
       'workout-split-delete-split-1',
-      'workout-split-activate-split-2',
     ]) {
       expect(
         StyleSheet.flatten(screen.getByTestId(id).props.style).minHeight,

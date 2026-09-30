@@ -34,6 +34,11 @@ export const workoutSplitStyles = StyleSheet.create({
     ...typeScale.caption,
     letterSpacing: 1,
   },
+  activeToggleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
 
   // ---- Split view (read-only) ----------------------------------------------
   dayBlock: {

@@ -9,6 +9,7 @@ import { EmptyState } from '../design/EmptyState';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
+import { Toggle } from '../design/Toggle';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProfile } from '../profile/ProfileProvider';
@@ -173,17 +174,27 @@ export function WorkoutSplitsScreen({ navigation }: Props) {
                 onPress={() => navigation.navigate('WorkoutSplitView', { splitId: split.id })}
                 disabled={busy}
                 trailing={
-                  isActive ? (
-                    <Text style={[styles.activeLabel, { color: theme.accent }]}>ACTIVE</Text>
-                  ) : (
-                    <TextButton
+                  <View style={styles.activeToggleWrap}>
+                    {isActive ? (
+                      <Text style={[styles.activeLabel, { color: theme.accent }]}>ACTIVE</Text>
+                    ) : null}
+                    <Toggle
                       testID={`workout-split-activate-${split.id}`}
-                      label="Set Active"
-                      accessibilityLabel="Set as active split"
-                      onPress={() => confirmSelectActive(split)}
-                      disabled={busy}
+                      value={isActive}
+                      // Turning an inactive split's toggle on makes it the
+                      // active one (same confirmation as before); the
+                      // already-active split's own toggle is disabled --
+                      // there's no "no split active at all" state today,
+                      // only switching which one is active, so it can't be
+                      // turned off in place, only superseded by another.
+                      onValueChange={(next) => {
+                        if (next) confirmSelectActive(split);
+                      }}
+                      accentColor={theme.accent}
+                      accessibilityLabel={isActive ? 'Active workout split' : 'Set as active split'}
+                      disabled={busy || isActive}
                     />
-                  )
+                  </View>
                 }
               />
               <View style={styles.splitActions}>
