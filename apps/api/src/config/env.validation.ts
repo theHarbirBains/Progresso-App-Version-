@@ -9,6 +9,8 @@ export interface EnvironmentVariables {
   SENTRY_DSN: string;
   /** Optional. Empty string means the webhook route rejects everything. */
   REVENUECAT_WEBHOOK_SECRET: string;
+  /** Optional. Empty string means AI nutrition estimation stays disabled. */
+  ANTHROPIC_API_KEY: string;
 }
 
 const NODE_ENVS: EnvironmentVariables['NODE_ENV'][] = ['development', 'production', 'test'];
@@ -39,5 +41,6 @@ export function validate(config: Record<string, unknown>): EnvironmentVariables 
     CORS_ORIGIN: (config.CORS_ORIGIN as string) || '*',
     SENTRY_DSN: (config.SENTRY_DSN as string) || '',
     REVENUECAT_WEBHOOK_SECRET: (config.REVENUECAT_WEBHOOK_SECRET as string) || '',
+    ANTHROPIC_API_KEY: (config.ANTHROPIC_API_KEY as string) || '',
   };
 }

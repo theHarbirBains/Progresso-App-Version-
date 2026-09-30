@@ -1,8 +1,9 @@
-import { BadRequestException, Controller, Get, Param, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/types/authenticated-request';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { EstimateNutritionDto } from './dto/estimate-nutrition.dto';
 import { SearchFoodsDto } from './dto/search-foods.dto';
 import { FoodsService } from './foods.service';
 
@@ -37,5 +38,14 @@ export class FoodsController {
       throw new BadRequestException('barcode must not be empty');
     }
     return this.foodsService.getByBarcode(barcode, user.id);
+  }
+
+  // AI Nutrition Search: a one-off estimate, not a search result -- see
+  // FoodsService.estimateNutrition. No @CurrentUser() needed here; nothing
+  // about the estimate itself is scoped to who asked.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('estimate')
+  async estimate(@Body() dto: EstimateNutritionDto) {
+    return this.foodsService.estimateNutrition(dto.description);
   }
 }

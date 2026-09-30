@@ -253,6 +253,15 @@ describe('NutritionTodayScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('FoodSearch');
   });
 
+  it('navigates to AI Food Search', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    fireEvent.press(screen.getByTestId('ai-food-search-button'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch');
+  });
+
   it('opens the app-level side menu when the header button is pressed', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');

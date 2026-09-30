@@ -34,6 +34,7 @@ import { AllTimeStatsProvider } from './src/progress/AllTimeStatsProvider';
 import { useProgressTheme } from './src/progress/useProgressTheme';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
 import { ActiveWorkoutScreen } from './src/screens/ActiveWorkoutScreen';
+import { AiFoodSearchScreen } from './src/screens/AiFoodSearchScreen';
 import { BackgroundThemeScreen } from './src/screens/BackgroundThemeScreen';
 import { CalorieEstimationScreen } from './src/screens/CalorieEstimationScreen';
 import { ChooseWorkoutSplitScreen } from './src/screens/ChooseWorkoutSplitScreen';
@@ -265,6 +266,7 @@ function Root() {
                 <Stack.Screen name="Nutrition" component={NutritionTodayScreen} />
                 <Stack.Screen name="FoodLibrary" component={FoodLibraryScreen} />
                 <Stack.Screen name="FoodSearch" component={FoodSearchScreen} />
+                <Stack.Screen name="AiFoodSearch" component={AiFoodSearchScreen} />
                 <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
                 <Stack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
                 <Stack.Screen name="NutritionHistory" component={NutritionHistoryScreen} />

@@ -289,6 +289,32 @@ export function getFoodByBarcode(
   );
 }
 
+/** AI Food Search's one estimate for a free-text description (e.g. "100
+ * grams of air fried potatoes with no oil") -- every field is the model's
+ * single best guess, not a fetched/verified figure. Through the backend,
+ * never direct-to-Supabase: this calls a third-party API (Anthropic), the
+ * exact kind of integration CLAUDE.md's hybrid architecture rule reserves
+ * for the backend. */
+export interface NutritionEstimate {
+  name: string;
+  servingSize: number;
+  servingUnit: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+export function estimateNutrition(
+  accessToken: string,
+  description: string,
+): Promise<NutritionEstimate> {
+  return request<NutritionEstimate>('/api/v1/foods/estimate', accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ description }),
+  });
+}
+
 // Social v1: a one-directional, accept-gated follow graph -- see
 // apps/api/src/follows for why every call here goes through the backend
 // (reading another user's username/display name/workouts/food logs is

@@ -28,10 +28,12 @@ const EMPTY_GOALS: NutritionGoals = { calories: null, proteinG: null, carbsG: nu
 // Layout: the shared Screen with a hamburger menu, then three widgets `widgetGap` apart:
 // the four macros (what was consumed, against the target when one is set, and
 // what remains); the one filled action -- Log Food -- with Scan Barcode, Search
-// Food, and Nutrition Goals as outlined secondaries (three ways into the same
-// LogFoodStep-backed logging flow, plus the one settings-like link); and
-// Today's Foods as rows (the food's picture, its name, the values snapshotted
-// when it was logged, an editable quantity and a quiet Delete).
+// Food, AI Food Search, and Nutrition Goals as outlined secondaries (three
+// ways into the same LogFoodStep-backed logging flow -- database search,
+// barcode, or a free-text description Claude estimates the nutrition for --
+// plus the one settings-like link); and Today's Foods as rows (the food's
+// picture, its name, the values snapshotted when it was logged, an editable
+// quantity and a quiet Delete).
 export function NutritionTodayScreen({ navigation }: Props) {
   const { nutritionTheme } = useProgressTheme();
   const { openMenu } = useAppMenu();
@@ -201,6 +203,11 @@ export function NutritionTodayScreen({ navigation }: Props) {
           testID="search-food-button"
           label="Search Food"
           onPress={() => navigation.navigate('FoodSearch')}
+        />
+        <SecondaryButton
+          testID="ai-food-search-button"
+          label="AI Food Search"
+          onPress={() => navigation.navigate('AiFoodSearch')}
         />
         <SecondaryButton
           testID="nutrition-goals-link"

@@ -133,6 +133,43 @@ describe('FoodFormScreen (create mode)', () => {
     expect(screen.getByTestId('food-form-barcode')).toHaveProp('value', '099999999999');
   });
 
+  it('prefills every field from initialValues (AI Food Search flow) -- still fully editable, saved on Save like any other create', async () => {
+    render(
+      <FoodFormScreen
+        mode="create"
+        initialValues={{
+          name: 'Air-Fried Potatoes (100g)',
+          servingSize: 100,
+          servingUnit: 'g',
+          calories: 120,
+          proteinG: 2,
+          carbsG: 27,
+          fatG: 0.2,
+        }}
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('food-form-name')).toHaveProp('value', 'Air-Fried Potatoes (100g)');
+    expect(screen.getByTestId('food-form-serving-size')).toHaveProp('value', '100');
+    expect(screen.getByTestId('food-form-serving-unit')).toHaveProp('value', 'g');
+    expect(screen.getByTestId('food-form-calories')).toHaveProp('value', '120');
+    expect(screen.getByTestId('food-form-protein')).toHaveProp('value', '2');
+    expect(screen.getByTestId('food-form-carbs')).toHaveProp('value', '27');
+    expect(screen.getByTestId('food-form-fat')).toHaveProp('value', '0.2');
+
+    fireEvent.changeText(screen.getByTestId('food-form-name'), 'Air-Fried Potatoes, edited');
+    fireEvent.press(screen.getByTestId('food-form-save'));
+
+    await waitFor(() =>
+      expect(mockCreateFood).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ name: 'Air-Fried Potatoes, edited', calories: 120 }),
+      ),
+    );
+  });
+
   it('shows an error and does not call onDone when createFood fails', async () => {
     mockCreateFood.mockRejectedValue(new Error('network error'));
     const onDone = jest.fn();

@@ -22,6 +22,7 @@ export type RootStackParamList = {
   /** `openCreate`/`barcode`: set by the Scan Barcode "Product not found" fallback so Food Library opens straight into creating a custom food, prefilled with the scanned barcode -- see BarcodeScannerScreen. */
   FoodLibrary: { openCreate?: boolean; barcode?: string } | undefined;
   FoodSearch: undefined;
+  AiFoodSearch: undefined;
   BarcodeScanner: undefined;
   NutritionGoals: undefined;
   NutritionHistory: undefined;

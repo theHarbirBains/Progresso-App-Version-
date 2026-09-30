@@ -2,6 +2,7 @@ import { InternalServerErrorException } from '@nestjs/common';
 import type { SupabaseService } from '../supabase/supabase.service';
 import type { FoodProvider, NormalizedFood } from './food-provider.interface';
 import { FoodsService } from './foods.service';
+import type { AnthropicNutritionProvider } from './providers/anthropic-nutrition.provider';
 
 interface Result {
   data: unknown;
@@ -63,6 +64,10 @@ function mockProvider(overrides: Partial<FoodProvider> = {}): FoodProvider {
   };
 }
 
+function mockNutritionProvider(): AnthropicNutritionProvider {
+  return { estimate: jest.fn() } as unknown as AnthropicNutritionProvider;
+}
+
 const localFoodRow = {
   id: 'food-1',
   name: 'Chicken Breast (cooked)',
@@ -116,7 +121,7 @@ describe('FoodsService', () => {
   it('returns an empty result for a blank query without touching the database or the provider', async () => {
     const { supabaseService } = mockSupabaseSequence([]);
     const provider = mockProvider();
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.search('   ', 0, 20);
 
@@ -133,7 +138,7 @@ describe('FoodsService', () => {
     const provider = mockProvider({
       searchFoods: jest.fn().mockResolvedValue({ foods: [normalizedOreo], hasMore: false }),
     });
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.search('food', 0, 20);
 
@@ -165,7 +170,7 @@ describe('FoodsService', () => {
     const provider = mockProvider({
       searchFoods: jest.fn().mockResolvedValue({ foods: [normalizedOreo], hasMore: false }),
     });
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     await service.search('oreo', 0, 20);
 
@@ -206,7 +211,7 @@ describe('FoodsService', () => {
         .fn()
         .mockResolvedValue({ foods: [normalizedOreo, normalizedChicken], hasMore: false }),
     });
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.search('food', 0, 20);
 
@@ -219,7 +224,7 @@ describe('FoodsService', () => {
       { data: [], error: null },
     ]);
     const provider = mockProvider();
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     await service.search('food', 1, 20);
 
@@ -234,7 +239,7 @@ describe('FoodsService', () => {
     const provider = mockProvider({
       searchFoods: jest.fn().mockRejectedValue(new Error('provider down')),
     });
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.search('food', 0, 20);
 
@@ -261,7 +266,7 @@ describe('FoodsService', () => {
         .fn()
         .mockResolvedValue({ foods: [normalizedOreo, normalizedChicken], hasMore: false }),
     });
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.search('food', 0, 20);
 
@@ -281,7 +286,7 @@ describe('FoodsService', () => {
     const provider = mockProvider({
       searchFoods: jest.fn().mockResolvedValue({ foods: [normalizedOreo], hasMore: false }),
     });
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.search('oreo', 0, 20);
 
@@ -295,7 +300,7 @@ describe('FoodsService', () => {
       { data: [], error: null },
     ]);
     const provider = mockProvider();
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.search('food', 0, 10);
 
@@ -306,7 +311,7 @@ describe('FoodsService', () => {
   it('throws when the local search query itself errors', async () => {
     const { supabaseService } = mockSupabaseSequence([{ data: null, error: { message: 'boom' } }]);
     const provider = mockProvider();
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     await expect(service.search('food', 0, 20)).rejects.toBeInstanceOf(
       InternalServerErrorException,
@@ -321,7 +326,7 @@ describe('FoodsService.getByBarcode', () => {
     const { supabaseService, instances } = mockSupabaseSequence([
       { data: cachedExternalFoodRow, error: null },
     ]);
-    const service = new FoodsService(supabaseService, mockProvider());
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
 
     await service.getByBarcode('0066721016123', USER_ID);
 
@@ -336,7 +341,7 @@ describe('FoodsService.getByBarcode', () => {
     const { supabaseService, instances } = mockSupabaseSequence([
       { data: cachedExternalFoodRow, error: null },
     ]);
-    const service = new FoodsService(supabaseService, mockProvider());
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
 
     await service.getByBarcode('0066721016123', 'x,created_by.neq.null');
 
@@ -348,7 +353,7 @@ describe('FoodsService.getByBarcode', () => {
       { data: cachedExternalFoodRow, error: null }, // local barcode lookup
     ]);
     const provider = mockProvider();
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.getByBarcode('0066721016123', USER_ID);
 
@@ -364,7 +369,7 @@ describe('FoodsService.getByBarcode', () => {
     const provider = mockProvider({
       getFoodByBarcode: jest.fn().mockResolvedValue(normalizedOreo),
     });
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.getByBarcode('0066721016123', USER_ID);
 
@@ -381,7 +386,7 @@ describe('FoodsService.getByBarcode', () => {
   it('returns null (never throws) when the product genuinely is not found anywhere', async () => {
     const { supabaseService } = mockSupabaseSequence([{ data: null, error: null }]);
     const provider = mockProvider({ getFoodByBarcode: jest.fn().mockResolvedValue(null) });
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.getByBarcode('0000000000000', USER_ID);
 
@@ -393,7 +398,7 @@ describe('FoodsService.getByBarcode', () => {
     const provider = mockProvider({
       getFoodByBarcode: jest.fn().mockRejectedValue(new Error('network down')),
     });
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.getByBarcode('0000000000000', USER_ID);
 
@@ -403,7 +408,7 @@ describe('FoodsService.getByBarcode', () => {
   it('returns null for a blank barcode without querying the database or the provider', async () => {
     const { supabaseService, from } = mockSupabaseSequence([]);
     const provider = mockProvider();
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.getByBarcode('   ', USER_ID);
 
@@ -415,10 +420,46 @@ describe('FoodsService.getByBarcode', () => {
   it('throws when the local barcode lookup itself errors', async () => {
     const { supabaseService } = mockSupabaseSequence([{ data: null, error: { message: 'boom' } }]);
     const provider = mockProvider();
-    const service = new FoodsService(supabaseService, provider);
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     await expect(service.getByBarcode('123', USER_ID)).rejects.toBeInstanceOf(
       InternalServerErrorException,
     );
+  });
+});
+
+describe('FoodsService.estimateNutrition', () => {
+  it('delegates to AnthropicNutritionProvider and returns its estimate as-is', async () => {
+    const { supabaseService } = mockSupabaseSequence([]);
+    const provider = mockProvider();
+    const estimate = {
+      name: 'Air-Fried Potatoes (100g)',
+      servingSize: 100,
+      servingUnit: 'g',
+      calories: 120,
+      proteinG: 2,
+      carbsG: 27,
+      fatG: 0.2,
+    };
+    const nutritionProvider = {
+      estimate: jest.fn().mockResolvedValue(estimate),
+    } as unknown as AnthropicNutritionProvider;
+    const service = new FoodsService(supabaseService, provider, nutritionProvider);
+
+    const result = await service.estimateNutrition('100 grams of air fried potatoes');
+
+    expect(nutritionProvider.estimate).toHaveBeenCalledWith('100 grams of air fried potatoes');
+    expect(result).toEqual(estimate);
+  });
+
+  it('propagates a failure from the provider rather than swallowing it', async () => {
+    const { supabaseService } = mockSupabaseSequence([]);
+    const provider = mockProvider();
+    const nutritionProvider = {
+      estimate: jest.fn().mockRejectedValue(new Error('provider down')),
+    } as unknown as AnthropicNutritionProvider;
+    const service = new FoodsService(supabaseService, provider, nutritionProvider);
+
+    await expect(service.estimateNutrition('anything')).rejects.toThrow('provider down');
   });
 });

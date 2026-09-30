@@ -1,5 +1,9 @@
 import { Inject, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import {
+  AnthropicNutritionProvider,
+  type NutritionEstimate,
+} from './providers/anthropic-nutrition.provider';
 import { FOOD_PROVIDER, type FoodProvider, type NormalizedFood } from './food-provider.interface';
 
 export interface FoodRecord {
@@ -68,7 +72,22 @@ export class FoodsService {
   constructor(
     private readonly supabaseService: SupabaseService,
     @Inject(FOOD_PROVIDER) private readonly provider: FoodProvider,
+    private readonly nutritionProvider: AnthropicNutritionProvider,
   ) {}
+
+  /**
+   * AI Nutrition Search: estimates calories/macros for a free-text food
+   * description (e.g. "100 grams of air fried potatoes with no oil"). A
+   * thin pass-through to AnthropicNutritionProvider -- unlike search()/
+   * getByBarcode(), there's no local catalog to check first or cache the
+   * result into: this is a one-off estimate the mobile app shows the user
+   * to review and edit before optionally saving it as their own custom food
+   * (via the existing direct-to-Supabase createFood(), same as any other
+   * manually-entered food -- see foodQueries.ts on the mobile side).
+   */
+  async estimateNutrition(description: string): Promise<NutritionEstimate> {
+    return this.nutritionProvider.estimate(description);
+  }
 
   async search(query: string, page: number, pageSize: number): Promise<FoodSearchResponse> {
     const trimmed = query.trim();

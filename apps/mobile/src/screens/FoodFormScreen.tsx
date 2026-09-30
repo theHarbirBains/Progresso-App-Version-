@@ -23,8 +23,27 @@ type CommonProps = {
   onAccentColor?: string;
 };
 
+/** Pre-fills a fresh create form -- e.g. from an AI Food Search estimate
+ * (see AiFoodSearchScreen), which is a starting point for the user to
+ * review and edit, not a value that's already been saved. Every field is
+ * still just this form's own local state after the first render, so
+ * editing/saving works identically to a blank create. */
+export interface FoodFormInitialValues {
+  name?: string;
+  servingSize?: number;
+  servingUnit?: string;
+  calories?: number;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
+}
+
 type Props =
-  | ({ mode: 'create'; initialBarcode?: string } & CommonProps)
+  | ({
+      mode: 'create';
+      initialBarcode?: string;
+      initialValues?: FoodFormInitialValues;
+    } & CommonProps)
   | ({ mode: 'edit'; food: FoodRow } & CommonProps);
 
 // Reachable from FoodLibraryScreen (the user's own custom foods) and, on
@@ -45,25 +64,53 @@ export function FoodFormScreen(props: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
 
-  const [name, setName] = useState(props.mode === 'edit' ? props.food.name : '');
+  const initialValues = props.mode === 'create' ? props.initialValues : undefined;
+
+  const [name, setName] = useState(
+    props.mode === 'edit' ? props.food.name : (initialValues?.name ?? ''),
+  );
   const [brand, setBrand] = useState(props.mode === 'edit' ? (props.food.brand ?? '') : '');
   const [barcode, setBarcode] = useState(
     props.mode === 'edit' ? (props.food.barcode ?? '') : (props.initialBarcode ?? ''),
   );
   const [servingSize, setServingSize] = useState(
-    props.mode === 'edit' ? String(props.food.servingSize) : '',
+    props.mode === 'edit'
+      ? String(props.food.servingSize)
+      : initialValues?.servingSize !== undefined
+        ? String(initialValues.servingSize)
+        : '',
   );
   const [servingUnit, setServingUnit] = useState(
-    props.mode === 'edit' ? props.food.servingUnit : '',
+    props.mode === 'edit' ? props.food.servingUnit : (initialValues?.servingUnit ?? ''),
   );
   const [calories, setCalories] = useState(
-    props.mode === 'edit' ? String(props.food.calories) : '',
+    props.mode === 'edit'
+      ? String(props.food.calories)
+      : initialValues?.calories !== undefined
+        ? String(initialValues.calories)
+        : '',
   );
   const [proteinG, setProteinG] = useState(
-    props.mode === 'edit' ? String(props.food.proteinG) : '',
+    props.mode === 'edit'
+      ? String(props.food.proteinG)
+      : initialValues?.proteinG !== undefined
+        ? String(initialValues.proteinG)
+        : '',
   );
-  const [carbsG, setCarbsG] = useState(props.mode === 'edit' ? String(props.food.carbsG) : '');
-  const [fatG, setFatG] = useState(props.mode === 'edit' ? String(props.food.fatG) : '');
+  const [carbsG, setCarbsG] = useState(
+    props.mode === 'edit'
+      ? String(props.food.carbsG)
+      : initialValues?.carbsG !== undefined
+        ? String(initialValues.carbsG)
+        : '',
+  );
+  const [fatG, setFatG] = useState(
+    props.mode === 'edit'
+      ? String(props.food.fatG)
+      : initialValues?.fatG !== undefined
+        ? String(initialValues.fatG)
+        : '',
+  );
   const [isActive, setIsActive] = useState(props.mode === 'edit' ? props.food.isActive : true);
   // A freshly picked photo (a local file, uploaded on Save), or the photo the
   // food already has -- which "Remove Photo" clears on Save.
