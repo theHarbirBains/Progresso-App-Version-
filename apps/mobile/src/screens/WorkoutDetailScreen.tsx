@@ -10,9 +10,8 @@ import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
-import { formatWeightKg, fromKg } from '../lib/units';
+import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
-import { computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import { computeDurationMinutes } from '../workouts/topSetSummary';
@@ -23,6 +22,7 @@ import {
   type WorkoutDetail,
 } from '../workouts/workoutQueries';
 import { formatCardDuration } from '../workouts/workoutFormat';
+import { formatVolume, volumeInUnit } from '../workouts/workoutSummary';
 import { workoutDetailStyles as styles } from './workoutDetailStyles';
 
 type Props = RootStackScreenProps<'WorkoutDetail'>;
@@ -137,7 +137,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     sets: completedSetsOnly(exercise.sets),
   }));
   const allLogged = loggedByExercise.flatMap((entry) => entry.sets);
-  const totalVolumeKg = computeLifetimeVolumeKg(allLogged);
+  const totalVolume = volumeInUnit(allLogged, weightUnit);
   const durationMinutes = computeDurationMinutes(workout.performedAt, workout.completedAt);
   const isRecord = (exerciseId: string, set: CompletedSetRecord, reps: number) =>
     Boolean(repPRs[exerciseId]?.some((pr) => pr.reps === reps && pr.sourceSetId === set.id)) ||
@@ -201,7 +201,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           <View style={styles.statRow}>
             <StatBlock
               testID="workout-detail-stat-volume"
-              value={`${Math.round(fromKg(totalVolumeKg, weightUnit)).toLocaleString()} ${weightUnit}`}
+              value={`${formatVolume(totalVolume)} ${weightUnit}`}
               label="Volume"
             />
             <StatBlock
