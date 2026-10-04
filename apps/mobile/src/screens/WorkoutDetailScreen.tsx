@@ -10,7 +10,7 @@ import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
-import { formatWeightKg } from '../lib/units';
+import { formatWeightKg, fromKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -201,7 +201,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           <View style={styles.statRow}>
             <StatBlock
               testID="workout-detail-stat-volume"
-              value={`${Number(formatWeightKg(totalVolumeKg, weightUnit)).toLocaleString()} ${weightUnit}`}
+              value={`${Math.round(fromKg(totalVolumeKg, weightUnit)).toLocaleString()} ${weightUnit}`}
               label="Volume"
             />
             <StatBlock

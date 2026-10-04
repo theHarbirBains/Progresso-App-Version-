@@ -96,6 +96,50 @@ describe('WorkoutDetailScreen', () => {
     expect(screen.getByText(/110kg × 8/)).toBeTruthy();
   });
 
+  it('shows a pound user volume as a whole number, never a decimal like 3149.9', async () => {
+    // 225 lb x 8 and 135 lb x 10, stored in kg (rounded to 2dp, as the
+    // database does) -- the true total is 3,150 lb.
+    mockGetMyProfile.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@example.com',
+      role: 'user',
+      displayName: null,
+      username: null,
+      weightUnit: 'lb',
+    });
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...workout,
+      exercises: [
+        {
+          ...workout.exercises[0],
+          sets: [
+            {
+              id: 's1',
+              setIndex: 1,
+              weightKg: 102.06,
+              reps: 8,
+              completedAt: '2026-01-01T12:05:00Z',
+            },
+            {
+              id: 's2',
+              setIndex: 2,
+              weightKg: 61.24,
+              reps: 10,
+              completedAt: '2026-01-01T12:10:00Z',
+            },
+          ],
+        },
+      ],
+    });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    await screen.findByText('Push Day');
+    expect(screen.getByTestId('workout-detail-stat-volume')).toHaveTextContent(/^3,150 lb/);
+    expect(screen.getByTestId('workout-detail-stat-volume')).not.toHaveTextContent(/\d\.\d/);
+  });
+
   it('shows the computed top set', async () => {
     render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
