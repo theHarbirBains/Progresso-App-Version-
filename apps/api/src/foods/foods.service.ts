@@ -102,7 +102,9 @@ export class FoodsService {
    */
   async interpretDescription(description: string): Promise<InterpretFoodResponse> {
     const parsed = await this.nutritionProvider.parse(description);
-    if (parsed.clarification !== null || parsed.main === null) {
+    // Only a description with no food to look up is sent back as a question. A missing amount is
+    // handled by the resolver, which asks for it with the source's own options.
+    if (parsed.main === null) {
       return {
         status: 'clarification',
         question: parsed.clarification ?? 'What did you eat?',

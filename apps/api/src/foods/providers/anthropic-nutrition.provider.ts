@@ -29,7 +29,7 @@ const PARSE_SYSTEM_PROMPT =
   'nutrition -- only report what the user said. Rules: ' +
   '(1) main is the food the amount applies to, with its quantity and unit exactly as the ' +
   'user wrote them. If the user gave no amount, set quantity and unit to null. Never invent ' +
-  'an amount. (2) searchTerm is a short, singular, generic name for a food database ' +
+  "an amount. A size word such as 'medium', 'large' or 'small' is the unit, with quantity 1 ('medium banana' is quantity 1, unit 'medium'). (2) searchTerm is a short, singular, generic name for a food database " +
   'lookup with no preparation words ("potatoes" -> "potato", "grilled chicken breast" -> ' +
   '"chicken breast"). (3) brand is a brand or restaurant the user named for the food ' +
   '("Fairlife", "McDonald\'s", "Oikos"), or null. (4) preparation records how the main food ' +
@@ -37,7 +37,7 @@ const PARSE_SYSTEM_PROMPT =
   'things the user said were added: oils, butter, sauces, toppings, other ingredients. Never ' +
   'add anything the user did not mention, and never add oil for an air fried or "no oil" ' +
   'preparation. (6) Set clarification only when the food itself cannot be identified, and ' +
-  'then leave main null. A missing amount is not a reason to set clarification. Always call ' +
+  'then leave main null. A missing amount is NEVER a reason to set clarification: leave quantity and unit null and still fill in main. Always call ' +
   'the tool.';
 
 const ESTIMATE_SYSTEM_PROMPT =

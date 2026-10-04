@@ -66,20 +66,23 @@ function escapeCell(text: string): string {
 
 async function main(): Promise<void> {
   const config = { get: (key: string) => process.env[key] } as never;
-  const stubNutrition = {
-    parse: async (text: string) => {
-      const parsed = HAND_PARSES[text];
-      if (!parsed) throw new Error(`no stand-in parse for ${text}`);
-      return parsed;
-    },
-    estimate: async () => {
-      throw new Error('AI estimate is not run in this evaluation');
-    },
-  } as unknown as AnthropicNutritionProvider;
+  const live = process.env.EVAL_PARSER === 'live';
+  const nutritionProvider = live
+    ? new AnthropicNutritionProvider(config)
+    : ({
+        parse: async (text: string) => {
+          const parsed = HAND_PARSES[text];
+          if (!parsed) throw new Error(`no stand-in parse for ${text}`);
+          return parsed;
+        },
+        estimate: async () => {
+          throw new Error('AI estimate is not run in this evaluation');
+        },
+      } as unknown as AnthropicNutritionProvider);
   const service = new FoodsService(
     new SupabaseService(config),
     new OpenFoodFactsProvider(),
-    stubNutrition,
+    nutritionProvider,
   );
 
   const rows: string[] = [];
