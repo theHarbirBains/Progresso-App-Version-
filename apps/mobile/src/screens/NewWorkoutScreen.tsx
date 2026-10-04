@@ -183,7 +183,11 @@ export function NewWorkoutScreen({ navigation }: Props) {
 
   return (
     <>
-      <Screen header={header} contentContainerStyle={styles.content}>
+      <Screen
+        header={header}
+        contentContainerStyle={styles.content}
+        scrollTestID="new-workout-scroll"
+      >
         {error || splitError || conflict ? (
           <View style={styles.conflictBlock}>
             {error ? (

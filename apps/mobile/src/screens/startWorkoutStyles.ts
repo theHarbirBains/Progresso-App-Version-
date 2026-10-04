@@ -10,6 +10,7 @@ export const startWorkoutStyles = StyleSheet.create({
   // since these are sections of a list screen, not adjacent widgets.
   content: {
     gap: spacing.xxl,
+    paddingHorizontal: spacing.xxl,
   },
   errorText: {
     ...typeScale.callout,

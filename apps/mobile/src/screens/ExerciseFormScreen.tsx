@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Alert, Image, StyleSheet, View } from 'react-native';
+import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { DestructiveButton, PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
+import { PhotoLightbox } from '../design/PhotoLightbox';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { TextInput } from '../design/TextInput';
@@ -64,6 +65,7 @@ export function ExerciseFormScreen(props: Props) {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoLightboxOpen, setPhotoLightboxOpen] = useState(false);
   const shownPhoto = photoUri ?? (photoRemoved ? null : existingPhotoUrl);
 
   const canSave = name.trim().length > 0 && muscleGroup !== null && !saving;
@@ -233,11 +235,17 @@ export function ExerciseFormScreen(props: Props) {
 
           {shownPhoto ? (
             <View style={styles.photoPreviewRow}>
-              <Image
-                testID="exercise-form-photo-preview"
-                source={{ uri: shownPhoto }}
-                style={styles.photoPreviewImage}
-              />
+              <TouchableOpacity
+                onPress={() => setPhotoLightboxOpen(true)}
+                accessibilityRole="imagebutton"
+                accessibilityLabel="View machine photo"
+              >
+                <Image
+                  testID="exercise-form-photo-preview"
+                  source={{ uri: shownPhoto }}
+                  style={styles.photoPreviewImage}
+                />
+              </TouchableOpacity>
               <View style={styles.photoActions}>
                 <SecondaryButton
                   testID="exercise-form-photo-change"
@@ -308,6 +316,12 @@ export function ExerciseFormScreen(props: Props) {
           )
         ) : null}
       </View>
+      <PhotoLightbox
+        testID="exercise-form-photo-lightbox"
+        visible={photoLightboxOpen}
+        uri={shownPhoto}
+        onClose={() => setPhotoLightboxOpen(false)}
+      />
     </Screen>
   );
 }

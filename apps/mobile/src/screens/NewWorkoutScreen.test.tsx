@@ -449,4 +449,18 @@ describe('NewWorkoutScreen -- one primary action, everything else plain rows', (
       expect(StyleSheet.flatten(row.props.style).minHeight).toBeGreaterThanOrEqual(44);
     }
   });
+
+  // Regression guard: the screen's own content (the hero card and the plain
+  // rows below it) had no horizontal padding, so everything sat flush
+  // against the screen's left/right edges instead of the gutter every other
+  // list screen (LogPastWorkout, onboarding, etc.) gives its content.
+  it('gives the screen content breathing room from the screen edges', async () => {
+    renderScreen();
+    await screen.findByTestId('start-workout-next');
+
+    expect(
+      StyleSheet.flatten(screen.getByTestId('new-workout-scroll').props.contentContainerStyle)
+        .paddingHorizontal,
+    ).toBeGreaterThan(0);
+  });
 });
