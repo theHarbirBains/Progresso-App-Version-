@@ -1,12 +1,12 @@
-import { act, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import * as navigationTransitions from '../navigation/navigationTransitions';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import { RecentWorkoutTopSets } from './RecentWorkoutTopSets';
 
 const topSets: WorkoutTopSet[] = [
-  { exerciseId: 'bench', exerciseName: 'Bench Press', weightKg: 225, reps: 8 },
-  { exerciseId: 'pulldown', exerciseName: 'Lat Pulldown', weightKg: 160, reps: 10 },
-  { exerciseId: 'row', exerciseName: 'Barbell Row', weightKg: 135, reps: 6 },
+  { exerciseId: 'bench', exerciseName: 'Bench Press', photoUrl: null, weightKg: 225, reps: 8 },
+  { exerciseId: 'pulldown', exerciseName: 'Lat Pulldown', photoUrl: null, weightKg: 160, reps: 10 },
+  { exerciseId: 'row', exerciseName: 'Barbell Row', photoUrl: null, weightKg: 135, reps: 6 },
 ];
 
 function selectedDot(testID: string): number {
@@ -85,5 +85,40 @@ describe('RecentWorkoutTopSets', () => {
     render(<RecentWorkoutTopSets testID="top" topSets={[topSets[1]]} weightUnit="lb" />);
 
     expect(screen.getByText(/lb × 10/)).toBeTruthy();
+  });
+
+  it('shows the exercise photo beside its top set only when the exercise has one', () => {
+    render(
+      <RecentWorkoutTopSets
+        testID="top"
+        topSets={[{ ...topSets[0], photoUrl: 'https://example.com/bench.jpg' }, topSets[1]]}
+        weightUnit="kg"
+      />,
+    );
+
+    expect(screen.getByTestId('top-photo-bench-zoom')).toBeTruthy();
+    expect(screen.queryByTestId('top-photo-pulldown-zoom')).toBeNull();
+    expect(screen.getByText('Lat Pulldown')).toBeTruthy();
+  });
+
+  it('opens the full-size photo when the exercise photo is tapped', () => {
+    render(
+      <RecentWorkoutTopSets
+        testID="top"
+        topSets={[{ ...topSets[0], photoUrl: 'https://example.com/bench.jpg' }]}
+        weightUnit="kg"
+      />,
+    );
+
+    expect(screen.queryByTestId('top-photo-bench-lightbox-close')).toBeNull();
+    fireEvent.press(screen.getByTestId('top-photo-bench-zoom'));
+    expect(screen.getByTestId('top-photo-bench-lightbox-close')).toBeTruthy();
+  });
+
+  it('does not render a photo for an exercise without one', () => {
+    render(<RecentWorkoutTopSets testID="top" topSets={[topSets[0]]} weightUnit="kg" />);
+
+    expect(screen.queryByTestId('top-photo-bench-zoom')).toBeNull();
+    expect(screen.getByText('Bench Press')).toBeTruthy();
   });
 });

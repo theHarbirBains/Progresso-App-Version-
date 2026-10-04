@@ -80,14 +80,14 @@ describe('enrichWorkoutSummaries', () => {
             workout_id: 'w1',
             exercise_id: 'bench',
             order_index: 1,
-            exercises: { name: 'Bench Press' },
+            exercises: { name: 'Bench Press', photo_url: 'https://example.com/bench.jpg' },
           },
           {
             id: 'we2',
             workout_id: 'w1',
             exercise_id: 'curl',
             order_index: 2,
-            exercises: { name: 'Curl' },
+            exercises: { name: 'Curl', photo_url: null },
           },
         ],
         error: null,
@@ -145,8 +145,14 @@ describe('enrichWorkoutSummaries', () => {
         completedExerciseCount: 2,
         // Heaviest completed set per exercise: 100x5 (not 80x8), and 60x10.
         topSets: [
-          { exerciseId: 'bench', exerciseName: 'Bench Press', weightKg: 100, reps: 5 },
-          { exerciseId: 'curl', exerciseName: 'Curl', weightKg: 60, reps: 10 },
+          {
+            exerciseId: 'bench',
+            exerciseName: 'Bench Press',
+            photoUrl: 'https://example.com/bench.jpg',
+            weightKg: 100,
+            reps: 5,
+          },
+          { exerciseId: 'curl', exerciseName: 'Curl', photoUrl: null, weightKg: 60, reps: 10 },
         ],
       },
     ]);

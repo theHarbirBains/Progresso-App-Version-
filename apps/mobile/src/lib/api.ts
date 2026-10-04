@@ -454,7 +454,13 @@ export type FriendsFeedItem =
         completedSetCount: number;
         totalVolumeKg: number;
         completedExerciseCount: number;
-        topSets: { exerciseId: string; exerciseName: string; weightKg: number; reps: number }[];
+        topSets: {
+          exerciseId: string;
+          exerciseName: string;
+          photoUrl: string | null;
+          weightKg: number;
+          reps: number;
+        }[];
       };
     }
   | {

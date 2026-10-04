@@ -1,11 +1,16 @@
 import { completedSetsOnly } from './setCompletion';
 import { heaviestSet } from './topSetSummary';
 import type { WorkoutExerciseWithSets } from './workoutQueries';
-type ExerciseWithSets = Pick<WorkoutExerciseWithSets, 'exerciseId' | 'exerciseName' | 'sets'>;
+type ExerciseWithSets = Pick<
+  WorkoutExerciseWithSets,
+  'exerciseId' | 'exerciseName' | 'photoUrl' | 'sets'
+>;
 
 export interface WorkoutTopSet {
   exerciseId: string;
   exerciseName: string;
+  /** The exercise's machine photo, or null when it has none -- shown beside the top set only when present. */
+  photoUrl: string | null;
   weightKg: number;
   reps: number;
 }
@@ -25,6 +30,7 @@ export function computeWorkoutTopSets(exercises: ExerciseWithSets[]): WorkoutTop
       topSets.push({
         exerciseId: exercise.exerciseId,
         exerciseName: exercise.exerciseName,
+        photoUrl: exercise.photoUrl,
         weightKg: top.weightKg,
         reps: top.reps,
       });

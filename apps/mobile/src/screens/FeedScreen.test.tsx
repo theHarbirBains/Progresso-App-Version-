@@ -262,7 +262,15 @@ describe('FeedScreen', () => {
             completedSetCount: 15,
             totalVolumeKg: 1200,
             completedExerciseCount: 5,
-            topSets: [{ exerciseId: 'row', exerciseName: 'Barbell Row', weightKg: 135, reps: 6 }],
+            topSets: [
+              {
+                exerciseId: 'row',
+                exerciseName: 'Barbell Row',
+                photoUrl: 'https://example.com/row.jpg',
+                weightKg: 135,
+                reps: 6,
+              },
+            ],
           },
         },
       ]),
@@ -270,6 +278,7 @@ describe('FeedScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('feed-item-workout-fw1-top-sets')).toBeTruthy();
+    expect(screen.getByTestId('feed-item-workout-fw1-top-sets-photo-row-zoom')).toBeTruthy();
     expect(screen.getByTestId('feed-item-workout-fw1-exercises')).toHaveTextContent('5', {
       exact: false,
     });
@@ -538,7 +547,9 @@ describe('FeedScreen -- merged Friends activity', () => {
       completedSetCount: 15,
       totalVolumeKg: 1200,
       completedExerciseCount: 5,
-      topSets: [{ exerciseId: 'row', exerciseName: 'Barbell Row', weightKg: 135, reps: 6 }],
+      topSets: [
+        { exerciseId: 'row', exerciseName: 'Barbell Row', photoUrl: null, weightKg: 135, reps: 6 },
+      ],
     },
   };
 

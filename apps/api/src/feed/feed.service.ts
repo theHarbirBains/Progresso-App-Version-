@@ -21,7 +21,13 @@ export type FeedItem =
         completedSetCount: number;
         totalVolumeKg: number;
         completedExerciseCount: number;
-        topSets: { exerciseId: string; exerciseName: string; weightKg: number; reps: number }[];
+        topSets: {
+          exerciseId: string;
+          exerciseName: string;
+          photoUrl: string | null;
+          weightKg: number;
+          reps: number;
+        }[];
       };
     }
   | {
@@ -210,7 +216,7 @@ export class FeedService {
     const workoutIds = workouts.map((w) => w.id);
     const { data: workoutExercises, error: weError } = await client
       .from('workout_exercises')
-      .select('id, workout_id, exercise_id, order_index, exercises(name)')
+      .select('id, workout_id, exercise_id, order_index, exercises(name, photo_url)')
       .in('workout_id', workoutIds)
       .is('deleted_at', null);
     if (weError) throw new InternalServerErrorException('Failed to load friends feed');
@@ -219,14 +225,15 @@ export class FeedService {
     const exerciseCountByWorkoutId = new Map<string, number>();
     const exerciseInfoById = new Map<
       string,
-      { exerciseId: string; exerciseName: string; orderIndex: number }
+      { exerciseId: string; exerciseName: string; photoUrl: string | null; orderIndex: number }
     >();
     for (const we of workoutExercises ?? []) {
       workoutIdByExerciseId.set(we.id as string, we.workout_id as string);
-      const embedded = we.exercises as unknown as { name: string } | null;
+      const embedded = we.exercises as unknown as { name: string; photo_url: string | null } | null;
       exerciseInfoById.set(we.id as string, {
         exerciseId: we.exercise_id as string,
         exerciseName: embedded?.name ?? '',
+        photoUrl: embedded?.photo_url ?? null,
         orderIndex: we.order_index as number,
       });
       exerciseCountByWorkoutId.set(
@@ -289,6 +296,7 @@ export class FeedService {
       const topSets: {
         exerciseId: string;
         exerciseName: string;
+        photoUrl: string | null;
         weightKg: number;
         reps: number;
       }[] = [];
@@ -306,6 +314,7 @@ export class FeedService {
         topSets.push({
           exerciseId: row.info.exerciseId,
           exerciseName: row.info.exerciseName,
+          photoUrl: row.info.photoUrl,
           weightKg: top.weightKg,
           reps: top.reps,
         });

@@ -177,14 +177,14 @@ describe('FeedService', () => {
             workout_id: 'w1',
             exercise_id: 'bench',
             order_index: 1,
-            exercises: { name: 'Bench Press' },
+            exercises: { name: 'Bench Press', photo_url: 'https://example.com/bench.jpg' },
           },
           {
             id: 'we-curl',
             workout_id: 'w1',
             exercise_id: 'curl',
             order_index: 2,
-            exercises: { name: 'Curl' },
+            exercises: { name: 'Curl', photo_url: null },
           },
           {
             id: 'we-empty',
@@ -218,8 +218,14 @@ describe('FeedService', () => {
         workout: {
           completedExerciseCount: 2,
           topSets: [
-            { exerciseId: 'bench', exerciseName: 'Bench Press', weightKg: 225, reps: 8 },
-            { exerciseId: 'curl', exerciseName: 'Curl', weightKg: 30, reps: 10 },
+            {
+              exerciseId: 'bench',
+              exerciseName: 'Bench Press',
+              photoUrl: 'https://example.com/bench.jpg',
+              weightKg: 225,
+              reps: 8,
+            },
+            { exerciseId: 'curl', exerciseName: 'Curl', photoUrl: null, weightKg: 30, reps: 10 },
           ],
         },
       });

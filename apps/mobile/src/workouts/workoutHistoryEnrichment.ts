@@ -74,7 +74,7 @@ export async function enrichWorkoutSummaries(
   const workoutIds = workouts.map((w) => w.id);
   const { data: workoutExercises, error: weError } = await supabase
     .from('workout_exercises')
-    .select('id, workout_id, exercise_id, order_index, exercises(name)')
+    .select('id, workout_id, exercise_id, order_index, exercises(name, photo_url)')
     .in('workout_id', workoutIds)
     .is('deleted_at', null);
   if (weError) throw new Error(weError.message);
@@ -83,13 +83,15 @@ export async function enrichWorkoutSummaries(
   const exerciseCountByWorkoutId = new Map<string, number>();
   const exerciseInfoById = new Map<
     string,
-    { exerciseId: string; exerciseName: string; orderIndex: number }
+    { exerciseId: string; exerciseName: string; photoUrl: string | null; orderIndex: number }
   >();
   for (const we of workoutExercises ?? []) {
     workoutIdByExerciseId.set(we.id, we.workout_id);
+    const embedded = we.exercises as unknown as { name: string; photo_url: string | null } | null;
     exerciseInfoById.set(we.id, {
       exerciseId: we.exercise_id,
-      exerciseName: (we.exercises as unknown as { name: string } | null)?.name ?? '',
+      exerciseName: embedded?.name ?? '',
+      photoUrl: embedded?.photo_url ?? null,
       orderIndex: we.order_index,
     });
     exerciseCountByWorkoutId.set(
@@ -141,7 +143,13 @@ export async function enrichWorkoutSummaries(
 
   const exerciseRowsByWorkoutId = new Map<
     string,
-    { exerciseId: string; exerciseName: string; sets: SetRecord[]; orderIndex: number }[]
+    {
+      exerciseId: string;
+      exerciseName: string;
+      photoUrl: string | null;
+      sets: SetRecord[];
+      orderIndex: number;
+    }[]
   >();
   for (const [weId, workoutId] of workoutIdByExerciseId) {
     const info = exerciseInfoById.get(weId);

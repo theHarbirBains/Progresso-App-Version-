@@ -446,6 +446,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                   id: workoutExerciseId,
                   exerciseId: exercise.id,
                   exerciseName: exercise.name,
+                  photoUrl: exercise.photoUrl,
                   muscleGroup: exercise.muscleGroup,
                   movementType: exercise.movementType,
                   loggingStyle: exercise.loggingStyle,
