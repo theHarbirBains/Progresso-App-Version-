@@ -293,27 +293,48 @@ export function getFoodByBarcode(
   );
 }
 
-/** AI Food Search's one estimate for a free-text description (e.g. "100
- * grams of air fried potatoes with no oil") -- every field is the model's
- * single best guess, not a fetched/verified figure. Through the backend,
- * never direct-to-Supabase: this calls a third-party API (Anthropic), the
- * exact kind of integration CLAUDE.md's hybrid architecture rule reserves
- * for the backend. */
-export interface NutritionEstimate {
+/** AI Food Search's interpretation of a free-text description (e.g. "100
+ * grams of air fried potatoes with no oil") -- see the backend's
+ * FoodsService.interpretDescription. Claude only understands the wording; each
+ * component's numbers come from Progresso's food data (`source: 'database'`),
+ * or are Claude's own estimate when no compatible food exists
+ * (`source: 'ai_estimate'`, never presented as a verified figure). Through the
+ * backend because it calls a third-party API (Anthropic). */
+export interface InterpretedComponent {
+  role: 'main' | 'ingredient';
   name: string;
-  servingSize: number;
-  servingUnit: string;
+  quantity: number;
+  unit: string;
+  source: 'database' | 'ai_estimate';
+  /** The Progresso food the numbers came from, when source is 'database'. */
+  matchedName: string | null;
+  /** An assumption the user should see, e.g. a generic "2 item" treated as large eggs. */
+  assumption: string | null;
   calories: number;
   proteinG: number;
   carbsG: number;
   fatG: number;
 }
 
-export function estimateNutrition(
+export interface FoodInterpretation {
+  name: string;
+  servingSize: number;
+  servingUnit: string;
+  preparation: string | null;
+  components: InterpretedComponent[];
+  totals: { calories: number; proteinG: number; carbsG: number; fatG: number };
+  hasEstimate: boolean;
+}
+
+export type InterpretFoodResponse =
+  | { status: 'ok'; interpretation: FoodInterpretation }
+  | { status: 'clarification'; question: string };
+
+export function interpretFoodDescription(
   accessToken: string,
   description: string,
-): Promise<NutritionEstimate> {
-  return request<NutritionEstimate>('/api/v1/foods/estimate', accessToken, {
+): Promise<InterpretFoodResponse> {
+  return request<InterpretFoodResponse>('/api/v1/foods/interpret', accessToken, {
     method: 'POST',
     body: JSON.stringify({ description }),
   });

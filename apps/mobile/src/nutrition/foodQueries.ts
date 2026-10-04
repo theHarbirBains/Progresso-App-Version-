@@ -134,6 +134,28 @@ export async function fetchAllFoods(params: FetchAllFoodsParams): Promise<FoodRo
   return ((data ?? []) as FoodDbRow[]).map(toFoodRow);
 }
 
+/**
+ * The user's own active food with exactly this name (case-insensitive, trimmed),
+ * or null. Used to stop AI Food Search adding a second copy of a food the
+ * library already has. Exact match, not a substring search: "Potato" must not
+ * be treated as already having "Sweet Potato".
+ */
+export async function findOwnFoodByName(userId: string, name: string): Promise<FoodRow | null> {
+  const wanted = name.trim().toLowerCase();
+  if (!wanted) return null;
+  const { data, error } = await supabase
+    .from('foods')
+    .select(FOOD_COLUMNS)
+    .eq('created_by', userId)
+    .eq('is_active', true)
+    .ilike('name', escapeIlike(name.trim()));
+  if (error) throw new Error(error.message);
+  const match = ((data ?? []) as FoodDbRow[])
+    .map(toFoodRow)
+    .find((food) => food.name.trim().toLowerCase() === wanted);
+  return match ?? null;
+}
+
 export interface FoodInput {
   name: string;
   /** Optional -- most custom foods have no brand. */

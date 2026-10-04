@@ -1,5 +1,11 @@
 import { supabase } from '../lib/supabase';
-import { createFood, fetchAllFoods, fetchFoods, updateFood } from './foodQueries';
+import {
+  createFood,
+  fetchAllFoods,
+  fetchFoods,
+  findOwnFoodByName,
+  updateFood,
+} from './foodQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
 
@@ -333,5 +339,49 @@ describe('updateFood', () => {
     expect(builder.update).toHaveBeenCalledWith({ brand: 'Kirkland', barcode: '012345678905' });
     expect(result.brand).toBe('Kirkland');
     expect(result.barcode).toBe('012345678905');
+  });
+});
+
+describe('findOwnFoodByName', () => {
+  it("looks only at the user's own active foods, by an escaped case-insensitive name", async () => {
+    const { calls } = mockTable({ data: [dbRow], error: null });
+
+    await findOwnFoodByName('user-1', 'Chicken Breast');
+
+    expect(calls.eq).toEqual([
+      ['created_by', 'user-1'],
+      ['is_active', true],
+    ]);
+    expect(calls.ilike).toEqual([['name', 'Chicken Breast']]);
+  });
+
+  it('returns the food only on an exact name match, never a longer name that contains it', async () => {
+    mockTable({
+      data: [{ ...dbRow, id: 'food-2', name: 'Sweet Chicken Breast' }, dbRow],
+      error: null,
+    });
+
+    const result = await findOwnFoodByName('user-1', '  chicken BREAST ');
+
+    expect(result?.id).toBe('food-1');
+  });
+
+  it('returns null when the library has no food of that name', async () => {
+    mockTable({ data: [{ ...dbRow, name: 'Sweet Chicken Breast' }], error: null });
+
+    await expect(findOwnFoodByName('user-1', 'Chicken Breast')).resolves.toBeNull();
+  });
+
+  it('returns null without querying for a blank name', async () => {
+    const { calls } = mockTable({ data: [dbRow], error: null });
+
+    await expect(findOwnFoodByName('user-1', '   ')).resolves.toBeNull();
+    expect(calls.ilike ?? []).toEqual([]);
+  });
+
+  it('throws the database error', async () => {
+    mockTable({ data: null, error: { message: 'boom' } });
+
+    await expect(findOwnFoodByName('user-1', 'Chicken Breast')).rejects.toThrow('boom');
   });
 });

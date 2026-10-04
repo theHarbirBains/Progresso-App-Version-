@@ -3,7 +3,7 @@ import { IsString, MaxLength, MinLength } from 'class-validator';
 
 const MAX_DESCRIPTION_LENGTH = 300;
 
-export class EstimateNutritionDto {
+export class InterpretFoodDto {
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @MinLength(3)

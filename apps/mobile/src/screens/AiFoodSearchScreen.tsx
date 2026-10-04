@@ -7,62 +7,89 @@ import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';
 import { Screen } from '../design/Screen';
 import { TextInput } from '../design/TextInput';
-import { estimateNutrition, type NutritionEstimate } from '../lib/api';
+import { interpretFoodDescription, type FoodInterpretation } from '../lib/api';
+import { createFood, findOwnFoodByName } from '../nutrition/foodQueries';
+import { InterpretedFoodReview } from '../nutrition/InterpretedFoodReview';
+import { libraryFoodInput, libraryFoodName } from '../nutrition/interpretedFood';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { aiFoodSearchStyles as styles } from './aiFoodSearchStyles';
-import { FoodFormScreen } from './FoodFormScreen';
 
 type Props = RootStackScreenProps<'AiFoodSearch'>;
 
-// A natural-language alternative to FoodSearchScreen's database lookup: the
-// user describes a food or meal in their own words (e.g. "100 grams of air
-// fried potatoes with no oil") instead of searching Progresso's own/cached
-// catalog, and the backend's Claude-backed /foods/estimate endpoint (see
-// apps/api/src/foods/providers/anthropic-nutrition.provider.ts) returns its
-// single best-guess calories/macros. That estimate is never saved on its
-// own -- it hands straight into FoodFormScreen's existing create form,
-// pre-filled (FoodFormInitialValues), so the user reviews/edits it exactly
-// like any other custom food before Save calls the same createFood() every
-// other custom-food path already uses. Going back from that form (Cancel)
-// returns here to try a different description, rather than leaving the
-// screen entirely.
+// AI Food Search: the user describes what they ate in their own words. Claude
+// only works out what the words mean (amounts, units, preparation, added oil,
+// butter or sauce). Progresso's own food data supplies every calorie and macro,
+// scaled exactly by the amount given. The result is reviewed on this screen
+// first, and only the Add to Food Library tap saves it.
 export function AiFoodSearchScreen({ navigation }: Props) {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const accessToken = session?.access_token;
+  const userId = user?.id;
   const { nutritionTheme: theme } = useProgressTheme();
 
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [estimate, setEstimate] = useState<NutritionEstimate | null>(null);
+  const [clarification, setClarification] = useState<string | null>(null);
+  const [interpretation, setInterpretation] = useState<FoodInterpretation | null>(null);
+  const [duplicateName, setDuplicateName] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const trimmed = description.trim();
 
-  async function handleEstimate() {
+  function reset() {
+    setInterpretation(null);
+    setClarification(null);
+    setDuplicateName(null);
+    setError(null);
+  }
+
+  async function handleInterpret() {
     if (!accessToken || trimmed.length === 0 || loading) return;
     setLoading(true);
-    setError(null);
+    reset();
     try {
-      setEstimate(await estimateNutrition(accessToken, trimmed));
+      const response = await interpretFoodDescription(accessToken, trimmed);
+      if (response.status === 'clarification') {
+        setClarification(response.question);
+        return;
+      }
+      setInterpretation(response.interpretation);
+      // Best-effort early warning; handleAdd checks again before saving.
+      if (userId) {
+        const existing = await findOwnFoodByName(
+          userId,
+          libraryFoodName(response.interpretation),
+        ).catch(() => null);
+        setDuplicateName(existing?.name ?? null);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to estimate nutrition');
+      setError(err instanceof Error ? err.message : 'Failed to read that food description');
     } finally {
       setLoading(false);
     }
   }
 
-  if (estimate) {
-    return (
-      <FoodFormScreen
-        mode="create"
-        initialValues={estimate}
-        onDone={() => navigation.navigate('FoodLibrary')}
-        onCancel={() => setEstimate(null)}
-        accentColor={theme.accent}
-        onAccentColor={theme.onAccent}
-      />
-    );
+  async function handleAdd() {
+    if (!interpretation || !userId || adding) return;
+    setAdding(true);
+    setError(null);
+    try {
+      // Checked again here, not only when the review appeared, so a food added
+      // elsewhere in the meantime still can't be duplicated.
+      const existing = await findOwnFoodByName(userId, libraryFoodName(interpretation));
+      if (existing) {
+        setDuplicateName(existing.name);
+        return;
+      }
+      await createFood(userId, libraryFoodInput(interpretation));
+      navigation.navigate('FoodLibrary');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add to your Food Library');
+    } finally {
+      setAdding(false);
+    }
   }
 
   return (
@@ -80,8 +107,15 @@ export function AiFoodSearchScreen({ navigation }: Props) {
       <AppCard testID="ai-food-search-card">
         <View style={styles.group}>
           <Text style={styles.description}>
-            Describe what you ate, and Claude will estimate its calories and macros -- you can
-            review and edit the result before saving it to your food library.
+            Describe what you ate. Progresso works out the amount and ingredients, and takes the
+            calories and macros from its food data. Review the result before anything is saved.
+          </Text>
+          <Text testID="ai-food-search-accuracy" style={styles.guidance}>
+            For the most accurate estimate, include the amount, serving unit, preparation method,
+            and any oils, sauces, or other ingredients used.
+          </Text>
+          <Text testID="ai-food-search-example" style={styles.example}>
+            {'Example: "150 g chicken breast, air fried with 1 tsp olive oil."'}
           </Text>
           <TextInput
             testID="ai-food-search-input"
@@ -91,24 +125,46 @@ export function AiFoodSearchScreen({ navigation }: Props) {
             onChangeText={setDescription}
             autoCapitalize="none"
             returnKeyType="done"
-            onSubmitEditing={handleEstimate}
+            onSubmitEditing={handleInterpret}
           />
+          {clarification ? (
+            <Text testID="ai-food-search-clarification" style={styles.clarificationText}>
+              {clarification}
+            </Text>
+          ) : null}
           {error ? (
             <Text testID="ai-food-search-error" style={styles.errorText}>
               {error}
             </Text>
           ) : null}
-          <PrimaryButton
-            testID="ai-food-search-submit"
-            label={loading ? 'Estimating…' : 'Get Estimate'}
-            loading={loading}
-            disabled={trimmed.length === 0}
-            onPress={handleEstimate}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
-          />
+          {interpretation ? null : (
+            <PrimaryButton
+              testID="ai-food-search-submit"
+              label={loading ? 'Reading…' : 'Get Estimate'}
+              loading={loading}
+              disabled={trimmed.length === 0}
+              onPress={handleInterpret}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+            />
+          )}
         </View>
       </AppCard>
+
+      {interpretation ? (
+        <InterpretedFoodReview
+          interpretation={interpretation}
+          duplicateName={duplicateName}
+          adding={adding}
+          onAdd={handleAdd}
+          onDescribeAgain={() => {
+            setInterpretation(null);
+            setDuplicateName(null);
+          }}
+          accentColor={theme.accent}
+          onAccentColor={theme.onAccent}
+        />
+      ) : null}
     </Screen>
   );
 }

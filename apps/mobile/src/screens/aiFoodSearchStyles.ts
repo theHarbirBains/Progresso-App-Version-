@@ -12,6 +12,19 @@ export const aiFoodSearchStyles = StyleSheet.create({
     ...typeScale.secondary,
     color: colors.textSecondary,
   },
+  guidance: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+  },
+  example: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+    fontStyle: 'italic',
+  },
+  clarificationText: {
+    ...typeScale.callout,
+    color: colors.textPrimary,
+  },
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,
