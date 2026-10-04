@@ -9,6 +9,7 @@ import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
+import { fetchWorkoutDetail } from '../workouts/workoutQueries';
 import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
@@ -37,6 +38,14 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
   fetchWorkoutSplitDetail: jest.fn(),
   fetchLastWorkoutSplitDayId: jest.fn(),
 }));
+
+jest.mock('../workouts/workoutQueries', () => ({
+  fetchWorkoutDetail: jest.fn(),
+  // Real (pure, no supabase dependency) implementation.
+  ...jest.requireActual('../workouts/setCompletion'),
+}));
+
+const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
@@ -156,6 +165,7 @@ beforeEach(() => {
     activeWorkoutSplitId: 'split-1',
   });
   mockFetchFeedItems.mockReset().mockResolvedValue(feedPage([]));
+  mockFetchWorkoutDetail.mockReset().mockRejectedValue(new Error('no detail'));
   mockFetchFriendsFeed.mockReset().mockResolvedValue(feedPage([]));
   mockListFollowNotifications.mockReset().mockResolvedValue([]);
   mockFetchNutritionGoals
@@ -211,7 +221,7 @@ describe('FeedScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('FindPeople');
   });
 
-  it('shows a completed workout as a card: split day, muscles, duration, exercises, sets and volume', async () => {
+  it('shows the most recent workout as a card: split day, muscles, duration, exercises and sets -- no volume', async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
     renderScreen();
 
@@ -219,9 +229,73 @@ describe('FeedScreen', () => {
     expect(card.getByText('Push')).toBeTruthy();
     expect(card.getByText(/Chest.*Shoulders/)).toBeTruthy();
     expect(screen.getByTestId('feed-item-workout-w1-duration')).toHaveTextContent(/1h/);
-    expect(screen.getByTestId('feed-item-workout-w1-exercises')).toHaveTextContent(/4/);
     expect(screen.getByTestId('feed-item-workout-w1-sets')).toHaveTextContent(/12/);
-    expect(screen.getByTestId('feed-item-workout-w1-volume')).toHaveTextContent(/1000/);
+    expect(screen.queryByTestId('feed-item-workout-w1-volume')).toBeNull();
+  });
+
+  it('keeps the original 2x2 grid, volume included, for an older workout', async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, olderWorkoutItem]));
+    renderScreen();
+
+    await screen.findByTestId('feed-item-workout-w0');
+    expect(screen.getByTestId('feed-item-workout-w0-volume')).toBeTruthy();
+    expect(screen.getByTestId('feed-item-workout-w0-exercises')).toBeTruthy();
+    expect(screen.queryByTestId('feed-item-workout-w0-top-sets')).toBeNull();
+  });
+
+  it('shows the completed exercise count and a Top Sets strip for the most recent workout, from its real sets', async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    mockFetchWorkoutDetail.mockResolvedValue({
+      id: 'w1',
+      exercises: [
+        {
+          id: 'we-bench',
+          exerciseId: 'bench',
+          exerciseName: 'Bench Press',
+          muscleGroup: 'chest',
+          movementType: 'bilateral',
+          loggingStyle: null,
+          orderIndex: 1,
+          sets: [
+            { id: 's1', setIndex: 1, weightKg: 200, reps: 5, completedAt: '2026-01-01T12:00:00Z' },
+            { id: 's2', setIndex: 2, weightKg: 225, reps: 8, completedAt: '2026-01-01T12:05:00Z' },
+            { id: 's3', setIndex: 3, weightKg: 300, reps: 1, completedAt: null },
+          ],
+        },
+        {
+          id: 'we-pulldown',
+          exerciseId: 'pulldown',
+          exerciseName: 'Lat Pulldown',
+          muscleGroup: 'back',
+          movementType: 'bilateral',
+          loggingStyle: null,
+          orderIndex: 2,
+          sets: [
+            { id: 's4', setIndex: 1, weightKg: 160, reps: 10, completedAt: '2026-01-01T12:10:00Z' },
+          ],
+        },
+        {
+          id: 'we-empty',
+          exerciseId: 'empty',
+          exerciseName: 'Curl',
+          muscleGroup: 'biceps',
+          movementType: 'bilateral',
+          loggingStyle: null,
+          orderIndex: 3,
+          sets: [{ id: 's5', setIndex: 1, weightKg: null, reps: null, completedAt: null }],
+        },
+      ],
+    });
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-item-workout-w1-top-sets')).toBeTruthy();
+    expect(screen.getByTestId('feed-item-workout-w1-exercises')).toHaveTextContent('2', {
+      exact: false,
+    });
+    expect(screen.getByText('Bench Press')).toBeTruthy();
+    expect(screen.getByText('225 kg × 8')).toBeTruthy();
+    expect(screen.queryByText('Curl')).toBeNull();
+    expect(mockFetchWorkoutDetail).toHaveBeenCalledWith('w1');
   });
 
   it("shows the account's own name and picture as each card's byline", async () => {
