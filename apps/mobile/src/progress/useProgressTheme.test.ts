@@ -92,7 +92,7 @@ describe('useProgressTheme', () => {
     expect(result.current.themeLoading).toBe(true);
     expect(result.current.theme).toBe(DEFAULT_WORKOUT_THEME);
     expect(result.current.nutritionTheme).toBe(DEFAULT_NUTRITION_THEME);
-    expect(result.current.weightUnit).toBe('kg');
+    expect(result.current.weightUnit).toBe('lb');
     expect(result.current.activeWorkoutSplitId).toBeNull();
     expect(result.current.displayName).toBeNull();
     expect(result.current.username).toBeNull();
@@ -108,7 +108,7 @@ describe('useProgressTheme', () => {
 
     expect(result.current.themeLoading).toBe(false);
     expect(result.current.theme).toBe(DEFAULT_WORKOUT_THEME);
-    expect(result.current.weightUnit).toBe('kg');
+    expect(result.current.weightUnit).toBe('lb');
     expect(result.current.activeWorkoutSplitId).toBeNull();
   });
 });

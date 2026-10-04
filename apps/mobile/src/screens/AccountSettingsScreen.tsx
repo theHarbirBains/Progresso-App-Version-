@@ -45,7 +45,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
   // elsewhere (the avatar picker on Profile, the two color-picker screens).
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('lb');
   const [pushNotificationsOptIn, setPushNotificationsOptIn] = useState(false);
   const [emailOptIn, setEmailOptIn] = useState(false);
 

@@ -78,7 +78,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   gender: null,
   birthday: toDateStringUTC(0, 1, DEFAULT_BIRTH_YEAR),
   weightValue: 70,
-  weightUnit: 'kg',
+  weightUnit: 'lb',
   heightValue: 170,
   heightUnit: 'cm',
   fitnessGoal: null,

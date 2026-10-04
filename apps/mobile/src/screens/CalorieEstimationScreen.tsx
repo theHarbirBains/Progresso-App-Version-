@@ -151,7 +151,7 @@ export function CalorieEstimationScreen({ navigation }: Props) {
   const [heightCm, setHeightCm] = useState(DEFAULT_HEIGHT_CM);
   const [heightUnit, setHeightUnit] = useState<HeightUnit>('cm');
   const [weightKg, setWeightKg] = useState(DEFAULT_WEIGHT_KG);
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('lb');
   const [activityLevel, setActivityLevel] = useState<ActivityLevel | null>(null);
   const [submitted, setSubmitted] = useState(false);
 

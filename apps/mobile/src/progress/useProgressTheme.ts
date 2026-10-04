@@ -44,7 +44,7 @@ export function useProgressTheme(): {
     nutritionTheme: profile?.nutritionAccentColor
       ? buildAccentTheme(profile.nutritionAccentColor)
       : DEFAULT_NUTRITION_THEME,
-    weightUnit: profile?.weightUnit ?? 'kg',
+    weightUnit: profile?.weightUnit ?? 'lb',
     activeWorkoutSplitId: profile?.activeWorkoutSplitId ?? null,
     displayName: profile?.displayName ?? null,
     username: profile?.username ?? null,

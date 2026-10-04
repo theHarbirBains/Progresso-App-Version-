@@ -127,7 +127,7 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
   const { workoutId } = route.params;
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const { theme, weightUnit } = useProgressTheme();
+  const { theme, weightUnit, themeLoading } = useProgressTheme();
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const [loading, setLoading] = useState(true);
@@ -156,6 +156,10 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
   }
 
   useEffect(() => {
+    // Wait for the weight unit to be known before seeding the editable text --
+    // otherwise a user whose profile hasn't loaded yet gets their weights
+    // written in the fallback unit, and they're never re-seeded.
+    if (themeLoading) return;
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -206,7 +210,7 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
     // re-running this on a later unit-preference change would stomp on
     // whatever the user has already typed this session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workoutId]);
+  }, [workoutId, themeLoading]);
 
   function blankSets(movementType: MovementType, setIndex: number): DraftSet[] {
     if (movementType === 'unilateral') {
