@@ -20,10 +20,12 @@ import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
+import { DurationInput } from '../workouts/DurationInput';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
 import { PastSetRow } from '../workouts/PastSetRow';
 import { PastUnilateralSetRow } from '../workouts/PastUnilateralSetRow';
 import { formatCardDate } from '../workouts/workoutFormat';
+import { computeDurationMinutes } from '../workouts/topSetSummary';
 import {
   addExerciseToWorkout,
   createSet,
@@ -138,6 +140,8 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
   const [calendarMonth, setCalendarMonth] = useState(() => date.getMonth() + 1);
 
   const [name, setName] = useState('');
+  const [durationHours, setDurationHours] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState('');
   const [exercises, setExercises] = useState<DraftExercise[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
@@ -161,6 +165,11 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
         if (cancelled) return;
         setOriginal(detail);
         setName(detail.name);
+        const loadedDuration = computeDurationMinutes(detail.performedAt, detail.completedAt);
+        if (loadedDuration !== null) {
+          setDurationHours(String(Math.floor(loadedDuration / 60)));
+          setDurationMinutes(String(loadedDuration % 60));
+        }
         const loadedDate = new Date(detail.performedAt);
         setDate(loadedDate);
         setCalendarYear(loadedDate.getFullYear());
@@ -312,7 +321,30 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
     setSaving(true);
     try {
       const performedAtIso = date.toISOString();
-      if (trimmedName !== original.name || performedAtIso !== original.performedAt) {
+      if (original.completedAt !== null) {
+        // completedAt is always recomputed from the date plus the duration
+        // together, so moving the date never silently skews a duration.
+        // With no duration entered it goes back to equal performedAt --
+        // the same "unknown duration" marker createLoggedWorkout uses.
+        const totalDurationMinutes =
+          (Number(durationHours) || 0) * 60 + (Number(durationMinutes) || 0);
+        const completedAtIso =
+          totalDurationMinutes > 0
+            ? new Date(date.getTime() + totalDurationMinutes * 60000).toISOString()
+            : performedAtIso;
+        if (
+          trimmedName !== original.name ||
+          performedAtIso !== original.performedAt ||
+          completedAtIso !== original.completedAt
+        ) {
+          await updateWorkout(workoutId, {
+            name: trimmedName,
+            performedAt: performedAtIso,
+            completedAt: completedAtIso,
+          });
+        }
+      } else if (trimmedName !== original.name || performedAtIso !== original.performedAt) {
+        // An unfinished workout has no duration to set -- never complete it here.
         await updateWorkout(workoutId, { name: trimmedName, performedAt: performedAtIso });
       }
 
@@ -477,6 +509,16 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
             autoCapitalize="words"
             returnKeyType="done"
           />
+
+          {original.completedAt !== null ? (
+            <DurationInput
+              testID="edit-workout-duration"
+              hours={durationHours}
+              minutes={durationMinutes}
+              onChangeHours={setDurationHours}
+              onChangeMinutes={setDurationMinutes}
+            />
+          ) : null}
 
           {exercises.map((exercise, index) => {
             const isUnilateral = exercise.movementType === 'unilateral';

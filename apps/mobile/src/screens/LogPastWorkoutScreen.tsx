@@ -19,6 +19,7 @@ import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
+import { DurationInput } from '../workouts/DurationInput';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
 import { PastSetRow } from '../workouts/PastSetRow';
 import { PastUnilateralSetRow } from '../workouts/PastUnilateralSetRow';
@@ -107,10 +108,11 @@ function exercisesToSave(source: DraftExercise[]): DraftExercise[] {
 function dateKeyToLocalDate(dateKey: string): Date {
   const [year, month, day] = dateKey.split('-').map(Number);
   // Noon, not midnight -- keeps this comfortably clear of any local
-  // timezone's day boundary, and (since completed_at is set to this same
-  // instant -- see createLoggedWorkout) means computeDurationMinutes sees
-  // performedAt === completedAt and honestly reports "--" rather than a
-  // fabricated duration.
+  // timezone's day boundary. completedAt is derived from this same instant
+  // plus whatever duration is entered below (see handleSave) -- when no
+  // duration is given, createLoggedWorkout's own default (completedAt =
+  // performedAt) means computeDurationMinutes sees performedAt ===
+  // completedAt and honestly reports "--" rather than a fabricated duration.
   return new Date(year, month - 1, day, 12, 0, 0);
 }
 
@@ -139,6 +141,8 @@ export function LogPastWorkoutScreen({ navigation }: Props) {
   const [calendarMonth, setCalendarMonth] = useState(() => date.getMonth() + 1);
 
   const [name, setName] = useState('');
+  const [durationHours, setDurationHours] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState('');
   const [exercises, setExercises] = useState<DraftExercise[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
@@ -269,7 +273,22 @@ export function LogPastWorkoutScreen({ navigation }: Props) {
     setSaving(true);
     try {
       const performedAtIso = date.toISOString();
-      const workout = await createLoggedWorkout(userId, trimmedName, performedAtIso);
+      const totalDurationMinutes =
+        (Number(durationHours) || 0) * 60 + (Number(durationMinutes) || 0);
+      // Omit entirely (rather than pass 0) when no duration was entered --
+      // createLoggedWorkout's own default (completedAt = performedAt) is
+      // what makes every existing duration readout show "--" instead of a
+      // fabricated "0 min".
+      const completedAtIso =
+        totalDurationMinutes > 0
+          ? new Date(date.getTime() + totalDurationMinutes * 60000).toISOString()
+          : undefined;
+      const workout = await createLoggedWorkout(
+        userId,
+        trimmedName,
+        performedAtIso,
+        completedAtIso,
+      );
 
       let orderIndex = 1;
       for (const ex of toSave) {
@@ -350,6 +369,14 @@ export function LogPastWorkoutScreen({ navigation }: Props) {
             onChangeText={setName}
             autoCapitalize="words"
             returnKeyType="done"
+          />
+
+          <DurationInput
+            testID="log-past-workout-duration"
+            hours={durationHours}
+            minutes={durationMinutes}
+            onChangeHours={setDurationHours}
+            onChangeMinutes={setDurationMinutes}
           />
 
           {exercises.map((exercise, index) => {

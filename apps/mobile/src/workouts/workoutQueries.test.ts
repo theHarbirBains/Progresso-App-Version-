@@ -18,6 +18,7 @@ import {
   reorderExercises,
   type SetRecord,
   updateSet,
+  updateWorkout,
 } from './workoutQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
@@ -506,6 +507,35 @@ describe('createLoggedWorkout', () => {
     });
   });
 
+  it('inserts with an explicit completedAt when a duration is given', async () => {
+    const tables = mockTables({
+      workouts: {
+        data: {
+          id: 'w1',
+          name: 'Leg Day',
+          performed_at: '2026-01-01T12:00:00.000Z',
+          completed_at: '2026-01-01T13:00:00.000Z',
+          workout_split_day_id: null,
+        },
+        error: null,
+      },
+    });
+
+    await createLoggedWorkout(
+      'user-1',
+      'Leg Day',
+      '2026-01-01T12:00:00.000Z',
+      '2026-01-01T13:00:00.000Z',
+    );
+
+    expect(tables.workouts.calls.insert[0][0]).toEqual({
+      user_id: 'user-1',
+      name: 'Leg Day',
+      performed_at: '2026-01-01T12:00:00.000Z',
+      completed_at: '2026-01-01T13:00:00.000Z',
+    });
+  });
+
   it('throws on a database error', async () => {
     mockTables({
       workouts: { data: null, error: { message: 'connection lost' } },
@@ -514,6 +544,44 @@ describe('createLoggedWorkout', () => {
     await expect(
       createLoggedWorkout('user-1', 'Leg Day', '2026-01-01T12:00:00.000Z'),
     ).rejects.toThrow('connection lost');
+  });
+});
+
+describe('updateWorkout', () => {
+  it('sends only the fields given -- name, date and/or duration (completedAt) independently', async () => {
+    const tables = mockTables({
+      workouts: { data: null, error: null },
+    });
+
+    await updateWorkout('w1', { name: 'Renamed' });
+    await updateWorkout('w1', { performedAt: '2026-01-05T12:00:00.000Z' });
+    await updateWorkout('w1', { completedAt: '2026-01-05T13:00:00.000Z' });
+    await updateWorkout('w1', {
+      name: 'Renamed',
+      performedAt: '2026-01-05T12:00:00.000Z',
+      completedAt: '2026-01-05T13:00:00.000Z',
+    });
+
+    expect(tables.workouts.calls.update).toEqual([
+      [{ name: 'Renamed' }],
+      [{ performed_at: '2026-01-05T12:00:00.000Z' }],
+      [{ completed_at: '2026-01-05T13:00:00.000Z' }],
+      [
+        {
+          name: 'Renamed',
+          performed_at: '2026-01-05T12:00:00.000Z',
+          completed_at: '2026-01-05T13:00:00.000Z',
+        },
+      ],
+    ]);
+  });
+
+  it('throws on a database error', async () => {
+    mockTables({
+      workouts: { data: null, error: { message: 'connection lost' } },
+    });
+
+    await expect(updateWorkout('w1', { name: 'Renamed' })).rejects.toThrow('connection lost');
   });
 });
 

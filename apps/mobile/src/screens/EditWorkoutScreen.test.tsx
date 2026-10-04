@@ -270,12 +270,59 @@ describe('EditWorkoutScreen -- saving changes', () => {
       expect(mockUpdateWorkout).toHaveBeenCalledWith('w1', {
         name: 'Leg Day (Heavy)',
         performedAt: baseWorkout.performedAt,
+        // No duration was ever recorded, so completedAt stays equal to performedAt.
+        completedAt: baseWorkout.performedAt,
       }),
     );
     expect(mockUpdateSet).toHaveBeenCalledWith('s1', { weightKg: 105, reps: 5 });
     expect(mockCreateSet).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' }),
+    );
+  });
+
+  it('seeds the duration from the workout, and saves an edited duration as completedAt = performedAt + duration', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      completedAt: new Date(new Date(FIXTURE_PERFORMED_AT).getTime() + 60 * 60000).toISOString(),
+    });
+    renderScreen();
+    await screen.findByTestId(EX);
+
+    expect(screen.getByTestId('edit-workout-duration-hours').props.value).toBe('1');
+    expect(screen.getByTestId('edit-workout-duration-minutes').props.value).toBe('0');
+
+    fireEvent.changeText(screen.getByTestId('edit-workout-duration-minutes'), '45');
+    fireEvent.press(screen.getByTestId('edit-workout-save'));
+
+    await waitFor(() =>
+      expect(mockUpdateWorkout).toHaveBeenCalledWith('w1', {
+        name: 'Leg Day',
+        performedAt: baseWorkout.performedAt,
+        completedAt: new Date(new Date(FIXTURE_PERFORMED_AT).getTime() + 105 * 60000).toISOString(),
+      }),
+    );
+  });
+
+  it('keeps an existing duration when only the date moves, rather than leaving completedAt behind', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      completedAt: new Date(new Date(FIXTURE_PERFORMED_AT).getTime() + 60 * 60000).toISOString(),
+    });
+    renderScreen();
+    await screen.findByTestId(EX);
+
+    // The 1st of the workout's own displayed month is always in the past and
+    // always visible, so this moves the date without navigating the calendar.
+    const firstOfMonth = new Date(aWeekAgo.getFullYear(), aWeekAgo.getMonth(), 1);
+    fireEvent.press(screen.getByTestId('edit-workout-date'));
+    fireEvent.press(await screen.findByTestId(`calendar-day-${toLocalDateKey(firstOfMonth)}`));
+    fireEvent.press(screen.getByTestId('edit-workout-save'));
+
+    await waitFor(() => expect(mockUpdateWorkout).toHaveBeenCalled());
+    const [, args] = mockUpdateWorkout.mock.calls[0];
+    expect(args.completedAt).toBe(
+      new Date(new Date(args.performedAt).getTime() + 60 * 60000).toISOString(),
     );
   });
 

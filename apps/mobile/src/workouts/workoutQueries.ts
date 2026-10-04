@@ -298,15 +298,24 @@ export async function createWorkout(
  * no conflict case to handle here. The PR/1RM trigger chain reads whatever
  * performed_at ends up in this row, so a backdated set still recomputes
  * correctly against the real historical order of things.
+ *
+ * `completedAt` defaults to `performedAt` (the same instant) when omitted,
+ * which is how every existing duration readout (`computeDurationMinutes`,
+ * `computeCompletedDurationMinutes`) already shows "--" for a manually
+ * logged workout rather than a fabricated duration -- see
+ * LogPastWorkoutScreen's own optional Duration field, which computes a real
+ * `completedAt` (`performedAt` + the entered duration) only when the user
+ * actually enters one.
  */
 export async function createLoggedWorkout(
   userId: string,
   name: string,
   performedAt: string,
+  completedAt: string = performedAt,
 ): Promise<WorkoutSummary> {
   const { data, error } = await supabase
     .from('workouts')
-    .insert({ user_id: userId, name, performed_at: performedAt, completed_at: performedAt })
+    .insert({ user_id: userId, name, performed_at: performedAt, completed_at: completedAt })
     .select('id, name, performed_at, completed_at, workout_split_day_id')
     .single();
 
@@ -315,8 +324,11 @@ export async function createLoggedWorkout(
 }
 
 /**
- * Renames a workout and/or moves it to a different date -- see
- * EditWorkoutScreen. Safe to call on a completed workout: the
+ * Renames a workout, moves it to a different date, and/or changes its
+ * duration -- see EditWorkoutScreen, which always recomputes `completedAt`
+ * fresh from the (possibly edited) date plus the (possibly edited) duration
+ * together, so moving the date alone never silently skews a duration that
+ * was set independently. Safe to call on a completed workout: the
  * workouts_recompute_prs trigger (supabase/migrations/20260823100008_pr_infrastructure.sql)
  * fires on performed_at changing and re-derives every PR/1RM touched by this
  * workout's sets, so correctness here is entirely the database's job, not
@@ -324,11 +336,12 @@ export async function createLoggedWorkout(
  */
 export async function updateWorkout(
   workoutId: string,
-  updates: { name?: string; performedAt?: string },
+  updates: { name?: string; performedAt?: string; completedAt?: string },
 ): Promise<void> {
   const payload: Record<string, unknown> = {};
   if (updates.name !== undefined) payload.name = updates.name;
   if (updates.performedAt !== undefined) payload.performed_at = updates.performedAt;
+  if (updates.completedAt !== undefined) payload.completed_at = updates.completedAt;
   const { error } = await supabase.from('workouts').update(payload).eq('id', workoutId);
   if (error) throw new Error(error.message);
 }

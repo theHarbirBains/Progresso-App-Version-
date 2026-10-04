@@ -300,7 +300,12 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
     fireEvent.press(screen.getByTestId('log-past-workout-save'));
 
     await waitFor(() => expect(mockCreateLoggedWorkout).toHaveBeenCalled());
-    expect(mockCreateLoggedWorkout).toHaveBeenCalledWith('user-1', 'Leg Day', expect.any(String));
+    expect(mockCreateLoggedWorkout).toHaveBeenCalledWith(
+      'user-1',
+      'Leg Day',
+      expect.any(String),
+      undefined,
+    );
     expect(mockAddExerciseToWorkout).toHaveBeenCalledWith('w1', 'ex-squat', 1);
     expect(mockCreateSet).toHaveBeenCalledTimes(1);
     expect(mockCreateSet).toHaveBeenCalledWith('we1', 1, undefined);
@@ -312,6 +317,26 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' }),
     );
+  });
+
+  it('computes a real completedAt from the entered duration, instead of leaving it equal to the date', async () => {
+    mockFetchExercises.mockResolvedValue({ rows: [squat], hasMore: false });
+    renderScreen();
+    await screen.findByTestId('log-past-workout-date');
+    fireEvent.changeText(screen.getByTestId('log-past-workout-name'), 'Leg Day');
+    fireEvent.changeText(screen.getByTestId('log-past-workout-duration-hours'), '1');
+    fireEvent.changeText(screen.getByTestId('log-past-workout-duration-minutes'), '26');
+    await addExerciseViaPicker(squat);
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-1-weight`), '100');
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-1-reps`), '5');
+
+    fireEvent.press(screen.getByTestId('log-past-workout-save'));
+
+    await waitFor(() => expect(mockCreateLoggedWorkout).toHaveBeenCalled());
+    const [, , performedAtIso, completedAtIso] = mockCreateLoggedWorkout.mock.calls[0];
+    const minutesApart =
+      (new Date(completedAtIso).getTime() - new Date(performedAtIso).getTime()) / 60000;
+    expect(minutesApart).toBe(86); // 1h 26m
   });
 
   it('rejects a future date with an inline error instead of saving', async () => {
