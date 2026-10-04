@@ -158,11 +158,11 @@ describe('Button sizing, loading and accessibility', () => {
     expect(StyleSheet.flatten(screen.getByTestId('btn').props.style).minHeight).toBe(44);
   });
 
-  it('renders every label in a Manrope face, never the system font', () => {
+  it('renders every label in an Inter face, never the system font', () => {
     render(<PrimaryButton label="Go" onPress={jest.fn()} />);
 
     expect(String(StyleSheet.flatten(screen.getByText('Go').props.style).fontFamily)).toMatch(
-      /^Manrope_/,
+      /^Inter_/,
     );
   });
 });

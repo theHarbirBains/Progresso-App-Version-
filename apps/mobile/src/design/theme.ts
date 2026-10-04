@@ -92,19 +92,19 @@ export const spacing = {
 // individual widget carries its own outer margin.
 export const widgetGap = 6;
 
-// Loaded via useFonts() in App.tsx before anything renders -- see
-// FontGate in App.tsx. Manrope carries ALL text (headings, body, labels);
-// JetBrains Mono is reserved for numeric readouts only (the "readout" feel),
-// never for prose. There is deliberately no system-font text anywhere: body
-// copy uses Manrope Regular, so the app has one typeface, not two competing
-// sans-serifs. The weights below are the only ones loaded -- see `Text` for
-// how a `fontWeight` written in a style resolves to one of them.
+// Loaded via useFonts() in App.tsx before anything renders. Inter carries
+// ALL text (headings, body, labels); JetBrains Mono is reserved for numeric
+// readouts only (the "readout" feel), never for prose. There is deliberately
+// no system-font text anywhere: body copy uses Inter Regular, so the app has
+// one typeface, not two competing sans-serifs. The weights below are the
+// only ones loaded -- see `Text` for how a `fontWeight` written in a style
+// resolves to one of them.
 export const fonts = {
-  body: 'Manrope_400Regular',
-  displayMedium: 'Manrope_500Medium',
-  semibold: 'Manrope_600SemiBold',
-  display: 'Manrope_700Bold',
-  displayHeavy: 'Manrope_800ExtraBold',
+  body: 'Inter_400Regular',
+  displayMedium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  display: 'Inter_700Bold',
+  displayHeavy: 'Inter_800ExtraBold',
   mono: 'JetBrainsMono_500Medium',
   monoBold: 'JetBrainsMono_700Bold',
 } as const;

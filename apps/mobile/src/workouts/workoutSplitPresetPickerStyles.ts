@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 
 // Local to WorkoutSplitPresetPicker only -- mirrors chooseWorkoutSplitStyles
 // (same card/chip/button visual language) without touching workoutSplitStyles.ts,
@@ -58,7 +58,7 @@ export const workoutSplitPresetPickerStyles = StyleSheet.create({
   },
   createSplitButtonText: {
     ...typeScale.cardTitle,
-    fontFamily: 'Manrope_700Bold',
+    fontFamily: fonts.display,
   },
   createOwnHelperText: {
     ...typeScale.caption,

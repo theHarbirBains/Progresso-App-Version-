@@ -4,7 +4,7 @@ import { fonts } from './theme';
 
 // The one Text primitive for the whole app. It is a drop-in replacement for
 // react-native's Text (same props, same ref) whose only job is to make sure
-// every string renders in Manrope -- React Native has no global default
+// every string renders in Inter -- React Native has no global default
 // font, so without this any Text that doesn't spell out a fontFamily falls
 // back to the platform system font, which is how the app ended up with two
 // competing sans-serifs.
@@ -12,11 +12,11 @@ import { fonts } from './theme';
 // Resolution rules, in order:
 //   1. A style that already names a fontFamily is left alone (the mono
 //      readouts, the typeScale tokens, anything explicit).
-//   2. Otherwise the style's `fontWeight` picks the matching Manrope face
+//   2. Otherwise the style's `fontWeight` picks the matching Inter face
 //      (see WEIGHT_FAMILY) and the `fontWeight` itself is dropped -- with a
 //      custom family, keeping it would ask the OS to synthesize bold on top
 //      of a face that is already bold.
-//   3. No family and no weight means body text: Manrope Regular.
+//   3. No family and no weight means body text: Inter Regular.
 //
 // A Text nested inside another Text with neither a family nor a weight of
 // its own is left completely alone, so it keeps inheriting its parent's face

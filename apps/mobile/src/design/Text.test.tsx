@@ -9,7 +9,7 @@ function styleOf(testID: string) {
 }
 
 describe('Text', () => {
-  it('renders body text in Manrope Regular when no family or weight is given', () => {
+  it('renders body text in Inter Regular when no family or weight is given', () => {
     render(<Text testID="t">Hello</Text>);
 
     expect(styleOf('t').fontFamily).toBe(fonts.body);
@@ -24,7 +24,7 @@ describe('Text', () => {
     ['bold', fonts.display],
     ['800', fonts.displayHeavy],
     ['900', fonts.displayHeavy],
-  ] as const)('maps fontWeight %s to the matching Manrope face', (weight, family) => {
+  ] as const)('maps fontWeight %s to the matching Inter face', (weight, family) => {
     render(
       <Text testID="t" style={{ fontWeight: weight, fontSize: 14 }}>
         Hello
