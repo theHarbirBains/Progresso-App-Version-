@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  HttpException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -17,6 +18,9 @@ const REQUEST_TIMEOUT_MS = 20000;
 const RETRY_DELAY_MS = 400;
 const MAX_TOKENS = 1024;
 
+/** The one message a user sees when AI food search can't complete. */
+const AI_FAILURE_MESSAGE = 'AI food search failed. Please try again.';
+
 const PARSE_TOOL_NAME = 'food_parse';
 const ESTIMATE_TOOL_NAME = 'nutrition_estimate';
 
@@ -30,14 +34,16 @@ const PARSE_SYSTEM_PROMPT =
   '(1) main is the food the amount applies to, with its quantity and unit exactly as the ' +
   'user wrote them. If the user gave no amount, set quantity and unit to null. Never invent ' +
   "an amount. A size word such as 'medium', 'large' or 'small' is the unit, with quantity 1 ('medium banana' is quantity 1, unit 'medium'). (2) searchTerm is a short, singular, generic name for a food database " +
-  'lookup with no preparation words ("potatoes" -> "potato", "grilled chicken breast" -> ' +
-  '"chicken breast"). (3) brand is a brand or restaurant the user named for the food ' +
+  'lookup. Keep a cooking-state word (baked, boiled, raw, fried, grilled, roasted, steamed, ' +
+  'scrambled) when the user gave one, because it tells preparations apart: "baked potatoes" -> ' +
+  '"baked potato". Drop only filler and preparation phrases such as "with no oil" ("potatoes" -> ' +
+  '"potato"). (3) brand is a brand or restaurant the user named for the food ' +
   '("Fairlife", "McDonald\'s", "Oikos"), or null. (4) preparation records how the main food ' +
   'was prepared, including an explicit "no oil", or null. (5) addedIngredients lists only ' +
   'things the user said were added: oils, butter, sauces, toppings, other ingredients. Never ' +
   'add anything the user did not mention, and never add oil for an air fried or "no oil" ' +
   'preparation. (6) Set clarification only when the food itself cannot be identified, and ' +
-  'then leave main null. A missing amount is NEVER a reason to set clarification: leave quantity and unit null and still fill in main. Always call ' +
+  'then leave main null. If the description names a food at all, main must be filled in, even when the amount is missing: a clarification is never about the amount. A missing amount is NEVER a reason to set clarification: leave quantity and unit null and still fill in main. Always call ' +
   'the tool.';
 
 const ESTIMATE_SYSTEM_PROMPT =
@@ -277,23 +283,48 @@ export class AnthropicNutritionProvider {
   constructor(private readonly configService: ConfigService<EnvironmentVariables, true>) {}
 
   async parse(description: string): Promise<ParsedFoodDescription> {
-    const body = await this.call(description, PARSE_SYSTEM_PROMPT, PARSE_TOOL);
-    const parsed = toParsed(body);
-    if (!parsed) {
-      this.logger.warn('Anthropic parse reply was not a usable food_parse tool call');
-      throw new BadGatewayException('AI food search failed. Please try again.');
-    }
-    return parsed;
+    return this.withOneRetry('parse', async () => {
+      const body = await this.call(description, PARSE_SYSTEM_PROMPT, PARSE_TOOL);
+      const parsed = toParsed(body);
+      if (!parsed) throw new UnusableReplyError('food_parse reply was not usable');
+      return parsed;
+    });
   }
 
   async estimate(description: string): Promise<NutritionEstimate> {
-    const body = await this.call(description, ESTIMATE_SYSTEM_PROMPT, ESTIMATE_TOOL);
-    const result = toEstimate(body);
-    if (!result) {
-      this.logger.warn('Anthropic estimate reply was not a usable nutrition_estimate tool call');
-      throw new BadGatewayException('Failed to estimate nutrition for that description');
+    return this.withOneRetry('estimate', async () => {
+      const body = await this.call(description, ESTIMATE_SYSTEM_PROMPT, ESTIMATE_TOOL);
+      const result = toEstimate(body);
+      if (!result) throw new UnusableReplyError('nutrition_estimate reply was not usable');
+      return result;
+    });
+  }
+
+  /**
+   * Runs one Claude call, and runs it again once if it failed transiently: a network error, a
+   * timeout, a 5xx response, or a reply that failed validation. Anything else (a 4xx, a missing
+   * key) is not retried, because another attempt would fail the same way. The delay only happens
+   * after a failure, so a successful call is never slowed down. A second failure becomes one clean
+   * error for the user, never a raw network message.
+   */
+  private async withOneRetry<T>(label: string, run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      if (!isTransient(error)) throw error;
+      this.logger.warn(`Anthropic ${label} failed transiently; retrying once: ${errorText(error)}`);
     }
-    return result;
+
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    try {
+      return await run();
+    } catch (error) {
+      if (isTransient(error)) {
+        this.logger.warn(`Anthropic ${label} failed again: ${errorText(error)}`);
+        throw new BadGatewayException(AI_FAILURE_MESSAGE);
+      }
+      throw error;
+    }
   }
 
   private async call(
@@ -315,17 +346,18 @@ export class AnthropicNutritionProvider {
     return toolUse?.input;
   }
 
+  /** One request to the API. A network error, a timeout, or a 5xx is transient; a 4xx is not. */
   private async request(
     apiKey: string,
     description: string,
     system: string,
     tool: { name: string; description: string; input_schema: object },
-    attempt = 0,
   ): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let response: Response;
     try {
-      const response = await fetch(API_URL, {
+      response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -336,30 +368,39 @@ export class AnthropicNutritionProvider {
         body: JSON.stringify({
           model: MODEL,
           max_tokens: MAX_TOKENS,
+          // Deterministic extraction: the same description should give the same structure every time.
+          temperature: 0,
           system,
           messages: [{ role: 'user', content: description }],
           tools: [tool],
           tool_choice: { type: 'tool', name: tool.name },
         }),
       });
-
-      if (!response.ok) {
-        if (response.status >= 500 && attempt < 1) {
-          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-          return this.request(apiKey, description, system, tool, attempt + 1);
-        }
-        this.logger.warn(`Anthropic request failed: ${response.status}`);
-        throw new BadGatewayException('AI food search failed. Please try again.');
-      }
-      return response;
-    } catch (err) {
-      if (err instanceof BadGatewayException) throw err;
-      this.logger.warn(
-        `Anthropic request errored: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      throw new BadGatewayException('AI food search failed. Please try again.');
+    } catch (error) {
+      throw new TransientError(`request errored: ${errorText(error)}`);
     } finally {
       clearTimeout(timeout);
     }
+
+    if (!response.ok) {
+      if (response.status >= 500) throw new TransientError(`request failed: ${response.status}`);
+      this.logger.warn(`Anthropic request failed: ${response.status}`);
+      throw new BadGatewayException(AI_FAILURE_MESSAGE);
+    }
+    return response;
   }
+}
+
+/** A failure another attempt could fix: a network error, a timeout, a 5xx, or an unusable reply. */
+class TransientError extends Error {}
+class UnusableReplyError extends TransientError {}
+
+// Anything we raise on purpose (a 4xx, a missing key) is final. Everything else is a failure another
+// attempt might fix: a network error, a timeout, a 5xx, or a reply that could not be used.
+function isTransient(error: unknown): boolean {
+  return !(error instanceof HttpException);
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

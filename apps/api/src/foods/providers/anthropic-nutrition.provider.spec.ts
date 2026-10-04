@@ -316,3 +316,54 @@ describe('AnthropicNutritionProvider.parse', () => {
     await expect(provider.parse('100g rice')).rejects.toBeInstanceOf(BadGatewayException);
   });
 });
+
+describe('AnthropicNutritionProvider: one retry for transient failures', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  it('makes a single call when the first attempt succeeds, with no retry delay', async () => {
+    mockFetchOnce(parseToolResponse(VALID_PARSE));
+    const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));
+
+    const started = Date.now();
+    await provider.parse('100 grams of air fried potatoes');
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(Date.now() - started).toBeLessThan(200);
+  });
+
+  it('retries once after a transient network failure and succeeds', async () => {
+    (global.fetch as jest.Mock)
+      .mockRejectedValueOnce(new Error('socket hang up'))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(parseToolResponse(VALID_PARSE)),
+      });
+    const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));
+
+    await expect(provider.parse('100 grams of air fried potatoes')).resolves.toEqual(VALID_PARSE);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries once after a malformed reply and succeeds', async () => {
+    mockFetchOnce({ content: [{ type: 'text', text: 'Sorry, I cannot help.' }] });
+    mockFetchOnce(parseToolResponse(VALID_PARSE));
+    const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));
+
+    await expect(provider.parse('100 grams of air fried potatoes')).resolves.toEqual(VALID_PARSE);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives one clean error, with no raw network message, after the retry also fails', async () => {
+    (global.fetch as jest.Mock).mockRejectedValue(new Error('ECONNRESET 10.0.0.1:443'));
+    const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));
+
+    const error = await provider.parse('anything').catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(BadGatewayException);
+    expect((error as Error).message).toBe('AI food search failed. Please try again.');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+});

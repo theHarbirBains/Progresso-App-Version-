@@ -573,7 +573,7 @@ describe('FoodsService.interpretDescription', () => {
     expect(result.hasEstimate).toBe(false);
   });
 
-  it('asks which food when a bare word matches more than one close candidate', async () => {
+  it('resolves a bare word to the plain food when the others carry extra name words', async () => {
     const { service } = interpreter({
       clarification: null,
       preparation: null,
@@ -583,14 +583,11 @@ describe('FoodsService.interpretDescription', () => {
 
     const result = interpretation(await service.interpretDescription('100 g potato'));
 
-    expect(result.complete).toBe(false);
-    expect(result.components[0]).toMatchObject({ state: 'choose' });
-    const choose = result.components[0]!;
-    if (choose.state !== 'choose') throw new Error('expected choose');
-    expect(choose.choices.map((c) => c.matchedName)).toEqual([
-      'Potato (baked)',
-      'Sweet Potato (baked)',
-    ]);
+    // "Sweet Potato (baked)" carries an extra name word, so "Potato (baked)" is the unambiguous match.
+    expect(result.components[0]).toMatchObject({
+      state: 'resolved',
+      component: { provenance: { matchedName: 'Potato (baked)' } },
+    });
   });
 
   it('resolves a specific phrase unambiguously', async () => {
@@ -610,7 +607,8 @@ describe('FoodsService.interpretDescription', () => {
     const { service } = interpreter({
       clarification: null,
       preparation: null,
-      main: parsedComponent('2% milk', 'milk', 250, 'ml'),
+      // The catalog's milk is "Whole Milk", so the term names it exactly. A bare "milk" is a choice (see the ranking tests).
+      main: parsedComponent('2% milk', 'whole milk', 250, 'ml'),
       addedIngredients: [],
     });
 
@@ -846,5 +844,57 @@ describe('FoodsService.interpretDescription', () => {
     );
 
     await expect(service.interpretDescription('anything')).rejects.toThrow('provider down');
+  });
+});
+
+describe('FoodsService: preparation in the query', () => {
+  it('resolves "baked potato" to the baked food, not an arbitrary potato', async () => {
+    const { service } = interpreter({
+      clarification: null,
+      preparation: 'baked',
+      main: parsedComponent('baked potato', 'baked potato', 100, 'g'),
+      addedIngredients: [],
+    });
+
+    const result = interpretation(await service.interpretDescription('100 g baked potato'));
+
+    expect(result.components[0]).toMatchObject({
+      state: 'resolved',
+      component: { provenance: { matchedName: 'Potato (baked)' } },
+    });
+  });
+
+  it('falls back to the plain food for "air fried potato" when no air-fried data exists, and says so', async () => {
+    const { service } = interpreter({
+      clarification: null,
+      preparation: 'air fried',
+      main: parsedComponent('air fried potato', 'air fried potato', 100, 'g'),
+      addedIngredients: [],
+    });
+
+    const result = interpretation(await service.interpretDescription('100 g air fried potato'));
+
+    const main = result.components[0]!;
+    if (main.state !== 'resolved') throw new Error('expected resolved');
+    expect(main.component.provenance.matchedName).toBe('Potato (baked)');
+    expect(main.component.provenance.assumptions.join(' ')).toMatch(/No food data for "air fried"/);
+  });
+});
+
+describe('FoodsService: resolver outcomes are never retried', () => {
+  it('does not call the parser again for an ambiguous match, a missing amount, or a not-found result', async () => {
+    const parsed = {
+      clarification: null,
+      preparation: null,
+      main: parsedComponent('potato', 'potato', null, null),
+      addedIngredients: [],
+    };
+    const { service, nutritionProvider } = interpreter(parsed);
+
+    await service.interpretDescription('potato');
+    await service.interpretDescription('potato');
+
+    expect(nutritionProvider.parse).toHaveBeenCalledTimes(2);
+    expect(nutritionProvider.estimate).not.toHaveBeenCalled();
   });
 });

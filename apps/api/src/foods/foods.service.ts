@@ -5,6 +5,7 @@ import { FOOD_PROVIDER, type FoodProvider, type NormalizedFood } from './food-pr
 import type { Amount } from '../nutrition-resolution/quantity';
 import { resolveComponent } from '../nutrition-resolution/resolver';
 import type { NutritionSource } from '../nutrition-resolution/source.interface';
+import { cookingWordsIn, withoutCookingWords } from '../nutrition-resolution/cooking';
 import { CatalogNutritionSource } from './sources/catalog.source';
 import { OpenFoodFactsNutritionSource } from './sources/open-food-facts.source';
 import { UsdaNutritionSource } from './sources/usda.source';
@@ -152,6 +153,29 @@ export class FoodsService {
     );
     const status = statusFromOutcome(request, outcome);
     if (status.state !== 'not_found' || pick !== null) return status;
+
+    // No food data for this exact preparation. Retry with the food itself, and say so.
+    const base = withoutCookingWords(request.term);
+    const cooking = cookingWordsIn(request.term);
+    if (cooking.length > 0 && base.length > 0) {
+      const retry = await resolveComponent(
+        {
+          name: request.name,
+          query: { term: base, brand: request.brand, barcode: request.barcode, restaurant: null },
+          quantity: request.quantity,
+          pick: null,
+        },
+        this.sourcesFor(request),
+      );
+      const retried = statusFromOutcome(request, retry);
+      if (retried.state === 'resolved') {
+        retried.component.provenance.assumptions.push(
+          `No food data for "${cooking.join(' ')}" in this form; used the closest match, ${retried.component.provenance.matchedName}.`,
+        );
+        return retried;
+      }
+      if (retried.state !== 'not_found') return retried;
+    }
 
     // No source matched. The amount is needed before any estimate can be stated for it.
     if (request.quantity === null) {
