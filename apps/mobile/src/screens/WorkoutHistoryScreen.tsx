@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
-import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { addMonths, isoToLocalDateKey, toLocalDateKey } from '../design/calendarGrid';
+import { Card } from '../design/Card';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
@@ -17,6 +17,7 @@ import { colors } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
+import { withAlpha } from '../theme/accentColor';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 import {
@@ -219,27 +220,31 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       }
     >
       {activeWorkout ? (
-        <AppCard hero topAccent={theme.accent} testID="active-workout-banner">
-          <Text style={styles.actionLine}>You have a workout in progress</Text>
+        <Card heroColor={theme.accent} testID="active-workout-banner">
+          <Text style={[styles.actionLine, { color: withAlpha(theme.onAccent, 0.85) }]}>
+            You have a workout in progress
+          </Text>
           <PrimaryButton
             testID="resume-active-workout"
             label={`Resume "${activeWorkout.name}"`}
             onPress={() => navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id })}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
+            accentColor={theme.onAccent}
+            onAccentColor={theme.accent}
           />
-        </AppCard>
+        </Card>
       ) : (
-        <AppCard hero topAccent={theme.accent} testID="workout-history-start">
-          <Text style={styles.actionLine}>Ready to train?</Text>
+        <Card heroColor={theme.accent} testID="workout-history-start">
+          <Text style={[styles.actionLine, { color: withAlpha(theme.onAccent, 0.85) }]}>
+            Ready to train?
+          </Text>
           <PrimaryButton
             testID="start-new-workout"
             label="Start New Workout"
             onPress={() => navigation.navigate('NewWorkout')}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
+            accentColor={theme.onAccent}
+            onAccentColor={theme.accent}
           />
-        </AppCard>
+        </Card>
       )}
 
       <View style={styles.logPastWorkoutWrap}>
@@ -250,7 +255,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
         />
       </View>
 
-      <AppCard testID="workout-history-calendar-card">
+      <Card testID="workout-history-calendar-card">
         <MonthCalendar
           testID="workout-calendar"
           year={year}
@@ -312,10 +317,10 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
             />
           </View>
         )}
-      </AppCard>
+      </Card>
 
       {selectedDateKey ? (
-        <AppCard testID="selected-day-section">
+        <Card testID="selected-day-section">
           <SectionHeader
             label={new Date(selectedDateKey).toLocaleDateString(undefined, {
               weekday: 'long',
@@ -335,10 +340,10 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
           ) : (
             <EmptyState testID="selected-day-empty" title="No workout on this day" />
           )}
-        </AppCard>
+        </Card>
       ) : null}
 
-      <AppCard testID="workout-history-recent">
+      <Card testID="workout-history-recent">
         <SectionHeader label="Recent Workouts" />
 
         {recentError ? (
@@ -375,7 +380,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
             onPress={handleLoadMoreRecent}
           />
         ) : null}
-      </AppCard>
+      </Card>
     </Screen>
   );
 }

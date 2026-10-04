@@ -19,10 +19,12 @@ export const workoutHistoryStyles = StyleSheet.create({
   },
 
   // The line above the one primary button ("Ready to train?", "You have a
-  // workout in progress").
+  // workout in progress") -- layout-only: color comes from `theme.onAccent`
+  // at render time (WorkoutHistoryScreen), since this card is now filled
+  // solid with the mode accent (the redesign's one hero treatment, see
+  // design/Card.tsx) and has to invert for a light vs. dark accent.
   actionLine: {
     ...typeScale.callout,
-    color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
   // A quiet secondary link, independent of whether there's an active

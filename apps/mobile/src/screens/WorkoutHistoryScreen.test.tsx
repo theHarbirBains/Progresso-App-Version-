@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Feather } from '@expo/vector-icons';
-import { AppCard } from '../design/AppCard';
+import { Card } from '../design/Card';
 import { PrimaryButton } from '../design/Button';
 import { fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
@@ -9,6 +9,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { addMonths, MONTH_LABELS, toLocalDateKey } from '../design/calendarGrid';
+import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { enrichWorkoutSummaries } from '../workouts/workoutHistoryEnrichment';
 import {
   fetchActiveWorkout,
@@ -434,12 +435,22 @@ describe('WorkoutHistoryScreen -- a stack of widgets', () => {
     renderScreen();
     await screen.findByTestId('workout-item-w1');
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(3);
+    expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(3);
     expect(screen.getByTestId('workout-history-start')).toBeTruthy();
     expect(screen.getByTestId('workout-history-calendar-card')).toBeTruthy();
     expect(
       within(screen.getByTestId('workout-history-recent')).getByTestId('workout-item-w1'),
     ).toBeTruthy();
+    await settle();
+  });
+
+  it("fills the start-workout action card solid with the mode accent -- the redesign's one hero", async () => {
+    mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: false });
+    renderScreen();
+    await screen.findByTestId('workout-item-w1');
+
+    const card = screen.getByTestId('workout-history-start');
+    expect(StyleSheet.flatten(card.props.style).backgroundColor).toBe(DEFAULT_WORKOUT_THEME.accent);
     await settle();
   });
 
@@ -453,7 +464,7 @@ describe('WorkoutHistoryScreen -- a stack of widgets', () => {
     await screen.findByTestId('selected-day-section');
 
     // resume + calendar + selected day + recent
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(4);
+    expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(4);
     expect(screen.queryByTestId('workout-history-start')).toBeNull();
     await settle();
   });
