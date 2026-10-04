@@ -7,21 +7,30 @@ import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';
 import { Screen } from '../design/Screen';
 import { TextInput } from '../design/TextInput';
-import { interpretFoodDescription, type FoodInterpretation } from '../lib/api';
+import {
+  interpretFoodDescription,
+  resolveFoodComponent,
+  type ComponentPick,
+  type ComponentRequest,
+  type FoodInterpretation,
+} from '../lib/api';
 import { createFood, findOwnFoodByName } from '../nutrition/foodQueries';
 import { InterpretedFoodReview } from '../nutrition/InterpretedFoodReview';
-import { libraryFoodInput, libraryFoodName } from '../nutrition/interpretedFood';
+import {
+  libraryFoodInput,
+  libraryFoodName,
+  withComponentStatus,
+} from '../nutrition/interpretedFood';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { aiFoodSearchStyles as styles } from './aiFoodSearchStyles';
 
 type Props = RootStackScreenProps<'AiFoodSearch'>;
 
-// AI Food Search: the user describes what they ate in their own words. Claude
-// only works out what the words mean (amounts, units, preparation, added oil,
-// butter or sauce). Progresso's own food data supplies every calorie and macro,
-// scaled exactly by the amount given. The result is reviewed on this screen
-// first, and only the Add to Food Library tap saves it.
+// AI Food Search: the user describes what they ate in their own words. Claude only works out
+// what the words mean. Progresso's own food data and other sources supply every figure, each
+// scaled to the amount given. Parts that need an amount or a choice are resolved on the review,
+// and only the Add to Food Library tap saves anything.
 export function AiFoodSearchScreen({ navigation }: Props) {
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
@@ -35,20 +44,27 @@ export function AiFoodSearchScreen({ navigation }: Props) {
   const [interpretation, setInterpretation] = useState<FoodInterpretation | null>(null);
   const [duplicateName, setDuplicateName] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [resolvingIndex, setResolvingIndex] = useState<number | null>(null);
 
   const trimmed = description.trim();
 
-  function reset() {
-    setInterpretation(null);
-    setClarification(null);
-    setDuplicateName(null);
-    setError(null);
+  // Warns early when a complete food already has a library entry with its name. Adding checks again.
+  async function checkDuplicate(next: FoodInterpretation) {
+    if (!userId || !next.complete) {
+      setDuplicateName(null);
+      return;
+    }
+    const existing = await findOwnFoodByName(userId, libraryFoodName(next)).catch(() => null);
+    setDuplicateName(existing?.name ?? null);
   }
 
   async function handleInterpret() {
     if (!accessToken || trimmed.length === 0 || loading) return;
     setLoading(true);
-    reset();
+    setError(null);
+    setClarification(null);
+    setInterpretation(null);
+    setDuplicateName(null);
     try {
       const response = await interpretFoodDescription(accessToken, trimmed);
       if (response.status === 'clarification') {
@@ -56,14 +72,7 @@ export function AiFoodSearchScreen({ navigation }: Props) {
         return;
       }
       setInterpretation(response.interpretation);
-      // Best-effort early warning; handleAdd checks again before saving.
-      if (userId) {
-        const existing = await findOwnFoodByName(
-          userId,
-          libraryFoodName(response.interpretation),
-        ).catch(() => null);
-        setDuplicateName(existing?.name ?? null);
-      }
+      await checkDuplicate(response.interpretation);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to read that food description');
     } finally {
@@ -71,19 +80,44 @@ export function AiFoodSearchScreen({ navigation }: Props) {
     }
   }
 
+  // Resolves one pending part: a candidate the user picked, or an amount they gave.
+  async function handleResolve(
+    request: ComponentRequest,
+    pick: ComponentPick | null,
+    quantity: { amount: number; unit: string } | null,
+  ) {
+    if (!accessToken || !interpretation || resolvingIndex !== null) return;
+    setResolvingIndex(request.index);
+    setError(null);
+    try {
+      const status = await resolveFoodComponent(
+        accessToken,
+        { ...request, quantity: quantity ?? request.quantity },
+        pick,
+      );
+      const next = withComponentStatus(interpretation, status);
+      setInterpretation(next);
+      await checkDuplicate(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to look that up');
+    } finally {
+      setResolvingIndex(null);
+    }
+  }
+
   async function handleAdd() {
-    if (!interpretation || !userId || adding) return;
+    if (!interpretation || !interpretation.complete || !userId || adding) return;
     setAdding(true);
     setError(null);
     try {
-      // Checked again here, not only when the review appeared, so a food added
-      // elsewhere in the meantime still can't be duplicated.
-      const existing = await findOwnFoodByName(userId, libraryFoodName(interpretation));
+      // Checked again at the moment of adding, so a food added elsewhere can't be duplicated.
+      const input = libraryFoodInput(interpretation);
+      const existing = await findOwnFoodByName(userId, input.name);
       if (existing) {
         setDuplicateName(existing.name);
         return;
       }
-      await createFood(userId, libraryFoodInput(interpretation));
+      await createFood(userId, input);
       navigation.navigate('FoodLibrary');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add to your Food Library');
@@ -156,10 +190,13 @@ export function AiFoodSearchScreen({ navigation }: Props) {
           interpretation={interpretation}
           duplicateName={duplicateName}
           adding={adding}
+          resolvingIndex={resolvingIndex}
+          onResolve={handleResolve}
           onAdd={handleAdd}
           onDescribeAgain={() => {
             setInterpretation(null);
             setDuplicateName(null);
+            setError(null);
           }}
           accentColor={theme.accent}
           onAccentColor={theme.onAccent}

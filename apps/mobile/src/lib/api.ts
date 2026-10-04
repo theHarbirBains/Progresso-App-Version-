@@ -293,42 +293,93 @@ export function getFoodByBarcode(
   );
 }
 
-/** AI Food Search's interpretation of a free-text description (e.g. "100
- * grams of air fried potatoes with no oil") -- see the backend's
- * FoodsService.interpretDescription. Claude only understands the wording; each
- * component's numbers come from Progresso's food data (`source: 'database'`),
- * or are Claude's own estimate when no compatible food exists
- * (`source: 'ai_estimate'`, never presented as a verified figure). Through the
- * backend because it calls a third-party API (Anthropic). */
-export interface InterpretedComponent {
+/** AI Food Search. The backend parses a description, then resolves each component against the
+ * best source for it. Every component reports its own state, so a pending one can be resolved
+ * without restarting the search. Figures come from data; an AI estimate is labelled as such.
+ * Through the backend because it calls third-party services. */
+export interface QuantityOption {
+  label: string;
+  amount: number;
+  unit: string;
+}
+
+export interface Choice {
+  sourceKind: 'progresso_catalog' | 'open_food_facts' | 'usda_fdc';
+  sourceId: string;
+  matchedName: string;
+  brand: string | null;
+  score: number;
+  reasons: string[];
+}
+
+export interface ComponentRequest {
+  index: number;
   role: 'main' | 'ingredient';
   name: string;
-  quantity: number;
-  unit: string;
-  source: 'database' | 'ai_estimate';
-  /** The Progresso food the numbers came from, when source is 'database'. */
-  matchedName: string | null;
-  /** An assumption the user should see, e.g. a generic "2 item" treated as large eggs. */
-  assumption: string | null;
+  term: string;
+  brand: string | null;
+  barcode: string | null;
+  quantity: { amount: number; unit: string } | null;
+}
+
+export interface ComponentPick {
+  sourceKind: Choice['sourceKind'];
+  sourceId: string;
+}
+
+export interface NutrientFigures {
   calories: number;
   proteinG: number;
   carbsG: number;
   fatG: number;
 }
 
+export interface ResolvedComponentFigures {
+  name: string;
+  quantity: { amount: number; unit: string };
+  grams: number | null;
+  nutrients: NutrientFigures;
+  provenance: {
+    confidence: 'verified' | 'calculated' | 'ai_estimate' | 'user_entered';
+    sourceKind: string | null;
+    sourceId: string | null;
+    matchedName: string | null;
+    brand: string | null;
+    dataVersion: string | null;
+    retrievedAt: string | null;
+    licence: string;
+    attribution: string | null;
+    assumptions: string[];
+  };
+}
+
+export type ComponentStatus =
+  | { state: 'resolved'; request: ComponentRequest; component: ResolvedComponentFigures }
+  | { state: 'ai_estimate'; request: ComponentRequest; component: ResolvedComponentFigures }
+  | {
+      state: 'needs_quantity';
+      request: ComponentRequest;
+      matchedName: string | null;
+      options: QuantityOption[];
+      reason: string;
+    }
+  | { state: 'choose'; request: ComponentRequest; choices: Choice[] }
+  | { state: 'not_found'; request: ComponentRequest; reason: string };
+
 export interface FoodInterpretation {
   name: string;
-  servingSize: number;
-  servingUnit: string;
   preparation: string | null;
-  components: InterpretedComponent[];
-  totals: { calories: number; proteinG: number; carbsG: number; fatG: number };
+  components: ComponentStatus[];
+  complete: boolean;
+  servingSize: number | null;
+  servingUnit: string | null;
+  totals: NutrientFigures | null;
   hasEstimate: boolean;
 }
 
 export type InterpretFoodResponse =
-  | { status: 'ok'; interpretation: FoodInterpretation }
-  | { status: 'clarification'; question: string };
+  | { status: 'clarification'; question: string }
+  | { status: 'ok'; interpretation: FoodInterpretation };
 
 export function interpretFoodDescription(
   accessToken: string,
@@ -337,6 +388,18 @@ export function interpretFoodDescription(
   return request<InterpretFoodResponse>('/api/v1/foods/interpret', accessToken, {
     method: 'POST',
     body: JSON.stringify({ description }),
+  });
+}
+
+/** Resolves one pending component: after the user picks a candidate, or gives an amount. */
+export function resolveFoodComponent(
+  accessToken: string,
+  componentRequest: ComponentRequest,
+  pick: ComponentPick | null,
+): Promise<ComponentStatus> {
+  return request<ComponentStatus>('/api/v1/foods/resolve-component', accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ request: componentRequest, pick }),
   });
 }
 

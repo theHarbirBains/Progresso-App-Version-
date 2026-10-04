@@ -239,6 +239,17 @@ describe('logFood', () => {
       carbs_g: 0,
       fat_g: 3.6,
       meal_type: 'lunch',
+      // No provenance on this food, so the log records none either.
+      nutrition_confidence: null,
+      nutrition_source_kind: null,
+      nutrition_source_id: null,
+      nutrition_matched_name: null,
+      nutrition_data_version: null,
+      nutrition_retrieved_at: null,
+      nutrition_licence: null,
+      nutrition_attribution: null,
+      nutrition_assumptions: [],
+      nutrition_components: null,
     });
   });
 

@@ -1,73 +1,27 @@
 import { Inject, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
-import {
-  AnthropicNutritionProvider,
-  type ParsedFoodComponent,
-} from './providers/anthropic-nutrition.provider';
+import { AnthropicNutritionProvider } from './providers/anthropic-nutrition.provider';
 import { FOOD_PROVIDER, type FoodProvider, type NormalizedFood } from './food-provider.interface';
-import { catalogScale, normalizeUnit } from './nutrition-units';
+import type { Amount } from '../nutrition-resolution/quantity';
+import { resolveComponent } from '../nutrition-resolution/resolver';
+import type { NutritionSource } from '../nutrition-resolution/source.interface';
+import { CatalogNutritionSource } from './sources/catalog.source';
+import { OpenFoodFactsNutritionSource } from './sources/open-food-facts.source';
+import { UsdaNutritionSource } from './sources/usda.source';
+import {
+  buildInterpretation,
+  requestsFromParsed,
+  statusFromOutcome,
+  type ComponentPick,
+  type ComponentRequest,
+  type ComponentStatus,
+  type InterpretFoodResponse,
+} from './interpretation';
 
-/** How many catalog candidates to test for a component's unit compatibility. */
-const CATALOG_CANDIDATE_LIMIT = 10;
-
-/**
- * Where a component's numbers came from. 'database' is a seeded Progresso food
- * scaled by an exact conversion; 'ai_estimate' is Claude's unverified estimate,
- * used only when no compatible food exists.
- */
-export type InterpretedSource = 'database' | 'ai_estimate';
-
-export interface InterpretedComponent {
-  role: 'main' | 'ingredient';
-  name: string;
-  quantity: number;
-  unit: string;
-  source: InterpretedSource;
-  /** The Progresso food the numbers came from, when source is 'database'. */
-  matchedName: string | null;
-  /** An assumption the user should see, e.g. a generic "2 eggs" matched to a large egg. */
-  assumption: string | null;
-  calories: number;
-  proteinG: number;
-  carbsG: number;
-  fatG: number;
-}
-
-export interface FoodInterpretation {
-  /** The main food, as the user described it. */
-  name: string;
-  servingSize: number;
-  servingUnit: string;
-  preparation: string | null;
-  components: InterpretedComponent[];
-  totals: { calories: number; proteinG: number; carbsG: number; fatG: number };
-  /** True when any component is an unverified AI estimate -- the review must say so. */
-  hasEstimate: boolean;
-}
-
-export type InterpretFoodResponse =
-  | { status: 'ok'; interpretation: FoodInterpretation }
-  | { status: 'clarification'; question: string };
-
+/** Rounds to a fixed number of decimal places, for figures shown to the user. */
 function roundTo(value: number, decimals: number): number {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
-}
-
-function sumNutrition(components: InterpretedComponent[]): FoodInterpretation['totals'] {
-  const totals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
-  for (const component of components) {
-    totals.calories += component.calories;
-    totals.proteinG += component.proteinG;
-    totals.carbsG += component.carbsG;
-    totals.fatG += component.fatG;
-  }
-  return {
-    calories: roundTo(totals.calories, 0),
-    proteinG: roundTo(totals.proteinG, 1),
-    carbsG: roundTo(totals.carbsG, 1),
-    fatG: roundTo(totals.fatG, 1),
-  };
 }
 
 export interface FoodRecord {
@@ -140,112 +94,133 @@ export class FoodsService {
   ) {}
 
   /**
-   * AI Food Search. Claude only understands the description (amounts, units,
-   * preparation, added oil/butter/sauces). Every calorie and macro comes from
-   * Progresso's own seeded food data, scaled exactly by the amount the user
-   * typed -- see nutrition-units.ts for the conversions that are allowed. A
-   * component the catalog can't match exactly is the one place Claude's own
-   * estimate is used, and it is labelled as such in the result.
-   *
-   * Never saves anything: the mobile app shows the interpretation for review
-   * and only adds it to the Food Library on the user's explicit tap.
+   * AI Food Search. Claude parses the description into its parts. The resolver then matches
+   * each component against the best source for it, in the order sourcesFor() gives. Figures
+   * come from data. Claude's memory is used only as a labelled last resort, for a component
+   * no source matched and whose amount is known. Nothing is saved here: the client saves only
+   * when the user taps Add to Food Library.
    */
   async interpretDescription(description: string): Promise<InterpretFoodResponse> {
     const parsed = await this.nutritionProvider.parse(description);
     if (parsed.clarification !== null || parsed.main === null) {
       return {
         status: 'clarification',
-        question: parsed.clarification ?? 'How much did you eat, and what was it?',
+        question: parsed.clarification ?? 'What did you eat?',
       };
     }
 
-    const components: InterpretedComponent[] = [await this.resolveComponent(parsed.main, 'main')];
-    for (const ingredient of parsed.addedIngredients) {
-      components.push(await this.resolveComponent(ingredient, 'ingredient'));
+    const statuses: ComponentStatus[] = [];
+    for (const request of requestsFromParsed(parsed)) {
+      statuses.push(await this.resolveRequest(request, null));
     }
-
     return {
       status: 'ok',
-      interpretation: {
-        name: parsed.main.name,
-        servingSize: parsed.main.quantity,
-        servingUnit: normalizeUnit(parsed.main.unit),
-        preparation: parsed.preparation,
-        components,
-        totals: sumNutrition(components),
-        hasEstimate: components.some((component) => component.source === 'ai_estimate'),
-      },
-    };
-  }
-
-  private async resolveComponent(
-    component: ParsedFoodComponent,
-    role: InterpretedComponent['role'],
-  ): Promise<InterpretedComponent> {
-    const unit = normalizeUnit(component.unit);
-    const candidates = await this.searchCatalog(component.searchTerm);
-    for (const candidate of candidates) {
-      const scale = catalogScale(
-        component.quantity,
-        component.unit,
-        { servingSize: candidate.servingSize, servingUnit: candidate.servingUnit },
-        candidate.name,
-      );
-      if (
-        !scale ||
-        candidate.proteinG === null ||
-        candidate.carbsG === null ||
-        candidate.fatG === null
-      ) {
-        continue;
-      }
-      return {
-        role,
-        name: component.name,
-        quantity: component.quantity,
-        unit,
-        source: 'database',
-        matchedName: candidate.name,
-        assumption: scale.assumption,
-        calories: roundTo(candidate.calories * scale.factor, 0),
-        proteinG: roundTo(candidate.proteinG * scale.factor, 1),
-        carbsG: roundTo(candidate.carbsG * scale.factor, 1),
-        fatG: roundTo(candidate.fatG * scale.factor, 1),
-      };
-    }
-
-    // No compatible food in the catalog: the one place Claude's own estimate
-    // is used. Its numbers are for the amount described, and are labelled.
-    const estimate = await this.nutritionProvider.estimate(
-      `${component.quantity} ${component.unit} of ${component.name}`,
-    );
-    return {
-      role,
-      name: component.name,
-      quantity: component.quantity,
-      unit,
-      source: 'ai_estimate',
-      matchedName: null,
-      assumption: null,
-      calories: roundTo(estimate.calories, 0),
-      proteinG: roundTo(estimate.proteinG, 1),
-      carbsG: roundTo(estimate.carbsG, 1),
-      fatG: roundTo(estimate.fatG, 1),
+      interpretation: buildInterpretation(parsed.main.name, parsed.preparation, statuses),
     };
   }
 
   /**
-   * The seeded catalog foods matching a generic term, best name matches first
-   * (a term that starts a food's name beats one that appears inside it: "potato"
-   * prefers "Potato (baked)" over "Sweet Potato"). Seeded foods only -- a
-   * user's own foods aren't searched here, so an interpretation is always
-   * backed by Progresso's reference data.
+   * Resolves one component the user was still waiting on: after they picked a candidate
+   * (pick is set), or after they gave an amount. Only that component is re-run.
    */
-  private async searchCatalog(term: string): Promise<FoodRecord[]> {
-    const lower = term.trim().toLowerCase();
-    const records = await this.searchLocal(term.trim(), 0, CATALOG_CANDIDATE_LIMIT);
-    const rank = (food: FoodRecord) => (food.name.toLowerCase().startsWith(lower) ? 0 : 1);
-    return [...records].sort((a, b) => rank(a) - rank(b));
+  async resolveComponent(
+    request: ComponentRequest,
+    pick: ComponentPick | null,
+  ): Promise<ComponentStatus> {
+    return this.resolveRequest(request, pick);
+  }
+
+  private async resolveRequest(
+    request: ComponentRequest,
+    pick: ComponentPick | null,
+  ): Promise<ComponentStatus> {
+    const outcome = await resolveComponent(
+      {
+        name: request.name,
+        query: {
+          term: request.term,
+          brand: request.brand,
+          barcode: request.barcode,
+          restaurant: null,
+        },
+        quantity: request.quantity,
+        pick,
+      },
+      this.sourcesFor(request),
+    );
+    const status = statusFromOutcome(request, outcome);
+    if (status.state !== 'not_found' || pick !== null) return status;
+
+    // No source matched. The amount is needed before any estimate can be stated for it.
+    if (request.quantity === null) {
+      return {
+        state: 'needs_quantity',
+        request,
+        matchedName: null,
+        options: [],
+        reason: 'No food data matched this. How much did you have?',
+      };
+    }
+    return this.estimateRequest(request, request.quantity);
+  }
+
+  /**
+   * The order sources are tried in. A named brand or a barcode points at a product, so branded
+   * sources come before generic data. Otherwise generic data comes first, and branded products
+   * after it. The Progresso catalog is always first.
+   */
+  private sourcesFor(request: ComponentRequest): NutritionSource[] {
+    const catalog = new CatalogNutritionSource(this.supabaseService);
+    const usda = new UsdaNutritionSource(this.supabaseService);
+    const offSearch = new OpenFoodFactsNutritionSource(this.provider, 'search');
+    const offBarcode = new OpenFoodFactsNutritionSource(this.provider, 'barcode');
+    if (request.barcode) return [catalog, offBarcode, offSearch];
+    if (request.brand) return [catalog, offSearch, usda];
+    return [catalog, usda, offSearch];
+  }
+
+  private async estimateRequest(
+    request: ComponentRequest,
+    quantity: Amount,
+  ): Promise<ComponentStatus> {
+    try {
+      const estimate = await this.nutritionProvider.estimate(
+        `${quantity.amount} ${quantity.unit} of ${request.name}`,
+      );
+      return {
+        state: 'ai_estimate',
+        request,
+        component: {
+          name: request.name,
+          quantity,
+          grams: null,
+          nutrients: {
+            calories: Math.round(estimate.calories),
+            proteinG: roundTo(estimate.proteinG, 1),
+            carbsG: roundTo(estimate.carbsG, 1),
+            fatG: roundTo(estimate.fatG, 1),
+          },
+          provenance: {
+            confidence: 'ai_estimate',
+            sourceKind: 'ai_estimate',
+            sourceId: null,
+            matchedName: null,
+            brand: null,
+            dataVersion: null,
+            retrievedAt: new Date().toISOString(),
+            licence: 'none',
+            attribution: null,
+            assumptions: ['AI estimate: no food data matched this. Not verified.'],
+          },
+        },
+      };
+    } catch {
+      return {
+        state: 'not_found',
+        request,
+        reason: 'We could not estimate this. Try describing it differently.',
+      };
+    }
   }
 
   async search(query: string, page: number, pageSize: number): Promise<FoodSearchResponse> {

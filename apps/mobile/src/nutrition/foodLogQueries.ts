@@ -2,7 +2,7 @@ import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
 import { supabase } from '../lib/supabase';
 import { calculateLogTotals, recalculateForQuantity } from './nutritionCalculations';
 import type { MealType } from './mealTypes';
-import type { FoodRow } from './foodQueries';
+import { provenanceToColumns, type FoodRow } from './foodQueries';
 
 // Direct-to-Supabase, same reasoning as foodQueries.ts: food_logs is
 // entirely own-row RLS with a real delete policy (no PR-style derived
@@ -163,7 +163,15 @@ export async function logFood(
   userId: string,
   food: Pick<
     FoodRow,
-    'id' | 'name' | 'servingSize' | 'servingUnit' | 'calories' | 'proteinG' | 'carbsG' | 'fatG'
+    | 'id'
+    | 'name'
+    | 'servingSize'
+    | 'servingUnit'
+    | 'calories'
+    | 'proteinG'
+    | 'carbsG'
+    | 'fatG'
+    | 'provenance'
   >,
   quantity: number,
   mealType: MealType,
@@ -184,6 +192,8 @@ export async function logFood(
       carbs_g: totals.carbsG,
       fat_g: totals.fatG,
       meal_type: mealType,
+      // The log keeps the figures' provenance as it was at logging time, even if the library food changes later.
+      ...provenanceToColumns(food.provenance),
     })
     .select(FOOD_LOG_COLUMNS)
     .single();

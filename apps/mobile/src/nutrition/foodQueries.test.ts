@@ -88,6 +88,7 @@ describe('fetchFoods', () => {
         carbsG: 0,
         fatG: 3.6,
         isActive: true,
+        provenance: null,
       },
     ]);
     expect(result.hasMore).toBe(false);
@@ -151,6 +152,7 @@ describe('fetchAllFoods', () => {
         carbsG: 0,
         fatG: 3.6,
         isActive: true,
+        provenance: null,
       },
     ]);
     expect(calls.eq).toEqual([
@@ -263,6 +265,17 @@ describe('createFood', () => {
       protein_g: 31,
       carbs_g: 0,
       fat_g: 3.6,
+      // A food the user typed in is recorded as user-entered, so its provenance is never blank.
+      nutrition_confidence: 'user_entered',
+      nutrition_source_kind: 'user_entered',
+      nutrition_source_id: null,
+      nutrition_matched_name: null,
+      nutrition_data_version: null,
+      nutrition_retrieved_at: null,
+      nutrition_licence: 'none',
+      nutrition_attribution: null,
+      nutrition_assumptions: [],
+      nutrition_components: null,
     });
     expect(result.id).toBe('food-1');
   });

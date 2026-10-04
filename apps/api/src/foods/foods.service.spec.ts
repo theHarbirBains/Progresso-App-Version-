@@ -3,6 +3,7 @@ import type { SupabaseService } from '../supabase/supabase.service';
 import type { FoodProvider, NormalizedFood } from './food-provider.interface';
 import { FoodsService } from './foods.service';
 import type { AnthropicNutritionProvider } from './providers/anthropic-nutrition.provider';
+import type { InterpretFoodResponse } from './interpretation';
 
 interface Result {
   data: unknown;
@@ -428,9 +429,9 @@ describe('FoodsService.getByBarcode', () => {
   });
 });
 
-// The seeded catalog as the service reads it: a name search returns the rows
-// whose name contains the searched term (case-insensitive), like the real
-// ilike query; the brand search finds nothing.
+// The Progresso catalog as the service reads it. A name search returns rows whose name
+// contains every word of the query (case-insensitive), like the word-by-word ilike queries.
+// Brand and the USDA and Open Food Facts sources return nothing here.
 function catalogRow(
   name: string,
   servingSize: number,
@@ -444,15 +445,13 @@ function catalogRow(
     id: `food-${name}`,
     name,
     brand: null,
-    image_url: null,
+    barcode: null,
     serving_size: String(servingSize),
     serving_unit: servingUnit,
     calories: String(calories),
     protein_g: String(proteinG),
     carbs_g: String(carbsG),
     fat_g: String(fatG),
-    provider: null,
-    barcode: null,
   };
 }
 
@@ -471,22 +470,24 @@ const CATALOG = [
 
 function catalogSupabase(rows: unknown[]) {
   const from = jest.fn(() => {
+    const terms: string[] = [];
     let column = '';
-    let pattern = '';
     const builder: Record<string, unknown> = {};
     for (const m of ['select', 'is', 'eq', 'order', 'limit']) {
       builder[m] = jest.fn(() => builder);
     }
-    builder.ilike = jest.fn((col: string, pat: string) => {
+    builder.ilike = jest.fn((col: string, pattern: string) => {
       column = col;
-      pattern = pat;
+      terms.push(pattern.slice(1, -1).toLowerCase());
       return builder;
     });
     builder.then = (resolve: (v: Result) => unknown, reject: (e: unknown) => unknown) => {
-      const term = pattern.slice(1, -1).toLowerCase();
       const data =
         column === 'name'
-          ? rows.filter((row) => (row as { name: string }).name.toLowerCase().includes(term))
+          ? rows.filter((row) => {
+              const name = (row as { name: string }).name.toLowerCase();
+              return terms.every((term) => name.includes(term));
+            })
           : [];
       return Promise.resolve({ data, error: null }).then(resolve, reject);
     };
@@ -495,8 +496,14 @@ function catalogSupabase(rows: unknown[]) {
   return { getClient: () => ({ from }) } as unknown as SupabaseService;
 }
 
-function parsedComponent(name: string, searchTerm: string, quantity: number, unit: string) {
-  return { name, searchTerm, quantity, unit };
+function parsedComponent(
+  name: string,
+  searchTerm: string,
+  quantity: number | null,
+  unit: string | null,
+  brand: string | null = null,
+) {
+  return { name, searchTerm, quantity, unit, brand };
 }
 
 const DEFAULT_ESTIMATE = {
@@ -522,17 +529,19 @@ function interpreter(parsed: unknown) {
   return { service, nutritionProvider };
 }
 
-function interpretation(result: Awaited<ReturnType<FoodsService['interpretDescription']>>) {
+type Interpretation = Extract<InterpretFoodResponse, { status: 'ok' }>['interpretation'];
+
+function interpretation(result: InterpretFoodResponse): Interpretation {
   if (result.status !== 'ok') throw new Error(`expected an interpretation, got ${result.status}`);
   return result.interpretation;
 }
 
 describe('FoodsService.interpretDescription', () => {
-  it('scales a grams query exactly against the catalog food in grams', async () => {
+  it('resolves a grams query from the catalog, as verified, with the catalog caveat', async () => {
     const { service, nutritionProvider } = interpreter({
       clarification: null,
       preparation: 'air fried, no oil',
-      main: parsedComponent('air fried potatoes', 'potato', 100, 'grams'),
+      main: parsedComponent('air fried potatoes', 'baked potato', 100, 'grams'),
       addedIngredients: [],
     });
 
@@ -541,22 +550,63 @@ describe('FoodsService.interpretDescription', () => {
     );
 
     expect(nutritionProvider.estimate).not.toHaveBeenCalled();
+    expect(result.complete).toBe(true);
     expect(result.servingSize).toBe(100);
     expect(result.servingUnit).toBe('g');
     expect(result.preparation).toBe('air fried, no oil');
-    expect(result.components[0]).toMatchObject({
-      role: 'main',
-      source: 'database',
-      matchedName: 'Potato (baked)',
+    const main = result.components[0]!;
+    expect(main).toMatchObject({ state: 'resolved' });
+    if (main.state !== 'resolved') throw new Error('expected resolved');
+    expect(main.component.nutrients).toEqual({
       calories: 93,
       proteinG: 2.5,
       carbsG: 21.2,
       fatG: 0.1,
     });
+    expect(main.component.provenance).toMatchObject({
+      confidence: 'verified',
+      sourceKind: 'progresso_catalog',
+      matchedName: 'Potato (baked)',
+    });
+    expect(main.component.provenance.assumptions[0]).toMatch(/original source/);
+    expect(result.totals).toEqual({ calories: 93, proteinG: 2.5, carbsG: 21.2, fatG: 0.1 });
     expect(result.hasEstimate).toBe(false);
   });
 
-  it('converts a millilitre query into a household cup for an exact scaled value', async () => {
+  it('asks which food when a bare word matches more than one close candidate', async () => {
+    const { service } = interpreter({
+      clarification: null,
+      preparation: null,
+      main: parsedComponent('potato', 'potato', 100, 'g'),
+      addedIngredients: [],
+    });
+
+    const result = interpretation(await service.interpretDescription('100 g potato'));
+
+    expect(result.complete).toBe(false);
+    expect(result.components[0]).toMatchObject({ state: 'choose' });
+    const choose = result.components[0]!;
+    if (choose.state !== 'choose') throw new Error('expected choose');
+    expect(choose.choices.map((c) => c.matchedName)).toEqual([
+      'Potato (baked)',
+      'Sweet Potato (baked)',
+    ]);
+  });
+
+  it('resolves a specific phrase unambiguously', async () => {
+    const { service } = interpreter({
+      clarification: null,
+      preparation: null,
+      main: parsedComponent('baked potato', 'baked potato', 100, 'g'),
+      addedIngredients: [],
+    });
+
+    const result = interpretation(await service.interpretDescription('100 g baked potato'));
+
+    expect(result.components[0]).toMatchObject({ state: 'resolved' });
+  });
+
+  it('converts a millilitre query against a cup serving, as calculated', async () => {
     const { service } = interpreter({
       clarification: null,
       preparation: null,
@@ -566,16 +616,16 @@ describe('FoodsService.interpretDescription', () => {
 
     const result = interpretation(await service.interpretDescription('250 ml 2% milk'));
 
-    // 250 ml is 250 / 236.588 of a cup, so 149 kcal scales to about 157.
-    expect(result.components[0]).toMatchObject({
-      source: 'database',
+    const main = result.components[0]!;
+    if (main.state !== 'resolved') throw new Error('expected resolved');
+    expect(main.component.nutrients.calories).toBe(157);
+    expect(main.component.provenance).toMatchObject({
+      confidence: 'calculated',
       matchedName: 'Whole Milk',
-      calories: 157,
-      unit: 'ml',
     });
   });
 
-  it('matches a household serving by its own unit, scaled by the count', async () => {
+  it('matches a medium banana exactly, as verified', async () => {
     const { service } = interpreter({
       clarification: null,
       preparation: null,
@@ -585,14 +635,13 @@ describe('FoodsService.interpretDescription', () => {
 
     const result = interpretation(await service.interpretDescription('one medium banana'));
 
-    expect(result.components[0]).toMatchObject({
-      matchedName: 'Banana',
-      calories: 105,
-      assumption: null,
-    });
+    const main = result.components[0]!;
+    if (main.state !== 'resolved') throw new Error('expected resolved');
+    expect(main.component.nutrients.calories).toBe(105);
+    expect(main.component.provenance.confidence).toBe('verified');
   });
 
-  it('scales a multi-serving grams query', async () => {
+  it('scales a multi-serving grams query, as calculated', async () => {
     const { service } = interpreter({
       clarification: null,
       preparation: 'grilled',
@@ -604,69 +653,74 @@ describe('FoodsService.interpretDescription', () => {
       await service.interpretDescription('200g grilled chicken breast'),
     );
 
-    expect(result.components[0]).toMatchObject({ calories: 330, proteinG: 62, fatG: 7.2 });
+    const main = result.components[0]!;
+    if (main.state !== 'resolved') throw new Error('expected resolved');
+    expect(main.component.nutrients).toEqual({ calories: 330, proteinG: 62, carbsG: 0, fatG: 7.2 });
+    expect(main.component.provenance.confidence).toBe('calculated');
   });
 
-  it('adds explicitly mentioned butter as its own calorie-contributing component', async () => {
+  it('resolves explicitly mentioned butter as its own component, and totals the meal once complete', async () => {
     const { service } = interpreter({
       clarification: null,
       preparation: 'scrambled',
-      main: parsedComponent('eggs', 'egg', 2, 'item'),
+      main: parsedComponent('eggs', 'egg', 2, 'large'),
       addedIngredients: [parsedComponent('butter', 'butter', 1, 'tsp')],
     });
 
     const result = interpretation(
-      await service.interpretDescription('2 scrambled eggs cooked with 1 tsp butter'),
+      await service.interpretDescription('2 large scrambled eggs cooked with 1 tsp butter'),
     );
 
     expect(result.components).toHaveLength(2);
-    expect(result.components[0]).toMatchObject({
-      role: 'main',
-      matchedName: 'Egg, Large',
-      calories: 144,
-      assumption: 'Treated "2 item" as 2 × Egg, Large (1 large).',
-    });
     expect(result.components[1]).toMatchObject({
-      role: 'ingredient',
-      matchedName: 'Butter',
-      calories: 34,
+      state: 'resolved',
+      request: { role: 'ingredient' },
     });
-    expect(result.totals.calories).toBe(178);
+    const butter = result.components[1]!;
+    if (butter.state !== 'resolved') throw new Error('expected resolved');
+    expect(butter.component.nutrients.calories).toBe(34);
+    expect(result.complete).toBe(true);
+    expect(result.totals?.calories).toBe(144 + 34);
   });
 
-  it('sums every component into the totals', async () => {
+  it('asks for the count of a generic "2 items" rather than assuming a size', async () => {
     const { service } = interpreter({
       clarification: null,
-      preparation: null,
-      main: parsedComponent('toast', 'whole wheat bread', 2, 'slice'),
-      addedIngredients: [parsedComponent('peanut butter', 'peanut butter', 1, 'tbsp')],
-    });
-
-    const result = interpretation(
-      await service.interpretDescription('2 slices whole wheat toast with 1 tbsp peanut butter'),
-    );
-
-    // 2 slices = 162 kcal; 1 tbsp of a 2 tbsp serving = 94 kcal.
-    expect(result.components.map((c) => c.calories)).toEqual([162, 94]);
-    // Protein 8 + 4, carbs 27.6 + 3.45, fat 2.2 + 8 (peanut butter's half serving).
-    expect(result.totals).toEqual({ calories: 256, proteinG: 12, carbsG: 31.1, fatG: 10.2 });
-  });
-
-  it('prefers the catalog food whose name starts with the term', async () => {
-    const { service } = interpreter({
-      clarification: null,
-      preparation: null,
-      main: parsedComponent('potato', 'potato', 100, 'g'),
+      preparation: 'scrambled',
+      main: parsedComponent('eggs', 'egg', 2, 'item'),
       addedIngredients: [],
     });
 
-    const result = interpretation(await service.interpretDescription('100 g potato'));
+    const result = interpretation(await service.interpretDescription('2 scrambled eggs'));
 
-    expect(result.components[0]!.matchedName).toBe('Potato (baked)');
+    expect(result.complete).toBe(false);
+    expect(result.totals).toBeNull();
+    expect(result.servingSize).toBeNull();
+    expect(result.components[0]).toMatchObject({
+      state: 'needs_quantity',
+      reason: '"item" doesn\'t name a size',
+    });
   });
 
-  it('refuses a mass-to-volume match, falling back to the labelled estimate instead', async () => {
-    const { service, nutritionProvider } = interpreter({
+  it('asks for an amount when the description has none, instead of assuming one', async () => {
+    const { service } = interpreter({
+      clarification: null,
+      preparation: null,
+      main: parsedComponent('banana', 'banana', null, null),
+      addedIngredients: [],
+    });
+
+    const result = interpretation(await service.interpretDescription('banana'));
+
+    expect(result.components[0]).toMatchObject({
+      state: 'needs_quantity',
+      reason: 'no amount given',
+    });
+    expect(result.complete).toBe(false);
+  });
+
+  it('asks rather than converting mass into volume for a food with only a mass figure', async () => {
+    const { service } = interpreter({
       clarification: null,
       preparation: null,
       main: parsedComponent('salmon', 'salmon', 150, 'ml'),
@@ -675,46 +729,112 @@ describe('FoodsService.interpretDescription', () => {
 
     const result = interpretation(await service.interpretDescription('150 ml salmon'));
 
-    expect(nutritionProvider.estimate).toHaveBeenCalledWith('150 ml of salmon');
-    expect(result.components[0]).toMatchObject({ source: 'ai_estimate', matchedName: null });
-    expect(result.hasEstimate).toBe(true);
+    expect(result.components[0]).toMatchObject({ state: 'needs_quantity' });
   });
 
-  it('uses a labelled AI estimate when nothing in the catalog matches', async () => {
+  it('gives a labelled AI estimate only when nothing matches and the amount is known', async () => {
     const { service, nutritionProvider } = interpreter({
       clarification: null,
       preparation: null,
-      main: parsedComponent('dragon fruit', 'dragon fruit', 1, 'item'),
+      main: parsedComponent('dragon fruit', 'dragon fruit', 100, 'g'),
       addedIngredients: [],
     });
 
-    const result = interpretation(await service.interpretDescription('one dragon fruit'));
+    const result = interpretation(await service.interpretDescription('100 g dragon fruit'));
 
-    expect(nutritionProvider.estimate).toHaveBeenCalledWith('1 item of dragon fruit');
-    expect(result.components[0]).toMatchObject({
-      source: 'ai_estimate',
-      matchedName: null,
-      calories: 100,
-      proteinG: 5,
+    expect(nutritionProvider.estimate).toHaveBeenCalledWith('100 g of dragon fruit');
+    const main = result.components[0]!;
+    if (main.state !== 'ai_estimate') throw new Error('expected ai_estimate');
+    expect(main.component.provenance).toMatchObject({
+      confidence: 'ai_estimate',
+      sourceKind: 'ai_estimate',
+      licence: 'none',
     });
+    expect(main.component.provenance.assumptions[0]).toMatch(/Not verified/);
     expect(result.hasEstimate).toBe(true);
+    expect(result.complete).toBe(true);
   });
 
-  it('returns a clarification and never estimates when the description is too vague', async () => {
+  it('asks for an amount, without estimating, when nothing matches and no amount was given', async () => {
     const { service, nutritionProvider } = interpreter({
-      clarification: 'How much rice did you eat?',
+      clarification: null,
+      preparation: null,
+      main: parsedComponent('dragon fruit', 'dragon fruit', null, null),
+      addedIngredients: [],
+    });
+
+    const result = interpretation(await service.interpretDescription('dragon fruit'));
+
+    expect(nutritionProvider.estimate).not.toHaveBeenCalled();
+    expect(result.components[0]).toMatchObject({ state: 'needs_quantity' });
+  });
+
+  it('returns a clarification and never estimates when the food itself is unclear', async () => {
+    const { service, nutritionProvider } = interpreter({
+      clarification: 'What food was it?',
       preparation: null,
       main: null,
       addedIngredients: [],
     });
 
-    const result = await service.interpretDescription('rice');
+    const result = await service.interpretDescription('some stuff');
 
-    expect(result).toEqual({ status: 'clarification', question: 'How much rice did you eat?' });
+    expect(result).toEqual({ status: 'clarification', question: 'What food was it?' });
     expect(nutritionProvider.estimate).not.toHaveBeenCalled();
   });
 
-  it('propagates a failure from the AI provider rather than swallowing it', async () => {
+  it('resolves one pending component from the candidate the user picked', async () => {
+    const { service } = interpreter({
+      clarification: null,
+      preparation: null,
+      main: null,
+      addedIngredients: [],
+    });
+
+    const status = await service.resolveComponent(
+      {
+        index: 0,
+        role: 'main',
+        name: 'potato',
+        term: 'potato',
+        brand: null,
+        barcode: null,
+        quantity: { amount: 100, unit: 'g' },
+      },
+      { sourceKind: 'progresso_catalog', sourceId: 'food-Potato (baked)' },
+    );
+
+    expect(status).toMatchObject({ state: 'resolved' });
+    if (status.state !== 'resolved') throw new Error('expected resolved');
+    expect(status.component.provenance.matchedName).toBe('Potato (baked)');
+  });
+
+  it('reports a pick that is no longer offered as not found, without estimating', async () => {
+    const { service, nutritionProvider } = interpreter({
+      clarification: null,
+      preparation: null,
+      main: null,
+      addedIngredients: [],
+    });
+
+    const status = await service.resolveComponent(
+      {
+        index: 0,
+        role: 'main',
+        name: 'potato',
+        term: 'potato',
+        brand: null,
+        barcode: null,
+        quantity: { amount: 100, unit: 'g' },
+      },
+      { sourceKind: 'progresso_catalog', sourceId: 'gone' },
+    );
+
+    expect(status).toMatchObject({ state: 'not_found' });
+    expect(nutritionProvider.estimate).not.toHaveBeenCalled();
+  });
+
+  it('propagates a failure from the AI parser rather than swallowing it', async () => {
     const nutritionProvider = {
       parse: jest.fn().mockRejectedValue(new Error('provider down')),
       estimate: jest.fn(),

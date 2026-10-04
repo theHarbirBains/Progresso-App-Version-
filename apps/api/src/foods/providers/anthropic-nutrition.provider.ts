@@ -28,14 +28,17 @@ const PARSE_SYSTEM_PROMPT =
   'structured parts using the food_parse tool. Do not estimate calories, macros or any ' +
   'nutrition -- only report what the user said. Rules: ' +
   '(1) main is the food the amount applies to, with its quantity and unit exactly as the ' +
-  'user wrote them. (2) searchTerm is a short, singular, generic name for a food database ' +
+  'user wrote them. If the user gave no amount, set quantity and unit to null. Never invent ' +
+  'an amount. (2) searchTerm is a short, singular, generic name for a food database ' +
   'lookup with no preparation words ("potatoes" -> "potato", "grilled chicken breast" -> ' +
-  '"chicken breast"). (3) preparation records how the main food was prepared, including ' +
-  'an explicit "no oil", or null. (4) addedIngredients lists only things the user said ' +
-  'were added: oils, butter, sauces, toppings, other ingredients. Never add anything the ' +
-  'user did not mention, and never add oil for an air fried or "no oil" preparation. ' +
-  '(5) If the amount or the food is missing or too vague to log, set clarification to one ' +
-  'short question asking for it, and leave main null. Always call the tool.';
+  '"chicken breast"). (3) brand is a brand or restaurant the user named for the food ' +
+  '("Fairlife", "McDonald\'s", "Oikos"), or null. (4) preparation records how the main food ' +
+  'was prepared, including an explicit "no oil", or null. (5) addedIngredients lists only ' +
+  'things the user said were added: oils, butter, sauces, toppings, other ingredients. Never ' +
+  'add anything the user did not mention, and never add oil for an air fried or "no oil" ' +
+  'preparation. (6) Set clarification only when the food itself cannot be identified, and ' +
+  'then leave main null. A missing amount is not a reason to set clarification. Always call ' +
+  'the tool.';
 
 const ESTIMATE_SYSTEM_PROMPT =
   'You are a nutrition estimation assistant inside a fitness app. The user describes a ' +
@@ -55,14 +58,21 @@ const COMPONENT_SCHEMA = {
       type: 'string',
       description: 'A short singular generic food name for a database lookup, e.g. "potato".',
     },
-    quantity: { type: 'number', description: 'The amount the user gave, as a number.' },
+    quantity: {
+      type: ['number', 'null'],
+      description: 'The amount the user gave, as a number. Null when no amount was given.',
+    },
     unit: {
-      type: 'string',
+      type: ['string', 'null'],
       description:
-        'The unit the user wrote, e.g. "g", "ml", "cup", "tbsp", "tsp", "oz", "slice", "medium", "large". Use "item" when a countable food had no unit.',
+        'The unit the user wrote, e.g. "g", "ml", "cup", "tbsp", "tsp", "oz", "slice", "medium", "large". Use "item" when a countable food had no unit. Null when no amount was given.',
+    },
+    brand: {
+      type: ['string', 'null'],
+      description: 'The brand or restaurant the user named for this food, or null.',
     },
   },
-  required: ['name', 'searchTerm', 'quantity', 'unit'],
+  required: ['name', 'searchTerm', 'quantity', 'unit', 'brand'],
 };
 
 const PARSE_TOOL = {
@@ -131,8 +141,10 @@ export interface NutritionEstimate {
 export interface ParsedFoodComponent {
   name: string;
   searchTerm: string;
-  quantity: number;
-  unit: string;
+  /** Null when the user gave no amount. The resolver asks for one; nothing is assumed here. */
+  quantity: number | null;
+  unit: string | null;
+  brand: string | null;
 }
 
 /** The structure of a food description. Carries no nutrition numbers. */
@@ -190,13 +202,22 @@ function toEstimate(input: unknown): NutritionEstimate | null {
 function toComponent(input: unknown): ParsedFoodComponent | null {
   if (typeof input !== 'object' || input === null) return null;
   const raw = input as Record<string, unknown>;
-  if (
-    !isNonEmptyString(raw.name) ||
-    !isNonEmptyString(raw.searchTerm) ||
-    !isNonEmptyString(raw.unit) ||
-    !isFiniteNumber(raw.quantity) ||
-    raw.quantity <= 0
-  ) {
+  if (!isNonEmptyString(raw.name) || !isNonEmptyString(raw.searchTerm)) return null;
+  const brand = isNonEmptyString(raw.brand) ? raw.brand.trim() : null;
+
+  // An amount is either a positive number with its unit, or absent with no unit. Anything in
+  // between is malformed rather than guessed at.
+  const hasQuantity = raw.quantity !== null && raw.quantity !== undefined;
+  if (!hasQuantity) {
+    return {
+      name: raw.name.trim(),
+      searchTerm: raw.searchTerm.trim(),
+      quantity: null,
+      unit: null,
+      brand,
+    };
+  }
+  if (!isFiniteNumber(raw.quantity) || raw.quantity <= 0 || !isNonEmptyString(raw.unit)) {
     return null;
   }
   return {
@@ -204,6 +225,7 @@ function toComponent(input: unknown): ParsedFoodComponent | null {
     searchTerm: raw.searchTerm.trim(),
     quantity: raw.quantity,
     unit: raw.unit.trim(),
+    brand,
   };
 }
 

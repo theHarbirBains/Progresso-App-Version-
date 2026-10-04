@@ -172,7 +172,13 @@ function parseToolResponse(input: unknown) {
 const VALID_PARSE = {
   clarification: null,
   preparation: 'air fried, no oil',
-  main: { name: 'air fried potatoes', searchTerm: 'potato', quantity: 100, unit: 'grams' },
+  main: {
+    name: 'air fried potatoes',
+    searchTerm: 'potato',
+    quantity: 100,
+    unit: 'grams',
+    brand: null,
+  },
   addedIngredients: [],
 };
 
@@ -226,7 +232,9 @@ describe('AnthropicNutritionProvider.parse', () => {
         clarification: null,
         preparation: 'scrambled',
         main: { name: 'eggs', searchTerm: 'egg', quantity: 2, unit: 'item' },
-        addedIngredients: [{ name: 'butter', searchTerm: 'butter', quantity: 1, unit: 'tsp' }],
+        addedIngredients: [
+          { name: 'butter', searchTerm: 'butter', quantity: 1, unit: 'tsp', brand: null },
+        ],
       }),
     );
     const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));
@@ -234,7 +242,7 @@ describe('AnthropicNutritionProvider.parse', () => {
     const result = await provider.parse('2 scrambled eggs cooked with 1 tsp butter');
 
     expect(result.addedIngredients).toEqual([
-      { name: 'butter', searchTerm: 'butter', quantity: 1, unit: 'tsp' },
+      { name: 'butter', searchTerm: 'butter', quantity: 1, unit: 'tsp', brand: null },
     ]);
   });
 
@@ -277,7 +285,9 @@ describe('AnthropicNutritionProvider.parse', () => {
     mockFetchOnce(
       parseToolResponse({
         ...VALID_PARSE,
-        addedIngredients: [{ name: 'butter', searchTerm: 'butter', unit: 'tsp' }],
+        addedIngredients: [
+          { name: 'butter', searchTerm: 'butter', quantity: 'lots', unit: 'tsp', brand: null },
+        ],
       }),
     );
     const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));

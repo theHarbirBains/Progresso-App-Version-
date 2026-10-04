@@ -4,8 +4,11 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { InterpretFoodDto } from './dto/interpret-food.dto';
+import { ResolveComponentDto } from './dto/resolve-component.dto';
 import { SearchFoodsDto } from './dto/search-foods.dto';
 import { FoodsService } from './foods.service';
+import type { ComponentRequest } from './interpretation';
+import { normalizeUnit } from './nutrition-units';
 
 // Food search combines Progresso's own cached catalog with a live external
 // provider call (see FoodsService) -- both are reads with no per-user data
@@ -47,5 +50,21 @@ export class FoodsController {
   @Post('interpret')
   async interpret(@Body() dto: InterpretFoodDto) {
     return this.foodsService.interpretDescription(dto.description);
+  }
+
+  // Resolves one component the user was still deciding: a candidate they picked, or an amount
+  // they gave. Only that component is re-run; the rest of the interpretation is kept client-side.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('resolve-component')
+  async resolveComponent(@Body() dto: ResolveComponentDto) {
+    const request: ComponentRequest = {
+      ...dto.request,
+      brand: dto.request.brand ?? null,
+      barcode: dto.request.barcode ?? null,
+      quantity: dto.request.quantity
+        ? { amount: dto.request.quantity.amount, unit: normalizeUnit(dto.request.quantity.unit) }
+        : null,
+    };
+    return this.foodsService.resolveComponent(request, dto.pick ?? null);
   }
 }
