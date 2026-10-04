@@ -238,7 +238,6 @@ describe('FoodLibraryScreen', () => {
     fireEvent.press(screen.getByTestId('food-create-button'));
     fireEvent.changeText(await screen.findByTestId('food-form-name'), 'Cherry');
     fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '150');
-    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
     fireEvent.changeText(screen.getByTestId('food-form-calories'), '50');
     fireEvent.changeText(screen.getByTestId('food-form-protein'), '1');
     fireEvent.changeText(screen.getByTestId('food-form-carbs'), '12');
@@ -262,11 +261,11 @@ describe('FoodLibraryScreen', () => {
     expect(await screen.findByTestId('food-search')).toBeTruthy();
   });
 
-  it('opens straight into creating a food, prefilled with the barcode, when reached from the Scan Barcode "not found" fallback', async () => {
+  it('opens straight into creating a food when reached from the Scan Barcode "not found" fallback, without a barcode field', async () => {
     renderScreen('nutrition', { openCreate: true, barcode: '012345678905' });
 
     expect(await screen.findByTestId('food-form-name')).toBeTruthy();
-    expect(screen.getByTestId('food-form-barcode')).toHaveProp('value', '012345678905');
+    expect(screen.queryByTestId('food-form-barcode')).toBeNull();
   });
 
   it('carries straight on to logging the food it just created for a scanned barcode', async () => {
@@ -280,7 +279,6 @@ describe('FoodLibraryScreen', () => {
 
     fireEvent.changeText(await screen.findByTestId('food-form-name'), 'Mystery Bar');
     fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '40');
-    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
     fireEvent.changeText(screen.getByTestId('food-form-calories'), '180');
     fireEvent.changeText(screen.getByTestId('food-form-protein'), '10');
     fireEvent.changeText(screen.getByTestId('food-form-carbs'), '20');
@@ -320,7 +318,6 @@ describe('FoodLibraryScreen', () => {
     fireEvent.press(screen.getByTestId('food-create-button'));
     fireEvent.changeText(await screen.findByTestId('food-form-name'), 'Almonds');
     fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '28');
-    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
     fireEvent.changeText(screen.getByTestId('food-form-calories'), '160');
     fireEvent.changeText(screen.getByTestId('food-form-protein'), '6');
     fireEvent.changeText(screen.getByTestId('food-form-carbs'), '6');
@@ -369,7 +366,6 @@ describe('FoodLibraryScreen', () => {
     expect(await screen.findByTestId('food-form-photo-remove')).toBeTruthy();
     expect(screen.getByTestId('food-form-photo-add')).toHaveTextContent('Change Photo');
     fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '28');
-    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
     fireEvent.changeText(screen.getByTestId('food-form-calories'), '160');
     fireEvent.changeText(screen.getByTestId('food-form-protein'), '6');
     fireEvent.changeText(screen.getByTestId('food-form-carbs'), '6');
@@ -393,7 +389,6 @@ describe('FoodLibraryScreen', () => {
     fireEvent.press(screen.getByTestId('food-create-button'));
     fireEvent.changeText(await screen.findByTestId('food-form-name'), 'Almonds');
     fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '28');
-    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
     fireEvent.changeText(screen.getByTestId('food-form-calories'), '160');
     fireEvent.changeText(screen.getByTestId('food-form-protein'), '6');
     fireEvent.changeText(screen.getByTestId('food-form-carbs'), '6');
@@ -427,7 +422,7 @@ describe('FoodLibraryScreen', () => {
     );
   });
 
-  it('creates a food with the optional brand and barcode filled in', async () => {
+  it('creates a food with the optional brand filled in', async () => {
     mockCreateFood.mockResolvedValue({ ...apple, id: 'food-3', name: 'Almonds' });
 
     renderScreen();
@@ -436,9 +431,7 @@ describe('FoodLibraryScreen', () => {
     fireEvent.press(screen.getByTestId('food-create-button'));
     fireEvent.changeText(await screen.findByTestId('food-form-name'), 'Almonds');
     fireEvent.changeText(screen.getByTestId('food-form-brand'), 'Kirkland');
-    fireEvent.changeText(screen.getByTestId('food-form-barcode'), '012345678905');
     fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '28');
-    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
     fireEvent.changeText(screen.getByTestId('food-form-calories'), '160');
     fireEvent.changeText(screen.getByTestId('food-form-protein'), '6');
     fireEvent.changeText(screen.getByTestId('food-form-carbs'), '6');
@@ -450,7 +443,7 @@ describe('FoodLibraryScreen', () => {
 
     expect(mockCreateFood).toHaveBeenCalledWith(
       'user-1',
-      expect.objectContaining({ brand: 'Kirkland', barcode: '012345678905' }),
+      expect.objectContaining({ brand: 'Kirkland' }),
     );
   });
 
@@ -616,7 +609,6 @@ describe('FoodFormScreen (via Food Library) -- labelled inputs, one primary acti
 
     fireEvent.changeText(screen.getByTestId('food-form-name'), 'Cherry');
     fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '150');
-    fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
     fireEvent.changeText(screen.getByTestId('food-form-calories'), '50');
     fireEvent.changeText(screen.getByTestId('food-form-protein'), '1');
     fireEvent.changeText(screen.getByTestId('food-form-carbs'), '12');

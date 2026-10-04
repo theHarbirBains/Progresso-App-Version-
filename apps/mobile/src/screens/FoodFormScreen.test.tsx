@@ -50,7 +50,8 @@ beforeEach(() => {
 function fillRequiredFields() {
   fireEvent.changeText(screen.getByTestId('food-form-name'), 'Rice');
   fireEvent.changeText(screen.getByTestId('food-form-serving-size'), '100');
-  fireEvent.changeText(screen.getByTestId('food-form-serving-unit'), 'g');
+  fireEvent.press(screen.getByTestId('food-form-serving-unit'));
+  fireEvent.press(screen.getByTestId('food-form-serving-unit-g'));
   fireEvent.changeText(screen.getByTestId('food-form-calories'), '130');
   fireEvent.changeText(screen.getByTestId('food-form-protein'), '2.7');
   fireEvent.changeText(screen.getByTestId('food-form-carbs'), '28');
@@ -101,26 +102,26 @@ describe('FoodFormScreen (create mode)', () => {
     expect(onDone).toHaveBeenCalledWith({ ...ownedFood, id: 'new-food-id' });
   });
 
-  it('trims name/brand/barcode and includes brand/barcode when provided', async () => {
+  it('trims name/brand and includes brand when provided', async () => {
     mockCreateFood.mockResolvedValue(ownedFood);
     render(<FoodFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
     fillRequiredFields();
     fireEvent.changeText(screen.getByTestId('food-form-name'), '  Rice  ');
     fireEvent.changeText(screen.getByTestId('food-form-brand'), '  Kirkland  ');
-    fireEvent.changeText(screen.getByTestId('food-form-barcode'), '  012345  ');
 
     await waitFor(() => fireEvent.press(screen.getByTestId('food-form-save')));
 
     await waitFor(() =>
       expect(mockCreateFood).toHaveBeenCalledWith(
         'user-1',
-        expect.objectContaining({ name: 'Rice', brand: 'Kirkland', barcode: '012345' }),
+        expect.objectContaining({ name: 'Rice', brand: 'Kirkland' }),
       ),
     );
   });
 
-  it('prefills the barcode from initialBarcode (Scan Barcode -> Product Not Found flow)', () => {
+  it('keeps the scanned barcode on the new food without showing a barcode field', async () => {
+    mockCreateFood.mockResolvedValue(ownedFood);
     render(
       <FoodFormScreen
         mode="create"
@@ -130,7 +131,16 @@ describe('FoodFormScreen (create mode)', () => {
       />,
     );
 
-    expect(screen.getByTestId('food-form-barcode')).toHaveProp('value', '099999999999');
+    expect(screen.queryByTestId('food-form-barcode')).toBeNull();
+    fillRequiredFields();
+    await waitFor(() => fireEvent.press(screen.getByTestId('food-form-save')));
+
+    await waitFor(() =>
+      expect(mockCreateFood).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ barcode: '099999999999' }),
+      ),
+    );
   });
 
   it('prefills every field from initialValues (AI Food Search flow) -- still fully editable, saved on Save like any other create', async () => {
@@ -153,7 +163,9 @@ describe('FoodFormScreen (create mode)', () => {
 
     expect(screen.getByTestId('food-form-name')).toHaveProp('value', 'Air-Fried Potatoes (100g)');
     expect(screen.getByTestId('food-form-serving-size')).toHaveProp('value', '100');
-    expect(screen.getByTestId('food-form-serving-unit')).toHaveProp('value', 'g');
+    expect(screen.getByTestId('food-form-serving-unit')).toHaveTextContent('gram', {
+      exact: false,
+    });
     expect(screen.getByTestId('food-form-calories')).toHaveProp('value', '120');
     expect(screen.getByTestId('food-form-protein')).toHaveProp('value', '2');
     expect(screen.getByTestId('food-form-carbs')).toHaveProp('value', '27');
@@ -204,9 +216,11 @@ describe('FoodFormScreen (edit mode)', () => {
 
     expect(screen.getByTestId('food-form-name')).toHaveProp('value', 'Chicken Breast');
     expect(screen.getByTestId('food-form-brand')).toHaveProp('value', 'Kirkland');
-    expect(screen.getByTestId('food-form-barcode')).toHaveProp('value', '012345678905');
+    expect(screen.queryByTestId('food-form-barcode')).toBeNull();
     expect(screen.getByTestId('food-form-serving-size')).toHaveProp('value', '100');
-    expect(screen.getByTestId('food-form-serving-unit')).toHaveProp('value', 'g');
+    expect(screen.getByTestId('food-form-serving-unit')).toHaveTextContent('gram', {
+      exact: false,
+    });
     expect(screen.getByTestId('food-form-calories')).toHaveProp('value', '165');
     expect(screen.getByTestId('food-form-protein')).toHaveProp('value', '31');
     expect(screen.getByTestId('food-form-carbs')).toHaveProp('value', '0');
@@ -351,5 +365,26 @@ describe('FoodFormScreen -- renders no bare text', () => {
   it('renders no bare text outside <Text> in edit mode', () => {
     render(<FoodFormScreen mode="edit" food={ownedFood} onDone={jest.fn()} onCancel={jest.fn()} />);
     expectNoBareText();
+  });
+});
+
+describe('FoodFormScreen serving unit dropdown', () => {
+  it('saves the unit chosen from the list, shown on the control', async () => {
+    mockCreateFood.mockResolvedValue(ownedFood);
+    render(<FoodFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fillRequiredFields();
+    fireEvent.press(screen.getByTestId('food-form-serving-unit'));
+    fireEvent.press(screen.getByTestId('food-form-serving-unit-cup'));
+
+    expect(screen.getByTestId('food-form-serving-unit')).toHaveTextContent('cup', { exact: false });
+    await waitFor(() => fireEvent.press(screen.getByTestId('food-form-save')));
+
+    await waitFor(() =>
+      expect(mockCreateFood).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ servingUnit: 'cup' }),
+      ),
+    );
   });
 });

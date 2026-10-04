@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
@@ -9,9 +10,16 @@ import { DestructiveButton, PrimaryButton, SecondaryButton, TextButton } from '.
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { TextInput } from '../design/TextInput';
-import { colors, spacing, typeScale, widgetGap } from '../design/theme';
+import { BottomSheet } from '../design/BottomSheet';
+import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
+import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
 import { uploadFoodPhoto } from '../lib/foodPhotoUpload';
 import { FoodImage } from '../nutrition/FoodImage';
+import {
+  DEFAULT_SERVING_UNIT,
+  servingUnitLabel,
+  servingUnitOptions,
+} from '../nutrition/servingUnits';
 import { createFood, updateFood, type FoodRow } from '../nutrition/foodQueries';
 
 type CommonProps = {
@@ -70,7 +78,7 @@ export function FoodFormScreen(props: Props) {
     props.mode === 'edit' ? props.food.name : (initialValues?.name ?? ''),
   );
   const [brand, setBrand] = useState(props.mode === 'edit' ? (props.food.brand ?? '') : '');
-  const [barcode, setBarcode] = useState(
+  const [barcode] = useState(
     props.mode === 'edit' ? (props.food.barcode ?? '') : (props.initialBarcode ?? ''),
   );
   const [servingSize, setServingSize] = useState(
@@ -80,8 +88,11 @@ export function FoodFormScreen(props: Props) {
         ? String(initialValues.servingSize)
         : '',
   );
+  const [unitSheetOpen, setUnitSheetOpen] = useState(false);
   const [servingUnit, setServingUnit] = useState(
-    props.mode === 'edit' ? props.food.servingUnit : (initialValues?.servingUnit ?? ''),
+    props.mode === 'edit'
+      ? props.food.servingUnit
+      : (initialValues?.servingUnit ?? DEFAULT_SERVING_UNIT),
   );
   const [calories, setCalories] = useState(
     props.mode === 'edit'
@@ -299,14 +310,6 @@ export function FoodFormScreen(props: Props) {
               value={brand}
               onChangeText={setBrand}
             />
-            <TextInput
-              testID="food-form-barcode"
-              label="Barcode (optional)"
-              placeholder="e.g. 012345678905"
-              keyboardType="number-pad"
-              value={barcode}
-              onChangeText={setBarcode}
-            />
           </View>
         </Section>
       </AppCard>
@@ -325,17 +328,48 @@ export function FoodFormScreen(props: Props) {
               />
             </View>
             <View style={styles.cell}>
-              <TextInput
+              <Text style={styles.fieldLabel}>Serving unit</Text>
+              <Pressable
                 testID="food-form-serving-unit"
-                label="Serving unit"
-                placeholder="g"
-                value={servingUnit}
-                onChangeText={setServingUnit}
-              />
+                style={styles.unitButton}
+                onPress={() => setUnitSheetOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`Serving unit, ${servingUnitLabel(servingUnit)}`}
+              >
+                <Text style={styles.unitValue} numberOfLines={1}>
+                  {servingUnitLabel(servingUnit)}
+                </Text>
+                <Feather name="chevron-down" size={16} color={colors.textMuted} />
+              </Pressable>
             </View>
           </View>
         </Section>
       </AppCard>
+
+      <BottomSheet
+        visible={unitSheetOpen}
+        onClose={() => setUnitSheetOpen(false)}
+        testID="food-form-serving-unit-sheet"
+      >
+        <View style={styles.sheetContent}>
+          <Text style={styles.sheetTitle}>Serving unit</Text>
+          <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
+            {servingUnitOptions(servingUnit).map((option) => (
+              <OnboardingOptionCard
+                key={option.value}
+                testID={`food-form-serving-unit-${option.value}`}
+                label={option.label}
+                selected={servingUnit === option.value}
+                onPress={() => {
+                  setServingUnit(option.value);
+                  setUnitSheetOpen(false);
+                }}
+                accentColor={colors.accent}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      </BottomSheet>
 
       <AppCard>
         <Section title="Nutrition per serving">
@@ -446,6 +480,39 @@ const styles = StyleSheet.create({
   },
   cell: {
     flex: 1,
+  },
+  fieldLabel: {
+    ...typeScale.label,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  unitButton: {
+    minHeight: minTouchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+  },
+  unitValue: {
+    ...typeScale.body,
+    color: colors.textPrimary,
+    flexShrink: 1,
+  },
+  sheetContent: {
+    gap: spacing.sm,
+    padding: spacing.lg,
+  },
+  sheetTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+  },
+  sheetList: {
+    maxHeight: 420,
   },
   actions: {
     gap: spacing.sm,
