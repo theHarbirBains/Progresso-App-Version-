@@ -38,7 +38,7 @@ Layered bottom-to-top, for every theme, every screen:
 
 1. **Flat fill** — the active Background Theme's `colors.background` (one of 9 themes: Obsidian/Midnight/Forest/Plum/Starlight/Aurora/Topographic/Carbon/Particles, user-selected in Appearance settings, persisted via `BackgroundThemeContext`/`backgroundThemeStore`).
 2. **Treatment** — each theme's own restrained procedural effect (sparse stars, slow aurora wash, contour lines, carbon fiber, ambient particles, or nothing/`flat`). Still respects Reduce Motion (`useReduceMotionPreference`).
-3. **Atmosphere** — the accent glow (alpha 0.2 easing to 0 from the top-left) and the bottom shade (0 → 0.28 black), both static. The former photographs (`WorkoutBackground.png`, `NutritionBackground.png`), the photo-only depth vignette and the Nutrition foreground plant window were removed along with the `workoutImageSource` / `nutritionImageSource` theme fields.
+3. **Atmosphere** — the accent glow (alpha 0.08 easing to 0 from the top-left, tightly concentrated rather than washing most of the screen -- lowered from an earlier, more prominent 0.2 that read as too strong/neon) and the bottom shade (0 → 0.28 black), both static. The former photographs (`WorkoutBackground.png`, `NutritionBackground.png`), the photo-only depth vignette and the Nutrition foreground plant window were removed along with the `workoutImageSource` / `nutritionImageSource` theme fields.
 
 Glass surfaces (§3b) sit **above** all four of these layers — they are a foreground concern, never part of this background stack.
 

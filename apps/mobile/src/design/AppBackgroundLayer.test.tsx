@@ -71,7 +71,7 @@ describe('AppBackgroundLayer atmosphere', () => {
     render(<AppBackgroundLayer accentColor="#2F80FF" />);
 
     expect(screen.getByTestId('app-background-glow').props.colors[0]).toBe(
-      'rgba(47, 128, 255, 0.2)',
+      'rgba(47, 128, 255, 0.08)',
     );
     expect(screen.getByTestId('app-background-shade')).toBeTruthy();
     expect(opacity('app-background-atmosphere')).toBe(1);
@@ -81,7 +81,7 @@ describe('AppBackgroundLayer atmosphere', () => {
     render(<AppBackgroundLayer accentColor="#10B981" />);
 
     expect(screen.getByTestId('app-background-glow').props.colors[0]).toBe(
-      'rgba(16, 185, 129, 0.2)',
+      'rgba(16, 185, 129, 0.08)',
     );
   });
 

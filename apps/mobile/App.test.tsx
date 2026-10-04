@@ -736,18 +736,18 @@ describe('App background', () => {
   it('glows in the neutral accent on Feed by default', async () => {
     await signIn();
 
-    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.2)');
+    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.08)');
   });
 
   it('keeps glowing in the same neutral accent after visiting Nutrition, even back on Feed', async () => {
     await signIn();
     fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
     await screen.findByTestId('nutrition-today-open-menu');
-    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.2)');
+    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.08)');
 
     fireEvent.press(screen.getByTestId('bottom-nav-feed'));
     await screen.findByTestId('feed-screen');
-    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.2)');
+    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.08)');
   });
 
   it('keeps glowing in the same neutral accent once back on a Train screen', async () => {
@@ -758,7 +758,7 @@ describe('App background', () => {
     fireEvent.press(screen.getByTestId('bottom-nav-train'));
     await screen.findByTestId('workout-history-open-menu');
 
-    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.2)');
+    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.08)');
   });
 });
 

@@ -104,9 +104,9 @@ function Atmosphere({ accentColor, testIDPrefix }: { accentColor?: string; testI
       {accentColor ? (
         <LinearGradient
           testID={`${testIDPrefix}-glow`}
-          colors={[withAlpha(accentColor, 0.2), withAlpha(accentColor, 0)]}
+          colors={[withAlpha(accentColor, 0.08), withAlpha(accentColor, 0)]}
           start={{ x: 0, y: 0 }}
-          end={{ x: 0.85, y: 0.55 }}
+          end={{ x: 0.55, y: 0.35 }}
           style={StyleSheet.absoluteFill}
         />
       ) : null}
