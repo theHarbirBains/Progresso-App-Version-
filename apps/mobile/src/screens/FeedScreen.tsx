@@ -3,11 +3,11 @@ import { ActivityIndicator, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
-import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
 import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
 import { PrimaryButton, TextButton } from '../design/Button';
+import { Card } from '../design/Card';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
@@ -15,6 +15,7 @@ import { SectionHeader } from '../design/SectionHeader';
 import { StatBlock } from '../design/StatBlock';
 import { StatValue } from '../design/StatValue';
 import { colors } from '../design/theme';
+import { withAlpha } from '../theme/accentColor';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
 import { fetchFriendsFeed, listFollowNotifications, type FriendsFeedItem } from '../lib/api';
 import { formatWeightKg } from '../lib/units';
@@ -129,7 +130,8 @@ export function FeedScreen({ navigation }: Props) {
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
-  const { weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId } = useProgressTheme();
+  const { theme, weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId } =
+    useProgressTheme();
 
   const [items, setItems] = useState<FeedItem[]>([]);
   const [page, setPage] = useState(0);
@@ -494,21 +496,26 @@ export function FeedScreen({ navigation }: Props) {
       </BubbleMenu>
 
       {nextPlan ? (
-        <AppCard
-          hero
-          topAccent={colors.textPrimary}
+        <Card
+          heroColor={theme.accent}
           testID="feed-next-workout"
           onPress={() => navigation.navigate('NewWorkout')}
           accessibilityLabel={`Next workout: ${nextPlan.day.name}${
             nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
           }`}
         >
-          <Text style={styles.nextWorkoutEyebrow}>Next Workout</Text>
-          <Text style={styles.nextWorkoutDayName}>{nextPlan.day.name}</Text>
+          <Text style={[styles.nextWorkoutEyebrow, { color: withAlpha(theme.onAccent, 0.72) }]}>
+            Next Workout
+          </Text>
+          <Text style={[styles.nextWorkoutDayName, { color: theme.onAccent }]}>
+            {nextPlan.day.name}
+          </Text>
           {nextPlan.day.muscleGroups.length > 0 ? (
-            <Text style={styles.nextWorkoutMuscles}>{musclesLabel(nextPlan.day)}</Text>
+            <Text style={[styles.nextWorkoutMuscles, { color: withAlpha(theme.onAccent, 0.85) }]}>
+              {musclesLabel(nextPlan.day)}
+            </Text>
           ) : null}
-          <Text style={styles.nextWorkoutMeta}>
+          <Text style={[styles.nextWorkoutMeta, { color: withAlpha(theme.onAccent, 0.72) }]}>
             {nextPlan.previousDayName
               ? `Up next after ${nextPlan.previousDayName}`
               : "Let's get started"}
@@ -516,16 +523,23 @@ export function FeedScreen({ navigation }: Props) {
           {/* The card is the one tap target (into NewWorkoutScreen, which
               actually starts it); this is the real button, shown for the eye,
               with its own touches off -- same convention as NewWorkoutScreen's
-              own hero card. */}
+              own hero card. Inverted from the card's own accent fill: a solid
+              onAccent pill with accent-colored text, so it reads as a real
+              button against the bold hero rather than disappearing into it. */}
           <View
             style={styles.nextWorkoutAction}
             pointerEvents="none"
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
-            <PrimaryButton label="Start Workout" onPress={() => undefined} />
+            <PrimaryButton
+              label="Start Workout"
+              onPress={() => undefined}
+              accentColor={theme.onAccent}
+              onAccentColor={theme.accent}
+            />
           </View>
-        </AppCard>
+        </Card>
       ) : null}
 
       {blockingError ? (
@@ -539,7 +553,7 @@ export function FeedScreen({ navigation }: Props) {
           <View style={styles.sectionHeaderWrap}>
             <SectionHeader label="Get Started" />
           </View>
-          <AppCard testID="feed-empty-actions">
+          <Card testID="feed-empty-actions">
             <ListRow
               testID="feed-empty-action-start-workout"
               icon="activity"
@@ -563,16 +577,15 @@ export function FeedScreen({ navigation }: Props) {
               onPress={() => navigation.navigate('FindPeople')}
               divider
             />
-          </AppCard>
+          </Card>
         </View>
       ) : (
         <>
           {displayItems.map((item) =>
             item.kind === 'workout' && item.workout ? (
-              <AppCard
+              <Card
                 key={item.key}
                 testID={`feed-item-workout-${item.workout.id}`}
-                topAccent={colors.textPrimary}
                 onPress={item.onPress}
               >
                 <View style={styles.metaRow}>
@@ -634,12 +647,11 @@ export function FeedScreen({ navigation }: Props) {
                     />
                   </View>
                 </View>
-              </AppCard>
+              </Card>
             ) : item.log ? (
-              <AppCard
+              <Card
                 key={item.key}
                 testID={`feed-item-foodlog-${item.log.id}`}
-                topAccent={colors.textPrimary}
                 onPress={item.onPress}
               >
                 <View style={styles.metaRow}>
@@ -699,7 +711,7 @@ export function FeedScreen({ navigation }: Props) {
                     label="Fat"
                   />
                 </View>
-              </AppCard>
+              </Card>
             ) : null,
           )}
 

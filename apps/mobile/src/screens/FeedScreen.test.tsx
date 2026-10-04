@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
-import { AppCard } from '../design/AppCard';
+import { Card } from '../design/Card';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchFeedItems } from '../feed/feedQueries';
@@ -8,6 +8,7 @@ import { fetchFriendsFeed, getMyProfile, listFollowNotifications } from '../lib/
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
+import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
@@ -434,7 +435,7 @@ describe('FeedScreen', () => {
 });
 
 describe('FeedScreen -- Strava-style activity cards', () => {
-  it('gives every card the same neutral top accent band -- Feed is black-and-white, kind comes across via icon, not color', async () => {
+  it('never tints a regular card with an accent color -- Feed is black-and-white, kind comes across via icon, not color', async () => {
     mockGetMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
@@ -442,8 +443,8 @@ describe('FeedScreen -- Strava-style activity cards', () => {
       displayName: null,
       username: null,
       weightUnit: 'kg',
-      // Even with per-mode accent colors set, Feed never uses them --
-      // that dual-accent system stays scoped to Train/Nutrition/Profile.
+      // Even with per-mode accent colors set, a regular card never uses
+      // them -- only the one Next Workout hero does.
       workoutAccentColor: '#2F80FF',
       nutritionAccentColor: '#10B981',
     });
@@ -451,23 +452,19 @@ describe('FeedScreen -- Strava-style activity cards', () => {
     renderScreen();
     await screen.findByTestId('feed-item-foodlog-log-1');
 
-    const workoutBand = StyleSheet.flatten(
-      screen.getByTestId('feed-item-workout-w1-top-accent').props.style,
-    );
-    const foodBand = StyleSheet.flatten(
-      screen.getByTestId('feed-item-foodlog-log-1-top-accent').props.style,
-    );
-    expect(workoutBand.backgroundColor).toBe(foodBand.backgroundColor);
-    expect(workoutBand.backgroundColor).not.toBe('#2F80FF');
-    expect(workoutBand.backgroundColor).not.toBe('#10B981');
+    const workoutCard = StyleSheet.flatten(screen.getByTestId('feed-item-workout-w1').props.style);
+    const foodCard = StyleSheet.flatten(screen.getByTestId('feed-item-foodlog-log-1').props.style);
+    expect(workoutCard.backgroundColor).toBe(foodCard.backgroundColor);
+    expect(workoutCard.backgroundColor).not.toBe('#2F80FF');
+    expect(workoutCard.backgroundColor).not.toBe('#10B981');
   });
 
-  it('draws one card per item, each with its own top accent -- no plain rows', async () => {
+  it('draws one flat card per item -- no plain rows', async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, foodLogItem]));
     renderScreen();
     await screen.findByTestId('feed-item-foodlog-log-1');
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+    expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(2);
   });
 });
 
@@ -523,7 +520,7 @@ describe('FeedScreen -- merged Friends activity', () => {
     renderScreen();
     await screen.findByTestId('feed-item-workout-fw1');
 
-    const cards = screen.UNSAFE_queryAllByType(AppCard);
+    const cards = screen.UNSAFE_queryAllByType(Card);
     expect(cards[0].props.testID).toBe('feed-item-workout-fw1');
     expect(cards[1].props.testID).toBe('feed-item-workout-w1');
   });
@@ -679,5 +676,14 @@ describe('FeedScreen -- Next Workout widget', () => {
     renderScreen();
 
     expect(await screen.findByTestId('feed-next-workout')).toBeTruthy();
+  });
+
+  it("is the one card filled solid with the mode accent -- the redesign's single bold hero", async () => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
+    mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
+    renderScreen();
+
+    const card = await screen.findByTestId('feed-next-workout');
+    expect(StyleSheet.flatten(card.props.style).backgroundColor).toBe(DEFAULT_WORKOUT_THEME.accent);
   });
 });

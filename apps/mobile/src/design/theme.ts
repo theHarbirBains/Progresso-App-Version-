@@ -71,6 +71,9 @@ export const radii = {
   sm: 8,
   md: 12,
   lg: 16,
+  // Softer, more pronounced corner for the new flat Card redesign (see
+  // design/Card.tsx) -- bigger than `lg`, still well short of `pill`.
+  xl: 24,
   pill: 999,
 } as const;
 
@@ -92,19 +95,21 @@ export const spacing = {
 // individual widget carries its own outer margin.
 export const widgetGap = 6;
 
-// Loaded via useFonts() in App.tsx before anything renders. Inter carries
-// ALL text (headings, body, labels); JetBrains Mono is reserved for numeric
-// readouts only (the "readout" feel), never for prose. There is deliberately
-// no system-font text anywhere: body copy uses Inter Regular, so the app has
-// one typeface, not two competing sans-serifs. The weights below are the
-// only ones loaded -- see `Text` for how a `fontWeight` written in a style
-// resolves to one of them.
+// Loaded via useFonts() in App.tsx before anything renders. Plus Jakarta
+// Sans carries ALL text (headings, body, labels) -- warmer and closer to
+// SF Pro's character than Inter, part of the app's visual redesign (see
+// FeedScreen, the first screen on the new system); JetBrains Mono is
+// reserved for numeric readouts only (the "readout" feel), never for prose.
+// There is deliberately no system-font text anywhere: body copy uses Plus
+// Jakarta Sans Regular, so the app has one typeface, not two competing
+// sans-serifs. The weights below are the only ones loaded -- see `Text` for
+// how a `fontWeight` written in a style resolves to one of them.
 export const fonts = {
-  body: 'Inter_400Regular',
-  displayMedium: 'Inter_500Medium',
-  semibold: 'Inter_600SemiBold',
-  display: 'Inter_700Bold',
-  displayHeavy: 'Inter_800ExtraBold',
+  body: 'PlusJakartaSans_400Regular',
+  displayMedium: 'PlusJakartaSans_500Medium',
+  semibold: 'PlusJakartaSans_600SemiBold',
+  display: 'PlusJakartaSans_700Bold',
+  displayHeavy: 'PlusJakartaSans_800ExtraBold',
   mono: 'JetBrainsMono_500Medium',
   monoBold: 'JetBrainsMono_700Bold',
 } as const;

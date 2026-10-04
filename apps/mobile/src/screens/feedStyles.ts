@@ -2,14 +2,17 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 
 // FeedScreen. Token-only. The frame (safe area, header, scrolling body) is
-// the shared `Screen`; each feed item is its own widget (`AppCard`), so this
-// holds only what's inside a card.
+// the shared `Screen`; each feed item is its own widget (the redesign's flat
+// `Card`, design/Card.tsx -- the first screen on the new system; every other
+// screen still uses `AppCard`), so this holds only what's inside a card.
 //
 // Card anatomy (byline row -> bold title -> stat strip) mirrors Strava's
-// activity-card structure -- see DESIGN.md's Feed section -- kept strictly
-// black-and-white/monochrome (textPrimary/textSecondary/textMuted only, no
-// accent color) per the explicit design call: Feed distinguishes a
-// workout from a food log with an icon, not a color.
+// activity-card structure -- see DESIGN.md's Feed section. Regular cards
+// stay black-and-white/monochrome (textPrimary/textSecondary/textMuted
+// only) -- a workout vs. a food log still reads from its icon, not a color
+// -- restrained accent use is the point: the one Next Workout hero is the
+// only place accent appears, filled solid rather than every card carrying
+// a tinted band.
 export const feedStyles = StyleSheet.create({
   content: {
     gap: widgetGap,
@@ -24,26 +27,24 @@ export const feedStyles = StyleSheet.create({
     paddingHorizontal: 6,
   },
 
-  // The "Next Workout" widget pinned above everything else -- same hero
-  // anatomy as NewWorkoutScreen's own version of this card (eyebrow, day
-  // name, muscles, a meta line, a non-interactive "button" for the eye).
+  // The "Next Workout" widget pinned above everything else -- the redesign's
+  // one bold hero, filled solid with the mode accent (see Card's `heroColor`)
+  // rather than a neutral surface, so these are layout-only: color comes
+  // from `theme.onAccent` at render time (FeedScreen), since it has to
+  // invert for a light vs. dark accent.
   nextWorkoutEyebrow: {
     ...typeScale.sectionHeading,
-    color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
   nextWorkoutDayName: {
     ...typeScale.screenTitle,
-    color: colors.textPrimary,
   },
   nextWorkoutMuscles: {
     ...typeScale.secondary,
-    color: colors.textSecondaryBright,
     marginTop: 2,
   },
   nextWorkoutMeta: {
     ...typeScale.secondary,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
   },
   nextWorkoutAction: {

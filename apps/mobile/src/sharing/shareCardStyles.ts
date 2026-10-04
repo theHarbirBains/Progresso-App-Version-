@@ -3,7 +3,7 @@ import { colors, radii, spacing, typeScale } from '../design/theme';
 
 // The shareable workout image (ShareCard) and the screen around it. Token-only.
 //
-// The card is deliberately minimal and clinical: near-black, Inter, mono
+// The card is deliberately minimal and clinical: near-black, Plus Jakarta Sans, mono
 // numerals, hairlines, one accent colour (the user's Workout accent, supplied
 // per render) used only for personal records. It is a PNG that leaves the app,
 // so it always paints the static Progresso palette rather than a Background
