@@ -136,7 +136,6 @@ describe('ExerciseLibraryScreen', () => {
         search: '',
         muscleGroup: null,
         source: 'all',
-        ascending: true,
       }),
     );
     await settle();
@@ -234,43 +233,6 @@ describe('ExerciseLibraryScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('exercise-library-count')).toHaveTextContent('1 exercise');
-    await settle();
-  });
-
-  it('toggles sort order and refetches when the sort control is pressed', async () => {
-    renderScreen();
-    await screen.findByTestId('exercise-item-ex-builtin');
-    mockFetchAllExercises.mockClear();
-
-    fireEvent.press(screen.getByTestId('exercise-library-sort'));
-
-    await waitFor(() =>
-      expect(mockFetchAllExercises).toHaveBeenCalledWith(
-        expect.objectContaining({ ascending: false }),
-      ),
-    );
-    expect(screen.getByTestId('exercise-library-sort')).toHaveTextContent(/Z → A/);
-    await settle();
-  });
-
-  it("jumps to a letter's section when its index-rail entry is pressed", async () => {
-    renderScreen();
-    await screen.findByTestId('exercise-item-ex-builtin');
-
-    // Only asserts the rail is wired up and doesn't throw -- SectionList's
-    // own scrollToLocation isn't meaningfully observable in this test
-    // environment (no real layout/scroll measurements).
-    expect(() => fireEvent.press(screen.getByTestId('exercise-library-index-M'))).not.toThrow();
-    await settle();
-  });
-
-  it('does not call onSelect for a letter with no exercises', async () => {
-    renderScreen();
-    await screen.findByTestId('exercise-item-ex-builtin');
-
-    expect(screen.getByTestId('exercise-library-index-Z').props.accessibilityState.disabled).toBe(
-      true,
-    );
     await settle();
   });
 
@@ -464,19 +426,13 @@ describe('ExerciseLibraryScreen -- two widgets, source blocks, New Exercise in t
     await settle();
   });
 
-  it('gives each source tab and the sort control a comfortable touch target', async () => {
+  it('gives each source tab a comfortable touch target', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
     expect(
       StyleSheet.flatten(screen.getByTestId('exercise-source-all').props.style).minHeight,
     ).toBeGreaterThanOrEqual(44);
-    expect(
-      StyleSheet.flatten(screen.getByTestId('exercise-library-sort').props.style).minHeight,
-    ).toBeGreaterThanOrEqual(44);
-    expect(screen.getByTestId('exercise-library-sort').props.accessibilityLabel).toBe(
-      'Toggle sort order',
-    );
     await settle();
   });
 

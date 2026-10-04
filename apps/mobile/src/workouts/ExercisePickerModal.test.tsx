@@ -32,6 +32,7 @@ beforeEach(() => {
         id: 'ex1',
         name: 'Barbell Bench Press',
         muscleGroup: 'chest',
+        movementType: 'bilateral',
         isActive: true,
         createdBy: null,
       },
@@ -39,6 +40,7 @@ beforeEach(() => {
         id: 'ex2',
         name: 'Barbell Back Squat',
         muscleGroup: 'quadriceps',
+        movementType: 'bilateral',
         isActive: true,
         createdBy: null,
       },
@@ -62,7 +64,7 @@ describe('ExercisePickerModal', () => {
 
     const item = await screen.findByTestId('exercise-picker-item-ex1');
     expect(within(item).getByText('Barbell Bench Press')).toBeTruthy();
-    expect(within(item).getByText('Chest')).toBeTruthy();
+    expect(within(item).getByText('Chest · Bilateral')).toBeTruthy();
   });
 
   // Regression guard: the muscle-group filter row was sitting flush against
@@ -298,15 +300,36 @@ describe('ExercisePickerModal -- one list of plain rows', () => {
     expect(StyleSheet.flatten(row.props.style).borderTopWidth).toBe(StyleSheet.hairlineWidth);
   });
 
-  it('describes each row by name and muscle group, and says when it is already added', async () => {
+  it('describes each row by name, muscle group and movement type, and says when it is already added', async () => {
     renderPicker(['ex2']);
     const open = await screen.findByTestId('exercise-picker-item-ex1');
     const added = screen.getByTestId('exercise-picker-item-ex2');
 
-    expect(open.props.accessibilityLabel).toBe('Barbell Bench Press, Chest');
-    expect(added.props.accessibilityLabel).toBe('Barbell Back Squat, Quadriceps, already added');
+    expect(open.props.accessibilityLabel).toBe('Barbell Bench Press, Chest, Bilateral');
+    expect(added.props.accessibilityLabel).toBe(
+      'Barbell Back Squat, Quadriceps, Bilateral, already added',
+    );
     expect(added.props.accessibilityState.disabled).toBe(true);
     expect(open.props.accessibilityState.disabled).toBe(false);
+  });
+
+  it('shows a unilateral exercise is unilateral', async () => {
+    mockFetchExercises.mockResolvedValue({
+      rows: [
+        {
+          id: 'ex3',
+          name: 'Single-Arm Row',
+          muscleGroup: 'back',
+          movementType: 'unilateral',
+          isActive: true,
+          createdBy: null,
+        },
+      ],
+      hasMore: false,
+    });
+    renderPicker();
+
+    expect(await screen.findByTestId('exercise-picker-item-ex3')).toHaveTextContent(/Unilateral/);
   });
 
   it('labels the search field for assistive tech', async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   SectionList,
@@ -9,10 +9,8 @@ import {
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
-import { AlphabetIndexRail } from '../design/AlphabetIndexRail';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
@@ -27,10 +25,7 @@ import {
   type ExerciseSource,
   type ExerciseSourceCounts,
 } from '../exercises/exerciseQueries';
-import {
-  ALPHABET_INDEX_LETTERS,
-  groupExercisesByLetter,
-} from '../exercises/exerciseLibraryGrouping';
+import { groupExercisesByLetter } from '../exercises/exerciseLibraryGrouping';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
 import { MOVEMENT_TYPE_LABELS } from '../exercises/movementTypes';
@@ -54,20 +49,19 @@ const SOURCE_OPTIONS: { value: ExerciseSource; label: string }[] = [
 ];
 
 // The Workout Mode "browse every exercise" screen -- built-ins plus the
-// user's own custom exercises, searchable/filterable/sortable, sectioned
-// alphabetically (A-Z, like iOS Contacts) with a jump-to-letter index on the
-// right, the same treatment FoodLibraryScreen already uses -- a jump index
-// needs the whole (filtered) result set up front, so this loads everything
-// matching the current filters rather than paging (see fetchAllExercises).
+// user's own custom exercises, searchable/filterable, sectioned
+// alphabetically (A-Z, like iOS Contacts) -- always A-Z, since this loads
+// everything matching the current filters rather than paging (see
+// fetchAllExercises).
 //
 // Layout: two widgets `widgetGap` apart. The browse widget holds search, the
 // muscle filter and an All / Built-in / Mine block row with the real
-// per-source totals; the list widget holds the count and sort control, then
-// the exercises as rows under letter headings -- each with its machine photo
-// (or a plain initial, "like a contact photo" -- see ExercisePhoto), name,
-// "Muscle · Movement", and a quiet Built-in/Mine marker, with the A-Z rail on
-// the right. New Exercise is the header's "+". Your own exercises open for
-// editing; built-ins are read-only.
+// per-source totals; the list widget holds the count, then the exercises as
+// rows under letter headings -- each with its machine photo (or a plain
+// initial, "like a contact photo" -- see ExercisePhoto), name,
+// "Muscle · Movement", and a quiet Built-in/Mine marker. New Exercise is the
+// header's "+". Your own exercises open for editing; built-ins are
+// read-only.
 export function ExerciseLibraryScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
@@ -82,12 +76,9 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   const [search, setSearch] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(null);
   const [source, setSource] = useState<ExerciseSource>('all');
-  const [ascending, setAscending] = useState(true);
   const [rows, setRows] = useState<ExerciseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeLetter, setActiveLetter] = useState<string | undefined>(undefined);
-  const sectionListRef = useRef<SectionList<ExerciseRow, { title: string }>>(null);
   // Real, independent per-source totals for the "All / Built-in / Mine"
   // category cards (see fetchExerciseSourceCounts) -- never fabricated, and
   // never derived from `rows`, which only reflects the CURRENT search/filter,
@@ -107,14 +98,14 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchAllExercises({ userId, search, muscleGroup, source, ascending });
+      const result = await fetchAllExercises({ userId, search, muscleGroup, source });
       setRows(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load exercises');
     } finally {
       setLoading(false);
     }
-  }, [userId, search, muscleGroup, source, ascending]);
+  }, [userId, search, muscleGroup, source]);
 
   useEffect(() => {
     void load();
@@ -143,27 +134,8 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   }
 
   const sections = useMemo(() => groupExercisesByLetter(rows), [rows]);
-  const availableLetters = useMemo(
-    () => new Set(sections.map((section) => section.letter)),
-    [sections],
-  );
   const listSections = useMemo(
     () => sections.map((section) => ({ title: section.letter, data: section.data })),
-    [sections],
-  );
-
-  const jumpToLetter = useCallback(
-    (letter: string) => {
-      const sectionIndex = sections.findIndex((section) => section.letter === letter);
-      if (sectionIndex === -1) return;
-      setActiveLetter(letter);
-      sectionListRef.current?.scrollToLocation({
-        sectionIndex,
-        itemIndex: 0,
-        viewPosition: 0,
-        animated: true,
-      });
-    },
     [sections],
   );
 
@@ -324,12 +296,6 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
           <Text testID="exercise-library-count" style={styles.countText}>
             {rows.length} {rows.length === 1 ? 'exercise' : 'exercises'}
           </Text>
-          <TextButton
-            testID="exercise-library-sort"
-            label={`Sort: ${ascending ? 'A → Z' : 'Z → A'}`}
-            accessibilityLabel="Toggle sort order"
-            onPress={() => setAscending((prev) => !prev)}
-          />
         </View>
 
         {error ? (
@@ -347,32 +313,14 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         ) : (
           <View style={styles.flex}>
             <SectionList
-              ref={sectionListRef}
               testID="exercise-library-list-section"
               sections={listSections}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               renderSectionHeader={renderSectionHeader}
               renderItem={renderItem}
-              onScrollToIndexFailed={() => {
-                // A section can be shorter than the viewport at the very end
-                // of the list; retry is unnecessary since scrollToLocation
-                // already handles this internally on modern RN -- this is
-                // just a safety net against the dev-only warning.
-              }}
             />
-            <View style={styles.indexRailWrap} pointerEvents="box-none">
-              <AlphabetIndexRail
-                testID="exercise-library-index"
-                letters={ALPHABET_INDEX_LETTERS}
-                availableLetters={availableLetters}
-                activeLetter={activeLetter}
-                onSelect={jumpToLetter}
-                accentColor={theme.accent}
-              />
-            </View>
           </View>
         )}
       </AppCard>

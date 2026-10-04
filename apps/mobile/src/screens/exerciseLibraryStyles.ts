@@ -1,14 +1,12 @@
 import { StyleSheet } from 'react-native';
 import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
-const INDEX_RAIL_WIDTH = 20;
-
 // ExerciseLibraryScreen's list/browse view. Token-only; the screen frame
 // (safe area, header, scrolling body) is the shared `Screen`, the page is two
 // widgets (`AppCard`) `widgetGap` apart, and each exercise is a `ListRow`
 // under an A-Z `SectionHeader` (same list anatomy as FoodLibraryScreen's own
 // A-Z library), so this file only holds what those don't cover: the filter
-// block, the source blocks, and the section-list/rail geometry.
+// block, the source blocks, and the section-list geometry.
 export const exerciseLibraryStyles = StyleSheet.create({
   flex: {
     flex: 1,
@@ -24,9 +22,6 @@ export const exerciseLibraryStyles = StyleSheet.create({
   listCard: {
     flex: 1,
   },
-  listContent: {
-    paddingRight: INDEX_RAIL_WIDTH,
-  },
   // An exercise row: the ListRow (opens it for editing when it's the user's
   // own) beside its photo/initial; consecutive rows in a section are
   // separated by a hairline.
@@ -37,13 +32,6 @@ export const exerciseLibraryStyles = StyleSheet.create({
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.divider,
-  },
-  indexRailWrap: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
 
   searchWrap: {

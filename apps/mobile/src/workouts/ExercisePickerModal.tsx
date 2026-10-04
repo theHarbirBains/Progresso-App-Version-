@@ -8,6 +8,7 @@ import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import { fetchExercises, type ExerciseRow } from '../exercises/exerciseQueries';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
+import { MOVEMENT_TYPE_LABELS } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
@@ -85,12 +86,12 @@ export function ExercisePickerModal({
         <ListRow
           testID={`exercise-picker-item-${item.id}`}
           title={`${item.name}${added ? ' (added)' : ''}`}
-          subtitle={MUSCLE_GROUP_LABELS[item.muscleGroup]}
+          subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
           chevron={false}
           divider
           disabled={added}
           onPress={() => onSelect(item)}
-          accessibilityLabel={`${item.name}, ${MUSCLE_GROUP_LABELS[item.muscleGroup]}${added ? ', already added' : ''}`}
+          accessibilityLabel={`${item.name}, ${MUSCLE_GROUP_LABELS[item.muscleGroup]}, ${MOVEMENT_TYPE_LABELS[item.movementType]}${added ? ', already added' : ''}`}
         />
       );
     },
