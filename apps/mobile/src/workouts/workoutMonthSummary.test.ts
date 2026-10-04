@@ -14,6 +14,8 @@ function workout(overrides: Partial<EnrichedWorkoutSummary>): EnrichedWorkoutSum
     totalVolumeKg: 0,
     durationMinutes: 0,
     exerciseCount: 0,
+    completedExerciseCount: 0,
+    topSets: [],
     ...overrides,
   };
 }

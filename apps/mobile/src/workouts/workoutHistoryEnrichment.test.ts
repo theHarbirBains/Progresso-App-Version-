@@ -75,16 +75,52 @@ describe('enrichWorkoutSummaries', () => {
       },
       workout_exercises: {
         data: [
-          { id: 'we1', workout_id: 'w1' },
-          { id: 'we2', workout_id: 'w1' },
+          {
+            id: 'we1',
+            workout_id: 'w1',
+            exercise_id: 'bench',
+            order_index: 1,
+            exercises: { name: 'Bench Press' },
+          },
+          {
+            id: 'we2',
+            workout_id: 'w1',
+            exercise_id: 'curl',
+            order_index: 2,
+            exercises: { name: 'Curl' },
+          },
         ],
         error: null,
       },
       sets: {
         data: [
-          { workout_exercise_id: 'we1', weight_kg: 100, reps: 5 },
-          { workout_exercise_id: 'we1', weight_kg: 80, reps: 8 },
-          { workout_exercise_id: 'we2', weight_kg: 60, reps: 10 },
+          {
+            id: 's1',
+            workout_exercise_id: 'we1',
+            set_index: 1,
+            side: 'none',
+            weight_kg: 100,
+            reps: 5,
+            completed_at: '2026-09-05T00:30:00Z',
+          },
+          {
+            id: 's2',
+            workout_exercise_id: 'we1',
+            set_index: 2,
+            side: 'none',
+            weight_kg: 80,
+            reps: 8,
+            completed_at: '2026-09-05T00:35:00Z',
+          },
+          {
+            id: 's3',
+            workout_exercise_id: 'we2',
+            set_index: 1,
+            side: 'none',
+            weight_kg: 60,
+            reps: 10,
+            completed_at: '2026-09-05T00:40:00Z',
+          },
         ],
         error: null,
       },
@@ -106,6 +142,12 @@ describe('enrichWorkoutSummaries', () => {
         totalVolumeKg: 1740,
         durationMinutes: 60,
         exerciseCount: 2,
+        completedExerciseCount: 2,
+        // Heaviest completed set per exercise: 100x5 (not 80x8), and 60x10.
+        topSets: [
+          { exerciseId: 'bench', exerciseName: 'Bench Press', weightKg: 100, reps: 5 },
+          { exerciseId: 'curl', exerciseName: 'Curl', weightKg: 60, reps: 10 },
+        ],
       },
     ]);
   });

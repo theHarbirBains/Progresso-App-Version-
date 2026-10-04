@@ -18,7 +18,6 @@ import { colors } from '../design/theme';
 import { withAlpha } from '../theme/accentColor';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
 import { fetchFriendsFeed, listFollowNotifications, type FriendsFeedItem } from '../lib/api';
-import { formatWeightKg } from '../lib/units';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { mealTypeLabel, type MealType } from '../nutrition/mealTypes';
@@ -26,13 +25,8 @@ import { FoodImage } from '../nutrition/FoodImage';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
-import {
-  computeWorkoutTopSets,
-  countCompletedExercises,
-  type WorkoutTopSet,
-} from '../workouts/recentWorkoutTopSets';
-import { fetchWorkoutDetail } from '../workouts/workoutQueries';
 import { RecentWorkoutTopSets } from '../feed/RecentWorkoutTopSets';
+import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import {
@@ -71,6 +65,8 @@ interface DisplayItem {
     exerciseCount: number;
     completedSetCount: number;
     totalVolumeKg: number;
+    completedExerciseCount: number;
+    topSets: WorkoutTopSet[];
   };
   log?: {
     id: string;
@@ -182,29 +178,6 @@ export function FeedScreen({ navigation }: Props) {
   const hasLoadedOnce = useRef(false);
   const hasLoadedFriendsOnce = useRef(false);
 
-  // The signed-in user's most recent completed workout, expanded with its
-  // exercises and sets -- only ever fetched for that one workout, and only
-  // to drive its own card's Top Sets strip. A failure just leaves the strip
-  // out, same as the other preview widgets on this screen.
-  const [recentTopSets, setRecentTopSets] = useState<{
-    workoutId: string;
-    completedExerciseCount: number;
-    topSets: WorkoutTopSet[];
-  } | null>(null);
-
-  const loadRecentWorkoutTopSets = useCallback(async (workoutId: string) => {
-    try {
-      const detail = await fetchWorkoutDetail(workoutId);
-      setRecentTopSets({
-        workoutId,
-        completedExerciseCount: countCompletedExercises(detail.exercises),
-        topSets: computeWorkoutTopSets(detail.exercises),
-      });
-    } catch {
-      setRecentTopSets(null);
-    }
-  }, []);
-
   const load = useCallback(async () => {
     if (!userId) return;
     if (!hasLoadedOnce.current) setLoading(true);
@@ -214,19 +187,13 @@ export function FeedScreen({ navigation }: Props) {
       setItems(result.items);
       setHasMore(result.hasMore);
       setPage(0);
-      const latestWorkout = result.items.find((item) => item.kind === 'workout');
-      if (latestWorkout && latestWorkout.kind === 'workout') {
-        void loadRecentWorkoutTopSets(latestWorkout.workout.id);
-      } else {
-        setRecentTopSets(null);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load your feed');
     } finally {
       setLoading(false);
       hasLoadedOnce.current = true;
     }
-  }, [userId, loadRecentWorkoutTopSets]);
+  }, [userId]);
 
   const loadFriends = useCallback(async () => {
     if (!accessToken) return;
@@ -373,6 +340,8 @@ export function FeedScreen({ navigation }: Props) {
             exerciseCount: item.workout.exerciseCount,
             completedSetCount: item.workout.completedSetCount,
             totalVolumeKg: item.workout.totalVolumeKg,
+            completedExerciseCount: item.workout.completedExerciseCount,
+            topSets: item.workout.topSets,
           },
         }
       : {
@@ -414,6 +383,8 @@ export function FeedScreen({ navigation }: Props) {
             exerciseCount: item.workout.exerciseCount,
             completedSetCount: item.workout.completedSetCount,
             totalVolumeKg: item.workout.totalVolumeKg,
+            completedExerciseCount: item.workout.completedExerciseCount,
+            topSets: item.workout.topSets,
           },
         }
       : {
@@ -459,10 +430,6 @@ export function FeedScreen({ navigation }: Props) {
   // and nutrition goals is one lightweight row fetch.
   const notificationBadgeCount =
     pendingRequestCount + (activeWorkoutSplitId === null ? 1 : 0) + (nutritionGoalsMissing ? 1 : 0);
-
-  const latestOwnWorkoutId =
-    items.find((item): item is Extract<FeedItem, { kind: 'workout' }> => item.kind === 'workout')
-      ?.workout.id ?? null;
 
   function retryAll() {
     void load();
@@ -661,65 +628,28 @@ export function FeedScreen({ navigation }: Props) {
                   </Text>
                 ) : null}
 
-                {item.workout.id === latestOwnWorkoutId ? (
-                  <>
-                    <View style={styles.statRow}>
-                      <StatBlock
-                        testID={`feed-item-workout-${item.workout.id}-duration`}
-                        value={formatCardDuration(item.workout.durationMinutes)}
-                        label="Duration"
-                      />
-                      <StatBlock
-                        testID={`feed-item-workout-${item.workout.id}-exercises`}
-                        value={
-                          recentTopSets?.workoutId === item.workout.id
-                            ? String(recentTopSets.completedExerciseCount)
-                            : '--'
-                        }
-                        label="Exercises"
-                      />
-                      <StatBlock
-                        testID={`feed-item-workout-${item.workout.id}-sets`}
-                        value={String(item.workout.completedSetCount)}
-                        label="Sets"
-                      />
-                    </View>
-                    {recentTopSets?.workoutId === item.workout.id ? (
-                      <RecentWorkoutTopSets
-                        testID={`feed-item-workout-${item.workout.id}-top-sets`}
-                        topSets={recentTopSets.topSets}
-                        weightUnit={weightUnit}
-                      />
-                    ) : null}
-                  </>
-                ) : (
-                  <View style={styles.statGrid}>
-                    <View style={styles.statRow}>
-                      <StatBlock
-                        testID={`feed-item-workout-${item.workout.id}-duration`}
-                        value={formatCardDuration(item.workout.durationMinutes)}
-                        label="Duration"
-                      />
-                      <StatBlock
-                        testID={`feed-item-workout-${item.workout.id}-exercises`}
-                        value={String(item.workout.exerciseCount)}
-                        label={item.workout.exerciseCount === 1 ? 'Exercise' : 'Exercises'}
-                      />
-                    </View>
-                    <View style={styles.statRow}>
-                      <StatBlock
-                        testID={`feed-item-workout-${item.workout.id}-sets`}
-                        value={String(item.workout.completedSetCount)}
-                        label="Sets"
-                      />
-                      <StatBlock
-                        testID={`feed-item-workout-${item.workout.id}-volume`}
-                        value={formatWeightKg(item.workout.totalVolumeKg, weightUnit)}
-                        label={`Volume (${weightUnit})`}
-                      />
-                    </View>
-                  </View>
-                )}
+                <View style={styles.statRow}>
+                  <StatBlock
+                    testID={`feed-item-workout-${item.workout.id}-duration`}
+                    value={formatCardDuration(item.workout.durationMinutes)}
+                    label="Duration"
+                  />
+                  <StatBlock
+                    testID={`feed-item-workout-${item.workout.id}-exercises`}
+                    value={String(item.workout.completedExerciseCount)}
+                    label={item.workout.completedExerciseCount === 1 ? 'Exercise' : 'Exercises'}
+                  />
+                  <StatBlock
+                    testID={`feed-item-workout-${item.workout.id}-sets`}
+                    value={String(item.workout.completedSetCount)}
+                    label="Sets"
+                  />
+                </View>
+                <RecentWorkoutTopSets
+                  testID={`feed-item-workout-${item.workout.id}-top-sets`}
+                  topSets={item.workout.topSets}
+                  weightUnit={weightUnit}
+                />
               </Card>
             ) : item.log ? (
               <Card

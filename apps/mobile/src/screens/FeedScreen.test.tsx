@@ -9,7 +9,6 @@ import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
-import { fetchWorkoutDetail } from '../workouts/workoutQueries';
 import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
@@ -38,14 +37,6 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
   fetchWorkoutSplitDetail: jest.fn(),
   fetchLastWorkoutSplitDayId: jest.fn(),
 }));
-
-jest.mock('../workouts/workoutQueries', () => ({
-  fetchWorkoutDetail: jest.fn(),
-  // Real (pure, no supabase dependency) implementation.
-  ...jest.requireActual('../workouts/setCompletion'),
-}));
-
-const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
@@ -88,6 +79,11 @@ const workoutItem = {
     totalVolumeKg: 1000,
     durationMinutes: 60,
     exerciseCount: 4,
+    completedExerciseCount: 2,
+    topSets: [
+      { exerciseId: 'bench', exerciseName: 'Bench Press', weightKg: 225, reps: 8 },
+      { exerciseId: 'pulldown', exerciseName: 'Lat Pulldown', weightKg: 160, reps: 10 },
+    ],
   },
 };
 
@@ -107,6 +103,8 @@ const olderWorkoutItem = {
     totalVolumeKg: 800,
     durationMinutes: 45,
     exerciseCount: 3,
+    completedExerciseCount: 3,
+    topSets: [],
   },
 };
 
@@ -165,7 +163,6 @@ beforeEach(() => {
     activeWorkoutSplitId: 'split-1',
   });
   mockFetchFeedItems.mockReset().mockResolvedValue(feedPage([]));
-  mockFetchWorkoutDetail.mockReset().mockRejectedValue(new Error('no detail'));
   mockFetchFriendsFeed.mockReset().mockResolvedValue(feedPage([]));
   mockListFollowNotifications.mockReset().mockResolvedValue([]);
   mockFetchNutritionGoals
@@ -221,81 +218,64 @@ describe('FeedScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('FindPeople');
   });
 
-  it('shows the most recent workout as a card: split day, muscles, duration, exercises and sets -- no volume', async () => {
-    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
-    renderScreen();
-
-    const card = within(await screen.findByTestId('feed-item-workout-w1'));
-    expect(card.getByText('Push')).toBeTruthy();
-    expect(card.getByText(/Chest.*Shoulders/)).toBeTruthy();
-    expect(screen.getByTestId('feed-item-workout-w1-duration')).toHaveTextContent(/1h/);
-    expect(screen.getByTestId('feed-item-workout-w1-sets')).toHaveTextContent(/12/);
-    expect(screen.queryByTestId('feed-item-workout-w1-volume')).toBeNull();
-  });
-
-  it('keeps the original 2x2 grid, volume included, for an older workout', async () => {
+  it('shows every own workout card the same way: duration, completed exercises, sets and a top sets strip -- no volume', async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, olderWorkoutItem]));
     renderScreen();
 
     await screen.findByTestId('feed-item-workout-w0');
-    expect(screen.getByTestId('feed-item-workout-w0-volume')).toBeTruthy();
-    expect(screen.getByTestId('feed-item-workout-w0-exercises')).toBeTruthy();
-    expect(screen.queryByTestId('feed-item-workout-w0-top-sets')).toBeNull();
-  });
-
-  it('shows the completed exercise count and a Top Sets strip for the most recent workout, from its real sets', async () => {
-    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
-    mockFetchWorkoutDetail.mockResolvedValue({
-      id: 'w1',
-      exercises: [
-        {
-          id: 'we-bench',
-          exerciseId: 'bench',
-          exerciseName: 'Bench Press',
-          muscleGroup: 'chest',
-          movementType: 'bilateral',
-          loggingStyle: null,
-          orderIndex: 1,
-          sets: [
-            { id: 's1', setIndex: 1, weightKg: 200, reps: 5, completedAt: '2026-01-01T12:00:00Z' },
-            { id: 's2', setIndex: 2, weightKg: 225, reps: 8, completedAt: '2026-01-01T12:05:00Z' },
-            { id: 's3', setIndex: 3, weightKg: 300, reps: 1, completedAt: null },
-          ],
-        },
-        {
-          id: 'we-pulldown',
-          exerciseId: 'pulldown',
-          exerciseName: 'Lat Pulldown',
-          muscleGroup: 'back',
-          movementType: 'bilateral',
-          loggingStyle: null,
-          orderIndex: 2,
-          sets: [
-            { id: 's4', setIndex: 1, weightKg: 160, reps: 10, completedAt: '2026-01-01T12:10:00Z' },
-          ],
-        },
-        {
-          id: 'we-empty',
-          exerciseId: 'empty',
-          exerciseName: 'Curl',
-          muscleGroup: 'biceps',
-          movementType: 'bilateral',
-          loggingStyle: null,
-          orderIndex: 3,
-          sets: [{ id: 's5', setIndex: 1, weightKg: null, reps: null, completedAt: null }],
-        },
-      ],
-    });
-    renderScreen();
-
-    expect(await screen.findByTestId('feed-item-workout-w1-top-sets')).toBeTruthy();
+    expect(screen.getByTestId('feed-item-workout-w1-duration')).toHaveTextContent(/1h/);
+    expect(screen.getByTestId('feed-item-workout-w1-sets')).toHaveTextContent(/12/);
     expect(screen.getByTestId('feed-item-workout-w1-exercises')).toHaveTextContent('2', {
       exact: false,
     });
+    expect(screen.queryByTestId('feed-item-workout-w1-volume')).toBeNull();
+    expect(screen.queryByTestId('feed-item-workout-w0-volume')).toBeNull();
+    expect(screen.getByTestId('feed-item-workout-w0-top-sets-empty')).toBeTruthy();
+  });
+
+  it("shows each workout's own top sets, one slide per exercise with a real top set", async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-item-workout-w1-top-sets')).toBeTruthy();
     expect(screen.getByText('Bench Press')).toBeTruthy();
     expect(screen.getByText('225 kg × 8')).toBeTruthy();
-    expect(screen.queryByText('Curl')).toBeNull();
-    expect(mockFetchWorkoutDetail).toHaveBeenCalledWith('w1');
+    expect(screen.getByText('Lat Pulldown')).toBeTruthy();
+  });
+
+  it("shows a friend's workout card with the same stats and top sets strip", async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([]));
+    mockFetchFriendsFeed.mockResolvedValue(
+      feedPage([
+        {
+          kind: 'workout' as const,
+          id: 'workout-fw1',
+          timestamp: '2026-01-02T13:00:00Z',
+          author: { id: 'user-2', username: 'jane', displayName: 'Jane Doe', avatarUrl: null },
+          workout: {
+            id: 'fw1',
+            name: 'Pull Day',
+            splitDayName: 'Pull',
+            muscleGroups: ['back' as const],
+            durationMinutes: 50,
+            exerciseCount: 5,
+            completedSetCount: 15,
+            totalVolumeKg: 1200,
+            completedExerciseCount: 5,
+            topSets: [{ exerciseId: 'row', exerciseName: 'Barbell Row', weightKg: 135, reps: 6 }],
+          },
+        },
+      ]),
+    );
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-item-workout-fw1-top-sets')).toBeTruthy();
+    expect(screen.getByTestId('feed-item-workout-fw1-exercises')).toHaveTextContent('5', {
+      exact: false,
+    });
+    expect(screen.getByText('Barbell Row')).toBeTruthy();
+    expect(screen.getByText('135 kg × 6')).toBeTruthy();
+    expect(screen.queryByTestId('feed-item-workout-fw1-volume')).toBeNull();
   });
 
   it("shows the account's own name and picture as each card's byline", async () => {
@@ -557,6 +537,8 @@ describe('FeedScreen -- merged Friends activity', () => {
       exerciseCount: 5,
       completedSetCount: 15,
       totalVolumeKg: 1200,
+      completedExerciseCount: 5,
+      topSets: [{ exerciseId: 'row', exerciseName: 'Barbell Row', weightKg: 135, reps: 6 }],
     },
   };
 

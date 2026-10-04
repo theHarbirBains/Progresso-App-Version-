@@ -154,6 +154,77 @@ describe('FeedService', () => {
       });
     });
 
+    it('gives each followee workout its completed-exercise count and per-exercise top sets, from its real sets', async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
+      client.queue('workouts', {
+        data: [
+          {
+            id: 'w1',
+            user_id: 'user-2',
+            name: 'Push Day',
+            performed_at: '2026-09-20T10:00:00.000Z',
+            completed_at: '2026-09-20T11:00:00.000Z',
+            workout_split_day_id: null,
+          },
+        ],
+        error: null,
+      });
+      client.queue('workout_exercises', {
+        data: [
+          {
+            id: 'we-bench',
+            workout_id: 'w1',
+            exercise_id: 'bench',
+            order_index: 1,
+            exercises: { name: 'Bench Press' },
+          },
+          {
+            id: 'we-curl',
+            workout_id: 'w1',
+            exercise_id: 'curl',
+            order_index: 2,
+            exercises: { name: 'Curl' },
+          },
+          {
+            id: 'we-empty',
+            workout_id: 'w1',
+            exercise_id: 'empty',
+            order_index: 3,
+            exercises: { name: 'Row' },
+          },
+        ],
+        error: null,
+      });
+      client.queue('sets', {
+        data: [
+          { id: 's1', workout_exercise_id: 'we-bench', set_index: 1, weight_kg: 200, reps: 5 },
+          { id: 's2', workout_exercise_id: 'we-bench', set_index: 2, weight_kg: 225, reps: 8 },
+          { id: 's3', workout_exercise_id: 'we-curl', set_index: 1, weight_kg: 30, reps: 10 },
+        ],
+        error: null,
+      });
+      client.queue('food_logs', { data: [], error: null });
+      client.queue('users', {
+        data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const result = await service.getFriendsFeed('user-1', 0);
+
+      expect(result.items[0]).toMatchObject({
+        kind: 'workout',
+        workout: {
+          completedExerciseCount: 2,
+          topSets: [
+            { exerciseId: 'bench', exerciseName: 'Bench Press', weightKg: 225, reps: 8 },
+            { exerciseId: 'curl', exerciseName: 'Curl', weightKg: 30, reps: 10 },
+          ],
+        },
+      });
+    });
+
     it('skips food logs on pages after the first', async () => {
       const client = createMockClient();
       client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });

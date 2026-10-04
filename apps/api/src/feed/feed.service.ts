@@ -20,6 +20,8 @@ export type FeedItem =
         exerciseCount: number;
         completedSetCount: number;
         totalVolumeKg: number;
+        completedExerciseCount: number;
+        topSets: { exerciseId: string; exerciseName: string; weightKg: number; reps: number }[];
       };
     }
   | {
@@ -121,6 +123,8 @@ export class FeedService {
             exerciseCount: workout.exerciseCount,
             completedSetCount: workout.completedSetCount,
             totalVolumeKg: workout.totalVolumeKg,
+            completedExerciseCount: workout.completedExerciseCount,
+            topSets: workout.topSets,
           },
         });
       }
@@ -206,15 +210,25 @@ export class FeedService {
     const workoutIds = workouts.map((w) => w.id);
     const { data: workoutExercises, error: weError } = await client
       .from('workout_exercises')
-      .select('id, workout_id')
+      .select('id, workout_id, exercise_id, order_index, exercises(name)')
       .in('workout_id', workoutIds)
       .is('deleted_at', null);
     if (weError) throw new InternalServerErrorException('Failed to load friends feed');
 
     const workoutIdByExerciseId = new Map<string, string>();
     const exerciseCountByWorkoutId = new Map<string, number>();
+    const exerciseInfoById = new Map<
+      string,
+      { exerciseId: string; exerciseName: string; orderIndex: number }
+    >();
     for (const we of workoutExercises ?? []) {
       workoutIdByExerciseId.set(we.id as string, we.workout_id as string);
+      const embedded = we.exercises as unknown as { name: string } | null;
+      exerciseInfoById.set(we.id as string, {
+        exerciseId: we.exercise_id as string,
+        exerciseName: embedded?.name ?? '',
+        orderIndex: we.order_index as number,
+      });
       exerciseCountByWorkoutId.set(
         we.workout_id as string,
         (exerciseCountByWorkoutId.get(we.workout_id as string) ?? 0) + 1,
@@ -223,11 +237,15 @@ export class FeedService {
 
     const completedSetCountByWorkoutId = new Map<string, number>();
     const totalVolumeKgByWorkoutId = new Map<string, number>();
+    const setsByExerciseRowId = new Map<
+      string,
+      { setIndex: number; weightKg: number; reps: number }[]
+    >();
     const workoutExerciseIds = Array.from(workoutIdByExerciseId.keys());
     if (workoutExerciseIds.length > 0) {
       const { data: sets, error: setsError } = await client
         .from('sets')
-        .select('workout_exercise_id, weight_kg, reps')
+        .select('id, workout_exercise_id, set_index, weight_kg, reps')
         .in('workout_exercise_id', workoutExerciseIds)
         .is('deleted_at', null)
         .not('completed_at', 'is', null)
@@ -238,6 +256,14 @@ export class FeedService {
       for (const set of sets ?? []) {
         const workoutId = workoutIdByExerciseId.get(set.workout_exercise_id as string);
         if (!workoutId) continue;
+        const exerciseRowId = set.workout_exercise_id as string;
+        const bucket = setsByExerciseRowId.get(exerciseRowId) ?? [];
+        bucket.push({
+          setIndex: set.set_index as number,
+          weightKg: Number(set.weight_kg),
+          reps: Number(set.reps),
+        });
+        setsByExerciseRowId.set(exerciseRowId, bucket);
         completedSetCountByWorkoutId.set(
           workoutId,
           (completedSetCountByWorkoutId.get(workoutId) ?? 0) + 1,
@@ -249,7 +275,42 @@ export class FeedService {
       }
     }
 
+    const exerciseRowIdsByWorkoutId = new Map<string, string[]>();
+    for (const [exerciseRowId, workoutId] of workoutIdByExerciseId) {
+      const list = exerciseRowIdsByWorkoutId.get(workoutId) ?? [];
+      list.push(exerciseRowId);
+      exerciseRowIdsByWorkoutId.set(workoutId, list);
+    }
+
     return workouts.map((workout) => {
+      const exerciseRows = (exerciseRowIdsByWorkoutId.get(workout.id) ?? [])
+        .map((id) => ({ id, info: exerciseInfoById.get(id)! }))
+        .sort((a, b) => a.info.orderIndex - b.info.orderIndex);
+      const topSets: {
+        exerciseId: string;
+        exerciseName: string;
+        weightKg: number;
+        reps: number;
+      }[] = [];
+      let completedExerciseCount = 0;
+      for (const row of exerciseRows) {
+        const completed = setsByExerciseRowId.get(row.id) ?? [];
+        if (completed.length === 0) continue;
+        completedExerciseCount += 1;
+        // Same rule as the mobile heaviestSet: sets in set order, first heaviest wins.
+        const ordered = [...completed].sort((x, y) => x.setIndex - y.setIndex);
+        let top = ordered[0]!;
+        for (const set of ordered) {
+          if (set.weightKg > top.weightKg) top = set;
+        }
+        topSets.push({
+          exerciseId: row.info.exerciseId,
+          exerciseName: row.info.exerciseName,
+          weightKg: top.weightKg,
+          reps: top.reps,
+        });
+      }
+
       const day = workout.workout_split_day_id
         ? splitDayInfo.get(workout.workout_split_day_id)
         : undefined;
@@ -265,6 +326,8 @@ export class FeedService {
         totalVolumeKg: totalVolumeKgByWorkoutId.get(workout.id) ?? 0,
         durationMinutes: computeDurationMinutes(workout.performed_at, workout.completed_at),
         exerciseCount: exerciseCountByWorkoutId.get(workout.id) ?? 0,
+        completedExerciseCount,
+        topSets,
       };
     });
   }
