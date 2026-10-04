@@ -119,6 +119,41 @@ describe('FeedService', () => {
       }
     });
 
+    it("timestamps a workout by performed_at, not completed_at -- so editing a workout's date (EditWorkoutScreen) moves it in Feed too", async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
+      client.queue('workouts', {
+        data: [
+          {
+            id: 'w1',
+            user_id: 'user-2',
+            name: 'Push Day',
+            // Deliberately the opposite order from completed_at: if the bug
+            // regressed (timestamping by completed_at again), this would
+            // report the wrong date.
+            performed_at: '2026-09-25T10:00:00.000Z',
+            completed_at: '2026-09-20T11:00:00.000Z',
+            workout_split_day_id: null,
+          },
+        ],
+        error: null,
+      });
+      client.queue('workout_exercises', { data: [], error: null });
+      client.queue('food_logs', { data: [], error: null });
+      client.queue('users', {
+        data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const result = await service.getFriendsFeed('user-1', 0);
+
+      expect(result.items[0]).toMatchObject({
+        id: 'workout-w1',
+        timestamp: '2026-09-25T10:00:00.000Z',
+      });
+    });
+
     it('skips food logs on pages after the first', async () => {
       const client = createMockClient();
       client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });

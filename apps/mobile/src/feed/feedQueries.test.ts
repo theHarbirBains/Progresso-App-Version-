@@ -64,6 +64,25 @@ describe('fetchFeedItems', () => {
     expect(page.items.map((i) => i.id)).toEqual(['foodLog-log-1', 'workout-w1']);
   });
 
+  it("sorts and timestamps a workout by performedAt, not completedAt -- so an edited (moved) workout's position/date stay current", async () => {
+    // completedAt is deliberately the opposite order from performedAt here:
+    // if the bug regressed (sorting/timestamping by completedAt again),
+    // this would sort w0 first and report the wrong date.
+    const movedWorkout = {
+      ...olderWorkout,
+      id: 'w-moved',
+      performedAt: '2026-02-01T12:00:00Z', // now the most recent by performedAt
+      completedAt: '2025-11-01T13:00:00Z', // but the oldest by completedAt
+    };
+    mockEnrichWorkoutSummaries.mockResolvedValue([workout, movedWorkout]);
+
+    const page = await fetchFeedItems('user-1');
+    const moved = page.items.find((i) => i.id === 'workout-w-moved');
+
+    expect(page.items.map((i) => i.id)).toEqual(['workout-w-moved', 'foodLog-log-1', 'workout-w1']);
+    expect(moved?.timestamp).toBe('2026-02-01T12:00:00Z');
+  });
+
   it('excludes a workout that has not been completed yet', async () => {
     mockEnrichWorkoutSummaries.mockResolvedValue([{ ...workout, completedAt: null }]);
 

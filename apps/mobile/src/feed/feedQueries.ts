@@ -60,7 +60,14 @@ export async function fetchFeedItems(userId: string, page = 0): Promise<FeedPage
       items.push({
         kind: 'workout',
         id: `workout-${workout.id}`,
-        timestamp: workout.completedAt,
+        // performedAt, not completedAt -- the date a workout is attributed
+        // to is editable after the fact (see EditWorkoutScreen), while
+        // completedAt is a "this is done" marker whose own value doesn't
+        // move with an edit. Every other workout query (own history, the
+        // calendar, PR ordering) already sorts/filters by performed_at;
+        // this keeps Feed consistent with that rather than silently
+        // showing a stale position/date after a workout is moved.
+        timestamp: workout.performedAt,
         workout,
       });
     }

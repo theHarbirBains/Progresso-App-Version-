@@ -103,7 +103,14 @@ export class FeedService {
         items.push({
           kind: 'workout',
           id: `workout-${workout.id}`,
-          timestamp: workout.completedAt as string,
+          // performedAt, not completedAt -- the date a workout is attributed
+          // to is editable after the fact (see EditWorkoutScreen), while
+          // completedAt is a "this is done" marker whose own value doesn't
+          // move with an edit. Every other workout query in the app (own
+          // history, the calendar, PR ordering) already sorts/filters by
+          // performed_at; this keeps Feed consistent with that rather than
+          // silently showing a stale position/date after a workout is moved.
+          timestamp: workout.performedAt as string,
           author: { id: workout.userId, username: null, displayName: null, avatarUrl: null },
           workout: {
             id: workout.id,
@@ -250,6 +257,7 @@ export class FeedService {
         id: workout.id,
         userId: workout.user_id,
         name: workout.name,
+        performedAt: workout.performed_at,
         completedAt: workout.completed_at,
         splitDayName: day?.name ?? null,
         muscleGroups: day?.muscleGroups ?? [],
