@@ -350,12 +350,26 @@ export async function updateWorkout(
   if (error) throw new Error(error.message);
 }
 
-export async function completeWorkout(workoutId: string): Promise<void> {
-  const { error } = await supabase
+/**
+ * Finishes an open workout. Idempotent: the update only applies while the
+ * workout is still open and not cancelled, so a second Finish (a double tap,
+ * or the same workout finished on another device) never re-stamps the
+ * timestamp. Resolves to whether this call was the one that finished it.
+ *
+ * `completedAt` defaults to now (the live Finish button). Recovery passes the
+ * last completed set's time instead, so a forgotten workout's duration reflects
+ * when it actually ended rather than when the user finally got back to the app.
+ */
+export async function completeWorkout(workoutId: string, completedAt?: string): Promise<boolean> {
+  const { data, error } = await supabase
     .from('workouts')
-    .update({ completed_at: new Date().toISOString() })
-    .eq('id', workoutId);
+    .update({ completed_at: completedAt ?? new Date().toISOString() })
+    .eq('id', workoutId)
+    .is('completed_at', null)
+    .is('deleted_at', null)
+    .select('id');
   if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
 }
 
 /**

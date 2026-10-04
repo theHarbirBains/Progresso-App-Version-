@@ -589,7 +589,7 @@ describe('updateWorkout', () => {
 
 describe('completeWorkout', () => {
   it('updates completed_at', async () => {
-    const { workouts } = mockTables({ workouts: { data: null, error: null } });
+    const { workouts } = mockTables({ workouts: { data: [{ id: 'w1' }], error: null } });
 
     await completeWorkout('w1');
 
@@ -597,6 +597,45 @@ describe('completeWorkout', () => {
       expect.objectContaining({ completed_at: expect.any(String) }),
     );
     expect(workouts.calls.eq).toEqual([['id', 'w1']]);
+  });
+
+  it('only ever completes a workout that is still open and not cancelled', async () => {
+    const { workouts } = mockTables({ workouts: { data: [{ id: 'w1' }], error: null } });
+
+    await completeWorkout('w1');
+
+    expect(workouts.calls.is).toEqual([
+      ['completed_at', null],
+      ['deleted_at', null],
+    ]);
+  });
+
+  it('writes an explicit completedAt when recovery supplies the last set time', async () => {
+    const { workouts } = mockTables({ workouts: { data: [{ id: 'w1' }], error: null } });
+
+    await completeWorkout('w1', '2026-10-04T14:00:00.000Z');
+
+    expect(workouts.builder.update).toHaveBeenCalledWith({
+      completed_at: '2026-10-04T14:00:00.000Z',
+    });
+  });
+
+  it('resolves true when it is the call that finished the workout', async () => {
+    mockTables({ workouts: { data: [{ id: 'w1' }], error: null } });
+
+    await expect(completeWorkout('w1')).resolves.toBe(true);
+  });
+
+  it('resolves false, and changes nothing, when the workout was already finished', async () => {
+    mockTables({ workouts: { data: [], error: null } });
+
+    await expect(completeWorkout('w1')).resolves.toBe(false);
+  });
+
+  it('throws the database error', async () => {
+    mockTables({ workouts: { data: null, error: { message: 'connection lost' } } });
+
+    await expect(completeWorkout('w1')).rejects.toThrow('connection lost');
   });
 });
 

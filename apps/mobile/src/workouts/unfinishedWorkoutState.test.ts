@@ -1,5 +1,6 @@
 import {
   assessUnfinishedWorkout,
+  toUnfinishedWorkoutInput,
   UNFINISHED_THRESHOLDS,
   type UnfinishedWorkoutInput,
 } from './unfinishedWorkoutState';
@@ -249,6 +250,39 @@ describe('assessUnfinishedWorkout', () => {
       );
       expect(Number.isNaN(result.idleMinutes)).toBe(false);
       expect(result.state).toBe('active');
+    });
+  });
+});
+
+describe('toUnfinishedWorkoutInput', () => {
+  it('splits completed and unfilled sets and counts completed exercises', () => {
+    const input = toUnfinishedWorkoutInput({
+      performedAt: '2026-10-04T10:00:00.000Z',
+      exercises: [
+        {
+          sets: [{ completedAt: '2026-10-04T10:10:00.000Z' }, { completedAt: null }],
+        },
+        { sets: [{ completedAt: null }] },
+        { sets: [{ completedAt: '2026-10-04T10:30:00.000Z' }] },
+      ],
+    });
+
+    expect(input).toEqual({
+      performedAt: '2026-10-04T10:00:00.000Z',
+      completedSetTimes: ['2026-10-04T10:10:00.000Z', '2026-10-04T10:30:00.000Z'],
+      plannedBlankSetCount: 2,
+      exerciseCount: 3,
+      completedExerciseCount: 2,
+    });
+  });
+
+  it('handles a workout with no exercises', () => {
+    expect(toUnfinishedWorkoutInput({ performedAt: 'x', exercises: [] })).toEqual({
+      performedAt: 'x',
+      completedSetTimes: [],
+      plannedBlankSetCount: 0,
+      exerciseCount: 0,
+      completedExerciseCount: 0,
     });
   });
 });

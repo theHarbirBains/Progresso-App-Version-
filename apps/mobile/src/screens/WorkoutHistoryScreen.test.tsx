@@ -12,7 +12,9 @@ import { addMonths, MONTH_LABELS, toLocalDateKey } from '../design/calendarGrid'
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { enrichWorkoutSummaries } from '../workouts/workoutHistoryEnrichment';
 import {
+  completeWorkout,
   fetchActiveWorkout,
+  fetchWorkoutDetail,
   fetchWorkoutHistory,
   fetchWorkoutsForMonth,
 } from '../workouts/workoutQueries';
@@ -23,10 +25,20 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
+  completeWorkout: jest.fn(),
   fetchActiveWorkout: jest.fn(),
+  fetchWorkoutDetail: jest.fn(),
   fetchWorkoutHistory: jest.fn(),
   fetchWorkoutsForMonth: jest.fn(),
 }));
+
+const mockRefetchAllTimeStats = jest.fn();
+jest.mock('../progress/AllTimeStatsProvider', () => ({
+  useAllTimeStats: () => ({ refetch: mockRefetchAllTimeStats }),
+}));
+
+const mockCompleteWorkout = completeWorkout as jest.Mock;
+const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 
 jest.mock('../workouts/workoutHistoryEnrichment', () => ({
   enrichWorkoutSummaries: jest.fn(),
@@ -39,9 +51,11 @@ const mockFetchWorkoutsForMonth = fetchWorkoutsForMonth as jest.Mock;
 const mockEnrichWorkoutSummaries = enrichWorkoutSummaries as jest.Mock;
 
 const mockNavigate = jest.fn();
+const mockNavigationReset = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation: any = {
   navigate: mockNavigate,
+  reset: mockNavigationReset,
   addListener: jest.fn((event: string, cb: () => void) => {
     if (event === 'focus') cb();
     return jest.fn();
@@ -564,5 +578,177 @@ describe('WorkoutHistoryScreen -- a stack of widgets', () => {
 
     expectNoBareText();
     await settle();
+  });
+});
+
+// Recovery of a workout that was never finished. Time is pinned so the
+// idle-time and calendar-day checks are deterministic.
+describe('unfinished workout recovery', () => {
+  const NOW = new Date(2026, 9, 4, 18, 0, 0);
+  const ACTIVE_ID = 'active-1';
+
+  function minutesAgo(minutes: number): string {
+    return new Date(NOW.getTime() - minutes * 60_000).toISOString();
+  }
+
+  // One exercise with `completedSetCount` sets finished, the last one
+  // `lastSetMinutesAgo` ago, plus any unfilled sets. Started an hour before its last set.
+  function openWorkoutDetail({
+    lastSetMinutesAgo,
+    completedSetCount = 3,
+    blankSetCount = 0,
+  }: {
+    lastSetMinutesAgo: number;
+    completedSetCount?: number;
+    blankSetCount?: number;
+  }) {
+    const completed = Array.from({ length: completedSetCount }, (_, i) => ({
+      completedAt: minutesAgo(lastSetMinutesAgo + (completedSetCount - 1 - i) * 5),
+    }));
+    const blanks = Array.from({ length: blankSetCount }, () => ({ completedAt: null }));
+    return {
+      id: ACTIVE_ID,
+      name: 'Leg Day',
+      performedAt: minutesAgo(lastSetMinutesAgo + 60),
+      completedAt: null,
+      exercises: [{ sets: [...completed, ...blanks] }],
+    };
+  }
+
+  function openWorkoutSummary(performedAt: string) {
+    return {
+      id: ACTIVE_ID,
+      name: 'Leg Day',
+      performedAt,
+      completedAt: null,
+      workoutSplitDayId: null,
+    };
+  }
+
+  function givenOpenWorkout(detail: ReturnType<typeof openWorkoutDetail>) {
+    mockFetchActiveWorkout.mockResolvedValue(openWorkoutSummary(detail.performedAt));
+    mockFetchWorkoutDetail.mockResolvedValue(detail);
+  }
+
+  function refocus() {
+    const calls = navigation.addListener.mock.calls;
+    const [, focusCallback] = calls[calls.length - 1];
+    act(() => {
+      focusCallback();
+    });
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: NOW });
+    mockFetchWorkoutDetail.mockReset();
+    mockCompleteWorkout.mockReset().mockResolvedValue(true);
+    mockRefetchAllTimeStats.mockReset();
+    mockNavigationReset.mockClear();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('asks whether the workout was finished once it has been quiet long enough', async () => {
+    givenOpenWorkout(openWorkoutDetail({ lastSetMinutesAgo: 200 }));
+    renderScreen();
+
+    expect(await screen.findByText('Did you finish this workout?')).toBeTruthy();
+    expect(screen.getByTestId('unfinished-workout-summary')).toHaveTextContent('3 sets', {
+      exact: false,
+    });
+    expect(screen.getByTestId('unfinished-workout-finish')).toBeTruthy();
+  });
+
+  it('Finish ends the workout at the last completed set, not at the time of the tap', async () => {
+    givenOpenWorkout(openWorkoutDetail({ lastSetMinutesAgo: 200 }));
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('unfinished-workout-finish'));
+
+    await waitFor(() =>
+      expect(mockCompleteWorkout).toHaveBeenCalledWith(ACTIVE_ID, minutesAgo(200)),
+    );
+    expect(mockRefetchAllTimeStats).toHaveBeenCalled();
+    expect(mockNavigationReset).toHaveBeenCalledWith({
+      index: 1,
+      routes: [
+        { name: 'WorkoutHistory' },
+        { name: 'ShareWorkout', params: { workoutId: ACTIVE_ID } },
+      ],
+    });
+  });
+
+  it('Resume Workout opens the workout and never completes it', async () => {
+    givenOpenWorkout(openWorkoutDetail({ lastSetMinutesAgo: 200 }));
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('unfinished-workout-resume'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('ActiveWorkout', { workoutId: ACTIVE_ID });
+    expect(mockCompleteWorkout).not.toHaveBeenCalled();
+  });
+
+  it('Not now hides the prompt and does not raise it again on refocus this session', async () => {
+    givenOpenWorkout(openWorkoutDetail({ lastSetMinutesAgo: 200 }));
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('unfinished-workout-not-now'));
+    expect(screen.queryByText('Did you finish this workout?')).toBeNull();
+
+    refocus();
+    await act(async () => {});
+    expect(screen.queryByText('Did you finish this workout?')).toBeNull();
+    expect(screen.getByTestId('resume-active-workout')).toBeTruthy();
+    expect(mockCompleteWorkout).not.toHaveBeenCalled();
+  });
+
+  it('shows a subtle idle indicator, and no prompt, while the workout is only quiet', async () => {
+    givenOpenWorkout(openWorkoutDetail({ lastSetMinutesAgo: 50 }));
+    renderScreen();
+
+    expect(await screen.findByTestId('active-workout-idle-indicator')).toHaveTextContent(
+      'Last set logged 50 min ago',
+    );
+    expect(screen.queryByText('Did you finish this workout?')).toBeNull();
+  });
+
+  it('shows neither the indicator nor the prompt for a workout that is still going', async () => {
+    givenOpenWorkout(openWorkoutDetail({ lastSetMinutesAgo: 5 }));
+    renderScreen();
+
+    expect(await screen.findByTestId('resume-active-workout')).toBeTruthy();
+    expect(screen.queryByTestId('active-workout-idle-indicator')).toBeNull();
+    expect(screen.queryByText('Did you finish this workout?')).toBeNull();
+  });
+
+  it('never prompts for a thin workout, even one that has gone quiet', async () => {
+    givenOpenWorkout(openWorkoutDetail({ lastSetMinutesAgo: 300, completedSetCount: 1 }));
+    renderScreen();
+
+    expect(await screen.findByTestId('resume-active-workout')).toBeTruthy();
+    expect(screen.queryByText('Did you finish this workout?')).toBeNull();
+  });
+
+  it('keeps unfilled sets out of the summary and says so', async () => {
+    givenOpenWorkout(openWorkoutDetail({ lastSetMinutesAgo: 200, blankSetCount: 2 }));
+    renderScreen();
+
+    expect(await screen.findByTestId('unfinished-workout-blank-note')).toHaveTextContent(
+      '2 unfilled sets will be left out.',
+    );
+    expect(screen.getByTestId('unfinished-workout-summary')).toHaveTextContent('3 sets', {
+      exact: false,
+    });
+  });
+
+  it('shows the banner without a prompt if the workout detail cannot be loaded', async () => {
+    mockFetchActiveWorkout.mockResolvedValue(openWorkoutSummary(minutesAgo(260)));
+    mockFetchWorkoutDetail.mockRejectedValue(new Error('network down'));
+    renderScreen();
+
+    expect(await screen.findByTestId('resume-active-workout')).toBeTruthy();
+    expect(screen.queryByText('Did you finish this workout?')).toBeNull();
   });
 });

@@ -16,9 +16,16 @@ import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { withAlpha } from '../theme/accentColor';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
+import { UnfinishedWorkoutSheet } from '../workouts/UnfinishedWorkoutSheet';
+import {
+  assessUnfinishedWorkout,
+  toUnfinishedWorkoutInput,
+  type UnfinishedWorkoutAssessment,
+} from '../workouts/unfinishedWorkoutState';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 import {
   enrichWorkoutSummaries,
@@ -26,7 +33,9 @@ import {
 } from '../workouts/workoutHistoryEnrichment';
 import { computeMonthSummary, formatTotalTime } from '../workouts/workoutMonthSummary';
 import {
+  completeWorkout,
   fetchActiveWorkout,
+  fetchWorkoutDetail,
   fetchWorkoutHistory,
   fetchWorkoutsForMonth,
   type WorkoutSummary,
@@ -34,6 +43,15 @@ import {
 import { workoutHistoryStyles as styles } from './workoutHistoryStyles';
 
 const RECENT_PAGE_SIZE = 20;
+
+// "5 min ago", "1h 5m ago" -- the banner's idle indicator, how long since the last set.
+function formatIdleMinutes(minutes: number): string {
+  const rounded = Math.round(minutes);
+  if (rounded < 60) return `${rounded} min ago`;
+  const hours = Math.floor(rounded / 60);
+  const rest = rounded % 60;
+  return rest === 0 ? `${hours}h ago` : `${formatCardDuration(rounded)} ago`;
+}
 
 type Props = RootStackScreenProps<'WorkoutHistory'>;
 
@@ -65,6 +83,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
   const userId = user?.id ?? '';
   const { theme } = useProgressTheme();
   const { openMenu } = useAppMenu();
+  const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -85,14 +104,71 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
   const [recentLoadingMore, setRecentLoadingMore] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
 
+  const [activeAssessment, setActiveAssessment] = useState<UnfinishedWorkoutAssessment | null>(
+    null,
+  );
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [finishingSuggested, setFinishingSuggested] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
+  // Workouts the user already waved off with "Not now" this session. The
+  // prompt is only ever raised once per workout per session -- a forgotten
+  // workout still shows the banner, but never nags on every refocus.
+  const dismissedPromptIdsRef = useRef(new Set<string>());
+
   const loadActive = useCallback(async () => {
     if (!userId) return;
+    let active: WorkoutSummary | null;
     try {
-      setActiveWorkout(await fetchActiveWorkout(userId));
+      active = await fetchActiveWorkout(userId);
     } catch {
       // The resume banner just stays hidden -- recent/month errors already surface a retry.
+      return;
+    }
+    setActiveWorkout(active);
+    if (!active) {
+      setActiveAssessment(null);
+      setPromptOpen(false);
+      return;
+    }
+    try {
+      const detail = await fetchWorkoutDetail(active.id);
+      const assessment = assessUnfinishedWorkout(toUnfinishedWorkoutInput(detail), new Date());
+      setActiveAssessment(assessment);
+      const shouldPrompt =
+        assessment.state === 'suspected_complete' && !dismissedPromptIdsRef.current.has(active.id);
+      setPromptOpen(shouldPrompt);
+    } catch {
+      // Assessment is an extra on top of the banner: if it can't load, the banner still works.
+      setActiveAssessment(null);
+      setPromptOpen(false);
     }
   }, [userId]);
+
+  async function finishSuggested() {
+    if (!activeWorkout || !activeAssessment?.suggestedEndAt || finishingSuggested) return;
+    setFinishError(null);
+    setFinishingSuggested(true);
+    try {
+      await completeWorkout(activeWorkout.id, activeAssessment.suggestedEndAt);
+      // Same stats refresh as a live Finish in ActiveWorkoutScreen.
+      void refetchAllTimeStats();
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'WorkoutHistory' },
+          { name: 'ShareWorkout', params: { workoutId: activeWorkout.id } },
+        ],
+      });
+    } catch (err) {
+      setFinishError(err instanceof Error ? err.message : 'Failed to finish workout');
+      setFinishingSuggested(false);
+    }
+  }
+
+  function notNowSuggested() {
+    if (activeWorkout) dismissedPromptIdsRef.current.add(activeWorkout.id);
+    setPromptOpen(false);
+  }
 
   // silent skips the setXLoading(true) that would otherwise blank the
   // calendar/list back to a spinner -- used only for the focus-listener's
@@ -224,6 +300,14 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
           <Text style={[styles.actionLine, { color: withAlpha(theme.onAccent, 0.85) }]}>
             You have a workout in progress
           </Text>
+          {activeAssessment?.state === 'possibly_inactive' ? (
+            <Text
+              testID="active-workout-idle-indicator"
+              style={[styles.actionLine, { color: withAlpha(theme.onAccent, 0.7) }]}
+            >
+              {`Last set logged ${formatIdleMinutes(activeAssessment.idleMinutes)}`}
+            </Text>
+          ) : null}
           <PrimaryButton
             testID="resume-active-workout"
             label={`Resume "${activeWorkout.name}"`}
@@ -381,6 +465,21 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
           />
         ) : null}
       </Card>
+      {activeWorkout && activeAssessment ? (
+        <UnfinishedWorkoutSheet
+          visible={promptOpen}
+          workoutName={activeWorkout.name}
+          assessment={activeAssessment}
+          finishing={finishingSuggested}
+          onFinish={() => void finishSuggested()}
+          onResume={() => {
+            setPromptOpen(false);
+            navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id });
+          }}
+          onNotNow={notNowSuggested}
+        />
+      ) : null}
+      {finishError ? <Text testID="finish-suggested-error">{finishError}</Text> : null}
     </Screen>
   );
 }

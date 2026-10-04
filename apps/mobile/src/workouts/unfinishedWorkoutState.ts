@@ -118,3 +118,35 @@ export function assessUnfinishedWorkout(
     suggestedDurationMinutes,
   };
 }
+
+/**
+ * Maps a loaded workout (already filtered to live exercises and sets by
+ * fetchWorkoutDetail) to the assessment input. Structural, not WorkoutDetail,
+ * so this module stays free of query types.
+ */
+export function toUnfinishedWorkoutInput(workout: {
+  performedAt: string;
+  exercises: { sets: { completedAt: string | null }[] }[];
+}): UnfinishedWorkoutInput {
+  const completedSetTimes: string[] = [];
+  let plannedBlankSetCount = 0;
+  let completedExerciseCount = 0;
+  for (const exercise of workout.exercises) {
+    let completedInExercise = 0;
+    for (const set of exercise.sets) {
+      if (set.completedAt === null) plannedBlankSetCount += 1;
+      else {
+        completedSetTimes.push(set.completedAt);
+        completedInExercise += 1;
+      }
+    }
+    if (completedInExercise > 0) completedExerciseCount += 1;
+  }
+  return {
+    performedAt: workout.performedAt,
+    completedSetTimes,
+    plannedBlankSetCount,
+    exerciseCount: workout.exercises.length,
+    completedExerciseCount,
+  };
+}
