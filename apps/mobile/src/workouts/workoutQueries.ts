@@ -314,6 +314,25 @@ export async function createLoggedWorkout(
   return toWorkoutSummary(data);
 }
 
+/**
+ * Renames a workout and/or moves it to a different date -- see
+ * EditWorkoutScreen. Safe to call on a completed workout: the
+ * workouts_recompute_prs trigger (supabase/migrations/20260823100008_pr_infrastructure.sql)
+ * fires on performed_at changing and re-derives every PR/1RM touched by this
+ * workout's sets, so correctness here is entirely the database's job, not
+ * this function's.
+ */
+export async function updateWorkout(
+  workoutId: string,
+  updates: { name?: string; performedAt?: string },
+): Promise<void> {
+  const payload: Record<string, unknown> = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.performedAt !== undefined) payload.performed_at = updates.performedAt;
+  const { error } = await supabase.from('workouts').update(payload).eq('id', workoutId);
+  if (error) throw new Error(error.message);
+}
+
 export async function completeWorkout(workoutId: string): Promise<void> {
   const { error } = await supabase
     .from('workouts')

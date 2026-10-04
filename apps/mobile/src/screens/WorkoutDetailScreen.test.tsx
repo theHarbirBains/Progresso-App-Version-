@@ -185,6 +185,28 @@ describe('WorkoutDetailScreen', () => {
 
     expect(screen.queryByTestId('workout-detail-share')).toBeNull();
   });
+
+  it('always shows an Edit action and navigates to EditWorkout', async () => {
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    await screen.findByText('Push Day');
+
+    fireEvent.press(screen.getByTestId('workout-detail-edit'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('EditWorkout', { workoutId: 'w1' });
+  });
+
+  it('shows the Edit action even for an incomplete (active) workout', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({ ...workout, completedAt: null });
+
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    await screen.findByText('Push Day');
+
+    expect(screen.getByTestId('workout-detail-edit')).toBeTruthy();
+  });
 });
 
 describe('WorkoutDetailScreen current PR/1RM indicators', () => {

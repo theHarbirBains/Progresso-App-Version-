@@ -164,7 +164,13 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
             accessibilityLabel: 'Back',
             testID: 'workout-detail-back',
           }}
-          rightAction={
+          rightAction={{
+            icon: 'edit-2',
+            onPress: () => navigation.navigate('EditWorkout', { workoutId }),
+            accessibilityLabel: 'Edit workout',
+            testID: 'workout-detail-edit',
+          }}
+          rightAction2={
             workout.completedAt
               ? {
                   icon: 'share',
