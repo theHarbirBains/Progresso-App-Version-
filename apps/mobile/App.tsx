@@ -69,7 +69,6 @@ import { WorkoutHistoryScreen } from './src/screens/WorkoutHistoryScreen';
 import { WorkoutSplitFormScreen } from './src/screens/WorkoutSplitFormScreen';
 import { WorkoutSplitsScreen } from './src/screens/WorkoutSplitsScreen';
 import { WorkoutSplitViewScreen } from './src/screens/WorkoutSplitViewScreen';
-import { DEFAULT_NUTRITION_THEME, type AccentTheme } from './src/theme/accentColor';
 
 type AuthMode = 'signIn' | 'signUp' | 'forgotPassword';
 
@@ -118,20 +117,16 @@ function Root() {
   // it to open.
   const [menuOpen, setMenuOpen] = useState(false);
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
-  const { theme: menuTheme } = useProgressTheme();
+  const { theme: menuTheme, nutritionTheme: nutritionMenuTheme } = useProgressTheme();
   const insets = useSafeAreaInsets();
   // AppSideMenu itself is one universal list now (APP_MENU_SECTIONS) --
   // there's no more per-mode section list to pick, so nothing here needs to
-  // track "which mode was the menu opened from" any more. menuTheme above
-  // stays Workout-only (per useProgressTheme's own scope) and still drives
+  // track "which mode was the menu opened from" any more. menuTheme drives
   // the global BottomNavBar's Train accent (and, below, a screen's own
-  // background glow when its mode is Workout). nutritionMenuTheme is its
-  // Nutrition counterpart, for the same per-screen glow purpose -- always
-  // the fixed default now (the app-wide black-and-white redesign,
-  // unconditional regardless of any saved nutritionAccentColor -- see
-  // useProgressTheme's own comment), so no longer needs its own profile
-  // fetch/effect.
-  const nutritionMenuTheme: AccentTheme = DEFAULT_NUTRITION_THEME;
+  // background glow when its mode is Workout); nutritionMenuTheme is its
+  // Nutrition counterpart, for the same per-screen glow purpose. Both are
+  // the user's own saved accent color (useProgressTheme), falling back to
+  // the fixed neutral default when none is set.
   // Every screen gets an opaque, themed backdrop that is part of the screen
   // itself, so a push/pop never depends on JS to paint what's behind the
   // incoming page in time (see ScreenBackdrop). Its soft glow follows the

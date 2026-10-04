@@ -9,7 +9,6 @@ import { colors, fonts } from '../design/theme';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
-import { DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 import { createExercise, getMyProfile } from '../lib/api';
 import { fetchExercises } from '../exercises/exerciseQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
@@ -427,7 +426,7 @@ describe('ActiveWorkoutScreen', () => {
     );
   });
 
-  it('uses the centralized Workout accent theme, even when the profile still has a saved custom color', async () => {
+  it("uses the user's own saved Workout accent theme", async () => {
     mockGetMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
@@ -447,10 +446,10 @@ describe('ActiveWorkoutScreen', () => {
       { wrapper: TestProviders },
     );
 
-    // A completed set's check button is filled with the mode accent -- the
-    // fixed default (app-wide black-and-white), not the saved custom color.
+    // A completed set's check button is filled with the mode accent --
+    // the user's own saved custom color, not the fixed default.
     const complete = await screen.findByTestId('exercise-card-we1-set-s1-complete');
-    expect(StyleSheet.flatten(complete.props.style).backgroundColor).toBe(DEFAULT_WORKOUT_COLOR);
+    expect(StyleSheet.flatten(complete.props.style).backgroundColor).toBe('#8B5CF6');
   });
 
   it('has no back arrow or "..." options menu -- Finish Workout/Cancel Workout are the only exits', async () => {
@@ -529,7 +528,7 @@ describe('ActiveWorkoutScreen', () => {
     expect(mockFetchAllCompletedWorkouts).toHaveBeenCalledTimes(1);
   });
 
-  it('the Finish Workout button follows the fixed Workout accent, even when the profile still has a saved custom color', async () => {
+  it("the Finish Workout button follows the user's own saved Workout accent", async () => {
     mockGetMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
@@ -552,7 +551,7 @@ describe('ActiveWorkoutScreen', () => {
 
     const button = screen.getByTestId('complete-workout');
     const flat = StyleSheet.flatten(button.props.style);
-    expect(flat.backgroundColor).toBe(DEFAULT_WORKOUT_COLOR);
+    expect(flat.backgroundColor).toBe('#8B5CF6');
   });
 
   it('is reachable without scrolling even with many exercises, and does not interfere with adding sets/exercises', async () => {

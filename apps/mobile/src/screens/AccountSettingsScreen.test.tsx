@@ -215,8 +215,23 @@ describe('AccountSettingsScreen Account category', () => {
     expect(mockGetMyProfile).toHaveBeenCalledWith('token-123');
   });
 
-  it('colors Save Changes with the fixed Workout accent, even when the profile still has a saved custom color', async () => {
+  it("colors Save Changes with the user's own saved Workout accent", async () => {
     mockGetMyProfile.mockResolvedValue({ ...baseProfile, workoutAccentColor: '#EF4444' });
+
+    render(
+      <BackgroundThemeProvider>
+        <AccountSettingsScreen navigation={navigation} route={{} as never} />
+      </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
+    );
+    await screen.findByTestId('account-email');
+
+    const style = StyleSheet.flatten(screen.getByTestId('account-save').props.style);
+    expect(style.backgroundColor).toBe('#EF4444');
+  });
+
+  it('falls back to the fixed default Workout accent when no custom color is saved', async () => {
+    mockGetMyProfile.mockResolvedValue({ ...baseProfile, workoutAccentColor: null });
 
     render(
       <BackgroundThemeProvider>

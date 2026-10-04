@@ -1,19 +1,19 @@
 import { useProfile } from '../profile/ProfileProvider';
 import {
+  buildAccentTheme,
   DEFAULT_NUTRITION_THEME,
   DEFAULT_WORKOUT_THEME,
   type AccentTheme,
 } from '../theme/accentColor';
 
 /**
- * `theme`/`nutritionTheme` are always the app's one fixed neutral default
- * (`DEFAULT_WORKOUT_THEME`/`DEFAULT_NUTRITION_THEME`, both the same white --
- * see accentColor.ts) -- the app-wide black-and-white redesign's own
- * explicit, unconditional call, deliberately NOT overridden by any
- * `workoutAccentColor`/`nutritionAccentColor` a profile might still have
- * saved from before that redesign (or via the still-functional-but-now-
- * visually-inert accent picker, AccentColorPickerScreen -- see its own
- * comment).
+ * `theme`/`nutritionTheme` are the user's own saved `workoutAccentColor`/
+ * `nutritionAccentColor` (via AccentColorPickerScreen), falling back to the
+ * app's fixed neutral white default when neither is set -- real,
+ * user-visible color customization, applied wherever a screen reads
+ * `theme.accent`/`nutritionTheme.accent` off this hook (Feed/Workout
+ * History's hero cards, the bottom nav's Train/Nutrition tabs via App.tsx,
+ * every other screen built on this hook).
  *
  * Also exposes the identity fields (`displayName`, `username`,
  * `avatarUrl`) and `weightUnit`/`activeWorkoutSplitId` off the one shared
@@ -38,9 +38,12 @@ export function useProgressTheme(): {
   const { profile, loading } = useProfile();
 
   return {
-    // Fixed, not state -- see the hook comment above.
-    theme: DEFAULT_WORKOUT_THEME,
-    nutritionTheme: DEFAULT_NUTRITION_THEME,
+    theme: profile?.workoutAccentColor
+      ? buildAccentTheme(profile.workoutAccentColor)
+      : DEFAULT_WORKOUT_THEME,
+    nutritionTheme: profile?.nutritionAccentColor
+      ? buildAccentTheme(profile.nutritionAccentColor)
+      : DEFAULT_NUTRITION_THEME,
     weightUnit: profile?.weightUnit ?? 'kg',
     activeWorkoutSplitId: profile?.activeWorkoutSplitId ?? null,
     displayName: profile?.displayName ?? null,

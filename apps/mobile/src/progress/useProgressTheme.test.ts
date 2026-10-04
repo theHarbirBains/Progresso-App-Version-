@@ -1,7 +1,11 @@
 import { renderHook } from '@testing-library/react-native';
 import { useProfile, type ProfileContextValue } from '../profile/ProfileProvider';
 import type { ProfileResponse } from '../lib/api';
-import { DEFAULT_NUTRITION_THEME, DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
+import {
+  buildAccentTheme,
+  DEFAULT_NUTRITION_THEME,
+  DEFAULT_WORKOUT_THEME,
+} from '../theme/accentColor';
 import { useProgressTheme } from './useProgressTheme';
 
 jest.mock('../profile/ProfileProvider', () => ({
@@ -48,12 +52,28 @@ describe('useProgressTheme', () => {
     expect(result.current.avatarUrl).toBe('https://example.com/avatar.jpg');
   });
 
-  it('keeps the fixed default theme -- app-wide black-and-white, unconditional even when the cached profile has a saved custom accent', () => {
+  it("derives theme/nutritionTheme from the user's own saved accent colors, per mode", () => {
     mockUseProfile.mockReturnValue(
       profileContext({
         profile: {
           workoutAccentColor: '#EF4444',
-          nutritionAccentColor: '#EF4444',
+          nutritionAccentColor: '#22C55E',
+        } as ProfileResponse,
+      }),
+    );
+
+    const { result } = renderHook(() => useProgressTheme());
+
+    expect(result.current.theme).toEqual(buildAccentTheme('#EF4444'));
+    expect(result.current.nutritionTheme).toEqual(buildAccentTheme('#22C55E'));
+  });
+
+  it('falls back to the fixed neutral default per mode when no custom accent is saved', () => {
+    mockUseProfile.mockReturnValue(
+      profileContext({
+        profile: {
+          workoutAccentColor: null,
+          nutritionAccentColor: null,
         } as ProfileResponse,
       }),
     );
