@@ -11,6 +11,8 @@ interface Props {
   name: string;
   size?: number;
   testID?: string;
+  /** Set for an exercise the user owns: tapping the photo opens its editor (where the photo itself is added or changed) instead of the full-screen zoom. Built-ins pass nothing and keep the zoom. */
+  onEdit?: () => void;
 }
 
 // An exercise's optional machine photo, shown "like a contact photo" -- a
@@ -22,7 +24,7 @@ interface Props {
 // initial, which has nothing worth seeing bigger -- this inner touch never
 // also triggers the row it sits in (e.g. opening the exercise for editing),
 // since RN only ever hands a touch to the innermost responder that claims it.
-export function ExercisePhoto({ uri, name, size = 44, testID }: Props) {
+export function ExercisePhoto({ uri, name, size = 44, testID, onEdit }: Props) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const frame = { width: size, height: size, borderRadius: size / 2 };
 
@@ -39,6 +41,19 @@ export function ExercisePhoto({ uri, name, size = 44, testID }: Props) {
       />
     </View>
   );
+
+  if (onEdit) {
+    return (
+      <TouchableOpacity
+        testID={testID ? `${testID}-edit` : undefined}
+        onPress={onEdit}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${name}`}
+      >
+        {photo}
+      </TouchableOpacity>
+    );
+  }
 
   if (!uri) return photo;
 

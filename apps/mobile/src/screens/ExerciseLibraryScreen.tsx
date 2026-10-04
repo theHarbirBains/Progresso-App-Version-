@@ -160,6 +160,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
                 testID={`exercise-item-${item.id}-photo`}
                 uri={item.photoUrl}
                 name={item.name}
+                onEdit={isMine ? () => setMode({ type: 'edit', exercise: item }) : undefined}
               />
             }
             title={item.name}

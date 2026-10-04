@@ -37,4 +37,21 @@ describe('ExercisePhoto', () => {
 
     expect(screen.getByTestId('photo-zoom').props.accessibilityLabel).toBe('View Leg Press photo');
   });
+
+  it('opens the editor instead of the zoom when the user owns the exercise', () => {
+    const onEdit = jest.fn();
+    render(
+      <ExercisePhoto
+        testID="photo"
+        uri="https://example.com/machine.jpg"
+        name="Leg Press"
+        onEdit={onEdit}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('photo-edit'));
+
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('photo-zoom')).toBeNull();
+  });
 });
