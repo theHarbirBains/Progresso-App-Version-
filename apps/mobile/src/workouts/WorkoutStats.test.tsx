@@ -7,7 +7,7 @@ const baseProps = {
   performedAt: null as string | null,
   active: false,
   totalSets: 0,
-  totalVolumeDisplay: '0 kg',
+  totalExercises: 0,
 };
 
 describe('WorkoutStats', () => {
@@ -25,11 +25,11 @@ describe('WorkoutStats', () => {
     expect(screen.getByTestId('workout-summary-duration')).toHaveTextContent(/^\d{2}:\d{2}/);
   });
 
-  it('shows total sets and total volume', () => {
-    render(<WorkoutStats {...baseProps} totalSets={5} totalVolumeDisplay="1,250 kg" />);
+  it('shows total sets and exercise count', () => {
+    render(<WorkoutStats {...baseProps} totalSets={5} totalExercises={3} />);
 
     expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('5');
-    expect(screen.getByTestId('workout-summary-total-volume')).toHaveTextContent('1,250 kg');
+    expect(screen.getByTestId('workout-summary-total-exercises')).toHaveTextContent('3');
   });
 
   it('labels each readout', () => {
@@ -37,7 +37,18 @@ describe('WorkoutStats', () => {
 
     expect(screen.getByText('Duration')).toBeTruthy();
     expect(screen.getByText('Total Sets')).toBeTruthy();
-    expect(screen.getByText('Total Volume')).toBeTruthy();
+    expect(screen.getByText('Exercises')).toBeTruthy();
+  });
+
+  // Regression guard: Total Volume is still meaningful on a COMPLETED
+  // workout's own detail/history view, but mid-workout it's a partial,
+  // still-climbing number that doesn't mean much yet -- it was replaced here
+  // with exercise count, which is.
+  it('does not show total volume mid-workout', () => {
+    render(<WorkoutStats {...baseProps} />);
+
+    expect(screen.queryByText('Total Volume')).toBeNull();
+    expect(screen.queryByTestId('workout-summary-total-volume')).toBeNull();
   });
 
   it('is a quiet strip: mono numbers in the neutral text color, no card or fill', () => {

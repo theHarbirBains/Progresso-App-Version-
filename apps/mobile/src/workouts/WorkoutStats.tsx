@@ -9,21 +9,18 @@ interface Props {
   performedAt: string | null;
   active: boolean;
   totalSets: number;
-  totalVolumeDisplay: string;
+  totalExercises: number;
   testID?: string;
 }
 
-// The live workout's three running numbers -- duration, total sets, total
-// volume -- as one quiet strip of mono readouts, neutral colour, no card.
+// The live workout's three running numbers -- duration, total sets,
+// exercises -- as one quiet strip of mono readouts, neutral colour, no card.
 // ActiveWorkoutScreen pins it under the header so all three stay in view while
-// the exercise list scrolls.
-export function WorkoutStats({
-  performedAt,
-  active,
-  totalSets,
-  totalVolumeDisplay,
-  testID,
-}: Props) {
+// the exercise list scrolls. Total Volume used to be the third number here,
+// but mid-workout it's a partial, still-climbing total that doesn't mean much
+// until the workout is done -- it still shows on the completed workout's own
+// detail/history view. Exercise count is meaningful at any point mid-workout.
+export function WorkoutStats({ performedAt, active, totalSets, totalExercises, testID }: Props) {
   return (
     <View testID={testID} style={styles.statsBar}>
       <View style={styles.statCell}>
@@ -48,10 +45,10 @@ export function WorkoutStats({
         <Text style={styles.statLabel}>Total Sets</Text>
       </View>
       <View style={styles.statCell}>
-        <Text testID="workout-summary-total-volume" style={styles.statValue}>
-          {totalVolumeDisplay}
+        <Text testID="workout-summary-total-exercises" style={styles.statValue}>
+          {totalExercises}
         </Text>
-        <Text style={styles.statLabel}>Total Volume</Text>
+        <Text style={styles.statLabel}>Exercises</Text>
       </View>
     </View>
   );

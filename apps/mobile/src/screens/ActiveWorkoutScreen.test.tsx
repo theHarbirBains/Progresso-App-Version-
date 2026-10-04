@@ -228,7 +228,7 @@ describe('ActiveWorkoutScreen', () => {
     expect(await screen.findByTestId('workout-summary-total-sets')).toHaveTextContent('2');
   });
 
-  it('shows Total Volume reflecting only logged (completed) sets', async () => {
+  it('shows the number of exercises added so far, not total volume', async () => {
     render(
       <BackgroundThemeProvider>
         <ActiveWorkoutScreen navigation={navigation} route={route} />
@@ -236,8 +236,8 @@ describe('ActiveWorkoutScreen', () => {
       { wrapper: TestProviders },
     );
 
-    // Only s1 (100kg x 10) is completed; s2 is blank and contributes 0.
-    expect(await screen.findByTestId('workout-summary-total-volume')).toHaveTextContent('1000 kg');
+    expect(await screen.findByTestId('workout-summary-total-exercises')).toHaveTextContent('1');
+    expect(screen.queryByTestId('workout-summary-total-volume')).toBeNull();
   });
 
   it('completing a set requires a valid weight and reps first', async () => {
@@ -1097,14 +1097,14 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     expect(header.getByText('Chest')).toBeTruthy();
   });
 
-  it('pins duration, sets and volume outside the scrolling list so they stay in view', async () => {
+  it('pins duration, sets and exercise count outside the scrolling list so they stay in view', async () => {
     await renderReady();
 
     const scroll = within(screen.UNSAFE_getByType(ScrollView));
     expect(scroll.queryByTestId('active-workout-summary')).toBeNull();
     expect(screen.getByTestId('workout-summary-duration')).toBeTruthy();
     expect(screen.getByTestId('workout-summary-total-sets')).toBeTruthy();
-    expect(screen.getByTestId('workout-summary-total-volume')).toBeTruthy();
+    expect(screen.getByTestId('workout-summary-total-exercises')).toBeTruthy();
   });
 
   it('has exactly one filled button -- Finish Workout -- pinned outside the scrolling list', async () => {

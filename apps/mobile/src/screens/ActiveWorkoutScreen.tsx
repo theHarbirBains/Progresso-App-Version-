@@ -36,7 +36,7 @@ import {
   type WorkoutDetail,
   type WorkoutExerciseWithSets,
 } from '../workouts/workoutQueries';
-import { computeTotalSets, computeTotalVolumeKg } from '../workouts/workoutSummary';
+import { computeTotalSets } from '../workouts/workoutSummary';
 import { WorkoutStats } from '../workouts/WorkoutStats';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
 import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
@@ -562,8 +562,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     new Set(workout.exercises.map((ex) => MUSCLE_GROUP_LABELS[ex.muscleGroup])),
   ).join(', ');
   const totalSets = computeTotalSets(workout.exercises);
-  const totalVolumeKg = computeTotalVolumeKg(workout.exercises);
-  const totalVolumeDisplay = `${formatWeightKg(totalVolumeKg, weightUnit)} ${weightUnit}`;
 
   return (
     <>
@@ -583,7 +581,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               performedAt={workout.performedAt}
               active={!workout.completedAt}
               totalSets={totalSets}
-              totalVolumeDisplay={totalVolumeDisplay}
+              totalExercises={workout.exercises.length}
             />
           </View>
         }
