@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { TextInput, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
@@ -5,6 +6,8 @@ import { colors } from '../design/theme';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
 
 export interface UnilateralSideInput {
+  /** The set row id of this side. Handlers receive it, so they need no lookup. */
+  id: string;
   weight: string;
   reps: string;
 }
@@ -19,9 +22,14 @@ interface Props {
   /** Whether BOTH sides currently hold valid values -- gates turning
    * completed on, same convention as SetRow's canComplete. */
   canComplete: boolean;
-  onChangeWeight: (side: 'left' | 'right', text: string) => void;
-  onChangeReps: (side: 'left' | 'right', text: string) => void;
-  onToggleComplete: () => void;
+  /**
+   * Stable, set-scoped handlers, taking the side's set id. They must be stable references
+   * for the memo below to skip rows that didn't change.
+   */
+  onChangeWeight: (setId: string, text: string) => void;
+  onChangeReps: (setId: string, text: string) => void;
+  /** Completes or un-completes the whole logical set. Receives the left side's id. */
+  onToggleComplete: (setId: string) => void;
   accentColor: string;
   onAccentColor: string;
   testID?: string;
@@ -40,8 +48,10 @@ const SIDES = [
  * are never added together anywhere in this component. The inputs and the
  * complete button are exactly SetRow's, so a unilateral exercise's sets look
  * like a natural extension of a bilateral one, not a different language.
+ *
+ * Memoised, like SetRow: typing into one side re-renders only that row.
  */
-export function UnilateralSetRow({
+function UnilateralSetRowComponent({
   setIndex,
   left,
   right,
@@ -71,7 +81,7 @@ export function UnilateralSetRow({
               accessibilityLabel={`Set ${setIndex} ${name} weight`}
               keyboardType="decimal-pad"
               value={values[key].weight}
-              onChangeText={(text) => onChangeWeight(key, text)}
+              onChangeText={(text) => onChangeWeight(values[key].id, text)}
               editable={!completed}
               placeholder="0"
               placeholderTextColor={colors.textMuted}
@@ -82,7 +92,7 @@ export function UnilateralSetRow({
               accessibilityLabel={`Set ${setIndex} ${name} reps`}
               keyboardType="number-pad"
               value={values[key].reps}
-              onChangeText={(text) => onChangeReps(key, text)}
+              onChangeText={(text) => onChangeReps(values[key].id, text)}
               editable={!completed}
               placeholder="0"
               placeholderTextColor={colors.textMuted}
@@ -100,7 +110,7 @@ export function UnilateralSetRow({
             backgroundColor: completed ? accentColor : 'transparent',
           },
         ]}
-        onPress={onToggleComplete}
+        onPress={() => onToggleComplete(left.id)}
         disabled={!canToggle}
         accessibilityRole="button"
         accessibilityState={{ selected: completed, disabled: !canToggle }}
@@ -115,3 +125,5 @@ export function UnilateralSetRow({
     </View>
   );
 }
+
+export const UnilateralSetRow = memo(UnilateralSetRowComponent);

@@ -64,9 +64,6 @@ interface Props {
   onChangeReps: (setId: string, text: string) => void;
   onToggleComplete: (setId: string) => void;
   /** Only used for a unilateral exercise -- completes/uncompletes both sides of one logical set together, since a unilateral set is one unit, not two independent ones. */
-  onToggleUnilateralComplete: (setIndex: number) => void;
-  onChangeUnilateralWeight: (setIndex: number, side: 'left' | 'right', text: string) => void;
-  onChangeUnilateralReps: (setIndex: number, side: 'left' | 'right', text: string) => void;
   onAddSet: () => void;
   onRemoveExercise: () => void;
   onMoveUp?: () => void;
@@ -95,9 +92,6 @@ function ExerciseCardComponent({
   onChangeWeight,
   onChangeReps,
   onToggleComplete,
-  onToggleUnilateralComplete,
-  onChangeUnilateralWeight,
-  onChangeUnilateralReps,
   onAddSet,
   onRemoveExercise,
   onMoveUp,
@@ -241,9 +235,9 @@ function ExerciseCardComponent({
               right={set.right}
               completed={set.left.completed && set.right.completed}
               canComplete={set.left.canComplete && set.right.canComplete}
-              onChangeWeight={(side, text) => onChangeUnilateralWeight(set.setIndex, side, text)}
-              onChangeReps={(side, text) => onChangeUnilateralReps(set.setIndex, side, text)}
-              onToggleComplete={() => onToggleUnilateralComplete(set.setIndex)}
+              onChangeWeight={onChangeWeight}
+              onChangeReps={onChangeReps}
+              onToggleComplete={onToggleComplete}
               accentColor={accentColor}
               onAccentColor={onAccentColor}
             />

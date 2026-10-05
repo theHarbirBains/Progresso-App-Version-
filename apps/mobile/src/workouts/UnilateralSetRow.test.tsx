@@ -3,8 +3,8 @@ import { UnilateralSetRow } from './UnilateralSetRow';
 
 const baseProps = {
   setIndex: 1,
-  left: { weight: '', reps: '' },
-  right: { weight: '', reps: '' },
+  left: { id: 'left-set', weight: '', reps: '' },
+  right: { id: 'right-set', weight: '', reps: '' },
   completed: false,
   canComplete: false,
   onChangeWeight: jest.fn(),
@@ -20,8 +20,8 @@ describe('UnilateralSetRow', () => {
     render(
       <UnilateralSetRow
         {...baseProps}
-        left={{ weight: '42.5', reps: '10' }}
-        right={{ weight: '40', reps: '10' }}
+        left={{ id: 'left-set', weight: '42.5', reps: '10' }}
+        right={{ id: 'right-set', weight: '40', reps: '10' }}
       />,
     );
 
@@ -48,10 +48,10 @@ describe('UnilateralSetRow', () => {
     fireEvent.changeText(screen.getByTestId('unilateral-set-left-reps'), '10');
     fireEvent.changeText(screen.getByTestId('unilateral-set-right-reps'), '8');
 
-    expect(onChangeWeight).toHaveBeenCalledWith('left', '42.5');
-    expect(onChangeWeight).toHaveBeenCalledWith('right', '40');
-    expect(onChangeReps).toHaveBeenCalledWith('left', '10');
-    expect(onChangeReps).toHaveBeenCalledWith('right', '8');
+    expect(onChangeWeight).toHaveBeenCalledWith('left-set', '42.5');
+    expect(onChangeWeight).toHaveBeenCalledWith('right-set', '40');
+    expect(onChangeReps).toHaveBeenCalledWith('left-set', '10');
+    expect(onChangeReps).toHaveBeenCalledWith('right-set', '8');
   });
 
   it('disables Complete until canComplete is true', () => {

@@ -103,12 +103,14 @@ function computeUnilateralSets(
     rows.push({
       setIndex,
       left: {
+        id: left.id,
         weight: setInputs[left.id]?.weight ?? '',
         reps: setInputs[left.id]?.reps ?? '',
         completed: left.completedAt !== null,
         canComplete: isValidDraft(setInputs[left.id]),
       },
       right: {
+        id: right.id,
         weight: setInputs[right.id]?.weight ?? '',
         reps: setInputs[right.id]?.reps ?? '',
         completed: right.completedAt !== null,
@@ -433,13 +435,20 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   workoutRef.current = workout;
   const toggleCompleteRef = useRef(handleToggleComplete);
   toggleCompleteRef.current = handleToggleComplete;
+  const toggleUnilateralRef = useRef(handleToggleUnilateralComplete);
+  toggleUnilateralRef.current = handleToggleUnilateralComplete;
   const toggleSetComplete = useCallback((setId: string) => {
     const current = workoutRef.current;
     if (!current) return;
     for (const exercise of current.exercises) {
       const set = exercise.sets.find((candidate) => candidate.id === setId);
       if (set) {
-        void toggleCompleteRef.current(exercise, set);
+        // A unilateral set completes as one unit, through its own path.
+        if (exercise.movementType === 'unilateral') {
+          void toggleUnilateralRef.current(exercise, set.setIndex);
+        } else {
+          void toggleCompleteRef.current(exercise, set);
+        }
         return;
       }
     }
@@ -684,27 +693,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               onChangeWeight={changeSetWeight}
               onChangeReps={changeSetReps}
               onToggleComplete={toggleSetComplete}
-              onToggleUnilateralComplete={(setIndex) =>
-                handleToggleUnilateralComplete(exercise, setIndex)
-              }
-              onChangeUnilateralWeight={(setIndex, side, text) => {
-                const set = exercise.sets.find((s) => s.setIndex === setIndex && s.side === side);
-                if (set) {
-                  setSetInputs((prev) => ({
-                    ...prev,
-                    [set.id]: { weight: text, reps: prev[set.id]?.reps ?? '' },
-                  }));
-                }
-              }}
-              onChangeUnilateralReps={(setIndex, side, text) => {
-                const set = exercise.sets.find((s) => s.setIndex === setIndex && s.side === side);
-                if (set) {
-                  setSetInputs((prev) => ({
-                    ...prev,
-                    [set.id]: { weight: prev[set.id]?.weight ?? '', reps: text },
-                  }));
-                }
-              }}
               onAddSet={() => handleAddSet(exercise)}
               onRemoveExercise={() => handleRemoveExercise(exercise.id)}
               onMoveUp={index > 0 ? getMoveHandler(index, -1) : undefined}

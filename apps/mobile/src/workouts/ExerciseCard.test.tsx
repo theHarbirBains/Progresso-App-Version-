@@ -12,9 +12,6 @@ const baseProps = {
   onChangeWeight: jest.fn(),
   onChangeReps: jest.fn(),
   onToggleComplete: jest.fn(),
-  onToggleUnilateralComplete: jest.fn(),
-  onChangeUnilateralWeight: jest.fn(),
-  onChangeUnilateralReps: jest.fn(),
   onAddSet: jest.fn(),
   onRemoveExercise: jest.fn(),
   accentColor: '#2F80FF',
@@ -25,8 +22,8 @@ const baseProps = {
 const oneUnilateralSet = [
   {
     setIndex: 1,
-    left: { weight: '42.5', reps: '10', completed: false, canComplete: true },
-    right: { weight: '40', reps: '10', completed: false, canComplete: true },
+    left: { id: 'l1', weight: '42.5', reps: '10', completed: false, canComplete: true },
+    right: { id: 'r1', weight: '40', reps: '10', completed: false, canComplete: true },
   },
 ];
 
@@ -246,21 +243,21 @@ describe('ExerciseCard (unilateral exercise)', () => {
     expect(screen.queryByTestId('exercise-card-per-side-note')).toBeNull();
   });
 
-  it('calls onToggleUnilateralComplete with the setIndex, not a set id, when Complete is pressed', () => {
-    const onToggleUnilateralComplete = jest.fn();
+  it('reports the completed set by its id, so the screen can route it to the unilateral path', () => {
+    const onToggleComplete = jest.fn();
     render(
       <ExerciseCard
         {...baseProps}
         movementType="unilateral"
         sets={[]}
         unilateralSets={oneUnilateralSet}
-        onToggleUnilateralComplete={onToggleUnilateralComplete}
+        onToggleComplete={onToggleComplete}
       />,
     );
 
     fireEvent.press(screen.getByTestId('exercise-card-set-1-complete'));
 
-    expect(onToggleUnilateralComplete).toHaveBeenCalledWith(1);
+    expect(onToggleComplete).toHaveBeenCalledWith('l1');
   });
 
   it('requires BOTH sides to be valid before the set can be completed', () => {
@@ -272,8 +269,8 @@ describe('ExerciseCard (unilateral exercise)', () => {
         unilateralSets={[
           {
             setIndex: 1,
-            left: { weight: '42.5', reps: '10', completed: false, canComplete: true },
-            right: { weight: '', reps: '', completed: false, canComplete: false },
+            left: { id: 'l1', weight: '42.5', reps: '10', completed: false, canComplete: true },
+            right: { id: 'r1', weight: '', reps: '', completed: false, canComplete: false },
           },
         ]}
       />,
@@ -284,25 +281,25 @@ describe('ExerciseCard (unilateral exercise)', () => {
     ).toBe(true);
   });
 
-  it('routes weight/reps changes with the side they belong to', () => {
-    const onChangeUnilateralWeight = jest.fn();
-    const onChangeUnilateralReps = jest.fn();
+  it("routes weight and reps changes by the side's own set id", () => {
+    const onChangeWeight = jest.fn();
+    const onChangeReps = jest.fn();
     render(
       <ExerciseCard
         {...baseProps}
         movementType="unilateral"
         sets={[]}
         unilateralSets={oneUnilateralSet}
-        onChangeUnilateralWeight={onChangeUnilateralWeight}
-        onChangeUnilateralReps={onChangeUnilateralReps}
+        onChangeWeight={onChangeWeight}
+        onChangeReps={onChangeReps}
       />,
     );
 
     fireEvent.changeText(screen.getByTestId('exercise-card-set-1-left-weight'), '45');
     fireEvent.changeText(screen.getByTestId('exercise-card-set-1-right-reps'), '8');
 
-    expect(onChangeUnilateralWeight).toHaveBeenCalledWith(1, 'left', '45');
-    expect(onChangeUnilateralReps).toHaveBeenCalledWith(1, 'right', '8');
+    expect(onChangeWeight).toHaveBeenCalledWith('l1', '45');
+    expect(onChangeReps).toHaveBeenCalledWith('r1', '8');
   });
 });
 
@@ -479,9 +476,6 @@ describe('ExerciseCard.arePropsEqual', () => {
       onChangeWeight: jest.fn(),
       onChangeReps: jest.fn(),
       onToggleComplete: jest.fn(),
-      onToggleUnilateralComplete: jest.fn(),
-      onChangeUnilateralWeight: jest.fn(),
-      onChangeUnilateralReps: jest.fn(),
       onAddSet: jest.fn(),
       onRemoveExercise: jest.fn(),
     };
