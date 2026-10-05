@@ -92,14 +92,30 @@ export class FeedService {
 
     const from = page * WORKOUT_PAGE_SIZE;
     const to = from + WORKOUT_PAGE_SIZE - 1;
-    const { data: workoutRows, error: workoutsError } = await client
-      .from('workouts')
-      .select('id, user_id, name, performed_at, completed_at, workout_split_day_id')
-      .in('user_id', followeeIds)
-      .not('completed_at', 'is', null)
-      .is('deleted_at', null)
-      .order('performed_at', { ascending: false })
-      .range(from, to);
+    // Workouts and food logs depend only on the followee list, so they run together.
+    const foodLogsQuery =
+      page === 0
+        ? client
+            .from('food_logs')
+            .select(
+              'id, user_id, food_name_snapshot, calories, protein_g, carbs_g, fat_g, meal_type, image_url, logged_at',
+            )
+            .in('user_id', followeeIds)
+            .order('logged_at', { ascending: false })
+            .limit(FOOD_LOG_LIMIT)
+        : null;
+    const [workoutsResult, foodLogsResult] = await Promise.all([
+      client
+        .from('workouts')
+        .select('id, user_id, name, performed_at, completed_at, workout_split_day_id')
+        .in('user_id', followeeIds)
+        .not('completed_at', 'is', null)
+        .is('deleted_at', null)
+        .order('performed_at', { ascending: false })
+        .range(from, to),
+      foodLogsQuery,
+    ]);
+    const { data: workoutRows, error: workoutsError } = workoutsResult;
     if (workoutsError) throw new InternalServerErrorException('Failed to load friends feed');
 
     const hasMore = (workoutRows ?? []).length === WORKOUT_PAGE_SIZE;
@@ -138,15 +154,8 @@ export class FeedService {
 
     // Food logs: only on the first page, matching the self-feed's own
     // "food logs aren't paginated yet" limitation (see feedQueries.ts).
-    if (page === 0) {
-      const { data: logRows, error: logsError } = await client
-        .from('food_logs')
-        .select(
-          'id, user_id, food_name_snapshot, calories, protein_g, carbs_g, fat_g, meal_type, image_url, logged_at',
-        )
-        .in('user_id', followeeIds)
-        .order('logged_at', { ascending: false })
-        .limit(FOOD_LOG_LIMIT);
+    if (page === 0 && foodLogsResult) {
+      const { data: logRows, error: logsError } = foodLogsResult;
       if (logsError) throw new InternalServerErrorException('Failed to load friends feed');
 
       for (const log of logRows ?? []) {
@@ -197,11 +206,24 @@ export class FeedService {
       ),
     );
     const splitDayInfo = new Map<string, { name: string; muscleGroups: string[] }>();
-    if (splitDayIds.length > 0) {
-      const { data, error } = await client
-        .from('workout_split_days')
-        .select('id, name, workout_split_day_muscle_groups(muscle_group)')
-        .in('id', splitDayIds);
+    const workoutIds = workouts.map((w) => w.id);
+    const splitDaysQuery =
+      splitDayIds.length > 0
+        ? client
+            .from('workout_split_days')
+            .select('id, name, workout_split_day_muscle_groups(muscle_group)')
+            .in('id', splitDayIds)
+        : null;
+    const [splitDaysResult, workoutExercisesResult] = await Promise.all([
+      splitDaysQuery,
+      client
+        .from('workout_exercises')
+        .select('id, workout_id, exercise_id, order_index, exercises(name, photo_url)')
+        .in('workout_id', workoutIds)
+        .is('deleted_at', null),
+    ]);
+    if (splitDaysResult) {
+      const { data, error } = splitDaysResult;
       if (error) throw new InternalServerErrorException('Failed to load friends feed');
       for (const day of data ?? []) {
         const embedded = day.workout_split_day_muscle_groups as unknown as
@@ -213,12 +235,7 @@ export class FeedService {
       }
     }
 
-    const workoutIds = workouts.map((w) => w.id);
-    const { data: workoutExercises, error: weError } = await client
-      .from('workout_exercises')
-      .select('id, workout_id, exercise_id, order_index, exercises(name, photo_url)')
-      .in('workout_id', workoutIds)
-      .is('deleted_at', null);
+    const { data: workoutExercises, error: weError } = workoutExercisesResult;
     if (weError) throw new InternalServerErrorException('Failed to load friends feed');
 
     const workoutIdByExerciseId = new Map<string, string>();
