@@ -151,3 +151,10 @@ jest.mock('expo-crypto', () => {
     }),
   };
 });
+
+// expo-image-manipulator is a native module. Suites that reach the upload helpers load it,
+// and the test environment has no native side, so it is mocked here once for every suite.
+jest.mock('expo-image-manipulator', () => ({
+  manipulateAsync: jest.fn(async (uri) => ({ uri })),
+  SaveFormat: { JPEG: 'jpeg', PNG: 'png' },
+}));

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { removeAvatarFile, uploadAvatar } from './avatarUpload';
+jest.mock('./imageResize', () => ({ resizeForUpload: async (uri: string) => uri }));
 
 jest.mock('./supabase', () => ({
   supabase: { storage: { from: jest.fn() } },

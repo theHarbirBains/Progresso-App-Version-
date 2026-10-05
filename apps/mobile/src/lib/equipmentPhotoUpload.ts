@@ -1,3 +1,4 @@
+import { resizeForUpload } from './imageResize';
 import { supabase } from './supabase';
 
 const EQUIPMENT_PHOTO_BUCKET = 'equipment-photos';
@@ -19,7 +20,7 @@ function equipmentPhotoPath(userId: string): string {
  * user's folder.
  */
 export async function uploadEquipmentPhoto(userId: string, localUri: string): Promise<string> {
-  const response = await fetch(localUri);
+  const response = await fetch(await resizeForUpload(localUri));
   const blob = await response.blob();
 
   const path = equipmentPhotoPath(userId);

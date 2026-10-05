@@ -1,3 +1,4 @@
+import { resizeForUpload } from './imageResize';
 import { supabase } from './supabase';
 
 const AVATAR_BUCKET = 'avatars';
@@ -21,7 +22,7 @@ function avatarPath(userId: string): string {
  * picture would keep showing it after a change.
  */
 export async function uploadAvatar(userId: string, localUri: string): Promise<string> {
-  const response = await fetch(localUri);
+  const response = await fetch(await resizeForUpload(localUri));
   const blob = await response.blob();
 
   const path = avatarPath(userId);

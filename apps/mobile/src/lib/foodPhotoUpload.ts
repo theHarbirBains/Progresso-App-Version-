@@ -1,3 +1,4 @@
+import { resizeForUpload } from './imageResize';
 import { supabase } from './supabase';
 
 const FOOD_PHOTO_BUCKET = 'food-photos';
@@ -17,7 +18,7 @@ function foodPhotoPath(userId: string): string {
  * user's folder. Returns the URL to store on the food row.
  */
 export async function uploadFoodPhoto(userId: string, localUri: string): Promise<string> {
-  const response = await fetch(localUri);
+  const response = await fetch(await resizeForUpload(localUri));
   const blob = await response.blob();
 
   const path = foodPhotoPath(userId);

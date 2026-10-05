@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { uploadFoodPhoto } from './foodPhotoUpload';
+jest.mock('./imageResize', () => ({ resizeForUpload: async (uri: string) => uri }));
 
 jest.mock('./supabase', () => ({
   supabase: { storage: { from: jest.fn() } },
