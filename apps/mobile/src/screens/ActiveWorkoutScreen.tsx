@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
@@ -409,6 +409,42 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   // pair is correct even across a reorder: the cached handler still means
   // "move whatever is at position N right now" for whichever exercise ends
   // up rendered there.
+  // Set-row handlers, stable for the life of the screen. Weight and reps use functional updates
+  // only, so they never need fresh state. Completion reads the latest workout and handler through
+  // refs, so it can stay stable too. A stable reference is what lets SetRow's memo skip the other
+  // rows while the user types into one.
+  const changeSetWeight = useCallback(
+    (setId: string, text: string) =>
+      setSetInputs((prev) => ({
+        ...prev,
+        [setId]: { weight: text, reps: prev[setId]?.reps ?? '' },
+      })),
+    [],
+  );
+  const changeSetReps = useCallback(
+    (setId: string, text: string) =>
+      setSetInputs((prev) => ({
+        ...prev,
+        [setId]: { weight: prev[setId]?.weight ?? '', reps: text },
+      })),
+    [],
+  );
+  const workoutRef = useRef(workout);
+  workoutRef.current = workout;
+  const toggleCompleteRef = useRef(handleToggleComplete);
+  toggleCompleteRef.current = handleToggleComplete;
+  const toggleSetComplete = useCallback((setId: string) => {
+    const current = workoutRef.current;
+    if (!current) return;
+    for (const exercise of current.exercises) {
+      const set = exercise.sets.find((candidate) => candidate.id === setId);
+      if (set) {
+        void toggleCompleteRef.current(exercise, set);
+        return;
+      }
+    }
+  }, []);
+
   const moveHandlersRef = useRef(new Map<string, () => void>());
   function getMoveHandler(index: number, direction: -1 | 1): () => void {
     const cacheKey = `${index}:${direction}`;
@@ -645,22 +681,9 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                   ? computeUnilateralSets(exercise.sets, setInputs)
                   : []
               }
-              onChangeWeight={(setId, text) =>
-                setSetInputs((prev) => ({
-                  ...prev,
-                  [setId]: { weight: text, reps: prev[setId]?.reps ?? '' },
-                }))
-              }
-              onChangeReps={(setId, text) =>
-                setSetInputs((prev) => ({
-                  ...prev,
-                  [setId]: { weight: prev[setId]?.weight ?? '', reps: text },
-                }))
-              }
-              onToggleComplete={(setId) => {
-                const set = exercise.sets.find((s) => s.id === setId);
-                if (set) handleToggleComplete(exercise, set);
-              }}
+              onChangeWeight={changeSetWeight}
+              onChangeReps={changeSetReps}
+              onToggleComplete={toggleSetComplete}
               onToggleUnilateralComplete={(setIndex) =>
                 handleToggleUnilateralComplete(exercise, setIndex)
               }

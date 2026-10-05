@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { SetRow } from './SetRow';
 
 const baseProps = {
+  setId: 'set-1',
   setIndex: 1,
   weight: '',
   reps: '',
@@ -29,8 +30,8 @@ describe('SetRow', () => {
     fireEvent.changeText(screen.getByTestId('set-row-weight'), '100');
     fireEvent.changeText(screen.getByTestId('set-row-reps'), '8');
 
-    expect(onChangeWeight).toHaveBeenCalledWith('100');
-    expect(onChangeReps).toHaveBeenCalledWith('8');
+    expect(onChangeWeight).toHaveBeenCalledWith('set-1', '100');
+    expect(onChangeReps).toHaveBeenCalledWith('set-1', '8');
   });
 
   it('disables the complete control until weight and reps are valid', () => {
@@ -69,5 +70,18 @@ describe('SetRow', () => {
     render(<SetRow {...baseProps} completed={true} canComplete={false} />);
 
     expect(screen.getByTestId('set-row-complete').props.accessibilityState.disabled).toBe(false);
+  });
+});
+
+describe('SetRow render behaviour', () => {
+  it('is memoised, so unchanged rows can skip re-rendering while the user types into another row', () => {
+    expect((SetRow as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for('react.memo'));
+  });
+
+  it('reports the set it belongs to, so a stable handler can serve every row', () => {
+    const onChangeWeight = jest.fn();
+    render(<SetRow {...baseProps} setId="set-9" onChangeWeight={onChangeWeight} />);
+    fireEvent.changeText(screen.getByTestId('set-row-weight'), '42');
+    expect(onChangeWeight).toHaveBeenCalledWith('set-9', '42');
   });
 });

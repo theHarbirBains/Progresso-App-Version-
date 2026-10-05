@@ -257,9 +257,10 @@ function ExerciseCardComponent({
               reps={set.reps}
               completed={set.completed}
               canComplete={set.canComplete}
-              onChangeWeight={(text) => onChangeWeight(set.id, text)}
-              onChangeReps={(text) => onChangeReps(set.id, text)}
-              onToggleComplete={() => onToggleComplete(set.id)}
+              setId={set.id}
+              onChangeWeight={onChangeWeight}
+              onChangeReps={onChangeReps}
+              onToggleComplete={onToggleComplete}
               accentColor={accentColor}
               onAccentColor={onAccentColor}
             />

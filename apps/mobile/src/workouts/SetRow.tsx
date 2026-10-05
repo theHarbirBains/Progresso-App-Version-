@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { TextInput, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
@@ -5,6 +6,7 @@ import { colors } from '../design/theme';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
 
 interface Props {
+  setId: string;
   setIndex: number;
   weight: string;
   reps: string;
@@ -12,9 +14,14 @@ interface Props {
   /** Whether weight+reps currently hold valid values -- gates turning
    * completed on (turning it back off is always allowed). */
   canComplete: boolean;
-  onChangeWeight: (text: string) => void;
-  onChangeReps: (text: string) => void;
-  onToggleComplete: () => void;
+  /**
+   * Set-scoped handlers, taking the set's id. They must be stable references (the screen
+   * passes functions that only use functional state updates), or the memo below can't skip
+   * the rows that didn't change while the user types into one row.
+   */
+  onChangeWeight: (setId: string, text: string) => void;
+  onChangeReps: (setId: string, text: string) => void;
+  onToggleComplete: (setId: string) => void;
   accentColor: string;
   onAccentColor: string;
   testID?: string;
@@ -25,7 +32,11 @@ interface Props {
 // tap complete, move on) free of accidental edits mid-workout. Built for
 // one-handed use: 48pt-tall numeric fields with a large mono readout and a
 // 44pt complete button, each field named for assistive tech.
-export function SetRow({
+//
+// Memoised: typing into one set re-renders only that set. Every prop here is a
+// value or a stable handler, so the other rows in the same exercise skip.
+function SetRowComponent({
+  setId,
   setIndex,
   weight,
   reps,
@@ -49,7 +60,7 @@ export function SetRow({
         accessibilityLabel={`Set ${setIndex} weight`}
         keyboardType="decimal-pad"
         value={weight}
-        onChangeText={onChangeWeight}
+        onChangeText={(text) => onChangeWeight(setId, text)}
         editable={!completed}
         placeholder="0"
         placeholderTextColor={colors.textMuted}
@@ -60,7 +71,7 @@ export function SetRow({
         accessibilityLabel={`Set ${setIndex} reps`}
         keyboardType="number-pad"
         value={reps}
-        onChangeText={onChangeReps}
+        onChangeText={(text) => onChangeReps(setId, text)}
         editable={!completed}
         placeholder="0"
         placeholderTextColor={colors.textMuted}
@@ -74,7 +85,7 @@ export function SetRow({
             backgroundColor: completed ? accentColor : 'transparent',
           },
         ]}
-        onPress={onToggleComplete}
+        onPress={() => onToggleComplete(setId)}
         disabled={!canToggle}
         accessibilityRole="button"
         accessibilityState={{ selected: completed, disabled: !canToggle }}
@@ -89,3 +100,5 @@ export function SetRow({
     </View>
   );
 }
+
+export const SetRow = memo(SetRowComponent);
