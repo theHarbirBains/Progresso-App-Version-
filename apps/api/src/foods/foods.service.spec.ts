@@ -898,3 +898,35 @@ describe('FoodsService: resolver outcomes are never retried', () => {
     expect(nutritionProvider.estimate).not.toHaveBeenCalled();
   });
 });
+
+describe('FoodsService: a "how much?" question is a missing amount, not a missing food', () => {
+  it("asks for the amount of the named food, rather than returning the parser's question", async () => {
+    const { service, nutritionProvider } = interpreter({
+      clarification: 'How much chicken breast did you eat?',
+      preparation: null,
+      main: null,
+      addedIngredients: [],
+    });
+
+    const result = interpretation(await service.interpretDescription('chicken breast'));
+
+    expect(nutritionProvider.estimate).not.toHaveBeenCalled();
+    expect(result.components[0]).toMatchObject({
+      state: 'needs_quantity',
+      request: { name: 'chicken breast', quantity: null },
+    });
+  });
+
+  it('strips a leading amount the parser did not keep, before searching', async () => {
+    const { service } = interpreter({
+      clarification: 'How much did you have?',
+      preparation: null,
+      main: null,
+      addedIngredients: [],
+    });
+
+    const result = interpretation(await service.interpretDescription('100 g potato'));
+
+    expect(result.components[0]?.request).toMatchObject({ name: 'potato', term: 'potato' });
+  });
+});

@@ -1,6 +1,9 @@
 import { Inject, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
-import { AnthropicNutritionProvider } from './providers/anthropic-nutrition.provider';
+import {
+  AnthropicNutritionProvider,
+  type ParsedFoodDescription,
+} from './providers/anthropic-nutrition.provider';
 import { FOOD_PROVIDER, type FoodProvider, type NormalizedFood } from './food-provider.interface';
 import type { Amount } from '../nutrition-resolution/quantity';
 import { resolveComponent } from '../nutrition-resolution/resolver';
@@ -44,6 +47,11 @@ export interface FoodSearchResponse {
   foods: FoodRecord[];
   hasMore: boolean;
 }
+
+/** A parser question about how much was eaten: a missing amount, not a missing food. */
+const AMOUNT_QUESTION = /\b(how much|how many|what amount|quantity|serving size)\b/i;
+/** A leading amount and unit the parser didn't keep ("100 g potato" -> "potato" after this). */
+const LEADING_AMOUNT = /^\s*\d+(?:\.\d+)?\s*[a-zA-Z]{0,12}\s+/;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -102,7 +110,10 @@ export class FoodsService {
    * when the user taps Add to Food Library.
    */
   async interpretDescription(description: string): Promise<InterpretFoodResponse> {
-    const parsed = await this.nutritionProvider.parse(description);
+    const parsed = await this.withFoodFromAmountQuestion(
+      description,
+      await this.nutritionProvider.parse(description),
+    );
     // Only a description with no food to look up is sent back as a question. A missing amount is
     // handled by the resolver, which asks for it with the source's own options.
     if (parsed.main === null) {
@@ -131,6 +142,27 @@ export class FoodsService {
     pick: ComponentPick | null,
   ): Promise<ComponentStatus> {
     return this.resolveRequest(request, pick);
+  }
+
+  /**
+   * The parser sometimes returns no food but asks "how much?". That is a missing amount, not an
+   * unidentified food, so the description's own words become the food with no amount. The
+   * resolver then asks for the amount with the source's own options. Any other question is still
+   * sent back to the user, unchanged.
+   */
+  private withFoodFromAmountQuestion(
+    description: string,
+    parsed: ParsedFoodDescription,
+  ): ParsedFoodDescription {
+    if (parsed.main !== null || !parsed.clarification) return parsed;
+    if (!AMOUNT_QUESTION.test(parsed.clarification)) return parsed;
+    const food = description.trim().replace(LEADING_AMOUNT, '').trim();
+    if (food.length === 0) return parsed;
+    return {
+      ...parsed,
+      clarification: null,
+      main: { name: food, searchTerm: food, quantity: null, unit: null, brand: null },
+    };
   }
 
   private async resolveRequest(
