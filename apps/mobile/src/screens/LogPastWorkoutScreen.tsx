@@ -13,6 +13,7 @@ import { TextInput } from '../design/TextInput';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import type { MovementType } from '../exercises/movementTypes';
+import { logWorkoutForClient } from '../lib/api';
 import { isValidWeightIncrement, roundWeight, toKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
@@ -34,7 +35,7 @@ import { ExerciseFormScreen } from './ExerciseFormScreen';
 import { liveWorkoutStyles } from './liveWorkoutStyles';
 import { logPastWorkoutStyles as styles } from './logPastWorkoutStyles';
 
-type Props = RootStackScreenProps<'LogPastWorkout'>;
+type Props = RootStackScreenProps<'LogPastWorkout' | 'TrainerLogWorkout'>;
 
 // The date picker has nothing to mark -- there's no per-day dot/meaning
 // here the way Workout History's own calendar has completed-workout dots.
@@ -129,9 +130,16 @@ function dateKeyToLocalDate(dateKey: string): Date {
  * completed/incomplete distinction that doesn't apply when every row typed
  * in already represents something done; see PastSetRow's own comment.
  */
-export function LogPastWorkoutScreen({ navigation }: Props) {
-  const { user } = useAuth();
+export function LogPastWorkoutScreen({ navigation, route }: Props) {
+  const { user, session } = useAuth();
   const userId = user?.id ?? '';
+  // Set when a trainer logs the workout for a client (see TrainerClientDetail).
+  // The save then goes through the trainer API, never the trainer's own data.
+  // Only TrainerLogWorkout carries these; the route type is shared with the plain
+  // LogPastWorkout entry, which has no params, so they are read through a cast.
+  const trainerParams = route?.params as { clientId: string; clientName?: string } | undefined;
+  const clientId = trainerParams?.clientId;
+  const clientName = trainerParams?.clientName;
   const { theme, weightUnit } = useProgressTheme();
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
@@ -283,6 +291,26 @@ export function LogPastWorkoutScreen({ navigation }: Props) {
         totalDurationMinutes > 0
           ? new Date(date.getTime() + totalDurationMinutes * 60000).toISOString()
           : undefined;
+      if (clientId) {
+        if (!session?.access_token) throw new Error('You are signed out');
+        await logWorkoutForClient(session.access_token, clientId, {
+          name: trimmedName,
+          performedAt: performedAtIso,
+          completedAt: completedAtIso,
+          exercises: toSave.map((ex) => ({
+            exerciseId: ex.exerciseId,
+            sets: ex.sets.map((set) => ({
+              setIndex: set.setIndex,
+              side: set.side ?? 'none',
+              weightKg: roundWeight(toKg(Number(set.weight), weightUnit)),
+              reps: Math.trunc(Number(set.reps)),
+            })),
+          })),
+        });
+        navigation.replace('TrainerClientDetail', { clientId, clientName });
+        return;
+      }
+
       const workout = await createLoggedWorkout(
         userId,
         trimmedName,
@@ -336,7 +364,7 @@ export function LogPastWorkoutScreen({ navigation }: Props) {
         header={
           <AppHeader
             testID="log-past-workout-header"
-            title="Log a Past Workout"
+            title={clientName ? `Log for ${clientName}` : 'Log a Past Workout'}
             onBack={() => navigation.goBack()}
           />
         }

@@ -10,7 +10,10 @@ type NoParamRoute = {
   [K in keyof RootStackParamList]: undefined extends RootStackParamList[K] ? K : never;
 }[keyof RootStackParamList];
 
-export type AppMenuRoute = NoParamRoute;
+/** Trainer screens are reached from Settings (Trainer Access), never from the side menu. */
+type TrainerRoute = 'TrainerClients' | 'TrainerClientForm' | 'TrainerAccess';
+
+export type AppMenuRoute = Exclude<NoParamRoute, TrainerRoute>;
 
 export interface AppMenuItem {
   route: AppMenuRoute;

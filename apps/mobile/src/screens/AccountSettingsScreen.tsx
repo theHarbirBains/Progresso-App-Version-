@@ -233,6 +233,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
           onNavigateWorkoutHistory={() => navigation.navigate('WorkoutHistory')}
           onNavigateExerciseLibrary={() => navigation.navigate('ExerciseLibrary')}
           onNavigateNutrition={() => navigation.navigate('Nutrition')}
+          onNavigateTrainerAccess={() => navigation.navigate('TrainerAccess')}
         />
       ) : null}
 

@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { toLocalDateKey } from '../design/calendarGrid';
 import { fetchExercises } from '../exercises/exerciseQueries';
-import { getMyProfile } from '../lib/api';
+import { getMyProfile, logWorkoutForClient } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
@@ -46,6 +46,7 @@ jest.mock('../lib/api', () => ({
   createExercise: jest.fn(),
   updateExercise: jest.fn(),
   createEquipmentProfile: jest.fn(),
+  logWorkoutForClient: jest.fn(),
 }));
 
 jest.mock('../lib/equipmentPhotoUpload', () => ({
@@ -359,6 +360,52 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
       "Pick a date that's already happened",
     );
     expect(mockCreateLoggedWorkout).not.toHaveBeenCalled();
+  });
+});
+
+describe('LogPastWorkoutScreen -- trainer mode', () => {
+  it('logs the workout for the client through the trainer API, never the trainer’s own data', async () => {
+    const mockLogWorkoutForClient = logWorkoutForClient as jest.Mock;
+    mockLogWorkoutForClient.mockReset().mockResolvedValue({ workoutId: 'client-w1' });
+    mockFetchExercises.mockResolvedValue({ rows: [squat], hasMore: false });
+    render(
+      <BackgroundThemeProvider>
+        <LogPastWorkoutScreen
+          navigation={navigation}
+          route={{ params: { clientId: 'client-1', clientName: 'Sam' } } as never}
+        />
+      </BackgroundThemeProvider>,
+      { wrapper: TestProviders },
+    );
+    await screen.findByTestId('log-past-workout-date');
+    expect(screen.getByText('Log for Sam')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByTestId('log-past-workout-name'), 'Leg Day');
+    await addExerciseViaPicker(squat);
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-1-weight`), '100');
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-1-reps`), '5');
+    fireEvent.press(screen.getByTestId('log-past-workout-save'));
+
+    await waitFor(() => expect(mockLogWorkoutForClient).toHaveBeenCalled());
+    const [token, clientId, payload] = mockLogWorkoutForClient.mock.calls[0];
+    expect(token).toBe('token-123');
+    expect(clientId).toBe('client-1');
+    expect(payload).toMatchObject({
+      name: 'Leg Day',
+      exercises: [
+        {
+          exerciseId: 'ex-squat',
+          sets: [{ setIndex: 1, side: 'none', weightKg: 100, reps: 5 }],
+        },
+      ],
+    });
+    expect(mockCreateLoggedWorkout).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('TrainerClientDetail', {
+        clientId: 'client-1',
+        clientName: 'Sam',
+      }),
+    );
   });
 });
 

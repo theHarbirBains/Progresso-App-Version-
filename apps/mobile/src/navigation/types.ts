@@ -17,6 +17,15 @@ export type RootStackParamList = {
   NewWorkout: undefined;
   ActiveWorkout: { workoutId: string };
   LogPastWorkout: undefined;
+  /** The same screen as LogPastWorkout, for a trainer logging a workout for one client. Saves through the trainer API, never the trainer's own data. */
+  TrainerLogWorkout: { clientId: string; clientName?: string };
+  /** Trainer mode (workouts only). Trainers manage their clients here. */
+  TrainerClients: undefined;
+  TrainerClientForm: undefined;
+  /** The same form as TrainerClientForm, editing one managed client's details. */
+  TrainerEditClient: { clientId: string };
+  TrainerClientDetail: { clientId: string; clientName?: string };
+  TrainerAccess: undefined;
   PRHistory: { exerciseId: string; exerciseName: string };
   ExerciseProgress: { exerciseId: string; exerciseName: string };
   Nutrition: undefined;

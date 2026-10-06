@@ -8,6 +8,7 @@ interface Props {
   onNavigateWorkoutHistory: () => void;
   onNavigateExerciseLibrary: () => void;
   onNavigateNutrition: () => void;
+  onNavigateTrainerAccess: () => void;
 }
 
 /** App category: links to existing screens only -- no duplicate workout/exercise/nutrition screens created here. */
@@ -16,6 +17,7 @@ export function AppCategory({
   onNavigateWorkoutHistory,
   onNavigateExerciseLibrary,
   onNavigateNutrition,
+  onNavigateTrainerAccess,
 }: Props) {
   return (
     <View style={styles.categoryGap}>
@@ -50,6 +52,16 @@ export function AppCategory({
           icon="pie-chart"
           title="Nutrition"
           onPress={onNavigateNutrition}
+        />
+      </Section>
+
+      <Section title="Trainers">
+        <ListRow
+          testID="open-trainer-access"
+          icon="user-check"
+          title="Trainer Access"
+          subtitle="Requests from trainers, and your clients"
+          onPress={onNavigateTrainerAccess}
         />
       </Section>
     </View>

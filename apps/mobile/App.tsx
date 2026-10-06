@@ -43,6 +43,10 @@ import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
 import { ExerciseProgressScreen } from './src/screens/ExerciseProgressScreen';
 import { FeedScreen } from './src/screens/FeedScreen';
 import { FindPeopleScreen } from './src/screens/FindPeopleScreen';
+import { TrainerAccessScreen } from './src/screens/TrainerAccessScreen';
+import { TrainerClientDetailScreen } from './src/screens/TrainerClientDetailScreen';
+import { TrainerClientFormScreen } from './src/screens/TrainerClientFormScreen';
+import { TrainerClientsScreen } from './src/screens/TrainerClientsScreen';
 import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
@@ -258,6 +262,7 @@ function Root() {
                 <Stack.Screen name="NewWorkout" component={NewWorkoutScreen} />
                 <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
                 <Stack.Screen name="LogPastWorkout" component={LogPastWorkoutScreen} />
+                <Stack.Screen name="TrainerLogWorkout" component={LogPastWorkoutScreen} />
                 <Stack.Screen name="PRHistory" component={PRHistoryScreen} />
                 <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
                 <Stack.Screen name="Nutrition" component={NutritionTodayScreen} />
@@ -281,6 +286,11 @@ function Root() {
                 <Stack.Screen name="WorkoutSplitForm" component={WorkoutSplitFormScreen} />
                 <Stack.Screen name="ChooseWorkoutSplit" component={ChooseWorkoutSplitScreen} />
                 <Stack.Screen name="Profile" component={ProfileScreen} />
+                <Stack.Screen name="TrainerAccess" component={TrainerAccessScreen} />
+                <Stack.Screen name="TrainerClients" component={TrainerClientsScreen} />
+                <Stack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
+                <Stack.Screen name="TrainerEditClient" component={TrainerClientFormScreen} />
+                <Stack.Screen name="TrainerClientDetail" component={TrainerClientDetailScreen} />
                 <Stack.Screen
                   name="FindPeople"
                   component={FindPeopleScreen}
