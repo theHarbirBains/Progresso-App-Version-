@@ -2790,6 +2790,208 @@ async function main() {
     /finish or cancel/,
   );
 
+  const expectSucceeds = async (promise, name) => {
+    try {
+      await promise;
+      record(name, true);
+    } catch (err) {
+      record(name, false, err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  // ---- live sessions and group workouts ----
+  // A host, a joined member, a guest (no login), and an outsider with no link.
+  const host = randomUUID();
+  const member = randomUUID();
+  const guest = randomUUID();
+  const outsider = randomUUID();
+  await admin.query(
+    'insert into auth.users (id, email) values ($1, $2), ($3, $4), ($5, $6), ($7, $8)',
+    [
+      host,
+      'group-host@test.local',
+      member,
+      'group-member@test.local',
+      guest,
+      'guest-1@placeholders.invalid',
+      outsider,
+      'group-outsider@test.local',
+    ],
+  );
+  const group = randomUUID();
+  await admin.query(
+    "insert into public.workout_groups (id, host_id, name) values ($1, $2, 'Thursday legs')",
+    [group, host],
+  );
+  await admin.query(
+    `insert into public.workout_group_members (group_id, user_id, role, status, is_guest, added_by) values
+       ($1, $2, 'host', 'joined', false, $2),
+       ($1, $3, 'member', 'joined', false, $2),
+       ($1, $4, 'member', 'joined', true, $2)`,
+    [group, host, member, guest],
+  );
+  const hostWorkout = randomUUID();
+  const guestWorkout = randomUUID();
+  await admin.query(
+    `insert into public.workouts (id, user_id, name, performed_at, group_id) values
+       ($1, $2, 'Legs', now(), $3),
+       ($4, $5, 'Legs', now(), $3)`,
+    [hostWorkout, host, group, guestWorkout, guest],
+  );
+
+  // Sessions coexist: a self workout, a trainer session and a group session for the
+  // same person can all be open. A second open one of the same kind cannot.
+  await admin.query(
+    "insert into public.workouts (user_id, name, performed_at) values ($1, 'Own run', now())",
+    [member],
+  );
+  await admin.query(
+    "insert into public.workouts (user_id, name, performed_at, logged_by) values ($1, 'Trainer run', now(), $2)",
+    [member, host],
+  );
+  await expectSucceeds(
+    admin.query(
+      "insert into public.workouts (user_id, name, performed_at, group_id) values ($1, 'Group legs', now(), $2)",
+      [member, group],
+    ),
+    'A self workout, a trainer session and a group session can be open at the same time',
+  );
+  await expectThrows(
+    admin.query(
+      "insert into public.workouts (user_id, name, performed_at, group_id) values ($1, 'Second group legs', now(), $2)",
+      [member, group],
+    ),
+    'Only one open session of a group per person',
+    /duplicate key|unique/i,
+  );
+  await expectThrows(
+    admin.query(
+      "insert into public.workouts (user_id, name, performed_at) values ($1, 'Second own', now())",
+      [member],
+    ),
+    'Only one open self workout is allowed per person',
+    /duplicate key|unique/i,
+  );
+
+  // Any joined member with an account can add exercises and sets to a group workout,
+  // including a guest's, and can edit them.
+  await expectSucceeds(
+    asUserCommitted(member, (client) =>
+      client.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+        [hostWorkout, benchPressId],
+      ),
+    ),
+    'A joined member can add an exercise to another member’s group workout',
+  );
+  const memberSet = await asUserCommitted(member, (client) =>
+    client.query(
+      `insert into public.sets (workout_exercise_id, set_index, weight_kg, reps)
+       select we.id, 1, 100, 5 from public.workout_exercises we where we.workout_id = $1
+       returning id`,
+      [hostWorkout],
+    ),
+  );
+  record(
+    'A joined member can enter sets in another member’s group workout',
+    memberSet.rows.length === 1,
+  );
+  await expectSucceeds(
+    asUser(member, (client) =>
+      client.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1)',
+        [guestWorkout, benchPressId],
+      ),
+    ),
+    'A joined member can add an exercise to a guest’s group workout',
+  );
+
+  // Outsiders see nothing of the group and cannot write to it.
+  const outsiderRead = await asUser(outsider, (client) =>
+    client.query('select id from public.workouts where id = $1', [hostWorkout]),
+  );
+  record('A non-member cannot read a group workout', outsiderRead.rows.length === 0);
+  const outsiderGroup = await asUser(outsider, (client) =>
+    client.query('select id from public.workout_groups where id = $1', [group]),
+  );
+  record('A non-member cannot read the group', outsiderGroup.rows.length === 0);
+  await expectThrows(
+    asUser(outsider, (client) =>
+      client.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 2)',
+        [hostWorkout, benchPressId],
+      ),
+    ),
+    'A non-member cannot add to a group workout',
+    RLS_ERROR,
+  );
+
+  // Leaving the group removes access at once.
+  await admin.query(
+    "update public.workout_group_members set status = 'left' where group_id = $1 and user_id = $2",
+    [group, member],
+  );
+  const leftRead = await asUser(member, (client) =>
+    client.query('select id from public.workouts where id = $1', [hostWorkout]),
+  );
+  record('Someone who has left the group loses access to its workouts', leftRead.rows.length === 0);
+  await admin.query(
+    "update public.workout_group_members set status = 'joined' where group_id = $1 and user_id = $2",
+    [group, member],
+  );
+
+  // Exercises a member adds are visible to the group, and to no one else.
+  const memberMachine = randomUUID();
+  await admin.query(
+    "insert into public.exercises (id, created_by, name, muscle_group, movement_type) values ($1, $2, 'Member Machine', 'chest', 'bilateral')",
+    [memberMachine, member],
+  );
+  await asUserCommitted(member, (client) =>
+    client.query(
+      'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 3)',
+      [hostWorkout, memberMachine],
+    ),
+  );
+  const hostSeesExercise = await asUser(host, (client) =>
+    client.query('select id from public.exercises where id = $1', [memberMachine]),
+  );
+  record(
+    'A group member can read an exercise another member used in the group',
+    hostSeesExercise.rows.length === 1,
+  );
+  const outsiderSeesExercise = await asUser(outsider, (client) =>
+    client.query('select id from public.exercises where id = $1', [memberMachine]),
+  );
+  record(
+    'An exercise used in a group is not visible outside it',
+    outsiderSeesExercise.rows.length === 0,
+  );
+
+  // Finishing a group workout is an update the members may make.
+  const finished = await asUser(member, (client) =>
+    client.query('update public.workouts set completed_at = now() where id = $1 returning id', [
+      guestWorkout,
+    ]),
+  );
+  record('A joined member can finish a guest’s group workout', finished.rows.length === 1);
+
+  // A trainer’s live session can use the client’s copy of the trainer’s exercise.
+  const resolved = await admin.query('select public.resolve_client_exercise($1, $2, $3) as id', [
+    T,
+    C,
+    trainerCustom,
+  ]);
+  record(
+    'A trainer’s exercise resolves to the client’s copy for a live session',
+    resolved.rows[0].id === clientCopy.rows[0].id,
+    JSON.stringify(resolved.rows[0]),
+  );
+  await expectThrows(
+    admin.query('select public.resolve_client_exercise($1, $2, $3)', [T, C, otherUsersCustom]),
+    'A live session cannot use an exercise outside the trainer’s library',
+    /not in this trainer/,
+  );
+
   await admin.end();
 }
 
