@@ -1173,10 +1173,12 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     await renderReady();
 
     await screen.findByTestId('exercise-card-we1-previous-session');
-    expect(screen.getByTestId('exercise-card-we1-previous-set-1')).toHaveTextContent(/100 kg × 5$/);
-    expect(screen.getByTestId('exercise-card-we1-previous-set-2')).toHaveTextContent(
-      /97.5 kg × 5$/,
-    );
+    const lastSet1 = within(screen.getByTestId('exercise-card-we1-previous-set-1'));
+    expect(lastSet1.getByText('100 kg')).toBeTruthy();
+    expect(lastSet1.getByText('5')).toBeTruthy();
+    const lastSet2 = within(screen.getByTestId('exercise-card-we1-previous-set-2'));
+    expect(lastSet2.getByText('97.5 kg')).toBeTruthy();
+    expect(lastSet2.getByText('5')).toBeTruthy();
     expect(
       screen.UNSAFE_queryAllByType(ScrollView).filter((node) => node.props.horizontal),
     ).toHaveLength(0);

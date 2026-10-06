@@ -198,18 +198,28 @@ function ExerciseCardComponent({
           </View>
           <Text style={styles.previousDate}>{previousSession.dateDisplay}</Text>
 
+          <View style={styles.previousColumnHeader}>
+            <Text style={styles.previousColumnIndex}>Set</Text>
+            <Text style={styles.previousColumnInput}>Weight</Text>
+            <Text style={styles.previousColumnInput}>Reps</Text>
+            <View style={styles.setHeaderComplete} />
+          </View>
           <View style={styles.previousSets}>
             {previousSession.sets.map((set) => (
               <View
                 key={`${set.setNumber}-${set.side ?? 'none'}`}
                 testID={testID ? `${testID}-previous-set-${set.setNumber}` : undefined}
                 style={styles.previousSet}
+                accessible
+                accessibilityLabel={`Set ${set.setNumber}${set.side ? ` ${set.side}` : ''}: ${set.weightDisplay} ${set.unit} for ${set.reps} reps`}
               >
                 <Text style={styles.previousSetNumber}>{set.setNumber}</Text>
-                <Text style={styles.previousSetValue}>
-                  {set.weightDisplay} {set.unit} × {set.reps}
-                  {set.side ? ` (${set.side === 'left' ? 'L' : 'R'})` : ''}
+                <Text style={styles.previousSetWeight}>
+                  {set.side ? `${set.side === 'left' ? 'L' : 'R'} ` : ''}
+                  {set.weightDisplay} {set.unit}
                 </Text>
+                <Text style={styles.previousSetReps}>{set.reps}</Text>
+                <View style={styles.setHeaderComplete} />
               </View>
             ))}
           </View>

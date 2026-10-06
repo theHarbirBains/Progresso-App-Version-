@@ -112,10 +112,10 @@ export const liveWorkoutStyles = StyleSheet.create({
   },
 
   // ---- Last Workout ----------------------------------------------------------
-  // Every set from the user's last completed session with this exercise, as a
-  // wrapping list of plain numbers directly above today's sets -- all visible
-  // at once (nothing hides behind a horizontal scroll) so they can be read
-  // while typing.
+  // Every set from the user's last completed session with this exercise, as
+  // rows in the same columns as today's set rows (number, weight, reps) so each
+  // previous figure sits directly above the input it is compared with. All
+  // visible at once (nothing hides behind a horizontal scroll) while typing.
   previousSession: {
     marginTop: spacing.md,
   },
@@ -147,25 +147,48 @@ export const liveWorkoutStyles = StyleSheet.create({
     ...typeScale.secondary,
     fontFamily: typeScale.label.fontFamily,
   },
-  previousSets: {
+  previousColumnHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    columnGap: spacing.lg,
-    rowGap: spacing.xs,
+    alignItems: 'center',
     marginTop: spacing.sm,
   },
-  previousSet: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.xs,
-  },
-  previousSetNumber: {
+  previousColumnIndex: {
+    width: 28,
     ...typeScale.caption,
     color: colors.textMuted,
   },
-  previousSetValue: {
-    ...typeScale.statSmall,
+  previousColumnInput: {
+    flex: 1,
+    ...typeScale.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  previousSets: {
+    marginTop: spacing.xs,
+  },
+  previousSet: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  previousSetNumber: {
+    width: 28,
+    ...typeScale.caption,
+    color: colors.textMuted,
+  },
+  previousSetWeight: {
+    flex: 1,
+    marginHorizontal: spacing.xs,
+    ...typeScale.secondary,
     color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  previousSetReps: {
+    flex: 1,
+    marginHorizontal: spacing.xs,
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+    textAlign: 'center',
   },
 
   // ---- Set rows --------------------------------------------------------------

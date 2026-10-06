@@ -1,6 +1,6 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
-import { fonts } from '../design/theme';
+import { typeScale } from '../design/theme';
 import { arePropsEqual, ExerciseCard } from './ExerciseCard';
 
 const baseProps = {
@@ -158,7 +158,7 @@ describe('ExerciseCard', () => {
       />,
     );
 
-    expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(/\(L\)/);
+    expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(/L 42\.5 lb/);
   });
 
   it('calls onViewHistory when View History is pressed', () => {
@@ -354,29 +354,37 @@ describe('ExerciseCard -- a plain block, quiet controls, previous numbers beside
     }
   });
 
-  it('prints each previous set as "weight unit × reps", numbered, with the side for unilateral sets', () => {
+  it('puts each previous set in set-grid columns: number, weight with its side, then reps', () => {
     render(<ExerciseCard {...baseProps} previousSession={previousSession} />);
 
     const first = within(screen.getByTestId('exercise-card-previous-set-1'));
     expect(first.getByText('1')).toBeTruthy();
-    expect(first.getByText('225 lb × 5')).toBeTruthy();
-    expect(screen.getByTestId('exercise-card-previous-set-2')).toHaveTextContent(
-      /^2\s*42\.5 lb × 10 \(R\)$/,
+    expect(first.getByText('225 lb')).toBeTruthy();
+    expect(first.getByText('5')).toBeTruthy();
+
+    const second = within(screen.getByTestId('exercise-card-previous-set-2'));
+    expect(second.getByText('2')).toBeTruthy();
+    expect(second.getByText('R 42.5 lb')).toBeTruthy();
+    expect(second.getByText('10')).toBeTruthy();
+  });
+
+  it('reads each previous set aloud as a whole sentence for assistive tech', () => {
+    render(<ExerciseCard {...baseProps} previousSession={previousSession} />);
+
+    expect(screen.getByTestId('exercise-card-previous-set-2').props.accessibilityLabel).toBe(
+      'Set 2 right: 42.5 lb for 10 reps',
     );
   });
 
-  it('lets the previous sets wrap onto more lines instead of scrolling sideways, in a mono readout', () => {
+  it('emphasises the reps with the statistic style rather than the weight', () => {
     render(<ExerciseCard {...baseProps} previousSession={previousSession} />);
 
-    expect(
-      screen
-        .UNSAFE_getAllByType(View)
-        .some((node) => StyleSheet.flatten(node.props.style)?.flexWrap === 'wrap'),
-    ).toBe(true);
-    const value = within(screen.getByTestId('exercise-card-previous-set-1')).getByText(
-      '225 lb × 5',
+    const reps = within(screen.getByTestId('exercise-card-previous-set-1')).getByText('5');
+    expect(StyleSheet.flatten(reps.props.style).fontFamily).toBe(typeScale.statSmall.fontFamily);
+    const weight = within(screen.getByTestId('exercise-card-previous-set-1')).getByText('225 lb');
+    expect(StyleSheet.flatten(weight.props.style).fontFamily).not.toBe(
+      typeScale.statSmall.fontFamily,
     );
-    expect(StyleSheet.flatten(value.props.style).fontFamily).toBe(fonts.monoBold);
   });
 
   it('shows no per-set proportion bars or cards for the previous session', () => {
