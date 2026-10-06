@@ -111,6 +111,9 @@ export class FeedService {
         .in('user_id', followeeIds)
         .not('completed_at', 'is', null)
         .is('deleted_at', null)
+        // A workout a trainer logged for a client is the client's own, but it is not
+        // something the client chose to share with followers (trainer mode, workouts only).
+        .is('logged_by', null)
         .order('performed_at', { ascending: false })
         .range(from, to),
       foodLogsQuery,

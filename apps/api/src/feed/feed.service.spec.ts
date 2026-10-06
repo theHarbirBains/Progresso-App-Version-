@@ -242,6 +242,20 @@ describe('FeedService', () => {
       expect(result.items).toEqual([]);
     });
 
+    it('leaves workouts a trainer logged for a client out of the friends feed', async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
+      client.queue('workouts', { data: [], error: null });
+      client.queue('food_logs', { data: [], error: null });
+      const service = serviceWith(client);
+
+      await service.getFriendsFeed('user-1', 0);
+
+      const workoutsIndex = client.from.mock.calls.findIndex(([table]) => table === 'workouts');
+      const workoutsBuilder = client.from.mock.results[workoutsIndex]?.value;
+      expect(workoutsBuilder.is).toHaveBeenCalledWith('logged_by', null);
+    });
+
     it('flags hasMore when a full page of workouts comes back', async () => {
       const client = createMockClient();
       client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
