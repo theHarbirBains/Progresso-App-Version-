@@ -45,6 +45,9 @@ import { FeedScreen } from './src/screens/FeedScreen';
 import { FindPeopleScreen } from './src/screens/FindPeopleScreen';
 import { TrainerAccessScreen } from './src/screens/TrainerAccessScreen';
 import { TrainerClaimScreen } from './src/screens/TrainerClaimScreen';
+import { GroupsScreen } from './src/screens/GroupsScreen';
+import { GroupSessionScreen } from './src/screens/GroupSessionScreen';
+import { TrainerLiveWorkoutScreen } from './src/screens/TrainerLiveWorkoutScreen';
 import { TrainerClaimCodeScreen } from './src/screens/TrainerClaimCodeScreen';
 import { TrainerClientDetailScreen } from './src/screens/TrainerClientDetailScreen';
 import { TrainerClientFormScreen } from './src/screens/TrainerClientFormScreen';
@@ -293,6 +296,9 @@ function Root() {
                 <Stack.Screen name="Profile" component={ProfileScreen} />
                 <Stack.Screen name="TrainerAccess" component={TrainerAccessScreen} />
                 <Stack.Screen name="TrainerClaim" component={TrainerClaimScreen} />
+                <Stack.Screen name="Groups" component={GroupsScreen} />
+                <Stack.Screen name="GroupSession" component={GroupSessionScreen} />
+                <Stack.Screen name="TrainerLiveWorkout" component={TrainerLiveWorkoutScreen} />
                 <Stack.Screen name="TrainerClaimCode" component={TrainerClaimCodeScreen} />
                 <Stack.Screen name="TrainerClients" component={TrainerClientsScreen} />
                 <Stack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
@@ -343,7 +349,10 @@ function Root() {
             }
             onNavigate={(route) => {
               setMenuOpen(false);
-              navigationRef.current?.navigate(route);
+              // Menu routes take no params, which the navigator's typed overloads cannot accept as one union.
+              const navigateByName = navigationRef.current?.navigate as
+                ((name: AppMenuRoute) => void) | undefined;
+              navigateByName?.call(navigationRef.current, route);
             }}
             onClose={() => setMenuOpen(false)}
             accentColor={

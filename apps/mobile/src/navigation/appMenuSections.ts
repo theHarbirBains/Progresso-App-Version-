@@ -79,6 +79,7 @@ export const APP_MENU_SECTIONS: AppMenuSection[] = [
       { route: 'FindPeople', label: 'Find People', icon: 'user-plus' },
       // Everyone sees this: requests from trainers, and who can log for them.
       { route: 'TrainerAccess', label: 'Trainer Access', icon: 'user-check' },
+      { route: 'Groups', label: 'Group Workouts', icon: 'users' },
     ],
   },
 ];

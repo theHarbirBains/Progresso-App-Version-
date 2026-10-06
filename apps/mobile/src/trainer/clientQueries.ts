@@ -63,3 +63,21 @@ export async function fetchClientPersonalRecords(clientId: string): Promise<Clie
 
   return rows.sort((a, b) => a.exerciseName.localeCompare(b.exerciseName) || a.reps - b.reps);
 }
+
+/** The trainer's open live session for this client, if one is running. */
+export async function fetchOpenLiveSession(
+  clientId: string,
+  trainerId: string,
+): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('id, name')
+    .eq('user_id', clientId)
+    .eq('logged_by', trainerId)
+    .is('completed_at', null)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const row = data as { id: string; name: string } | null;
+  return row ? { id: row.id, name: row.name } : null;
+}

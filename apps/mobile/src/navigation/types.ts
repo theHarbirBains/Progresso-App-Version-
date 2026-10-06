@@ -26,6 +26,12 @@ export type RootStackParamList = {
   TrainerEditClient: { clientId: string };
   TrainerClientDetail: { clientId: string; clientName?: string };
   TrainerAccess: undefined;
+  /** Group workouts: start one, and see the live ones you are in. */
+  Groups: undefined;
+  /** One group session: every member's workout, editable by anyone in the group. */
+  GroupSession: { groupId: string };
+  /** A live session a trainer runs for a client, finished by the trainer. */
+  TrainerLiveWorkout: { workoutId: string; clientId: string; clientName?: string };
   /** The one-time code a trainer gets for a client they track before that client has an account. */
   TrainerClaimCode: { code: string; clientId: string; clientName?: string };
   /** The client's side: enter the code a trainer gave them to move their tracked history onto their account. */

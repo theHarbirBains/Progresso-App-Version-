@@ -15,6 +15,7 @@ import {
   listTrainerClients,
   regenerateTrainerClaimCode,
   type TrainerClient,
+  startLiveWorkout,
 } from '../lib/api';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -24,6 +25,7 @@ import {
   fetchClientWorkouts,
   type ClientRecordRow,
   type ClientWorkoutRow,
+  fetchOpenLiveSession,
 } from '../trainer/clientQueries';
 import { formatTrainerHeight, trainerClientStatusLabel } from '../trainer/trainerLabels';
 import { formatCardDate } from '../workouts/workoutFormat';
@@ -44,7 +46,7 @@ interface ClientData {
  */
 export function TrainerClientDetailScreen({ navigation, route }: Props) {
   const { clientId, clientName } = route.params;
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const accessToken = session?.access_token;
   const { weightUnit } = useProgressTheme();
 
@@ -52,6 +54,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
+  const [liveSession, setLiveSession] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!accessToken) return;
@@ -68,17 +71,32 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
         fetchClientWorkouts(clientId),
         fetchClientPersonalRecords(clientId),
       ]);
+      setLiveSession(await fetchOpenLiveSession(clientId, user?.id ?? ''));
       setData({ client, workouts, records });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this client');
     } finally {
       setLoading(false);
     }
-  }, [accessToken, clientId]);
+  }, [accessToken, clientId, user?.id]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function startLive() {
+    if (!accessToken) return;
+    try {
+      const { workoutId } = await startLiveWorkout(accessToken, clientId, 'Live session');
+      navigation.navigate('TrainerLiveWorkout', {
+        workoutId,
+        clientId,
+        clientName: client?.displayName ?? clientName,
+      });
+    } catch (err) {
+      Alert.alert('Could not start the session', err instanceof Error ? err.message : 'Try again');
+    }
+  }
 
   async function getClaimCode() {
     if (!accessToken) return;
@@ -187,6 +205,27 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                   navigation.navigate('TrainerLogWorkout', { clientId, clientName: title })
                 }
               />
+              {client.status === 'active' ? (
+                liveSession ? (
+                  <PrimaryButton
+                    testID="trainer-client-resume-live"
+                    label="Resume Live Session"
+                    onPress={() =>
+                      navigation.navigate('TrainerLiveWorkout', {
+                        workoutId: liveSession.id,
+                        clientId,
+                        clientName: client.displayName ?? clientName,
+                      })
+                    }
+                  />
+                ) : (
+                  <SecondaryButton
+                    testID="trainer-client-start-live"
+                    label="Start Live Session"
+                    onPress={() => void startLive()}
+                  />
+                )
+              ) : null}
               {client.awaitingClaim ? (
                 <SecondaryButton
                   testID="trainer-client-claim-code"

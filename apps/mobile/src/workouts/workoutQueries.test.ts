@@ -441,7 +441,7 @@ describe('createWorkout', () => {
           data: null,
           error: {
             message:
-              'duplicate key value violates unique constraint "workouts_one_active_per_user"',
+              'duplicate key value violates unique constraint "workouts_one_active_per_session"',
             code: '23505',
           },
         }).builder;

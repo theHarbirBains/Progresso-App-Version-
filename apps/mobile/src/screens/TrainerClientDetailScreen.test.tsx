@@ -12,11 +12,13 @@ jest.mock('../lib/api', () => ({
   endTrainerClient: jest.fn(),
   listTrainerClients: jest.fn(),
   regenerateTrainerClaimCode: jest.fn(),
+  startLiveWorkout: jest.fn(),
 }));
 
 jest.mock('../trainer/clientQueries', () => ({
   fetchClientWorkouts: jest.fn(),
   fetchClientPersonalRecords: jest.fn(),
+  fetchOpenLiveSession: jest.fn(async () => null),
 }));
 
 jest.mock('../progress/useProgressTheme', () => ({
@@ -122,6 +124,23 @@ describe('TrainerClientDetailScreen', () => {
       }),
     );
     expect(mockRegenerate).toHaveBeenCalledWith('token-123', 'client-1');
+  });
+
+  it('starts a live session for an active client, and opens it', async () => {
+    const { startLiveWorkout } = jest.requireMock('../lib/api') as { startLiveWorkout: jest.Mock };
+    startLiveWorkout.mockResolvedValue({ workoutId: 'live-1' });
+    renderDetail();
+
+    fireEvent.press(await screen.findByTestId('trainer-client-start-live'));
+
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('TrainerLiveWorkout', {
+        workoutId: 'live-1',
+        clientId: 'client-1',
+        clientName: 'Sam',
+      }),
+    );
+    expect(startLiveWorkout).toHaveBeenCalledWith('token-123', 'client-1', 'Live session');
   });
 
   it('says so when the client is no longer linked, and shows none of their data', async () => {

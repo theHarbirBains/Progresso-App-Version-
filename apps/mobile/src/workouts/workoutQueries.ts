@@ -65,7 +65,7 @@ export interface WorkoutDetail extends WorkoutSummary {
   exercises: WorkoutExerciseWithSets[];
 }
 
-const ACTIVE_WORKOUT_CONFLICT_CONSTRAINT = 'workouts_one_active_per_user';
+const ACTIVE_WORKOUT_CONFLICT_CONSTRAINT = 'workouts_one_active_per_session';
 
 // Exported so other modules deriving from the same row shape (e.g. the
 // Workouts tab's month-range fetch/enrichment) share one mapping instead of
@@ -93,6 +93,8 @@ export async function fetchActiveWorkout(userId: string): Promise<WorkoutSummary
     .eq('user_id', userId)
     .is('completed_at', null)
     .is('deleted_at', null)
+    .is('group_id', null)
+    .is('logged_by', null)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -298,7 +300,7 @@ export async function createWorkout(
  * "no live tracking, no in-progress state" flow. Since completed_at is
  * already set, this can never collide with the one-active-workout-per-user
  * constraint (a partial index that only applies while completed_at is
- * null -- see workouts_one_active_per_user) -- unlike createWorkout, there's
+ * null -- see workouts_one_active_per_session) -- unlike createWorkout, there's
  * no conflict case to handle here. The PR/1RM trigger chain reads whatever
  * performed_at ends up in this row, so a backdated set still recomputes
  * correctly against the real historical order of things.

@@ -780,3 +780,153 @@ export function claimTrainerHistory(
     body: JSON.stringify({ code }),
   });
 }
+
+// Group workouts (see apps/api/src/groups). Friends, clients and guests can be in a group;
+// every joined member can read and edit every group workout's exercises and sets.
+export interface GroupSummary {
+  id: string;
+  name: string;
+  hostId: string;
+  startedAt: string;
+  myRole: 'host' | 'member';
+}
+
+export interface GroupMember {
+  userId: string;
+  displayName: string | null;
+  role: 'host' | 'member';
+  status: 'invited' | 'joined';
+  isGuest: boolean;
+  /** This member's workout in the group, or null while they are only invited. */
+  workoutId: string | null;
+}
+
+export interface GroupDetail {
+  id: string;
+  name: string;
+  status: 'live' | 'finished';
+  hostId: string;
+  startedAt: string;
+  finishedAt: string | null;
+  members: GroupMember[];
+}
+
+export interface GroupInvite {
+  groupId: string;
+  name: string;
+  hostDisplayName: string | null;
+  invitedAt: string;
+}
+
+export function createGroup(
+  accessToken: string,
+  input: { name: string; workoutId?: string },
+): Promise<{ groupId: string }> {
+  return request<{ groupId: string }>('/api/v1/groups', accessToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function listGroups(accessToken: string): Promise<GroupSummary[]> {
+  return request<GroupSummary[]>('/api/v1/groups', accessToken);
+}
+
+export function listGroupInvites(accessToken: string): Promise<GroupInvite[]> {
+  return request<GroupInvite[]>('/api/v1/groups/invites', accessToken);
+}
+
+export function getGroup(accessToken: string, groupId: string): Promise<GroupDetail> {
+  return request<GroupDetail>(`/api/v1/groups/${encodeURIComponent(groupId)}`, accessToken);
+}
+
+export function inviteToGroup(
+  accessToken: string,
+  groupId: string,
+  username: string,
+): Promise<{ userId: string; status: 'invited' | 'joined' }> {
+  return request(`/api/v1/groups/${encodeURIComponent(groupId)}/members`, accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ username }),
+  });
+}
+
+export function addGroupGuest(
+  accessToken: string,
+  groupId: string,
+  displayName: string,
+): Promise<{ userId: string }> {
+  return request(`/api/v1/groups/${encodeURIComponent(groupId)}/guests`, accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ displayName }),
+  });
+}
+
+export function respondToGroupInvite(
+  accessToken: string,
+  groupId: string,
+  action: 'accept' | 'decline',
+): Promise<{ ok: true }> {
+  return request<{ ok: true }>(
+    `/api/v1/groups/${encodeURIComponent(groupId)}/invite`,
+    accessToken,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ action }),
+    },
+  );
+}
+
+export function finishGroup(accessToken: string, groupId: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(
+    `/api/v1/groups/${encodeURIComponent(groupId)}/finish`,
+    accessToken,
+    {
+      method: 'POST',
+    },
+  );
+}
+
+export function leaveGroup(accessToken: string, groupId: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/api/v1/groups/${encodeURIComponent(groupId)}/leave`, accessToken, {
+    method: 'POST',
+  });
+}
+
+// Trainer live sessions for a client: started, added to as it happens, and finished by the trainer.
+export function startLiveWorkout(
+  accessToken: string,
+  clientId: string,
+  name: string,
+): Promise<{ workoutId: string }> {
+  return request<{ workoutId: string }>(
+    `/api/v1/trainer/clients/${encodeURIComponent(clientId)}/live-workouts`,
+    accessToken,
+    { method: 'POST', body: JSON.stringify({ name }) },
+  );
+}
+
+export function finishLiveWorkout(
+  accessToken: string,
+  clientId: string,
+  workoutId: string,
+): Promise<{ ok: true }> {
+  return request<{ ok: true }>(
+    `/api/v1/trainer/clients/${encodeURIComponent(clientId)}/live-workouts/${encodeURIComponent(workoutId)}/finish`,
+    accessToken,
+    { method: 'POST' },
+  );
+}
+
+/** The exercise id to use in a client's live session (the client's own copy of a trainer's exercise). */
+export function resolveClientExercise(
+  accessToken: string,
+  clientId: string,
+  exerciseId: string,
+): Promise<{ exerciseId: string }> {
+  return request<{ exerciseId: string }>(
+    `/api/v1/trainer/clients/${encodeURIComponent(clientId)}/exercises/resolve`,
+    accessToken,
+    { method: 'POST', body: JSON.stringify({ exerciseId }) },
+  );
+}

@@ -3,7 +3,8 @@ import { Alert, ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
-import { PrimaryButton, TextButton } from '../design/Button';
+import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
+import { createGroup } from '../lib/api';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
@@ -144,7 +145,7 @@ function computeUnilateralSets(
 // endpoint.
 export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const { workoutId } = route.params;
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
@@ -153,6 +154,24 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+  const [startingGroup, setStartingGroup] = useState(false);
+
+  // Starts a group from this workout: the group session includes it as this person's workout.
+  async function handleStartGroup() {
+    if (!session?.access_token || startingGroup || !workout) return;
+    setStartingGroup(true);
+    try {
+      const { groupId } = await createGroup(session.access_token, {
+        name: workout.name,
+        workoutId,
+      });
+      navigation.navigate('GroupSession', { groupId });
+    } catch (err) {
+      Alert.alert('Could not start a group', err instanceof Error ? err.message : 'Try again');
+    } finally {
+      setStartingGroup(false);
+    }
+  }
   const [cancelling, setCancelling] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
@@ -754,6 +773,12 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         </ScrollView>
 
         <View style={styles.footer}>
+          <SecondaryButton
+            testID="start-group-from-workout"
+            label={startingGroup ? 'Starting group…' : 'Start a Group From This Workout'}
+            onPress={() => void handleStartGroup()}
+            disabled={startingGroup}
+          />
           <PrimaryButton
             testID="complete-workout"
             label={completing ? 'Completing…' : 'Finish Workout'}
