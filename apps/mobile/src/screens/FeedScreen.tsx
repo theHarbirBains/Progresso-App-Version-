@@ -25,6 +25,7 @@ import { FoodImage } from '../nutrition/FoodImage';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
+import { fetchActiveWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
 import { RecentWorkoutTopSets } from '../feed/RecentWorkoutTopSets';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
@@ -265,12 +266,27 @@ export function FeedScreen({ navigation }: Props) {
   const loadNextWorkoutRef = useRef(loadNextWorkout);
   loadNextWorkoutRef.current = loadNextWorkout;
 
+  // A workout that is still open is shown here, so reopening the app finds it (it is never
+  // cancelled by the app itself). Tapping it resumes it.
+  const [liveWorkout, setLiveWorkout] = useState<WorkoutSummary | null>(null);
+  const loadLiveWorkout = useCallback(async () => {
+    if (!userId) return;
+    try {
+      setLiveWorkout(await fetchActiveWorkout(userId));
+    } catch {
+      setLiveWorkout(null);
+    }
+  }, [userId]);
+  const loadLiveWorkoutRef = useRef(loadLiveWorkout);
+  loadLiveWorkoutRef.current = loadLiveWorkout;
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       void load();
       void loadFriends();
       void loadNotificationBadgeCount();
       void loadNextWorkoutRef.current();
+      void loadLiveWorkoutRef.current();
     });
     return unsubscribe;
   }, [navigation, load, loadFriends, loadNotificationBadgeCount]);
@@ -434,6 +450,7 @@ export function FeedScreen({ navigation }: Props) {
   function retryAll() {
     void load();
     void loadFriends();
+    void loadLiveWorkout();
   }
 
   async function handleLoadMoreAll() {
@@ -501,6 +518,29 @@ export function FeedScreen({ navigation }: Props) {
           }}
         />
       </BubbleMenu>
+
+      {liveWorkout ? (
+        <Card
+          heroColor={theme.accent}
+          testID="feed-live-workout"
+          onPress={() => navigation.navigate('ActiveWorkout', { workoutId: liveWorkout.id })}
+          accessibilityLabel={`Workout in progress: ${liveWorkout.name}. Resume`}
+        >
+          <Text style={[styles.nextWorkoutEyebrow, { color: withAlpha(theme.onAccent, 0.72) }]}>
+            Workout in progress
+          </Text>
+          <Text style={[styles.nextWorkoutDayName, { color: theme.onAccent }]}>
+            {liveWorkout.name}
+          </Text>
+          <PrimaryButton
+            testID="feed-resume-workout"
+            label="Resume Workout"
+            onPress={() => navigation.navigate('ActiveWorkout', { workoutId: liveWorkout.id })}
+            accentColor={theme.onAccent}
+            onAccentColor={theme.accent}
+          />
+        </Card>
+      ) : null}
 
       {nextPlan ? (
         <Card

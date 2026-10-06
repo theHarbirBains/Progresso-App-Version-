@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { fetchActiveWorkout } from '../workouts/workoutQueries';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Card } from '../design/Card';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
@@ -25,6 +26,10 @@ jest.mock('../lib/api', () => ({
   listFollowNotifications: jest.fn(),
 }));
 
+jest.mock('../workouts/workoutQueries', () => ({
+  fetchActiveWorkout: jest.fn().mockResolvedValue(null),
+}));
+
 jest.mock('../feed/feedQueries', () => ({
   fetchFeedItems: jest.fn(),
 }));
@@ -40,6 +45,7 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchActiveWorkout = fetchActiveWorkout as jest.Mock;
 const mockFetchFeedItems = fetchFeedItems as jest.Mock;
 const mockFetchFriendsFeed = fetchFriendsFeed as jest.Mock;
 const mockListFollowNotifications = listFollowNotifications as jest.Mock;
@@ -752,5 +758,44 @@ describe('FeedScreen -- Next Workout widget', () => {
 
     const card = await screen.findByTestId('feed-next-workout');
     expect(StyleSheet.flatten(card.props.style).backgroundColor).toBe(DEFAULT_WORKOUT_THEME.accent);
+  });
+});
+
+describe('FeedScreen live workout', () => {
+  it('shows a workout that is still open, so reopening the app finds it', async () => {
+    mockFetchActiveWorkout.mockResolvedValue({
+      id: 'live-1',
+      name: 'Leg Day',
+      performedAt: '2026-10-05T10:00:00Z',
+      completedAt: null,
+      workoutSplitDayId: null,
+    });
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-live-workout')).toHaveTextContent('Leg Day', {
+      exact: false,
+    });
+  });
+
+  it('resumes that workout when it is tapped', async () => {
+    mockFetchActiveWorkout.mockResolvedValue({
+      id: 'live-1',
+      name: 'Leg Day',
+      performedAt: '2026-10-05T10:00:00Z',
+      completedAt: null,
+      workoutSplitDayId: null,
+    });
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('feed-resume-workout'));
+    expect(mockNavigate).toHaveBeenCalledWith('ActiveWorkout', { workoutId: 'live-1' });
+  });
+
+  it('shows nothing when no workout is open', async () => {
+    mockFetchActiveWorkout.mockResolvedValue(null);
+    renderScreen();
+
+    await waitFor(() => expect(mockFetchActiveWorkout).toHaveBeenCalled());
+    expect(screen.queryByTestId('feed-live-workout')).toBeNull();
   });
 });

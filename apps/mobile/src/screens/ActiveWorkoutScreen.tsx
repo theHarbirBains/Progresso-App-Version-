@@ -36,6 +36,13 @@ import {
   type WorkoutDetail,
   type WorkoutExerciseWithSets,
 } from '../workouts/workoutQueries';
+import {
+  clearLiveWorkoutDraft,
+  loadLiveWorkoutDraft,
+  mergeLiveWorkoutDrafts,
+  pendingDraftsFor,
+  saveLiveWorkoutDraft,
+} from '../workouts/liveWorkoutDraft';
 import { computeTotalSets } from '../workouts/workoutSummary';
 import { WorkoutStats } from '../workouts/WorkoutStats';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
@@ -151,6 +158,21 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
 
   const [setInputs, setSetInputs] = useState<Record<string, SetInputDraft>>({});
+  // Mirrors what is typed into open sets to the device, so an app close or reset mid-set doesn't
+  // lose it. Debounced so typing never waits on storage. Completed sets are saved on the server
+  // instead, so only open sets are kept here.
+  useEffect(() => {
+    if (!workout || loading) return;
+    const timer = setTimeout(() => {
+      const openSetIds = new Set(
+        workout.exercises.flatMap((exercise) =>
+          exercise.sets.filter((set) => set.completedAt === null).map((set) => set.id),
+        ),
+      );
+      void saveLiveWorkoutDraft(workout.id, pendingDraftsFor(setInputs, openSetIds));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [setInputs, workout, loading]);
   // Every set from the user's last completed session with each exercise
   // already in THIS workout -- keyed by exerciseId, not workoutExerciseId,
   // so it reflects real history across past workouts. fetchPreviousPerformance
@@ -190,15 +212,20 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         if (cancelled) return;
         setWorkout(detail);
 
-        const nextInputs: Record<string, SetInputDraft> = {};
+        const savedInputs: Record<string, SetInputDraft> = {};
+        const openSetIds = new Set<string>();
         for (const exercise of detail.exercises) {
           for (const set of exercise.sets) {
-            nextInputs[set.id] = {
+            savedInputs[set.id] = {
               weight: set.weightKg !== null ? formatWeightKg(set.weightKg, weightUnit) : '',
               reps: set.reps !== null ? String(set.reps) : '',
             };
+            if (set.completedAt === null) openSetIds.add(set.id);
           }
         }
+        // Values typed into open sets before the app was closed or reset come back here.
+        const drafts = await loadLiveWorkoutDraft(workoutId);
+        const nextInputs = mergeLiveWorkoutDrafts(savedInputs, drafts, openSetIds);
         setSetInputs(nextInputs);
 
         // Last completed session per exercise already in this workout --
@@ -521,6 +548,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     setCompleting(true);
     try {
       await completeWorkout(workout.id);
+      void clearLiveWorkoutDraft(workout.id);
       // The only thing that changes what AllTimeStatsProvider's cache holds
       // -- refreshes it now so Profile/Progress already have this workout's
       // stats and PRs the moment they're next visited, instead of a stale
@@ -551,6 +579,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       // enters history, never advances split progression, and never
       // affects PR/1RM data. See cancelWorkout's own comment.
       await cancelWorkout(workout.id);
+      void clearLiveWorkoutDraft(workout.id);
       navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to cancel workout');
