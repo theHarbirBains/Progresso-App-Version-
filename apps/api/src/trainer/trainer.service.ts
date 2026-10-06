@@ -1,12 +1,16 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { SupabaseService } from '../supabase/supabase.service';
 import type { AddClientDto } from './dto/add-client.dto';
+import type { TrackClientDto } from './dto/track-client.dto';
 import type { LogWorkoutDto } from './dto/log-workout.dto';
 import type { UpdateClientProfileDto } from './dto/update-client-profile.dto';
 
@@ -20,6 +24,8 @@ export interface TrainerClientSummary {
   /** Only set for an invite: the address the trainer typed. */
   email: string | null;
   status: 'invited' | 'pending' | 'active';
+  /** A tracked client with no account yet: their history is waiting for a claim code. */
+  awaitingClaim: boolean;
   source: TrainerLinkSource;
   displayName: string | null;
   birthday: string | null;
@@ -80,6 +86,31 @@ interface ProfileFields {
   weight_unit?: 'kg' | 'lb';
 }
 
+const CLAIM_CODE_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const CLAIM_WINDOW_MS = 60 * 60 * 1000;
+const CLAIM_ATTEMPTS_PER_WINDOW = 10;
+// No 0/O or 1/I/L, so a code read aloud or typed from a screen is unambiguous.
+const CLAIM_ALPHABET = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
+
+function generateClaimCode(): string {
+  let code = '';
+  for (let i = 0; i < 8; i += 1) code += CLAIM_ALPHABET[randomInt(CLAIM_ALPHABET.length)];
+  return code;
+}
+
+function normaliseClaimCode(raw: string): string {
+  return raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function formatClaimCode(code: string): string {
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
+function hashClaimCode(raw: string): string {
+  return createHash('sha256').update(normaliseClaimCode(raw)).digest('hex');
+}
+
 /**
  * Trainer mode, workouts only (docs/proposals/trainer-mode/README.md).
  *
@@ -91,6 +122,9 @@ interface ProfileFields {
  */
 @Injectable()
 export class TrainerService {
+  /** Recent claim attempts per user, for the limit in claimHistory. */
+  private readonly claimAttempts = new Map<string, number[]>();
+
   constructor(private readonly supabaseService: SupabaseService) {}
 
   async getStatus(userId: string): Promise<{ isTrainer: boolean }> {
@@ -101,7 +135,7 @@ export class TrainerService {
     await this.assertTrainer(trainerId);
     const client = this.supabaseService.getClient();
 
-    const [linksResult, invitesResult] = await Promise.all([
+    const [linksResult, invitesResult, trackedResult] = await Promise.all([
       client
         .from('trainer_clients')
         .select('client_id, status, source')
@@ -114,8 +148,13 @@ export class TrainerService {
         )
         .eq('trainer_id', trainerId)
         .eq('status', 'pending'),
+      client
+        .from('trainer_placeholder_clients')
+        .select('placeholder_user_id')
+        .eq('trainer_id', trainerId)
+        .is('claimed_at', null),
     ]);
-    if (linksResult.error || invitesResult.error) {
+    if (linksResult.error || invitesResult.error || trackedResult.error) {
       throw new InternalServerErrorException('Failed to load clients');
     }
 
@@ -124,6 +163,11 @@ export class TrainerService {
       status: 'pending' | 'active';
       source: TrainerLinkSource;
     }[];
+    const awaiting = new Set(
+      ((trackedResult.data ?? []) as { placeholder_user_id: string }[]).map(
+        (row) => row.placeholder_user_id,
+      ),
+    );
     const profiles = linkRows.length
       ? await this.loadProfiles(linkRows.map((row) => row.client_id))
       : new Map<string, ProfileRow>();
@@ -135,6 +179,7 @@ export class TrainerService {
         inviteId: null,
         email: null,
         status: row.status,
+        awaitingClaim: awaiting.has(row.client_id),
         source: row.source,
         displayName: profile?.display_name ?? null,
         birthday: profile?.birthday ?? null,
@@ -151,6 +196,7 @@ export class TrainerService {
         inviteId: row.id,
         email: row.email,
         status: 'invited',
+        awaitingClaim: false,
         source: 'managed',
         displayName: row.display_name,
         birthday: row.birthday,
@@ -537,6 +583,197 @@ export class TrainerService {
       details: (row.details as Record<string, unknown>) ?? {},
       createdAt: row.created_at as string,
     }));
+  }
+
+  /**
+   * Tracks a client who has no Progresso account. The account is a placeholder
+   * that nobody can sign in to, so every workout the trainer logs has an owner
+   * from the start. The trainer gets a claim code to give the client.
+   */
+  async trackClient(
+    trainerId: string,
+    dto: TrackClientDto,
+  ): Promise<{ clientId: string; claimCode: string; expiresAt: string }> {
+    await this.assertTrainer(trainerId);
+    const client = this.supabaseService.getClient();
+
+    const { data: created, error: createError } = await client.auth.admin.createUser({
+      email: `placeholder-${randomUUID()}@placeholders.invalid`,
+      email_confirm: true,
+      user_metadata: { placeholder: true },
+    });
+    if (createError || !created?.user) {
+      throw new InternalServerErrorException('Failed to create the client');
+    }
+    const clientId = created.user.id;
+
+    await this.updateProfile(clientId, {
+      display_name: dto.displayName,
+      birthday: dto.birthday,
+      height_value: dto.heightValue,
+      height_unit: dto.heightUnit,
+      weight_value: dto.weightValue,
+      weight_unit: dto.weightUnit,
+    });
+
+    const { error: linkError } = await client.from('trainer_clients').insert({
+      trainer_id: trainerId,
+      client_id: clientId,
+      status: 'active',
+      source: 'managed',
+    });
+    if (linkError) throw new InternalServerErrorException('Failed to link client');
+
+    const code = await this.issueClaimCode(trainerId, clientId, true);
+    await this.audit(
+      trainerId,
+      clientId,
+      'client.tracked',
+      'trainer_placeholder_clients',
+      null,
+      {},
+    );
+    return { clientId, ...code };
+  }
+
+  /** A new claim code for a tracked client. The old code stops working at once. */
+  async regenerateClaimCode(
+    trainerId: string,
+    clientId: string,
+  ): Promise<{ claimCode: string; expiresAt: string }> {
+    await this.assertTrainer(trainerId);
+    await this.assertActiveLink(trainerId, clientId);
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('trainer_placeholder_clients')
+      .select('id')
+      .eq('trainer_id', trainerId)
+      .eq('placeholder_user_id', clientId)
+      .is('claimed_at', null)
+      .maybeSingle();
+    if (error) throw new InternalServerErrorException('Failed to look up the client');
+    if (!data) {
+      throw new NotFoundException('This client has no history waiting to be claimed');
+    }
+
+    const code = await this.issueClaimCode(trainerId, clientId, false);
+    await this.audit(
+      trainerId,
+      clientId,
+      'claim_code.regenerated',
+      'trainer_placeholder_clients',
+      null,
+      {},
+    );
+    return code;
+  }
+
+  /**
+   * The client enters the code their trainer gave them. Their tracked history moves
+   * onto their own account. Their trainer link then waits for them to accept it.
+   */
+  async claimHistory(userId: string, rawCode: string): Promise<{ workouts: number }> {
+    this.enforceClaimLimit(userId);
+    const client = this.supabaseService.getClient();
+
+    const { data: row, error } = await client
+      .from('trainer_placeholder_clients')
+      .select('trainer_id, placeholder_user_id, code_expires_at')
+      .eq('code_hash', hashClaimCode(rawCode))
+      .is('claimed_at', null)
+      .maybeSingle();
+    if (error) throw new InternalServerErrorException('Failed to check the code');
+    const placeholder = row as {
+      trainer_id: string;
+      placeholder_user_id: string;
+      code_expires_at: string;
+    } | null;
+    if (!placeholder) {
+      throw new BadRequestException(
+        'That code is not valid. Check it, or ask your trainer for a new one.',
+      );
+    }
+    if (Date.parse(placeholder.code_expires_at) <= Date.now()) {
+      throw new BadRequestException('That code has expired. Ask your trainer for a new one.');
+    }
+    if (placeholder.trainer_id === userId) {
+      throw new BadRequestException('A trainer cannot claim a client they track');
+    }
+
+    const { data: moved, error: rpcError } = await client.rpc('claim_placeholder_history', {
+      p_placeholder: placeholder.placeholder_user_id,
+      p_client: userId,
+    });
+    if (rpcError) throw this.mapClaimError(rpcError.message);
+
+    // The history now belongs to the client. The placeholder has nothing left and
+    // cannot sign in, so a failure to delete it is harmless and not reported.
+    await client.auth.admin.deleteUser(placeholder.placeholder_user_id);
+
+    const workouts = Number(moved ?? 0);
+    await this.audit(
+      placeholder.trainer_id,
+      userId,
+      'history.claimed',
+      'trainer_placeholder_clients',
+      null,
+      {
+        workouts,
+      },
+    );
+    return { workouts };
+  }
+
+  private async issueClaimCode(
+    trainerId: string,
+    placeholderId: string,
+    isNew: boolean,
+  ): Promise<{ claimCode: string; expiresAt: string }> {
+    const raw = generateClaimCode();
+    const expiresAt = new Date(Date.now() + CLAIM_CODE_DAYS * DAY_MS).toISOString();
+    const client = this.supabaseService.getClient();
+    const fields = { code_hash: hashClaimCode(raw), code_expires_at: expiresAt };
+
+    if (isNew) {
+      const { error } = await client
+        .from('trainer_placeholder_clients')
+        .insert({ trainer_id: trainerId, placeholder_user_id: placeholderId, ...fields });
+      if (error) throw new InternalServerErrorException('Failed to create a claim code');
+    } else {
+      const { error } = await client
+        .from('trainer_placeholder_clients')
+        .update(fields)
+        .eq('trainer_id', trainerId)
+        .eq('placeholder_user_id', placeholderId)
+        .is('claimed_at', null);
+      if (error) throw new InternalServerErrorException('Failed to create a claim code');
+    }
+    return { claimCode: formatClaimCode(normaliseClaimCode(raw)), expiresAt };
+  }
+
+  /** At most CLAIM_ATTEMPTS_PER_WINDOW tries per user per hour, so a code cannot be guessed by trying many. */
+  private enforceClaimLimit(userId: string): void {
+    const now = Date.now();
+    const recent = (this.claimAttempts.get(userId) ?? []).filter(
+      (at) => now - at < CLAIM_WINDOW_MS,
+    );
+    if (recent.length >= CLAIM_ATTEMPTS_PER_WINDOW) {
+      throw new HttpException('Too many attempts. Try again later.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    recent.push(now);
+    this.claimAttempts.set(userId, recent);
+  }
+
+  private mapClaimError(message: string): Error {
+    if (/finish or cancel/.test(message)) {
+      return new BadRequestException(message);
+    }
+    if (/no unclaimed placeholder/.test(message)) {
+      return new BadRequestException(
+        'That code is no longer valid. Ask your trainer for a new one.',
+      );
+    }
+    return new InternalServerErrorException('Failed to claim the history');
   }
 
   // ---- internals -----------------------------------------------------------

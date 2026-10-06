@@ -25,6 +25,7 @@ const CHAIN_METHODS = [
   'insert',
   'update',
   'delete',
+  'is',
 ] as const;
 
 /**
@@ -37,6 +38,7 @@ function createMockClient() {
   const rpcQueues = new Map<string, Result[]>();
   const adminQueue: Result[] = [];
   const userQueue: Result[] = [];
+  const createQueue: Result[] = [];
   const calls: { target: string; method: string; args: unknown[] }[] = [];
 
   const take = (queue: Result[] | undefined, name: string): Promise<Result> => {
@@ -77,6 +79,14 @@ function createMockClient() {
           calls.push({ target: 'auth.admin', method: 'getUserById', args: [id] });
           return take(userQueue, 'auth.admin.getUserById');
         }),
+        createUser: jest.fn((attributes: unknown) => {
+          calls.push({ target: 'auth.admin', method: 'createUser', args: [attributes] });
+          return take(createQueue, 'auth.admin.createUser');
+        }),
+        deleteUser: jest.fn((id: string) => {
+          calls.push({ target: 'auth.admin', method: 'deleteUser', args: [id] });
+          return Promise.resolve({ data: null, error: null });
+        }),
       },
     },
   };
@@ -94,6 +104,9 @@ function createMockClient() {
     },
     queueUser(...results: Result[]) {
       userQueue.push(...results);
+    },
+    queueCreate(...results: Result[]) {
+      createQueue.push(...results);
     },
     calls,
   };
@@ -398,6 +411,7 @@ describe('TrainerService', () => {
         'trainer_clients',
         ok([{ client_id: CLIENT, status: 'active', source: 'managed' }]),
       );
+      mock.queue('trainer_placeholder_clients', ok([]));
       mock.queue(
         'trainer_invites',
         ok([
@@ -600,6 +614,168 @@ describe('TrainerService', () => {
       expect(audit?.args[0]).toMatchObject({
         action: 'link.ended',
         details: { endedBy: 'client' },
+      });
+    });
+  });
+});
+
+describe('TrainerService: clients without an account', () => {
+  const PLACEHOLDER = '55555555-5555-4555-8555-555555555555';
+  const future = () => new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+
+  describe('trackClient', () => {
+    it('creates a placeholder account nobody can sign in to, links it as managed, and returns a claim code', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queueCreate(ok({ user: { id: PLACEHOLDER } }));
+      mock.queue('users', ok());
+      mock.queue('trainer_clients', ok());
+      mock.queue('trainer_placeholder_clients', ok());
+      mock.queue('trainer_actions', ok());
+
+      const result = await service.trackClient(TRAINER, {
+        displayName: 'Pat',
+        heightValue: 170,
+        heightUnit: 'cm',
+      });
+
+      expect(result.clientId).toBe(PLACEHOLDER);
+      expect(result.claimCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+      const account = mock.calls.find((c) => c.method === 'createUser');
+      expect((account?.args[0] as { email: string }).email).toMatch(/@placeholders\.invalid$/);
+      const link = mock.calls.find((c) => c.target === 'trainer_clients' && c.method === 'insert');
+      expect(link?.args[0]).toEqual({
+        trainer_id: TRAINER,
+        client_id: PLACEHOLDER,
+        status: 'active',
+        source: 'managed',
+      });
+    });
+
+    it('stores only a hash of the code, never the code itself', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queueCreate(ok({ user: { id: PLACEHOLDER } }));
+      mock.queue('users', ok());
+      mock.queue('trainer_clients', ok());
+      mock.queue('trainer_placeholder_clients', ok());
+      mock.queue('trainer_actions', ok());
+
+      const result = await service.trackClient(TRAINER, { displayName: 'Pat' });
+
+      const stored = mock.calls.find(
+        (c) => c.target === 'trainer_placeholder_clients' && c.method === 'insert',
+      );
+      const row = stored?.args[0] as { code_hash: string };
+      expect(row.code_hash).toMatch(/^[0-9a-f]{64}$/);
+      expect(JSON.stringify(stored?.args)).not.toContain(result.claimCode);
+    });
+  });
+
+  describe('regenerateClaimCode', () => {
+    it('issues a new code for a tracked client, replacing the stored hash', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queue('trainer_clients', ok({ id: 'l1', status: 'active', source: 'managed' }));
+      mock.queue('trainer_placeholder_clients', ok({ id: 'p1' }), ok());
+      mock.queue('trainer_actions', ok());
+
+      const result = await service.regenerateClaimCode(TRAINER, PLACEHOLDER);
+
+      expect(result.claimCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+      const update = mock.calls.find(
+        (c) => c.target === 'trainer_placeholder_clients' && c.method === 'update',
+      );
+      expect((update?.args[0] as { code_hash: string }).code_hash).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('refuses a client with no history waiting to be claimed', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queue('trainer_clients', ok({ id: 'l1', status: 'active', source: 'linked' }));
+      mock.queue('trainer_placeholder_clients', ok(null));
+      await expect(service.regenerateClaimCode(TRAINER, CLIENT)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('claimHistory', () => {
+    it('moves the history to the client, deletes the placeholder, and records the claim', async () => {
+      const { mock, service } = setup();
+      mock.queue(
+        'trainer_placeholder_clients',
+        ok({ trainer_id: TRAINER, placeholder_user_id: PLACEHOLDER, code_expires_at: future() }),
+      );
+      mock.queueRpc('claim_placeholder_history', ok(3));
+      mock.queue('trainer_actions', ok());
+
+      await expect(service.claimHistory(CLIENT, 'abcd-2345')).resolves.toEqual({ workouts: 3 });
+
+      const rpc = mock.calls.find((c) => c.target === 'rpc:claim_placeholder_history');
+      expect(rpc?.args[0]).toEqual({ p_placeholder: PLACEHOLDER, p_client: CLIENT });
+      expect(mock.calls.some((c) => c.method === 'deleteUser' && c.args[0] === PLACEHOLDER)).toBe(
+        true,
+      );
+      const lookup = mock.calls.find(
+        (c) => c.target === 'trainer_placeholder_clients' && c.method === 'eq',
+      );
+      expect(lookup?.args[0]).toBe('code_hash');
+    });
+
+    it('answers a wrong code with a single message', async () => {
+      const { mock, service } = setup();
+      mock.queue('trainer_placeholder_clients', ok(null));
+      await expect(service.claimHistory(CLIENT, 'ABCD-2345')).rejects.toThrow(BadRequestException);
+      expect(mock.calls.some((c) => c.target === 'rpc:claim_placeholder_history')).toBe(false);
+    });
+
+    it('refuses an expired code, and says it has expired', async () => {
+      const { mock, service } = setup();
+      mock.queue(
+        'trainer_placeholder_clients',
+        ok({
+          trainer_id: TRAINER,
+          placeholder_user_id: PLACEHOLDER,
+          code_expires_at: new Date(Date.now() - 1000).toISOString(),
+        }),
+      );
+      await expect(service.claimHistory(CLIENT, 'ABCD-2345')).rejects.toThrow(/expired/);
+    });
+
+    it('refuses to let a trainer claim a client they track', async () => {
+      const { mock, service } = setup();
+      mock.queue(
+        'trainer_placeholder_clients',
+        ok({ trainer_id: CLIENT, placeholder_user_id: PLACEHOLDER, code_expires_at: future() }),
+      );
+      await expect(service.claimHistory(CLIENT, 'ABCD-2345')).rejects.toThrow(BadRequestException);
+    });
+
+    it('tells the client to finish their open workout, and leaves the placeholder alone', async () => {
+      const { mock, service } = setup();
+      mock.queue(
+        'trainer_placeholder_clients',
+        ok({ trainer_id: TRAINER, placeholder_user_id: PLACEHOLDER, code_expires_at: future() }),
+      );
+      mock.queueRpc(
+        'claim_placeholder_history',
+        fail('finish or cancel the open workout on your account first'),
+      );
+      await expect(service.claimHistory(CLIENT, 'ABCD-2345')).rejects.toThrow(/finish or cancel/);
+      expect(mock.calls.some((c) => c.method === 'deleteUser')).toBe(false);
+    });
+
+    it('limits claim attempts per user, so a code cannot be guessed by trying many', async () => {
+      const { mock, service } = setup();
+      for (let i = 0; i < 10; i += 1) {
+        mock.queue('trainer_placeholder_clients', ok(null));
+      }
+      for (let i = 0; i < 10; i += 1) {
+        await expect(service.claimHistory(CLIENT, 'ABCD-2345')).rejects.toThrow(
+          BadRequestException,
+        );
+      }
+      await expect(service.claimHistory(CLIENT, 'ABCD-2345')).rejects.toMatchObject({
+        status: 429,
       });
     });
   });

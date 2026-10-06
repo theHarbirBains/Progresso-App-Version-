@@ -4,8 +4,10 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { AddClientDto } from './dto/add-client.dto';
+import { ClaimHistoryDto } from './dto/claim-history.dto';
 import { LogWorkoutDto } from './dto/log-workout.dto';
 import { RespondTrainerRequestDto } from './dto/respond-trainer-request.dto';
+import { TrackClientDto } from './dto/track-client.dto';
 import { UpdateClientProfileDto } from './dto/update-client-profile.dto';
 import { TrainerService } from './trainer.service';
 
@@ -97,6 +99,31 @@ export class TrainerController {
   ) {
     await this.trainerService.endLink(user.id, trainerId, user.id);
     return { ok: true };
+  }
+
+  // A client the trainer tracks with no account. The response carries the claim
+  // code, which the trainer gives the client. It is not shown again.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('tracked-clients')
+  async trackClient(@CurrentUser() user: AuthenticatedUser, @Body() dto: TrackClientDto) {
+    return this.trainerService.trackClient(user.id, dto);
+  }
+
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('clients/:clientId/claim-code')
+  async regenerateClaimCode(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+  ) {
+    return this.trainerService.regenerateClaimCode(user.id, clientId);
+  }
+
+  // The client enters the code their trainer gave them. Their tracked history moves
+  // onto their own account.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('history/claim')
+  async claimHistory(@CurrentUser() user: AuthenticatedUser, @Body() dto: ClaimHistoryDto) {
+    return this.trainerService.claimHistory(user.id, dto.code);
   }
 
   // Attaches invites sent to this person's (confirmed) email. The app calls it at sign-in.

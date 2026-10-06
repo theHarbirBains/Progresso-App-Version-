@@ -2630,6 +2630,166 @@ async function main() {
     /append-only/,
   );
 
+  // ---- trainer-tracked clients without an account ----
+  // A placeholder account stands in for a client who has no Progresso account.
+  // Claiming moves its history onto the client's own account.
+  const placeholder = randomUUID();
+  const placeholderOpen = randomUUID();
+  const trackedClaimant = randomUUID();
+  await admin.query('insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6)', [
+    placeholder,
+    'placeholder-1@placeholders.invalid',
+    placeholderOpen,
+    'placeholder-2@placeholders.invalid',
+    trackedClaimant,
+    'tracked-claimant@test.local',
+  ]);
+  const trackPlaceholder = async (id, codeHash) => {
+    await admin.query(
+      "insert into public.trainer_clients (trainer_id, client_id, status, source) values ($1, $2, 'active', 'managed')",
+      [T, id],
+    );
+    await admin.query(
+      "insert into public.trainer_placeholder_clients (trainer_id, placeholder_user_id, code_hash, code_expires_at) values ($1, $2, $3, now() + interval '30 days')",
+      [T, id, codeHash],
+    );
+  };
+  await trackPlaceholder(placeholder, 'code-hash-1');
+  await trackPlaceholder(placeholderOpen, 'code-hash-2');
+
+  // Logged the same way the API logs it.
+  const trackedLog = await logFor(T, placeholder, logPayload(trainerCustom, twoSets));
+  const trackedWorkoutId = trackedLog.rows[0].id;
+
+  const claimed = await admin.query('select public.claim_placeholder_history($1, $2) as moved', [
+    placeholder,
+    trackedClaimant,
+  ]);
+  record(
+    'Claiming moves the tracked workouts onto the client account',
+    claimed.rows[0].moved === 1,
+    JSON.stringify(claimed.rows[0]),
+  );
+
+  const moved = await admin.query('select user_id, logged_by from public.workouts where id = $1', [
+    trackedWorkoutId,
+  ]);
+  record(
+    'The moved workout belongs to the client and keeps its trainer attribution',
+    moved.rows[0].user_id === trackedClaimant && moved.rows[0].logged_by === T,
+    JSON.stringify(moved.rows[0]),
+  );
+
+  const placeholderLeft = await admin.query(
+    `select
+       (select count(*)::int from public.workouts where user_id = $1) as workouts,
+       (select count(*)::int from public.exercises where created_by = $1) as exercises,
+       (select count(*)::int from public.rep_prs where user_id = $1) as prs,
+       (select count(*)::int from public.workout_exercises where user_id = $1) as workout_exercises`,
+    [placeholder],
+  );
+  record(
+    'Nothing is left on the placeholder account after the claim',
+    Object.values(placeholderLeft.rows[0]).every((count) => count === 0),
+    JSON.stringify(placeholderLeft.rows[0]),
+  );
+
+  const clientOwnsExercise = await admin.query(
+    `select we.exercise_id, e.created_by, e.photo_url
+     from public.workout_exercises we join public.exercises e on e.id = we.exercise_id
+     where we.workout_id = $1`,
+    [trackedWorkoutId],
+  );
+  record(
+    "The client's history uses an exercise copy they own, with its photo",
+    clientOwnsExercise.rows.length === 1 &&
+      clientOwnsExercise.rows[0].created_by === trackedClaimant &&
+      clientOwnsExercise.rows[0].photo_url === 'https://example.test/gym-b.jpg',
+    JSON.stringify(clientOwnsExercise.rows),
+  );
+
+  const clientPrs = await admin.query(
+    'select count(*)::int as count from public.rep_prs where user_id = $1',
+    [trackedClaimant],
+  );
+  record('PRs are rebuilt for the client from the moved sets', clientPrs.rows[0].count > 0);
+
+  const links = await admin.query(
+    'select client_id, status, source from public.trainer_clients where trainer_id = $1 and client_id in ($2, $3)',
+    [T, trackedClaimant, placeholder],
+  );
+  record(
+    'The trainer link moves to the client as pending and linked, so the client chooses to keep the trainer',
+    links.rows.length === 1 &&
+      links.rows[0].client_id === trackedClaimant &&
+      links.rows[0].status === 'pending' &&
+      links.rows[0].source === 'linked',
+    JSON.stringify(links.rows),
+  );
+
+  await expectThrows(
+    admin.query('select public.claim_placeholder_history($1, $2)', [placeholder, trackedClaimant]),
+    'A placeholder can only be claimed once',
+    /no unclaimed placeholder/,
+  );
+
+  // Merging: the client already has the same exercise, so the history uses it.
+  const mergeClaimant = randomUUID();
+  const mergePlaceholder = randomUUID();
+  await admin.query(
+    "insert into auth.users (id, email) values ($1, 'merge-claimant@test.local'), ($2, 'placeholder-3@placeholders.invalid')",
+    [mergeClaimant, mergePlaceholder],
+  );
+  const ownCopy = randomUUID();
+  await admin.query(
+    "insert into public.exercises (id, created_by, name, muscle_group, movement_type) values ($1, $2, 'Gym B Chest Machine', 'chest', 'bilateral')",
+    [ownCopy, mergeClaimant],
+  );
+  await trackPlaceholder(mergePlaceholder, 'code-hash-3');
+  await logFor(T, mergePlaceholder, logPayload(trainerCustom, twoSets));
+  await admin.query('select public.claim_placeholder_history($1, $2)', [
+    mergePlaceholder,
+    mergeClaimant,
+  ]);
+  const mergedUse = await admin.query(
+    `select we.exercise_id from public.workout_exercises we
+     join public.workouts w on w.id = we.workout_id where w.user_id = $1`,
+    [mergeClaimant],
+  );
+  record(
+    'When the client already has the same exercise, the history uses their own copy',
+    mergedUse.rows.length === 1 && mergedUse.rows[0].exercise_id === ownCopy,
+    JSON.stringify(mergedUse.rows),
+  );
+
+  // An open workout on both sides blocks the claim until one is finished.
+  await logFor(
+    T,
+    placeholderOpen,
+    JSON.stringify({
+      name: 'Open session',
+      performedAt: '2026-10-02T09:00:00Z',
+      exercises: [{ exerciseId: benchPressId, sets: twoSets }],
+    }),
+  );
+  await admin.query(
+    "insert into public.workouts (user_id, name, performed_at) values ($1, 'Their own session', now())",
+    [trackedClaimant],
+  );
+  const openClaimant = randomUUID();
+  await admin.query("insert into auth.users (id, email) values ($1, 'open-claimant@test.local')", [
+    openClaimant,
+  ]);
+  await admin.query(
+    "insert into public.workouts (user_id, name, performed_at) values ($1, 'Their own session', now())",
+    [openClaimant],
+  );
+  await expectThrows(
+    admin.query('select public.claim_placeholder_history($1, $2)', [placeholderOpen, openClaimant]),
+    'A claim waits while both accounts have an open workout',
+    /finish or cancel/,
+  );
+
   await admin.end();
 }
 
