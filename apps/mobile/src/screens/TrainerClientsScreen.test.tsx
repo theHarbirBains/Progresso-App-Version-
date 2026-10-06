@@ -68,6 +68,31 @@ describe('TrainerClientsScreen', () => {
     });
   });
 
+  it('shows an invite that is still waiting as sent, with nothing to open yet', async () => {
+    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
+    mockListTrainerClients.mockResolvedValue([
+      {
+        clientId: null,
+        inviteId: 'invite-1',
+        email: 'pat@example.com',
+        status: 'invited',
+        source: 'managed',
+        displayName: 'Pat',
+        birthday: null,
+        heightValue: null,
+        heightUnit: 'cm',
+        weightValue: null,
+        weightUnit: 'kg',
+      },
+    ]);
+    renderScreen();
+
+    const invite = await screen.findByTestId('trainer-invite-invite-1');
+    expect(invite).toHaveTextContent(/Invite sent/);
+    fireEvent.press(invite);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   it('explains that trainer mode needs a subscription, rather than showing an empty list', async () => {
     mockGetTrainerStatus.mockResolvedValue({ isTrainer: false });
     renderScreen();

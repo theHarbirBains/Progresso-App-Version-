@@ -14,7 +14,12 @@ import type { RootStackScreenProps } from '../navigation/types';
 
 type Props = RootStackScreenProps<'TrainerClientForm' | 'TrainerEditClient'>;
 
+/** Username finds an existing account (a request); email invites someone (an invite). */
+export type AddMode = 'username' | 'email';
+
 export interface ClientFormValues {
+  mode: AddMode;
+  username: string;
   email: string;
   name: string;
   heightText: string;
@@ -22,32 +27,37 @@ export interface ClientFormValues {
   weightUnit: 'kg' | 'lb';
 }
 
-export type ClientFormErrors = Partial<Record<'email' | 'name' | 'height' | 'weight', string>>;
+export type ClientFormErrors = Partial<
+  Record<'username' | 'email' | 'name' | 'height' | 'weight', string>
+>;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
 const MAX_HEIGHT_CM = 300;
 const MAX_WEIGHT = 1000;
 
 /**
- * Checks the form before anything is sent. Height and weight are optional; a
- * blank field is simply not sent. The email is only checked when adding, since
- * an existing client's email cannot be changed here.
+ * Checks the form before anything is sent. Height and weight are optional, and
+ * only an email invite takes them: an existing account's profile belongs to its
+ * owner. The name is optional, since it is only a convenience for the invite.
  */
 export function validateClientForm(values: ClientFormValues, isNew: boolean): ClientFormErrors {
   const errors: ClientFormErrors = {};
-  if (isNew && !EMAIL_PATTERN.test(values.email.trim())) {
+  const takesDetails = !isNew || values.mode === 'email';
+
+  if (isNew && values.mode === 'username' && !USERNAME_PATTERN.test(values.username.trim())) {
+    errors.username = 'Usernames are 3–20 letters, numbers or underscores';
+  }
+  if (isNew && values.mode === 'email' && !EMAIL_PATTERN.test(values.email.trim())) {
     errors.email = 'Enter a valid email address';
   }
-  if (isNew && values.name.trim() === '') {
-    errors.name = 'Enter their name';
-  }
-  if (values.heightText.trim() !== '') {
+  if (takesDetails && values.heightText.trim() !== '') {
     const height = Number(values.heightText);
     if (!Number.isFinite(height) || height <= 0 || height > MAX_HEIGHT_CM) {
       errors.height = `Enter a height between 1 and ${MAX_HEIGHT_CM} cm`;
     }
   }
-  if (values.weightText.trim() !== '') {
+  if (takesDetails && values.weightText.trim() !== '') {
     const weight = Number(values.weightText);
     if (!Number.isFinite(weight) || weight <= 0 || weight > MAX_WEIGHT) {
       errors.weight = `Enter a weight between 1 and ${MAX_WEIGHT}`;
@@ -57,8 +67,9 @@ export function validateClientForm(values: ClientFormValues, isNew: boolean): Cl
 }
 
 /**
- * Adds a client by email, or edits the details of a managed client. A linked
- * client's details belong to them, so this screen is never offered for one.
+ * Adds a client by username (a request to an existing account) or by email (an
+ * invite), or edits the details of a managed client. A linked client's details
+ * belong to them, so this screen is never offered for one.
  */
 export function TrainerClientFormScreen({ navigation, route }: Props) {
   // Only TrainerEditClient carries a client; TrainerClientForm (add) has no params.
@@ -70,6 +81,8 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(!isNew);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [values, setValues] = useState<ClientFormValues>({
+    mode: 'username',
+    username: '',
     email: '',
     name: '',
     heightText: '',
@@ -94,13 +107,13 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
           setLoadError('This client is no longer linked to your account');
           return;
         }
-        setValues({
-          email: '',
+        setValues((prev) => ({
+          ...prev,
           name: existing.displayName ?? '',
           heightText: existing.heightValue === null ? '' : String(existing.heightValue),
           weightText: existing.weightValue === null ? '' : String(existing.weightValue),
           weightUnit: existing.weightUnit,
-        });
+        }));
       } catch (err) {
         if (!cancelled)
           setLoadError(err instanceof Error ? err.message : 'Could not load this client');
@@ -128,8 +141,7 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
     const details = {
       displayName: values.name.trim() || undefined,
       heightValue: values.heightText.trim() === '' ? undefined : Number(values.heightText),
-      // The form always takes height in cm. Managed clients are created here, so their
-      // stored unit is cm as well.
+      // The form takes height in cm, and an invite stores it that way.
       heightUnit: values.heightText.trim() === '' ? undefined : ('cm' as const),
       weightValue: values.weightText.trim() === '' ? undefined : Number(values.weightText),
       weightUnit: values.weightText.trim() === '' ? undefined : values.weightUnit,
@@ -137,25 +149,33 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
 
     setSaving(true);
     try {
-      if (isNew) {
+      if (isNew && values.mode === 'username') {
         const result = await addTrainerClient(accessToken, {
+          username: values.username.trim().toLowerCase(),
+        });
+        if (result.kind === 'request' && result.status === 'active') {
+          navigation.replace('TrainerClientDetail', { clientId: result.clientId });
+          return;
+        }
+        Alert.alert('Request sent', 'They need to accept it before you can log workouts for them.');
+        navigation.goBack();
+        return;
+      }
+
+      if (isNew) {
+        // The same answer for every address, so a trainer cannot learn who has an account.
+        await addTrainerClient(accessToken, {
           email: values.email.trim().toLowerCase(),
           ...details,
         });
-        if (result.status === 'pending') {
-          Alert.alert(
-            'Request sent',
-            'They need to accept it before you can log workouts for them.',
-          );
-          navigation.goBack();
-          return;
-        }
-        navigation.replace('TrainerClientDetail', {
-          clientId: result.clientId,
-          clientName: values.name.trim(),
-        });
+        Alert.alert(
+          'Invite sent',
+          'They’ll see it when they open Progresso. If they already use Progresso, ask for their username and add them that way.',
+        );
+        navigation.goBack();
         return;
       }
+
       await updateTrainerClientProfile(accessToken, clientId!, details);
       navigation.goBack();
     } catch (err) {
@@ -163,6 +183,8 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
       setSaving(false);
     }
   }
+
+  const addingByEmail = isNew && values.mode === 'email';
 
   return (
     <Screen
@@ -185,6 +207,33 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
       {!loading && !loadError ? (
         <View style={{ gap: spacing.md }}>
           {isNew ? (
+            <SegmentedControl
+              testID="trainer-client-mode"
+              value={values.mode}
+              onChange={(mode) => {
+                update('mode', mode);
+                setErrors({});
+              }}
+              options={[
+                { value: 'username', label: 'Username' },
+                { value: 'email', label: 'Email invite' },
+              ]}
+            />
+          ) : null}
+
+          {isNew && values.mode === 'username' ? (
+            <TextInput
+              testID="trainer-client-username"
+              label="Their Progresso username"
+              value={values.username}
+              onChangeText={(text) => update('username', text)}
+              autoCapitalize="none"
+              error={errors.username}
+              helperText="They'll get a request to accept. Nothing about their account is shown to you."
+            />
+          ) : null}
+
+          {addingByEmail ? (
             <TextInput
               testID="trainer-client-email"
               label="Email"
@@ -194,51 +243,59 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
               autoCapitalize="none"
               autoComplete="email"
               error={errors.email}
-              helperText="If they already have an account, they'll get a request to accept."
+              helperText="They'll see the invite when they open Progresso."
             />
           ) : null}
 
-          <TextInput
-            testID="trainer-client-name"
-            label="Name"
-            value={values.name}
-            onChangeText={(text) => update('name', text)}
-            error={errors.name}
-          />
+          {!isNew || addingByEmail ? (
+            <TextInput
+              testID="trainer-client-name"
+              label="Name"
+              value={values.name}
+              onChangeText={(text) => update('name', text)}
+              error={errors.name}
+            />
+          ) : null}
 
-          <TextInput
-            testID="trainer-client-height"
-            label="Height (cm)"
-            value={values.heightText}
-            onChangeText={(text) => update('heightText', text)}
-            keyboardType="decimal-pad"
-            error={errors.height}
-          />
+          {!isNew || addingByEmail ? (
+            <TextInput
+              testID="trainer-client-height"
+              label="Height (cm)"
+              value={values.heightText}
+              onChangeText={(text) => update('heightText', text)}
+              keyboardType="decimal-pad"
+              error={errors.height}
+            />
+          ) : null}
 
-          <TextInput
-            testID="trainer-client-weight"
-            label="Weight"
-            value={values.weightText}
-            onChangeText={(text) => update('weightText', text)}
-            keyboardType="decimal-pad"
-            error={errors.weight}
-          />
+          {!isNew || addingByEmail ? (
+            <TextInput
+              testID="trainer-client-weight"
+              label="Weight"
+              value={values.weightText}
+              onChangeText={(text) => update('weightText', text)}
+              keyboardType="decimal-pad"
+              error={errors.weight}
+            />
+          ) : null}
 
-          <SegmentedControl
-            testID="trainer-client-weight-unit"
-            value={values.weightUnit}
-            onChange={(unit) => update('weightUnit', unit)}
-            options={[
-              { value: 'kg', label: 'kg' },
-              { value: 'lb', label: 'lb' },
-            ]}
-          />
+          {!isNew || addingByEmail ? (
+            <SegmentedControl
+              testID="trainer-client-weight-unit"
+              value={values.weightUnit}
+              onChange={(unit) => update('weightUnit', unit)}
+              options={[
+                { value: 'kg', label: 'kg' },
+                { value: 'lb', label: 'lb' },
+              ]}
+            />
+          ) : null}
 
           {saveError ? <ErrorState testID="trainer-client-form-error" message={saveError} /> : null}
 
           <PrimaryButton
             testID="trainer-client-save"
-            label={isNew ? 'Add Client' : 'Save Details'}
+            label={!isNew ? 'Save Details' : addingByEmail ? 'Send Invite' : 'Send Request'}
             onPress={() => void handleSave()}
             loading={saving}
             disabled={saving}

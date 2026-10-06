@@ -580,8 +580,12 @@ export function fetchFriendsFeed(accessToken: string, page = 0): Promise<Friends
 export type TrainerLinkSource = 'managed' | 'linked';
 
 export interface TrainerClient {
-  clientId: string;
-  status: 'pending' | 'active';
+  /** null for an invite whose person has not signed in yet. */
+  clientId: string | null;
+  inviteId: string | null;
+  /** Only set for an invite: the address the trainer typed. */
+  email: string | null;
+  status: 'invited' | 'pending' | 'active';
   source: TrainerLinkSource;
   displayName: string | null;
   birthday: string | null;
@@ -639,14 +643,26 @@ export function listTrainerClients(accessToken: string): Promise<TrainerClient[]
   return request<TrainerClient[]>('/api/v1/trainer/clients', accessToken);
 }
 
-/** A new email creates a managed client (active at once); an existing account gets a pending request. */
+/** The answer to adding a client. An email invite is identical whether or not the address has an account. */
+export type AddTrainerClientResult =
+  | { kind: 'request'; status: 'pending' | 'active'; clientId: string }
+  | { kind: 'invite'; status: 'invited' };
+
+/** Give exactly one of a username (an existing account gets a request) or an email (an invite). */
 export function addTrainerClient(
   accessToken: string,
-  input: TrainerProfileInput & { email: string },
-): Promise<{ clientId: string; status: 'pending' | 'active'; source: TrainerLinkSource }> {
-  return request(`/api/v1/trainer/clients`, accessToken, {
+  input: TrainerProfileInput & { username?: string; email?: string },
+): Promise<AddTrainerClientResult> {
+  return request<AddTrainerClientResult>(`/api/v1/trainer/clients`, accessToken, {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+/** Attaches invites sent to this person's confirmed email. Called at sign-in. */
+export function claimTrainerInvites(accessToken: string): Promise<{ claimed: number }> {
+  return request<{ claimed: number }>('/api/v1/trainer/invites/claim', accessToken, {
+    method: 'POST',
   });
 }
 

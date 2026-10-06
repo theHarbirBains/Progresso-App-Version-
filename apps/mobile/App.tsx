@@ -20,7 +20,7 @@ import { BackgroundThemeProvider, useBackgroundTheme } from './src/design/Backgr
 import { BottomNavBar } from './src/design/BottomNavBar';
 import { wrapApp } from './src/lib/sentry';
 import { AppMenuContext } from './src/navigation/AppMenuContext';
-import type { AppMenuRoute } from './src/navigation/appMenuSections';
+import { appMenuSectionsFor, type AppMenuRoute } from './src/navigation/appMenuSections';
 import { routeToBottomNavTab } from './src/navigation/bottomNavRouting';
 import { getDefaultScreenOptions } from './src/navigation/navigationTransitions';
 import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
@@ -47,6 +47,7 @@ import { TrainerAccessScreen } from './src/screens/TrainerAccessScreen';
 import { TrainerClientDetailScreen } from './src/screens/TrainerClientDetailScreen';
 import { TrainerClientFormScreen } from './src/screens/TrainerClientFormScreen';
 import { TrainerClientsScreen } from './src/screens/TrainerClientsScreen';
+import { useTrainerStatus } from './src/trainer/useTrainerStatus';
 import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
@@ -100,6 +101,8 @@ const MODE_AGNOSTIC_ROUTES = new Set(['Feed', 'ProgressOverview', 'Profile']);
 function Root() {
   const { status, session, user } = useAuth();
   const { theme: backgroundTheme } = useBackgroundTheme();
+  // Trainer status decides whether the side menu lists the trainer's clients.
+  const isTrainer = useTrainerStatus();
   const { profile, loading: profileLoading } = useProfile();
   const [mode, setMode] = useState<AuthMode>('signIn');
   // Feed, Progress, and You (Profile) are the app's mode-agnostic root
@@ -330,6 +333,7 @@ function Root() {
 
           <AppSideMenu
             visible={menuOpen}
+            sections={appMenuSectionsFor(isTrainer)}
             activeRoute={
               (navigationRef.current?.getCurrentRoute()?.name as AppMenuRoute | undefined) ?? 'Feed'
             }

@@ -100,23 +100,33 @@ export function TrainerClientsScreen({ navigation }: Props) {
 
       {state.status === 'ready' && state.isTrainer && state.clients.length > 0 ? (
         <AppCard testID="trainer-clients-list">
-          {state.clients.map((client, index) => (
-            <ListRow
-              key={client.clientId}
-              testID={`trainer-client-${client.clientId}`}
-              icon="user"
-              title={client.displayName ?? 'Unnamed client'}
-              subtitle={trainerClientStatusLabel(client)}
-              chevron
-              divider={index > 0}
-              onPress={() =>
-                navigation.navigate('TrainerClientDetail', {
-                  clientId: client.clientId,
-                  clientName: client.displayName ?? undefined,
-                })
-              }
-            />
-          ))}
+          {state.clients.map((client, index) => {
+            // An invite has no account yet, so there is no page to open for it.
+            const clientId = client.clientId;
+            const key = clientId ?? client.inviteId ?? String(index);
+            return (
+              <ListRow
+                key={key}
+                testID={
+                  clientId ? `trainer-client-${clientId}` : `trainer-invite-${client.inviteId}`
+                }
+                icon={clientId ? 'user' : 'mail'}
+                title={client.displayName ?? client.email ?? 'Unnamed client'}
+                subtitle={trainerClientStatusLabel(client)}
+                chevron={clientId !== null}
+                divider={index > 0}
+                onPress={
+                  clientId
+                    ? () =>
+                        navigation.navigate('TrainerClientDetail', {
+                          clientId,
+                          clientName: client.displayName ?? undefined,
+                        })
+                    : undefined
+                }
+              />
+            );
+          })}
         </AppCard>
       ) : null}
 

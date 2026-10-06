@@ -1,11 +1,12 @@
 import type { TrainerActivity, TrainerClient } from '../lib/api';
 
 /**
- * The status line under a client's name in the client list. Pending means the
- * client has not accepted yet; managed means the trainer created the account,
- * linked means the client owns it.
+ * The status line under a client's name in the client list. An invite is waiting
+ * for its person to sign in; pending means they have not accepted yet; managed
+ * means the invite created the account, linked means the client owns it.
  */
 export function trainerClientStatusLabel(client: TrainerClient): string {
+  if (client.status === 'invited') return 'Invite sent';
   if (client.status === 'pending') return 'Waiting for them to accept';
   return client.source === 'managed' ? 'Managed account' : 'Linked account';
 }

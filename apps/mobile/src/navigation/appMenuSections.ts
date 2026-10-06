@@ -10,10 +10,10 @@ type NoParamRoute = {
   [K in keyof RootStackParamList]: undefined extends RootStackParamList[K] ? K : never;
 }[keyof RootStackParamList];
 
-/** Trainer screens are reached from Settings (Trainer Access), never from the side menu. */
-type TrainerRoute = 'TrainerClients' | 'TrainerClientForm' | 'TrainerAccess';
+/** The add/edit form is opened from a client's page or from Clients, never from the side menu directly. */
+type FormOnlyRoute = 'TrainerClientForm';
 
-export type AppMenuRoute = Exclude<NoParamRoute, TrainerRoute>;
+export type AppMenuRoute = Exclude<NoParamRoute, FormOnlyRoute>;
 
 export interface AppMenuItem {
   route: AppMenuRoute;
@@ -75,9 +75,30 @@ export const APP_MENU_SECTIONS: AppMenuSection[] = [
   },
   {
     title: 'SOCIAL',
-    items: [{ route: 'FindPeople', label: 'Find People', icon: 'user-plus' }],
+    items: [
+      { route: 'FindPeople', label: 'Find People', icon: 'user-plus' },
+      // Everyone sees this: requests from trainers, and who can log for them.
+      { route: 'TrainerAccess', label: 'Trainer Access', icon: 'user-check' },
+    ],
   },
 ];
+
+/**
+ * The menu for this person. A trainer also gets Clients under TRAINING, which is
+ * how they reach their clients from anywhere in the app. Everyone else sees the
+ * same menu without it.
+ */
+export function appMenuSectionsFor(isTrainer: boolean): AppMenuSection[] {
+  if (!isTrainer) return APP_MENU_SECTIONS;
+  return APP_MENU_SECTIONS.map((section) =>
+    section.title === 'TRAINING'
+      ? {
+          ...section,
+          items: [...section.items, { route: 'TrainerClients', label: 'Clients', icon: 'users' }],
+        }
+      : section,
+  );
+}
 
 /** Rendered by AppSideMenu as a standalone row below every section, with no
  * section header -- Settings applies to the whole app, not to Training or

@@ -223,9 +223,13 @@ the add / edit form. Logging for a client reuses the past-workout screen, titled
 - F. A trainer's custom exercise is copied into the client's library when logged for them.
 
 **Still open:**
-- **Enumeration:** adding an email tells the trainer whether an account exists (a request
-  for an existing account, an invite for a new one). Making both responses look the same
-  would change how managed clients start, so it needs your decision.
+- **Enumeration (resolved):** adding by username finds an existing account and sends a
+  request, which is acceptable because usernames are already public through search. Adding
+  by email is always an invite, with the same answer whether or not the address has an
+  account. The invite attaches at sign-in, only for a confirmed email, and a new account it
+  creates is managed while an existing one stays linked. The email lookup is gone.
+- **Visibility:** Trainer Access is in the side menu for everyone (under Social), and
+  Clients appears under Training for trainers only, read from trainer status at launch.
 - **Paywall:** deferred as requested. Until it exists, a trainer is granted access by a
   `subscriptions` row with `entitlement_id = 'trainer'`, `status = 'active'` and a future
   `current_period_ends_at`.

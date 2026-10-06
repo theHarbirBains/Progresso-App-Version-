@@ -7,6 +7,8 @@ const CLIENT = 'client-1';
 function client(overrides: Partial<TrainerClient>): TrainerClient {
   return {
     clientId: CLIENT,
+    inviteId: null,
+    email: null,
     status: 'active',
     source: 'managed',
     displayName: 'Sam',
@@ -33,6 +35,14 @@ function activity(action: string, trainerId = TRAINER): TrainerActivity {
 }
 
 describe('trainerClientStatusLabel', () => {
+  it('shows an invite that is still waiting for its person as sent', () => {
+    expect(
+      trainerClientStatusLabel(
+        client({ clientId: null, inviteId: 'i1', email: 'pat@x.co', status: 'invited' }),
+      ),
+    ).toBe('Invite sent');
+  });
+
   it('says a pending client has not accepted yet', () => {
     expect(trainerClientStatusLabel(client({ status: 'pending', source: 'linked' }))).toBe(
       'Waiting for them to accept',
