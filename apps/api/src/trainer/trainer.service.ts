@@ -11,6 +11,7 @@ import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { SupabaseService } from '../supabase/supabase.service';
 import type { AddClientDto } from './dto/add-client.dto';
 import type { TrackClientDto } from './dto/track-client.dto';
+import type { ResolveExerciseDto, StartLiveWorkoutDto } from './dto/live-session.dto';
 import type { LogWorkoutDto } from './dto/log-workout.dto';
 import type { UpdateClientProfileDto } from './dto/update-client-profile.dto';
 
@@ -774,6 +775,77 @@ export class TrainerService {
       );
     }
     return new InternalServerErrorException('Failed to claim the history');
+  }
+
+  /**
+   * A live session for a client: the trainer adds to it as the session happens, and
+   * it stays open until the trainer finishes it. Only one is open per client at a time.
+   */
+  async startLiveWorkout(
+    trainerId: string,
+    clientId: string,
+    dto: StartLiveWorkoutDto,
+  ): Promise<{ workoutId: string }> {
+    await this.assertTrainer(trainerId);
+    await this.assertActiveLink(trainerId, clientId);
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('workouts')
+      .insert({
+        user_id: clientId,
+        name: dto.name,
+        performed_at: new Date().toISOString(),
+        logged_by: trainerId,
+      })
+      .select('id')
+      .single();
+    if (error) {
+      if (/duplicate key|unique/i.test(error.message)) {
+        throw new BadRequestException('A live session for this client is already open');
+      }
+      throw new InternalServerErrorException('Failed to start the live session');
+    }
+    const workoutId = (data as { id: string }).id;
+    await this.audit(trainerId, clientId, 'live.started', 'workouts', workoutId, {});
+    return { workoutId };
+  }
+
+  /** Finishes a live session the trainer started. The client's data is kept as it is. */
+  async finishLiveWorkout(trainerId: string, clientId: string, workoutId: string): Promise<void> {
+    await this.assertTrainer(trainerId);
+    await this.assertActiveLink(trainerId, clientId);
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('workouts')
+      .update({ completed_at: new Date().toISOString() })
+      .eq('id', workoutId)
+      .eq('user_id', clientId)
+      .eq('logged_by', trainerId)
+      .is('completed_at', null)
+      .select('id');
+    if (error) throw new InternalServerErrorException('Failed to finish the live session');
+    if (!data || data.length === 0) throw new NotFoundException('No open live session to finish');
+    await this.audit(trainerId, clientId, 'live.finished', 'workouts', workoutId, {});
+  }
+
+  /**
+   * The exercise to use in a client's live session: the client's own copy of the
+   * trainer's exercise (made if needed), or the exercise itself when it is already the
+   * client's or a built-in.
+   */
+  async resolveClientExercise(
+    trainerId: string,
+    clientId: string,
+    dto: ResolveExerciseDto,
+  ): Promise<{ exerciseId: string }> {
+    await this.assertTrainer(trainerId);
+    const { data, error } = await this.supabaseService.getClient().rpc('resolve_client_exercise', {
+      p_trainer: trainerId,
+      p_client: clientId,
+      p_exercise: dto.exerciseId,
+    });
+    if (error) throw this.mapLogError(error.message);
+    return { exerciseId: data as string };
   }
 
   // ---- internals -----------------------------------------------------------

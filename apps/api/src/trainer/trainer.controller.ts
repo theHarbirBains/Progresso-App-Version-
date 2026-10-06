@@ -5,6 +5,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { AddClientDto } from './dto/add-client.dto';
 import { ClaimHistoryDto } from './dto/claim-history.dto';
+import { ResolveExerciseDto, StartLiveWorkoutDto } from './dto/live-session.dto';
 import { LogWorkoutDto } from './dto/log-workout.dto';
 import { RespondTrainerRequestDto } from './dto/respond-trainer-request.dto';
 import { TrackClientDto } from './dto/track-client.dto';
@@ -124,6 +125,38 @@ export class TrainerController {
   @Post('history/claim')
   async claimHistory(@CurrentUser() user: AuthenticatedUser, @Body() dto: ClaimHistoryDto) {
     return this.trainerService.claimHistory(user.id, dto.code);
+  }
+
+  // A live session for a client, run as it happens and finished by the trainer.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('clients/:clientId/live-workouts')
+  async startLiveWorkout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @Body() dto: StartLiveWorkoutDto,
+  ) {
+    return this.trainerService.startLiveWorkout(user.id, clientId, dto);
+  }
+
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('clients/:clientId/live-workouts/:workoutId/finish')
+  async finishLiveWorkout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @Param('workoutId', ParseUUIDPipe) workoutId: string,
+  ) {
+    await this.trainerService.finishLiveWorkout(user.id, clientId, workoutId);
+    return { ok: true };
+  }
+
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('clients/:clientId/exercises/resolve')
+  async resolveExercise(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @Body() dto: ResolveExerciseDto,
+  ) {
+    return this.trainerService.resolveClientExercise(user.id, clientId, dto);
   }
 
   // Attaches invites sent to this person's (confirmed) email. The app calls it at sign-in.

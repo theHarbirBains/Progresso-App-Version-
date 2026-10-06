@@ -16,6 +16,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { RevenueCatModule } from './revenuecat/revenuecat.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { TrainerModule } from './trainer/trainer.module';
+import { GroupsModule } from './groups/groups.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { UsersModule } from './users/users.module';
     FollowsModule,
     FeedModule,
     TrainerModule,
+    GroupsModule,
     AdminModule,
     RevenueCatModule,
     NotificationsModule,
