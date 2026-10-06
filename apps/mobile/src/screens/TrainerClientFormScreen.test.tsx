@@ -105,6 +105,7 @@ describe('TrainerClientFormScreen', () => {
     const alert = jest.spyOn(Alert, 'alert');
     renderForm(undefined);
 
+    fireEvent.press(screen.getByText('Username'));
     fireEvent.changeText(screen.getByTestId('trainer-client-username'), '  Sam_Lifts ');
     fireEvent.press(screen.getByTestId('trainer-client-save'));
 
@@ -125,6 +126,7 @@ describe('TrainerClientFormScreen', () => {
     });
     renderForm(undefined);
 
+    fireEvent.press(screen.getByText('Username'));
     fireEvent.changeText(screen.getByTestId('trainer-client-username'), 'sam_lifts');
     fireEvent.press(screen.getByTestId('trainer-client-save'));
 
@@ -201,7 +203,7 @@ describe('TrainerClientFormScreen', () => {
     fireEvent.press(screen.getByTestId('trainer-client-save'));
 
     expect(mockAddTrainerClient).not.toHaveBeenCalled();
-    expect(screen.getByText('Usernames are 3–20 letters, numbers or underscores')).toBeTruthy();
+    expect(screen.getByText('Enter their name')).toBeTruthy();
   });
 
   it("edits a managed client's details, loading what is already saved", async () => {

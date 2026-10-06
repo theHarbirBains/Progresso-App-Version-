@@ -89,7 +89,7 @@ export function TrainerClientsScreen({ navigation }: Props) {
         <EmptyState
           testID="trainer-clients-empty"
           title="No clients yet"
-          description="Add a client by email to start logging workouts for them."
+          description="Add someone to your client pool, even if they do not use Progresso yet. Track their workouts from the start."
           action={{
             label: 'Add Client',
             onPress: () => navigation.navigate('TrainerClientForm'),

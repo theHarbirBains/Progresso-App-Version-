@@ -89,7 +89,7 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(!isNew);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [values, setValues] = useState<ClientFormValues>({
-    mode: 'username',
+    mode: 'untracked',
     username: '',
     email: '',
     name: '',
@@ -241,9 +241,9 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
                 setErrors({});
               }}
               options={[
+                { value: 'untracked', label: 'No account' },
                 { value: 'username', label: 'Username' },
                 { value: 'email', label: 'Email invite' },
-                { value: 'untracked', label: 'No account' },
               ]}
             />
           ) : null}
