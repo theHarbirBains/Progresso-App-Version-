@@ -89,6 +89,14 @@ describe('TrainerAccessScreen', () => {
     );
   });
 
+  it('shows the Clients entry to everyone, and says what it needs when there is no subscription', async () => {
+    renderScreen();
+    const row = await screen.findByTestId('trainer-access-open-clients');
+    expect(row).toHaveTextContent(/Needs a Trainer subscription/);
+    fireEvent.press(row);
+    expect(mockNavigate).toHaveBeenCalledWith('TrainerClients');
+  });
+
   it('gives a trainer a way into their own clients', async () => {
     mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
     renderScreen();

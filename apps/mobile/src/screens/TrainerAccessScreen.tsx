@@ -112,7 +112,6 @@ export function TrainerAccessScreen({ navigation }: Props) {
 
   const nothingToShow =
     data !== null &&
-    !data.isTrainer &&
     data.requests.length === 0 &&
     data.trainers.length === 0 &&
     data.activity.length === 0;
@@ -144,18 +143,20 @@ export function TrainerAccessScreen({ navigation }: Props) {
 
       {!loading && !error && data ? (
         <View style={{ gap: 6 }}>
-          {data.isTrainer ? (
-            <AppCard testID="trainer-access-clients">
-              <ListRow
-                testID="trainer-access-open-clients"
-                icon="users"
-                title="My Clients"
-                subtitle="Add clients and log workouts for them"
-                chevron
-                onPress={() => navigation.navigate('TrainerClients')}
-              />
-            </AppCard>
-          ) : null}
+          <AppCard testID="trainer-access-clients">
+            <ListRow
+              testID="trainer-access-open-clients"
+              icon="users"
+              title="Clients"
+              subtitle={
+                data.isTrainer
+                  ? 'Your client pool: track workouts, with or without their account'
+                  : 'Needs a Trainer subscription. Open to see what it includes'
+              }
+              chevron
+              onPress={() => navigation.navigate('TrainerClients')}
+            />
+          </AppCard>
 
           <AppCard testID="trainer-access-link-history">
             <ListRow
