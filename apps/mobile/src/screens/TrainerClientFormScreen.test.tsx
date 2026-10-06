@@ -8,8 +8,10 @@ import {
   updateTrainerClientProfile,
 } from '../lib/api';
 import {
+  heightCmFromValues,
   TrainerClientFormScreen,
   validateClientForm,
+  validateHeight,
   type ClientFormValues,
 } from './TrainerClientFormScreen';
 
@@ -41,10 +43,61 @@ const blank: ClientFormValues = {
   username: '',
   email: '',
   name: '',
+  heightUnit: 'cm',
   heightText: '',
+  feetText: '',
+  inchesText: '',
   weightText: '',
   weightUnit: 'kg',
 };
+
+describe('height in either unit', () => {
+  it('accepts feet and inches, and converts them to cm for storage', () => {
+    expect(
+      validateHeight({ heightUnit: 'ft_in', heightText: '', feetText: '5', inchesText: '11' }),
+    ).toBeUndefined();
+    expect(
+      heightCmFromValues({ ...blank, heightUnit: 'ft_in', feetText: '5', inchesText: '11' }),
+    ).toBe(180);
+  });
+
+  it('refuses inches past eleven, and feet outside a plausible range', () => {
+    expect(
+      validateHeight({ heightUnit: 'ft_in', heightText: '', feetText: '5', inchesText: '12' }),
+    ).toBeDefined();
+    expect(
+      validateHeight({ heightUnit: 'ft_in', heightText: '', feetText: '2', inchesText: '0' }),
+    ).toBeDefined();
+  });
+
+  it('treats an unentered height as not given in either unit', () => {
+    expect(heightCmFromValues({ ...blank, heightUnit: 'cm', heightText: '' })).toBeUndefined();
+    expect(
+      heightCmFromValues({ ...blank, heightUnit: 'ft_in', feetText: '', inchesText: '' }),
+    ).toBeUndefined();
+  });
+
+  it('sends the converted cm with the unit the trainer chose', async () => {
+    mockTrack.mockResolvedValue({
+      clientId: 'c1',
+      claimCode: 'ABCD-2345',
+      expiresAt: '2026-11-01T00:00:00.000Z',
+    });
+    renderForm(undefined);
+
+    fireEvent.press(screen.getByText('ft / in'));
+    fireEvent.changeText(screen.getByTestId('trainer-client-name'), 'Pat');
+    fireEvent.changeText(screen.getByTestId('trainer-client-height-feet'), '5');
+    fireEvent.changeText(screen.getByTestId('trainer-client-height-inches'), '11');
+    fireEvent.press(screen.getByTestId('trainer-client-save'));
+
+    await waitFor(() => expect(mockTrack).toHaveBeenCalled());
+    expect(mockTrack).toHaveBeenCalledWith(
+      'token-123',
+      expect.objectContaining({ heightValue: 180, heightUnit: 'ft_in' }),
+    );
+  });
+});
 
 describe('validateClientForm', () => {
   it('needs a valid username to request an existing account', () => {

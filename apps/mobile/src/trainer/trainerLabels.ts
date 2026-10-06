@@ -1,4 +1,5 @@
 import type { TrainerActivity, TrainerClient } from '../lib/api';
+import { feetAndInchesFromCm } from '../onboarding/weightHeightConversion';
 
 /**
  * The status line under a client's name in the client list. An invite is waiting
@@ -10,6 +11,13 @@ export function trainerClientStatusLabel(client: TrainerClient): string {
   if (client.awaitingClaim) return 'Not on Progresso yet';
   if (client.status === 'pending') return 'Waiting for them to accept';
   return client.source === 'managed' ? 'Managed account' : 'Linked account';
+}
+
+/** A client's height in both units, as stored in cm: "180 cm (5 ft 11 in)". */
+export function formatTrainerHeight(heightCm: number | null): string {
+  if (heightCm === null) return '—';
+  const { feet, inches } = feetAndInchesFromCm(heightCm);
+  return `${Math.round(heightCm)} cm (${feet} ft ${inches} in)`;
 }
 
 /**

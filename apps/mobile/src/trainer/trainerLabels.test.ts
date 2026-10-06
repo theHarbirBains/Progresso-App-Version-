@@ -1,5 +1,9 @@
 import type { TrainerActivity, TrainerClient } from '../lib/api';
-import { describeTrainerActivity, trainerClientStatusLabel } from './trainerLabels';
+import {
+  describeTrainerActivity,
+  formatTrainerHeight,
+  trainerClientStatusLabel,
+} from './trainerLabels';
 
 const TRAINER = 'trainer-1';
 const CLIENT = 'client-1';
@@ -34,6 +38,16 @@ function activity(action: string, trainerId = TRAINER): TrainerActivity {
     createdAt: '2026-10-01T00:00:00.000Z',
   };
 }
+
+describe('formatTrainerHeight', () => {
+  it('shows the height in both units', () => {
+    expect(formatTrainerHeight(180)).toBe('180 cm (5 ft 11 in)');
+  });
+
+  it('shows a dash when no height is recorded', () => {
+    expect(formatTrainerHeight(null)).toBe('—');
+  });
+});
 
 describe('trainerClientStatusLabel', () => {
   it('says a tracked client is not on Progresso yet, until they claim their history', () => {

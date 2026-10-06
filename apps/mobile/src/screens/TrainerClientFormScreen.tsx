@@ -16,6 +16,7 @@ import {
   updateTrainerClientProfile,
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { cmFromFeetAndInches, feetAndInchesFromCm } from '../onboarding/weightHeightConversion';
 
 type Props = RootStackScreenProps<'TrainerClientForm' | 'TrainerEditClient'>;
 
@@ -27,9 +28,43 @@ export interface ClientFormValues {
   username: string;
   email: string;
   name: string;
+  heightUnit: 'cm' | 'ft_in';
   heightText: string;
+  feetText: string;
+  inchesText: string;
   weightText: string;
   weightUnit: 'kg' | 'lb';
+}
+
+/** Height in cm, or in whole feet and inches. A blank height is not sent. */
+export function validateHeight(
+  values: Pick<ClientFormValues, 'heightUnit' | 'heightText' | 'feetText' | 'inchesText'>,
+): string | undefined {
+  if (values.heightUnit === 'cm') {
+    if (values.heightText.trim() === '') return undefined;
+    const height = Number(values.heightText);
+    if (!Number.isFinite(height) || height <= 0 || height > MAX_HEIGHT_CM) {
+      return `Enter a height between 1 and ${MAX_HEIGHT_CM} cm`;
+    }
+    return undefined;
+  }
+  if (values.feetText.trim() === '' && values.inchesText.trim() === '') return undefined;
+  const feet = Number(values.feetText);
+  const inches = values.inchesText.trim() === '' ? 0 : Number(values.inchesText);
+  const feetOk = Number.isInteger(feet) && feet >= 3 && feet <= 8;
+  const inchesOk = Number.isInteger(inches) && inches >= 0 && inches <= 11;
+  if (!feetOk || !inchesOk) return 'Enter feet from 3 to 8, and inches from 0 to 11';
+  return undefined;
+}
+
+/** The height in cm that the form's values describe, or undefined when none was entered. */
+export function heightCmFromValues(values: ClientFormValues): number | undefined {
+  if (values.heightUnit === 'cm') {
+    return values.heightText.trim() === '' ? undefined : Number(values.heightText);
+  }
+  if (values.feetText.trim() === '' && values.inchesText.trim() === '') return undefined;
+  const inches = values.inchesText.trim() === '' ? 0 : Number(values.inchesText);
+  return Math.round(cmFromFeetAndInches(Number(values.feetText), inches));
 }
 
 export type ClientFormErrors = Partial<
@@ -59,11 +94,9 @@ export function validateClientForm(values: ClientFormValues, isNew: boolean): Cl
   if (isNew && values.mode === 'untracked' && values.name.trim() === '') {
     errors.name = 'Enter their name';
   }
-  if (takesDetails && values.heightText.trim() !== '') {
-    const height = Number(values.heightText);
-    if (!Number.isFinite(height) || height <= 0 || height > MAX_HEIGHT_CM) {
-      errors.height = `Enter a height between 1 and ${MAX_HEIGHT_CM} cm`;
-    }
+  if (takesDetails) {
+    const heightError = validateHeight(values);
+    if (heightError) errors.height = heightError;
   }
   if (takesDetails && values.weightText.trim() !== '') {
     const weight = Number(values.weightText);
@@ -93,7 +126,10 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
     username: '',
     email: '',
     name: '',
+    heightUnit: 'cm',
     heightText: '',
+    feetText: '',
+    inchesText: '',
     weightText: '',
     weightUnit: 'kg',
   });
@@ -118,7 +154,14 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
         setValues((prev) => ({
           ...prev,
           name: existing.displayName ?? '',
-          heightText: existing.heightValue === null ? '' : String(existing.heightValue),
+          heightUnit: existing.heightUnit,
+          heightText: existing.heightValue === null ? '' : String(Math.round(existing.heightValue)),
+          ...(existing.heightValue === null
+            ? { feetText: '', inchesText: '' }
+            : (() => {
+                const { feet, inches } = feetAndInchesFromCm(existing.heightValue);
+                return { feetText: String(feet), inchesText: String(inches) };
+              })()),
           weightText: existing.weightValue === null ? '' : String(existing.weightValue),
           weightUnit: existing.weightUnit,
         }));
@@ -148,9 +191,8 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
 
     const details = {
       displayName: values.name.trim() || undefined,
-      heightValue: values.heightText.trim() === '' ? undefined : Number(values.heightText),
-      // The form takes height in cm, and an invite stores it that way.
-      heightUnit: values.heightText.trim() === '' ? undefined : ('cm' as const),
+      heightValue: heightCmFromValues(values),
+      heightUnit: heightCmFromValues(values) === undefined ? undefined : values.heightUnit,
       weightValue: values.weightText.trim() === '' ? undefined : Number(values.weightText),
       weightUnit: values.weightText.trim() === '' ? undefined : values.weightUnit,
     };
@@ -285,14 +327,50 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
           ) : null}
 
           {!isNew || addingNew ? (
-            <TextInput
-              testID="trainer-client-height"
-              label="Height (cm)"
-              value={values.heightText}
-              onChangeText={(text) => update('heightText', text)}
-              keyboardType="decimal-pad"
-              error={errors.height}
+            <SegmentedControl
+              testID="trainer-client-height-unit"
+              value={values.heightUnit}
+              onChange={(unit) => update('heightUnit', unit)}
+              options={[
+                { value: 'cm', label: 'cm' },
+                { value: 'ft_in', label: 'ft / in' },
+              ]}
             />
+          ) : null}
+
+          {!isNew || addingNew ? (
+            values.heightUnit === 'cm' ? (
+              <TextInput
+                testID="trainer-client-height"
+                label="Height (cm)"
+                value={values.heightText}
+                onChangeText={(text) => update('heightText', text)}
+                keyboardType="decimal-pad"
+                error={errors.height}
+              />
+            ) : (
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <TextInput
+                    testID="trainer-client-height-feet"
+                    label="Feet"
+                    value={values.feetText}
+                    onChangeText={(text) => update('feetText', text)}
+                    keyboardType="number-pad"
+                    error={errors.height}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <TextInput
+                    testID="trainer-client-height-inches"
+                    label="Inches"
+                    value={values.inchesText}
+                    onChangeText={(text) => update('inchesText', text)}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+            )
           ) : null}
 
           {!isNew || addingNew ? (

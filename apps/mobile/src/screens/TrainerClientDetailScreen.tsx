@@ -25,7 +25,7 @@ import {
   type ClientRecordRow,
   type ClientWorkoutRow,
 } from '../trainer/clientQueries';
-import { trainerClientStatusLabel } from '../trainer/trainerLabels';
+import { formatTrainerHeight, trainerClientStatusLabel } from '../trainer/trainerLabels';
 import { formatCardDate } from '../workouts/workoutFormat';
 
 type Props = RootStackScreenProps<'TrainerClientDetail'>;
@@ -164,7 +164,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
             />
             <ListRow
               title="Height"
-              value={client.heightValue === null ? '—' : `${client.heightValue} cm`}
+              value={formatTrainerHeight(client.heightValue)}
               divider
               testID="trainer-client-height-value"
             />
