@@ -14,8 +14,12 @@ export type TrainerLinkStatus = 'pending' | 'active' | 'ended';
 export type TrainerLinkSource = 'managed' | 'linked';
 
 export interface TrainerClientSummary {
-  clientId: string;
-  status: 'pending' | 'active';
+  /** null for an invite whose person has not signed in yet. */
+  clientId: string | null;
+  inviteId: string | null;
+  /** Only set for an invite: the address the trainer typed. */
+  email: string | null;
+  status: 'invited' | 'pending' | 'active';
   source: TrainerLinkSource;
   displayName: string | null;
   birthday: string | null;
@@ -24,6 +28,11 @@ export interface TrainerClientSummary {
   weightValue: number | null;
   weightUnit: 'kg' | 'lb';
 }
+
+/** What adding a client produced. The invite answer is identical whether or not the email has an account. */
+export type AddClientResult =
+  | { kind: 'request'; status: 'pending' | 'active'; clientId: string }
+  | { kind: 'invite'; status: 'invited' };
 
 export interface TrainerRequestSummary {
   trainerId: string;
@@ -49,6 +58,17 @@ interface LinkRow {
   id: string;
   status: TrainerLinkStatus;
   source: TrainerLinkSource;
+}
+
+interface InviteRow {
+  id: string;
+  email: string;
+  display_name: string | null;
+  birthday: string | null;
+  height_value: number | null;
+  height_unit: 'cm' | 'ft_in';
+  weight_value: number | null;
+  weight_unit: 'kg' | 'lb';
 }
 
 interface ProfileFields {
@@ -81,25 +101,39 @@ export class TrainerService {
     await this.assertTrainer(trainerId);
     const client = this.supabaseService.getClient();
 
-    const { data: links, error: linksError } = await client
-      .from('trainer_clients')
-      .select('client_id, status, source')
-      .eq('trainer_id', trainerId)
-      .in('status', ['pending', 'active']);
-    if (linksError) throw new InternalServerErrorException('Failed to load clients');
+    const [linksResult, invitesResult] = await Promise.all([
+      client
+        .from('trainer_clients')
+        .select('client_id, status, source')
+        .eq('trainer_id', trainerId)
+        .in('status', ['pending', 'active']),
+      client
+        .from('trainer_invites')
+        .select(
+          'id, email, display_name, birthday, height_value, height_unit, weight_value, weight_unit',
+        )
+        .eq('trainer_id', trainerId)
+        .eq('status', 'pending'),
+    ]);
+    if (linksResult.error || invitesResult.error) {
+      throw new InternalServerErrorException('Failed to load clients');
+    }
 
-    const linkRows = (links ?? []) as {
+    const linkRows = (linksResult.data ?? []) as {
       client_id: string;
       status: 'pending' | 'active';
       source: TrainerLinkSource;
     }[];
-    if (linkRows.length === 0) return [];
+    const profiles = linkRows.length
+      ? await this.loadProfiles(linkRows.map((row) => row.client_id))
+      : new Map<string, ProfileRow>();
 
-    const profiles = await this.loadProfiles(linkRows.map((row) => row.client_id));
-    return linkRows.map((row) => {
+    const linked: TrainerClientSummary[] = linkRows.map((row) => {
       const profile = profiles.get(row.client_id);
       return {
         clientId: row.client_id,
+        inviteId: null,
+        email: null,
         status: row.status,
         source: row.source,
         displayName: profile?.display_name ?? null,
@@ -110,62 +144,216 @@ export class TrainerService {
         weightUnit: profile?.weight_unit ?? 'kg',
       };
     });
+
+    const invited: TrainerClientSummary[] = ((invitesResult.data ?? []) as InviteRow[]).map(
+      (row) => ({
+        clientId: null,
+        inviteId: row.id,
+        email: row.email,
+        status: 'invited',
+        source: 'managed',
+        displayName: row.display_name,
+        birthday: row.birthday,
+        heightValue: row.height_value,
+        heightUnit: row.height_unit,
+        weightValue: row.weight_value,
+        weightUnit: row.weight_unit,
+      }),
+    );
+
+    return [...linked, ...invited];
   }
 
   /**
-   * Adds a client by email. A new email creates a managed account (an invite
-   * is sent) and the trainer can log for it straight away. An existing account
-   * gets a pending link request, which the client must accept.
+   * Adds a client by username, or invites one by email. A username finds an
+   * existing account and sends it a request, so the result is honest about
+   * that. An email is always an invite, and the answer is the same whether or
+   * not the email has an account, so it never reveals who is on Progresso.
    */
-  async addClient(
-    trainerId: string,
-    dto: AddClientDto,
-  ): Promise<{ clientId: string; status: 'pending' | 'active'; source: TrainerLinkSource }> {
+  async addClient(trainerId: string, dto: AddClientDto): Promise<AddClientResult> {
     await this.assertTrainer(trainerId);
-    const email = dto.email.trim().toLowerCase();
-    const existingId = await this.findUserIdByEmail(email);
+    if (dto.username && dto.email) {
+      throw new BadRequestException('Use either a username or an email, not both');
+    }
+    if (dto.username) {
+      return this.addByUsername(trainerId, dto.username.trim().toLowerCase());
+    }
+    if (dto.email) {
+      return this.inviteByEmail(trainerId, dto.email.trim().toLowerCase(), dto);
+    }
+    throw new BadRequestException('Enter a username or an email address');
+  }
 
-    if (existingId === trainerId) {
+  private async addByUsername(trainerId: string, username: string): Promise<AddClientResult> {
+    const clientId = await this.findUserIdByUsername(username);
+    if (!clientId) {
+      throw new NotFoundException('No Progresso user has that username');
+    }
+    if (clientId === trainerId) {
       throw new BadRequestException('You cannot add yourself as a client');
     }
+    const status = await this.requestLink(trainerId, clientId);
+    return { kind: 'request', status, clientId };
+  }
 
-    if (existingId) {
-      const status = await this.requestLink(trainerId, existingId);
-      return { clientId: existingId, status, source: 'linked' };
-    }
-
-    if (!dto.displayName) {
-      throw new BadRequestException('A name is required to add a new client');
-    }
-
+  private async inviteByEmail(
+    trainerId: string,
+    email: string,
+    dto: AddClientDto,
+  ): Promise<AddClientResult> {
     const client = this.supabaseService.getClient();
-    const { data, error } = await client.auth.admin.inviteUserByEmail(email, {
-      data: { display_name: dto.displayName, managed_by_trainer: true },
+    const details = {
+      display_name: dto.displayName ?? null,
+      birthday: dto.birthday ?? null,
+      height_value: dto.heightValue ?? null,
+      height_unit: dto.heightUnit ?? 'cm',
+      weight_value: dto.weightValue ?? null,
+      weight_unit: dto.weightUnit ?? 'kg',
+    };
+
+    // One pending invite per trainer and email: a second invite updates the first.
+    const { data: existing, error: findError } = await client
+      .from('trainer_invites')
+      .select('id')
+      .eq('trainer_id', trainerId)
+      .eq('email', email)
+      .eq('status', 'pending')
+      .maybeSingle();
+    if (findError) throw new InternalServerErrorException('Failed to save invite');
+
+    if (existing) {
+      const { error } = await client
+        .from('trainer_invites')
+        .update(details)
+        .eq('id', (existing as { id: string }).id);
+      if (error) throw new InternalServerErrorException('Failed to save invite');
+    } else {
+      // Email not yet sent, so the account state is unknown here. It is set just below.
+      const { data: created, error } = await client
+        .from('trainer_invites')
+        .insert({ trainer_id: trainerId, email, ...details })
+        .select('id')
+        .single();
+      if (error || !created) throw new InternalServerErrorException('Failed to save invite');
+      await this.audit(
+        trainerId,
+        null,
+        'invite.created',
+        'trainer_invites',
+        (created as { id: string }).id,
+        {},
+      );
+    }
+
+    // A new email gets an invitation, which also creates its account. An email that
+    // already has an account is refused by the auth provider, and that refusal is
+    // ignored on purpose: the answer to the trainer must not differ between the two.
+    const { error: inviteError } = await client.auth.admin.inviteUserByEmail(email, {
+      data: { display_name: dto.displayName ?? null, managed_by_trainer: true },
     });
-    if (error || !data?.user) {
+    const createdAccount = !inviteError;
+    if (inviteError && !/already|registered|exists/i.test(inviteError.message)) {
       throw new BadRequestException('Could not send an invite to that email address');
     }
-    const clientId = data.user.id;
 
-    await this.updateProfile(clientId, {
-      display_name: dto.displayName,
-      birthday: dto.birthday,
-      height_value: dto.heightValue,
-      height_unit: dto.heightUnit,
-      weight_value: dto.weightValue,
-      weight_unit: dto.weightUnit,
-    });
+    const { error: flagError } = await client
+      .from('trainer_invites')
+      .update({ created_account: createdAccount })
+      .eq('trainer_id', trainerId)
+      .eq('email', email)
+      .eq('status', 'pending');
+    if (flagError) throw new InternalServerErrorException('Failed to save invite');
 
-    const { error: linkError } = await client.from('trainer_clients').insert({
-      trainer_id: trainerId,
-      client_id: clientId,
-      status: 'active',
-      source: 'managed',
-    });
-    if (linkError) throw new InternalServerErrorException('Failed to link client');
+    return { kind: 'invite', status: 'invited' };
+  }
 
-    await this.audit(trainerId, clientId, 'client.created', 'trainer_clients', null, {});
-    return { clientId, status: 'active', source: 'managed' };
+  /**
+   * Attaches the signed-in person's pending invites, if any. Runs for every user
+   * at sign-in, so an invite reaches an existing account the same way as a new
+   * one. Only a confirmed email counts, so an invite cannot be claimed by someone
+   * who merely typed the address.
+   */
+  async claimInvites(userId: string): Promise<{ claimed: number }> {
+    const client = this.supabaseService.getClient();
+    const { data: authData, error: authError } = await client.auth.admin.getUserById(userId);
+    const user = authData?.user;
+    if (authError || !user?.email || !user.email_confirmed_at) {
+      return { claimed: 0 };
+    }
+    const email = user.email.toLowerCase();
+
+    const { data: invites, error } = await client
+      .from('trainer_invites')
+      .select(
+        'id, trainer_id, display_name, birthday, height_value, height_unit, weight_value, weight_unit, created_account',
+      )
+      .eq('email', email)
+      .eq('status', 'pending');
+    if (error) throw new InternalServerErrorException('Failed to check invites');
+
+    let claimed = 0;
+    for (const invite of (invites ?? []) as (InviteRow & {
+      trainer_id: string;
+      created_account: boolean;
+    })[]) {
+      await this.fillMissingProfile(userId, invite);
+
+      const link = await this.findLink(invite.trainer_id, userId);
+      if (!link) {
+        const { data: created, error: linkError } = await client
+          .from('trainer_clients')
+          .insert({
+            trainer_id: invite.trainer_id,
+            client_id: userId,
+            status: 'pending',
+            source: invite.created_account ? 'managed' : 'linked',
+          })
+          .select('id')
+          .single();
+        if (linkError || !created)
+          throw new InternalServerErrorException('Failed to attach invite');
+        await this.audit(
+          invite.trainer_id,
+          userId,
+          'link.requested',
+          'trainer_clients',
+          (created as { id: string }).id,
+          { via: 'invite' },
+        );
+      }
+
+      const { error: claimError } = await client
+        .from('trainer_invites')
+        .update({ status: 'claimed', claimed_by: userId, claimed_at: new Date().toISOString() })
+        .eq('id', invite.id);
+      if (claimError) throw new InternalServerErrorException('Failed to attach invite');
+      claimed += 1;
+    }
+    return { claimed };
+  }
+
+  /** Fills only the profile fields the person has not set. An invite never overwrites their own details. */
+  private async fillMissingProfile(userId: string, invite: InviteRow): Promise<void> {
+    const { data } = await this.supabaseService
+      .getClient()
+      .from('users')
+      .select('display_name, birthday, height_value, weight_value')
+      .eq('id', userId)
+      .maybeSingle();
+    const profile = (data ?? {}) as Partial<ProfileRow>;
+
+    const fill: ProfileFields = {};
+    if (!profile.display_name && invite.display_name) fill.display_name = invite.display_name;
+    if (!profile.birthday && invite.birthday) fill.birthday = invite.birthday;
+    if (profile.height_value == null && invite.height_value != null) {
+      fill.height_value = invite.height_value;
+      fill.height_unit = invite.height_unit;
+    }
+    if (profile.weight_value == null && invite.weight_value != null) {
+      fill.weight_value = invite.weight_value;
+      fill.weight_unit = invite.weight_unit;
+    }
+    if (Object.keys(fill).length > 0) await this.updateProfile(userId, fill);
   }
 
   /** Edits a managed client's profile. Linked accounts belong to their owner, so they are refused. */
@@ -442,12 +630,15 @@ export class TrainerService {
     if (error) throw new InternalServerErrorException('Failed to update trainer link');
   }
 
-  private async findUserIdByEmail(email: string): Promise<string | null> {
+  private async findUserIdByUsername(username: string): Promise<string | null> {
     const { data, error } = await this.supabaseService
       .getClient()
-      .rpc('find_auth_user_id_by_email', { p_email: email });
-    if (error) throw new InternalServerErrorException('Failed to look up that email');
-    return (data as string | null) ?? null;
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
+    if (error) throw new InternalServerErrorException('Failed to look up that username');
+    return (data as { id: string } | null)?.id ?? null;
   }
 
   private async loadProfiles(userIds: string[]): Promise<Map<string, ProfileRow>> {
@@ -463,10 +654,7 @@ export class TrainerService {
     return map;
   }
 
-  private async updateProfile(
-    userId: string,
-    fields: ProfileFields & Record<string, unknown>,
-  ): Promise<void> {
+  private async updateProfile(userId: string, fields: ProfileFields): Promise<void> {
     const payload: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(fields)) {
       if (value !== undefined) payload[key] = value;

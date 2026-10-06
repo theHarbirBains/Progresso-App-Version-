@@ -99,6 +99,13 @@ export class TrainerController {
     return { ok: true };
   }
 
+  // Attaches invites sent to this person's (confirmed) email. The app calls it at sign-in.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('invites/claim')
+  async claimInvites(@CurrentUser() user: AuthenticatedUser) {
+    return this.trainerService.claimInvites(user.id);
+  }
+
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Get('actions')
   async actions(@CurrentUser() user: AuthenticatedUser) {

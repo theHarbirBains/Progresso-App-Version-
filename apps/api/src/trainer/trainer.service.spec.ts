@@ -29,13 +29,14 @@ const CHAIN_METHODS = [
 
 /**
  * Supabase stand-in for these tests. Results are queued per table (and per
- * rpc name, for rpc), and consumed in the order the service issues queries.
- * Every call is recorded so tests can assert what was written.
+ * rpc name, and per auth-admin call), and consumed in the order the service
+ * issues queries. Every call is recorded so tests can assert what was written.
  */
 function createMockClient() {
   const queues = new Map<string, Result[]>();
   const rpcQueues = new Map<string, Result[]>();
   const adminQueue: Result[] = [];
+  const userQueue: Result[] = [];
   const calls: { target: string; method: string; args: unknown[] }[] = [];
 
   const take = (queue: Result[] | undefined, name: string): Promise<Result> => {
@@ -72,6 +73,10 @@ function createMockClient() {
           calls.push({ target: 'auth.admin', method: 'inviteUserByEmail', args: [email, options] });
           return take(adminQueue, 'auth.admin.inviteUserByEmail');
         }),
+        getUserById: jest.fn((id: string) => {
+          calls.push({ target: 'auth.admin', method: 'getUserById', args: [id] });
+          return take(userQueue, 'auth.admin.getUserById');
+        }),
       },
     },
   };
@@ -86,6 +91,9 @@ function createMockClient() {
     },
     queueInvite(...results: Result[]) {
       adminQueue.push(...results);
+    },
+    queueUser(...results: Result[]) {
+      userQueue.push(...results);
     },
     calls,
   };
@@ -121,6 +129,8 @@ const logDto = (overrides: Partial<LogWorkoutDto> = {}): LogWorkoutDto =>
     ...overrides,
   }) as LogWorkoutDto;
 
+const ALREADY_REGISTERED = 'A user with this email address has already been registered';
+
 describe('TrainerService', () => {
   describe('getStatus', () => {
     it('reports the Trainer entitlement from the subscription projection', async () => {
@@ -149,98 +159,286 @@ describe('TrainerService', () => {
     });
   });
 
-  describe('addClient', () => {
+  describe('addClient by username', () => {
+    it('reports a username that matches no account, without creating anything', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queue('users', ok(null));
+      await expect(
+        service.addClient(TRAINER, { username: 'nobody_here' } as AddClientDto),
+      ).rejects.toThrow(NotFoundException);
+      expect(mock.calls.some((c) => c.method === 'insert')).toBe(false);
+    });
+
     it('refuses to add yourself', async () => {
       const { mock, service } = setup();
       mock.queue('subscriptions', activeTrainer());
-      mock.queueRpc('find_auth_user_id_by_email', ok(TRAINER));
+      mock.queue('users', ok({ id: TRAINER }));
       await expect(
-        service.addClient(TRAINER, { email: 'me@b.co' } as AddClientDto),
+        service.addClient(TRAINER, { username: 'me_coach' } as AddClientDto),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('sends an existing account a pending link request, without creating an account', async () => {
+    it('sends the account a pending request, looking the username up in lower case', async () => {
       const { mock, service } = setup();
       mock.queue('subscriptions', activeTrainer());
-      mock.queueRpc('find_auth_user_id_by_email', ok(CLIENT));
+      mock.queue('users', ok({ id: CLIENT }));
       mock.queue('trainer_clients', ok(null), ok({ id: 'link-1' }));
       mock.queue('trainer_actions', ok());
 
-      const result = await service.addClient(TRAINER, {
-        email: 'Client@Example.com',
-        displayName: 'Ignored',
-      } as AddClientDto);
+      const result = await service.addClient(TRAINER, { username: 'Sam_Lifts' } as AddClientDto);
 
-      expect(result).toEqual({ clientId: CLIENT, status: 'pending', source: 'linked' });
+      expect(result).toEqual({ kind: 'request', status: 'pending', clientId: CLIENT });
+      const lookup = mock.calls.find((c) => c.target === 'users' && c.method === 'eq');
+      expect(lookup?.args).toEqual(['username', 'sam_lifts']);
       expect(mock.client.auth.admin.inviteUserByEmail).not.toHaveBeenCalled();
-      const rpcCall = mock.calls.find((c) => c.target === 'rpc:find_auth_user_id_by_email');
-      expect(rpcCall?.args[0]).toEqual({ p_email: 'client@example.com' });
     });
 
     it('re-requests an ended link as linked, so a trainer never keeps edit rights to an account the client owns', async () => {
       const { mock, service } = setup();
       mock.queue('subscriptions', activeTrainer());
-      mock.queueRpc('find_auth_user_id_by_email', ok(CLIENT));
+      mock.queue('users', ok({ id: CLIENT }));
       mock.queue('trainer_clients', ok({ id: 'link-1', status: 'ended', source: 'managed' }), ok());
       mock.queue('trainer_actions', ok());
 
-      const result = await service.addClient(TRAINER, { email: 'c@example.com' } as AddClientDto);
+      const result = await service.addClient(TRAINER, { username: 'sam_lifts' } as AddClientDto);
 
-      expect(result.status).toBe('pending');
+      expect(result).toEqual({ kind: 'request', status: 'pending', clientId: CLIENT });
       const update = mock.calls.find(
         (c) => c.target === 'trainer_clients' && c.method === 'update',
       );
       expect(update?.args[0]).toMatchObject({ status: 'pending', source: 'linked' });
     });
+  });
 
-    it('creates a managed client from a new email, sets its profile, and links it as active', async () => {
+  describe('addClient by email (invite)', () => {
+    it('invites a new email, records that the invite created the account, and answers the same way', async () => {
       const { mock, service } = setup();
       mock.queue('subscriptions', activeTrainer());
-      mock.queueRpc('find_auth_user_id_by_email', ok(null));
-      mock.queueInvite({ data: { user: { id: NEW_CLIENT } }, error: null });
-      mock.queue('users', ok());
-      mock.queue('trainer_clients', ok());
+      mock.queue('trainer_invites', ok(null), ok({ id: 'inv-1' }), ok());
       mock.queue('trainer_actions', ok());
+      mock.queueInvite({ data: { user: { id: NEW_CLIENT } }, error: null });
 
       const result = await service.addClient(TRAINER, {
-        email: 'new@example.com',
+        email: '  New@Example.com ',
         displayName: 'Sam',
         heightValue: 180,
         heightUnit: 'cm',
-        weightValue: 80,
-        weightUnit: 'kg',
       } as AddClientDto);
 
-      expect(result).toEqual({ clientId: NEW_CLIENT, status: 'active', source: 'managed' });
-      const invite = mock.calls.find((c) => c.method === 'inviteUserByEmail');
-      expect(invite?.args[1]).toEqual({
-        data: { display_name: 'Sam', managed_by_trainer: true },
+      expect(result).toEqual({ kind: 'invite', status: 'invited' });
+      const insert = mock.calls.find(
+        (c) => c.target === 'trainer_invites' && c.method === 'insert',
+      );
+      expect(insert?.args[0]).toMatchObject({
+        trainer_id: TRAINER,
+        email: 'new@example.com',
+        display_name: 'Sam',
+        height_value: 180,
       });
+      const invite = mock.calls.find((c) => c.method === 'inviteUserByEmail');
+      expect(invite?.args[0]).toBe('new@example.com');
+      const flag = mock.calls.filter(
+        (c) => c.target === 'trainer_invites' && c.method === 'update',
+      );
+      expect(flag[0]?.args[0]).toEqual({ created_account: true });
+    });
+
+    it('answers exactly as it does for a new email when the address already has an account', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queue('trainer_invites', ok(null), ok({ id: 'inv-2' }), ok());
+      mock.queue('trainer_actions', ok());
+      mock.queueInvite({ data: null, error: { message: ALREADY_REGISTERED } });
+
+      const result = await service.addClient(TRAINER, {
+        email: 'existing@example.com',
+      } as AddClientDto);
+
+      expect(result).toEqual({ kind: 'invite', status: 'invited' });
+      const flag = mock.calls.filter(
+        (c) => c.target === 'trainer_invites' && c.method === 'update',
+      );
+      expect(flag[0]?.args[0]).toEqual({ created_account: false });
+    });
+
+    it('updates the existing pending invite rather than adding a second one', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queue('trainer_invites', ok({ id: 'inv-3' }), ok(), ok());
+      mock.queueInvite({ data: null, error: { message: ALREADY_REGISTERED } });
+
+      await service.addClient(TRAINER, {
+        email: 'again@example.com',
+        displayName: 'Ana',
+      } as AddClientDto);
+
+      expect(mock.calls.some((c) => c.target === 'trainer_invites' && c.method === 'insert')).toBe(
+        false,
+      );
+      const update = mock.calls.find(
+        (c) => c.target === 'trainer_invites' && c.method === 'update',
+      );
+      expect(update?.args[0]).toMatchObject({ display_name: 'Ana' });
+    });
+
+    it('fails honestly on a real invite error, rather than pretending it was sent', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queue('trainer_invites', ok(null), ok({ id: 'inv-4' }));
+      mock.queue('trainer_actions', ok());
+      mock.queueInvite({ data: null, error: { message: 'Email rate limit exceeded' } });
+
+      await expect(
+        service.addClient(TRAINER, { email: 'x@example.com' } as AddClientDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('needs exactly one of a username or an email', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      await expect(service.addClient(TRAINER, {} as AddClientDto)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      mock.queue('subscriptions', activeTrainer());
+      await expect(
+        service.addClient(TRAINER, { username: 'sam_lifts', email: 'a@b.co' } as AddClientDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('claimInvites', () => {
+    const invite = {
+      id: 'inv-9',
+      trainer_id: TRAINER,
+      email: 'new@example.com',
+      display_name: 'Sam',
+      birthday: null,
+      height_value: 180,
+      height_unit: 'cm',
+      weight_value: null,
+      weight_unit: 'kg',
+      created_account: true,
+    };
+
+    it('claims nothing until the email is confirmed, so an invite cannot be taken by typing an address', async () => {
+      const { mock, service } = setup();
+      mock.queueUser(
+        ok({ user: { id: NEW_CLIENT, email: 'new@example.com', email_confirmed_at: null } }),
+      );
+
+      await expect(service.claimInvites(NEW_CLIENT)).resolves.toEqual({ claimed: 0 });
+      expect(mock.calls.some((c) => c.target === 'trainer_invites')).toBe(false);
+    });
+
+    it('attaches a confirmed invite as a managed link, fills only blank profile fields, and marks it claimed', async () => {
+      const { mock, service } = setup();
+      mock.queueUser(
+        ok({
+          user: { id: NEW_CLIENT, email: 'New@Example.com', email_confirmed_at: '2026-10-01' },
+        }),
+      );
+      mock.queue('trainer_invites', ok([invite]), ok());
+      mock.queue(
+        'users',
+        ok({ display_name: null, birthday: null, height_value: null, weight_value: 75 }),
+        ok(),
+      );
+      mock.queue('trainer_clients', ok(null), ok({ id: 'link-9' }));
+      mock.queue('trainer_actions', ok());
+
+      await expect(service.claimInvites(NEW_CLIENT)).resolves.toEqual({ claimed: 1 });
+
       const profile = mock.calls.find((c) => c.target === 'users' && c.method === 'update');
-      expect(profile?.args[0]).toMatchObject({
+      expect(profile?.args[0]).toEqual({
         display_name: 'Sam',
         height_value: 180,
         height_unit: 'cm',
-        weight_value: 80,
-        weight_unit: 'kg',
       });
       const link = mock.calls.find((c) => c.target === 'trainer_clients' && c.method === 'insert');
       expect(link?.args[0]).toEqual({
         trainer_id: TRAINER,
         client_id: NEW_CLIENT,
-        status: 'active',
+        status: 'pending',
         source: 'managed',
       });
+      const claim = mock.calls.filter(
+        (c) => c.target === 'trainer_invites' && c.method === 'update',
+      );
+      expect(claim[0]?.args[0]).toMatchObject({ status: 'claimed', claimed_by: NEW_CLIENT });
     });
 
-    it('requires a name before inviting a new email', async () => {
+    it('links an existing account as linked, and does not duplicate a link that already exists', async () => {
+      const { mock, service } = setup();
+      mock.queueUser(
+        ok({ user: { id: CLIENT, email: 'new@example.com', email_confirmed_at: '2026-10-01' } }),
+      );
+      mock.queue('trainer_invites', ok([{ ...invite, created_account: false }]), ok());
+      mock.queue(
+        'users',
+        ok({ display_name: 'Already', birthday: null, height_value: 170, weight_value: null }),
+      );
+      mock.queue('trainer_clients', ok({ id: 'link-5', status: 'ended', source: 'linked' }));
+
+      await expect(service.claimInvites(CLIENT)).resolves.toEqual({ claimed: 1 });
+      expect(mock.calls.some((c) => c.target === 'trainer_clients' && c.method === 'insert')).toBe(
+        false,
+      );
+      // Every field the invite offers is already set on this account (or not offered), so nothing is written.
+      expect(mock.calls.some((c) => c.target === 'users' && c.method === 'update')).toBe(false);
+    });
+  });
+
+  describe('listClients', () => {
+    it('lists linked clients and, separately, invites still waiting for their person', async () => {
       const { mock, service } = setup();
       mock.queue('subscriptions', activeTrainer());
-      mock.queueRpc('find_auth_user_id_by_email', ok(null));
-      await expect(
-        service.addClient(TRAINER, { email: 'new@example.com' } as AddClientDto),
-      ).rejects.toThrow(BadRequestException);
-      expect(mock.client.auth.admin.inviteUserByEmail).not.toHaveBeenCalled();
+      mock.queue(
+        'trainer_clients',
+        ok([{ client_id: CLIENT, status: 'active', source: 'managed' }]),
+      );
+      mock.queue(
+        'trainer_invites',
+        ok([
+          {
+            id: 'inv-1',
+            email: 'pat@example.com',
+            display_name: 'Pat',
+            birthday: null,
+            height_value: null,
+            height_unit: 'cm',
+            weight_value: null,
+            weight_unit: 'kg',
+          },
+        ]),
+      );
+      mock.queue(
+        'users',
+        ok([
+          {
+            id: CLIENT,
+            display_name: 'Sam',
+            birthday: null,
+            height_value: null,
+            height_unit: 'cm',
+            weight_value: null,
+            weight_unit: 'kg',
+          },
+        ]),
+      );
+
+      const clients = await service.listClients(TRAINER);
+
+      expect(clients).toHaveLength(2);
+      expect(clients[0]).toMatchObject({ clientId: CLIENT, status: 'active', displayName: 'Sam' });
+      expect(clients[1]).toMatchObject({
+        clientId: null,
+        inviteId: 'inv-1',
+        email: 'pat@example.com',
+        status: 'invited',
+        displayName: 'Pat',
+      });
     });
   });
 

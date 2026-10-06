@@ -2570,12 +2570,48 @@ async function main() {
     'A client cannot create their own trainer link',
     /permission denied|row-level security/i,
   );
+  // Invites: a trainer sees only their own, and nobody can write them directly.
+  await admin.query(
+    "insert into public.trainer_invites (trainer_id, email, display_name) values ($1, 'invitee@test.local', 'Invitee')",
+    [T],
+  );
+  const ownInvites = await asUser(T, (client) =>
+    client.query('select id from public.trainer_invites where trainer_id = $1', [T]),
+  );
+  record(
+    'A trainer can see their own invites',
+    ownInvites.rows.length >= 1,
+    `${ownInvites.rows.length} rows`,
+  );
+  const inviteeCannotSee = await asUser(C, (client) =>
+    client.query("select id from public.trainer_invites where email = 'invitee@test.local'"),
+  );
+  record(
+    'An invited address cannot see the invite before it is claimed',
+    inviteeCannotSee.rows.length === 0,
+  );
   await expectThrows(
     asUser(T, (client) =>
-      client.query('select public.find_auth_user_id_by_email($1)', ['trainer-client@test.local']),
+      client.query(
+        "insert into public.trainer_invites (trainer_id, email) values ($1, 'direct@test.local')",
+        [T],
+      ),
     ),
-    'Account lookup by email is service role only',
-    /permission denied/,
+    'A trainer cannot write invites directly (the API owns the rules)',
+    /permission denied|row-level security/i,
+  );
+  await expectThrows(
+    admin.query(
+      "insert into public.trainer_invites (trainer_id, email) values ($1, 'invitee@test.local')",
+      [T],
+    ),
+    'Only one pending invite exists per trainer and email',
+    /duplicate key|unique/i,
+  );
+  await expectThrows(
+    asUser(T, (client) => client.query('select public.find_auth_user_id_by_email($1)', ['x@y.z'])),
+    'The old email lookup function is gone',
+    /does not exist|permission denied/,
   );
 
   const auditId = randomUUID();
