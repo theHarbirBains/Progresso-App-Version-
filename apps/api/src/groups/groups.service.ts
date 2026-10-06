@@ -25,6 +25,9 @@ export interface GroupMemberView {
   isGuest: boolean;
   /** This member's workout in the group. Every joined member can read and edit it. */
   workoutId: string | null;
+  /** The day of the member’s split their group workout is, or null for none. */
+  workoutSplitDayId: string | null;
+  workoutName: string | null;
 }
 
 export interface GroupDetail {
@@ -65,6 +68,17 @@ export class GroupsService {
 
   async create(userId: string, dto: CreateGroupDto): Promise<{ groupId: string }> {
     const client = this.supabaseService.getClient();
+
+    // Your own workout in the group: a day of your split, a named workout outside it,
+    // or the group's own name.
+    let workoutName = dto.name;
+    let splitDayId: string | undefined;
+    if (dto.splitDayId) {
+      splitDayId = dto.splitDayId;
+      workoutName = await this.ownedSplitDayName(userId, dto.splitDayId);
+    } else if (dto.workoutName) {
+      workoutName = dto.workoutName;
+    }
 
     if (dto.workoutId) {
       // Starting from a workout: it must be the caller's own open, solo workout.
@@ -107,7 +121,7 @@ export class GroupsService {
         .eq('id', dto.workoutId);
       if (error) throw new InternalServerErrorException('Failed to add the workout to the group');
     } else {
-      await this.createMemberWorkout(userId, groupId, dto.name);
+      await this.createMemberWorkout(userId, groupId, workoutName, splitDayId);
     }
 
     return { groupId };
@@ -222,12 +236,19 @@ export class GroupsService {
 
     const { data: workouts, error: workoutsError } = await client
       .from('workouts')
-      .select('id, user_id')
+      .select('id, user_id, name, workout_split_day_id')
       .eq('group_id', groupId)
       .is('deleted_at', null);
     if (workoutsError) throw new InternalServerErrorException('Failed to load workouts');
     const workoutByUser = new Map(
-      ((workouts ?? []) as { id: string; user_id: string }[]).map((w) => [w.user_id, w.id]),
+      (
+        (workouts ?? []) as {
+          id: string;
+          user_id: string;
+          name: string;
+          workout_split_day_id: string | null;
+        }[]
+      ).map((w) => [w.user_id, { id: w.id, name: w.name, splitDayId: w.workout_split_day_id }]),
     );
 
     const names = await this.loadDisplayNames(members.map((m) => m.user_id));
@@ -244,7 +265,9 @@ export class GroupsService {
         role: m.role,
         status: m.status === 'left' ? 'invited' : m.status,
         isGuest: m.is_guest,
-        workoutId: workoutByUser.get(m.user_id) ?? null,
+        workoutId: workoutByUser.get(m.user_id)?.id ?? null,
+        workoutSplitDayId: workoutByUser.get(m.user_id)?.splitDayId ?? null,
+        workoutName: workoutByUser.get(m.user_id)?.name ?? null,
       })),
     };
   }
@@ -468,7 +491,44 @@ export class GroupsService {
     return { userId: clientId, status };
   }
 
+  /** The caller picks which day of their split their group workout is, or clears it. */
+  async setMyWorkoutDay(userId: string, groupId: string, splitDayId: string | null): Promise<void> {
+    await this.requireJoined(userId, groupId);
+    if (splitDayId) await this.ownedSplitDayName(userId, splitDayId);
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('workouts')
+      .update({ workout_split_day_id: splitDayId })
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .is('deleted_at', null);
+    if (error) throw new InternalServerErrorException('Failed to set the day');
+  }
+
   // ---- internals -----------------------------------------------------------
+
+  /** The name of a day in one of the caller's own splits. Anyone else's day is not found. */
+  private async ownedSplitDayName(userId: string, splitDayId: string): Promise<string> {
+    const client = this.supabaseService.getClient();
+    const { data: day, error } = await client
+      .from('workout_split_days')
+      .select('name, workout_split_id')
+      .eq('id', splitDayId)
+      .maybeSingle();
+    if (error) throw new InternalServerErrorException('Failed to look up the day');
+    const row = day as { name: string; workout_split_id: string } | null;
+    if (!row) throw new NotFoundException('That day is not in your split');
+
+    const { data: split, error: splitError } = await client
+      .from('workout_splits')
+      .select('id')
+      .eq('id', row.workout_split_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (splitError) throw new InternalServerErrorException('Failed to look up the day');
+    if (!split) throw new NotFoundException('That day is not in your split');
+    return row.name;
+  }
 
   /** Trainer actions need the Trainer entitlement, as they do everywhere else in trainer mode. */
   private async assertTrainerEntitlement(userId: string): Promise<void> {
@@ -520,11 +580,22 @@ export class GroupsService {
     return (data as MemberRow | null) ?? null;
   }
 
-  private async createMemberWorkout(userId: string, groupId: string, name: string): Promise<void> {
+  private async createMemberWorkout(
+    userId: string,
+    groupId: string,
+    name: string,
+    splitDayId?: string,
+  ): Promise<void> {
     const { error } = await this.supabaseService
       .getClient()
       .from('workouts')
-      .insert({ user_id: userId, name, performed_at: new Date().toISOString(), group_id: groupId });
+      .insert({
+        user_id: userId,
+        name,
+        performed_at: new Date().toISOString(),
+        group_id: groupId,
+        workout_split_day_id: splitDayId ?? null,
+      });
     if (error) throw new InternalServerErrorException('Failed to create the workout');
   }
 

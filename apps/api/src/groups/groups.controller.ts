@@ -9,6 +9,7 @@ import {
   CreateGroupDto,
   InviteMemberDto,
   RespondGroupInviteDto,
+  SetMyWorkoutDayDto,
 } from './dto/groups.dto';
 import { GroupsService } from './groups.service';
 
@@ -82,6 +83,18 @@ export class GroupsController {
     @Body() dto: RespondGroupInviteDto,
   ) {
     await this.groupsService.respondToInvite(user.id, id, dto.action);
+    return { ok: true };
+  }
+
+  // Which day of your split your group workout is. Any day of your own split, or none.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Patch(':id/my-workout')
+  async setMyWorkoutDay(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetMyWorkoutDayDto,
+  ) {
+    await this.groupsService.setMyWorkoutDay(user.id, id, dto.splitDayId ?? null);
     return { ok: true };
   }
 

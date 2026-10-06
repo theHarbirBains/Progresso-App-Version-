@@ -799,6 +799,9 @@ export interface GroupMember {
   isGuest: boolean;
   /** This member's workout in the group, or null while they are only invited. */
   workoutId: string | null;
+  /** The day of their split this group workout is, or null. */
+  workoutSplitDayId: string | null;
+  workoutName: string | null;
 }
 
 export interface GroupDetail {
@@ -820,7 +823,7 @@ export interface GroupInvite {
 
 export function createGroup(
   accessToken: string,
-  input: { name: string; workoutId?: string },
+  input: { name: string; workoutId?: string; splitDayId?: string; workoutName?: string },
 ): Promise<{ groupId: string }> {
   return request<{ groupId: string }>('/api/v1/groups', accessToken, {
     method: 'POST',
@@ -941,4 +944,20 @@ export function addClientToGroup(
     method: 'POST',
     body: JSON.stringify({ clientId }),
   });
+}
+
+/** Which day of your split your group workout is. null clears it. */
+export function setMyGroupWorkoutDay(
+  accessToken: string,
+  groupId: string,
+  splitDayId: string | null,
+): Promise<{ ok: true }> {
+  return request<{ ok: true }>(
+    `/api/v1/groups/${encodeURIComponent(groupId)}/my-workout`,
+    accessToken,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ splitDayId }),
+    },
+  );
 }

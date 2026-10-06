@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
@@ -9,38 +9,42 @@ import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
+import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
+import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 import {
-  addClientToGroup,
   addGroupGuest,
   finishGroup,
   getGroup,
   getTrainerStatus,
   inviteToGroup,
   leaveGroup,
-  listTrainerClients,
+  setMyGroupWorkoutDay,
   type GroupDetail,
-  type TrainerClient,
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { LiveWorkoutEditor } from '../workouts/LiveWorkoutEditor';
+import { fetchWorkoutSplitDetail, type WorkoutSplitDay } from '../workouts/workoutSplitQueries';
 
 type Props = RootStackScreenProps<'GroupSession'>;
 
 /**
- * One group session. Every joined member's workout is shown with an editor, so
- * anyone in the group can enter and change sets and exercises. Friends are invited
- * by username, a trainer brings in their own clients, and guests are added by name
- * with no account needed.
+ * One group session. Every joined member's workout is shown with an editor, so anyone
+ * in the group can enter and change sets and exercises. Each person picks which day of
+ * their own split their workout is. Friends are invited by username, a trainer brings
+ * in their clients from a separate list, and guests are added by name.
  */
 export function GroupSessionScreen({ navigation, route }: Props) {
   const { groupId } = route.params;
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
   const userId = user?.id ?? '';
+  const { theme, activeWorkoutSplitId } = useProgressTheme();
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
-  const [trainerClients, setTrainerClients] = useState<TrainerClient[]>([]);
+  const [isTrainer, setIsTrainer] = useState(false);
+  const [days, setDays] = useState<WorkoutSplitDay[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [guestName, setGuestName] = useState('');
@@ -55,18 +59,35 @@ export function GroupSessionScreen({ navigation, route }: Props) {
       setError(err instanceof Error ? err.message : 'Could not load this group');
       return;
     }
-    // A trainer's clients to add. Anyone else simply has none to add.
     try {
-      const { isTrainer } = await getTrainerStatus(accessToken);
-      setTrainerClients(isTrainer ? await listTrainerClients(accessToken) : []);
+      const status = await getTrainerStatus(accessToken);
+      setIsTrainer(status.isTrainer);
     } catch {
-      setTrainerClients([]);
+      setIsTrainer(false);
     }
   }, [accessToken, groupId]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!activeWorkoutSplitId) {
+      setDays([]);
+      return;
+    }
+    let cancelled = false;
+    fetchWorkoutSplitDetail(activeWorkoutSplitId)
+      .then((detail) => {
+        if (!cancelled) setDays([...detail.days].sort((a, b) => a.orderIndex - b.orderIndex));
+      })
+      .catch(() => {
+        if (!cancelled) setDays([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWorkoutSplitId]);
 
   async function run(action: () => Promise<unknown>, failure: string) {
     if (busy) return;
@@ -99,9 +120,12 @@ export function GroupSessionScreen({ navigation, route }: Props) {
     }, 'Could not add the guest');
   }
 
-  function addClient(clientId: string) {
+  function pickDay(splitDayId: string | null) {
     if (!accessToken) return;
-    void run(() => addClientToGroup(accessToken, groupId, clientId), 'Could not add that client');
+    void run(
+      () => setMyGroupWorkoutDay(accessToken, groupId, splitDayId),
+      'Could not set your day',
+    );
   }
 
   function finish() {
@@ -127,19 +151,19 @@ export function GroupSessionScreen({ navigation, route }: Props) {
   }
 
   const isHost = group?.hostId === userId;
-  // Clients not already in the group (joined or invited), with an account or tracked.
-  const memberIds = new Set(group?.members.map((member) => member.userId) ?? []);
-  const clientsToAdd = trainerClients.filter(
-    (client) =>
-      client.clientId !== null && client.status === 'active' && !memberIds.has(client.clientId),
-  );
+  const isLive = group?.status === 'live';
+  const joined = group?.members.filter((member) => member.status === 'joined') ?? [];
+  const invited = group?.members.filter((member) => member.status === 'invited') ?? [];
+  const me = joined.find((member) => member.userId === userId);
 
   return (
     <Screen
       scrollTestID="group-session-scroll"
+      contentContainerStyle={{ gap: widgetGap }}
       header={
         <AppHeader
           title={group?.name ?? 'Group'}
+          subtitle={isLive ? `${joined.length} in the group` : 'Finished'}
           onBack={() => navigation.goBack()}
           testID="group-session-header"
         />
@@ -151,7 +175,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
       {!group && !error ? <LoadingState testID="group-session-loading" /> : null}
 
       {group ? (
-        <View style={{ gap: 6 }}>
+        <>
           {group.status === 'finished' ? (
             <AppCard testID="group-session-finished">
               <ListRow
@@ -161,66 +185,85 @@ export function GroupSessionScreen({ navigation, route }: Props) {
             </AppCard>
           ) : null}
 
-          {group.members
-            .filter((member) => member.status === 'joined')
-            .map((member) => (
-              <AppCard key={member.userId} testID={`group-member-${member.userId}`}>
-                <SectionHeader
-                  label={`${member.displayName ?? 'Member'}${member.isGuest ? ' · guest' : ''}${member.role === 'host' ? ' · host' : ''}`}
-                />
-                {member.workoutId ? (
-                  <LiveWorkoutEditor
-                    workoutId={member.workoutId}
-                    userId={userId}
-                    testID={`group-workout-${member.userId}`}
+          {me && isLive ? (
+            <AppCard testID="group-session-day" topAccent={theme.accent}>
+              <SectionHeader label="Your day" />
+              {days.length === 0 ? (
+                <Text style={styles.muted}>Choose a split to tag your workout with its day.</Text>
+              ) : (
+                <View style={styles.chips}>
+                  <DayChip
+                    testID="group-day-none"
+                    label="No day"
+                    selected={me.workoutSplitDayId === null}
+                    accent={theme.accent}
+                    onAccent={theme.onAccent}
+                    onPress={() => pickDay(null)}
                   />
-                ) : null}
-              </AppCard>
-            ))}
-
-          {group.members.some((member) => member.status === 'invited') ? (
-            <AppCard testID="group-session-invited">
-              <SectionHeader label="Invited" />
-              {group.members
-                .filter((member) => member.status === 'invited')
-                .map((member, index) => (
-                  <ListRow
-                    key={member.userId}
-                    title={member.displayName ?? 'Invited'}
-                    subtitle="Waiting for them to accept"
-                    divider={index > 0}
-                  />
-                ))}
+                  {days.map((day) => (
+                    <DayChip
+                      key={day.id}
+                      testID={`group-day-${day.id}`}
+                      label={day.name}
+                      selected={me.workoutSplitDayId === day.id}
+                      accent={theme.accent}
+                      onAccent={theme.onAccent}
+                      onPress={() => pickDay(day.id)}
+                    />
+                  ))}
+                </View>
+              )}
             </AppCard>
           ) : null}
 
-          {group.status === 'live' && clientsToAdd.length > 0 ? (
-            <AppCard testID="group-session-clients">
-              <SectionHeader label="Your clients" />
-              {clientsToAdd.map((client, index) => (
+          {joined.map((member) => (
+            <AppCard key={member.userId} testID={`group-member-${member.userId}`}>
+              <SectionHeader
+                label={`${member.displayName ?? 'Member'}${member.isGuest ? ' · guest' : ''}${member.role === 'host' ? ' · host' : ''}`}
+              />
+              {member.workoutName ? <Text style={styles.muted}>{member.workoutName}</Text> : null}
+              {member.workoutId ? (
+                <LiveWorkoutEditor
+                  workoutId={member.workoutId}
+                  userId={userId}
+                  accentColor={theme.accent}
+                  onAccentColor={theme.onAccent}
+                  testID={`group-workout-${member.userId}`}
+                />
+              ) : null}
+            </AppCard>
+          ))}
+
+          {invited.length > 0 ? (
+            <AppCard testID="group-session-invited">
+              <SectionHeader label="Invited" />
+              {invited.map((member, index) => (
                 <ListRow
-                  key={client.clientId ?? index}
-                  testID={`group-client-${client.clientId}`}
-                  title={client.displayName ?? 'Client'}
-                  subtitle="Add them to this group"
+                  key={member.userId}
+                  title={member.displayName ?? 'Invited'}
+                  subtitle="Waiting for them to accept"
                   divider={index > 0}
-                  trailing={
-                    <SecondaryButton
-                      testID={`group-add-client-${client.clientId}`}
-                      label="Add"
-                      size="sm"
-                      disabled={busy}
-                      onPress={() => addClient(client.clientId as string)}
-                    />
-                  }
                 />
               ))}
             </AppCard>
           ) : null}
 
-          {group.status === 'live' ? (
+          {isLive && isTrainer ? (
+            <AppCard testID="group-session-clients">
+              <SectionHeader label="Clients" />
+              <ListRow
+                testID="group-open-add-clients"
+                title="Add clients"
+                subtitle="Bring in several of your clients at once"
+                chevron
+                onPress={() => navigation.navigate('GroupAddClients', { groupId })}
+              />
+            </AppCard>
+          ) : null}
+
+          {isLive ? (
             <AppCard testID="group-session-add">
-              <SectionHeader label="Add to the group" />
+              <SectionHeader label="Add a friend or a guest" />
               <TextInput
                 testID="group-invite-username"
                 label="Friend's username"
@@ -250,20 +293,73 @@ export function GroupSessionScreen({ navigation, route }: Props) {
             </AppCard>
           ) : null}
 
-          {group.status === 'live' ? (
+          {isLive ? (
             <PrimaryButton
               testID="group-finish"
               label="Finish Group"
               onPress={finish}
               disabled={busy}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
             />
           ) : null}
 
-          {group.status === 'live' && !isHost ? (
+          {isLive && !isHost ? (
             <TextButton testID="group-leave" label="Leave Group" destructive onPress={leave} />
           ) : null}
-        </View>
+        </>
       ) : null}
     </Screen>
   );
 }
+
+interface DayChipProps {
+  testID: string;
+  label: string;
+  selected: boolean;
+  accent: string;
+  onAccent: string;
+  onPress: () => void;
+}
+
+/** A split day as a pill. Selected fills with the mode accent; the rest sit on the surface. */
+function DayChip({ testID, label, selected, accent, onAccent, onPress }: DayChipProps) {
+  return (
+    <TouchableOpacity
+      testID={testID}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
+      style={[styles.chip, selected ? { backgroundColor: accent, borderColor: accent } : null]}
+    >
+      <Text style={[styles.chipLabel, { color: selected ? onAccent : colors.textPrimary }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+const styles = {
+  muted: {
+    ...typeScale.secondary,
+    color: colors.textMuted,
+  },
+  chips: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: spacing.sm,
+  },
+  chip: {
+    minHeight: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
+    justifyContent: 'center' as const,
+  },
+  chipLabel: {
+    ...typeScale.secondary,
+  },
+};

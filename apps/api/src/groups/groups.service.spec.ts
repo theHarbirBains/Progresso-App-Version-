@@ -326,3 +326,70 @@ describe('GroupsService: a trainer adds their clients', () => {
     expect(mock.calls.some((c) => c.target === 'workouts' && c.method === 'insert')).toBe(false);
   });
 });
+
+describe('GroupsService: any day of your own split', () => {
+  const SPLIT = '88888888-8888-4888-8888-888888888888';
+  const DAY = '99999999-9999-4999-8999-999999999999';
+
+  it('starts your group workout on a day of your own split, named after the day', async () => {
+    const { mock, service } = setup();
+    mock.queue('workout_split_days', ok({ name: 'Push', workout_split_id: SPLIT }));
+    mock.queue('workout_splits', ok({ id: SPLIT }));
+    mock.queue('workout_groups', ok({ id: GROUP }));
+    mock.queue('workout_group_members', ok());
+    mock.queue('workouts', ok());
+
+    await service.create(HOST, { name: 'Thursday legs', splitDayId: DAY });
+
+    const workout = mock.calls.find((c) => c.target === 'workouts' && c.method === 'insert');
+    expect(workout?.args[0]).toMatchObject({
+      user_id: HOST,
+      name: 'Push',
+      workout_split_day_id: DAY,
+    });
+  });
+
+  it('refuses a day that is not in the caller’s own split', async () => {
+    const { mock, service } = setup();
+    mock.queue('workout_split_days', ok({ name: 'Push', workout_split_id: SPLIT }));
+    mock.queue('workout_splits', ok(null));
+
+    await expect(service.create(HOST, { name: 'Thursday legs', splitDayId: DAY })).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(mock.calls.some((c) => c.target === 'workout_groups')).toBe(false);
+  });
+
+  it('starts a workout outside the split, by the name given', async () => {
+    const { mock, service } = setup();
+    mock.queue('workout_groups', ok({ id: GROUP }));
+    mock.queue('workout_group_members', ok());
+    mock.queue('workouts', ok());
+
+    await service.create(HOST, { name: 'Thursday legs', workoutName: 'Arms and abs' });
+
+    const workout = mock.calls.find((c) => c.target === 'workouts' && c.method === 'insert');
+    expect(workout?.args[0]).toMatchObject({ name: 'Arms and abs', workout_split_day_id: null });
+  });
+
+  it('changes your group workout to another day of your split, or clears it', async () => {
+    const { mock, service } = setup();
+    mock.queue('workout_group_members', joined(MEMBER));
+    mock.queue('workout_split_days', ok({ name: 'Pull', workout_split_id: SPLIT }));
+    mock.queue('workout_splits', ok({ id: SPLIT }));
+    mock.queue('workouts', ok());
+    await service.setMyWorkoutDay(MEMBER, GROUP, DAY);
+    const change = mock.calls
+      .filter((c) => c.target === 'workouts' && c.method === 'update')
+      .at(-1);
+    expect(change?.args[0]).toEqual({ workout_split_day_id: DAY });
+
+    mock.queue('workout_group_members', joined(MEMBER));
+    mock.queue('workouts', ok());
+    await service.setMyWorkoutDay(MEMBER, GROUP, null);
+    const cleared = mock.calls
+      .filter((c) => c.target === 'workouts' && c.method === 'update')
+      .at(-1);
+    expect(cleared?.args[0]).toEqual({ workout_split_day_id: null });
+  });
+});

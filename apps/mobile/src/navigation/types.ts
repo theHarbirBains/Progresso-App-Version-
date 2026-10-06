@@ -30,6 +30,8 @@ export type RootStackParamList = {
   Groups: undefined;
   /** One group session: every member's workout, editable by anyone in the group. */
   GroupSession: { groupId: string };
+  /** A trainer picks several of their clients to add to the group. */
+  GroupAddClients: { groupId: string };
   /** A live session a trainer runs for a client, finished by the trainer. */
   TrainerLiveWorkout: { workoutId: string; clientId: string; clientName?: string };
   /** The one-time code a trainer gets for a client they track before that client has an account. */

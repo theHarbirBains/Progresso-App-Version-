@@ -14,6 +14,25 @@ jest.mock('../lib/api', () => ({
   respondToGroupInvite: jest.fn(),
 }));
 
+jest.mock('../progress/useProgressTheme', () => ({
+  useProgressTheme: () => ({
+    theme: { accent: '#3DDC97', onAccent: '#000000' },
+    activeWorkoutSplitId: 'split-1',
+    weightUnit: 'kg',
+  }),
+}));
+
+jest.mock('../workouts/workoutSplitQueries', () => ({
+  fetchWorkoutSplitDetail: jest.fn(async () => ({
+    id: 'split-1',
+    name: 'Main',
+    days: [
+      { id: 'day-1', name: 'Push', orderIndex: 1, muscleGroups: ['chest'] },
+      { id: 'day-2', name: 'Pull', orderIndex: 2, muscleGroups: ['back'] },
+    ],
+  })),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockListGroups = listGroups as jest.Mock;
 const mockInvites = listGroupInvites as jest.Mock;
@@ -36,7 +55,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' }, user: { id: 'me' } });
   mockListGroups.mockReset().mockResolvedValue([live]);
   mockInvites.mockReset().mockResolvedValue([]);
-  mockCreate.mockReset();
+  mockCreate.mockReset().mockResolvedValue({ groupId: 'g2' });
   mockRespond.mockReset().mockResolvedValue({ ok: true });
   mockNavigate.mockClear();
 });
@@ -49,17 +68,30 @@ describe('GroupsScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('GroupSession', { groupId: 'g1' });
   });
 
-  it('starts a new group from its name', async () => {
-    mockCreate.mockResolvedValue({ groupId: 'g2' });
+  it('starts a group on any day of the split', async () => {
     render(<GroupsScreen navigation={navigation} route={{} as never} />);
 
-    fireEvent.changeText(await screen.findByTestId('groups-name-input'), 'Saturday push');
-    fireEvent.press(screen.getByTestId('groups-create'));
+    fireEvent.press(await screen.findByTestId('groups-day-day-2'));
 
     await waitFor(() =>
       expect(mockNavigate).toHaveBeenCalledWith('GroupSession', { groupId: 'g2' }),
     );
-    expect(mockCreate).toHaveBeenCalledWith('token-1', { name: 'Saturday push' });
+    expect(mockCreate).toHaveBeenCalledWith('token-1', { name: 'Pull', splitDayId: 'day-2' });
+  });
+
+  it('starts a separate workout outside the split, named by the person', async () => {
+    render(<GroupsScreen navigation={navigation} route={{} as never} />);
+
+    fireEvent.press(await screen.findByTestId('groups-create-separate'));
+    fireEvent.changeText(await screen.findByTestId('groups-separate-name'), 'Arms and abs');
+    fireEvent.press(screen.getByTestId('groups-separate-start'));
+
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith('token-1', {
+        name: 'Arms and abs',
+        workoutName: 'Arms and abs',
+      }),
+    );
   });
 
   it('accepting an invite joins the group and opens it', async () => {
