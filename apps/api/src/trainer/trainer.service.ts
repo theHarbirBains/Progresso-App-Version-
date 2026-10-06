@@ -259,6 +259,27 @@ export class TrainerService {
     }));
   }
 
+  /** The client's active trainers, with each trainer's display name. */
+  async listMyTrainers(clientId: string): Promise<TrainerRequestSummary[]> {
+    const client = this.supabaseService.getClient();
+    const { data: links, error } = await client
+      .from('trainer_clients')
+      .select('trainer_id, updated_at')
+      .eq('client_id', clientId)
+      .eq('status', 'active');
+    if (error) throw new InternalServerErrorException('Failed to load trainers');
+
+    const rows = (links ?? []) as { trainer_id: string; updated_at: string }[];
+    if (rows.length === 0) return [];
+
+    const profiles = await this.loadProfiles(rows.map((row) => row.trainer_id));
+    return rows.map((row) => ({
+      trainerId: row.trainer_id,
+      trainerDisplayName: profiles.get(row.trainer_id)?.display_name ?? null,
+      requestedAt: row.updated_at,
+    }));
+  }
+
   /** Client accepts or declines a trainer's pending request. */
   async respondToRequest(
     clientId: string,

@@ -355,6 +355,25 @@ describe('TrainerService', () => {
       expect(update?.args[0]).toMatchObject({ status: 'active', ended_at: null });
     });
 
+    it("lists a client's active trainers, with their display names", async () => {
+      const { mock, service } = setup();
+      mock.queue(
+        'trainer_clients',
+        ok([{ trainer_id: TRAINER, updated_at: '2026-10-01T00:00:00.000Z' }]),
+      );
+      mock.queue('users', ok([{ id: TRAINER, display_name: 'Coach Jo' }]));
+
+      await expect(service.listMyTrainers(CLIENT)).resolves.toEqual([
+        {
+          trainerId: TRAINER,
+          trainerDisplayName: 'Coach Jo',
+          requestedAt: '2026-10-01T00:00:00.000Z',
+        },
+      ]);
+      const filter = mock.calls.find((c) => c.target === 'trainer_clients' && c.method === 'eq');
+      expect(filter?.args).toEqual(['client_id', CLIENT]);
+    });
+
     it('404s when there is no pending request to answer', async () => {
       const { mock, service } = setup();
       mock.queue('trainer_clients', ok(null));

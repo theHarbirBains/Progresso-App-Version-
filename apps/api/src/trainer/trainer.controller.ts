@@ -73,6 +73,12 @@ export class TrainerController {
   }
 
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Get('trainers')
+  async myTrainers(@CurrentUser() user: AuthenticatedUser) {
+    return this.trainerService.listMyTrainers(user.id);
+  }
+
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Patch('requests/:trainerId')
   async respondToRequest(
     @CurrentUser() user: AuthenticatedUser,
