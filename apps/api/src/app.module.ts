@@ -15,6 +15,7 @@ import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RevenueCatModule } from './revenuecat/revenuecat.module';
 import { SupabaseModule } from './supabase/supabase.module';
+import { TrainerModule } from './trainer/trainer.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -33,6 +34,7 @@ import { UsersModule } from './users/users.module';
     FoodsModule,
     FollowsModule,
     FeedModule,
+    TrainerModule,
     AdminModule,
     RevenueCatModule,
     NotificationsModule,
