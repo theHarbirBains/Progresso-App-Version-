@@ -11,12 +11,16 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { TextInput } from '../design/TextInput';
 import {
+  addClientToGroup,
   addGroupGuest,
   finishGroup,
   getGroup,
+  getTrainerStatus,
   inviteToGroup,
   leaveGroup,
+  listTrainerClients,
   type GroupDetail,
+  type TrainerClient,
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { LiveWorkoutEditor } from '../workouts/LiveWorkoutEditor';
@@ -25,8 +29,9 @@ type Props = RootStackScreenProps<'GroupSession'>;
 
 /**
  * One group session. Every joined member's workout is shown with an editor, so
- * anyone in the group can enter and change sets and exercises. Friends and clients
- * are invited by username; guests are added by name, with no account needed.
+ * anyone in the group can enter and change sets and exercises. Friends are invited
+ * by username, a trainer brings in their own clients, and guests are added by name
+ * with no account needed.
  */
 export function GroupSessionScreen({ navigation, route }: Props) {
   const { groupId } = route.params;
@@ -35,6 +40,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
   const userId = user?.id ?? '';
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
+  const [trainerClients, setTrainerClients] = useState<TrainerClient[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [guestName, setGuestName] = useState('');
@@ -47,6 +53,14 @@ export function GroupSessionScreen({ navigation, route }: Props) {
       setGroup(await getGroup(accessToken, groupId));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this group');
+      return;
+    }
+    // A trainer's clients to add. Anyone else simply has none to add.
+    try {
+      const { isTrainer } = await getTrainerStatus(accessToken);
+      setTrainerClients(isTrainer ? await listTrainerClients(accessToken) : []);
+    } catch {
+      setTrainerClients([]);
     }
   }, [accessToken, groupId]);
 
@@ -85,6 +99,11 @@ export function GroupSessionScreen({ navigation, route }: Props) {
     }, 'Could not add the guest');
   }
 
+  function addClient(clientId: string) {
+    if (!accessToken) return;
+    void run(() => addClientToGroup(accessToken, groupId, clientId), 'Could not add that client');
+  }
+
   function finish() {
     if (!accessToken) return;
     Alert.alert('Finish the group', 'This completes everyone’s workout in the group.', [
@@ -108,6 +127,12 @@ export function GroupSessionScreen({ navigation, route }: Props) {
   }
 
   const isHost = group?.hostId === userId;
+  // Clients not already in the group (joined or invited), with an account or tracked.
+  const memberIds = new Set(group?.members.map((member) => member.userId) ?? []);
+  const clientsToAdd = trainerClients.filter(
+    (client) =>
+      client.clientId !== null && client.status === 'active' && !memberIds.has(client.clientId),
+  );
 
   return (
     <Screen
@@ -169,12 +194,36 @@ export function GroupSessionScreen({ navigation, route }: Props) {
             </AppCard>
           ) : null}
 
+          {group.status === 'live' && clientsToAdd.length > 0 ? (
+            <AppCard testID="group-session-clients">
+              <SectionHeader label="Your clients" />
+              {clientsToAdd.map((client, index) => (
+                <ListRow
+                  key={client.clientId ?? index}
+                  testID={`group-client-${client.clientId}`}
+                  title={client.displayName ?? 'Client'}
+                  subtitle="Add them to this group"
+                  divider={index > 0}
+                  trailing={
+                    <SecondaryButton
+                      testID={`group-add-client-${client.clientId}`}
+                      label="Add"
+                      size="sm"
+                      disabled={busy}
+                      onPress={() => addClient(client.clientId as string)}
+                    />
+                  }
+                />
+              ))}
+            </AppCard>
+          ) : null}
+
           {group.status === 'live' ? (
             <AppCard testID="group-session-add">
               <SectionHeader label="Add to the group" />
               <TextInput
                 testID="group-invite-username"
-                label="Friend or client's username"
+                label="Friend's username"
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"

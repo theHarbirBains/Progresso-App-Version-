@@ -1,7 +1,15 @@
 import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { addGroupGuest, finishGroup, getGroup, inviteToGroup } from '../lib/api';
+import {
+  addClientToGroup,
+  addGroupGuest,
+  finishGroup,
+  getGroup,
+  getTrainerStatus,
+  inviteToGroup,
+  listTrainerClients,
+} from '../lib/api';
 import { GroupSessionScreen } from './GroupSessionScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -14,6 +22,9 @@ jest.mock('../lib/api', () => ({
   getGroup: jest.fn(),
   inviteToGroup: jest.fn(),
   leaveGroup: jest.fn(),
+  addClientToGroup: jest.fn(),
+  getTrainerStatus: jest.fn(),
+  listTrainerClients: jest.fn(),
 }));
 
 // The per-member editor is covered on its own; here it is a marker per workout.
@@ -126,5 +137,47 @@ describe('GroupSessionScreen', () => {
 
     await waitFor(() => expect(mockFinish).toHaveBeenCalledWith('token-1', 'g1'));
     alert.mockRestore();
+  });
+  it('a trainer adds one of their clients to the group, and that client is not offered again', async () => {
+    (getTrainerStatus as jest.Mock).mockResolvedValue({ isTrainer: true });
+    (listTrainerClients as jest.Mock).mockResolvedValue([
+      {
+        clientId: 'sam',
+        inviteId: null,
+        email: null,
+        status: 'active',
+        source: 'managed',
+        displayName: 'Sam',
+        birthday: null,
+        heightValue: null,
+        heightUnit: 'cm',
+        weightValue: null,
+        weightUnit: 'kg',
+        awaitingClaim: true,
+      },
+      {
+        clientId: 'pat',
+        inviteId: null,
+        email: null,
+        status: 'active',
+        source: 'managed',
+        displayName: 'Pat',
+        birthday: null,
+        heightValue: null,
+        heightUnit: 'cm',
+        weightValue: null,
+        weightUnit: 'kg',
+        awaitingClaim: false,
+      },
+    ]);
+    (addClientToGroup as jest.Mock).mockResolvedValue({ userId: 'sam', status: 'joined' });
+    renderScreen();
+
+    // Pat is already in the group, so only Sam is offered.
+    expect(await screen.findByTestId('group-client-sam')).toBeTruthy();
+    expect(screen.queryByTestId('group-client-pat')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('group-add-client-sam'));
+    await waitFor(() => expect(addClientToGroup).toHaveBeenCalledWith('token-1', 'g1', 'sam'));
   });
 });

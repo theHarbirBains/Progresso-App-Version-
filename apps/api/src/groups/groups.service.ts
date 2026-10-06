@@ -412,7 +412,78 @@ export class GroupsService {
     if (workoutError) throw new InternalServerErrorException('Failed to close your workout');
   }
 
+  /**
+   * Adds one of the caller's active clients. A tracked client (one with no account of
+   * their own) joins straight away, because the trainer is bringing them. A client with
+   * an account is invited and accepts, as anyone else does.
+   */
+  async addClient(
+    userId: string,
+    groupId: string,
+    clientId: string,
+  ): Promise<{ userId: string; status: 'invited' | 'joined' }> {
+    await this.requireLive(groupId);
+    await this.requireJoined(userId, groupId);
+    await this.assertTrainerEntitlement(userId);
+    const client = this.supabaseService.getClient();
+
+    const { data: link, error: linkError } = await client
+      .from('trainer_clients')
+      .select('id')
+      .eq('trainer_id', userId)
+      .eq('client_id', clientId)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (linkError) throw new InternalServerErrorException('Failed to check your clients');
+    if (!link) throw new ForbiddenException('Only your active clients can be added this way');
+
+    const existing = await this.findMember(groupId, clientId);
+    if (existing && existing.status !== 'left') {
+      return { userId: clientId, status: existing.status };
+    }
+
+    const { data: tracked, error: trackedError } = await client
+      .from('trainer_placeholder_clients')
+      .select('id')
+      .eq('trainer_id', userId)
+      .eq('placeholder_user_id', clientId)
+      .is('claimed_at', null)
+      .maybeSingle();
+    if (trackedError) throw new InternalServerErrorException('Failed to check your clients');
+
+    const joinsNow = tracked !== null;
+    const status = joinsNow ? 'joined' : 'invited';
+    const row = { role: 'member' as const, status, is_guest: false, added_by: userId };
+    const { error: writeError } = existing
+      ? await client.from('workout_group_members').update(row).eq('id', existing.id)
+      : await client
+          .from('workout_group_members')
+          .insert({ group_id: groupId, user_id: clientId, ...row });
+    if (writeError) throw new InternalServerErrorException('Failed to add the client');
+
+    if (joinsNow) {
+      const name = await this.loadGroupName(groupId);
+      await this.createMemberWorkout(clientId, groupId, name);
+    }
+    return { userId: clientId, status };
+  }
+
   // ---- internals -----------------------------------------------------------
+
+  /** Trainer actions need the Trainer entitlement, as they do everywhere else in trainer mode. */
+  private async assertTrainerEntitlement(userId: string): Promise<void> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('subscriptions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('entitlement_id', 'trainer')
+      .eq('status', 'active')
+      .gt('current_period_ends_at', new Date().toISOString())
+      .maybeSingle();
+    if (error) throw new InternalServerErrorException('Failed to check your subscription');
+    if (!data) throw new ForbiddenException('A Trainer subscription is required to add clients');
+  }
 
   private async requireLive(groupId: string): Promise<void> {
     const { data, error } = await this.supabaseService

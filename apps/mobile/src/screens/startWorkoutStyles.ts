@@ -27,6 +27,22 @@ export const startWorkoutStyles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  heroDayCount: {
+    ...typeScale.statSmall,
+  },
+  // The day's position in the split, in the mode accent (set inline), shown where a
+  // list row's icon would be.
+  dayNumber: {
+    ...typeScale.statSmall,
+    width: 28,
+    textAlign: 'center',
+  },
   heroDayName: {
     ...typeScale.screenTitle,
     color: colors.textPrimary,

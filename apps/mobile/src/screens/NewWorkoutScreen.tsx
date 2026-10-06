@@ -36,15 +36,14 @@ function musclesLabel(day: WorkoutSplitDay): string {
 
 // This screen is ONLY about choosing which workout to perform -- no
 // exercise selection here. Exercises are added after entering
-// ActiveWorkoutScreen (which already supports that in full). Picking any
-// day (the recommended next one, or any other day in the active split)
-// immediately creates the workout tagged with that day and enters the
-// live tracking screen; "Do a Different Workout" collects a free-text name
-// for an improvised, untagged workout via the same path.
+// ActiveWorkoutScreen. Picking any day (the recommended next one, or any
+// other day in the active split) immediately creates the workout tagged with
+// that day and enters the live tracking screen; "Do a Different Workout"
+// collects a name for an improvised, untagged workout via the same path.
 //
-// Layout: one clear primary action (the Next Workout card) and everything
-// else as plain rows -- the split's other days, then "Do a Different
-// Workout" -- rather than a card per option.
+// Layout (DESIGN.md, Start Workout): one hero card for the next day, the
+// split's other days as numbered rows, then the ways to train that are not
+// the split (a group, a different workout, a past workout) as plain rows.
 export function NewWorkoutScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
@@ -178,6 +177,7 @@ export function NewWorkoutScreen({ navigation }: Props) {
   const orderedDays = activeSplit
     ? [...activeSplit.days].sort((a, b) => a.orderIndex - b.orderIndex)
     : [];
+  const dayNumber = (dayId: string) => orderedDays.findIndex((d) => d.id === dayId) + 1;
   const otherDays = orderedDays.filter((d) => d.id !== nextPlan?.day.id);
   const nextBusy = nextPlan ? busyKey === nextPlan.day.id : false;
 
@@ -228,7 +228,14 @@ export function NewWorkoutScreen({ navigation }: Props) {
             }`}
             accessibilityState={{ disabled: nextBusy }}
           >
-            <Text style={styles.heroEyebrow}>Next Workout</Text>
+            <View style={styles.heroTopRow}>
+              <Text style={styles.heroEyebrow}>Next Workout</Text>
+              {orderedDays.length > 0 ? (
+                <Text style={[styles.heroDayCount, { color: theme.accent }]}>
+                  {`Day ${dayNumber(nextPlan.day.id)} of ${orderedDays.length}`}
+                </Text>
+              ) : null}
+            </View>
             <Text style={styles.heroDayName}>{nextPlan.day.name}</Text>
             {nextPlan.day.muscleGroups.length > 0 ? (
               <Text style={styles.heroMuscles}>{musclesLabel(nextPlan.day)}</Text>
@@ -266,6 +273,11 @@ export function NewWorkoutScreen({ navigation }: Props) {
                   key={day.id}
                   testID={`start-workout-day-${day.id}`}
                   divider={index > 0}
+                  leading={
+                    <Text style={[styles.dayNumber, { color: theme.accent }]}>
+                      {String(dayNumber(day.id)).padStart(2, '0')}
+                    </Text>
+                  }
                   title={day.name}
                   subtitle={day.muscleGroups.length > 0 ? musclesLabel(day) : undefined}
                   onPress={() => startWorkout(day.id, day.name, day.id)}
@@ -284,9 +296,18 @@ export function NewWorkoutScreen({ navigation }: Props) {
           </Section>
         ) : null}
 
-        <View>
+        <Section title="More Ways to Train">
+          <ListRow
+            testID="start-workout-group"
+            title="Group Workout"
+            subtitle="Train together with friends, clients and guests"
+            chevron
+            onPress={() => navigation.navigate('Groups')}
+            accessibilityLabel="Group Workout, train together with friends, clients and guests"
+          />
           <ListRow
             testID="start-workout-custom"
+            divider
             title="Do a Different Workout"
             subtitle="Not part of your split"
             onPress={() => setCustomSheetOpen(true)}
@@ -300,7 +321,7 @@ export function NewWorkoutScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('LogPastWorkout')}
             accessibilityLabel="Log a Past Workout, already did it? Add it after the fact"
           />
-        </View>
+        </Section>
       </Screen>
       <BottomSheet
         visible={customSheetOpen}

@@ -930,3 +930,15 @@ export function resolveClientExercise(
     { method: 'POST', body: JSON.stringify({ exerciseId }) },
   );
 }
+
+/** A trainer brings one of their active clients into the group. A tracked client joins at once; anyone else is invited. */
+export function addClientToGroup(
+  accessToken: string,
+  groupId: string,
+  clientId: string,
+): Promise<{ userId: string; status: 'invited' | 'joined' }> {
+  return request(`/api/v1/groups/${encodeURIComponent(groupId)}/clients`, accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ clientId }),
+  });
+}

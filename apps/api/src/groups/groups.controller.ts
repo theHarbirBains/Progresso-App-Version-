@@ -4,6 +4,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import {
+  AddGroupClientDto,
   AddGuestDto,
   CreateGroupDto,
   InviteMemberDto,
@@ -50,6 +51,17 @@ export class GroupsController {
     @Body() dto: InviteMemberDto,
   ) {
     return this.groupsService.inviteMember(user.id, id, dto.username);
+  }
+
+  // A trainer brings an active client into the group (a tracked client joins at once).
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post(':id/clients')
+  async addClient(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AddGroupClientDto,
+  ) {
+    return this.groupsService.addClient(user.id, id, dto.clientId);
   }
 
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)

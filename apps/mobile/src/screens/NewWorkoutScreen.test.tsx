@@ -164,6 +164,18 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
     expect(mockCreateWorkout).toHaveBeenCalledWith('user-1', 'Recovery', 'day-2');
   });
 
+  it('offers starting a group workout from the Start Workout page', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <NewWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+      { wrapper: ProfileProvider },
+    );
+
+    fireEvent.press(await screen.findByTestId('start-workout-group'));
+    expect(mockNavigate).toHaveBeenCalledWith('Groups');
+  });
+
   it('Do a Different Workout opens a naming sheet; confirming starts an untagged workout with the given name', async () => {
     render(
       <BackgroundThemeProvider>

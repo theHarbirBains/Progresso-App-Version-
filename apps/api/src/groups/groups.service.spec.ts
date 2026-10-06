@@ -276,3 +276,53 @@ describe('GroupsService', () => {
     });
   });
 });
+
+describe('GroupsService: a trainer adds their clients', () => {
+  const CLIENT = '77777777-7777-4777-8777-777777777777';
+
+  it('refuses someone who is not one of the caller’s active clients', async () => {
+    const { mock, service } = setup();
+    mock.queue('workout_groups', ok({ status: 'live' }));
+    mock.queue('workout_group_members', joined(HOST, 'host'));
+    mock.queue('subscriptions', ok({ id: 'sub' }));
+    mock.queue('trainer_clients', ok(null));
+
+    await expect(service.addClient(HOST, GROUP, CLIENT)).rejects.toThrow(ForbiddenException);
+  });
+
+  it('brings a tracked client straight into the group, with their workout', async () => {
+    const { mock, service } = setup();
+    mock.queue('workout_groups', ok({ status: 'live' }), ok({ name: 'Thursday legs' }));
+    mock.queue('workout_group_members', joined(HOST, 'host'), ok(null), ok());
+    mock.queue('subscriptions', ok({ id: 'sub' }));
+    mock.queue('trainer_clients', ok({ id: 'l1' }));
+    mock.queue('trainer_placeholder_clients', ok({ id: 'p1' }));
+    mock.queue('workouts', ok());
+
+    await expect(service.addClient(HOST, GROUP, CLIENT)).resolves.toEqual({
+      userId: CLIENT,
+      status: 'joined',
+    });
+    const member = mock.calls.find(
+      (c) => c.target === 'workout_group_members' && c.method === 'insert',
+    );
+    expect(member?.args[0]).toMatchObject({ user_id: CLIENT, status: 'joined' });
+    const workout = mock.calls.find((c) => c.target === 'workouts' && c.method === 'insert');
+    expect(workout?.args[0]).toMatchObject({ user_id: CLIENT, group_id: GROUP });
+  });
+
+  it('invites a client who has their own account, and they accept', async () => {
+    const { mock, service } = setup();
+    mock.queue('workout_groups', ok({ status: 'live' }));
+    mock.queue('workout_group_members', joined(HOST, 'host'), ok(null), ok());
+    mock.queue('subscriptions', ok({ id: 'sub' }));
+    mock.queue('trainer_clients', ok({ id: 'l1' }));
+    mock.queue('trainer_placeholder_clients', ok(null));
+
+    await expect(service.addClient(HOST, GROUP, CLIENT)).resolves.toEqual({
+      userId: CLIENT,
+      status: 'invited',
+    });
+    expect(mock.calls.some((c) => c.target === 'workouts' && c.method === 'insert')).toBe(false);
+  });
+});
