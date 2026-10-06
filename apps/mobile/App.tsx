@@ -44,6 +44,8 @@ import { ExerciseProgressScreen } from './src/screens/ExerciseProgressScreen';
 import { FeedScreen } from './src/screens/FeedScreen';
 import { FindPeopleScreen } from './src/screens/FindPeopleScreen';
 import { TrainerAccessScreen } from './src/screens/TrainerAccessScreen';
+import { TrainerClaimScreen } from './src/screens/TrainerClaimScreen';
+import { TrainerClaimCodeScreen } from './src/screens/TrainerClaimCodeScreen';
 import { TrainerClientDetailScreen } from './src/screens/TrainerClientDetailScreen';
 import { TrainerClientFormScreen } from './src/screens/TrainerClientFormScreen';
 import { TrainerClientsScreen } from './src/screens/TrainerClientsScreen';
@@ -290,6 +292,8 @@ function Root() {
                 <Stack.Screen name="ChooseWorkoutSplit" component={ChooseWorkoutSplitScreen} />
                 <Stack.Screen name="Profile" component={ProfileScreen} />
                 <Stack.Screen name="TrainerAccess" component={TrainerAccessScreen} />
+                <Stack.Screen name="TrainerClaim" component={TrainerClaimScreen} />
+                <Stack.Screen name="TrainerClaimCode" component={TrainerClaimCodeScreen} />
                 <Stack.Screen name="TrainerClients" component={TrainerClientsScreen} />
                 <Stack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
                 <Stack.Screen name="TrainerEditClient" component={TrainerClientFormScreen} />

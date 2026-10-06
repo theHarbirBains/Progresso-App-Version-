@@ -586,6 +586,8 @@ export interface TrainerClient {
   /** Only set for an invite: the address the trainer typed. */
   email: string | null;
   status: 'invited' | 'pending' | 'active';
+  /** A tracked client with no account yet: their history waits for a claim code. */
+  awaitingClaim: boolean;
   source: TrainerLinkSource;
   displayName: string | null;
   birthday: string | null;
@@ -735,4 +737,46 @@ export function endTrainerLink(accessToken: string, trainerId: string): Promise<
 
 export function listTrainerActivity(accessToken: string): Promise<TrainerActivity[]> {
   return request<TrainerActivity[]>('/api/v1/trainer/actions', accessToken);
+}
+
+/** A client tracked before they have an account. The code is shown once, to give to the client. */
+export function trackTrainerClient(
+  accessToken: string,
+  input: {
+    displayName: string;
+    birthday?: string;
+    heightValue?: number;
+    heightUnit?: HeightUnit;
+    weightValue?: number;
+    weightUnit?: 'kg' | 'lb';
+  },
+): Promise<{ clientId: string; claimCode: string; expiresAt: string }> {
+  return request<{ clientId: string; claimCode: string; expiresAt: string }>(
+    '/api/v1/trainer/tracked-clients',
+    accessToken,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+/** A new claim code for a tracked client. The old one stops working at once. */
+export function regenerateTrainerClaimCode(
+  accessToken: string,
+  clientId: string,
+): Promise<{ claimCode: string; expiresAt: string }> {
+  return request<{ claimCode: string; expiresAt: string }>(
+    `/api/v1/trainer/clients/${encodeURIComponent(clientId)}/claim-code`,
+    accessToken,
+    { method: 'POST' },
+  );
+}
+
+/** The client enters the code their trainer gave them. Their tracked history moves onto their account. */
+export function claimTrainerHistory(
+  accessToken: string,
+  code: string,
+): Promise<{ workouts: number }> {
+  return request<{ workouts: number }>('/api/v1/trainer/history/claim', accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
 }

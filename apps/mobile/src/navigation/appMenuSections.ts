@@ -11,7 +11,7 @@ type NoParamRoute = {
 }[keyof RootStackParamList];
 
 /** The add/edit form is opened from a client's page or from Clients, never from the side menu directly. */
-type FormOnlyRoute = 'TrainerClientForm';
+type FormOnlyRoute = 'TrainerClientForm' | 'TrainerClaim';
 
 export type AppMenuRoute = Exclude<NoParamRoute, FormOnlyRoute>;
 

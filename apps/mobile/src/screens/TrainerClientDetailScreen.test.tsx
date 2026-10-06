@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { listTrainerClients } from '../lib/api';
+import { listTrainerClients, regenerateTrainerClaimCode } from '../lib/api';
 import { fetchClientPersonalRecords, fetchClientWorkouts } from '../trainer/clientQueries';
 import { TrainerClientDetailScreen } from './TrainerClientDetailScreen';
 
@@ -11,6 +11,7 @@ jest.mock('../auth/AuthProvider', () => ({
 jest.mock('../lib/api', () => ({
   endTrainerClient: jest.fn(),
   listTrainerClients: jest.fn(),
+  regenerateTrainerClaimCode: jest.fn(),
 }));
 
 jest.mock('../trainer/clientQueries', () => ({
@@ -24,6 +25,7 @@ jest.mock('../progress/useProgressTheme', () => ({
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockListTrainerClients = listTrainerClients as jest.Mock;
+const mockRegenerate = regenerateTrainerClaimCode as jest.Mock;
 const mockFetchWorkouts = fetchClientWorkouts as jest.Mock;
 const mockFetchRecords = fetchClientPersonalRecords as jest.Mock;
 
@@ -100,6 +102,26 @@ describe('TrainerClientDetailScreen', () => {
 
     await screen.findByTestId('trainer-client-profile');
     expect(screen.queryByTestId('trainer-client-edit')).toBeNull();
+  });
+
+  it('gives a tracked client a claim code to hand over', async () => {
+    mockListTrainerClients.mockResolvedValue([{ ...client, awaitingClaim: true }]);
+    mockRegenerate.mockResolvedValue({
+      claimCode: 'WXYZ-6789',
+      expiresAt: '2026-11-01T00:00:00.000Z',
+    });
+    renderDetail();
+
+    fireEvent.press(await screen.findByTestId('trainer-client-claim-code'));
+
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('TrainerClaimCode', {
+        code: 'WXYZ-6789',
+        clientId: 'client-1',
+        clientName: 'Sam',
+      }),
+    );
+    expect(mockRegenerate).toHaveBeenCalledWith('token-123', 'client-1');
   });
 
   it('says so when the client is no longer linked, and shows none of their data', async () => {

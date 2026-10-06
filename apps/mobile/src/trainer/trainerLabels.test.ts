@@ -10,6 +10,7 @@ function client(overrides: Partial<TrainerClient>): TrainerClient {
     inviteId: null,
     email: null,
     status: 'active',
+    awaitingClaim: false,
     source: 'managed',
     displayName: 'Sam',
     birthday: null,
@@ -35,6 +36,10 @@ function activity(action: string, trainerId = TRAINER): TrainerActivity {
 }
 
 describe('trainerClientStatusLabel', () => {
+  it('says a tracked client is not on Progresso yet, until they claim their history', () => {
+    expect(trainerClientStatusLabel(client({ awaitingClaim: true }))).toBe('Not on Progresso yet');
+  });
+
   it('shows an invite that is still waiting for its person as sent', () => {
     expect(
       trainerClientStatusLabel(

@@ -10,7 +10,12 @@ import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
-import { endTrainerClient, listTrainerClients, type TrainerClient } from '../lib/api';
+import {
+  endTrainerClient,
+  listTrainerClients,
+  regenerateTrainerClaimCode,
+  type TrainerClient,
+} from '../lib/api';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -74,6 +79,20 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function getClaimCode() {
+    if (!accessToken) return;
+    try {
+      const { claimCode } = await regenerateTrainerClaimCode(accessToken, clientId);
+      navigation.navigate('TrainerClaimCode', {
+        code: claimCode,
+        clientId,
+        clientName: client?.displayName ?? clientName,
+      });
+    } catch (err) {
+      Alert.alert('Could not get a code', err instanceof Error ? err.message : 'Try again');
+    }
+  }
 
   function confirmEnd() {
     Alert.alert(
@@ -168,6 +187,13 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                   navigation.navigate('TrainerLogWorkout', { clientId, clientName: title })
                 }
               />
+              {client.awaitingClaim ? (
+                <SecondaryButton
+                  testID="trainer-client-claim-code"
+                  label="Get Claim Code"
+                  onPress={() => void getClaimCode()}
+                />
+              ) : null}
               {client.source === 'managed' ? (
                 <SecondaryButton
                   testID="trainer-client-edit"

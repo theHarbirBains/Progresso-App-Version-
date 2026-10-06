@@ -243,3 +243,29 @@ the add / edit form. Logging for a client reuses the past-workout screen, titled
   equipment-photos bucket is public read, so it displays.
 - **Tests not run here:** the API end-to-end specs need a running environment, and the
   mobile app hasn't been run on a device.
+
+## 12. Clients without an account
+
+A trainer can track a client who has no Progresso account yet. Adding one takes only a
+name. Their details are optional.
+
+- The API creates a **placeholder** account for the client: an address on a domain that
+  cannot receive mail, with no password. Nobody can sign in to it. Every workout the
+  trainer logs therefore has an owner from the start, so the isolation and PR rules are
+  unchanged.
+- The trainer gets a **claim code** (8 characters, no look-alike letters, shown once). Only
+  a SHA-256 hash of it is stored. It works once and expires after 30 days. Getting a new
+  code replaces the old one at once.
+- The client opens Trainer Access, chooses Link Tracked History and enters the code.
+  `claim_placeholder_history` then moves, in one transaction: the workouts, the exercises
+  (merged by name where the client already has one), the sets, machine photos, PRs
+  (rebuilt for the client), the profile details they have not set themselves, and the
+  trainer link. The link starts pending, so the client chooses to keep the trainer by
+  accepting. The placeholder account is then deleted.
+- Claims are refused while both accounts have an open workout, so no session is merged
+  under another.
+- Attempts are limited to 10 per user per hour. **This limit lives in the API's memory,
+  so it resets on restart and is not shared between instances.** It should move to shared
+  storage before launch.
+- `trainer_placeholder_clients.failed_attempts` is not used yet. It is reserved for a
+  per-code lock and should be dropped if that is not added.

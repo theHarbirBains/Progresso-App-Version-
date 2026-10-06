@@ -26,6 +26,10 @@ export type RootStackParamList = {
   TrainerEditClient: { clientId: string };
   TrainerClientDetail: { clientId: string; clientName?: string };
   TrainerAccess: undefined;
+  /** The one-time code a trainer gets for a client they track before that client has an account. */
+  TrainerClaimCode: { code: string; clientId: string; clientName?: string };
+  /** The client's side: enter the code a trainer gave them to move their tracked history onto their account. */
+  TrainerClaim: undefined;
   PRHistory: { exerciseId: string; exerciseName: string };
   ExerciseProgress: { exerciseId: string; exerciseName: string };
   Nutrition: undefined;

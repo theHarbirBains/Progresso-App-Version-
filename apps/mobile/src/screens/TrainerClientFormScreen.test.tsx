@@ -1,7 +1,12 @@
 import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { addTrainerClient, listTrainerClients, updateTrainerClientProfile } from '../lib/api';
+import {
+  addTrainerClient,
+  listTrainerClients,
+  trackTrainerClient,
+  updateTrainerClientProfile,
+} from '../lib/api';
 import {
   TrainerClientFormScreen,
   validateClientForm,
@@ -16,12 +21,14 @@ jest.mock('../lib/api', () => ({
   addTrainerClient: jest.fn(),
   listTrainerClients: jest.fn(),
   updateTrainerClientProfile: jest.fn(),
+  trackTrainerClient: jest.fn(),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockAddTrainerClient = addTrainerClient as jest.Mock;
 const mockListTrainerClients = listTrainerClients as jest.Mock;
 const mockUpdate = updateTrainerClientProfile as jest.Mock;
+const mockTrack = trackTrainerClient as jest.Mock;
 
 const mockNavigate = jest.fn();
 const mockReplace = jest.fn();
@@ -82,6 +89,7 @@ beforeEach(() => {
   mockAddTrainerClient.mockReset();
   mockListTrainerClients.mockReset();
   mockUpdate.mockReset().mockResolvedValue({ ok: true });
+  mockTrack.mockReset();
   mockNavigate.mockClear();
   mockReplace.mockClear();
   mockGoBack.mockClear();
@@ -149,6 +157,43 @@ describe('TrainerClientFormScreen', () => {
     expect(alert).toHaveBeenCalledWith('Invite sent', expect.stringContaining('open Progresso'));
     expect(mockReplace).not.toHaveBeenCalled();
     alert.mockRestore();
+  });
+
+  it('tracks a client with no account, and opens the code to give them', async () => {
+    mockTrack.mockResolvedValue({
+      clientId: 'client-9',
+      claimCode: 'ABCD-2345',
+      expiresAt: '2026-11-01T00:00:00.000Z',
+    });
+    renderForm(undefined);
+
+    fireEvent.press(screen.getByText('No account'));
+    fireEvent.changeText(screen.getByTestId('trainer-client-name'), 'Pat');
+    fireEvent.changeText(screen.getByTestId('trainer-client-height'), '170');
+    fireEvent.press(screen.getByTestId('trainer-client-save'));
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('TrainerClaimCode', {
+        code: 'ABCD-2345',
+        clientId: 'client-9',
+        clientName: 'Pat',
+      }),
+    );
+    expect(mockTrack).toHaveBeenCalledWith(
+      'token-123',
+      expect.objectContaining({ displayName: 'Pat', heightValue: 170, heightUnit: 'cm' }),
+    );
+    expect(mockAddTrainerClient).not.toHaveBeenCalled();
+  });
+
+  it('needs a name before tracking someone without an account', () => {
+    renderForm(undefined);
+
+    fireEvent.press(screen.getByText('No account'));
+    fireEvent.press(screen.getByTestId('trainer-client-save'));
+
+    expect(mockTrack).not.toHaveBeenCalled();
+    expect(screen.getByText('Enter their name')).toBeTruthy();
   });
 
   it('saves nothing when the form is not valid, and says what is missing', () => {

@@ -7,6 +7,7 @@ import type { TrainerActivity, TrainerClient } from '../lib/api';
  */
 export function trainerClientStatusLabel(client: TrainerClient): string {
   if (client.status === 'invited') return 'Invite sent';
+  if (client.awaitingClaim) return 'Not on Progresso yet';
   if (client.status === 'pending') return 'Waiting for them to accept';
   return client.source === 'managed' ? 'Managed account' : 'Linked account';
 }

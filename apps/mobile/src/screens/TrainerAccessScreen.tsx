@@ -157,6 +157,17 @@ export function TrainerAccessScreen({ navigation }: Props) {
             </AppCard>
           ) : null}
 
+          <AppCard testID="trainer-access-link-history">
+            <ListRow
+              testID="trainer-access-open-claim"
+              icon="link"
+              title="Link Tracked History"
+              subtitle="A trainer tracked you before you had an account? Enter their code."
+              chevron
+              onPress={() => navigation.navigate('TrainerClaim')}
+            />
+          </AppCard>
+
           {data.requests.length > 0 ? (
             <AppCard testID="trainer-access-requests">
               <SectionHeader label="Requests" />

@@ -9,13 +9,18 @@ import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { TextInput } from '../design/TextInput';
 import { spacing } from '../design/theme';
-import { addTrainerClient, listTrainerClients, updateTrainerClientProfile } from '../lib/api';
+import {
+  addTrainerClient,
+  listTrainerClients,
+  trackTrainerClient,
+  updateTrainerClientProfile,
+} from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 
 type Props = RootStackScreenProps<'TrainerClientForm' | 'TrainerEditClient'>;
 
 /** Username finds an existing account (a request); email invites someone (an invite). */
-export type AddMode = 'username' | 'email';
+export type AddMode = 'username' | 'email' | 'untracked';
 
 export interface ClientFormValues {
   mode: AddMode;
@@ -43,13 +48,16 @@ const MAX_WEIGHT = 1000;
  */
 export function validateClientForm(values: ClientFormValues, isNew: boolean): ClientFormErrors {
   const errors: ClientFormErrors = {};
-  const takesDetails = !isNew || values.mode === 'email';
+  const takesDetails = !isNew || values.mode !== 'username';
 
   if (isNew && values.mode === 'username' && !USERNAME_PATTERN.test(values.username.trim())) {
     errors.username = 'Usernames are 3–20 letters, numbers or underscores';
   }
   if (isNew && values.mode === 'email' && !EMAIL_PATTERN.test(values.email.trim())) {
     errors.email = 'Enter a valid email address';
+  }
+  if (isNew && values.mode === 'untracked' && values.name.trim() === '') {
+    errors.name = 'Enter their name';
   }
   if (takesDetails && values.heightText.trim() !== '') {
     const height = Number(values.heightText);
@@ -149,6 +157,23 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
 
     setSaving(true);
     try {
+      if (isNew && values.mode === 'untracked') {
+        // No account yet: track the client and show the code to give them.
+        const tracked = await trackTrainerClient(accessToken, {
+          displayName: values.name.trim(),
+          heightValue: details.heightValue,
+          heightUnit: details.heightUnit,
+          weightValue: details.weightValue,
+          weightUnit: details.weightUnit,
+        });
+        navigation.replace('TrainerClaimCode', {
+          code: tracked.claimCode,
+          clientId: tracked.clientId,
+          clientName: values.name.trim(),
+        });
+        return;
+      }
+
       if (isNew && values.mode === 'username') {
         const result = await addTrainerClient(accessToken, {
           username: values.username.trim().toLowerCase(),
@@ -185,6 +210,7 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
   }
 
   const addingByEmail = isNew && values.mode === 'email';
+  const addingNew = isNew && values.mode !== 'username';
 
   return (
     <Screen
@@ -217,6 +243,7 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
               options={[
                 { value: 'username', label: 'Username' },
                 { value: 'email', label: 'Email invite' },
+                { value: 'untracked', label: 'No account' },
               ]}
             />
           ) : null}
@@ -247,7 +274,7 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
             />
           ) : null}
 
-          {!isNew || addingByEmail ? (
+          {!isNew || addingNew ? (
             <TextInput
               testID="trainer-client-name"
               label="Name"
@@ -257,7 +284,7 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
             />
           ) : null}
 
-          {!isNew || addingByEmail ? (
+          {!isNew || addingNew ? (
             <TextInput
               testID="trainer-client-height"
               label="Height (cm)"
@@ -268,7 +295,7 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
             />
           ) : null}
 
-          {!isNew || addingByEmail ? (
+          {!isNew || addingNew ? (
             <TextInput
               testID="trainer-client-weight"
               label="Weight"
@@ -279,7 +306,7 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
             />
           ) : null}
 
-          {!isNew || addingByEmail ? (
+          {!isNew || addingNew ? (
             <SegmentedControl
               testID="trainer-client-weight-unit"
               value={values.weightUnit}
@@ -295,7 +322,15 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
 
           <PrimaryButton
             testID="trainer-client-save"
-            label={!isNew ? 'Save Details' : addingByEmail ? 'Send Invite' : 'Send Request'}
+            label={
+              !isNew
+                ? 'Save Details'
+                : values.mode === 'untracked'
+                  ? 'Create Client'
+                  : addingByEmail
+                    ? 'Send Invite'
+                    : 'Send Request'
+            }
             onPress={() => void handleSave()}
             loading={saving}
             disabled={saving}
