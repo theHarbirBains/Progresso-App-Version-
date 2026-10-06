@@ -2216,6 +2216,384 @@ async function main() {
   });
 
   await foodsAdmin.end();
+
+  // ---- trainer mode (workouts only) ----
+  // Trainer T has an active Trainer entitlement; TE's is expired and TN has
+  // none. C is an active client of all three; CP is pending with T; CO has no
+  // link to anyone. Every check runs against committed rows.
+  const T = randomUUID();
+  const TE = randomUUID();
+  const TN = randomUUID();
+  const C = randomUUID();
+  const CP = randomUUID();
+  const CO = randomUUID();
+  await admin.query(
+    'insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6),($7,$8),($9,$10),($11,$12)',
+    [
+      T,
+      'trainer@test.local',
+      TE,
+      'expired-trainer@test.local',
+      TN,
+      'noplan-trainer@test.local',
+      C,
+      'trainer-client@test.local',
+      CP,
+      'pending-client@test.local',
+      CO,
+      'unlinked-client@test.local',
+    ],
+  );
+  await admin.query(
+    `insert into public.subscriptions (user_id, revenuecat_customer_id, status, entitlement_id, current_period_ends_at)
+     values ($1, 'rc-trainer', 'active', 'trainer', now() + interval '30 days'),
+            ($2, 'rc-trainer-expired', 'expired', 'trainer', now() - interval '1 day')`,
+    [T, TE],
+  );
+  await admin.query(
+    `insert into public.trainer_clients (trainer_id, client_id, status) values
+       ($1, $2, 'active'), ($3, $2, 'active'), ($4, $2, 'active'), ($1, $5, 'pending')`,
+    [T, C, TE, TN, CP],
+  );
+
+  const trainerCustom = randomUUID();
+  const otherUsersCustom = randomUUID();
+  const retiredCustom = randomUUID();
+  await admin.query(
+    `insert into public.exercises (id, created_by, name, muscle_group, movement_type, photo_url) values
+       ($1, $2, 'Gym B Chest Machine', 'chest', 'bilateral', 'https://example.test/gym-b.jpg'),
+       ($3, $4, 'Other Users Machine', 'chest', 'bilateral', null),
+       ($5, $2, 'Retired Machine', 'chest', 'bilateral', null)`,
+    [trainerCustom, T, otherUsersCustom, CO, retiredCustom],
+  );
+  await admin.query('update public.exercises set is_active = false where id = $1', [retiredCustom]);
+
+  const logPayload = (exerciseId, sets) =>
+    JSON.stringify({
+      name: 'Trainer session',
+      performedAt: '2026-10-01T09:00:00Z',
+      completedAt: '2026-10-01T10:00:00Z',
+      exercises: [{ exerciseId, sets }],
+    });
+  const twoSets = [
+    { setIndex: 1, weightKg: 100, reps: 5 },
+    { setIndex: 2, weightKg: 97.5, reps: 5 },
+  ];
+  const logFor = (trainer, client, payload) =>
+    admin.query('select public.trainer_log_workout($1, $2, $3::jsonb) as id', [
+      trainer,
+      client,
+      payload,
+    ]);
+
+  // Logging, as the API calls it.
+  const logged = await logFor(T, C, logPayload(trainerCustom, twoSets));
+  const workoutId = logged.rows[0].id;
+  const workoutRow = (
+    await admin.query('select user_id, logged_by from public.workouts where id = $1', [workoutId])
+  ).rows[0];
+  record(
+    'A trainer-logged workout belongs to the client and is attributed to the trainer',
+    workoutRow.user_id === C && workoutRow.logged_by === T,
+    JSON.stringify(workoutRow),
+  );
+
+  const clientCopy = await admin.query(
+    "select id, created_by, photo_url from public.exercises where created_by = $1 and name = 'Gym B Chest Machine'",
+    [C],
+  );
+  const workoutExerciseRows = (
+    await admin.query('select exercise_id from public.workout_exercises where workout_id = $1', [
+      workoutId,
+    ])
+  ).rows;
+  record(
+    "A trainer's custom exercise is copied into the client's library and used by the workout",
+    clientCopy.rows.length === 1 &&
+      workoutExerciseRows.length === 1 &&
+      workoutExerciseRows[0].exercise_id === clientCopy.rows[0].id &&
+      clientCopy.rows[0].photo_url === 'https://example.test/gym-b.jpg',
+    JSON.stringify({ copies: clientCopy.rows.length, used: workoutExerciseRows }),
+  );
+
+  await logFor(T, C, logPayload(trainerCustom, twoSets));
+  const copyCount = await admin.query(
+    "select count(*)::int as count from public.exercises where created_by = $1 and name = 'Gym B Chest Machine'",
+    [C],
+  );
+  record(
+    'Logging the same trainer exercise again reuses the client copy rather than duplicating it',
+    copyCount.rows[0].count === 1,
+    JSON.stringify(copyCount.rows[0]),
+  );
+
+  const attributedSets = await admin.query(
+    `select count(*)::int as count, bool_and(s.logged_by = $2) as all_attributed
+     from public.sets s join public.workout_exercises we on we.id = s.workout_exercise_id
+     where we.workout_id = $1`,
+    [workoutId, T],
+  );
+  record(
+    'Every set a trainer logs is attributed to the trainer',
+    attributedSets.rows[0].count === 2 && attributedSets.rows[0].all_attributed === true,
+    JSON.stringify(attributedSets.rows[0]),
+  );
+
+  const prs = await admin.query(
+    'select count(*)::int as count from public.rep_prs where user_id = $1',
+    [C],
+  );
+  record(
+    'The PR trigger chain runs for trainer-logged sets (client PRs are recomputed)',
+    prs.rows[0].count > 0,
+    JSON.stringify(prs.rows[0]),
+  );
+
+  const benchPressId = (
+    await admin.query("select id from public.exercises where name = 'Barbell Bench Press'")
+  ).rows[0].id;
+  const builtIn = await logFor(T, C, logPayload(benchPressId, twoSets));
+  const builtInRef = await admin.query(
+    'select exercise_id from public.workout_exercises where workout_id = $1',
+    [builtIn.rows[0].id],
+  );
+  record(
+    'A built-in exercise is referenced directly, not copied',
+    builtInRef.rows[0].exercise_id === benchPressId,
+  );
+
+  await expectThrows(
+    logFor(T, CP, logPayload(trainerCustom, twoSets)),
+    'Logging is refused while the client link is still pending',
+    /not an active client/,
+  );
+  await expectThrows(
+    logFor(T, CO, logPayload(trainerCustom, twoSets)),
+    'Logging is refused for a client with no link to the trainer',
+    /not an active client/,
+  );
+  await expectThrows(
+    logFor(TE, C, logPayload(trainerCustom, twoSets)),
+    'Logging is refused when the trainer entitlement has expired',
+    /entitlement is not active/,
+  );
+  await expectThrows(
+    logFor(TN, C, logPayload(trainerCustom, twoSets)),
+    'Logging is refused when the trainer has no entitlement at all',
+    /entitlement is not active/,
+  );
+  await expectThrows(
+    logFor(T, C, logPayload(otherUsersCustom, twoSets)),
+    "Logging is refused for another user's custom exercise",
+    /not in this trainer's library/,
+  );
+  await expectThrows(
+    logFor(T, C, logPayload(retiredCustom, twoSets)),
+    'Logging is refused for a deactivated exercise',
+    /not available/,
+  );
+
+  await expectThrows(
+    asUser(T, (client) =>
+      client.query('select public.trainer_log_workout($1, $2, $3::jsonb)', [
+        T,
+        C,
+        logPayload(trainerCustom, twoSets),
+      ]),
+    ),
+    'The logging function is not callable by an authenticated user directly (service role only)',
+    /permission denied/,
+  );
+
+  const clientSeesOwn = await asUser(C, (client) =>
+    client.query('select logged_by from public.workouts where id = $1', [workoutId]),
+  );
+  record(
+    'The client sees the workout their trainer logged, with the trainer attributed',
+    clientSeesOwn.rows.length === 1 && clientSeesOwn.rows[0].logged_by === T,
+    JSON.stringify(clientSeesOwn.rows),
+  );
+
+  const trainerSeesClient = await asUser(T, (client) =>
+    client.query('select id from public.workouts where user_id = $1', [C]),
+  );
+  record(
+    'An active trainer sees the client workouts',
+    trainerSeesClient.rows.length >= 1,
+    `${trainerSeesClient.rows.length} rows`,
+  );
+
+  const trainerSeesCopy = await asUser(T, (client) =>
+    client.query('select id from public.exercises where id = $1', [clientCopy.rows[0].id]),
+  );
+  record(
+    "An active trainer can read the client's custom exercises shown in their history",
+    trainerSeesCopy.rows.length === 1,
+  );
+
+  const trainerSeesPrs = await asUser(T, (client) =>
+    client.query('select id from public.rep_prs where user_id = $1', [C]),
+  );
+  record(
+    'An active trainer can read the client PRs',
+    trainerSeesPrs.rows.length > 0,
+    `${trainerSeesPrs.rows.length} rows`,
+  );
+
+  const trainerSeesProfile = await asUser(T, (client) =>
+    client.query('select id from public.users where id = $1', [C]),
+  );
+  record(
+    "An active trainer can read the client's profile (body measurements)",
+    trainerSeesProfile.rows.length === 1,
+  );
+
+  const pendingHidden = await asUser(T, (client) =>
+    client.query('select id from public.workouts where user_id = $1', [CP]),
+  );
+  record(
+    'A trainer cannot read a pending client',
+    pendingHidden.rows.length === 0,
+    `${pendingHidden.rows.length} rows`,
+  );
+  const unlinkedHidden = await asUser(T, (client) =>
+    client.query('select id from public.workouts where user_id = $1', [CO]),
+  );
+  record('A trainer cannot read a client with no link', unlinkedHidden.rows.length === 0);
+  const noPlanHidden = await asUser(TN, (client) =>
+    client.query('select id from public.workouts where user_id = $1', [C]),
+  );
+  record(
+    'A trainer without the entitlement cannot read client workouts',
+    noPlanHidden.rows.length === 0,
+  );
+
+  const clientSeesLink = await asUser(C, (client) =>
+    client.query('select id from public.trainer_clients where client_id = $1', [C]),
+  );
+  record('A client can see their trainer links', clientSeesLink.rows.length >= 1);
+  const otherSeesLink = await asUser(CO, (client) =>
+    client.query('select id from public.trainer_clients where client_id = $1', [C]),
+  );
+  record(
+    'Another user cannot see a link between a trainer and a client',
+    otherSeesLink.rows.length === 0,
+  );
+
+  // Lapsed entitlement stops access, and restoring it brings access back.
+  await admin.query(
+    "update public.subscriptions set current_period_ends_at = now() - interval '1 day' where user_id = $1",
+    [T],
+  );
+  const lapsed = await asUser(T, (client) =>
+    client.query('select id from public.workouts where user_id = $1', [C]),
+  );
+  record(
+    'A lapsed Trainer entitlement stops the trainer reading client workouts',
+    lapsed.rows.length === 0,
+  );
+  await admin.query(
+    "update public.subscriptions set current_period_ends_at = now() + interval '30 days' where user_id = $1",
+    [T],
+  );
+
+  // An ended link stops access, and the client keeps their data.
+  await admin.query(
+    "update public.trainer_clients set status = 'ended', ended_at = now() where trainer_id = $1 and client_id = $2",
+    [T, C],
+  );
+  const ended = await asUser(T, (client) =>
+    client.query('select id from public.workouts where user_id = $1', [C]),
+  );
+  record('An ended link stops the trainer reading the client workouts', ended.rows.length === 0);
+  const clientKeeps = await asUser(C, (client) =>
+    client.query('select id from public.workouts where user_id = $1', [C]),
+  );
+  record('An ended link leaves the client data intact', clientKeeps.rows.length >= 1);
+  await admin.query(
+    "update public.trainer_clients set status = 'active', ended_at = null where trainer_id = $1 and client_id = $2",
+    [T, C],
+  );
+
+  // Direct writes (the database backstop for the API path).
+  const directInsert = await asUser(T, (client) =>
+    client.query(
+      "insert into public.workouts (user_id, name, performed_at) values ($1, 'Direct entry', now()) returning logged_by",
+      [C],
+    ),
+  );
+  record(
+    'An active trainer can insert a workout for a client directly, attributed to the trainer',
+    directInsert.rows[0].logged_by === T,
+    JSON.stringify(directInsert.rows[0]),
+  );
+  await expectThrows(
+    asUser(T, (client) =>
+      client.query(
+        "insert into public.workouts (user_id, name, performed_at) values ($1, 'Not allowed', now())",
+        [CO],
+      ),
+    ),
+    'A trainer cannot insert a workout for an unlinked user',
+    RLS_ERROR,
+  );
+
+  const spoofed = await asUser(C, (client) =>
+    client.query(
+      "insert into public.workouts (user_id, name, performed_at, logged_by) values ($1, 'Self entry', now(), $2) returning logged_by",
+      [C, T],
+    ),
+  );
+  record(
+    'A client cannot claim a workout was logged by their trainer',
+    spoofed.rows[0].logged_by === null,
+    JSON.stringify(spoofed.rows[0]),
+  );
+  const frozen = await asUser(C, (client) =>
+    client.query('update public.workouts set logged_by = null where id = $1 returning logged_by', [
+      workoutId,
+    ]),
+  );
+  record(
+    'A client cannot change the attribution on a trainer-logged workout',
+    frozen.rows[0].logged_by === T,
+    JSON.stringify(frozen.rows[0]),
+  );
+
+  await expectThrows(
+    asUser(C, (client) =>
+      client.query('insert into public.trainer_clients (trainer_id, client_id) values ($1, $2)', [
+        CO,
+        C,
+      ]),
+    ),
+    'A client cannot create their own trainer link',
+    /permission denied|row-level security/i,
+  );
+  await expectThrows(
+    asUser(T, (client) =>
+      client.query('select public.find_auth_user_id_by_email($1)', ['trainer-client@test.local']),
+    ),
+    'Account lookup by email is service role only',
+    /permission denied/,
+  );
+
+  const auditId = randomUUID();
+  await admin.query(
+    "insert into public.trainer_actions (id, trainer_id, client_id, action) values ($1, $2, $3, 'test')",
+    [auditId, T, C],
+  );
+  await expectThrows(
+    admin.query("update public.trainer_actions set action = 'changed' where id = $1", [auditId]),
+    'Trainer audit rows cannot be updated',
+    /append-only/,
+  );
+  await expectThrows(
+    admin.query('delete from public.trainer_actions where id = $1', [auditId]),
+    'Trainer audit rows cannot be deleted',
+    /append-only/,
+  );
+
   await admin.end();
 }
 
