@@ -105,8 +105,8 @@ describe('TrainerClientDetailScreen', () => {
     expect(await screen.findByTestId('trainer-client-profile')).toHaveTextContent(
       /Managed account/,
     );
-    expect(screen.getByTestId('trainer-client-height-value')).toHaveTextContent(/180 cm/);
-    expect(screen.getByTestId('trainer-client-weight-value')).toHaveTextContent(/80 kg/);
+    expect(screen.getByTestId('trainer-client-height-value')).toHaveTextContent(/5 ft 11 in/);
+    expect(screen.getByTestId('trainer-client-weight-value')).toHaveTextContent(/176.4 lb/);
     expect(screen.getByTestId('trainer-client-record-r1')).toHaveTextContent(/Barbell Back Squat/);
     expect(mockFetchWorkouts).toHaveBeenCalledWith('client-1', 0);
   });
@@ -135,6 +135,13 @@ describe('TrainerClientDetailScreen', () => {
     expect(await screen.findByTestId('trainer-client-workout-w2')).toHaveTextContent(/Push/);
     expect(mockFetchWorkouts).toHaveBeenLastCalledWith('client-1', 1);
     expect(screen.queryByTestId('trainer-client-workouts-more')).toBeNull();
+  });
+
+  it('shows a client stored in pounds as the same pounds, not converted twice', async () => {
+    mockListTrainerClients.mockResolvedValue([{ ...client, weightValue: 175, weightUnit: 'lb' }]);
+    renderDetail();
+
+    expect(await screen.findByTestId('trainer-client-weight-value')).toHaveTextContent(/175 lb/);
   });
 
   it('opens the logger for this client, on the trainer route that saves through the trainer API', async () => {

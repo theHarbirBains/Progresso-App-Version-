@@ -23,7 +23,7 @@ import {
   startLiveWorkout,
   type TrainerClient,
 } from '../lib/api';
-import { formatWeightKg } from '../lib/units';
+import { formatWeightKg, toKg } from '../lib/units';
 import { feetAndInchesFromCm } from '../onboarding/weightHeightConversion';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -40,6 +40,9 @@ import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 
 type Props = RootStackScreenProps<'TrainerClientDetail'>;
+
+/** A client's page always shows pounds, whatever the trainer's own unit setting is. */
+const CLIENT_WEIGHT_UNIT = 'lb';
 
 interface ClientData {
   client: TrainerClient | null;
@@ -65,7 +68,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
   const { clientId, clientName } = route.params;
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
-  const { weightUnit, theme } = useProgressTheme();
+  const { theme } = useProgressTheme();
 
   const [data, setData] = useState<ClientData | null>(null);
   const [page, setPage] = useState(0);
@@ -236,17 +239,15 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
             <View style={styles.statRow}>
               <StatBlock
                 testID="trainer-client-height-value"
-                value={client.heightValue === null ? '—' : `${Math.round(client.heightValue)} cm`}
-                label={
-                  client.heightValue === null ? 'Height' : feetAndInchesText(client.heightValue)
-                }
+                value={client.heightValue === null ? '—' : feetAndInchesText(client.heightValue)}
+                label="Height"
               />
               <StatBlock
                 testID="trainer-client-weight-value"
                 value={
                   client.weightValue === null
                     ? '—'
-                    : `${formatWeightKg(client.weightValue, client.weightUnit)} ${client.weightUnit}`
+                    : `${formatWeightKg(toKg(client.weightValue, client.weightUnit), CLIENT_WEIGHT_UNIT)} ${CLIENT_WEIGHT_UNIT}`
                 }
                 label="Weight"
               />
@@ -363,7 +364,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
               <RecentWorkoutTopSets
                 testID={`trainer-client-workout-${workout.id}-top-sets`}
                 topSets={workout.topSets}
-                weightUnit={weightUnit}
+                weightUnit={CLIENT_WEIGHT_UNIT}
               />
             </Card>
           ))}
@@ -387,7 +388,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                 testID={`trainer-client-record-${record.id}`}
                 title={record.exerciseName}
                 subtitle={`${record.reps} ${record.reps === 1 ? 'rep' : 'reps'}`}
-                value={`${formatWeightKg(record.bestWeightKg, weightUnit)} ${weightUnit}`}
+                value={`${formatWeightKg(record.bestWeightKg, CLIENT_WEIGHT_UNIT)} ${CLIENT_WEIGHT_UNIT}`}
                 divider={index > 0}
               />
             ))}
