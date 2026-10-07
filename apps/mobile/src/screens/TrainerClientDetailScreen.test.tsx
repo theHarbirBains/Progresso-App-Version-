@@ -107,6 +107,7 @@ describe('TrainerClientDetailScreen', () => {
     );
     expect(screen.getByTestId('trainer-client-height-value')).toHaveTextContent(/5 ft 11 in/);
     expect(screen.getByTestId('trainer-client-weight-value')).toHaveTextContent(/176.4 lb/);
+    fireEvent.press(screen.getByText('Records'));
     expect(screen.getByTestId('trainer-client-record-r1')).toHaveTextContent(/Barbell Back Squat/);
     expect(mockFetchWorkouts).toHaveBeenCalledWith('client-1', 0);
   });
@@ -154,11 +155,11 @@ describe('TrainerClientDetailScreen', () => {
     });
   });
 
-  it('offers editing only for a managed client', async () => {
+  it('offers editing only for a managed client, from the menu', async () => {
     mockListTrainerClients.mockResolvedValue([{ ...client, source: 'linked' }]);
     renderDetail();
 
-    await screen.findByTestId('trainer-client-profile');
+    fireEvent.press(await screen.findByTestId('trainer-client-manage'));
     expect(screen.queryByTestId('trainer-client-edit')).toBeNull();
   });
 
@@ -170,6 +171,7 @@ describe('TrainerClientDetailScreen', () => {
     });
     renderDetail();
 
+    fireEvent.press(await screen.findByTestId('trainer-client-manage'));
     fireEvent.press(await screen.findByTestId('trainer-client-claim-code'));
 
     await waitFor(() =>
@@ -187,14 +189,14 @@ describe('TrainerClientDetailScreen', () => {
     startLiveWorkout.mockResolvedValue({ workoutId: 'live-1' });
     renderDetail();
 
+    fireEvent.press(await screen.findByTestId('trainer-client-manage'));
     fireEvent.press(await screen.findByTestId('trainer-client-start-live'));
 
     await waitFor(() =>
-      expect(mockNavigate).toHaveBeenCalledWith('TrainerLiveWorkout', {
-        workoutId: 'live-1',
-        clientId: 'client-1',
-        clientName: 'Sam',
-      }),
+      expect(mockNavigate).toHaveBeenCalledWith(
+        'TrainerLiveWorkout',
+        expect.objectContaining({ workoutId: 'live-1', clientId: 'client-1', clientName: 'Sam' }),
+      ),
     );
     expect(startLiveWorkout).toHaveBeenCalledWith('token-123', 'client-1', 'Live session');
   });

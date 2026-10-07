@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
-import { Card } from '../design/Card';
+import { BottomSheet } from '../design/BottomSheet';
 import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
@@ -14,8 +14,9 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
-import { colors, widgetGap } from '../design/theme';
-import { RecentWorkoutTopSets } from '../feed/RecentWorkoutTopSets';
+import { UnderlineTabs } from '../design/UnderlineTabs';
+import { colors, spacing, typeScale, widgetGap } from '../design/theme';
+import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
 import {
   endTrainerClient,
   listTrainerClients,
@@ -27,7 +28,6 @@ import { formatWeightKg, toKg } from '../lib/units';
 import { feetAndInchesFromCm } from '../onboarding/weightHeightConversion';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { feedStyles as styles } from '../screens/feedStyles';
 import {
   fetchClientPersonalRecords,
   fetchClientWorkoutFeed,
@@ -36,13 +36,13 @@ import {
 } from '../trainer/clientQueries';
 import { trainerClientStatusLabel } from '../trainer/trainerLabels';
 import type { EnrichedWorkoutSummary } from '../workouts/workoutHistoryEnrichment';
-import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
-import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 
 type Props = RootStackScreenProps<'TrainerClientDetail'>;
 
 /** A client's page always shows pounds, whatever the trainer's own unit setting is. */
 const CLIENT_WEIGHT_UNIT = 'lb';
+
+type Tab = 'workouts' | 'records';
 
 interface ClientData {
   client: TrainerClient | null;
@@ -51,18 +51,18 @@ interface ClientData {
   records: ClientRecordRow[];
 }
 
-/** "5 ft 11 in" for a height stored in cm, so the profile shows both units. */
+/** "5 ft 11 in" for a height stored in cm. */
 function feetAndInchesText(heightCm: number): string {
   const { feet, inches } = feetAndInchesFromCm(heightCm);
   return `${feet} ft ${inches} in`;
 }
 
 /**
- * One client, for their trainer, laid out like the Feed: a profile card, the actions for
- * logging for them, then one Feed-style card per finished workout (byline, title, stat
- * strip, top sets), then their PRs. The workouts come from the same history and
- * enrichment the client's own Feed uses, under the trainer RLS policies, so a lapsed
- * subscription or ended link shows nothing.
+ * One client, as a profile for their trainer: an identity card with the logging action,
+ * then Workouts (the same Feed cards the client sees, with their top-set carousels) and
+ * Records. Edit Details, Start Live Session, Get Claim Code and End Trainer Link sit
+ * behind the menu, so the page itself stays about the person. The data comes under the
+ * trainer RLS policies, so a lapsed subscription or ended link shows nothing.
  */
 export function TrainerClientDetailScreen({ navigation, route }: Props) {
   const { clientId, clientName } = route.params;
@@ -72,11 +72,17 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
 
   const [data, setData] = useState<ClientData | null>(null);
   const [page, setPage] = useState(0);
+  const [tab, setTab] = useState<Tab>('workouts');
+  const [manageOpen, setManageOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
-  const [liveSession, setLiveSession] = useState<{ id: string; name: string } | null>(null);
+  const [liveSession, setLiveSession] = useState<{
+    id: string;
+    name: string;
+    startedAt: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     if (!accessToken) return;
@@ -129,11 +135,13 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
   async function startLive() {
     if (!accessToken) return;
     try {
+      const startedAt = new Date().toISOString();
       const { workoutId } = await startLiveWorkout(accessToken, clientId, 'Live session');
       navigation.navigate('TrainerLiveWorkout', {
         workoutId,
         clientId,
         clientName: client?.displayName ?? clientName,
+        startedAt,
       });
     } catch (err) {
       Alert.alert('Could not start the session', err instanceof Error ? err.message : 'Try again');
@@ -155,6 +163,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
   }
 
   function confirmEnd() {
+    setManageOpen(false);
     Alert.alert(
       'End trainer link',
       'You will no longer be able to log workouts for this client or see their data. Their existing workouts are kept.',
@@ -194,6 +203,16 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
         <AppHeader
           title={title}
           onBack={() => navigation.goBack()}
+          rightAction={
+            client
+              ? {
+                  icon: 'more-horizontal',
+                  onPress: () => setManageOpen(true),
+                  accessibilityLabel: 'Client actions',
+                  testID: 'trainer-client-manage',
+                }
+              : undefined
+          }
           testID="trainer-client-detail-header"
         />
       }
@@ -218,25 +237,23 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
 
       {!loading && !error && client ? (
         <>
-          <Card testID="trainer-client-profile">
-            <View style={styles.metaRow}>
-              <View style={styles.avatarWrap}>
-                <Avatar
-                  initial={initial}
-                  size={32}
-                  iconSize={16}
-                  iconColor={colors.textSecondary}
-                  initialStyle={styles.avatarInitial}
-                />
-              </View>
-              <View style={styles.metaBody}>
-                <Text style={styles.metaName} numberOfLines={1}>
+          <AppCard hero topAccent={theme.accent} testID="trainer-client-profile">
+            <View style={styles.identity}>
+              <Avatar
+                initial={initial}
+                size={64}
+                iconSize={28}
+                iconColor={colors.textSecondary}
+                initialStyle={styles.identityInitial}
+              />
+              <View style={styles.identityBody}>
+                <Text style={styles.name} numberOfLines={1}>
                   {title}
                 </Text>
-                <Text style={styles.metaTimestamp}>{trainerClientStatusLabel(client)}</Text>
+                <Text style={styles.status}>{trainerClientStatusLabel(client)}</Text>
               </View>
             </View>
-            <View style={styles.statRow}>
+            <View style={styles.stats}>
               <StatBlock
                 testID="trainer-client-height-value"
                 value={client.heightValue === null ? '—' : feetAndInchesText(client.heightValue)}
@@ -252,9 +269,6 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                 label="Weight"
               />
             </View>
-          </Card>
-
-          <Card testID="trainer-client-actions">
             <PrimaryButton
               testID="trainer-client-log-workout"
               label="Log Workout"
@@ -265,135 +279,121 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                 navigation.navigate('TrainerLogWorkout', { clientId, clientName: title })
               }
             />
-            {client.status === 'active' ? (
-              liveSession ? (
-                <SecondaryButton
-                  testID="trainer-client-resume-live"
-                  label="Resume Live Session"
-                  onPress={() =>
-                    navigation.navigate('TrainerLiveWorkout', {
-                      workoutId: liveSession.id,
-                      clientId,
-                      clientName: client.displayName ?? clientName,
-                    })
-                  }
-                />
-              ) : (
-                <SecondaryButton
-                  testID="trainer-client-start-live"
-                  label="Start Live Session"
-                  onPress={() => void startLive()}
-                />
-              )
-            ) : null}
-            {client.awaitingClaim ? (
+            {client.status === 'active' && liveSession ? (
               <SecondaryButton
-                testID="trainer-client-claim-code"
-                label="Get Claim Code"
-                onPress={() => void getClaimCode()}
+                testID="trainer-client-resume-live"
+                label="Resume Live Session"
+                onPress={() =>
+                  navigation.navigate('TrainerLiveWorkout', {
+                    workoutId: liveSession.id,
+                    clientId,
+                    clientName: client.displayName ?? clientName,
+                    startedAt: liveSession.startedAt,
+                  })
+                }
               />
             ) : null}
-            {client.source === 'managed' ? (
-              <SecondaryButton
-                testID="trainer-client-edit"
-                label="Edit Details"
-                onPress={() => navigation.navigate('TrainerEditClient', { clientId })}
-              />
-            ) : null}
-          </Card>
+          </AppCard>
 
-          <View style={styles.sectionHeaderWrap}>
-            <SectionHeader label="Workouts" />
-          </View>
-          {data?.workouts.length === 0 ? (
-            <Card testID="trainer-client-no-workouts">
-              <ListRow title="No finished workouts yet" />
-            </Card>
-          ) : null}
-          {data?.workouts.map((workout) => (
-            <Card key={workout.id} testID={`trainer-client-workout-${workout.id}`}>
-              <View style={styles.metaRow}>
-                <View style={styles.avatarWrap}>
-                  <Avatar
-                    initial={initial}
-                    size={32}
-                    iconSize={16}
-                    iconColor={colors.textSecondary}
-                    initialStyle={styles.avatarInitial}
-                  />
-                </View>
-                <View style={styles.metaBody}>
-                  <Text style={styles.metaName} numberOfLines={1}>
-                    {title}
-                  </Text>
-                  <View style={styles.metaSubRow}>
-                    <Feather name="activity" size={11} color={colors.textMuted} />
-                    <Text style={styles.metaTimestamp}>{formatCardDate(workout.performedAt)}</Text>
-                  </View>
-                </View>
-              </View>
+          <UnderlineTabs<Tab>
+            categories={[
+              { key: 'workouts', label: 'Workouts', icon: 'activity' },
+              { key: 'records', label: 'Records', icon: 'award' },
+            ]}
+            active={tab}
+            onSelect={setTab}
+            accentColor={theme.accent}
+            testID="trainer-client-tabs"
+          />
 
-              <Text style={styles.itemTitle} numberOfLines={1}>
-                {workout.name}
-              </Text>
-              {workout.muscleGroups.length > 0 ? (
-                <Text style={styles.itemSubtitle} numberOfLines={1}>
-                  {workout.muscleGroups
-                    .map((group) => SPLIT_MUSCLE_GROUP_LABELS[group])
-                    .join(' • ')}
-                </Text>
+          {tab === 'workouts' ? (
+            <>
+              {data?.workouts.length === 0 ? (
+                <AppCard testID="trainer-client-no-workouts">
+                  <Text style={styles.empty}>No finished workouts yet.</Text>
+                </AppCard>
               ) : null}
-
-              <View style={styles.statRow}>
-                <StatBlock
-                  testID={`trainer-client-workout-${workout.id}-duration`}
-                  value={formatCardDuration(workout.durationMinutes)}
-                  label="Duration"
+              {data?.workouts.map((workout) => (
+                <WorkoutFeedCard
+                  key={workout.id}
+                  idPrefix="trainer-client-workout"
+                  workout={workout}
+                  authorName={title}
+                  timestamp={workout.performedAt}
+                  weightUnit={CLIENT_WEIGHT_UNIT}
                 />
-                <StatBlock
-                  testID={`trainer-client-workout-${workout.id}-exercises`}
-                  value={String(workout.completedExerciseCount)}
-                  label={workout.completedExerciseCount === 1 ? 'Exercise' : 'Exercises'}
+              ))}
+              {data?.hasMore ? (
+                <SecondaryButton
+                  testID="trainer-client-workouts-more"
+                  label={loadingMore ? 'Loading…' : 'Load More'}
+                  disabled={loadingMore}
+                  onPress={() => void loadMore()}
                 />
-                <StatBlock
-                  testID={`trainer-client-workout-${workout.id}-sets`}
-                  value={String(workout.completedSetCount)}
-                  label="Sets"
+              ) : null}
+            </>
+          ) : (
+            <AppCard testID="trainer-client-records">
+              <SectionHeader label="Personal Records" />
+              {data?.records.length === 0 ? (
+                <ListRow title="No personal records yet" testID="trainer-client-no-records" />
+              ) : null}
+              {data?.records.map((record, index) => (
+                <ListRow
+                  key={record.id}
+                  testID={`trainer-client-record-${record.id}`}
+                  title={record.exerciseName}
+                  subtitle={`${record.reps} ${record.reps === 1 ? 'rep' : 'reps'}`}
+                  value={`${formatWeightKg(record.bestWeightKg, CLIENT_WEIGHT_UNIT)} ${CLIENT_WEIGHT_UNIT}`}
+                  divider={index > 0}
                 />
-              </View>
-              <RecentWorkoutTopSets
-                testID={`trainer-client-workout-${workout.id}-top-sets`}
-                topSets={workout.topSets}
-                weightUnit={CLIENT_WEIGHT_UNIT}
-              />
-            </Card>
-          ))}
-          {data?.hasMore ? (
-            <SecondaryButton
-              testID="trainer-client-workouts-more"
-              label={loadingMore ? 'Loading…' : 'Load More'}
-              disabled={loadingMore}
-              onPress={() => void loadMore()}
-            />
-          ) : null}
+              ))}
+            </AppCard>
+          )}
+        </>
+      ) : null}
 
-          <Card testID="trainer-client-records">
-            <SectionHeader label="Personal Records" />
-            {data?.records.length === 0 ? (
-              <ListRow title="No personal records yet" testID="trainer-client-no-records" />
-            ) : null}
-            {data?.records.map((record, index) => (
-              <ListRow
-                key={record.id}
-                testID={`trainer-client-record-${record.id}`}
-                title={record.exerciseName}
-                subtitle={`${record.reps} ${record.reps === 1 ? 'rep' : 'reps'}`}
-                value={`${formatWeightKg(record.bestWeightKg, CLIENT_WEIGHT_UNIT)} ${CLIENT_WEIGHT_UNIT}`}
-                divider={index > 0}
-              />
-            ))}
-          </Card>
-
+      <BottomSheet
+        visible={manageOpen}
+        onClose={() => setManageOpen(false)}
+        testID="trainer-client-manage-sheet"
+      >
+        <SectionHeader label="Manage" />
+        {client && client.status === 'active' && !liveSession ? (
+          <ListRow
+            testID="trainer-client-start-live"
+            title="Start Live Session"
+            subtitle="Log their workout as it happens"
+            onPress={() => {
+              setManageOpen(false);
+              void startLive();
+            }}
+          />
+        ) : null}
+        {client?.source === 'managed' ? (
+          <ListRow
+            testID="trainer-client-edit"
+            title="Edit Details"
+            divider
+            onPress={() => {
+              setManageOpen(false);
+              navigation.navigate('TrainerEditClient', { clientId });
+            }}
+          />
+        ) : null}
+        {client?.awaitingClaim ? (
+          <ListRow
+            testID="trainer-client-claim-code"
+            title="Get Claim Code"
+            subtitle="Hand this to them so they can link their history"
+            divider
+            onPress={() => {
+              setManageOpen(false);
+              void getClaimCode();
+            }}
+          />
+        ) : null}
+        <View style={styles.endAction}>
           <TextButton
             testID="trainer-client-end-link"
             label={ending ? 'Ending…' : 'End Trainer Link'}
@@ -401,8 +401,46 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
             disabled={ending}
             onPress={confirmEnd}
           />
-        </>
-      ) : null}
+        </View>
+      </BottomSheet>
     </Screen>
   );
 }
+
+const styles = {
+  identity: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  identityInitial: {
+    ...typeScale.screenTitle,
+    color: colors.textSecondary,
+  },
+  identityBody: {
+    flex: 1,
+  },
+  name: {
+    ...typeScale.screenTitle,
+    color: colors.textPrimary,
+  },
+  status: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  stats: {
+    flexDirection: 'row' as const,
+    gap: widgetGap,
+    marginBottom: spacing.md,
+  },
+  empty: {
+    ...typeScale.secondary,
+    color: colors.textMuted,
+  },
+  endAction: {
+    marginTop: spacing.md,
+    alignItems: 'flex-start' as const,
+  },
+};

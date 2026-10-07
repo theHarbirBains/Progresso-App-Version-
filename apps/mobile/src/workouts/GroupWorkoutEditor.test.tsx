@@ -20,6 +20,10 @@ jest.mock('./ExercisePickerModal', () => ({
   ExercisePickerModal: () => null,
 }));
 
+jest.mock('../screens/ExerciseFormScreen', () => ({
+  ExerciseFormScreen: () => null,
+}));
+
 jest.mock('../progress/useProgressTheme', () => ({
   useProgressTheme: () => ({ weightUnit: 'kg', theme: { accent: '#3DDC97', onAccent: '#000000' } }),
 }));
@@ -121,5 +125,11 @@ describe('GroupWorkoutEditor', () => {
     await waitFor(() => expect(mockRemove).toHaveBeenCalledTimes(2));
     expect(mockRemove).toHaveBeenCalledWith('w-me-we-1');
     expect(mockRemove).toHaveBeenCalledWith('w-sam-we-1');
+  });
+
+  it('lets anyone create a custom exercise, from the editor', async () => {
+    renderEditor();
+
+    expect(await screen.findByTestId('group-workout-create-custom')).toBeTruthy();
   });
 });

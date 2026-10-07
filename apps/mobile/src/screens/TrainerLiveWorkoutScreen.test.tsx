@@ -7,18 +7,24 @@ jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('../progress/useProgressTheme', () => ({
+  useProgressTheme: () => ({ theme: { accent: '#3DDC97', onAccent: '#000000' }, weightUnit: 'kg' }),
+}));
+
 jest.mock('../lib/api', () => ({
   cancelLiveWorkout: jest.fn(),
   finishLiveWorkout: jest.fn(),
   resolveClientExercise: jest.fn(),
 }));
 
-jest.mock('../workouts/LiveWorkoutEditor', () => {
+jest.mock('../workouts/GroupWorkoutEditor', () => {
   const { Text } = jest.requireActual('react-native');
   return {
-    LiveWorkoutEditor: jest.fn(({ workoutId, userId }: { workoutId: string; userId: string }) => (
-      <Text testID="live-editor">{`${workoutId} by ${userId}`}</Text>
-    )),
+    GroupWorkoutEditor: jest.fn(
+      ({ members, userId }: { members: { workoutId: string }[]; userId: string }) => (
+        <Text testID="live-editor">{`${members[0].workoutId} by ${userId}`}</Text>
+      ),
+    ),
   };
 });
 
@@ -72,8 +78,8 @@ describe('TrainerLiveWorkoutScreen', () => {
   });
 
   it('exposes the resolve step to the editor, so picked exercises become the client’s copies', async () => {
-    const { LiveWorkoutEditor } = jest.requireMock('../workouts/LiveWorkoutEditor') as {
-      LiveWorkoutEditor: jest.Mock;
+    const { GroupWorkoutEditor } = jest.requireMock('../workouts/GroupWorkoutEditor') as {
+      GroupWorkoutEditor: jest.Mock;
     };
     render(
       <TrainerLiveWorkoutScreen
@@ -81,7 +87,7 @@ describe('TrainerLiveWorkoutScreen', () => {
         route={{ params: { workoutId: 'w9', clientId: 'c1' } } as never}
       />,
     );
-    const props = LiveWorkoutEditor.mock.calls.at(-1)?.[0] as {
+    const props = GroupWorkoutEditor.mock.calls.at(-1)?.[0] as {
       resolveExerciseId: (id: string) => Promise<string>;
     };
     await expect(props.resolveExerciseId('trainer-ex')).resolves.toBe('client-copy-1');

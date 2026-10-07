@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Modal, StyleSheet, View } from 'react-native';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { Text } from '../design/Text';
@@ -11,6 +11,14 @@ import { computeTotalSets } from './workoutSummary';
 import { WorkoutStats } from './WorkoutStats';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { AddExerciseButton } from './AddExerciseButton';
+import { CreateCustomExerciseButton } from './CreateCustomExerciseButton';
+import { ExerciseFormScreen } from '../screens/ExerciseFormScreen';
+import {
+  loadLiveWorkoutDraft,
+  mergeLiveWorkoutDrafts,
+  pendingDraftsFor,
+  saveLiveWorkoutDraft,
+} from './liveWorkoutDraft';
 import { ExerciseCard, type PreviousSessionDisplay } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
 import {
@@ -40,6 +48,11 @@ export interface GroupWorkoutMember {
 
 interface Props {
   members: GroupWorkoutMember[];
+  /**
+   * Turns a picked exercise into the one this workout should use. A trainer's live session
+   * needs the client's copy of the trainer's own exercises. Groups do not pass it.
+   */
+  resolveExerciseId?: (exerciseId: string) => Promise<string>;
   /** When the group started: the stats strip counts the workout from here, as Active Workout does. */
   startedAt: string;
   /** The signed-in person: their tab reads "You", and their exercise library is the picker's. */
@@ -57,6 +70,7 @@ interface Props {
  */
 export function GroupWorkoutEditor({
   members,
+  resolveExerciseId,
   startedAt,
   userId,
   accentColor,
@@ -73,6 +87,7 @@ export function GroupWorkoutEditor({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
 
   const memberKey = members.map((m) => `${m.userId}:${m.workoutId}`).join('|');
 
@@ -80,18 +95,29 @@ export function GroupWorkoutEditor({
   const loadMember = useCallback(
     async (member: GroupWorkoutMember) => {
       const detail = await fetchWorkoutDetail(member.workoutId);
+      // Values typed into open sets before the app closed or crashed are read back here.
+      const drafts = await loadLiveWorkoutDraft(member.workoutId);
       setDetails((prev) => ({ ...prev, [member.userId]: detail }));
+      const openSetIds = new Set(
+        detail.exercises.flatMap((ex) =>
+          ex.sets.filter((set) => set.completedAt === null).map((set) => set.id),
+        ),
+      );
+      const saved: Record<string, SetInputDraft> = {};
+      for (const exercise of detail.exercises) {
+        for (const set of exercise.sets) {
+          saved[set.id] = {
+            weight: set.weightKg !== null ? formatWeightKg(set.weightKg, weightUnit) : '',
+            reps: set.reps !== null ? String(set.reps) : '',
+          };
+        }
+      }
+      const merged = mergeLiveWorkoutDrafts(saved, drafts, openSetIds);
       setSetInputs((prev) => {
         const next = { ...prev };
-        for (const exercise of detail.exercises) {
-          for (const set of exercise.sets) {
-            if (set.completedAt !== null || next[set.id] === undefined) {
-              next[set.id] = {
-                weight: set.weightKg !== null ? formatWeightKg(set.weightKg, weightUnit) : '',
-                reps: set.reps !== null ? String(set.reps) : '',
-              };
-            }
-          }
+        for (const [setId, value] of Object.entries(merged)) {
+          // Saved sets always take the server's value; an open set keeps what is typed in it now.
+          if (!openSetIds.has(setId) || next[setId] === undefined) next[setId] = value;
         }
         return next;
       });
@@ -227,13 +253,30 @@ export function GroupWorkoutEditor({
     };
   }, [selectedMember, selectedExerciseIds]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      for (const member of members) {
+        const detail = details[member.userId];
+        if (!detail) continue;
+        const openSetIds = new Set(
+          detail.exercises.flatMap((ex) =>
+            ex.sets.filter((set) => set.completedAt === null).map((set) => set.id),
+          ),
+        );
+        void saveLiveWorkoutDraft(member.workoutId, pendingDraftsFor(setInputs, openSetIds));
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [setInputs, details, members]);
+
   async function addExercise(exercise: ExerciseRow) {
     setPickerOpen(false);
     await change(async () => {
       for (const member of members) {
         const detail = details[member.userId];
         if (!detail) continue;
-        await addToWorkout(member.workoutId, exercise.id, exercise.movementType, detail);
+        const exerciseId = resolveExerciseId ? await resolveExerciseId(exercise.id) : exercise.id;
+        await addToWorkout(member.workoutId, exerciseId, exercise.movementType, detail);
       }
     });
   }
@@ -332,13 +375,15 @@ export function GroupWorkoutEditor({
 
   return (
     <View testID={testID} style={styles.root}>
-      <UnderlineTabs
-        categories={tabs}
-        active={selected?.userId ?? userId}
-        onSelect={setSelectedId}
-        accentColor={accentColor}
-        testID={`${testID}-tabs`}
-      />
+      {members.length > 1 ? (
+        <UnderlineTabs
+          categories={tabs}
+          active={selected?.userId ?? userId}
+          onSelect={setSelectedId}
+          accentColor={accentColor}
+          testID={`${testID}-tabs`}
+        />
+      ) : null}
 
       <WorkoutStats
         testID={`${testID}-summary`}
@@ -417,6 +462,10 @@ export function GroupWorkoutEditor({
       })}
 
       <AddExerciseButton testID={`${testID}-add-exercise`} onPress={() => setPickerOpen(true)} />
+      <CreateCustomExerciseButton
+        testID={`${testID}-create-custom`}
+        onPress={() => setCustomOpen(true)}
+      />
 
       <ExercisePickerModal
         visible={pickerOpen}
@@ -424,10 +473,25 @@ export function GroupWorkoutEditor({
         onSelect={(exercise) => void addExercise(exercise)}
         userId={userId}
         alreadyAddedIds={exercises.map((ex) => ex.exerciseId)}
-        onCreateCustom={() => setPickerOpen(false)}
+        onCreateCustom={() => {
+          setPickerOpen(false);
+          setCustomOpen(true);
+        }}
         accentColor={accentColor}
         onAccentColor={onAccentColor}
       />
+      <Modal visible={customOpen} animationType="slide" onRequestClose={() => setCustomOpen(false)}>
+        <ExerciseFormScreen
+          mode="create"
+          accentColor={accentColor}
+          onAccentColor={onAccentColor}
+          onDone={() => {
+            setCustomOpen(false);
+            setPickerOpen(true);
+          }}
+          onCancel={() => setCustomOpen(false)}
+        />
+      </Modal>
     </View>
   );
 }

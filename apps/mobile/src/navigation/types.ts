@@ -34,7 +34,8 @@ export type RootStackParamList = {
   /** Working out as a group: pick who is training, the workout, then start. */
   GroupStart: undefined;
   /** A live session a trainer runs for a client, finished by the trainer. */
-  TrainerLiveWorkout: { workoutId: string; clientId: string; clientName?: string };
+  /** startedAt is when the session began, so its stats count from then. */
+  TrainerLiveWorkout: { workoutId: string; clientId: string; clientName?: string; startedAt?: string };
   /** The one-time code a trainer gets for a client they track before that client has an account. */
   TrainerClaimCode: { code: string; clientId: string; clientName?: string };
   /** The client's side: enter the code a trainer gave them to move their tracked history onto their account. */
