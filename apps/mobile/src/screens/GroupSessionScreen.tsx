@@ -24,14 +24,14 @@ import {
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { LiveWorkoutEditor } from '../workouts/LiveWorkoutEditor';
+import { GroupWorkoutEditor } from '../workouts/GroupWorkoutEditor';
 import { fetchWorkoutSplitDetail, type WorkoutSplitDay } from '../workouts/workoutSplitQueries';
 
 type Props = RootStackScreenProps<'GroupSession'>;
 
 /**
- * One group session. Every joined member's workout is shown with an editor, so anyone
- * in the group can enter and change sets and exercises. Each person picks which day of
+ * One group session. The group's live workout is one editor with a tab per member; the
+ * exercises are shared by everyone, and each tab holds that person's own sets. Each person picks which day of
  * their own split their workout is. Friends are invited by username, a trainer brings
  * in their clients from a separate list, and guests are added by name.
  */
@@ -216,23 +216,25 @@ export function GroupSessionScreen({ navigation, route }: Props) {
             </AppCard>
           ) : null}
 
-          {joined.map((member) => (
-            <AppCard key={member.userId} testID={`group-member-${member.userId}`}>
-              <SectionHeader
-                label={`${member.displayName ?? 'Member'}${member.isGuest ? ' · guest' : ''}${member.role === 'host' ? ' · host' : ''}`}
-              />
-              {member.workoutName ? <Text style={styles.muted}>{member.workoutName}</Text> : null}
-              {member.workoutId ? (
-                <LiveWorkoutEditor
-                  workoutId={member.workoutId}
-                  userId={userId}
-                  accentColor={theme.accent}
-                  onAccentColor={theme.onAccent}
-                  testID={`group-workout-${member.userId}`}
-                />
-              ) : null}
-            </AppCard>
-          ))}
+          {isLive ? (
+            <GroupWorkoutEditor
+              members={joined.flatMap((member) =>
+                member.workoutId
+                  ? [
+                      {
+                        userId: member.userId,
+                        displayName: member.displayName,
+                        workoutId: member.workoutId,
+                      },
+                    ]
+                  : [],
+              )}
+              userId={userId}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+              testID="group-workout"
+            />
+          ) : null}
 
           {invited.length > 0 ? (
             <AppCard testID="group-session-invited">

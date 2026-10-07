@@ -44,13 +44,17 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
   })),
 }));
 
-// The per-member editor is covered on its own; here it is a marker per workout.
-jest.mock('../workouts/LiveWorkoutEditor', () => {
+// The group editor is covered on its own; here it is a marker listing the workouts it was given.
+jest.mock('../workouts/GroupWorkoutEditor', () => {
   const { Text } = jest.requireActual('react-native');
   return {
-    LiveWorkoutEditor: ({ workoutId, testID }: { workoutId: string; testID: string }) => (
-      <Text testID={testID}>editor {workoutId}</Text>
-    ),
+    GroupWorkoutEditor: ({
+      members,
+      testID,
+    }: {
+      members: { workoutId: string }[];
+      testID: string;
+    }) => <Text testID={testID}>editor {members.map((m) => m.workoutId).join(',')}</Text>,
   };
 });
 
@@ -130,11 +134,11 @@ beforeEach(() => {
 });
 
 describe('GroupSessionScreen', () => {
-  it('shows every joined member’s workout to edit, and the invited people as waiting', async () => {
+  it('gives the live workout every joined member’s workout, and shows the invited people as waiting', async () => {
     renderScreen();
 
-    expect(await screen.findByTestId('group-workout-me')).toHaveTextContent('editor w-me');
-    expect(screen.getByTestId('group-workout-pat')).toHaveTextContent('editor w-pat');
+    expect(await screen.findByTestId('group-workout')).toHaveTextContent(/w-me/);
+    expect(screen.getByTestId('group-workout')).toHaveTextContent(/w-pat/);
     expect(screen.getByTestId('group-session-invited')).toHaveTextContent(/Jo/);
   });
 
