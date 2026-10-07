@@ -291,6 +291,24 @@ describe('GroupsService', () => {
       );
       expect(member?.args[0]).toEqual({ status: 'left' });
     });
+
+    it('cancelling discards the workout rather than counting it, and leaves the group', async () => {
+      const { mock, service } = setup();
+      mock.queue('workout_group_members', joined(MEMBER), ok());
+      mock.queue('workout_groups', ok({ status: 'live' }));
+      mock.queue('workouts', ok());
+      mock.queue('workout_group_members', ok());
+
+      await service.cancel(MEMBER, GROUP);
+
+      const discard = mock.calls.find((c) => c.target === 'workouts' && c.method === 'update');
+      expect(discard?.args[0]).toMatchObject({ deleted_at: expect.any(String) });
+      expect(discard?.args[0]).not.toHaveProperty('completed_at');
+      const left = mock.calls.filter(
+        (c) => c.target === 'workout_group_members' && c.method === 'update',
+      );
+      expect(left.at(-1)?.args[0]).toEqual({ status: 'left' });
+    });
   });
 });
 

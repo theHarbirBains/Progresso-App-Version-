@@ -456,6 +456,37 @@ export class GroupsService {
   }
 
   /**
+   * Cancels the caller's workout in the group. It is discarded, never counted in history.
+   * A member then leaves the group. The host ends the group for everyone instead, so it is
+   * never left without one.
+   */
+  async cancel(userId: string, groupId: string): Promise<void> {
+    const member = await this.requireJoined(userId, groupId);
+    await this.requireLive(groupId);
+    const client = this.supabaseService.getClient();
+    const now = new Date().toISOString();
+
+    const { error } = await client
+      .from('workouts')
+      .update({ deleted_at: now })
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .is('completed_at', null)
+      .is('deleted_at', null);
+    if (error) throw new InternalServerErrorException('Failed to cancel your workout');
+
+    if (member.role === 'host') {
+      await this.finish(userId, groupId);
+      return;
+    }
+    const { error: leaveError } = await client
+      .from('workout_group_members')
+      .update({ status: 'left' })
+      .eq('id', member.id);
+    if (leaveError) throw new InternalServerErrorException('Failed to leave the group');
+  }
+
+  /**
    * Adds one of the caller's active clients. A tracked client (one with no account of
    * their own) joins straight away, because the trainer is bringing them. A client with
    * an account is invited and accepts, as anyone else does.

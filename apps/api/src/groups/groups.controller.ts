@@ -67,6 +67,14 @@ export class GroupsController {
     return { ok: true };
   }
 
+  /** Discards the caller's workout in the group: not history. A member leaves; the host ends the group. */
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post(':id/cancel')
+  async cancel(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    await this.groupsService.cancel(user.id, id);
+    return { ok: true };
+  }
+
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Post(':id/leave')
   async leave(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
