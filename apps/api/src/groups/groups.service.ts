@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -647,7 +648,12 @@ export class GroupsService {
         group_id: groupId,
         workout_split_day_id: splitDayId ?? null,
       });
-    if (error) throw new InternalServerErrorException('Failed to create the workout');
+    if (error) {
+      if (/duplicate key|unique/i.test(error.message)) {
+        throw new ConflictException('You already have a live workout. Finish or cancel it first.');
+      }
+      throw new InternalServerErrorException('Failed to create the workout');
+    }
   }
 
   private async loadGroupName(groupId: string): Promise<string> {

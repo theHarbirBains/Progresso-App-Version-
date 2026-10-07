@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -828,7 +829,9 @@ export class TrainerService {
       .single();
     if (error) {
       if (/duplicate key|unique/i.test(error.message)) {
-        throw new BadRequestException('A live session for this client is already open');
+        throw new ConflictException(
+          'This client already has a live workout. Finish or cancel it first.',
+        );
       }
       throw new InternalServerErrorException('Failed to start the live session');
     }
