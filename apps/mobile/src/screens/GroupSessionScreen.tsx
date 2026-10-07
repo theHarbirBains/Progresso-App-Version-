@@ -10,7 +10,13 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
-import { finishGroup, getGroup, leaveGroup, type GroupDetail } from '../lib/api';
+import {
+  cancelGroupWorkout,
+  finishGroup,
+  getGroup,
+  leaveGroup,
+  type GroupDetail,
+} from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
@@ -75,6 +81,28 @@ export function GroupSessionScreen({ navigation, route }: Props) {
           ),
       },
     ]);
+  }
+
+  // Discards the caller's workout, so it is never kept in history. The host ending it ends the group for everyone.
+  function cancel() {
+    if (!accessToken) return;
+    Alert.alert(
+      'Cancel your workout?',
+      isHost
+        ? 'Your workout is discarded and the group ends for everyone. This cannot be undone.'
+        : 'Your workout is discarded and you leave the group. This cannot be undone.',
+      [
+        { text: 'Keep going', style: 'cancel' },
+        {
+          text: 'Cancel workout',
+          style: 'destructive',
+          onPress: () =>
+            void run(() => cancelGroupWorkout(accessToken, groupId), 'Could not cancel').then(() =>
+              navigation.goBack(),
+            ),
+        },
+      ],
+    );
   }
 
   function leave() {
@@ -178,12 +206,13 @@ export function GroupSessionScreen({ navigation, route }: Props) {
         <View style={styles.footer}>
           <PrimaryButton
             testID="group-finish"
-            label={busy ? 'Finishing…' : 'Finish Group'}
+            label={busy ? 'Finishing…' : 'Finish Group Workout'}
             onPress={finish}
             disabled={busy}
             accentColor={theme.accent}
             onAccentColor={theme.onAccent}
           />
+          <TextButton testID="group-cancel" label="Cancel Workout" destructive onPress={cancel} />
         </View>
       ) : null}
     </Screen>

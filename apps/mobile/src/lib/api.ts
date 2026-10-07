@@ -860,6 +860,11 @@ export function getGroup(accessToken: string, groupId: string): Promise<GroupDet
   return request<GroupDetail>(`/api/v1/groups/${encodeURIComponent(groupId)}`, accessToken);
 }
 
+/** Discards the caller's workout in the group, so it never counts in history. A member leaves; the host ends the group for everyone. */
+export function cancelGroupWorkout(accessToken: string, groupId: string): Promise<{ ok: true }> {
+  return request(`/api/v1/groups/${encodeURIComponent(groupId)}/cancel`, accessToken, { method: 'POST' });
+}
+
 export function respondToGroupInvite(
   accessToken: string,
   groupId: string,
