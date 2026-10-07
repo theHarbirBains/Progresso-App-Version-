@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Avatar } from '../design/Avatar';
@@ -33,6 +34,8 @@ interface Props {
   timestamp: string;
   weightUnit: 'kg' | 'lb';
   onPress?: () => void;
+  /** Extra actions shown under the card, e.g. a trainer's Edit and Delete. Feed passes none. */
+  actions?: ReactNode;
 }
 
 /**
@@ -48,6 +51,7 @@ export function WorkoutFeedCard({
   timestamp,
   weightUnit,
   onPress,
+  actions,
 }: Props) {
   return (
     <Card testID={`${idPrefix}-${workout.id}`} onPress={onPress}>
@@ -104,6 +108,7 @@ export function WorkoutFeedCard({
         topSets={workout.topSets}
         weightUnit={weightUnit}
       />
+      {actions}
     </Card>
   );
 }

@@ -21,6 +21,10 @@ jest.mock('../trainer/clientQueries', () => ({
   fetchOpenLiveSession: jest.fn(async () => null),
 }));
 
+jest.mock('../workouts/workoutQueries', () => ({
+  deleteWorkout: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('../progress/useProgressTheme', () => ({
   useProgressTheme: () => ({ weightUnit: 'kg', theme: { accent: '#3DDC97', onAccent: '#000000' } }),
 }));
@@ -34,7 +38,11 @@ const mockFetchRecords = fetchClientPersonalRecords as jest.Mock;
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { navigate: mockNavigate, goBack: mockGoBack };
+const navigation: any = {
+  navigate: mockNavigate,
+  goBack: mockGoBack,
+  addListener: jest.fn(() => () => undefined),
+};
 
 const client = {
   clientId: 'client-1',
@@ -207,5 +215,44 @@ describe('TrainerClientDetailScreen', () => {
 
     expect(await screen.findByTestId('trainer-client-detail-gone')).toBeTruthy();
     await waitFor(() => expect(mockFetchWorkouts).not.toHaveBeenCalled());
+  });
+
+  it('edits one of this client workouts, as the trainer', async () => {
+    renderDetail();
+
+    fireEvent.press(await screen.findByTestId('trainer-client-workout-w1-edit'));
+    expect(mockNavigate).toHaveBeenCalledWith('EditWorkout', {
+      workoutId: 'w1',
+      clientId: 'client-1',
+      clientName: 'Sam',
+    });
+  });
+
+  it('deletes one of this client workouts once the trainer confirms, and removes it from the list', async () => {
+    const { Alert } = jest.requireActual('react-native');
+    const { deleteWorkout } = jest.requireMock('../workouts/workoutQueries') as {
+      deleteWorkout: jest.Mock;
+    };
+    const alert = jest.spyOn(Alert, 'alert');
+    renderDetail();
+
+    fireEvent.press(await screen.findByTestId('trainer-client-workout-w1-delete'));
+    expect(deleteWorkout).not.toHaveBeenCalled();
+    const buttons = (alert.mock.calls[0][2] ?? []) as { text?: string; onPress?: () => void }[];
+    buttons.find((button) => button.text === 'Delete')?.onPress?.();
+
+    await waitFor(() => expect(deleteWorkout).toHaveBeenCalledWith('w1'));
+    await waitFor(() => expect(screen.queryByTestId('trainer-client-workout-w1')).toBeNull());
+    alert.mockRestore();
+  });
+
+  it('logs a past workout for the client from their Workouts tab', async () => {
+    renderDetail();
+
+    fireEvent.press(await screen.findByTestId('trainer-client-log-past'));
+    expect(mockNavigate).toHaveBeenCalledWith('TrainerLogWorkout', {
+      clientId: 'client-1',
+      clientName: 'Sam',
+    });
   });
 });

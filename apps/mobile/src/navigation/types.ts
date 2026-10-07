@@ -12,7 +12,8 @@ export type RootStackParamList = {
   ExerciseLibrary: undefined;
   WorkoutHistory: undefined;
   WorkoutDetail: { workoutId: string };
-  EditWorkout: { workoutId: string };
+  /** clientId is set when a trainer edits one of a client's workouts. */
+  EditWorkout: { workoutId: string; clientId?: string; clientName?: string };
   ShareWorkout: { workoutId: string };
   NewWorkout: undefined;
   ActiveWorkout: { workoutId: string };
@@ -35,7 +36,12 @@ export type RootStackParamList = {
   GroupStart: undefined;
   /** A live session a trainer runs for a client, finished by the trainer. */
   /** startedAt is when the session began, so its stats count from then. */
-  TrainerLiveWorkout: { workoutId: string; clientId: string; clientName?: string; startedAt?: string };
+  TrainerLiveWorkout: {
+    workoutId: string;
+    clientId: string;
+    clientName?: string;
+    startedAt?: string;
+  };
   /** The one-time code a trainer gets for a client they track before that client has an account. */
   TrainerClaimCode: { code: string; clientId: string; clientName?: string };
   /** The client's side: enter the code a trainer gave them to move their tracked history onto their account. */

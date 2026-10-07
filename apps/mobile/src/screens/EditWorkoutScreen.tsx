@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
+import { resolveClientExercise } from '../lib/api';
 import { AppHeader } from '../design/AppHeader';
 import { BottomSheet } from '../design/BottomSheet';
-import { PrimaryButton, SecondaryButton } from '../design/Button';
+import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { addMonths, toLocalDateKey } from '../design/calendarGrid';
 import { colors } from '../design/theme';
 import { ListRow } from '../design/ListRow';
@@ -30,6 +31,7 @@ import {
   addExerciseToWorkout,
   createSet,
   deleteSet,
+  deleteWorkout,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
   updateSet,
@@ -124,8 +126,8 @@ function dateKeyToLocalDate(dateKey: string): Date {
  * assumes PR state itself.
  */
 export function EditWorkoutScreen({ navigation, route }: Props) {
-  const { workoutId } = route.params;
-  const { user } = useAuth();
+  const { workoutId, clientId } = route.params;
+  const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
@@ -308,6 +310,28 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
     setDatePickerOpen(false);
   }
 
+  // A trainer removes a client's workout. It is cancelled, never logged, and the client's history drops it.
+  function confirmDeleteWorkout() {
+    Alert.alert(
+      'Delete this workout?',
+      'It will be removed from the client’s history. This cannot be undone.',
+      [
+        { text: 'Keep it', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteWorkout(workoutId)
+              .then(() => navigation.goBack())
+              .catch((err: unknown) =>
+                setError(err instanceof Error ? err.message : 'Could not delete the workout'),
+              );
+          },
+        },
+      ],
+    );
+  }
+
   async function handleSave() {
     if (!userId || saving || !original) return;
     setError(null);
@@ -384,11 +408,13 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
 
         let workoutExerciseId = exercise.id;
         if (workoutExerciseId === null) {
-          workoutExerciseId = await addExerciseToWorkout(
-            workoutId,
-            exercise.exerciseId,
-            nextOrderIndex,
-          );
+          // A trainer editing a client's workout adds the client's copy of the exercise.
+          const exerciseId =
+            clientId && session?.access_token
+              ? (await resolveClientExercise(session.access_token, clientId, exercise.exerciseId))
+                  .exerciseId
+              : exercise.exerciseId;
+          workoutExerciseId = await addExerciseToWorkout(workoutId, exerciseId, nextOrderIndex);
           nextOrderIndex += 1;
         }
 
@@ -647,6 +673,14 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
             accentColor={theme.accent}
             onAccentColor={theme.onAccent}
           />
+          {clientId ? (
+            <TextButton
+              testID="edit-workout-delete"
+              label="Delete Workout"
+              destructive
+              onPress={confirmDeleteWorkout}
+            />
+          ) : null}
         </View>
       </Screen>
 

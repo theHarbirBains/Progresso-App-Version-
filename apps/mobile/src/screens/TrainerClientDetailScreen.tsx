@@ -15,6 +15,7 @@ import { SectionHeader } from '../design/SectionHeader';
 import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
 import { UnderlineTabs } from '../design/UnderlineTabs';
+import { deleteWorkout } from '../workouts/workoutQueries';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
 import {
@@ -112,6 +113,39 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Coming back from editing or logging a workout shows the change straight away.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => void load());
+    return unsubscribe;
+  }, [navigation, load]);
+
+  function confirmDeleteWorkout(workout: EnrichedWorkoutSummary) {
+    Alert.alert(
+      'Delete this workout?',
+      `“${workout.name}” will be removed from the client’s history. This cannot be undone.`,
+      [
+        { text: 'Keep it', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteWorkout(workout.id)
+              .then(() =>
+                setData((prev) =>
+                  prev
+                    ? { ...prev, workouts: prev.workouts.filter((w) => w.id !== workout.id) }
+                    : prev,
+                ),
+              )
+              .catch((err: unknown) =>
+                Alert.alert('Could not delete', err instanceof Error ? err.message : 'Try again'),
+              );
+          },
+        },
+      ],
+    );
+  }
 
   async function loadMore() {
     if (loadingMore || !data) return;
@@ -308,6 +342,13 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
 
           {tab === 'workouts' ? (
             <>
+              <SecondaryButton
+                testID="trainer-client-log-past"
+                label="Log Past Workout"
+                onPress={() =>
+                  navigation.navigate('TrainerLogWorkout', { clientId, clientName: title })
+                }
+              />
               {data?.workouts.length === 0 ? (
                 <AppCard testID="trainer-client-no-workouts">
                   <Text style={styles.empty}>No finished workouts yet.</Text>
@@ -321,6 +362,28 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                   authorName={title}
                   timestamp={workout.performedAt}
                   weightUnit={CLIENT_WEIGHT_UNIT}
+                  actions={
+                    <View style={styles.workoutActions}>
+                      <SecondaryButton
+                        testID={`trainer-client-workout-${workout.id}-edit`}
+                        label="Edit"
+                        size="sm"
+                        onPress={() =>
+                          navigation.navigate('EditWorkout', {
+                            workoutId: workout.id,
+                            clientId,
+                            clientName: title,
+                          })
+                        }
+                      />
+                      <TextButton
+                        testID={`trainer-client-workout-${workout.id}-delete`}
+                        label="Delete"
+                        destructive
+                        onPress={() => confirmDeleteWorkout(workout)}
+                      />
+                    </View>
+                  }
                 />
               ))}
               {data?.hasMore ? (
@@ -408,6 +471,12 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
 }
 
 const styles = {
+  workoutActions: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
   identity: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,

@@ -341,6 +341,19 @@ export async function createLoggedWorkout(
  * workout's sets, so correctness here is entirely the database's job, not
  * this function's.
  */
+/**
+ * Cancels a workout by soft-deleting it. It is never logged afterwards, and the PR
+ * triggers re-derive any records its sets held.
+ */
+export async function deleteWorkout(workoutId: string): Promise<void> {
+  const { error } = await supabase
+    .from('workouts')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', workoutId)
+    .is('deleted_at', null);
+  if (error) throw new Error(error.message);
+}
+
 export async function updateWorkout(
   workoutId: string,
   updates: { name?: string; performedAt?: string; completedAt?: string },
