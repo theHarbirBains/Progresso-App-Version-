@@ -86,20 +86,36 @@ beforeEach(() => {
   mockReplace.mockClear();
 });
 
+/** Step one: who is working out today, then on to the workout. */
+async function continueToWorkout() {
+  fireEvent.press(await screen.findByTestId('group-start-continue'));
+}
+
 describe('GroupStartScreen', () => {
+  it('asks who is working out today before the workout', async () => {
+    render(<GroupStartScreen navigation={navigation} route={{} as never} />);
+
+    expect(await screen.findByTestId('group-start-people')).toHaveTextContent(
+      /Who's working out today/,
+    );
+    expect(screen.queryByTestId('group-start-split')).toBeNull();
+  });
+
   it('keeps Start disabled until a workout is chosen', async () => {
     render(<GroupStartScreen navigation={navigation} route={{} as never} />);
 
-    await screen.findByTestId('group-start-friend-f1');
+    await continueToWorkout();
+    expect(screen.getByTestId('group-start-submit')).toBeDisabled();
     fireEvent.press(screen.getByTestId('group-start-submit'));
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it('starts a group on a day of the split, with a friend and a client in it', async () => {
+  it('starts a split day, with a friend and a client in the group', async () => {
     render(<GroupStartScreen navigation={navigation} route={{} as never} />);
 
     fireEvent.press(await screen.findByTestId('group-start-friend-f1'));
     fireEvent.press(screen.getByTestId('group-start-client-c1'));
+    await continueToWorkout();
     fireEvent.press(screen.getByTestId('group-start-day-day-2'));
     fireEvent.press(screen.getByTestId('group-start-submit'));
 
@@ -111,13 +127,14 @@ describe('GroupStartScreen', () => {
     expect(mockClient).toHaveBeenCalledWith('token-1', 'g9', 'c1');
   });
 
-  it('adds a guest by name, and starts a workout outside the split by its own name', async () => {
+  it('creates an own workout by name, with a guest added by name', async () => {
     render(<GroupStartScreen navigation={navigation} route={{} as never} />);
 
     fireEvent.changeText(await screen.findByTestId('group-start-guest-name'), 'Alex');
     fireEvent.press(screen.getByTestId('group-start-guest-add'));
-    fireEvent.press(screen.getByTestId('group-start-outside'));
-    fireEvent.changeText(screen.getByTestId('group-start-outside-name'), 'Arms and abs');
+    await continueToWorkout();
+    fireEvent.press(screen.getByTestId('group-start-own'));
+    fireEvent.changeText(screen.getByTestId('group-start-own-name'), 'Arms and abs');
     fireEvent.press(screen.getByTestId('group-start-submit'));
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalled());
@@ -126,5 +143,16 @@ describe('GroupStartScreen', () => {
       workoutName: 'Arms and abs',
     });
     expect(mockGuest).toHaveBeenCalledWith('token-1', 'g9', 'Alex');
+  });
+
+  it('goes back to change who is training, keeping the picks', async () => {
+    render(<GroupStartScreen navigation={navigation} route={{} as never} />);
+
+    fireEvent.press(await screen.findByTestId('group-start-friend-f1'));
+    await continueToWorkout();
+    fireEvent.press(screen.getByTestId('group-start-back-people'));
+
+    expect(await screen.findByTestId('group-start-people')).toBeTruthy();
+    expect(screen.getByTestId('group-start-friend-f1')).toBeTruthy();
   });
 });

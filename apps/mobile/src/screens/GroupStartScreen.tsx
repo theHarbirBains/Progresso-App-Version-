@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { PrimaryButton, SecondaryButton } from '../design/Button';
+import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
@@ -31,12 +31,17 @@ import { fetchWorkoutSplitDetail, type WorkoutSplitDay } from '../workouts/worko
 
 type Props = RootStackScreenProps<'GroupStart'>;
 
-const OUTSIDE = 'outside';
+/** The two steps: who is working out today, then which workout they are doing. */
+type Step = 'people' | 'workout';
+
+/** The workout choice for "create my own"; any other value is a split day's id. */
+const OWN = 'own';
 
 /**
- * Working out as a group, in three steps: who is training, which workout, then start.
- * Friends and clients are added to the group straight away; a guest is added by name
- * and needs no account.
+ * Working out as a group, opened from Start Workout. Step one asks who is working out
+ * today (friends, the trainer's clients, or guests by name). Step two is the workout:
+ * create their own with a name, or choose a day from their own split. Friends and
+ * clients join the group straight away; a guest needs no account.
  */
 export function GroupStartScreen({ navigation }: Props) {
   const { session } = useAuth();
@@ -49,13 +54,14 @@ export function GroupStartScreen({ navigation }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [step, setStep] = useState<Step>('people');
   const [pickedFriends, setPickedFriends] = useState<Set<string>>(new Set());
   const [pickedClients, setPickedClients] = useState<Set<string>>(new Set());
   const [guests, setGuests] = useState<string[]>([]);
   const [guestName, setGuestName] = useState('');
 
   const [workout, setWorkout] = useState<string | null>(null);
-  const [outsideName, setOutsideName] = useState('');
+  const [ownName, setOwnName] = useState('');
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
@@ -101,7 +107,7 @@ export function GroupStartScreen({ navigation }: Props) {
   const pickableClientList = useMemo(() => pickableClients(clients, new Set()), [clients]);
   const selectedCount = pickedFriends.size + pickedClients.size + guests.length;
   const workoutName =
-    workout === OUTSIDE ? outsideName.trim() : (days.find((d) => d.id === workout)?.name ?? '');
+    workout === OWN ? ownName.trim() : (days.find((d) => d.id === workout)?.name ?? '');
   const canStart = workout !== null && workoutName !== '' && !starting;
 
   function toggle(set: Set<string>, id: string, update: (next: Set<string>) => void) {
@@ -124,7 +130,7 @@ export function GroupStartScreen({ navigation }: Props) {
     setError(null);
     try {
       const { groupId } =
-        workout === OUTSIDE
+        workout === OWN
           ? await createGroup(accessToken, { name: workoutName, workoutName })
           : await createGroup(accessToken, { name: workoutName, splitDayId: workout as string });
 
@@ -172,6 +178,11 @@ export function GroupStartScreen({ navigation }: Props) {
     />
   );
 
+  const summary =
+    selectedCount === 0
+      ? 'Just you'
+      : `You and ${selectedCount} ${selectedCount === 1 ? 'other' : 'others'}`;
+
   return (
     <Screen
       scrollTestID="group-start-scroll"
@@ -179,8 +190,8 @@ export function GroupStartScreen({ navigation }: Props) {
       header={
         <AppHeader
           title="Working Out as a Group"
-          subtitle="Pick who, pick the workout, then start"
-          onBack={() => navigation.goBack()}
+          subtitle={step === 'people' ? "Who's working out today?" : 'What are you doing?'}
+          onBack={() => (step === 'workout' ? setStep('people') : navigation.goBack())}
           testID="group-start-header"
         />
       }
@@ -188,10 +199,10 @@ export function GroupStartScreen({ navigation }: Props) {
       {error ? <ErrorState testID="group-start-error" message={error} /> : null}
       {!loaded ? <LoadingState testID="group-start-loading" /> : null}
 
-      {loaded ? (
+      {loaded && step === 'people' ? (
         <>
           <AppCard testID="group-start-people">
-            <SectionHeader label="1 · Who is training" />
+            <SectionHeader label="Who's working out today?" />
 
             {friends.length > 0 ? <Text style={styles.group}>Friends</Text> : null}
             {friends.map((friend) => (
@@ -247,8 +258,44 @@ export function GroupStartScreen({ navigation }: Props) {
             </View>
           </AppCard>
 
+          <Text style={styles.summary}>{summary}</Text>
+          <PrimaryButton
+            testID="group-start-continue"
+            label="Continue"
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+            onPress={() => setStep('workout')}
+          />
+        </>
+      ) : null}
+
+      {loaded && step === 'workout' ? (
+        <>
           <AppCard testID="group-start-workout">
-            <SectionHeader label="2 · Workout" />
+            <SectionHeader label="Create your own" />
+            <ListRow
+              testID="group-start-own"
+              title="Create my own workout"
+              subtitle="Name it, then add exercises as you go"
+              trailing={check(workout === OWN)}
+              onPress={() => setWorkout(OWN)}
+            />
+            {workout === OWN ? (
+              <TextInput
+                testID="group-start-own-name"
+                label="Workout name"
+                value={ownName}
+                onChangeText={setOwnName}
+                placeholder="e.g. Arms and abs"
+              />
+            ) : null}
+          </AppCard>
+
+          <AppCard testID="group-start-split">
+            <SectionHeader label="From your split" />
+            {days.length === 0 ? (
+              <Text style={styles.group}>You have no active split yet.</Text>
+            ) : null}
             {days.map((day, index) => (
               <ListRow
                 key={day.id}
@@ -264,29 +311,10 @@ export function GroupStartScreen({ navigation }: Props) {
                 onPress={() => setWorkout(day.id)}
               />
             ))}
-            <ListRow
-              testID="group-start-outside"
-              divider={days.length > 0}
-              title="Something outside my split"
-              trailing={check(workout === OUTSIDE)}
-              onPress={() => setWorkout(OUTSIDE)}
-            />
-            {workout === OUTSIDE ? (
-              <TextInput
-                testID="group-start-outside-name"
-                label="Workout name"
-                value={outsideName}
-                onChangeText={setOutsideName}
-                placeholder="e.g. Arms and abs"
-              />
-            ) : null}
           </AppCard>
 
           <Text style={styles.summary}>
-            {workoutName ? `${workoutName}` : 'No workout chosen'}
-            {selectedCount > 0
-              ? ` · with ${selectedCount} ${selectedCount === 1 ? 'other' : 'others'}`
-              : ' · just you'}
+            {workoutName ? workoutName : 'No workout chosen'} · {summary}
           </Text>
 
           <PrimaryButton
@@ -297,6 +325,11 @@ export function GroupStartScreen({ navigation }: Props) {
             loading={starting}
             accentColor={theme.accent}
             onAccentColor={theme.onAccent}
+          />
+          <TextButton
+            testID="group-start-back-people"
+            label="Change who's training"
+            onPress={() => setStep('people')}
           />
         </>
       ) : null}

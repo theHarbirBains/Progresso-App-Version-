@@ -173,7 +173,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
     );
 
     fireEvent.press(await screen.findByTestId('start-workout-group'));
-    expect(mockNavigate).toHaveBeenCalledWith('Groups');
+    expect(mockNavigate).toHaveBeenCalledWith('GroupStart');
   });
 
   it('Do a Different Workout opens a naming sheet; confirming starts an untagged workout with the given name', async () => {

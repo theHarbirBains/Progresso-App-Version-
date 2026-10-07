@@ -299,11 +299,11 @@ export function NewWorkoutScreen({ navigation }: Props) {
         <Section title="More Ways to Train">
           <ListRow
             testID="start-workout-group"
-            title="Group Workout"
-            subtitle="Train together with friends, clients and guests"
+            title="Working Out as a Group"
+            subtitle="Pick who is training, then your workout"
             chevron
-            onPress={() => navigation.navigate('Groups')}
-            accessibilityLabel="Group Workout, train together with friends, clients and guests"
+            onPress={() => navigation.navigate('GroupStart')}
+            accessibilityLabel="Working Out as a Group, pick who is training, then your workout"
           />
           <ListRow
             testID="start-workout-custom"

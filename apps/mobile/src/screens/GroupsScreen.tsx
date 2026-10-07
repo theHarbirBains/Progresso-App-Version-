@@ -3,15 +3,14 @@ import { Alert, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { PrimaryButton, SecondaryButton } from '../design/Button';
+import { SecondaryButton, PrimaryButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
-import { colors, spacing, typeScale, widgetGap } from '../design/theme';
-import { Text } from '../design/Text';
+import { spacing, widgetGap } from '../design/theme';
 import {
   listGroupInvites,
   listGroups,
@@ -25,7 +24,7 @@ import { formatCardDate } from '../workouts/workoutFormat';
 
 type Props = RootStackScreenProps<'Groups'>;
 
-/** Group workouts: start one, answer invites, and open the groups that are live. */
+/** Group workouts: answer invites and open the groups that are live. A group is started from Start Workout. */
 export function GroupsScreen({ navigation }: Props) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
@@ -72,7 +71,7 @@ export function GroupsScreen({ navigation }: Props) {
       header={
         <AppHeader
           title="Group Workouts"
-          subtitle="Train together"
+          subtitle="Your live and invited groups"
           onBack={() => navigation.goBack()}
           testID="groups-header"
         />
@@ -85,17 +84,6 @@ export function GroupsScreen({ navigation }: Props) {
 
       {groups !== null ? (
         <>
-          <AppCard hero topAccent={theme.accent} testID="groups-start">
-            <Text style={styles.lede}>Work out with friends, clients or guests.</Text>
-            <PrimaryButton
-              testID="groups-start-button"
-              label="Working Out as a Group"
-              onPress={() => navigation.navigate('GroupStart')}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-          </AppCard>
-
           {invites.length > 0 ? (
             <AppCard testID="groups-invites">
               <SectionHeader label="Invites" />
@@ -135,7 +123,7 @@ export function GroupsScreen({ navigation }: Props) {
               <EmptyState
                 testID="groups-empty"
                 title="No live groups"
-                description="Start one, or accept an invite."
+                description="Start one from Start Workout, or accept an invite."
               />
             ) : (
               groups.map((group, index) => (
@@ -159,11 +147,6 @@ export function GroupsScreen({ navigation }: Props) {
 }
 
 const styles = {
-  lede: {
-    ...typeScale.secondary,
-    color: colors.textSecondaryBright,
-    marginBottom: spacing.sm,
-  },
   invite: {
     gap: spacing.sm,
   },

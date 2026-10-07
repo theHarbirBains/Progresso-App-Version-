@@ -43,13 +43,6 @@ beforeEach(() => {
 });
 
 describe('GroupsScreen', () => {
-  it('opens the group workout flow from one button', async () => {
-    render(<GroupsScreen navigation={navigation} route={{} as never} />);
-
-    fireEvent.press(await screen.findByTestId('groups-start-button'));
-    expect(mockNavigate).toHaveBeenCalledWith('GroupStart');
-  });
-
   it('lists the live groups, and opens one', async () => {
     render(<GroupsScreen navigation={navigation} route={{} as never} />);
 
