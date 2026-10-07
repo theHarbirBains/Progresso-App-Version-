@@ -2839,38 +2839,39 @@ async function main() {
     [hostWorkout, host, group, guestWorkout, guest],
   );
 
-  // Sessions coexist: a self workout, a trainer session and a group session for the
-  // same person can all be open. A second open one of the same kind cannot.
+  // One live workout at a time: while a person has an open self workout, a trainer
+  // session or a group session for them cannot also be open. Cancelling the live one
+  // frees them to start the next.
   await admin.query(
     "insert into public.workouts (user_id, name, performed_at) values ($1, 'Own run', now())",
     [member],
   );
+  await expectThrows(
+    admin.query(
+      "insert into public.workouts (user_id, name, performed_at, logged_by) values ($1, 'Trainer run', now(), $2)",
+      [member, host],
+    ),
+    'A trainer cannot start a session for someone who already has a live workout',
+    /duplicate key|unique/i,
+  );
+  await expectThrows(
+    admin.query(
+      "insert into public.workouts (user_id, name, performed_at, group_id) values ($1, 'Group legs', now(), $2)",
+      [member, group],
+    ),
+    'A person cannot join a group workout while they have a live workout',
+    /duplicate key|unique/i,
+  );
   await admin.query(
-    "insert into public.workouts (user_id, name, performed_at, logged_by) values ($1, 'Trainer run', now(), $2)",
-    [member, host],
+    "update public.workouts set deleted_at = now() where user_id = $1 and name = 'Own run'",
+    [member],
   );
   await expectSucceeds(
     admin.query(
       "insert into public.workouts (user_id, name, performed_at, group_id) values ($1, 'Group legs', now(), $2)",
       [member, group],
     ),
-    'A self workout, a trainer session and a group session can be open at the same time',
-  );
-  await expectThrows(
-    admin.query(
-      "insert into public.workouts (user_id, name, performed_at, group_id) values ($1, 'Second group legs', now(), $2)",
-      [member, group],
-    ),
-    'Only one open session of a group per person',
-    /duplicate key|unique/i,
-  );
-  await expectThrows(
-    admin.query(
-      "insert into public.workouts (user_id, name, performed_at) values ($1, 'Second own', now())",
-      [member],
-    ),
-    'Only one open self workout is allowed per person',
-    /duplicate key|unique/i,
+    'Once the live workout is cancelled, the person can start a group workout',
   );
 
   // Any joined member with an account can add exercises and sets to a group workout,
