@@ -24,6 +24,11 @@ jest.mock('../lib/api', () => ({
   getMyProfile: jest.fn(),
   fetchFriendsFeed: jest.fn(),
   listFollowNotifications: jest.fn(),
+  listGroups: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../trainer/clientQueries', () => ({
+  fetchMyOpenLiveSessions: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
@@ -797,5 +802,33 @@ describe('FeedScreen live workout', () => {
 
     await waitFor(() => expect(mockFetchActiveWorkout).toHaveBeenCalled());
     expect(screen.queryByTestId('feed-live-workout')).toBeNull();
+  });
+
+  it('shows a live group workout and a live trainer session on the dashboard, to resume', async () => {
+    const { listGroups } = jest.requireMock('../lib/api') as { listGroups: jest.Mock };
+    const { fetchMyOpenLiveSessions } = jest.requireMock('../trainer/clientQueries') as {
+      fetchMyOpenLiveSessions: jest.Mock;
+    };
+    listGroups.mockResolvedValue([
+      {
+        id: 'g1',
+        name: 'Thursday legs',
+        hostId: 'me',
+        myRole: 'host',
+        startedAt: '2026-10-06T09:00:00.000Z',
+      },
+    ]);
+    fetchMyOpenLiveSessions.mockResolvedValue([
+      {
+        workoutId: 'w7',
+        clientId: 'c1',
+        clientName: 'Purnima',
+        startedAt: '2026-10-06T09:00:00.000Z',
+      },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-live-group-g1')).toHaveTextContent(/Thursday legs/);
+    expect(screen.getByTestId('feed-live-session-w7')).toHaveTextContent(/Purnima/);
   });
 });

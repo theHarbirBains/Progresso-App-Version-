@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
 import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
-import { PrimaryButton, TextButton } from '../design/Button';
+import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { Card } from '../design/Card';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
@@ -17,7 +17,14 @@ import { StatValue } from '../design/StatValue';
 import { colors } from '../design/theme';
 import { withAlpha } from '../theme/accentColor';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
-import { fetchFriendsFeed, listFollowNotifications, type FriendsFeedItem } from '../lib/api';
+import {
+  fetchFriendsFeed,
+  listFollowNotifications,
+  listGroups,
+  type FriendsFeedItem,
+  type GroupSummary,
+} from '../lib/api';
+import { fetchMyOpenLiveSessions, type TrainerOpenSession } from '../trainer/clientQueries';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { mealTypeLabel, type MealType } from '../nutrition/mealTypes';
@@ -26,7 +33,7 @@ import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import { fetchActiveWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
-import { RecentWorkoutTopSets } from '../feed/RecentWorkoutTopSets';
+import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
@@ -34,7 +41,7 @@ import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
 } from '../workouts/workoutSplitQueries';
-import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
+import { formatCardDate } from '../workouts/workoutFormat';
 import { feedStyles as styles } from './feedStyles';
 
 type Props = RootStackScreenProps<'Feed'>;
@@ -269,6 +276,10 @@ export function FeedScreen({ navigation }: Props) {
   // A workout that is still open is shown here, so reopening the app finds it (it is never
   // cancelled by the app itself). Tapping it resumes it.
   const [liveWorkout, setLiveWorkout] = useState<WorkoutSummary | null>(null);
+  // Group workouts you are in, and live sessions a trainer is running, are listed too, so
+  // nothing that is open is ever missing from the dashboard.
+  const [liveGroups, setLiveGroups] = useState<GroupSummary[]>([]);
+  const [liveSessions, setLiveSessions] = useState<TrainerOpenSession[]>([]);
   const loadLiveWorkout = useCallback(async () => {
     if (!userId) return;
     try {
@@ -276,7 +287,17 @@ export function FeedScreen({ navigation }: Props) {
     } catch {
       setLiveWorkout(null);
     }
-  }, [userId]);
+    try {
+      setLiveGroups(accessToken ? await listGroups(accessToken) : []);
+    } catch {
+      setLiveGroups([]);
+    }
+    try {
+      setLiveSessions(await fetchMyOpenLiveSessions(userId));
+    } catch {
+      setLiveSessions([]);
+    }
+  }, [userId, accessToken]);
   const loadLiveWorkoutRef = useRef(loadLiveWorkout);
   loadLiveWorkoutRef.current = loadLiveWorkout;
 
@@ -542,6 +563,54 @@ export function FeedScreen({ navigation }: Props) {
         </Card>
       ) : null}
 
+      {liveGroups.map((group) => (
+        <Card
+          key={`group-${group.id}`}
+          testID={`feed-live-group-${group.id}`}
+          onPress={() => navigation.navigate('GroupSession', { groupId: group.id })}
+          accessibilityLabel={`Group workout in progress: ${group.name}. Resume`}
+        >
+          <Text style={styles.nextWorkoutEyebrow}>Group workout in progress</Text>
+          <Text style={styles.nextWorkoutDayName}>{group.name}</Text>
+          <SecondaryButton
+            testID={`feed-resume-group-${group.id}`}
+            label="Resume Group Workout"
+            onPress={() => navigation.navigate('GroupSession', { groupId: group.id })}
+          />
+        </Card>
+      ))}
+
+      {liveSessions.map((session) => (
+        <Card
+          key={`session-${session.workoutId}`}
+          testID={`feed-live-session-${session.workoutId}`}
+          onPress={() =>
+            navigation.navigate('TrainerLiveWorkout', {
+              workoutId: session.workoutId,
+              clientId: session.clientId,
+              clientName: session.clientName,
+              startedAt: session.startedAt,
+            })
+          }
+          accessibilityLabel={`Live session with ${session.clientName}. Resume`}
+        >
+          <Text style={styles.nextWorkoutEyebrow}>Live session</Text>
+          <Text style={styles.nextWorkoutDayName}>{session.clientName}</Text>
+          <SecondaryButton
+            testID={`feed-resume-session-${session.workoutId}`}
+            label="Resume Live Session"
+            onPress={() =>
+              navigation.navigate('TrainerLiveWorkout', {
+                workoutId: session.workoutId,
+                clientId: session.clientId,
+                clientName: session.clientName,
+                startedAt: session.startedAt,
+              })
+            }
+          />
+        </Card>
+      ))}
+
       {nextPlan ? (
         <Card
           heroColor={theme.accent}
@@ -630,67 +699,16 @@ export function FeedScreen({ navigation }: Props) {
         <>
           {displayItems.map((item) =>
             item.kind === 'workout' && item.workout ? (
-              <Card
-                key={item.key}
-                testID={`feed-item-workout-${item.workout.id}`}
+              <WorkoutFeedCard
+                idPrefix="feed-item-workout"
+                workout={item.workout}
+                authorName={item.authorName}
+                avatarUrl={item.avatarUrl}
+                timestamp={item.timestamp}
+                weightUnit={weightUnit}
                 onPress={item.onPress}
-              >
-                <View style={styles.metaRow}>
-                  <View style={styles.avatarWrap}>
-                    <Avatar
-                      uri={item.avatarUrl}
-                      initial={item.authorName.charAt(0).toUpperCase()}
-                      size={32}
-                      iconSize={16}
-                      iconColor={colors.textSecondary}
-                      initialStyle={styles.avatarInitial}
-                    />
-                  </View>
-                  <View style={styles.metaBody}>
-                    <Text style={styles.metaName} numberOfLines={1}>
-                      {item.authorName}
-                    </Text>
-                    <View style={styles.metaSubRow}>
-                      <Feather name="activity" size={11} color={colors.textMuted} />
-                      <Text style={styles.metaTimestamp}>{formatCardDate(item.timestamp)}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <Text style={styles.itemTitle} numberOfLines={1}>
-                  {item.workout.name}
-                </Text>
-                {item.workout.muscleGroups.length > 0 ? (
-                  <Text style={styles.itemSubtitle} numberOfLines={1}>
-                    {item.workout.muscleGroups
-                      .map((group) => SPLIT_MUSCLE_GROUP_LABELS[group])
-                      .join(' • ')}
-                  </Text>
-                ) : null}
-
-                <View style={styles.statRow}>
-                  <StatBlock
-                    testID={`feed-item-workout-${item.workout.id}-duration`}
-                    value={formatCardDuration(item.workout.durationMinutes)}
-                    label="Duration"
-                  />
-                  <StatBlock
-                    testID={`feed-item-workout-${item.workout.id}-exercises`}
-                    value={String(item.workout.completedExerciseCount)}
-                    label={item.workout.completedExerciseCount === 1 ? 'Exercise' : 'Exercises'}
-                  />
-                  <StatBlock
-                    testID={`feed-item-workout-${item.workout.id}-sets`}
-                    value={String(item.workout.completedSetCount)}
-                    label="Sets"
-                  />
-                </View>
-                <RecentWorkoutTopSets
-                  testID={`feed-item-workout-${item.workout.id}-top-sets`}
-                  topSets={item.workout.topSets}
-                  weightUnit={weightUnit}
-                />
-              </Card>
+                key={item.key}
+              />
             ) : item.log ? (
               <Card
                 key={item.key}
