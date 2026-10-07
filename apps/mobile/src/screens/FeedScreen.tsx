@@ -299,6 +299,8 @@ export function FeedScreen({ navigation }: Props) {
       setLiveSessions([]);
     }
   }, [userId, accessToken]);
+  // While any workout is open, its Live now card takes the place of the next-workout widget.
+  const anyWorkoutLive = liveWorkout !== null || liveGroups.length > 0 || liveSessions.length > 0;
   const loadLiveWorkoutRef = useRef(loadLiveWorkout);
   loadLiveWorkoutRef.current = loadLiveWorkout;
 
@@ -585,7 +587,7 @@ export function FeedScreen({ navigation }: Props) {
         />
       ))}
 
-      {nextPlan ? (
+      {nextPlan && !anyWorkoutLive ? (
         <Card
           heroColor={theme.accent}
           testID="feed-next-workout"

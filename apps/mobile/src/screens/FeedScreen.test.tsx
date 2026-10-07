@@ -863,4 +863,18 @@ describe('FeedScreen live workout', () => {
     expect(screen.queryByTestId('feed-live-group-g1')).toBeNull();
     expect(screen.queryByTestId('feed-live-group-g2')).toBeNull();
   });
+
+  it('replaces the next-workout widget with the live workout while one is open', async () => {
+    mockFetchActiveWorkout.mockResolvedValue({
+      id: 'live-1',
+      name: 'Leg Day',
+      performedAt: '2026-10-05T10:00:00Z',
+      completedAt: null,
+      workoutSplitDayId: null,
+    });
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-live-workout')).toBeTruthy();
+    expect(screen.queryByTestId('feed-next-workout')).toBeNull();
+  });
 });
