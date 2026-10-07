@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
 import { fonts, widgetGap } from '../design/theme';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
@@ -20,6 +20,7 @@ jest.mock('../lib/api', () => ({
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
+  deleteWorkout: jest.fn().mockResolvedValue(undefined),
   fetchWorkoutDetail: jest.fn(),
   // Real (pure, no supabase dependency) implementation.
   ...jest.requireActual('../workouts/setCompletion'),
@@ -457,5 +458,38 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     await screen.findByTestId('pr-tag-s2');
 
     expectNoBareText();
+  });
+
+  it('lets a trainer delete this client workout from its own screen, once confirmed', async () => {
+    const { Alert } = jest.requireActual('react-native');
+    const { deleteWorkout } = jest.requireMock('../workouts/workoutQueries') as {
+      deleteWorkout: jest.Mock;
+    };
+    const alert = jest.spyOn(Alert, 'alert');
+    render(
+      <WorkoutDetailScreen
+        navigation={navigation}
+        route={{ params: { workoutId: 'w1', clientId: 'client-1', clientName: 'Sam' } } as never}
+      />,
+      { wrapper: ProfileProvider },
+    );
+
+    fireEvent.press(await screen.findByTestId('workout-detail-delete'));
+    expect(deleteWorkout).not.toHaveBeenCalled();
+    const buttons = (alert.mock.calls[0][2] ?? []) as { text?: string; onPress?: () => void }[];
+    buttons.find((button) => button.text === 'Delete')?.onPress?.();
+
+    await waitFor(() => expect(deleteWorkout).toHaveBeenCalledWith('w1'));
+    await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
+    alert.mockRestore();
+  });
+
+  it('shows no delete for the user own workout', async () => {
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    await screen.findByText('Push Day');
+    expect(screen.queryByTestId('workout-detail-delete')).toBeNull();
   });
 });

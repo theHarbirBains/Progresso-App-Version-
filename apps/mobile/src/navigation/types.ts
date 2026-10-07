@@ -11,7 +11,8 @@ export type RootStackParamList = {
   AccountSettings: undefined;
   ExerciseLibrary: undefined;
   WorkoutHistory: undefined;
-  WorkoutDetail: { workoutId: string };
+  /** clientId is set when a trainer opens one of a client’s workouts. */
+  WorkoutDetail: { workoutId: string; clientId?: string; clientName?: string };
   /** clientId is set when a trainer edits one of a client's workouts. */
   EditWorkout: { workoutId: string; clientId?: string; clientName?: string };
   ShareWorkout: { workoutId: string };

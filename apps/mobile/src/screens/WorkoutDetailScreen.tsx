@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { TextButton } from '../design/Button';
 import { Badge } from '../design/Badge';
 import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
@@ -17,6 +18,7 @@ import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../work
 import { computeDurationMinutes } from '../workouts/topSetSummary';
 import {
   completedSetsOnly,
+  deleteWorkout,
   fetchWorkoutDetail,
   type CompletedSetRecord,
   type WorkoutDetail,
@@ -48,7 +50,29 @@ function formatDateTime(iso: string): string {
 // top set called out, and a row per logged set with a PR / 1RM badge while
 // that set is still the live record.
 export function WorkoutDetailScreen({ route, navigation }: Props) {
-  const { workoutId } = route.params;
+  // A trainer removes a client's workout from the client's history. It can't be logged again.
+  function confirmDeleteWorkout() {
+    Alert.alert(
+      'Delete this workout?',
+      'It will be removed from the client’s history. This cannot be undone.',
+      [
+        { text: 'Keep it', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteWorkout(workoutId)
+              .then(() => navigation.goBack())
+              .catch((err: unknown) =>
+                Alert.alert('Could not delete', err instanceof Error ? err.message : 'Try again'),
+              );
+          },
+        },
+      ],
+    );
+  }
+
+  const { workoutId, clientId, clientName } = route.params;
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
@@ -166,12 +190,12 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           }}
           rightAction={{
             icon: 'edit-2',
-            onPress: () => navigation.navigate('EditWorkout', { workoutId }),
+            onPress: () => navigation.navigate('EditWorkout', { workoutId, clientId, clientName }),
             accessibilityLabel: 'Edit workout',
             testID: 'workout-detail-edit',
           }}
           rightAction2={
-            workout.completedAt
+            workout.completedAt && !clientId
               ? {
                   icon: 'share',
                   onPress: () => navigation.navigate('ShareWorkout', { workoutId }),
@@ -283,6 +307,15 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           </AppCard>
         );
       })}
+
+      {clientId ? (
+        <TextButton
+          testID="workout-detail-delete"
+          label="Delete Workout"
+          destructive
+          onPress={confirmDeleteWorkout}
+        />
+      ) : null}
     </Screen>
   );
 }
