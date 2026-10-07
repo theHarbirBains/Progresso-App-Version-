@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, TouchableOpacity, View } from 'react-native';
+import { Avatar } from '../design/Avatar';
+import { PhotoLightbox } from '../design/PhotoLightbox';
 import { Text } from '../design/Text';
 import { AppHeader } from '../design/AppHeader';
 import { useBackgroundTheme } from '../design/BackgroundThemeContext';
@@ -79,12 +81,32 @@ export function ExercisePickerModal({
 
   const alreadyAddedIdSet = useMemo(() => new Set(alreadyAddedIds), [alreadyAddedIds]);
 
+  // One full-screen photo viewer for the whole picker, so a tapped photo opens above it.
+  const [photoOpen, setPhotoOpen] = useState<{ uri: string; name: string } | null>(null);
+
   const renderItem = useCallback(
     ({ item }: { item: ExerciseRow }) => {
       const added = alreadyAddedIdSet.has(item.id);
       return (
         <ListRow
           testID={`exercise-picker-item-${item.id}`}
+          leading={
+            <TouchableOpacity
+              testID={`exercise-picker-photo-${item.id}`}
+              onPress={() => item.photoUrl && setPhotoOpen({ uri: item.photoUrl, name: item.name })}
+              disabled={!item.photoUrl}
+              accessibilityRole={item.photoUrl ? 'imagebutton' : undefined}
+              accessibilityLabel={item.photoUrl ? `View ${item.name} photo` : undefined}
+            >
+              <Avatar
+                uri={item.photoUrl}
+                initial={item.name.trim().charAt(0).toUpperCase() || null}
+                size={64}
+                iconSize={28}
+                iconColor={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          }
           title={`${item.name}${added ? ' (added)' : ''}`}
           subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
           chevron={false}
@@ -177,6 +199,12 @@ export function ExercisePickerModal({
           />
         </View>
       </View>
+      <PhotoLightbox
+        testID="exercise-picker-lightbox"
+        visible={photoOpen !== null}
+        uri={photoOpen?.uri ?? null}
+        onClose={() => setPhotoOpen(null)}
+      />
     </Modal>
   );
 }

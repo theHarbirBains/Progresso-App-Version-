@@ -340,4 +340,37 @@ describe('ExercisePickerModal -- one list of plain rows', () => {
       'Search exercises',
     );
   });
+
+  it('shows an exercise photo, and tapping it opens the photo full size without selecting the exercise', async () => {
+    mockFetchExercises.mockResolvedValue({
+      rows: [
+        {
+          id: 'ex3',
+          name: 'Leg Press',
+          muscleGroup: 'quadriceps',
+          movementType: 'bilateral',
+          isActive: true,
+          createdBy: null,
+          photoUrl: 'https://example.test/leg-press.jpg',
+        },
+      ],
+      hasMore: false,
+    });
+    const onSelect = jest.fn();
+    render(
+      <ExercisePickerModal
+        visible={true}
+        onClose={jest.fn()}
+        onSelect={onSelect}
+        userId="user-1"
+        alreadyAddedIds={[]}
+        onCreateCustom={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(await screen.findByTestId('exercise-picker-photo-ex3'));
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId('exercise-picker-lightbox')).toBeTruthy();
+  });
 });
