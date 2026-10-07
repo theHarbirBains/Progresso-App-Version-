@@ -201,33 +201,40 @@ export function GroupStartScreen({ navigation }: Props) {
 
       {loaded && step === 'people' ? (
         <>
-          <AppCard testID="group-start-people">
-            <SectionHeader label="Who's working out today?" />
+          {friends.length > 0 ? (
+            <AppCard testID="group-start-friends">
+              <SectionHeader label="Friends" />
+              {friends.map((friend) => (
+                <ListRow
+                  key={friend.id}
+                  testID={`group-start-friend-${friend.id}`}
+                  title={friend.displayName ?? friend.username ?? 'Friend'}
+                  subtitle={friend.username ? `@${friend.username}` : undefined}
+                  trailing={check(pickedFriends.has(friend.id))}
+                  onPress={() => toggle(pickedFriends, friend.id, setPickedFriends)}
+                />
+              ))}
+            </AppCard>
+          ) : null}
 
-            {friends.length > 0 ? <Text style={styles.group}>Friends</Text> : null}
-            {friends.map((friend) => (
-              <ListRow
-                key={friend.id}
-                testID={`group-start-friend-${friend.id}`}
-                title={friend.displayName ?? friend.username ?? 'Friend'}
-                subtitle={friend.username ? `@${friend.username}` : undefined}
-                trailing={check(pickedFriends.has(friend.id))}
-                onPress={() => toggle(pickedFriends, friend.id, setPickedFriends)}
-              />
-            ))}
+          {pickableClientList.length > 0 ? (
+            <AppCard testID="group-start-clients">
+              <SectionHeader label="Clients" />
+              {pickableClientList.map((client) => (
+                <ListRow
+                  key={client.clientId ?? clientName(client)}
+                  testID={`group-start-client-${client.clientId}`}
+                  title={clientName(client)}
+                  trailing={check(pickedClients.has(client.clientId as string))}
+                  onPress={() => toggle(pickedClients, client.clientId as string, setPickedClients)}
+                />
+              ))}
+            </AppCard>
+          ) : null}
 
-            {pickableClientList.length > 0 ? <Text style={styles.group}>Clients</Text> : null}
-            {pickableClientList.map((client) => (
-              <ListRow
-                key={client.clientId ?? clientName(client)}
-                testID={`group-start-client-${client.clientId}`}
-                title={clientName(client)}
-                trailing={check(pickedClients.has(client.clientId as string))}
-                onPress={() => toggle(pickedClients, client.clientId as string, setPickedClients)}
-              />
-            ))}
-
-            <Text style={styles.group}>Guests</Text>
+          <AppCard testID="group-start-guests">
+            <SectionHeader label="Guests" />
+            <Text style={styles.hint}>Guests need no account. Add them by name.</Text>
             {guests.map((name, index) => (
               <ListRow
                 key={`${name}-${index}`}
@@ -342,6 +349,11 @@ const styles = {
     ...typeScale.label,
     color: colors.textSecondary,
     marginTop: spacing.sm,
+  },
+  hint: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
   guestRow: {
     flexDirection: 'row' as const,

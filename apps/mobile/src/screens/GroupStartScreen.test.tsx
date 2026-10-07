@@ -95,9 +95,9 @@ describe('GroupStartScreen', () => {
   it('asks who is working out today before the workout', async () => {
     render(<GroupStartScreen navigation={navigation} route={{} as never} />);
 
-    expect(await screen.findByTestId('group-start-people')).toHaveTextContent(
-      /Who's working out today/,
-    );
+    expect(await screen.findByTestId('group-start-guests')).toBeTruthy();
+    expect(screen.getByTestId('group-start-friends')).toHaveTextContent(/Friends/);
+    expect(screen.getByTestId('group-start-clients')).toHaveTextContent(/Clients/);
     expect(screen.queryByTestId('group-start-split')).toBeNull();
   });
 
@@ -152,7 +152,7 @@ describe('GroupStartScreen', () => {
     await continueToWorkout();
     fireEvent.press(screen.getByTestId('group-start-back-people'));
 
-    expect(await screen.findByTestId('group-start-people')).toBeTruthy();
+    expect(await screen.findByTestId('group-start-guests')).toBeTruthy();
     expect(screen.getByTestId('group-start-friend-f1')).toBeTruthy();
   });
 });
