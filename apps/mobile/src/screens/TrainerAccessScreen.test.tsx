@@ -5,7 +5,7 @@ import {
   endTrainerLink,
   getTrainerStatus,
   listMyTrainers,
-  listTrainerActivity,
+  listTrainerClients,
   listTrainerRequests,
   respondToTrainerRequest,
 } from '../lib/api';
@@ -23,7 +23,7 @@ jest.mock('../lib/api', () => ({
   endTrainerLink: jest.fn(),
   getTrainerStatus: jest.fn(),
   listMyTrainers: jest.fn(),
-  listTrainerActivity: jest.fn(),
+  listTrainerClients: jest.fn(),
   listTrainerRequests: jest.fn(),
   respondToTrainerRequest: jest.fn(),
 }));
@@ -32,20 +32,39 @@ const mockUseAuth = useAuth as jest.Mock;
 const mockGetTrainerStatus = getTrainerStatus as jest.Mock;
 const mockListTrainerRequests = listTrainerRequests as jest.Mock;
 const mockListMyTrainers = listMyTrainers as jest.Mock;
-const mockListTrainerActivity = listTrainerActivity as jest.Mock;
+const mockListTrainerClients = listTrainerClients as jest.Mock;
 const mockRespond = respondToTrainerRequest as jest.Mock;
 const mockEndTrainerLink = endTrainerLink as jest.Mock;
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { navigate: mockNavigate, goBack: mockGoBack };
+const navigation: any = {
+  navigate: mockNavigate,
+  goBack: mockGoBack,
+  addListener: jest.fn(() => () => undefined),
+};
 
 const TRAINER_ID = 'trainer-1';
 const request = {
   trainerId: TRAINER_ID,
   trainerDisplayName: 'Coach Jo',
   requestedAt: '2026-10-01T00:00:00.000Z',
+};
+
+const sam = {
+  clientId: 'client-sam',
+  inviteId: null,
+  email: null,
+  status: 'active',
+  awaitingClaim: false,
+  source: 'managed',
+  displayName: 'Sam',
+  birthday: null,
+  heightValue: null,
+  heightUnit: 'cm',
+  weightValue: null,
+  weightUnit: 'kg',
 };
 
 function renderScreen() {
@@ -60,7 +79,7 @@ beforeEach(() => {
   mockGetTrainerStatus.mockReset().mockResolvedValue({ isTrainer: false });
   mockListTrainerRequests.mockReset().mockResolvedValue([]);
   mockListMyTrainers.mockReset().mockResolvedValue([]);
-  mockListTrainerActivity.mockReset().mockResolvedValue([]);
+  mockListTrainerClients.mockReset().mockResolvedValue([]);
   mockRespond.mockReset().mockResolvedValue({ ok: true });
   mockEndTrainerLink.mockReset().mockResolvedValue({ ok: true });
   mockNavigate.mockClear();
@@ -93,20 +112,36 @@ describe('TrainerAccessScreen', () => {
     );
   });
 
-  it('shows the Clients entry to everyone, and says what it needs when there is no subscription', async () => {
+  it('lets a trainer see their clients in the Clients widget, and open one', async () => {
+    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
+    mockListTrainerClients.mockResolvedValue([sam]);
     renderScreen();
-    const row = await screen.findByTestId('trainer-access-open-clients');
-    expect(row).toHaveTextContent(/Needs a Trainer subscription/);
-    fireEvent.press(row);
-    expect(mockNavigate).toHaveBeenCalledWith('TrainerClients');
+
+    expect(await screen.findByTestId('trainer-access-clients')).toHaveTextContent(/Sam/);
+    expect(screen.getByTestId('trainer-access-add-client')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('trainer-access-client-client-sam'));
+    expect(mockNavigate).toHaveBeenCalledWith('TrainerClientDetail', {
+      clientId: 'client-sam',
+      clientName: 'Sam',
+    });
   });
 
-  it('gives a trainer a way into their own clients', async () => {
-    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
+  it('says clients need a Trainer subscription for everyone else, and still offers tracked history', async () => {
     renderScreen();
 
-    fireEvent.press(await screen.findByTestId('trainer-access-open-clients'));
-    expect(mockNavigate).toHaveBeenCalledWith('TrainerClients');
+    const widget = await screen.findByTestId('trainer-access-clients');
+    expect(widget).toHaveTextContent(/Clients need a Trainer subscription/);
+    fireEvent.press(screen.getByTestId('trainer-access-open-claim'));
+    expect(mockNavigate).toHaveBeenCalledWith('TrainerClaim');
+  });
+
+  it('has no activity widget', async () => {
+    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
+    mockListTrainerClients.mockResolvedValue([sam]);
+    renderScreen();
+
+    await screen.findByTestId('trainer-access-clients');
+    expect(screen.queryByText('Activity')).toBeNull();
   });
 
   it('explains the empty state when there is nothing to show', async () => {
