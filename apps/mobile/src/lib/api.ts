@@ -119,7 +119,8 @@ async function request<T>(path: string, accessToken: string, init?: RequestInit)
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      // Only a request with a body is JSON. The API rejects an empty body sent as JSON.
+      ...(init?.body === undefined ? {} : { 'Content-Type': 'application/json' }),
       Authorization: `Bearer ${accessToken}`,
       ...init?.headers,
     },
@@ -862,7 +863,9 @@ export function getGroup(accessToken: string, groupId: string): Promise<GroupDet
 
 /** Discards the caller's workout in the group, so it never counts in history. A member leaves; the host ends the group for everyone. */
 export function cancelGroupWorkout(accessToken: string, groupId: string): Promise<{ ok: true }> {
-  return request(`/api/v1/groups/${encodeURIComponent(groupId)}/cancel`, accessToken, { method: 'POST' });
+  return request(`/api/v1/groups/${encodeURIComponent(groupId)}/cancel`, accessToken, {
+    method: 'POST',
+  });
 }
 
 export function respondToGroupInvite(

@@ -29,6 +29,19 @@ function mockFetchOnce(status: number, body: unknown) {
   });
 }
 
+describe('bodyless POST requests', () => {
+  it('send no JSON content type, since there is no body to describe', async () => {
+    mockFetchOnce(200, { ok: true });
+
+    await api.cancelGroupWorkout('token-123', 'group-1');
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(init.method).toBe('POST');
+    expect(init.headers).not.toHaveProperty('Content-Type');
+    expect(init.headers.Authorization).toBe('Bearer token-123');
+  });
+});
+
 describe('getMyProfile', () => {
   it('sends a GET with the bearer token and returns the parsed profile', async () => {
     const { getMyProfile } = api;
@@ -47,7 +60,6 @@ describe('getMyProfile', () => {
     expect(result).toEqual(profile);
     expect(global.fetch).toHaveBeenCalledWith('http://localhost:4000/api/v1/users/me', {
       headers: {
-        'Content-Type': 'application/json',
         Authorization: 'Bearer token-123',
       },
     });
@@ -182,7 +194,6 @@ describe('getFoodByBarcode', () => {
       'http://localhost:4000/api/v1/foods/barcode/0066721016123',
       {
         headers: {
-          'Content-Type': 'application/json',
           Authorization: 'Bearer token-123',
         },
       },
