@@ -373,4 +373,32 @@ describe('ExercisePickerModal -- one list of plain rows', () => {
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.getByTestId('exercise-picker-lightbox')).toBeTruthy();
   });
+
+  it('filters to built-in or custom exercises from the source control', async () => {
+    render(
+      <ExercisePickerModal
+        visible={true}
+        onClose={jest.fn()}
+        onSelect={jest.fn()}
+        userId="user-1"
+        alreadyAddedIds={[]}
+        onCreateCustom={jest.fn()}
+      />,
+    );
+    await screen.findByTestId('exercise-picker-item-ex1');
+
+    fireEvent.press(screen.getByText('Custom'));
+    await waitFor(() =>
+      expect(mockFetchExercises).toHaveBeenLastCalledWith(
+        expect.objectContaining({ source: 'mine' }),
+      ),
+    );
+
+    fireEvent.press(screen.getByText('Built-in'));
+    await waitFor(() =>
+      expect(mockFetchExercises).toHaveBeenLastCalledWith(
+        expect.objectContaining({ source: 'builtin' }),
+      ),
+    );
+  });
 });

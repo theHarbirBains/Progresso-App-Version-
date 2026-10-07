@@ -8,11 +8,16 @@ import { useBackgroundTheme } from '../design/BackgroundThemeContext';
 import { ListRow } from '../design/ListRow';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
-import { fetchExercises, type ExerciseRow } from '../exercises/exerciseQueries';
+import {
+  fetchExercises,
+  type ExerciseRow,
+  type ExerciseSource,
+} from '../exercises/exerciseQueries';
 import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
 import { MOVEMENT_TYPE_LABELS } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
+import { SegmentedControl } from '../design/SegmentedControl';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -55,6 +60,8 @@ export function ExercisePickerModal({
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(null);
+  // All exercises, only the built-in ones, or only the ones this person created.
+  const [source, setSource] = useState<ExerciseSource>('all');
   const [rows, setRows] = useState<ExerciseRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -67,7 +74,7 @@ export function ExercisePickerModal({
     if (!visible || !userId) return;
     let cancelled = false;
     setLoading(true);
-    fetchExercises({ userId, search, muscleGroup, source: 'all', page: 0, pageSize: PAGE_SIZE })
+    fetchExercises({ userId, search, muscleGroup, source, page: 0, pageSize: PAGE_SIZE })
       .then((result) => {
         if (!cancelled) setRows(result.rows);
       })
@@ -77,7 +84,7 @@ export function ExercisePickerModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, userId, search, muscleGroup]);
+  }, [visible, userId, search, muscleGroup, source]);
 
   const alreadyAddedIdSet = useMemo(() => new Set(alreadyAddedIds), [alreadyAddedIds]);
 
@@ -152,6 +159,19 @@ export function ExercisePickerModal({
             accessibilityLabel="Search exercises"
             value={searchInput}
             onChangeText={setSearchInput}
+          />
+
+          <SegmentedControl<ExerciseSource>
+            testID="exercise-picker-source"
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'builtin', label: 'Built-in' },
+              { value: 'mine', label: 'Custom' },
+            ]}
+            value={source}
+            onChange={setSource}
+            accentColor={accentColor}
+            onAccentColor={onAccentColor}
           />
 
           <View testID="exercise-picker-muscle-group-wrap" style={styles.muscleGroupChipsWrap}>
