@@ -27,7 +27,6 @@ import {
   filterClientsByName,
   groupClientsByLetter,
   pickableClients,
-  type ClientSection,
 } from '../trainer/clientPicker';
 import { trainerClientStatusLabel } from '../trainer/trainerLabels';
 
