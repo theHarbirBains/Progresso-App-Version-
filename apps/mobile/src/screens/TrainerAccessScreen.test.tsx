@@ -170,7 +170,7 @@ describe('TrainerAccessScreen', () => {
     alert.mockRestore();
   });
 
-  it('has a back arrow, and lists every client a trainer has', async () => {
+  it('has no back arrow, and lists every client a trainer has', async () => {
     mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
     mockListTrainerClients.mockResolvedValue([
       sam,
@@ -180,6 +180,6 @@ describe('TrainerAccessScreen', () => {
 
     expect(await screen.findByTestId('trainer-access-client-client-sam')).toBeTruthy();
     expect(screen.getByTestId('trainer-access-client-client-ana')).toBeTruthy();
-    expect(screen.getByLabelText('Back')).toBeTruthy();
+    expect(screen.queryByLabelText('Back')).toBeNull();
   });
 });

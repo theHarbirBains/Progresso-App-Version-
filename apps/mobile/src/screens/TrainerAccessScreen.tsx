@@ -134,14 +134,7 @@ export function TrainerAccessScreen({ navigation }: Props) {
   return (
     <Screen
       contentContainerStyle={{ gap: widgetGap }}
-      header={
-        <AppHeader
-          title="Trainer Access"
-          subtitle="Who can log workouts for you"
-          onBack={() => navigation.goBack()}
-          testID="trainer-access-header"
-        />
-      }
+      header={<AppHeader title="Trainer Access" testID="trainer-access-header" />}
     >
       {loading ? <LoadingState testID="trainer-access-loading" /> : null}
 
