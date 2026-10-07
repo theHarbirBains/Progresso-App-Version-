@@ -1,4 +1,14 @@
-import { IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateGroupDto {
   @IsString()
@@ -22,12 +32,28 @@ export class CreateGroupDto {
   @IsOptional()
   @IsUUID()
   workoutId?: string;
-}
 
-export class InviteMemberDto {
-  @IsString()
-  @Matches(/^[a-zA-Z0-9_]{3,20}$/)
-  username!: string;
+  // Who is working out today. They are added as the group starts; nobody can be added after it has started.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  @Matches(/^[a-zA-Z0-9_]{3,20}$/, { each: true })
+  friendUsernames?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsUUID(undefined, { each: true })
+  clientIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(80, { each: true })
+  guestNames?: string[];
 }
 
 // Which day of your split this group workout is. null clears it.

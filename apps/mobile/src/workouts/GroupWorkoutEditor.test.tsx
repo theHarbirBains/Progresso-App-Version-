@@ -78,6 +78,7 @@ function renderEditor() {
   return render(
     <GroupWorkoutEditor
       members={members}
+      startedAt="2026-10-06T09:00:00.000Z"
       userId="me"
       accentColor="#3DDC97"
       onAccentColor="#000000"

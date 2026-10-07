@@ -7,6 +7,8 @@ import { UnderlineTabs } from '../design/UnderlineTabs';
 import { colors, spacing, typeScale } from '../design/theme';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { formatWeightKg, roundWeight, toKg } from '../lib/units';
+import { computeTotalSets } from './workoutSummary';
+import { WorkoutStats } from './WorkoutStats';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { AddExerciseButton } from './AddExerciseButton';
 import { ExerciseCard, type PreviousSessionDisplay } from './ExerciseCard';
@@ -38,6 +40,8 @@ export interface GroupWorkoutMember {
 
 interface Props {
   members: GroupWorkoutMember[];
+  /** When the group started: the stats strip counts the workout from here, as Active Workout does. */
+  startedAt: string;
   /** The signed-in person: their tab reads "You", and their exercise library is the picker's. */
   userId: string;
   accentColor: string;
@@ -53,6 +57,7 @@ interface Props {
  */
 export function GroupWorkoutEditor({
   members,
+  startedAt,
   userId,
   accentColor,
   onAccentColor,
@@ -333,6 +338,14 @@ export function GroupWorkoutEditor({
         onSelect={setSelectedId}
         accentColor={accentColor}
         testID={`${testID}-tabs`}
+      />
+
+      <WorkoutStats
+        testID={`${testID}-summary`}
+        performedAt={startedAt}
+        active
+        totalSets={computeTotalSets(selectedDetail?.exercises ?? [])}
+        totalExercises={selectedDetail?.exercises.length ?? 0}
       />
 
       {error ? (

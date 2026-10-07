@@ -825,11 +825,24 @@ export interface GroupInvite {
   invitedAt: string;
 }
 
+/**
+ * Starts a group and adds the people working out today. Nobody can be added once it has
+ * started. `skipped` names anyone the server could not add (not a friend or client, or a
+ * guest it could not create); the group starts regardless.
+ */
 export function createGroup(
   accessToken: string,
-  input: { name: string; workoutId?: string; splitDayId?: string; workoutName?: string },
-): Promise<{ groupId: string }> {
-  return request<{ groupId: string }>('/api/v1/groups', accessToken, {
+  input: {
+    name: string;
+    workoutId?: string;
+    splitDayId?: string;
+    workoutName?: string;
+    friendUsernames?: string[];
+    clientIds?: string[];
+    guestNames?: string[];
+  },
+): Promise<{ groupId: string; skipped: string[] }> {
+  return request<{ groupId: string; skipped: string[] }>('/api/v1/groups', accessToken, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -845,28 +858,6 @@ export function listGroupInvites(accessToken: string): Promise<GroupInvite[]> {
 
 export function getGroup(accessToken: string, groupId: string): Promise<GroupDetail> {
   return request<GroupDetail>(`/api/v1/groups/${encodeURIComponent(groupId)}`, accessToken);
-}
-
-export function inviteToGroup(
-  accessToken: string,
-  groupId: string,
-  username: string,
-): Promise<{ userId: string; status: 'invited' | 'joined' }> {
-  return request(`/api/v1/groups/${encodeURIComponent(groupId)}/members`, accessToken, {
-    method: 'POST',
-    body: JSON.stringify({ username }),
-  });
-}
-
-export function addGroupGuest(
-  accessToken: string,
-  groupId: string,
-  displayName: string,
-): Promise<{ userId: string }> {
-  return request(`/api/v1/groups/${encodeURIComponent(groupId)}/guests`, accessToken, {
-    method: 'POST',
-    body: JSON.stringify({ displayName }),
-  });
 }
 
 export function respondToGroupInvite(
@@ -949,18 +940,6 @@ export function resolveClientExercise(
     accessToken,
     { method: 'POST', body: JSON.stringify({ exerciseId }) },
   );
-}
-
-/** A trainer brings one of their active clients into the group. A tracked client joins at once; anyone else is invited. */
-export function addClientToGroup(
-  accessToken: string,
-  groupId: string,
-  clientId: string,
-): Promise<{ userId: string; status: 'invited' | 'joined' }> {
-  return request(`/api/v1/groups/${encodeURIComponent(groupId)}/clients`, accessToken, {
-    method: 'POST',
-    body: JSON.stringify({ clientId }),
-  });
 }
 
 /** Which day of your split your group workout is. null clears it. */

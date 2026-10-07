@@ -106,6 +106,7 @@ describe('GroupsService', () => {
 
       await expect(service.create(HOST, { name: 'Thursday legs' })).resolves.toEqual({
         groupId: GROUP,
+        skipped: [],
       });
 
       const member = mock.calls.find(
@@ -123,6 +124,22 @@ describe('GroupsService', () => {
         group_id: GROUP,
         name: 'Thursday legs',
       });
+    });
+
+    it('adds the friends chosen when the group starts, and reports any it could not add', async () => {
+      const { mock, service } = setup();
+      mock.queue('workout_groups', ok({ id: GROUP }));
+      mock.queue('workout_group_members', ok());
+      mock.queue('workouts', ok());
+      const invite = jest
+        .spyOn(service, 'inviteMember')
+        .mockResolvedValueOnce({ userId: 'a', status: 'invited' })
+        .mockRejectedValueOnce(new ForbiddenException('not a friend'));
+
+      await expect(
+        service.create(HOST, { name: 'Legs', friendUsernames: ['sam_lifts', 'stranger'] }),
+      ).resolves.toEqual({ groupId: GROUP, skipped: ['stranger'] });
+      expect(invite).toHaveBeenCalledWith(HOST, GROUP, 'sam_lifts');
     });
 
     it('starts from an open workout of the caller’s own, rather than a new one', async () => {

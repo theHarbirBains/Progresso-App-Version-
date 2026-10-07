@@ -47,7 +47,6 @@ import { TrainerAccessScreen } from './src/screens/TrainerAccessScreen';
 import { TrainerClaimScreen } from './src/screens/TrainerClaimScreen';
 import { GroupsScreen } from './src/screens/GroupsScreen';
 import { GroupSessionScreen } from './src/screens/GroupSessionScreen';
-import { GroupAddClientsScreen } from './src/screens/GroupAddClientsScreen';
 import { GroupStartScreen } from './src/screens/GroupStartScreen';
 import { TrainerLiveWorkoutScreen } from './src/screens/TrainerLiveWorkoutScreen';
 import { TrainerClaimCodeScreen } from './src/screens/TrainerClaimCodeScreen';
@@ -300,7 +299,6 @@ function Root() {
                 <Stack.Screen name="TrainerClaim" component={TrainerClaimScreen} />
                 <Stack.Screen name="Groups" component={GroupsScreen} />
                 <Stack.Screen name="GroupSession" component={GroupSessionScreen} />
-                <Stack.Screen name="GroupAddClients" component={GroupAddClientsScreen} />
                 <Stack.Screen name="GroupStart" component={GroupStartScreen} />
                 <Stack.Screen name="TrainerLiveWorkout" component={TrainerLiveWorkoutScreen} />
                 <Stack.Screen name="TrainerClaimCode" component={TrainerClaimCodeScreen} />

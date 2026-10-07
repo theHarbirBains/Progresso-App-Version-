@@ -3,14 +3,7 @@ import type { AuthenticatedUser } from '../auth/types/authenticated-request';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
-import {
-  AddGroupClientDto,
-  AddGuestDto,
-  CreateGroupDto,
-  InviteMemberDto,
-  RespondGroupInviteDto,
-  SetMyWorkoutDayDto,
-} from './dto/groups.dto';
+import { CreateGroupDto, RespondGroupInviteDto, SetMyWorkoutDayDto } from './dto/groups.dto';
 import { GroupsService } from './groups.service';
 
 // Group workouts (see apps/api/src/groups). Every write is checked here against
@@ -42,37 +35,6 @@ export class GroupsController {
   @Get(':id')
   async detail(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.groupsService.getDetail(user.id, id);
-  }
-
-  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
-  @Post(':id/members')
-  async inviteMember(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: InviteMemberDto,
-  ) {
-    return this.groupsService.inviteMember(user.id, id, dto.username);
-  }
-
-  // A trainer brings an active client into the group (a tracked client joins at once).
-  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
-  @Post(':id/clients')
-  async addClient(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: AddGroupClientDto,
-  ) {
-    return this.groupsService.addClient(user.id, id, dto.clientId);
-  }
-
-  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
-  @Post(':id/guests')
-  async addGuest(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: AddGuestDto,
-  ) {
-    return this.groupsService.addGuest(user.id, id, dto);
   }
 
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)

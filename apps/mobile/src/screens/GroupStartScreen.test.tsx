@@ -1,14 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import {
-  addClientToGroup,
-  addGroupGuest,
-  createGroup,
-  getTrainerStatus,
-  inviteToGroup,
-  listFollowing,
-  listTrainerClients,
-} from '../lib/api';
+import { createGroup, getTrainerStatus, listFollowing, listTrainerClients } from '../lib/api';
 import { GroupStartScreen } from './GroupStartScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -16,11 +8,8 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../lib/api', () => ({
-  addClientToGroup: jest.fn(),
-  addGroupGuest: jest.fn(),
   createGroup: jest.fn(),
   getTrainerStatus: jest.fn(),
-  inviteToGroup: jest.fn(),
   listFollowing: jest.fn(),
   listTrainerClients: jest.fn(),
 }));
@@ -46,9 +35,6 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockCreate = createGroup as jest.Mock;
-const mockInvite = inviteToGroup as jest.Mock;
-const mockClient = addClientToGroup as jest.Mock;
-const mockGuest = addGroupGuest as jest.Mock;
 const mockFollowing = listFollowing as jest.Mock;
 const mockTrainer = getTrainerStatus as jest.Mock;
 const mockClients = listTrainerClients as jest.Mock;
@@ -59,10 +45,7 @@ const navigation: any = { replace: mockReplace, goBack: jest.fn() };
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' }, user: { id: 'me' } });
-  mockCreate.mockReset().mockResolvedValue({ groupId: 'g9' });
-  mockInvite.mockReset().mockResolvedValue({ userId: 'x', status: 'invited' });
-  mockClient.mockReset().mockResolvedValue({ userId: 'c', status: 'joined' });
-  mockGuest.mockReset().mockResolvedValue({ userId: 'g' });
+  mockCreate.mockReset().mockResolvedValue({ groupId: 'g9', skipped: [] });
   mockFollowing
     .mockReset()
     .mockResolvedValue([{ id: 'f1', username: 'sam_lifts', displayName: 'Sam', avatarUrl: null }]);
@@ -122,9 +105,13 @@ describe('GroupStartScreen', () => {
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('GroupSession', { groupId: 'g9' }),
     );
-    expect(mockCreate).toHaveBeenCalledWith('token-1', { name: 'Pull', splitDayId: 'day-2' });
-    expect(mockInvite).toHaveBeenCalledWith('token-1', 'g9', 'sam_lifts');
-    expect(mockClient).toHaveBeenCalledWith('token-1', 'g9', 'c1');
+    expect(mockCreate).toHaveBeenCalledWith('token-1', {
+      name: 'Pull',
+      splitDayId: 'day-2',
+      friendUsernames: ['sam_lifts'],
+      clientIds: ['c1'],
+      guestNames: [],
+    });
   });
 
   it('creates an own workout by name, with a guest added by name', async () => {
@@ -141,8 +128,10 @@ describe('GroupStartScreen', () => {
     expect(mockCreate).toHaveBeenCalledWith('token-1', {
       name: 'Arms and abs',
       workoutName: 'Arms and abs',
+      friendUsernames: [],
+      clientIds: [],
+      guestNames: ['Alex'],
     });
-    expect(mockGuest).toHaveBeenCalledWith('token-1', 'g9', 'Alex');
   });
 
   it('goes back to change who is training, keeping the picks', async () => {

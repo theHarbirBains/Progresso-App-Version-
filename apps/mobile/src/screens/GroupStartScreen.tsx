@@ -14,11 +14,8 @@ import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import {
-  addClientToGroup,
-  addGroupGuest,
   createGroup,
   getTrainerStatus,
-  inviteToGroup,
   listFollowing,
   listTrainerClients,
   type FollowUser,
@@ -129,37 +126,30 @@ export function GroupStartScreen({ navigation }: Props) {
     setStarting(true);
     setError(null);
     try {
-      const { groupId } =
+      // Everyone working out today goes into the start request, so nobody can be added after it.
+      const pickedFriendList = friends.filter((f) => pickedFriends.has(f.id));
+      const friendUsernames = pickedFriendList.flatMap((f) => (f.username ? [f.username] : []));
+      const clientIds = pickableClientList.flatMap((c) =>
+        c.clientId && pickedClients.has(c.clientId) ? [c.clientId] : [],
+      );
+      const people = { friendUsernames, clientIds, guestNames: guests };
+      const { groupId, skipped } =
         workout === OWN
-          ? await createGroup(accessToken, { name: workoutName, workoutName })
-          : await createGroup(accessToken, { name: workoutName, splitDayId: workout as string });
+          ? await createGroup(accessToken, { name: workoutName, workoutName, ...people })
+          : await createGroup(accessToken, {
+              name: workoutName,
+              splitDayId: workout as string,
+              ...people,
+            });
 
-      // Everyone else is added after the group exists. A failure for one person does not stop the rest.
-      const failed: string[] = [];
-      for (const friend of friends.filter((f) => pickedFriends.has(f.id))) {
-        if (!friend.username) {
-          failed.push(friend.displayName ?? 'a friend');
-          continue;
-        }
-        await inviteToGroup(accessToken, groupId, friend.username).catch(() =>
-          failed.push(friend.displayName ?? friend.username ?? 'a friend'),
-        );
-      }
-      for (const client of pickableClientList.filter(
-        (c) => c.clientId && pickedClients.has(c.clientId),
-      )) {
-        await addClientToGroup(accessToken, groupId, client.clientId as string).catch(() =>
-          failed.push(clientName(client)),
-        );
-      }
-      for (const name of guests) {
-        await addGroupGuest(accessToken, groupId, name).catch(() => failed.push(name));
-      }
-
-      if (failed.length > 0) {
+      const notAdded = [
+        ...pickedFriendList.filter((f) => !f.username).map((f) => f.displayName ?? 'a friend'),
+        ...skipped.map((key) => nameFor(key)),
+      ];
+      if (notAdded.length > 0) {
         Alert.alert(
           'Some people were not added',
-          `${failed.join(', ')} can be added from the group.`,
+          `${notAdded.join(', ')} can be added from the group.`,
         );
       }
       navigation.replace('GroupSession', { groupId });
@@ -168,6 +158,15 @@ export function GroupStartScreen({ navigation }: Props) {
     } finally {
       setStarting(false);
     }
+  }
+
+  /** The name to show for one of the identifiers the server reports as not added. */
+  function nameFor(key: string): string {
+    const friend = friends.find((f) => f.username === key);
+    if (friend) return friend.displayName ?? key;
+    const client = clients.find((c) => c.clientId === key);
+    if (client) return clientName(client);
+    return key;
   }
 
   const check = (on: boolean) => (

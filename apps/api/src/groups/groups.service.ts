@@ -66,7 +66,16 @@ interface MemberRow {
 export class GroupsService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async create(userId: string, dto: CreateGroupDto): Promise<{ groupId: string }> {
+  /**
+   * Starts a group and adds the people working out today. This is the only place people
+   * are added: once the group has started there is no route to add anyone. A person who
+   * cannot be added (not a friend or client, or an unknown guest) is returned in `skipped`
+   * and the group still starts.
+   */
+  async create(
+    userId: string,
+    dto: CreateGroupDto,
+  ): Promise<{ groupId: string; skipped: string[] }> {
     const client = this.supabaseService.getClient();
 
     // Your own workout in the group: a day of your split, a named workout outside it,
@@ -124,7 +133,18 @@ export class GroupsService {
       await this.createMemberWorkout(userId, groupId, workoutName, splitDayId);
     }
 
-    return { groupId };
+    const skipped: string[] = [];
+    for (const username of dto.friendUsernames ?? []) {
+      await this.inviteMember(userId, groupId, username).catch(() => skipped.push(username));
+    }
+    for (const clientId of dto.clientIds ?? []) {
+      await this.addClient(userId, groupId, clientId).catch(() => skipped.push(clientId));
+    }
+    for (const displayName of dto.guestNames ?? []) {
+      await this.addGuest(userId, groupId, { displayName }).catch(() => skipped.push(displayName));
+    }
+
+    return { groupId, skipped };
   }
 
   /** Live groups the caller is in. */

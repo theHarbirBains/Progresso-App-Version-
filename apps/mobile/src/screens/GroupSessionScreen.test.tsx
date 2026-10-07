@@ -1,14 +1,7 @@
 import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import {
-  addGroupGuest,
-  finishGroup,
-  getGroup,
-  getTrainerStatus,
-  inviteToGroup,
-  setMyGroupWorkoutDay,
-} from '../lib/api';
+import { finishGroup, getGroup } from '../lib/api';
 import { GroupSessionScreen } from './GroupSessionScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -16,32 +9,16 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../lib/api', () => ({
-  addGroupGuest: jest.fn(),
   finishGroup: jest.fn(),
   getGroup: jest.fn(),
-  getTrainerStatus: jest.fn(),
-  inviteToGroup: jest.fn(),
   leaveGroup: jest.fn(),
-  setMyGroupWorkoutDay: jest.fn(),
 }));
 
 jest.mock('../progress/useProgressTheme', () => ({
   useProgressTheme: () => ({
     theme: { accent: '#3DDC97', onAccent: '#000000' },
-    activeWorkoutSplitId: 'split-1',
     weightUnit: 'kg',
   }),
-}));
-
-jest.mock('../workouts/workoutSplitQueries', () => ({
-  fetchWorkoutSplitDetail: jest.fn(async () => ({
-    id: 'split-1',
-    name: 'Main',
-    days: [
-      { id: 'day-1', name: 'Push', orderIndex: 1, muscleGroups: ['chest'] },
-      { id: 'day-2', name: 'Pull', orderIndex: 2, muscleGroups: ['back'] },
-    ],
-  })),
 }));
 
 // The group editor is covered on its own; here it is a marker listing the workouts it was given.
@@ -60,16 +37,11 @@ jest.mock('../workouts/GroupWorkoutEditor', () => {
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetGroup = getGroup as jest.Mock;
-const mockTrainer = getTrainerStatus as jest.Mock;
-const mockInvite = inviteToGroup as jest.Mock;
-const mockGuest = addGroupGuest as jest.Mock;
 const mockFinish = finishGroup as jest.Mock;
-const mockSetDay = setMyGroupWorkoutDay as jest.Mock;
 
 const mockGoBack = jest.fn();
-const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { navigate: mockNavigate, goBack: mockGoBack };
+const navigation: any = { navigate: jest.fn(), goBack: mockGoBack };
 
 function group(overrides: Record<string, unknown> = {}) {
   return {
@@ -124,13 +96,8 @@ function renderScreen() {
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' }, user: { id: 'me' } });
   mockGetGroup.mockReset().mockResolvedValue(group());
-  mockTrainer.mockReset().mockResolvedValue({ isTrainer: false });
-  mockInvite.mockReset().mockResolvedValue({ userId: 'x', status: 'invited' });
-  mockGuest.mockReset().mockResolvedValue({ userId: 'g' });
   mockFinish.mockReset().mockResolvedValue({ ok: true });
-  mockSetDay.mockReset().mockResolvedValue({ ok: true });
   mockGoBack.mockClear();
-  mockNavigate.mockClear();
 });
 
 describe('GroupSessionScreen', () => {
@@ -142,39 +109,24 @@ describe('GroupSessionScreen', () => {
     expect(screen.getByTestId('group-session-invited')).toHaveTextContent(/Jo/);
   });
 
-  it('lets each person pick which day of their split their own workout is', async () => {
+  it('offers no way to add anyone once the group has started', async () => {
     renderScreen();
 
-    fireEvent.press(await screen.findByTestId('group-day-day-2'));
-
-    await waitFor(() => expect(mockSetDay).toHaveBeenCalledWith('token-1', 'g1', 'day-2'));
+    await screen.findByTestId('group-workout');
+    expect(screen.queryByTestId('group-invite-username')).toBeNull();
+    expect(screen.queryByTestId('group-guest-name')).toBeNull();
+    expect(screen.queryByTestId('group-open-add-clients')).toBeNull();
+    expect(screen.queryByTestId('group-day-day-2')).toBeNull();
   });
 
-  it('adds a guest by name, with no account needed', async () => {
+  it('a finished group shows that it has finished, with no Finish button', async () => {
+    mockGetGroup.mockResolvedValue(
+      group({ status: 'finished', finishedAt: '2026-10-06T10:00:00.000Z' }),
+    );
     renderScreen();
 
-    fireEvent.changeText(await screen.findByTestId('group-guest-name'), 'Sam');
-    fireEvent.press(screen.getByTestId('group-guest-submit'));
-
-    await waitFor(() => expect(mockGuest).toHaveBeenCalledWith('token-1', 'g1', 'Sam'));
-  });
-
-  it('invites a friend by username', async () => {
-    renderScreen();
-
-    fireEvent.changeText(await screen.findByTestId('group-invite-username'), 'Friend_One');
-    fireEvent.press(screen.getByTestId('group-invite-submit'));
-
-    await waitFor(() => expect(mockInvite).toHaveBeenCalledWith('token-1', 'g1', 'friend_one'));
-  });
-
-  it('a trainer opens the client picker to bring in several clients at once', async () => {
-    mockTrainer.mockResolvedValue({ isTrainer: true });
-    renderScreen();
-
-    fireEvent.press(await screen.findByTestId('group-open-add-clients'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('GroupAddClients', { groupId: 'g1' });
+    expect(await screen.findByTestId('group-session-finished')).toBeTruthy();
+    expect(screen.queryByTestId('group-finish')).toBeNull();
   });
 
   it('finishes the group for everyone, once the person confirms', async () => {
