@@ -149,6 +149,18 @@ export class TrainerController {
     return { ok: true };
   }
 
+  // Discards a live session the trainer started. Nothing from it is kept.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Post('clients/:clientId/live-workouts/:workoutId/cancel')
+  async cancelLiveWorkout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @Param('workoutId', ParseUUIDPipe) workoutId: string,
+  ) {
+    await this.trainerService.cancelLiveWorkout(user.id, clientId, workoutId);
+    return { ok: true };
+  }
+
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Post('clients/:clientId/exercises/resolve')
   async resolveExercise(

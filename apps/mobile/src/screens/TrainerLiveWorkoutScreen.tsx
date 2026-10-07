@@ -2,11 +2,11 @@ import { Alert, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { PrimaryButton } from '../design/Button';
+import { PrimaryButton, TextButton } from '../design/Button';
 import { Screen } from '../design/Screen';
 import { Text } from '../design/Text';
 import { colors, typeScale } from '../design/theme';
-import { finishLiveWorkout, resolveClientExercise } from '../lib/api';
+import { cancelLiveWorkout, finishLiveWorkout, resolveClientExercise } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { LiveWorkoutEditor } from '../workouts/LiveWorkoutEditor';
 
@@ -27,6 +27,29 @@ export function TrainerLiveWorkoutScreen({ navigation, route }: Props) {
     if (!accessToken) return Promise.reject(new Error('You are signed out'));
     return resolveClientExercise(accessToken, clientId, exerciseId).then(
       (result) => result.exerciseId,
+    );
+  }
+
+  // Discards the session: nothing from it is kept, and the client's stats do not count it.
+  function cancel() {
+    if (!accessToken) return;
+    Alert.alert(
+      'Discard this session?',
+      'Nothing from it will be kept, and it will not count towards the client’s stats.',
+      [
+        { text: 'Keep it', style: 'cancel' },
+        {
+          text: 'Discard session',
+          style: 'destructive',
+          onPress: () => {
+            void cancelLiveWorkout(accessToken, clientId, workoutId)
+              .then(() => navigation.goBack())
+              .catch((err: unknown) =>
+                Alert.alert('Could not discard', err instanceof Error ? err.message : 'Try again'),
+              );
+          },
+        },
+      ],
     );
   }
 
@@ -73,6 +96,12 @@ export function TrainerLiveWorkoutScreen({ navigation, route }: Props) {
         </AppCard>
 
         <PrimaryButton testID="trainer-live-finish" label="Finish Session" onPress={finish} />
+        <TextButton
+          testID="trainer-live-cancel"
+          label="Cancel Session"
+          destructive
+          onPress={cancel}
+        />
       </View>
     </Screen>
   );

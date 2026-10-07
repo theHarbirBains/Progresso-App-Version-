@@ -829,6 +829,29 @@ export class TrainerService {
   }
 
   /**
+   * Cancels a live session the trainer started: the session is discarded, not kept as a
+   * finished workout. It is soft-deleted, so the client's PRs are rebuilt without it, as
+   * they are for any deleted workout.
+   */
+  async cancelLiveWorkout(trainerId: string, clientId: string, workoutId: string): Promise<void> {
+    await this.assertTrainer(trainerId);
+    await this.assertActiveLink(trainerId, clientId);
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('workouts')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', workoutId)
+      .eq('user_id', clientId)
+      .eq('logged_by', trainerId)
+      .is('completed_at', null)
+      .is('deleted_at', null)
+      .select('id');
+    if (error) throw new InternalServerErrorException('Failed to cancel the live session');
+    if (!data || data.length === 0) throw new NotFoundException('No open live session to cancel');
+    await this.audit(trainerId, clientId, 'live.cancelled', 'workouts', workoutId, {});
+  }
+
+  /**
    * The exercise to use in a client's live session: the client's own copy of the
    * trainer's exercise (made if needed), or the exercise itself when it is already the
    * client's or a built-in.

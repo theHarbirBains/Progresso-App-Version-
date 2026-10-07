@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { finishLiveWorkout, resolveClientExercise } from '../lib/api';
 import { TrainerLiveWorkoutScreen } from './TrainerLiveWorkoutScreen';
@@ -8,6 +8,7 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../lib/api', () => ({
+  cancelLiveWorkout: jest.fn(),
   finishLiveWorkout: jest.fn(),
   resolveClientExercise: jest.fn(),
 }));
@@ -44,6 +45,30 @@ describe('TrainerLiveWorkoutScreen', () => {
 
     expect(screen.getByTestId('live-editor')).toHaveTextContent('w9 by trainer-1');
     expect(screen.getByTestId('trainer-live-finish')).toBeTruthy();
+  });
+
+  it('discards the session only after the trainer confirms, and then goes back', async () => {
+    const { Alert } = jest.requireActual('react-native');
+    const { cancelLiveWorkout } = jest.requireMock('../lib/api') as {
+      cancelLiveWorkout: jest.Mock;
+    };
+    cancelLiveWorkout.mockResolvedValue({ ok: true });
+    const alert = jest.spyOn(Alert, 'alert');
+    render(
+      <TrainerLiveWorkoutScreen
+        navigation={navigation}
+        route={{ params: { workoutId: 'w9', clientId: 'c1', clientName: 'Pat' } } as never}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('trainer-live-cancel'));
+    expect(cancelLiveWorkout).not.toHaveBeenCalled();
+    const buttons = (alert.mock.calls[0][2] ?? []) as { text?: string; onPress?: () => void }[];
+    buttons.find((button) => button.text === 'Discard session')?.onPress?.();
+
+    await waitFor(() => expect(navigation.goBack).toHaveBeenCalled());
+    expect(cancelLiveWorkout).toHaveBeenCalledWith('token-1', 'c1', 'w9');
+    alert.mockRestore();
   });
 
   it('exposes the resolve step to the editor, so picked exercises become the client’s copies', async () => {

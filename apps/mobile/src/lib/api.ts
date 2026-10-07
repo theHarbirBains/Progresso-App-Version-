@@ -921,6 +921,19 @@ export function finishLiveWorkout(
   );
 }
 
+/** Discards a live session. Nothing from it is kept. */
+export function cancelLiveWorkout(
+  accessToken: string,
+  clientId: string,
+  workoutId: string,
+): Promise<{ ok: true }> {
+  return request<{ ok: true }>(
+    `/api/v1/trainer/clients/${encodeURIComponent(clientId)}/live-workouts/${encodeURIComponent(workoutId)}/cancel`,
+    accessToken,
+    { method: 'POST' },
+  );
+}
+
 /** The exercise id to use in a client's live session (the client's own copy of a trainer's exercise). */
 export function resolveClientExercise(
   accessToken: string,

@@ -780,3 +780,45 @@ describe('TrainerService: clients without an account', () => {
     });
   });
 });
+
+describe('TrainerService: cancelling a live session', () => {
+  const WORKOUT = '12121212-1212-4212-8212-121212121212';
+
+  it('refuses a client who is not one of the trainer’s active clients', async () => {
+    const { mock, service } = setup();
+    mock.queue('subscriptions', activeTrainer());
+    mock.queue('trainer_clients', ok(null));
+
+    await expect(service.cancelLiveWorkout(TRAINER, CLIENT, WORKOUT)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(mock.calls.some((c) => c.target === 'workouts')).toBe(false);
+  });
+
+  it('discards the open session: it is soft-deleted, not finished, and the cancel is recorded', async () => {
+    const { mock, service } = setup();
+    mock.queue('subscriptions', activeTrainer());
+    mock.queue('trainer_clients', ok({ id: 'l1', status: 'active', source: 'managed' }));
+    mock.queue('workouts', ok([{ id: WORKOUT }]));
+    mock.queue('trainer_actions', ok());
+
+    await expect(service.cancelLiveWorkout(TRAINER, CLIENT, WORKOUT)).resolves.toBeUndefined();
+
+    const update = mock.calls.find((c) => c.target === 'workouts' && c.method === 'update');
+    expect(update?.args[0]).toMatchObject({ deleted_at: expect.any(String) });
+    expect(update?.args[0]).not.toHaveProperty('completed_at');
+    const audit = mock.calls.find((c) => c.target === 'trainer_actions' && c.method === 'insert');
+    expect(audit?.args[0]).toMatchObject({ action: 'live.cancelled', target_id: WORKOUT });
+  });
+
+  it('says there is no open session when none matches, rather than cancelling something else', async () => {
+    const { mock, service } = setup();
+    mock.queue('subscriptions', activeTrainer());
+    mock.queue('trainer_clients', ok({ id: 'l1', status: 'active', source: 'managed' }));
+    mock.queue('workouts', ok([]));
+
+    await expect(service.cancelLiveWorkout(TRAINER, CLIENT, WORKOUT)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});

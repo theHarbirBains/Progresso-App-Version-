@@ -15,6 +15,10 @@ jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('../progress/useProgressTheme', () => ({
+  useProgressTheme: () => ({ theme: { accent: '#3DDC97', onAccent: '#000000' }, weightUnit: 'kg' }),
+}));
+
 jest.mock('../lib/api', () => ({
   endTrainerLink: jest.fn(),
   getTrainerStatus: jest.fn(),

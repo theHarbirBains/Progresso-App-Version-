@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
@@ -10,6 +10,8 @@ import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
+import { Text } from '../design/Text';
+import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import {
   endTrainerLink,
   getTrainerStatus,
@@ -21,6 +23,7 @@ import {
   type TrainerRequest,
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { describeTrainerActivity } from '../trainer/trainerLabels';
 import { formatCardDate } from '../workouts/workoutFormat';
 
@@ -34,15 +37,19 @@ interface AccessData {
 }
 
 /**
- * Trainer access, for everyone: the trainer's own clients (if they are a
- * trainer), requests from trainers who want to log for you, the trainers who
- * currently can, and a record of what they have done. Accepting or declining,
- * and ending a link, are always the client's choice.
+ * Trainer access, for everyone: the trainer's own clients (if they are a trainer), a
+ * way to link history a trainer tracked for them, requests from trainers who want to
+ * log for you, the trainers who currently can, and a record of what has been done.
+ * Accepting or declining, and ending a link, are always the client's choice.
+ *
+ * Styled like the rest of Train: the mode accent, a hero card for anything waiting on
+ * the person, widget cards with plain rows, and accent buttons.
  */
 export function TrainerAccessScreen({ navigation }: Props) {
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
   const userId = user?.id ?? '';
+  const { theme } = useProgressTheme();
 
   const [data, setData] = useState<AccessData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,9 +126,11 @@ export function TrainerAccessScreen({ navigation }: Props) {
   return (
     <Screen
       scrollTestID="trainer-access-scroll"
+      contentContainerStyle={{ gap: widgetGap }}
       header={
         <AppHeader
           title="Trainer Access"
+          subtitle="Who can log workouts for you, and what they have done"
           onBack={() => navigation.goBack()}
           testID="trainer-access-header"
         />
@@ -133,47 +142,16 @@ export function TrainerAccessScreen({ navigation }: Props) {
         <ErrorState testID="trainer-access-error" message={error} onRetry={() => void load()} />
       ) : null}
 
-      {!loading && !error && nothingToShow ? (
-        <EmptyState
-          testID="trainer-access-empty"
-          title="No trainer links"
-          description="A trainer can ask to log workouts for you. Their request will appear here, and you decide whether to accept it."
-        />
-      ) : null}
-
       {!loading && !error && data ? (
-        <View style={{ gap: 6 }}>
-          <AppCard testID="trainer-access-clients">
-            <ListRow
-              testID="trainer-access-open-clients"
-              icon="users"
-              title="Clients"
-              subtitle={
-                data.isTrainer
-                  ? 'Your client pool: track workouts, with or without their account'
-                  : 'Needs a Trainer subscription. Open to see what it includes'
-              }
-              chevron
-              onPress={() => navigation.navigate('TrainerClients')}
-            />
-          </AppCard>
-
-          <AppCard testID="trainer-access-link-history">
-            <ListRow
-              testID="trainer-access-open-claim"
-              icon="link"
-              title="Link Tracked History"
-              subtitle="A trainer tracked you before you had an account? Enter their code."
-              chevron
-              onPress={() => navigation.navigate('TrainerClaim')}
-            />
-          </AppCard>
-
+        <>
           {data.requests.length > 0 ? (
-            <AppCard testID="trainer-access-requests">
-              <SectionHeader label="Requests" />
+            <AppCard hero topAccent={theme.accent} testID="trainer-access-requests">
+              <Text style={styles.eyebrow}>Waiting for you</Text>
+              <Text style={styles.lede}>
+                A trainer wants to log workouts for you. You decide whether to accept.
+              </Text>
               {data.requests.map((request, index) => (
-                <View key={request.trainerId} style={{ gap: 8 }}>
+                <View key={request.trainerId} style={styles.block}>
                   <ListRow
                     testID={`trainer-request-${request.trainerId}`}
                     title={request.trainerDisplayName ?? 'A trainer'}
@@ -181,7 +159,7 @@ export function TrainerAccessScreen({ navigation }: Props) {
                     detail={formatCardDate(request.requestedAt)}
                     divider={index > 0}
                   />
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={styles.actions}>
                     <SecondaryButton
                       testID={`trainer-request-decline-${request.trainerId}`}
                       label="Decline"
@@ -195,6 +173,8 @@ export function TrainerAccessScreen({ navigation }: Props) {
                       size="sm"
                       loading={busyTrainerId === request.trainerId}
                       disabled={busyTrainerId !== null}
+                      accentColor={theme.accent}
+                      onAccentColor={theme.onAccent}
                       onPress={() => void respond(request.trainerId, 'accept')}
                     />
                   </View>
@@ -203,9 +183,41 @@ export function TrainerAccessScreen({ navigation }: Props) {
             </AppCard>
           ) : null}
 
+          <AppCard testID="trainer-access-clients">
+            <SectionHeader label="Clients" />
+            {data.isTrainer ? (
+              <ListRow
+                testID="trainer-access-open-clients"
+                title="Your client pool"
+                subtitle="Track workouts, with or without their account"
+                chevron
+                onPress={() => navigation.navigate('TrainerClients')}
+              />
+            ) : (
+              <ListRow
+                testID="trainer-access-open-clients"
+                title="Clients"
+                subtitle="Needs a Trainer subscription. Open to see what it includes"
+                chevron
+                onPress={() => navigation.navigate('TrainerClients')}
+              />
+            )}
+          </AppCard>
+
+          <AppCard testID="trainer-access-link-history">
+            <SectionHeader label="Tracked history" />
+            <ListRow
+              testID="trainer-access-open-claim"
+              title="Link Tracked History"
+              subtitle="A trainer tracked you before you had an account? Enter their code."
+              chevron
+              onPress={() => navigation.navigate('TrainerClaim')}
+            />
+          </AppCard>
+
           {data.trainers.length > 0 ? (
             <AppCard testID="trainer-access-trainers">
-              <SectionHeader label="Your Trainers" />
+              <SectionHeader label="Your trainers" />
               {data.trainers.map((trainer, index) => (
                 <ListRow
                   key={trainer.trainerId}
@@ -240,8 +252,35 @@ export function TrainerAccessScreen({ navigation }: Props) {
               ))}
             </AppCard>
           ) : null}
-        </View>
+
+          {nothingToShow ? (
+            <EmptyState
+              testID="trainer-access-empty"
+              title="No trainer links"
+              description="A trainer can ask to log workouts for you. Their request will appear here, and you decide whether to accept it."
+            />
+          ) : null}
+        </>
       ) : null}
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  eyebrow: {
+    ...typeScale.sectionHeading,
+    color: colors.textSecondary,
+  },
+  lede: {
+    ...typeScale.secondary,
+    color: colors.textSecondaryBright,
+    marginBottom: spacing.sm,
+  },
+  block: {
+    gap: spacing.sm,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+});
