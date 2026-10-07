@@ -273,6 +273,26 @@ describe('GroupsService', () => {
   });
 
   describe('leave', () => {
+    it('a host cancel discards every open workout in the group and ends it, and completes none', async () => {
+      const { mock, service } = setup();
+      mock.queue('workout_group_members', joined(HOST, 'host'));
+      mock.queue('workout_groups', ok({ status: 'live' }));
+      mock.queue('workouts', ok());
+      mock.queue('workout_groups', ok());
+
+      await service.cancel(HOST, GROUP);
+
+      const discard = mock.calls.find((c) => c.target === 'workouts' && c.method === 'update');
+      expect(discard?.args[0]).toEqual({ deleted_at: expect.any(String) });
+      expect(
+        mock.calls.some((c) => c.method === 'update' && 'completed_at' in (c.args[0] as object)),
+      ).toBe(false);
+      const end = mock.calls
+        .filter((c) => c.target === 'workout_groups' && c.method === 'update')
+        .at(-1);
+      expect(end?.args[0]).toMatchObject({ status: 'finished' });
+    });
+
     it('stops the host leaving, since the host finishes the group instead', async () => {
       const { mock, service } = setup();
       mock.queue('workout_group_members', joined(HOST, 'host'));

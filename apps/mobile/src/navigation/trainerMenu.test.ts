@@ -11,16 +11,12 @@ describe('appMenuSectionsFor', () => {
     expect(routesIn(appMenuSectionsFor(true), 'SOCIAL')).toContain('TrainerAccess');
   });
 
-  it('adds Clients under Training only for a trainer', () => {
+  it('never lists Clients in the side menu, for anyone; trainers reach it from Trainer Access', () => {
     expect(routesIn(appMenuSectionsFor(false), 'TRAINING')).not.toContain('TrainerClients');
-    expect(routesIn(appMenuSectionsFor(true), 'TRAINING')).toContain('TrainerClients');
+    expect(routesIn(appMenuSectionsFor(true), 'TRAINING')).not.toContain('TrainerClients');
   });
 
-  it('leaves every other entry in place for a trainer, with Clients at the end of Training', () => {
-    const plain = appMenuSectionsFor(false).flatMap((s) => s.items.map((i) => i.label));
-    const trainer = appMenuSectionsFor(true).flatMap((s) => s.items.map((i) => i.label));
-    expect(trainer.filter((label) => label !== 'Clients')).toEqual(plain);
-    // Training has five entries, so Clients is the sixth.
-    expect(trainer.indexOf('Clients')).toBe(5);
+  it('shows the same menu to a trainer as to everyone else', () => {
+    expect(appMenuSectionsFor(true)).toEqual(appMenuSectionsFor(false));
   });
 });

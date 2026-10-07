@@ -448,14 +448,15 @@ export class GroupsService {
       .eq('id', member.id);
     if (error) throw new InternalServerErrorException('Failed to leave the group');
 
+    // Leaving discards this person's open workout. Only Finish Group Workout logs a workout.
     const { error: workoutError } = await client
       .from('workouts')
-      .update({ completed_at: now })
+      .update({ deleted_at: now })
       .eq('group_id', groupId)
       .eq('user_id', userId)
       .is('completed_at', null)
       .is('deleted_at', null);
-    if (workoutError) throw new InternalServerErrorException('Failed to close your workout');
+    if (workoutError) throw new InternalServerErrorException('Failed to discard your workout');
   }
 
   /**
@@ -469,17 +470,24 @@ export class GroupsService {
     const client = this.supabaseService.getClient();
     const now = new Date().toISOString();
 
-    const { error } = await client
+    // A cancel never logs a workout. The host's cancel discards everyone's open workout in
+    // the group and ends it; a member's discards only their own and leaves the group.
+    let discard = client
       .from('workouts')
       .update({ deleted_at: now })
       .eq('group_id', groupId)
-      .eq('user_id', userId)
       .is('completed_at', null)
       .is('deleted_at', null);
-    if (error) throw new InternalServerErrorException('Failed to cancel your workout');
+    if (member.role !== 'host') discard = discard.eq('user_id', userId);
+    const { error } = await discard;
+    if (error) throw new InternalServerErrorException('Failed to cancel the workout');
 
     if (member.role === 'host') {
-      await this.finish(userId, groupId);
+      const { error: endError } = await client
+        .from('workout_groups')
+        .update({ status: 'finished', finished_at: now })
+        .eq('id', groupId);
+      if (endError) throw new InternalServerErrorException('Failed to end the group');
       return;
     }
     const { error: leaveError } = await client

@@ -94,7 +94,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
     Alert.alert(
       'Cancel your workout?',
       isHost
-        ? 'Your workout is discarded and the group ends for everyone. This cannot be undone.'
+        ? 'Everyone’s open workout in this group is discarded and the group ends. Nothing is saved. This cannot be undone.'
         : 'Your workout is discarded and you leave the group. This cannot be undone.',
       [
         { text: 'Keep going', style: 'cancel' },
@@ -202,10 +202,6 @@ export function GroupSessionScreen({ navigation, route }: Props) {
               />
             ))}
           </AppCard>
-        ) : null}
-
-        {isLive && !isHost ? (
-          <TextButton testID="group-leave" label="Leave Group" destructive onPress={leave} />
         ) : null}
       </ScrollView>
 

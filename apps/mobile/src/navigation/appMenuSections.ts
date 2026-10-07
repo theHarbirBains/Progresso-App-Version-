@@ -85,20 +85,11 @@ export const APP_MENU_SECTIONS: AppMenuSection[] = [
 ];
 
 /**
- * The menu for this person. A trainer also gets Clients under TRAINING, which is
- * how they reach their clients from anywhere in the app. Everyone else sees the
- * same menu without it.
+ * The menu for this person. Clients is not listed; trainers reach their client list
+ * from Trainer Access.
  */
-export function appMenuSectionsFor(isTrainer: boolean): AppMenuSection[] {
-  if (!isTrainer) return APP_MENU_SECTIONS;
-  return APP_MENU_SECTIONS.map((section) =>
-    section.title === 'TRAINING'
-      ? {
-          ...section,
-          items: [...section.items, { route: 'TrainerClients', label: 'Clients', icon: 'users' }],
-        }
-      : section,
-  );
+export function appMenuSectionsFor(_isTrainer: boolean): AppMenuSection[] {
+  return APP_MENU_SECTIONS;
 }
 
 /** Rendered by AppSideMenu as a standalone row below every section, with no
