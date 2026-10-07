@@ -54,7 +54,7 @@ export function ExerciseFormScreen(props: Props) {
   const [isUnilateral, setIsUnilateral] = useState(
     props.mode === 'edit' ? props.exercise.movementType === 'unilateral' : false,
   );
-  const [isActive, setIsActive] = useState(props.mode === 'edit' ? props.exercise.isActive : true);
+  const [isActive] = useState(props.mode === 'edit' ? props.exercise.isActive : true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,16 +158,29 @@ export function ExerciseFormScreen(props: Props) {
     }
   }
 
-  async function handleToggleActive() {
+  // Deleting deactivates the exercise: it leaves the library and the picker, and every past
+  // workout keeps its history. Its name is free to use again.
+  function confirmDelete() {
+    if (props.mode !== 'edit') return;
+    Alert.alert(
+      'Delete this exercise?',
+      `${name.trim() || 'It'} will be removed from your library. Past workouts keep their history.`,
+      [
+        { text: 'Keep it', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void handleDelete() },
+      ],
+    );
+  }
+
+  async function handleDelete() {
     if (!accessToken || props.mode !== 'edit') return;
     setError(null);
     setSaving(true);
     try {
-      await updateExercise(accessToken, props.exercise.id, { isActive: !isActive });
-      setIsActive((prev) => !prev);
+      await updateExercise(accessToken, props.exercise.id, { isActive: false });
       props.onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update exercise');
+      setError(err instanceof Error ? err.message : 'Could not delete the exercise');
     } finally {
       setSaving(false);
     }
@@ -296,24 +309,14 @@ export function ExerciseFormScreen(props: Props) {
           onAccentColor={onAccentColor}
         />
 
-        {props.mode === 'edit' ? (
-          isActive ? (
-            <DestructiveButton
-              testID="exercise-form-toggle-active"
-              label="Deactivate"
-              accessibilityLabel="Deactivate exercise"
-              onPress={handleToggleActive}
-              disabled={saving}
-            />
-          ) : (
-            <SecondaryButton
-              testID="exercise-form-toggle-active"
-              label="Reactivate"
-              accessibilityLabel="Reactivate exercise"
-              onPress={handleToggleActive}
-              disabled={saving}
-            />
-          )
+        {props.mode === 'edit' && isActive ? (
+          <DestructiveButton
+            testID="exercise-form-delete"
+            label="Delete Exercise"
+            accessibilityLabel="Delete exercise"
+            onPress={confirmDelete}
+            disabled={saving}
+          />
         ) : null}
       </View>
       <PhotoLightbox

@@ -155,10 +155,10 @@ describe('ExerciseFormScreen (create mode)', () => {
     expect(onCancel).toHaveBeenCalled();
   });
 
-  it('never shows Deactivate/Reactivate in create mode', () => {
+  it('never shows Delete in create mode', () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
-    expect(screen.queryByTestId('exercise-form-toggle-active')).toBeNull();
+    expect(screen.queryByTestId('exercise-form-delete')).toBeNull();
   });
 
   it('adds a photo, uploads it on Save, and includes it in the create payload', async () => {
@@ -246,8 +246,10 @@ describe('ExerciseFormScreen (edit mode)', () => {
     expect(onDone).toHaveBeenCalled();
   });
 
-  it('deactivates an active exercise', async () => {
+  it('deletes an active exercise once the person confirms, and leaves the library', async () => {
     const onDone = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert');
+    alert.mockClear();
     render(
       <ExerciseFormScreen
         mode="edit"
@@ -257,15 +259,19 @@ describe('ExerciseFormScreen (edit mode)', () => {
       />,
     );
 
-    fireEvent.press(screen.getByTestId('exercise-form-toggle-active'));
+    fireEvent.press(screen.getByTestId('exercise-form-delete'));
+    expect(mockUpdateExercise).not.toHaveBeenCalled();
+    const buttons = (alert.mock.calls[0]?.[2] ?? []) as { text?: string; onPress?: () => void }[];
+    buttons.find((button) => button.text === 'Delete')?.onPress?.();
 
     await waitFor(() =>
       expect(mockUpdateExercise).toHaveBeenCalledWith('token-123', 'ex-mine', { isActive: false }),
     );
     expect(onDone).toHaveBeenCalled();
+    alert.mockRestore();
   });
 
-  it('shows Reactivate for a deactivated exercise', () => {
+  it('offers no Reactivate: a deleted exercise does not come back', () => {
     render(
       <ExerciseFormScreen
         mode="edit"
@@ -275,7 +281,8 @@ describe('ExerciseFormScreen (edit mode)', () => {
       />,
     );
 
-    expect(screen.getByTestId('exercise-form-toggle-active')).toHaveTextContent('Reactivate');
+    expect(screen.queryByTestId('exercise-form-delete')).toBeNull();
+    expect(screen.queryByText('Reactivate')).toBeNull();
   });
 
   it('shows an existing photo and lets it be replaced', async () => {

@@ -484,6 +484,34 @@ async function main() {
     return res.rows[0].id;
   });
 
+  // A deleted custom exercise (deactivated) frees its name, but an active duplicate is still refused.
+  const reusable = await asUserCommitted(userA, async (client) => {
+    const res = await client.query(
+      "insert into public.exercises (name, muscle_group, created_by) values ('Reusable Name Check', 'biceps', $1) returning id",
+      [userA],
+    );
+    return res.rows[0].id;
+  });
+  await expectThrows(
+    asUserCommitted(userA, (client) =>
+      client.query(
+        "insert into public.exercises (name, muscle_group, created_by) values ('Reusable Name Check', 'biceps', $1)",
+        [userA],
+      ),
+    ),
+    'A second active custom exercise with the same name is refused',
+    /duplicate key|unique/i,
+  );
+  await admin.query("update public.exercises set is_active = false where id = $1", [reusable]);
+  // Succeeds, or the insert throws and the run stops here.
+  await asUserCommitted(userA, (client) =>
+    client.query(
+      "insert into public.exercises (name, muscle_group, created_by) values ('Reusable Name Check', 'biceps', $1)",
+      [userA],
+    ),
+  );
+  console.log('[PASS] After a custom exercise is deleted, its name can be used again');
+
   await asUser(userA, async (client) => {
     const res = await client.query(
       "update public.exercises set name = 'My Curl Variation v2' where id = $1",
