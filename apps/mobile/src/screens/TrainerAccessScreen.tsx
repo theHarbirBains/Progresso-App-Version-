@@ -183,7 +183,11 @@ export function TrainerAccessScreen({ navigation }: Props) {
             </AppCard>
           ) : null}
 
-          <AppCard testID="trainer-access-clients">
+          <AppCard
+            testID="trainer-access-clients"
+            hero={data.requests.length === 0}
+            topAccent={theme.accent}
+          >
             <SectionHeader label="Clients" />
             {data.isTrainer ? (
               <ListRow
