@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
 import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
-import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
+import { PrimaryButton, TextButton } from '../design/Button';
 import { Card } from '../design/Card';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
@@ -34,6 +34,7 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import { fetchActiveWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
 import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
+import { LiveNowCard } from '../feed/LiveNowCard';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
@@ -541,65 +542,38 @@ export function FeedScreen({ navigation }: Props) {
       </BubbleMenu>
 
       {liveWorkout ? (
-        <Card
-          heroColor={theme.accent}
+        <LiveNowCard
           testID="feed-live-workout"
+          title={liveWorkout.name}
+          subtitle="Your workout"
           onPress={() => navigation.navigate('ActiveWorkout', { workoutId: liveWorkout.id })}
-          accessibilityLabel={`Workout in progress: ${liveWorkout.name}. Resume`}
-        >
-          <Text style={[styles.nextWorkoutEyebrow, { color: withAlpha(theme.onAccent, 0.72) }]}>
-            Workout in progress
-          </Text>
-          <Text style={[styles.nextWorkoutDayName, { color: theme.onAccent }]}>
-            {liveWorkout.name}
-          </Text>
-          <PrimaryButton
-            testID="feed-resume-workout"
-            label="Resume Workout"
-            onPress={() => navigation.navigate('ActiveWorkout', { workoutId: liveWorkout.id })}
-            accentColor={theme.onAccent}
-            onAccentColor={theme.accent}
-          />
-        </Card>
+        />
       ) : null}
 
       {liveGroups.length === 1 ? (
-        <Card
-          key={`group-${liveGroups[0].id}`}
+        <LiveNowCard
           testID={`feed-live-group-${liveGroups[0].id}`}
+          title={liveGroups[0].name}
+          subtitle="Group workout"
           onPress={() => navigation.navigate('GroupSession', { groupId: liveGroups[0].id })}
-          accessibilityLabel={`Group workout in progress: ${liveGroups[0].name}. Resume`}
-        >
-          <Text style={styles.nextWorkoutEyebrow}>Group workout in progress</Text>
-          <Text style={styles.nextWorkoutDayName}>{liveGroups[0].name}</Text>
-          <SecondaryButton
-            testID={`feed-resume-group-${liveGroups[0].id}`}
-            label="Resume Group Workout"
-            onPress={() => navigation.navigate('GroupSession', { groupId: liveGroups[0].id })}
-          />
-        </Card>
+        />
       ) : null}
 
       {liveGroups.length > 1 ? (
-        <Card
+        <LiveNowCard
           testID="feed-live-groups"
+          title={`${liveGroups.length} group workouts`}
+          subtitle="Open Group Workouts to choose one"
           onPress={() => navigation.navigate('Groups')}
-          accessibilityLabel={`${liveGroups.length} group workouts in progress. Open Group Workouts`}
-        >
-          <Text style={styles.nextWorkoutEyebrow}>Group workouts in progress</Text>
-          <Text style={styles.nextWorkoutDayName}>{`${liveGroups.length} open`}</Text>
-          <SecondaryButton
-            testID="feed-open-groups"
-            label="Open Group Workouts"
-            onPress={() => navigation.navigate('Groups')}
-          />
-        </Card>
+        />
       ) : null}
 
       {liveSessions.map((session) => (
-        <Card
-          key={`session-${session.workoutId}`}
+        <LiveNowCard
+          key={session.workoutId}
           testID={`feed-live-session-${session.workoutId}`}
+          title={session.clientName}
+          subtitle="Live session with your client"
           onPress={() =>
             navigation.navigate('TrainerLiveWorkout', {
               workoutId: session.workoutId,
@@ -608,23 +582,7 @@ export function FeedScreen({ navigation }: Props) {
               startedAt: session.startedAt,
             })
           }
-          accessibilityLabel={`Live session with ${session.clientName}. Resume`}
-        >
-          <Text style={styles.nextWorkoutEyebrow}>Live session</Text>
-          <Text style={styles.nextWorkoutDayName}>{session.clientName}</Text>
-          <SecondaryButton
-            testID={`feed-resume-session-${session.workoutId}`}
-            label="Resume Live Session"
-            onPress={() =>
-              navigation.navigate('TrainerLiveWorkout', {
-                workoutId: session.workoutId,
-                clientId: session.clientId,
-                clientName: session.clientName,
-                startedAt: session.startedAt,
-              })
-            }
-          />
-        </Card>
+        />
       ))}
 
       {nextPlan ? (

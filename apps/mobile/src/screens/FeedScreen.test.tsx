@@ -792,7 +792,7 @@ describe('FeedScreen live workout', () => {
     });
     renderScreen();
 
-    fireEvent.press(await screen.findByTestId('feed-resume-workout'));
+    fireEvent.press(await screen.findByTestId('feed-live-workout'));
     expect(mockNavigate).toHaveBeenCalledWith('ActiveWorkout', { workoutId: 'live-1' });
   });
 
@@ -859,7 +859,7 @@ describe('FeedScreen live workout', () => {
     ]);
     renderScreen();
 
-    expect(await screen.findByTestId('feed-live-groups')).toHaveTextContent(/3 open/);
+    expect(await screen.findByTestId('feed-live-groups')).toHaveTextContent(/3 group workouts/);
     expect(screen.queryByTestId('feed-live-group-g1')).toBeNull();
     expect(screen.queryByTestId('feed-live-group-g2')).toBeNull();
   });

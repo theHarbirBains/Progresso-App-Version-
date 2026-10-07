@@ -65,7 +65,7 @@ export interface WorkoutDetail extends WorkoutSummary {
   exercises: WorkoutExerciseWithSets[];
 }
 
-const ACTIVE_WORKOUT_CONFLICT_CONSTRAINT = 'workouts_one_active_per_session';
+const ACTIVE_WORKOUT_CONFLICT_CONSTRAINT = 'workouts_one_live_per_user';
 
 // Exported so other modules deriving from the same row shape (e.g. the
 // Workouts tab's month-range fetch/enrichment) share one mapping instead of
