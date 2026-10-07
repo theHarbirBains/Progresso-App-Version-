@@ -2866,6 +2866,15 @@ async function main() {
     "update public.workouts set deleted_at = now() where user_id = $1 and name = 'Own run'",
     [member],
   );
+  // A cancelled workout is never logged: it cannot be completed, by any path.
+  await expectThrows(
+    admin.query(
+      "update public.workouts set completed_at = now() where user_id = $1 and name = 'Own run'",
+      [member],
+    ),
+    'A cancelled workout cannot be completed',
+    /cancelled workout/i,
+  );
   await expectSucceeds(
     admin.query(
       "insert into public.workouts (user_id, name, performed_at, group_id) values ($1, 'Group legs', now(), $2)",

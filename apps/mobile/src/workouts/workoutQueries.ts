@@ -188,6 +188,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
     .from('workouts')
     .select('id, name, performed_at, completed_at, workout_split_day_id')
     .eq('id', workoutId)
+    .is('deleted_at', null)
     .single();
   if (workoutError) throw new Error(workoutError.message);
 
@@ -348,7 +349,11 @@ export async function updateWorkout(
   if (updates.name !== undefined) payload.name = updates.name;
   if (updates.performedAt !== undefined) payload.performed_at = updates.performedAt;
   if (updates.completedAt !== undefined) payload.completed_at = updates.completedAt;
-  const { error } = await supabase.from('workouts').update(payload).eq('id', workoutId);
+  const { error } = await supabase
+    .from('workouts')
+    .update(payload)
+    .eq('id', workoutId)
+    .is('deleted_at', null);
   if (error) throw new Error(error.message);
 }
 

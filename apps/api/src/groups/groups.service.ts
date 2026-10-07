@@ -428,7 +428,8 @@ export class GroupsService {
       .from('workouts')
       .update({ completed_at: now })
       .eq('group_id', groupId)
-      .is('completed_at', null);
+      .is('completed_at', null)
+      .is('deleted_at', null);
     if (error) throw new InternalServerErrorException('Failed to finish the group workouts');
   }
 
@@ -452,7 +453,8 @@ export class GroupsService {
       .update({ completed_at: now })
       .eq('group_id', groupId)
       .eq('user_id', userId)
-      .is('completed_at', null);
+      .is('completed_at', null)
+      .is('deleted_at', null);
     if (workoutError) throw new InternalServerErrorException('Failed to close your workout');
   }
 

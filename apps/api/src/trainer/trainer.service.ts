@@ -852,6 +852,7 @@ export class TrainerService {
       .eq('user_id', clientId)
       .eq('logged_by', trainerId)
       .is('completed_at', null)
+      .is('deleted_at', null)
       .select('id');
     if (error) throw new InternalServerErrorException('Failed to finish the live session');
     if (!data || data.length === 0) throw new NotFoundException('No open live session to finish');
