@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
@@ -133,8 +133,7 @@ export function TrainerAccessScreen({ navigation }: Props) {
 
   return (
     <Screen
-      scroll={false}
-      contentContainerStyle={styles.body}
+      contentContainerStyle={{ gap: widgetGap }}
       header={
         <AppHeader
           title="Trainer Access"
@@ -200,55 +199,49 @@ export function TrainerAccessScreen({ navigation }: Props) {
             />
           ) : null}
 
-          <View style={styles.fill}>
-            <AppCard
-              testID="trainer-access-clients"
-              topAccent={theme.accent}
-              hero={data.requests.length === 0}
-            >
-              <SectionHeader label="Clients" />
-              {!data.isTrainer ? (
-                <Text style={styles.empty}>Clients need a Trainer subscription.</Text>
-              ) : sortedClients.length === 0 ? (
-                <Text style={styles.empty} testID="trainer-access-no-clients">
-                  No clients yet. Add someone, even if they do not use Progresso yet.
-                </Text>
-              ) : (
-                <ScrollView
-                  style={styles.list}
-                  contentContainerStyle={styles.listContent}
-                  showsVerticalScrollIndicator={false}
-                >
-                  {sortedClients.map((client, index) => {
-                    const openable = client.clientId !== null;
-                    return (
-                      <ListRow
-                        key={client.clientId ?? client.inviteId ?? `client-${index}`}
-                        testID={
-                          openable
-                            ? `trainer-access-client-${client.clientId}`
-                            : `trainer-access-invite-${client.inviteId}`
-                        }
-                        title={clientName(client)}
-                        subtitle={trainerClientStatusLabel(client)}
-                        chevron={openable}
-                        divider={index > 0}
-                        onPress={
-                          openable
-                            ? () =>
-                                navigation.navigate('TrainerClientDetail', {
-                                  clientId: client.clientId as string,
-                                  clientName: client.displayName ?? undefined,
-                                })
-                            : undefined
-                        }
-                      />
-                    );
-                  })}
-                </ScrollView>
-              )}
-            </AppCard>
-          </View>
+          <AppCard
+            testID="trainer-access-clients"
+            topAccent={theme.accent}
+            hero={data.requests.length === 0}
+          >
+            <SectionHeader label="Clients" />
+            {!data.isTrainer ? (
+              <Text style={styles.empty}>Clients need a Trainer subscription.</Text>
+            ) : sortedClients.length === 0 ? (
+              <Text style={styles.empty} testID="trainer-access-no-clients">
+                No clients yet. Add someone, even if they do not use Progresso yet.
+              </Text>
+            ) : (
+              <>
+                {sortedClients.map((client, index) => {
+                  const openable = client.clientId !== null;
+                  return (
+                    <ListRow
+                      key={client.clientId ?? client.inviteId ?? `client-${index}`}
+                      testID={
+                        openable
+                          ? `trainer-access-client-${client.clientId}`
+                          : `trainer-access-invite-${client.inviteId}`
+                      }
+                      title={clientName(client)}
+                      subtitle={trainerClientStatusLabel(client)}
+                      chevron={openable}
+                      divider={index > 0}
+                      onPress={
+                        openable
+                          ? () =>
+                              navigation.navigate('TrainerClientDetail', {
+                                clientId: client.clientId as string,
+                                clientName: client.displayName ?? undefined,
+                              })
+                          : undefined
+                      }
+                    />
+                  );
+                })}
+              </>
+            )}
+          </AppCard>
 
           {data.trainers.length > 0 ? (
             <AppCard testID="trainer-access-trainers" topAccent={theme.accent}>
@@ -293,20 +286,6 @@ export function TrainerAccessScreen({ navigation }: Props) {
 }
 
 const styles = {
-  body: {
-    flexGrow: 1,
-    gap: widgetGap,
-  },
-  fill: {
-    flex: 1,
-    minHeight: 160,
-  },
-  list: {
-    flex: 1,
-  },
-  listContent: {
-    paddingBottom: spacing.sm,
-  },
   eyebrow: {
     ...typeScale.sectionHeading,
     color: colors.textSecondary,

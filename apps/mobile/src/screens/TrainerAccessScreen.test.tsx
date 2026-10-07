@@ -169,4 +169,17 @@ describe('TrainerAccessScreen', () => {
     await waitFor(() => expect(mockEndTrainerLink).toHaveBeenCalledWith('token-123', TRAINER_ID));
     alert.mockRestore();
   });
+
+  it('has a back arrow, and lists every client a trainer has', async () => {
+    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
+    mockListTrainerClients.mockResolvedValue([
+      sam,
+      { ...sam, clientId: 'client-ana', displayName: 'Ana' },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('trainer-access-client-client-sam')).toBeTruthy();
+    expect(screen.getByTestId('trainer-access-client-client-ana')).toBeTruthy();
+    expect(screen.getByLabelText('Back')).toBeTruthy();
+  });
 });
