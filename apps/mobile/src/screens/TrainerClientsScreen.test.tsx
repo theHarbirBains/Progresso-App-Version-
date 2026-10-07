@@ -7,6 +7,10 @@ jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('../progress/useProgressTheme', () => ({
+  useProgressTheme: () => ({ theme: { accent: '#3DDC97', onAccent: '#000000' }, weightUnit: 'kg' }),
+}));
+
 jest.mock('../lib/api', () => ({
   getTrainerStatus: jest.fn(),
   listTrainerClients: jest.fn(),
@@ -119,5 +123,25 @@ describe('TrainerClientsScreen', () => {
     expect(await screen.findByTestId('trainer-clients-error')).toHaveTextContent(/Network down/);
     fireEvent.press(screen.getByText('Retry'));
     await waitFor(() => expect(screen.getByTestId('trainer-client-client-1')).toBeTruthy());
+  });
+});
+
+describe('TrainerClientsScreen grouping', () => {
+  it('files each client under what needs doing for them', async () => {
+    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
+    mockListTrainerClients.mockResolvedValue([
+      { ...managed, clientId: 'client-2', displayName: 'Purnima', awaitingClaim: true },
+      { ...managed, clientId: 'client-3', displayName: 'Ana', status: 'pending', source: 'linked' },
+      { ...managed, clientId: null, inviteId: 'invite-1', displayName: 'Pat', status: 'invited' },
+      managed,
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('trainer-clients-tracked')).toHaveTextContent(/Purnima/);
+    expect(screen.getByTestId('trainer-clients-pending')).toHaveTextContent(/Ana/);
+    expect(screen.getByTestId('trainer-clients-invited')).toHaveTextContent(/Pat/);
+    expect(screen.getByTestId('trainer-clients-active')).toHaveTextContent(/Sam/);
+    expect(screen.getByTestId('trainer-clients-count-active')).toHaveTextContent(/1s*Active/);
+    expect(screen.getByTestId('trainer-clients-count-waiting')).toHaveTextContent(/2s*Waiting/);
   });
 });

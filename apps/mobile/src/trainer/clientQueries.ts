@@ -1,16 +1,14 @@
 import { supabase } from '../lib/supabase';
+import {
+  enrichWorkoutSummaries,
+  type EnrichedWorkoutSummary,
+} from '../workouts/workoutHistoryEnrichment';
+import { fetchWorkoutHistory } from '../workouts/workoutQueries';
 
 // Read-only views of a client's data for their trainer. These go direct to
 // Supabase: the trainer RLS policies (see the trainer_mode migration) decide
 // which rows come back, so a trainer with no active link or no Trainer
 // subscription gets nothing here. Writes never come through this file.
-
-export interface ClientWorkoutRow {
-  id: string;
-  name: string;
-  performedAt: string;
-  completedAt: string | null;
-}
 
 export interface ClientRecordRow {
   id: string;
@@ -19,26 +17,22 @@ export interface ClientRecordRow {
   bestWeightKg: number;
 }
 
-const WORKOUT_LIMIT = 30;
+export const CLIENT_WORKOUT_PAGE_SIZE = 20;
 const RECORD_LIMIT = 200;
 
-/** The client's most recent workouts, newest first. */
-export async function fetchClientWorkouts(clientId: string): Promise<ClientWorkoutRow[]> {
-  const { data, error } = await supabase
-    .from('workouts')
-    .select('id, name, performed_at, completed_at')
-    .eq('user_id', clientId)
-    .is('deleted_at', null)
-    .order('performed_at', { ascending: false })
-    .limit(WORKOUT_LIMIT);
-  if (error) throw new Error(error.message);
-
-  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
-    id: row.id as string,
-    name: row.name as string,
-    performedAt: row.performed_at as string,
-    completedAt: (row.completed_at as string | null) ?? null,
-  }));
+/**
+ * One page of the client's finished workouts, newest first, in the same shape the Feed
+ * shows its own: duration, exercise and set counts, and each top set. It reads the
+ * same history query and enrichment as Feed, so the trainer sees what the client sees.
+ * `page` is 0-based; `hasMore` drives Load More.
+ */
+export async function fetchClientWorkoutFeed(
+  clientId: string,
+  page: number,
+): Promise<{ workouts: EnrichedWorkoutSummary[]; hasMore: boolean }> {
+  const { rows, hasMore } = await fetchWorkoutHistory(clientId, page, CLIENT_WORKOUT_PAGE_SIZE);
+  const enriched = await enrichWorkoutSummaries(rows);
+  return { workouts: enriched.filter((workout) => workout.completedAt !== null), hasMore };
 }
 
 /** The client's rep-count PRs, grouped by exercise name, then by reps. */

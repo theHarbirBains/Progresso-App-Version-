@@ -36,6 +36,8 @@ function activity(action: string, trainerId = TRAINER): TrainerActivity {
     targetId: null,
     details: {},
     createdAt: '2026-10-01T00:00:00.000Z',
+    trainerName: 'Coach Jo',
+    clientName: 'Purnima',
   };
 }
 
@@ -75,26 +77,34 @@ describe('trainerClientStatusLabel', () => {
 });
 
 describe('describeTrainerActivity', () => {
-  it('words a logged workout for the trainer who logged it', () => {
+  it('names the client a logged workout is for, to the trainer who logged it', () => {
     expect(describeTrainerActivity(activity('workout.logged'), TRAINER)).toBe(
-      'Logged a workout for a client',
+      'Logged a workout for Purnima',
     );
+  });
+
+  it('falls back to a generic name when the client has no display name', () => {
+    expect(
+      describeTrainerActivity({ ...activity('workout.logged'), clientName: null }, TRAINER),
+    ).toBe('Logged a workout for a client');
   });
 
   it('words the same entry for the client it was done to', () => {
     expect(describeTrainerActivity(activity('workout.logged'), CLIENT)).toBe(
-      'A trainer logged a workout for you',
+      'Coach Jo logged a workout for you',
     );
   });
 
   it('describes link changes from both sides', () => {
     expect(describeTrainerActivity(activity('link.requested'), TRAINER)).toBe(
-      'Sent a link request',
+      'Sent Purnima a link request',
     );
     expect(describeTrainerActivity(activity('link.requested'), CLIENT)).toBe(
-      'A trainer sent you a link request',
+      'Coach Jo sent you a link request',
     );
-    expect(describeTrainerActivity(activity('link.ended'), CLIENT)).toBe('Link ended');
+    expect(describeTrainerActivity(activity('link.ended'), CLIENT)).toBe(
+      'Link with Coach Jo ended',
+    );
   });
 
   it('shows an unknown action by its raw name rather than guessing', () => {

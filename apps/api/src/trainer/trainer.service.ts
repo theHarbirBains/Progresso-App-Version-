@@ -56,6 +56,10 @@ export interface TrainerActionSummary {
   targetId: string | null;
   details: Record<string, unknown>;
   createdAt: string;
+  /** Who the action was done by. Null only if that account has no display name. */
+  trainerName: string | null;
+  /** Who the action was about. Null for an action with no client, or a client with no display name. */
+  clientName: string | null;
 }
 
 const TRAINER_ENTITLEMENT = 'trainer';
@@ -574,16 +578,39 @@ export class TrainerService {
       .limit(ACTION_LIST_LIMIT);
     if (error) throw new InternalServerErrorException('Failed to load activity');
 
-    return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
-      id: row.id as string,
-      trainerId: row.trainer_id as string,
-      clientId: (row.client_id as string | null) ?? null,
-      action: row.action as string,
-      targetTable: (row.target_table as string | null) ?? null,
-      targetId: (row.target_id as string | null) ?? null,
-      details: (row.details as Record<string, unknown>) ?? {},
-      createdAt: row.created_at as string,
-    }));
+    const rows = (data ?? []) as Record<string, unknown>[];
+    // Names come from one users lookup, so each entry can say who it is about.
+    const ids = Array.from(
+      new Set(rows.flatMap((row) => [row.trainer_id as string, row.client_id as string | null])),
+    ).filter((id): id is string => Boolean(id));
+    const names = new Map<string, string | null>();
+    if (ids.length > 0) {
+      const { data: people, error: peopleError } = await this.supabaseService
+        .getClient()
+        .from('users')
+        .select('id, display_name')
+        .in('id', ids);
+      if (peopleError) throw new InternalServerErrorException('Failed to load activity');
+      for (const person of (people ?? []) as { id: string; display_name: string | null }[]) {
+        names.set(person.id, person.display_name);
+      }
+    }
+
+    return rows.map((row) => {
+      const clientId = (row.client_id as string | null) ?? null;
+      return {
+        id: row.id as string,
+        trainerId: row.trainer_id as string,
+        clientId,
+        action: row.action as string,
+        targetTable: (row.target_table as string | null) ?? null,
+        targetId: (row.target_id as string | null) ?? null,
+        details: (row.details as Record<string, unknown>) ?? {},
+        createdAt: row.created_at as string,
+        trainerName: names.get(row.trainer_id as string) ?? null,
+        clientName: clientId ? (names.get(clientId) ?? null) : null,
+      };
+    });
   }
 
   /**

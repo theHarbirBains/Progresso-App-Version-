@@ -621,6 +621,10 @@ export interface TrainerActivity {
   targetId: string | null;
   details: Record<string, unknown>;
   createdAt: string;
+  /** Who did the action. Null if that account has no display name. */
+  trainerName: string | null;
+  /** Who the action was about. Null for an action with no client. */
+  clientName: string | null;
 }
 
 export interface LoggedSetInput {

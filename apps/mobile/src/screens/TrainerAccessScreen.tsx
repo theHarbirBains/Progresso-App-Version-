@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { Card } from '../design/Card';
 import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
@@ -37,13 +37,11 @@ interface AccessData {
 }
 
 /**
- * Trainer access, for everyone: the trainer's own clients (if they are a trainer), a
- * way to link history a trainer tracked for them, requests from trainers who want to
- * log for you, the trainers who currently can, and a record of what has been done.
- * Accepting or declining, and ending a link, are always the client's choice.
- *
- * Styled like the rest of Train: the mode accent, a hero card for anything waiting on
- * the person, widget cards with plain rows, and accent buttons.
+ * Trainer access, for everyone, in the Feed's flat cards: requests waiting on the
+ * person (Accept is the one primary action), their clients (if they are a trainer), a
+ * way to link history a trainer tracked for them, the trainers who can log for them,
+ * and an activity list that names who each entry is about. Accepting, declining and
+ * ending a link are always the client's choice.
  */
 export function TrainerAccessScreen({ navigation }: Props) {
   const { session, user } = useAuth();
@@ -130,7 +128,7 @@ export function TrainerAccessScreen({ navigation }: Props) {
       header={
         <AppHeader
           title="Trainer Access"
-          subtitle="Who can log workouts for you, and what they have done"
+          subtitle="Who can log workouts for you"
           onBack={() => navigation.goBack()}
           testID="trainer-access-header"
         />
@@ -145,7 +143,7 @@ export function TrainerAccessScreen({ navigation }: Props) {
       {!loading && !error && data ? (
         <>
           {data.requests.length > 0 ? (
-            <AppCard hero topAccent={theme.accent} testID="trainer-access-requests">
+            <Card testID="trainer-access-requests">
               <Text style={styles.eyebrow}>Waiting for you</Text>
               <Text style={styles.lede}>
                 A trainer wants to log workouts for you. You decide whether to accept.
@@ -155,8 +153,7 @@ export function TrainerAccessScreen({ navigation }: Props) {
                   <ListRow
                     testID={`trainer-request-${request.trainerId}`}
                     title={request.trainerDisplayName ?? 'A trainer'}
-                    subtitle="Wants to log workouts for you"
-                    detail={formatCardDate(request.requestedAt)}
+                    subtitle={`Asked ${formatCardDate(request.requestedAt)}`}
                     divider={index > 0}
                   />
                   <View style={styles.actions}>
@@ -180,47 +177,34 @@ export function TrainerAccessScreen({ navigation }: Props) {
                   </View>
                 </View>
               ))}
-            </AppCard>
+            </Card>
           ) : null}
 
-          <AppCard
-            testID="trainer-access-clients"
-            hero={data.requests.length === 0}
-            topAccent={theme.accent}
-          >
+          <Card testID="trainer-access-clients">
             <SectionHeader label="Clients" />
-            {data.isTrainer ? (
-              <ListRow
-                testID="trainer-access-open-clients"
-                title="Your client pool"
-                subtitle="Track workouts, with or without their account"
-                chevron
-                onPress={() => navigation.navigate('TrainerClients')}
-              />
-            ) : (
-              <ListRow
-                testID="trainer-access-open-clients"
-                title="Clients"
-                subtitle="Needs a Trainer subscription. Open to see what it includes"
-                chevron
-                onPress={() => navigation.navigate('TrainerClients')}
-              />
-            )}
-          </AppCard>
-
-          <AppCard testID="trainer-access-link-history">
-            <SectionHeader label="Tracked history" />
+            <ListRow
+              testID="trainer-access-open-clients"
+              title={data.isTrainer ? 'Your clients' : 'Clients'}
+              subtitle={
+                data.isTrainer
+                  ? 'Track workouts, with or without their account'
+                  : 'Needs a Trainer subscription'
+              }
+              chevron
+              onPress={() => navigation.navigate('TrainerClients')}
+            />
             <ListRow
               testID="trainer-access-open-claim"
-              title="Link Tracked History"
+              title="Link tracked history"
               subtitle="A trainer tracked you before you had an account? Enter their code."
               chevron
+              divider
               onPress={() => navigation.navigate('TrainerClaim')}
             />
-          </AppCard>
+          </Card>
 
           {data.trainers.length > 0 ? (
-            <AppCard testID="trainer-access-trainers">
+            <Card testID="trainer-access-trainers">
               <SectionHeader label="Your trainers" />
               {data.trainers.map((trainer, index) => (
                 <ListRow
@@ -239,22 +223,22 @@ export function TrainerAccessScreen({ navigation }: Props) {
                   }
                 />
               ))}
-            </AppCard>
+            </Card>
           ) : null}
 
           {data.activity.length > 0 ? (
-            <AppCard testID="trainer-access-activity">
+            <Card testID="trainer-access-activity">
               <SectionHeader label="Activity" />
               {data.activity.map((entry, index) => (
                 <ListRow
                   key={entry.id}
                   testID={`trainer-activity-${entry.id}`}
                   title={describeTrainerActivity(entry, userId)}
-                  detail={formatCardDate(entry.createdAt)}
+                  subtitle={formatCardDate(entry.createdAt)}
                   divider={index > 0}
                 />
               ))}
-            </AppCard>
+            </Card>
           ) : null}
 
           {nothingToShow ? (
@@ -270,7 +254,7 @@ export function TrainerAccessScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = {
   eyebrow: {
     ...typeScale.sectionHeading,
     color: colors.textSecondary,
@@ -284,7 +268,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: 'row' as const,
     gap: spacing.sm,
   },
-});
+};
