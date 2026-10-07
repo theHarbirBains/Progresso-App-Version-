@@ -563,22 +563,38 @@ export function FeedScreen({ navigation }: Props) {
         </Card>
       ) : null}
 
-      {liveGroups.map((group) => (
+      {liveGroups.length === 1 ? (
         <Card
-          key={`group-${group.id}`}
-          testID={`feed-live-group-${group.id}`}
-          onPress={() => navigation.navigate('GroupSession', { groupId: group.id })}
-          accessibilityLabel={`Group workout in progress: ${group.name}. Resume`}
+          key={`group-${liveGroups[0].id}`}
+          testID={`feed-live-group-${liveGroups[0].id}`}
+          onPress={() => navigation.navigate('GroupSession', { groupId: liveGroups[0].id })}
+          accessibilityLabel={`Group workout in progress: ${liveGroups[0].name}. Resume`}
         >
           <Text style={styles.nextWorkoutEyebrow}>Group workout in progress</Text>
-          <Text style={styles.nextWorkoutDayName}>{group.name}</Text>
+          <Text style={styles.nextWorkoutDayName}>{liveGroups[0].name}</Text>
           <SecondaryButton
-            testID={`feed-resume-group-${group.id}`}
+            testID={`feed-resume-group-${liveGroups[0].id}`}
             label="Resume Group Workout"
-            onPress={() => navigation.navigate('GroupSession', { groupId: group.id })}
+            onPress={() => navigation.navigate('GroupSession', { groupId: liveGroups[0].id })}
           />
         </Card>
-      ))}
+      ) : null}
+
+      {liveGroups.length > 1 ? (
+        <Card
+          testID="feed-live-groups"
+          onPress={() => navigation.navigate('Groups')}
+          accessibilityLabel={`${liveGroups.length} group workouts in progress. Open Group Workouts`}
+        >
+          <Text style={styles.nextWorkoutEyebrow}>Group workouts in progress</Text>
+          <Text style={styles.nextWorkoutDayName}>{`${liveGroups.length} open`}</Text>
+          <SecondaryButton
+            testID="feed-open-groups"
+            label="Open Group Workouts"
+            onPress={() => navigation.navigate('Groups')}
+          />
+        </Card>
+      ) : null}
 
       {liveSessions.map((session) => (
         <Card

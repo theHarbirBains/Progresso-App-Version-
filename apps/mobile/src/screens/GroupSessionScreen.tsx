@@ -55,14 +55,17 @@ export function GroupSessionScreen({ navigation, route }: Props) {
     void load();
   }, [load]);
 
-  async function run(action: () => Promise<unknown>, failure: string) {
-    if (busy) return;
+  /** Runs one change. Resolves true only if it saved, so a failed change never leaves the screen. */
+  async function run(action: () => Promise<unknown>, failure: string): Promise<boolean> {
+    if (busy) return false;
     setBusy(true);
     try {
       await action();
       await load();
+      return true;
     } catch (err) {
       Alert.alert(failure, err instanceof Error ? err.message : 'Try again');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -76,8 +79,10 @@ export function GroupSessionScreen({ navigation, route }: Props) {
         text: 'Finish',
         style: 'destructive',
         onPress: () =>
-          void run(() => finishGroup(accessToken, groupId), 'Could not finish the group').then(() =>
-            navigation.goBack(),
+          void run(() => finishGroup(accessToken, groupId), 'Could not finish the group').then(
+            (saved) => {
+              if (saved) navigation.goBack();
+            },
           ),
       },
     ]);
@@ -97,8 +102,10 @@ export function GroupSessionScreen({ navigation, route }: Props) {
           text: 'Cancel workout',
           style: 'destructive',
           onPress: () =>
-            void run(() => cancelGroupWorkout(accessToken, groupId), 'Could not cancel').then(() =>
-              navigation.goBack(),
+            void run(() => cancelGroupWorkout(accessToken, groupId), 'Could not cancel').then(
+              (saved) => {
+                if (saved) navigation.goBack();
+              },
             ),
         },
       ],
@@ -107,9 +114,9 @@ export function GroupSessionScreen({ navigation, route }: Props) {
 
   function leave() {
     if (!accessToken) return;
-    void run(() => leaveGroup(accessToken, groupId), 'Could not leave the group').then(() =>
-      navigation.goBack(),
-    );
+    void run(() => leaveGroup(accessToken, groupId), 'Could not leave the group').then((saved) => {
+      if (saved) navigation.goBack();
+    });
   }
 
   const isHost = group?.hostId === userId;

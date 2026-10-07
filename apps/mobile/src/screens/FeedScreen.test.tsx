@@ -831,4 +831,36 @@ describe('FeedScreen live workout', () => {
     expect(await screen.findByTestId('feed-live-group-g1')).toHaveTextContent(/Thursday legs/);
     expect(screen.getByTestId('feed-live-session-w7')).toHaveTextContent(/Purnima/);
   });
+
+  it('shows several open group workouts as one card, not a card each', async () => {
+    const { listGroups } = jest.requireMock('../lib/api') as { listGroups: jest.Mock };
+    listGroups.mockResolvedValue([
+      {
+        id: 'g1',
+        name: 'Old one',
+        hostId: 'me',
+        myRole: 'host',
+        startedAt: '2026-09-01T09:00:00.000Z',
+      },
+      {
+        id: 'g2',
+        name: 'Older one',
+        hostId: 'me',
+        myRole: 'host',
+        startedAt: '2026-08-01T09:00:00.000Z',
+      },
+      {
+        id: 'g3',
+        name: 'Oldest one',
+        hostId: 'me',
+        myRole: 'member',
+        startedAt: '2026-07-01T09:00:00.000Z',
+      },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-live-groups')).toHaveTextContent(/3 open/);
+    expect(screen.queryByTestId('feed-live-group-g1')).toBeNull();
+    expect(screen.queryByTestId('feed-live-group-g2')).toBeNull();
+  });
 });
