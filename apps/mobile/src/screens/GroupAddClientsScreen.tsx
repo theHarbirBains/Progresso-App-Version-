@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SectionList, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
-import { AlphabetIndexRail } from '../design/AlphabetIndexRail';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';
@@ -14,7 +13,6 @@ import { Screen } from '../design/Screen';
 import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
-import { ALPHABET_INDEX_LETTERS } from '../exercises/exerciseLibraryGrouping';
 import {
   addClientToGroup,
   getGroup,
@@ -53,8 +51,6 @@ export function GroupAddClientsScreen({ navigation, route }: Props) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
-  const sectionListRef = useRef<SectionList<TrainerClient, ClientSection>>(null);
-  const [activeLetter, setActiveLetter] = useState<string | undefined>(undefined);
 
   const load = useCallback(async () => {
     if (!accessToken) return;
@@ -79,10 +75,6 @@ export function GroupAddClientsScreen({ navigation, route }: Props) {
   const pickable = useMemo(() => pickableClients(clients ?? [], inGroup), [clients, inGroup]);
   const filtered = useMemo(() => filterClientsByName(pickable, query), [pickable, query]);
   const sections = useMemo(() => groupClientsByLetter(filtered), [filtered]);
-  const availableLetters = useMemo(
-    () => new Set(sections.map((section) => section.letter)),
-    [sections],
-  );
 
   function toggle(clientId: string) {
     setSelected((prev) => {
@@ -90,18 +82,6 @@ export function GroupAddClientsScreen({ navigation, route }: Props) {
       if (next.has(clientId)) next.delete(clientId);
       else next.add(clientId);
       return next;
-    });
-  }
-
-  function jumpToLetter(letter: string) {
-    const sectionIndex = sections.findIndex((section) => section.letter === letter);
-    if (sectionIndex === -1) return;
-    setActiveLetter(letter);
-    sectionListRef.current?.scrollToLocation({
-      sectionIndex,
-      itemIndex: 0,
-      viewPosition: 0,
-      animated: true,
     });
   }
 
@@ -177,7 +157,6 @@ export function GroupAddClientsScreen({ navigation, route }: Props) {
                 value={query}
                 onChangeText={(text) => {
                   setQuery(text);
-                  setActiveLetter(undefined);
                 }}
                 autoCapitalize="words"
                 placeholder="Type a name"
@@ -194,7 +173,6 @@ export function GroupAddClientsScreen({ navigation, route }: Props) {
                 <Text style={styles.muted}>No client has that name.</Text>
               ) : (
                 <SectionList
-                  ref={sectionListRef}
                   testID="group-add-clients-list"
                   sections={sections}
                   keyExtractor={(client) => client.clientId ?? clientName(client)}
@@ -227,18 +205,6 @@ export function GroupAddClientsScreen({ navigation, route }: Props) {
                   }}
                 />
               )}
-              {sections.length > 0 ? (
-                <View style={styles.rail} pointerEvents="box-none">
-                  <AlphabetIndexRail
-                    testID="group-add-clients-index"
-                    letters={ALPHABET_INDEX_LETTERS}
-                    availableLetters={availableLetters}
-                    activeLetter={activeLetter}
-                    onSelect={jumpToLetter}
-                    accentColor={theme.accent}
-                  />
-                </View>
-              ) : null}
             </View>
 
             <View style={styles.footer}>
@@ -286,13 +252,6 @@ const styles = StyleSheet.create({
     ...typeScale.sectionHeading,
     paddingTop: spacing.md,
     paddingBottom: spacing.xs,
-  },
-  rail: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
   },
   footer: {
     paddingVertical: spacing.md,

@@ -114,6 +114,6 @@ describe('GroupAddClientsScreen', () => {
     renderScreen();
 
     expect(await screen.findByText('120 clients')).toBeTruthy();
-    expect(screen.getByTestId('group-add-clients-index')).toBeTruthy();
+    expect(screen.queryByTestId('group-add-clients-index')).toBeNull();
   });
 });
