@@ -440,8 +440,7 @@ describe('createWorkout', () => {
         return createQueryBuilder({
           data: null,
           error: {
-            message:
-              'duplicate key value violates unique constraint "workouts_one_live_per_user"',
+            message: 'duplicate key value violates unique constraint "workouts_one_live_per_user"',
             code: '23505',
           },
         }).builder;

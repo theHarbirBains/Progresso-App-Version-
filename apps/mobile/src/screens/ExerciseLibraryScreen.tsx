@@ -1,23 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  SectionList,
-  TouchableOpacity,
-  View,
-  type SectionListData,
-} from 'react-native';
-import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
-import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { EmptyState } from '../design/EmptyState';
-import { ErrorState } from '../design/ErrorState';
-import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
-import { SectionHeader } from '../design/SectionHeader';
-import { TextInput } from '../design/TextInput';
-import { colors } from '../design/theme';
 import {
   fetchAllExercises,
   fetchExerciseSourceCounts,
@@ -25,11 +9,8 @@ import {
   type ExerciseSource,
   type ExerciseSourceCounts,
 } from '../exercises/exerciseQueries';
-import { groupExercisesByLetter } from '../exercises/exerciseLibraryGrouping';
-import { ExercisePhoto } from '../exercises/ExercisePhoto';
-import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
-import { MOVEMENT_TYPE_LABELS } from '../exercises/movementTypes';
-import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
+import { ExerciseBrowser } from '../exercises/ExerciseBrowser';
+import { type MuscleGroup } from '../exercises/muscleGroups';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -41,12 +22,6 @@ const SEARCH_DEBOUNCE_MS = 300;
 type Props = RootStackScreenProps<'ExerciseLibrary'>;
 
 type Mode = { type: 'list' } | { type: 'create' } | { type: 'edit'; exercise: ExerciseRow };
-
-const SOURCE_OPTIONS: { value: ExerciseSource; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'builtin', label: 'Built-in' },
-  { value: 'mine', label: 'Mine' },
-];
 
 // The Workout Mode "browse every exercise" screen -- built-ins plus the
 // user's own custom exercises, searchable/filterable, sectioned
@@ -133,58 +108,6 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     void load();
   }
 
-  const sections = useMemo(() => groupExercisesByLetter(rows), [rows]);
-  const listSections = useMemo(
-    () => sections.map((section) => ({ title: section.letter, data: section.data })),
-    [sections],
-  );
-
-  const renderSectionHeader = useCallback(
-    ({ section }: { section: SectionListData<ExerciseRow, { title: string }> }) => (
-      <View testID={`exercise-library-section-${section.title}`}>
-        <SectionHeader label={section.title} />
-      </View>
-    ),
-    [],
-  );
-
-  const renderItem = useCallback(
-    ({ item, index }: { item: ExerciseRow; index: number }) => {
-      const isMine = item.createdBy != null;
-      return (
-        <View style={[styles.row, index > 0 && styles.rowDivider]}>
-          <ListRow
-            testID={`exercise-item-${item.id}`}
-            leading={
-              <ExercisePhoto
-                testID={`exercise-item-${item.id}-photo`}
-                uri={item.photoUrl}
-                name={item.name}
-                onEdit={isMine ? () => setMode({ type: 'edit', exercise: item }) : undefined}
-              />
-            }
-            title={item.name}
-            subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
-            onPress={isMine ? () => setMode({ type: 'edit', exercise: item }) : undefined}
-            trailing={
-              <>
-                <Text
-                  style={[styles.sourceLabel, { color: isMine ? theme.accent : colors.textMuted }]}
-                >
-                  {isMine ? 'Mine' : 'Built-in'}
-                </Text>
-                {isMine ? (
-                  <Feather name="chevron-right" size={18} color={colors.textMuted} />
-                ) : null}
-              </>
-            }
-          />
-        </View>
-      );
-    },
-    [theme.accent],
-  );
-
   if (mode.type === 'create') {
     return (
       <ExerciseFormScreen
@@ -235,96 +158,22 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         />
       }
     >
-      <AppCard testID="exercise-library-browse">
-        <View style={styles.searchWrap}>
-          <TextInput
-            testID="exercise-search"
-            placeholder="Search exercises..."
-            value={searchInput}
-            onChangeText={setSearchInput}
-            autoCapitalize="none"
-            leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
-          />
-        </View>
-
-        <View testID="exercise-library-muscle-group-wrap" style={styles.chipsWrap}>
-          <MuscleGroupChips
-            value={muscleGroup}
-            onChange={setMuscleGroup}
-            includeAll
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
-          />
-        </View>
-
-        <View style={styles.sourceTabs}>
-          {SOURCE_OPTIONS.map((option) => {
-            const selected = option.value === source;
-            const count = sourceCounts?.[option.value] ?? null;
-            return (
-              <TouchableOpacity
-                key={option.value}
-                testID={`exercise-source-${option.value}`}
-                style={[
-                  styles.sourceTab,
-                  selected ? { backgroundColor: theme.accentBg, borderColor: theme.accent } : null,
-                ]}
-                onPress={() => setSource(option.value)}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  count !== null ? `${option.label}, ${count} exercises` : option.label
-                }
-                accessibilityState={{ selected }}
-              >
-                <Text style={[styles.sourceTabLabel, selected ? { color: theme.accent } : null]}>
-                  {option.label}
-                </Text>
-                <Text
-                  testID={`exercise-source-${option.value}-count`}
-                  style={styles.sourceTabCount}
-                >
-                  {count !== null ? String(count) : ' '}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </AppCard>
-
-      <AppCard testID="exercise-library-list" style={styles.listCard}>
-        <View style={styles.countSortRow}>
-          <Text testID="exercise-library-count" style={styles.countText}>
-            {rows.length} {rows.length === 1 ? 'exercise' : 'exercises'}
-          </Text>
-        </View>
-
-        {error ? (
-          <ErrorState testID="exercise-library-error" message={error} onRetry={load} />
-        ) : loading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator
-              testID="exercise-library-loading"
-              size="large"
-              color={colors.textPrimary}
-            />
-          </View>
-        ) : rows.length === 0 ? (
-          <EmptyState testID="exercise-library-empty" title="No exercises found" />
-        ) : (
-          <View style={styles.flex}>
-            <SectionList
-              testID="exercise-library-list-section"
-              sections={listSections}
-              keyExtractor={(item) => item.id}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              renderSectionHeader={renderSectionHeader}
-              renderItem={renderItem}
-            />
-          </View>
-        )}
-      </AppCard>
+      <ExerciseBrowser
+        searchInput={searchInput}
+        onSearchChange={setSearchInput}
+        muscleGroup={muscleGroup}
+        onMuscleGroupChange={setMuscleGroup}
+        source={source}
+        onSourceChange={setSource}
+        sourceCounts={sourceCounts}
+        rows={rows}
+        loading={loading}
+        error={error}
+        onRetry={load}
+        accent={{ color: theme.accent, background: theme.accentBg, onColor: theme.onAccent }}
+        onOpenMine={(exercise) => setMode({ type: 'edit', exercise })}
+        testID="exercise-library"
+      />
     </Screen>
   );
 }

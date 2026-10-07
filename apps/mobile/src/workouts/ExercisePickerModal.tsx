@@ -1,27 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, TouchableOpacity, View } from 'react-native';
-import { Avatar } from '../design/Avatar';
-import { PhotoLightbox } from '../design/PhotoLightbox';
-import { Text } from '../design/Text';
+import { useEffect, useMemo, useState } from 'react';
+import { Modal, View } from 'react-native';
 import { AppHeader } from '../design/AppHeader';
 import { useBackgroundTheme } from '../design/BackgroundThemeContext';
 import { ListRow } from '../design/ListRow';
-import { TextInput } from '../design/TextInput';
+import { PhotoLightbox } from '../design/PhotoLightbox';
 import { colors } from '../design/theme';
 import {
-  fetchExercises,
+  fetchAllExercises,
+  fetchExerciseSourceCounts,
   type ExerciseRow,
   type ExerciseSource,
+  type ExerciseSourceCounts,
 } from '../exercises/exerciseQueries';
-import { MuscleGroupChips } from '../exercises/MuscleGroupChips';
-import { MOVEMENT_TYPE_LABELS } from '../exercises/movementTypes';
-import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
+import { ExerciseBrowser } from '../exercises/ExerciseBrowser';
+import type { MuscleGroup } from '../exercises/muscleGroups';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
-import { SegmentedControl } from '../design/SegmentedControl';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { withAlpha } from '../theme/accentColor';
 
 const SEARCH_DEBOUNCE_MS = 300;
-const PAGE_SIZE = 20;
 
 interface Props {
   visible: boolean;
@@ -40,10 +37,10 @@ interface Props {
 }
 
 /**
- * The existing search/select flow (fetchExercises, MuscleGroupChips),
- * reused as a modal so it works mid-workout (ActiveWorkoutScreen) without
- * duplicating the search UI. A search field and muscle filter over one list
- * of plain rows; "Create Custom Exercise" is the first row, not a card.
+ * Add Exercise during a workout. It is the Exercise Library's own browse layout (the shared
+ * ExerciseBrowser), so the two look the same: search, muscle filter, All / Built-in /
+ * Custom with counts, and the exercises A-Z with their photos. Tapping an exercise adds
+ * it; a tapped photo opens full size. Exercises already in the workout are greyed out.
  */
 export function ExercisePickerModal({
   visible,
@@ -60,11 +57,16 @@ export function ExercisePickerModal({
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(null);
-  // All exercises, only the built-in ones, or only the ones this person created.
   const [source, setSource] = useState<ExerciseSource>('all');
   const [rows, setRows] = useState<ExerciseRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sourceCounts, setSourceCounts] = useState<ExerciseSourceCounts | null>(null);
+  const [photoOpen, setPhotoOpen] = useState<string | null>(null);
+  // Bumped by Retry to load the exercises again.
+  const [attempt, setAttempt] = useState(0);
 
+  // Debounce free-text search, as the Exercise Library does.
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -74,9 +76,13 @@ export function ExercisePickerModal({
     if (!visible || !userId) return;
     let cancelled = false;
     setLoading(true);
-    fetchExercises({ userId, search, muscleGroup, source, page: 0, pageSize: PAGE_SIZE })
+    setError(null);
+    fetchAllExercises({ userId, search, muscleGroup, source })
       .then((result) => {
-        if (!cancelled) setRows(result.rows);
+        if (!cancelled) setRows(result);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load exercises');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -84,48 +90,25 @@ export function ExercisePickerModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, userId, search, muscleGroup, source]);
+  }, [visible, userId, search, muscleGroup, source, attempt]);
+
+  // The tab counts are independent of the search and filter, so they load once per opening.
+  useEffect(() => {
+    if (!visible || !userId) return;
+    let cancelled = false;
+    fetchExerciseSourceCounts(userId)
+      .then((counts) => {
+        if (!cancelled) setSourceCounts(counts);
+      })
+      .catch(() => {
+        if (!cancelled) setSourceCounts(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, userId]);
 
   const alreadyAddedIdSet = useMemo(() => new Set(alreadyAddedIds), [alreadyAddedIds]);
-
-  // One full-screen photo viewer for the whole picker, so a tapped photo opens above it.
-  const [photoOpen, setPhotoOpen] = useState<{ uri: string; name: string } | null>(null);
-
-  const renderItem = useCallback(
-    ({ item }: { item: ExerciseRow }) => {
-      const added = alreadyAddedIdSet.has(item.id);
-      return (
-        <ListRow
-          testID={`exercise-picker-item-${item.id}`}
-          leading={
-            <TouchableOpacity
-              testID={`exercise-picker-photo-${item.id}`}
-              onPress={() => item.photoUrl && setPhotoOpen({ uri: item.photoUrl, name: item.name })}
-              disabled={!item.photoUrl}
-              accessibilityRole={item.photoUrl ? 'imagebutton' : undefined}
-              accessibilityLabel={item.photoUrl ? `View ${item.name} photo` : undefined}
-            >
-              <Avatar
-                uri={item.photoUrl}
-                initial={item.name.trim().charAt(0).toUpperCase() || null}
-                size={64}
-                iconSize={28}
-                iconColor={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          }
-          title={`${item.name}${added ? ' (added)' : ''}`}
-          subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
-          chevron={false}
-          divider
-          disabled={added}
-          onPress={() => onSelect(item)}
-          accessibilityLabel={`${item.name}, ${MUSCLE_GROUP_LABELS[item.muscleGroup]}, ${MOVEMENT_TYPE_LABELS[item.movementType]}${added ? ', already added' : ''}`}
-        />
-      );
-    },
-    [alreadyAddedIdSet, onSelect],
-  );
 
   return (
     <Modal
@@ -133,11 +116,8 @@ export function ExercisePickerModal({
       animationType={reduceMotion ? 'none' : 'slide'}
       onRequestClose={onClose}
     >
-      {/* Unlike a normal stacked screen, a native Modal opens its own
-          separate window -- it does NOT sit behind AppBackgroundLayer, so
-          `styles.screen`'s usual transparent background would expose the
-          OS's own (light) window background instead. This is the one place
-          that needs the current Background Theme's color applied directly. */}
+      {/* A native Modal opens its own window, outside AppBackgroundLayer, so it takes the
+          current Background Theme colour itself. */}
       <View
         testID="exercise-picker-root"
         style={[styles.flex, { backgroundColor: backgroundTheme.colors.background }]}
@@ -153,76 +133,46 @@ export function ExercisePickerModal({
         />
 
         <View style={styles.pickerBody}>
-          <TextInput
-            testID="exercise-picker-search"
-            placeholder="Search exercises"
-            accessibilityLabel="Search exercises"
-            value={searchInput}
-            onChangeText={setSearchInput}
-          />
-
-          <SegmentedControl<ExerciseSource>
-            testID="exercise-picker-source"
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'builtin', label: 'Built-in' },
-              { value: 'mine', label: 'Custom' },
-            ]}
-            value={source}
-            onChange={setSource}
-            accentColor={accentColor}
-            onAccentColor={onAccentColor}
-          />
-
-          <View testID="exercise-picker-muscle-group-wrap" style={styles.muscleGroupChipsWrap}>
-            <MuscleGroupChips
-              value={muscleGroup}
-              onChange={setMuscleGroup}
-              includeAll
-              accentColor={accentColor}
-              onAccentColor={onAccentColor}
-              chipBorderColor={colors.border}
-              chipTextColor={colors.textSecondary}
-            />
-          </View>
-
-          <FlatList
-            data={rows}
-            keyExtractor={(item) => item.id}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            ListHeaderComponent={
-              <>
-                <ListRow
-                  testID="exercise-picker-create-custom"
-                  icon="plus"
-                  title="Create Custom Exercise"
-                  subtitle="Can't find the exercise? Create your own."
-                  onPress={onCreateCustom}
-                  accessibilityLabel="Create Custom Exercise. Can't find the exercise? Create your own."
-                />
-                {loading ? (
-                  <View style={styles.pickerLoading}>
-                    <ActivityIndicator
-                      testID="exercise-picker-loading"
-                      size="large"
-                      color={colors.textPrimary}
-                    />
-                  </View>
-                ) : null}
-              </>
+          <ExerciseBrowser
+            searchInput={searchInput}
+            onSearchChange={setSearchInput}
+            muscleGroup={muscleGroup}
+            onMuscleGroupChange={setMuscleGroup}
+            source={source}
+            onSourceChange={setSource}
+            sourceCounts={sourceCounts}
+            rows={rows}
+            loading={loading}
+            error={error}
+            onRetry={() => setAttempt((n) => n + 1)}
+            accent={{
+              color: accentColor,
+              background: withAlpha(accentColor, 0.14),
+              onColor: onAccentColor,
+            }}
+            isRowDisabled={(exercise) => alreadyAddedIdSet.has(exercise.id)}
+            rowSuffix={(exercise) => (alreadyAddedIdSet.has(exercise.id) ? ' (added)' : '')}
+            onSelectRow={onSelect}
+            onPhotoPress={(exercise) => setPhotoOpen(exercise.photoUrl)}
+            listHeader={
+              <ListRow
+                testID="exercise-picker-create-custom"
+                icon="plus"
+                title="Create Custom Exercise"
+                subtitle="Can't find the exercise? Create your own."
+                onPress={onCreateCustom}
+                accessibilityLabel="Create Custom Exercise. Can't find the exercise? Create your own."
+              />
             }
-            renderItem={renderItem}
-            ListEmptyComponent={
-              !loading ? <Text style={styles.pickerEmptyText}>No exercises found</Text> : null
-            }
+            testID="exercise-picker"
           />
         </View>
       </View>
+
       <PhotoLightbox
         testID="exercise-picker-lightbox"
         visible={photoOpen !== null}
-        uri={photoOpen?.uri ?? null}
+        uri={photoOpen}
         onClose={() => setPhotoOpen(null)}
       />
     </Modal>

@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { toLocalDateKey } from '../design/calendarGrid';
-import { fetchExercises } from '../exercises/exerciseQueries';
+import { fetchAllExercises } from '../exercises/exerciseQueries';
 import { getMyProfile, logWorkoutForClient } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
@@ -54,7 +54,8 @@ jest.mock('../lib/equipmentPhotoUpload', () => ({
 }));
 
 jest.mock('../exercises/exerciseQueries', () => ({
-  fetchExercises: jest.fn(),
+  fetchAllExercises: jest.fn(),
+  fetchExerciseSourceCounts: jest.fn().mockResolvedValue({ all: 0, builtin: 0, mine: 0 }),
 }));
 
 jest.mock('../progress/progressStatsQueries', () => ({
@@ -79,7 +80,7 @@ jest.mock('../workouts/workoutQueries', () => ({
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
-const mockFetchExercises = fetchExercises as jest.Mock;
+const mockFetchExercises = fetchAllExercises as jest.Mock;
 const mockFetchAllCompletedWorkouts = fetchAllCompletedWorkouts as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
 const mockFetchAllRepPRs = fetchAllRepPRs as jest.Mock;
@@ -120,7 +121,7 @@ beforeEach(() => {
     nutritionAccentColor: null,
     activeWorkoutSplitId: null,
   });
-  mockFetchExercises.mockReset().mockResolvedValue({ rows: [], hasMore: false });
+  mockFetchExercises.mockReset().mockResolvedValue([]);
   mockFetchAllCompletedWorkouts.mockReset().mockResolvedValue([]);
   mockFetchAllExerciseHistory.mockReset().mockResolvedValue([]);
   mockFetchAllRepPRs.mockReset().mockResolvedValue([]);
@@ -171,7 +172,7 @@ const EX = 'log-past-workout-exercise-local-1';
 
 async function addExerciseViaPicker(exercise: { id: string; name: string }) {
   fireEvent.press(screen.getByTestId('log-past-workout-add-exercise'));
-  fireEvent.press(await screen.findByTestId(`exercise-picker-item-${exercise.id}`));
+  fireEvent.press(await screen.findByTestId(`exercise-item-${exercise.id}`));
 }
 
 describe('LogPastWorkoutScreen -- date picker', () => {
@@ -199,7 +200,7 @@ describe('LogPastWorkoutScreen -- date picker', () => {
 
 describe('LogPastWorkoutScreen -- exercises and sets', () => {
   it('adding an exercise starts it with exactly one blank bilateral set', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [squat], hasMore: false });
+    mockFetchExercises.mockResolvedValue([squat]);
     renderScreen();
     await screen.findByTestId('log-past-workout-date');
 
@@ -213,7 +214,7 @@ describe('LogPastWorkoutScreen -- exercises and sets', () => {
   });
 
   it('Add Set appends another row; its remove button takes it back out', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [squat], hasMore: false });
+    mockFetchExercises.mockResolvedValue([squat]);
     renderScreen();
     await screen.findByTestId('log-past-workout-date');
     await addExerciseViaPicker(squat);
@@ -229,7 +230,7 @@ describe('LogPastWorkoutScreen -- exercises and sets', () => {
   });
 
   it('removing an exercise removes its whole block', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [squat], hasMore: false });
+    mockFetchExercises.mockResolvedValue([squat]);
     renderScreen();
     await screen.findByTestId('log-past-workout-date');
     await addExerciseViaPicker(squat);
@@ -242,7 +243,7 @@ describe('LogPastWorkoutScreen -- exercises and sets', () => {
   });
 
   it('adds a unilateral exercise with a Left and Right row for its first set', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [splitSquat], hasMore: false });
+    mockFetchExercises.mockResolvedValue([splitSquat]);
     renderScreen();
     await screen.findByTestId('log-past-workout-date');
 
@@ -271,7 +272,7 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
   });
 
   it('blocks saving a named workout with no valid sets', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [squat], hasMore: false });
+    mockFetchExercises.mockResolvedValue([squat]);
     renderScreen();
     await screen.findByTestId('log-past-workout-date');
     fireEvent.changeText(screen.getByTestId('log-past-workout-name'), 'Leg Day');
@@ -286,7 +287,7 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
   });
 
   it('saves a fully-filled set, drops a second blank one left untouched, then navigates to Workout Detail', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [squat], hasMore: false });
+    mockFetchExercises.mockResolvedValue([squat]);
     renderScreen();
     await screen.findByTestId('log-past-workout-date');
     fireEvent.changeText(screen.getByTestId('log-past-workout-name'), 'Leg Day');
@@ -321,7 +322,7 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
   });
 
   it('computes a real completedAt from the entered duration, instead of leaving it equal to the date', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [squat], hasMore: false });
+    mockFetchExercises.mockResolvedValue([squat]);
     renderScreen();
     await screen.findByTestId('log-past-workout-date');
     fireEvent.changeText(screen.getByTestId('log-past-workout-name'), 'Leg Day');
@@ -341,7 +342,7 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
   });
 
   it('rejects a future date with an inline error instead of saving', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [squat], hasMore: false });
+    mockFetchExercises.mockResolvedValue([squat]);
     renderScreen();
     await screen.findByTestId('log-past-workout-date');
     fireEvent.changeText(screen.getByTestId('log-past-workout-name'), 'Leg Day');
@@ -367,7 +368,7 @@ describe('LogPastWorkoutScreen -- trainer mode', () => {
   it('logs the workout for the client through the trainer API, never the trainer’s own data', async () => {
     const mockLogWorkoutForClient = logWorkoutForClient as jest.Mock;
     mockLogWorkoutForClient.mockReset().mockResolvedValue({ workoutId: 'client-w1' });
-    mockFetchExercises.mockResolvedValue({ rows: [squat], hasMore: false });
+    mockFetchExercises.mockResolvedValue([squat]);
     render(
       <BackgroundThemeProvider>
         <LogPastWorkoutScreen
@@ -420,7 +421,7 @@ describe('LogPastWorkoutScreen -- misc', () => {
   });
 
   it('renders no bare text outside <Text>', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [splitSquat], hasMore: false });
+    mockFetchExercises.mockResolvedValue([splitSquat]);
     renderScreen();
     await screen.findByTestId('log-past-workout-date');
     await addExerciseViaPicker(splitSquat);

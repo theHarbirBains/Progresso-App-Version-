@@ -1,14 +1,14 @@
 import { Modal, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { fetchExercises } from '../exercises/exerciseQueries';
+import { fetchAllExercises } from '../exercises/exerciseQueries';
 import { BACKGROUND_THEMES } from '../design/backgroundThemes';
 import { useBackgroundTheme } from '../design/BackgroundThemeContext';
-import { AppCard } from '../design/AppCard';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { ExercisePickerModal } from './ExercisePickerModal';
 
 jest.mock('../exercises/exerciseQueries', () => ({
-  fetchExercises: jest.fn(),
+  fetchAllExercises: jest.fn(),
+  fetchExerciseSourceCounts: jest.fn().mockResolvedValue({ all: 2, builtin: 2, mine: 0 }),
 }));
 
 jest.mock('../design/BackgroundThemeContext', () => ({
@@ -19,34 +19,31 @@ jest.mock('../navigation/navigationTransitions', () => ({
   useReduceMotionPreference: jest.fn(),
 }));
 
-const mockFetchExercises = fetchExercises as jest.Mock;
+const mockFetchExercises = fetchAllExercises as jest.Mock;
 const mockUseBackgroundTheme = useBackgroundTheme as jest.Mock;
 const mockUseReduceMotionPreference = useReduceMotionPreference as jest.Mock;
 
 beforeEach(() => {
   mockUseBackgroundTheme.mockReturnValue({ theme: BACKGROUND_THEMES.obsidian });
   mockUseReduceMotionPreference.mockReturnValue(false);
-  mockFetchExercises.mockReset().mockResolvedValue({
-    rows: [
-      {
-        id: 'ex1',
-        name: 'Barbell Bench Press',
-        muscleGroup: 'chest',
-        movementType: 'bilateral',
-        isActive: true,
-        createdBy: null,
-      },
-      {
-        id: 'ex2',
-        name: 'Barbell Back Squat',
-        muscleGroup: 'quadriceps',
-        movementType: 'bilateral',
-        isActive: true,
-        createdBy: null,
-      },
-    ],
-    hasMore: false,
-  });
+  mockFetchExercises.mockReset().mockResolvedValue([
+    {
+      id: 'ex1',
+      name: 'Barbell Bench Press',
+      muscleGroup: 'chest',
+      movementType: 'bilateral',
+      isActive: true,
+      createdBy: null,
+    },
+    {
+      id: 'ex2',
+      name: 'Barbell Back Squat',
+      muscleGroup: 'quadriceps',
+      movementType: 'bilateral',
+      isActive: true,
+      createdBy: null,
+    },
+  ]);
 });
 
 describe('ExercisePickerModal', () => {
@@ -62,7 +59,7 @@ describe('ExercisePickerModal', () => {
       />,
     );
 
-    const item = await screen.findByTestId('exercise-picker-item-ex1');
+    const item = await screen.findByTestId('exercise-item-ex1');
     expect(within(item).getByText('Barbell Bench Press')).toBeTruthy();
     expect(within(item).getByText('Chest · Bilateral')).toBeTruthy();
   });
@@ -83,7 +80,7 @@ describe('ExercisePickerModal', () => {
       />,
     );
 
-    const wrap = screen.getByTestId('exercise-picker-muscle-group-wrap');
+    const wrap = screen.getByTestId('exercise-library-muscle-group-wrap');
     expect(StyleSheet.flatten(wrap.props.style).marginVertical).toBeGreaterThan(0);
   });
 
@@ -99,9 +96,7 @@ describe('ExercisePickerModal', () => {
       />,
     );
 
-    const item = await screen.findByTestId('exercise-picker-item-ex1');
-    expect(item).toHaveTextContent(/added/);
-    expect(item.props.accessibilityState?.disabled).toBe(true);
+    expect(await screen.findByTestId('exercise-item-ex1')).toHaveTextContent(/\(added\)/);
   });
 
   it('calls onSelect when an exercise is pressed', async () => {
@@ -117,7 +112,7 @@ describe('ExercisePickerModal', () => {
       />,
     );
 
-    fireEvent.press(await screen.findByTestId('exercise-picker-item-ex1'));
+    fireEvent.press(await screen.findByTestId('exercise-item-ex1'));
 
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'ex1', name: 'Barbell Bench Press' }),
@@ -137,7 +132,7 @@ describe('ExercisePickerModal', () => {
     );
     await screen.findByText('Barbell Bench Press');
 
-    fireEvent.changeText(screen.getByTestId('exercise-picker-search'), 'bench');
+    fireEvent.changeText(screen.getByTestId('exercise-search'), 'bench');
 
     await waitFor(() =>
       expect(mockFetchExercises).toHaveBeenLastCalledWith(
@@ -166,7 +161,7 @@ describe('ExercisePickerModal', () => {
   });
 
   it('shows an empty state when no exercises match', async () => {
-    mockFetchExercises.mockResolvedValue({ rows: [], hasMore: false });
+    mockFetchExercises.mockResolvedValue([]);
 
     render(
       <ExercisePickerModal
@@ -195,6 +190,7 @@ describe('ExercisePickerModal', () => {
       />,
     );
 
+    await screen.findByText('Barbell Bench Press');
     expect(screen.getByText('Create Custom Exercise')).toBeTruthy();
     expect(screen.getByText("Can't find the exercise? Create your own.")).toBeTruthy();
 
@@ -275,16 +271,6 @@ describe('ExercisePickerModal -- one list of plain rows', () => {
     );
   }
 
-  it('draws no cards -- Create Custom Exercise and every exercise are rows', async () => {
-    renderPicker();
-    await screen.findByText('Barbell Bench Press');
-
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
-    expect(screen.getByTestId('exercise-picker-create-custom').props.accessibilityRole).toBe(
-      'button',
-    );
-  });
-
   it('names the close control for assistive tech', async () => {
     renderPicker();
     await screen.findByText('Barbell Bench Press');
@@ -293,69 +279,51 @@ describe('ExercisePickerModal -- one list of plain rows', () => {
     expect(screen.getByText('Add Exercise')).toBeTruthy();
   });
 
-  it('separates exercise rows with a hairline', async () => {
-    renderPicker();
-    const row = await screen.findByTestId('exercise-picker-item-ex1');
-
-    expect(StyleSheet.flatten(row.props.style).borderTopWidth).toBe(StyleSheet.hairlineWidth);
-  });
-
   it('describes each row by name, muscle group and movement type, and says when it is already added', async () => {
     renderPicker(['ex2']);
-    const open = await screen.findByTestId('exercise-picker-item-ex1');
-    const added = screen.getByTestId('exercise-picker-item-ex2');
+    const open = await screen.findByTestId('exercise-item-ex1');
+    const added = screen.getByTestId('exercise-item-ex2');
 
-    expect(open.props.accessibilityLabel).toBe('Barbell Bench Press, Chest, Bilateral');
-    expect(added.props.accessibilityLabel).toBe(
-      'Barbell Back Squat, Quadriceps, Bilateral, already added',
-    );
-    expect(added.props.accessibilityState.disabled).toBe(true);
+    expect(open.props.accessibilityLabel).toBe('Barbell Bench Press, Chest · Bilateral');
+    expect(added).toHaveTextContent(/Barbell Back Squat \(added\)/);
     expect(open.props.accessibilityState.disabled).toBe(false);
   });
 
   it('shows a unilateral exercise is unilateral', async () => {
-    mockFetchExercises.mockResolvedValue({
-      rows: [
-        {
-          id: 'ex3',
-          name: 'Single-Arm Row',
-          muscleGroup: 'back',
-          movementType: 'unilateral',
-          isActive: true,
-          createdBy: null,
-        },
-      ],
-      hasMore: false,
-    });
+    mockFetchExercises.mockResolvedValue([
+      {
+        id: 'ex3',
+        name: 'Single-Arm Row',
+        muscleGroup: 'back',
+        movementType: 'unilateral',
+        isActive: true,
+        createdBy: null,
+      },
+    ]);
     renderPicker();
 
-    expect(await screen.findByTestId('exercise-picker-item-ex3')).toHaveTextContent(/Unilateral/);
+    expect(await screen.findByTestId('exercise-item-ex3')).toHaveTextContent(/Unilateral/);
   });
 
   it('labels the search field for assistive tech', async () => {
     renderPicker();
     await screen.findByText('Barbell Bench Press');
 
-    expect(screen.getByTestId('exercise-picker-search').props.accessibilityLabel).toBe(
-      'Search exercises',
-    );
+    expect(screen.getByTestId('exercise-search').props.accessibilityLabel).toBe('Search exercises');
   });
 
   it('shows an exercise photo, and tapping it opens the photo full size without selecting the exercise', async () => {
-    mockFetchExercises.mockResolvedValue({
-      rows: [
-        {
-          id: 'ex3',
-          name: 'Leg Press',
-          muscleGroup: 'quadriceps',
-          movementType: 'bilateral',
-          isActive: true,
-          createdBy: null,
-          photoUrl: 'https://example.test/leg-press.jpg',
-        },
-      ],
-      hasMore: false,
-    });
+    mockFetchExercises.mockResolvedValue([
+      {
+        id: 'ex3',
+        name: 'Leg Press',
+        muscleGroup: 'quadriceps',
+        movementType: 'bilateral',
+        isActive: true,
+        createdBy: null,
+        photoUrl: 'https://example.test/leg-press.jpg',
+      },
+    ]);
     const onSelect = jest.fn();
     render(
       <ExercisePickerModal
@@ -368,7 +336,7 @@ describe('ExercisePickerModal -- one list of plain rows', () => {
       />,
     );
 
-    fireEvent.press(await screen.findByTestId('exercise-picker-photo-ex3'));
+    fireEvent.press(await screen.findByTestId('exercise-item-ex3-photo'));
 
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.getByTestId('exercise-picker-lightbox')).toBeTruthy();
@@ -385,16 +353,16 @@ describe('ExercisePickerModal -- one list of plain rows', () => {
         onCreateCustom={jest.fn()}
       />,
     );
-    await screen.findByTestId('exercise-picker-item-ex1');
+    await screen.findByTestId('exercise-item-ex1');
 
-    fireEvent.press(screen.getByText('Custom'));
+    fireEvent.press(screen.getByText('Mine'));
     await waitFor(() =>
       expect(mockFetchExercises).toHaveBeenLastCalledWith(
         expect.objectContaining({ source: 'mine' }),
       ),
     );
 
-    fireEvent.press(screen.getByText('Built-in'));
+    fireEvent.press(screen.getByTestId('exercise-source-builtin'));
     await waitFor(() =>
       expect(mockFetchExercises).toHaveBeenLastCalledWith(
         expect.objectContaining({ source: 'builtin' }),

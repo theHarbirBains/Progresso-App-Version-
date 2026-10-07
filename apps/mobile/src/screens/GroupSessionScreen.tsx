@@ -10,13 +10,7 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
-import {
-  cancelGroupWorkout,
-  finishGroup,
-  getGroup,
-  leaveGroup,
-  type GroupDetail,
-} from '../lib/api';
+import { cancelGroupWorkout, finishGroup, getGroup, type GroupDetail } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
@@ -110,13 +104,6 @@ export function GroupSessionScreen({ navigation, route }: Props) {
         },
       ],
     );
-  }
-
-  function leave() {
-    if (!accessToken) return;
-    void run(() => leaveGroup(accessToken, groupId), 'Could not leave the group').then((saved) => {
-      if (saved) navigation.goBack();
-    });
   }
 
   const isHost = group?.hostId === userId;

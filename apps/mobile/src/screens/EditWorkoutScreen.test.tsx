@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { toLocalDateKey } from '../design/calendarGrid';
-import { fetchExercises } from '../exercises/exerciseQueries';
+import { fetchAllExercises } from '../exercises/exerciseQueries';
 import { getMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
@@ -57,7 +57,8 @@ jest.mock('../lib/equipmentPhotoUpload', () => ({
 }));
 
 jest.mock('../exercises/exerciseQueries', () => ({
-  fetchExercises: jest.fn(),
+  fetchAllExercises: jest.fn(),
+  fetchExerciseSourceCounts: jest.fn().mockResolvedValue({ all: 0, builtin: 0, mine: 0 }),
 }));
 
 jest.mock('../progress/progressStatsQueries', () => ({
@@ -85,7 +86,7 @@ jest.mock('../workouts/workoutQueries', () => ({
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
-const mockFetchExercises = fetchExercises as jest.Mock;
+const mockFetchExercises = fetchAllExercises as jest.Mock;
 const mockFetchAllCompletedWorkouts = fetchAllCompletedWorkouts as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
 const mockFetchAllRepPRs = fetchAllRepPRs as jest.Mock;
@@ -149,7 +150,7 @@ beforeEach(() => {
     nutritionAccentColor: null,
     activeWorkoutSplitId: null,
   });
-  mockFetchExercises.mockReset().mockResolvedValue({ rows: [], hasMore: false });
+  mockFetchExercises.mockReset().mockResolvedValue([]);
   mockFetchAllCompletedWorkouts.mockReset().mockResolvedValue([]);
   mockFetchAllExerciseHistory.mockReset().mockResolvedValue([]);
   mockFetchAllRepPRs.mockReset().mockResolvedValue([]);
@@ -402,15 +403,14 @@ describe('EditWorkoutScreen -- saving changes', () => {
   });
 
   it('adds a brand new exercise as a real workout_exercise with its sets', async () => {
-    mockFetchExercises.mockResolvedValue({
-      rows: [{ id: 'ex-bench', name: 'Bench Press', muscleGroup: 'chest' }],
-      hasMore: false,
-    });
+    mockFetchExercises.mockResolvedValue([
+      { id: 'ex-bench', name: 'Bench Press', muscleGroup: 'chest' },
+    ]);
     renderScreen();
     await screen.findByTestId(EX);
 
     fireEvent.press(screen.getByTestId('edit-workout-add-exercise'));
-    fireEvent.press(await screen.findByTestId('exercise-picker-item-ex-bench'));
+    fireEvent.press(await screen.findByTestId('exercise-item-ex-bench'));
     // local-1 (the loaded exercise) and local-2 (its one loaded set) are
     // already consumed by the initial seed, so the newly added exercise is local-3.
     const newBlock = await screen.findByTestId('edit-workout-exercise-local-3');

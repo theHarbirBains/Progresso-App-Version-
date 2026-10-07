@@ -10,7 +10,7 @@ import { ProfileProvider } from '../profile/ProfileProvider';
 import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { createExercise, getMyProfile } from '../lib/api';
-import { fetchExercises } from '../exercises/exerciseQueries';
+import { fetchAllExercises } from '../exercises/exerciseQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
 import {
@@ -55,7 +55,8 @@ jest.mock('../lib/equipmentPhotoUpload', () => ({
 }));
 
 jest.mock('../exercises/exerciseQueries', () => ({
-  fetchExercises: jest.fn(),
+  fetchAllExercises: jest.fn(),
+  fetchExerciseSourceCounts: jest.fn().mockResolvedValue({ all: 0, builtin: 0, mine: 0 }),
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
@@ -86,7 +87,7 @@ jest.mock('../workouts/prSummaryQueries', () => ({
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockCreateExercise = createExercise as jest.Mock;
-const mockFetchExercises = fetchExercises as jest.Mock;
+const mockFetchExercises = fetchAllExercises as jest.Mock;
 const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 const mockCreateSet = createSet as jest.Mock;
 const mockUpdateSet = updateSet as jest.Mock;
@@ -144,7 +145,7 @@ beforeEach(() => {
     nutritionAccentColor: null,
     activeWorkoutSplitId: null,
   });
-  mockFetchExercises.mockReset().mockResolvedValue({ rows: [], hasMore: false });
+  mockFetchExercises.mockReset().mockResolvedValue([]);
   mockFetchWorkoutDetail.mockReset().mockResolvedValue(baseWorkout);
   mockCreateSet.mockReset().mockResolvedValue({
     id: 's3',
@@ -347,18 +348,15 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('adds an exercise mid-workout, which starts with exactly one blank set', async () => {
-    mockFetchExercises.mockResolvedValue({
-      rows: [
-        {
-          id: 'ex2',
-          name: 'Barbell Back Squat',
-          muscleGroup: 'quadriceps',
-          isActive: true,
-          createdBy: null,
-        },
-      ],
-      hasMore: false,
-    });
+    mockFetchExercises.mockResolvedValue([
+      {
+        id: 'ex2',
+        name: 'Barbell Back Squat',
+        muscleGroup: 'quadriceps',
+        isActive: true,
+        createdBy: null,
+      },
+    ]);
 
     render(
       <BackgroundThemeProvider>
@@ -369,7 +367,7 @@ describe('ActiveWorkoutScreen', () => {
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
-    fireEvent.press(await screen.findByTestId('exercise-picker-item-ex2'));
+    fireEvent.press(await screen.findByTestId('exercise-item-ex2'));
 
     await waitFor(() => expect(mockAddExerciseToWorkout).toHaveBeenCalledWith('w1', 'ex2', 2));
     expect(mockCreateSet).toHaveBeenCalledWith('we2', 1);
@@ -740,20 +738,17 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
   });
 
   it('adds a unilateral exercise from the picker, creating both a left and a right blank row for its first set', async () => {
-    mockFetchExercises.mockResolvedValue({
-      rows: [
-        {
-          id: 'ex-row',
-          name: 'Single-Arm Dumbbell Row',
-          muscleGroup: 'back',
-          movementType: 'unilateral',
-          loggingStyle: 'single_side',
-          isActive: true,
-          createdBy: null,
-        },
-      ],
-      hasMore: false,
-    });
+    mockFetchExercises.mockResolvedValue([
+      {
+        id: 'ex-row',
+        name: 'Single-Arm Dumbbell Row',
+        muscleGroup: 'back',
+        movementType: 'unilateral',
+        loggingStyle: 'single_side',
+        isActive: true,
+        createdBy: null,
+      },
+    ]);
     mockCreateSet
       .mockReset()
       .mockImplementation(async (weId: string, setIndex: number, side?: string) => ({
@@ -774,7 +769,7 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
     await screen.findByTestId('exercise-card-we-bss');
 
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
-    fireEvent.press(await screen.findByTestId('exercise-picker-item-ex-row'));
+    fireEvent.press(await screen.findByTestId('exercise-item-ex-row'));
 
     await waitFor(() => expect(mockAddExerciseToWorkout).toHaveBeenCalledWith('w1', 'ex-row', 2));
     expect(mockCreateSet).toHaveBeenCalledWith('we2', 1, 'left');
@@ -900,23 +895,20 @@ describe('Create Custom Exercise from Add Exercise', () => {
 
     // The picker closes and the full New Exercise screen (with its own
     // Machine Photo section) replaces the active workout in its place.
-    expect(screen.queryByTestId('exercise-picker-search')).toBeNull();
+    expect(screen.queryByTestId('exercise-search')).toBeNull();
     expect(await screen.findByText('New Exercise')).toBeTruthy();
     expect(screen.getByText('Machine Photo (Optional)')).toBeTruthy();
 
     mockCreateExercise.mockResolvedValue({ id: 'ex-new' });
-    mockFetchExercises.mockResolvedValue({
-      rows: [
-        {
-          id: 'ex-new',
-          name: 'Cable Preacher Curl',
-          muscleGroup: 'biceps',
-          isActive: true,
-          createdBy: 'user-1',
-        },
-      ],
-      hasMore: false,
-    });
+    mockFetchExercises.mockResolvedValue([
+      {
+        id: 'ex-new',
+        name: 'Cable Preacher Curl',
+        muscleGroup: 'biceps',
+        isActive: true,
+        createdBy: 'user-1',
+      },
+    ]);
 
     fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Cable Preacher Curl');
     fireEvent.press(screen.getByTestId('exercise-form-muscle-group'));
@@ -924,7 +916,7 @@ describe('Create Custom Exercise from Add Exercise', () => {
     fireEvent.press(screen.getByTestId('exercise-form-save'));
 
     // Back in the picker, immediately able to add the exercise just created.
-    fireEvent.press(await screen.findByTestId('exercise-picker-item-ex-new'));
+    fireEvent.press(await screen.findByTestId('exercise-item-ex-new'));
 
     await waitFor(() => expect(mockAddExerciseToWorkout).toHaveBeenCalledWith('w1', 'ex-new', 2));
   });
@@ -985,10 +977,9 @@ describe('Last Workout', () => {
   });
 
   it('fetches and shows the previous session for a newly added exercise too, not just ones already in the workout', async () => {
-    mockFetchExercises.mockResolvedValue({
-      rows: [{ id: 'ex2', name: 'Barbell Back Squat', muscleGroup: 'quadriceps', isActive: true }],
-      hasMore: false,
-    });
+    mockFetchExercises.mockResolvedValue([
+      { id: 'ex2', name: 'Barbell Back Squat', muscleGroup: 'quadriceps', isActive: true },
+    ]);
     mockAddExerciseToWorkout.mockResolvedValue('we2');
     mockFetchPreviousPerformance.mockImplementation(
       async (_userId: string, exerciseId: string, _excludeWorkoutId: string) => {
@@ -1013,7 +1004,7 @@ describe('Last Workout', () => {
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
-    fireEvent.press(await screen.findByTestId('exercise-picker-item-ex2'));
+    fireEvent.press(await screen.findByTestId('exercise-item-ex2'));
 
     await waitFor(() =>
       expect(mockFetchPreviousPerformance).toHaveBeenCalledWith('user-1', 'ex2', 'w1'),
