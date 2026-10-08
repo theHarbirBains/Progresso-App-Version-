@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Image, type StyleProp, type TextStyle } from 'react-native';
+import type { StyleProp, TextStyle } from 'react-native';
+import { Image } from 'expo-image';
 import { Text } from './Text';
 import { Feather } from '@expo/vector-icons';
 
@@ -36,6 +37,8 @@ export function Avatar({ uri, initial, size, iconSize, iconColor, initialStyle, 
         testID={testID}
         source={{ uri }}
         style={{ width: size, height: size, borderRadius: size / 2 }}
+        contentFit="cover"
+        cachePolicy="memory-disk"
         accessibilityRole="image"
         accessibilityLabel="Profile picture"
         onError={() => setFailed(true)}

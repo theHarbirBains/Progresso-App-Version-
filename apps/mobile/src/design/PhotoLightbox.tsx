@@ -1,4 +1,5 @@
-import { Image, Modal, StyleSheet, View } from 'react-native';
+import { Modal, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton } from './IconButton';
 import { colors } from './theme';
@@ -25,7 +26,7 @@ export function PhotoLightbox({ visible, uri, onClose, testID }: Props) {
   return (
     <Modal visible={visible} transparent={false} animationType="fade" onRequestClose={onClose}>
       <View testID={testID} style={styles.root}>
-        <Image source={{ uri }} style={styles.image} resizeMode="contain" />
+        <Image source={{ uri }} style={styles.image} contentFit="contain" cachePolicy="memory-disk" />
         <View style={[styles.closeWrap, { top: insets.top + 8 }]}>
           <IconButton
             testID={testID ? `${testID}-close` : undefined}

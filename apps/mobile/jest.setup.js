@@ -158,3 +158,12 @@ jest.mock('expo-image-manipulator', () => ({
   manipulateAsync: jest.fn(async (uri) => ({ uri })),
   SaveFormat: { JPEG: 'jpeg', PNG: 'png' },
 }));
+
+// expo-image has no jest-expo auto-mock either. react-native's own Image accepts the same
+// source/style/onError/testID props Avatar/FoodImage/PhotoLightbox actually use --
+// contentFit/cachePolicy are simply extra props it ignores -- so it's a faithful stand-in
+// for every test that doesn't specifically assert on expo-image's own caching behavior.
+jest.mock('expo-image', () => {
+  const { Image } = require('react-native');
+  return { Image };
+});

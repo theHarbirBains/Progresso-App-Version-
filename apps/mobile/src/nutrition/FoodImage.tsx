@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radii } from '../design/theme';
 import { foodGlyph } from './foodGlyph';
@@ -37,7 +38,8 @@ export function FoodImage({ uri, name, size = 48, testID }: Props) {
           testID={testID ? `${testID}-photo` : undefined}
           source={{ uri: uri as string }}
           style={frame}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
           onError={() => setFailed(true)}
         />
       ) : (
