@@ -33,6 +33,7 @@ correctness intact is to make **every client a real auth user from the moment th
 trainer adds them**.
 
 **Recommended: "managed clients".**
+
 - Adding a client creates a Supabase auth user with the client's email and no usable
   password. The client profile is marked `claimed = false`.
 - The trainer logs workouts for that user as normal. `workouts.user_id` is the client.
@@ -50,12 +51,12 @@ and break the rule that user data is isolated by `user_id`.
 
 New table `trainer_clients`:
 
-| column | notes |
-|---|---|
-| `trainer_id` | auth user with the Trainer entitlement |
-| `client_id` | auth user (managed or real) |
-| `status` | `pending` / `active` / `ended` |
-| `created_at`, `ended_at` | |
+| column                   | notes                                  |
+| ------------------------ | -------------------------------------- |
+| `trainer_id`             | auth user with the Trainer entitlement |
+| `client_id`              | auth user (managed or real)            |
+| `status`                 | `pending` / `active` / `ended`         |
+| `created_at`, `ended_at` |                                        |
 
 - Linking an **existing** account requires the client to accept (`pending` → `active`).
 - A **managed** client (created by the trainer, not yet claimed) is `active` immediately,
@@ -122,9 +123,9 @@ the backstop, so a direct Supabase call still cannot reach another user's data.
 - `is_active_trainer_for` reads the projection. The projection is updated by the existing
   webhook path, so no new billing code is required for v1.
 - **Open question C:** what happens when the trainer's subscription lapses?
-  - *Option 1 (recommended):* writes stop immediately; reads stop too, and the trainer sees
+  - _Option 1 (recommended):_ writes stop immediately; reads stop too, and the trainer sees
     the clients list with a "renew to view" state. Clients' data is untouched.
-  - *Option 2:* read-only for a grace period, then stop.
+  - _Option 2:_ read-only for a grace period, then stop.
 - **Open question D:** client seat limits per tier (e.g. 10 clients on Trainer). Not
   needed for v1 unless you want it at launch.
 
@@ -185,14 +186,14 @@ Each phase is a separate reviewable change, per the working process in CLAUDE.md
 
 ## 10. Decisions needed
 
-| # | Question | Recommendation |
-|---|---|---|
-| A | Can a managed client see anything before they claim? | No (default) |
-| B | Trainer writes via API or direct to Supabase? | API, with RLS as backstop |
-| C | Lapsed subscription: stop immediately or grace period? | Stop immediately, data untouched |
-| D | Client seat limit per tier, at launch? | No (add later) |
-| E | Trainer-logged workouts in the client's friends feed? | No |
-| F | Trainer custom exercises: copy on log or shared visibility? | Copy on log (§7) |
+| #   | Question                                                    | Recommendation                   |
+| --- | ----------------------------------------------------------- | -------------------------------- |
+| A   | Can a managed client see anything before they claim?        | No (default)                     |
+| B   | Trainer writes via API or direct to Supabase?               | API, with RLS as backstop        |
+| C   | Lapsed subscription: stop immediately or grace period?      | Stop immediately, data untouched |
+| D   | Client seat limit per tier, at launch?                      | No (add later)                   |
+| E   | Trainer-logged workouts in the client's friends feed?       | No                               |
+| F   | Trainer custom exercises: copy on log or shared visibility? | Copy on log (§7)                 |
 
 Once these are decided, phase 2 can start, beginning with the RLS policy tests.
 
@@ -214,6 +215,7 @@ the add / edit form. Logging for a client reuses the past-workout screen, titled
 "Log for <name>", and saves through the API.
 
 **Decisions taken as recommended:**
+
 - A. A managed client is active at once, so the trainer can log for them before they
   claim the account. Until they claim it, they can't see anything.
 - B. Trainer writes go through the API, with RLS as the backstop.
@@ -223,6 +225,7 @@ the add / edit form. Logging for a client reuses the past-workout screen, titled
 - F. A trainer's custom exercise is copied into the client's library when logged for them.
 
 **Still open:**
+
 - **Enumeration (resolved):** adding by username finds an existing account and sends a
   request, which is acceptable because usernames are already public through search. Adding
   by email is always an invite, with the same answer whether or not the address has an

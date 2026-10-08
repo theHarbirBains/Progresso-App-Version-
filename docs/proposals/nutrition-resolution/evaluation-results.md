@@ -2,24 +2,24 @@
 
 Run: 2026-10-04T21:09:01.463Z. 15 of 16 queries behaved as intended.
 
-| Query | Main state | As intended | Confidence | Source | Detail |
-| --- | --- | --- | --- | --- | --- |
-| potato | choose | yes |  |  | Potato (baked) [progresso_catalog, 0.88]; Sweet Potato (baked) [progresso_catalog, 0.83]; Sweet potato, apple & chicken [progresso_catalog, 0.81] |
-| baked potato | needs_quantity | yes |  |  | no amount given · matched Potato (baked) |
-| 100g potato | choose | yes |  |  | Potato (baked) [progresso_catalog, 0.88]; Sweet Potato (baked) [progresso_catalog, 0.83]; Sweet potato, apple & chicken [progresso_catalog, 0.81] |
-| 1 cup cooked rice | choose | yes |  |  | Rice flour, white, unenriched [usda_fdc, 0.88]; Rice, white, glutinous, unenriched, uncooked [usda_fdc, 0.85]; Rice, white, glutinous, unenriched, cooked [usda_fdc, 0.85] |
-| chicken breast | choose | yes |  |  | Chicken breast [progresso_catalog, 1.00]; Chicken Breast [progresso_catalog, 1.00]; Chicken Breasts [progresso_catalog, 1.00] |
-| 200g chicken breast | choose | yes |  |  | Chicken breast [progresso_catalog, 1.00]; Chicken Breast [progresso_catalog, 1.00]; Chicken Breasts [progresso_catalog, 1.00] |
-| banana | needs_quantity | yes |  |  | no amount given · matched Banana |
-| medium banana | resolved | yes | verified | progresso_catalog | 105 kcal, 1.3 g protein (Banana) |
-| 2 eggs | choose | no |  |  | Eggs [progresso_catalog, 1.00]; eggs [progresso_catalog, 1.00]; Egg, Large [progresso_catalog, 0.88] |
-| 250ml milk | choose | yes |  |  | Whole Milk [progresso_catalog, 0.88]; Skim Milk [progresso_catalog, 0.88]; Oat milk [progresso_catalog, 0.88] |
-| 1 Oreo | choose | yes |  |  | Milka oreo [open_food_facts, 0.88]; The Original Oreo [open_food_facts, 0.88]; Oreo Mini [open_food_facts, 0.88] |
-| Fairlife 2% milk | choose | yes |  |  | ultrafiltered WHOLE MILK [open_food_facts, 0.83]; ultrafiltered partly skimmed milk [open_food_facts, 0.81]; Partially Skimmed Chocolate Milk [open_food_facts, 0.81] |
-| Big Mac | needs_quantity | yes |  |  | no amount given · matched Big Mac Sauce |
-| chicken shawarma | choose | yes |  |  | Shawarma Chicken [open_food_facts, 1.00]; Chicken Shawarma [open_food_facts, 1.00]; Chicken Shawarma Pockets [open_food_facts, 0.92] |
-| homemade chicken curry | needs_quantity | yes |  |  | no amount given · matched Curry Chicken |
-| air fried potatoes with no oil | choose | yes |  |  | Potato (baked) [progresso_catalog, 0.88]; Sweet Potato (baked) [progresso_catalog, 0.83]; Sweet potato, apple & chicken [progresso_catalog, 0.81] |
+| Query                          | Main state     | As intended | Confidence | Source            | Detail                                                                                                                                                                     |
+| ------------------------------ | -------------- | ----------- | ---------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| potato                         | choose         | yes         |            |                   | Potato (baked) [progresso_catalog, 0.88]; Sweet Potato (baked) [progresso_catalog, 0.83]; Sweet potato, apple & chicken [progresso_catalog, 0.81]                          |
+| baked potato                   | needs_quantity | yes         |            |                   | no amount given · matched Potato (baked)                                                                                                                                   |
+| 100g potato                    | choose         | yes         |            |                   | Potato (baked) [progresso_catalog, 0.88]; Sweet Potato (baked) [progresso_catalog, 0.83]; Sweet potato, apple & chicken [progresso_catalog, 0.81]                          |
+| 1 cup cooked rice              | choose         | yes         |            |                   | Rice flour, white, unenriched [usda_fdc, 0.88]; Rice, white, glutinous, unenriched, uncooked [usda_fdc, 0.85]; Rice, white, glutinous, unenriched, cooked [usda_fdc, 0.85] |
+| chicken breast                 | choose         | yes         |            |                   | Chicken breast [progresso_catalog, 1.00]; Chicken Breast [progresso_catalog, 1.00]; Chicken Breasts [progresso_catalog, 1.00]                                              |
+| 200g chicken breast            | choose         | yes         |            |                   | Chicken breast [progresso_catalog, 1.00]; Chicken Breast [progresso_catalog, 1.00]; Chicken Breasts [progresso_catalog, 1.00]                                              |
+| banana                         | needs_quantity | yes         |            |                   | no amount given · matched Banana                                                                                                                                           |
+| medium banana                  | resolved       | yes         | verified   | progresso_catalog | 105 kcal, 1.3 g protein (Banana)                                                                                                                                           |
+| 2 eggs                         | choose         | no          |            |                   | Eggs [progresso_catalog, 1.00]; eggs [progresso_catalog, 1.00]; Egg, Large [progresso_catalog, 0.88]                                                                       |
+| 250ml milk                     | choose         | yes         |            |                   | Whole Milk [progresso_catalog, 0.88]; Skim Milk [progresso_catalog, 0.88]; Oat milk [progresso_catalog, 0.88]                                                              |
+| 1 Oreo                         | choose         | yes         |            |                   | Milka oreo [open_food_facts, 0.88]; The Original Oreo [open_food_facts, 0.88]; Oreo Mini [open_food_facts, 0.88]                                                           |
+| Fairlife 2% milk               | choose         | yes         |            |                   | ultrafiltered WHOLE MILK [open_food_facts, 0.83]; ultrafiltered partly skimmed milk [open_food_facts, 0.81]; Partially Skimmed Chocolate Milk [open_food_facts, 0.81]      |
+| Big Mac                        | needs_quantity | yes         |            |                   | no amount given · matched Big Mac Sauce                                                                                                                                    |
+| chicken shawarma               | choose         | yes         |            |                   | Shawarma Chicken [open_food_facts, 1.00]; Chicken Shawarma [open_food_facts, 1.00]; Chicken Shawarma Pockets [open_food_facts, 0.92]                                       |
+| homemade chicken curry         | needs_quantity | yes         |            |                   | no amount given · matched Curry Chicken                                                                                                                                    |
+| air fried potatoes with no oil | choose         | yes         |            |                   | Potato (baked) [progresso_catalog, 0.88]; Sweet Potato (baked) [progresso_catalog, 0.83]; Sweet potato, apple & chicken [progresso_catalog, 0.81]                          |
 
 ## Acceptable states, written before the run
 
@@ -53,8 +53,8 @@ Run: 2026-10-04T21:09:01.463Z. 15 of 16 queries behaved as intended.
 
 ## Defects this run found, and what was done
 
-1. **A weaker source overrode an ambiguous, stronger one.** "100g potato" resolved to *Potato
-   Chips* (536 kcal) because the catalog was ambiguous and USDA then auto-accepted. Fixed: a
+1. **A weaker source overrode an ambiguous, stronger one.** "100g potato" resolved to _Potato
+   Chips_ (536 kcal) because the catalog was ambiguous and USDA then auto-accepted. Fixed: a
    strong but ambiguous set now stops the search and the user chooses.
 2. **A conversion failure at one source ended the search.** "1 cup cooked rice" asked for a
    quantity although USDA publishes a cup weight for cooked rice. Fixed: the search continues
@@ -62,7 +62,7 @@ Run: 2026-10-04T21:09:01.463Z. 15 of 16 queries behaved as intended.
 
 ## Defects this run found, and left for review
 
-3. **A wrong match at auto-accept strength.** "Big Mac" matched *Big Mac Sauce* (score about 0.92)
+3. **A wrong match at auto-accept strength.** "Big Mac" matched _Big Mac Sauce_ (score about 0.92)
    and asked for an amount for the sauce. The name score treats the sauce and the item alike. This
    is the most serious finding: a confident wrong match is worse than a question. The fix belongs
    in the scoring, not the thresholds, and needs a decision.

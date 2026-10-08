@@ -272,9 +272,8 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
   // one shared RootStackParamList regardless of the current screen. Only
   // setParams' route-specific params type actually differs, which these
   // sections never call.
-  const progressNavigation = navigation as unknown as RootStackScreenProps<
-    'ProgressOverview'
-  >['navigation'];
+  const progressNavigation =
+    navigation as unknown as RootStackScreenProps<'ProgressOverview'>['navigation'];
 
   return (
     <Screen

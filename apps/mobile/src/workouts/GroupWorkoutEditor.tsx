@@ -485,7 +485,10 @@ export function GroupWorkoutEditor({
             component's own comment) has nothing behind it and falls back to plain white. */}
         <View
           testID={`${testID}-create-custom-modal`}
-          style={[styles.customExerciseModal, { backgroundColor: backgroundTheme.colors.background }]}
+          style={[
+            styles.customExerciseModal,
+            { backgroundColor: backgroundTheme.colors.background },
+          ]}
         >
           <ExerciseFormScreen
             mode="create"

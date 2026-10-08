@@ -52,14 +52,14 @@ ResolvedComponent           nutrients, grams, provenance
 
 Files in the draft (`apps/api/src/nutrition-resolution/`):
 
-| File | Role |
-|---|---|
-| `source.interface.ts` | Types: `NutritionSource`, `SourceCandidate`, `NutrientBasis`, `MeasureWeight`, `Provenance`, `Confidence`, `Licence` |
-| `scoring.ts` | Name score, brand score, barcode, ranking, the auto-accept and ambiguity thresholds |
-| `quantity.ts` | `scaleFor`: converts an amount to a factor against the source's basis |
-| `resolver.ts` | `resolveComponent`: the source order, the four outcomes, provenance |
-| `usda-fdc.mapping.ts` | Pure mapping from USDA responses to candidates |
-| `nutrition-resolution.spec.ts` | 31 tests, all passing |
+| File                           | Role                                                                                                                 |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `source.interface.ts`          | Types: `NutritionSource`, `SourceCandidate`, `NutrientBasis`, `MeasureWeight`, `Provenance`, `Confidence`, `Licence` |
+| `scoring.ts`                   | Name score, brand score, barcode, ranking, the auto-accept and ambiguity thresholds                                  |
+| `quantity.ts`                  | `scaleFor`: converts an amount to a factor against the source's basis                                                |
+| `resolver.ts`                  | `resolveComponent`: the source order, the four outcomes, provenance                                                  |
+| `usda-fdc.mapping.ts`          | Pure mapping from USDA responses to candidates                                                                       |
+| `nutrition-resolution.spec.ts` | 31 tests, all passing                                                                                                |
 
 The existing unit module (`apps/api/src/foods/nutrition-units.ts`) is reused unchanged.
 
@@ -92,12 +92,12 @@ serving), in this order:
 
 ## Provenance
 
-| Confidence | Meaning | When |
-|---|---|---|
-| `verified` | Figures published by a source for exactly this amount | Amount equals the source's basis or a published measure |
-| `calculated` | Verified figures scaled or combined for the amount given | Any other amount |
-| `ai_estimate` | No reliable source; Claude's estimate | Final fallback only |
-| `user_entered` | The user typed the figures | Their own foods |
+| Confidence     | Meaning                                                  | When                                                    |
+| -------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| `verified`     | Figures published by a source for exactly this amount    | Amount equals the source's basis or a published measure |
+| `calculated`   | Verified figures scaled or combined for the amount given | Any other amount                                        |
+| `ai_estimate`  | No reliable source; Claude's estimate                    | Final fallback only                                     |
+| `user_entered` | The user typed the figures                               | Their own foods                                         |
 
 Each resolved component carries: source kind, source ID, matched name, brand, data
 version, retrieval time, licence, attribution, and any assumptions. These are stored on
@@ -113,7 +113,7 @@ One read-only request each, using the public demo key, on 2026-10-04.
   carry `amount`, `gramWeight`, and `modifier`.
 - **Important finding:** for SR Legacy records, `measureUnit.name` is `"undetermined"`.
   The household name is in **`modifier`** ("cup", or a size such as `potato (2-1/3" x
-  4-3/4")`). The mapping reads `modifier`. Reading `measureUnit` would have dropped every
+4-3/4")`). The mapping reads `modifier`. Reading `measureUnit` would have dropped every
   household measure.
 
 Not verified from a live source (recorded from knowledge, to check before relying on

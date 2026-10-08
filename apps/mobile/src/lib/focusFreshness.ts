@@ -15,6 +15,9 @@ export const FOCUS_REFRESH_STALE_MS = 45_000;
  * load actually succeeds, so a failed load is retried on the next focus rather
  * than being treated as fresh.
  */
-export function isStale(lastLoadedAt: number | null, ttlMs: number = FOCUS_REFRESH_STALE_MS): boolean {
+export function isStale(
+  lastLoadedAt: number | null,
+  ttlMs: number = FOCUS_REFRESH_STALE_MS,
+): boolean {
   return lastLoadedAt === null || Date.now() - lastLoadedAt > ttlMs;
 }

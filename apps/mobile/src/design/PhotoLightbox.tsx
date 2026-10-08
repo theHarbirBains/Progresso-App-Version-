@@ -26,7 +26,12 @@ export function PhotoLightbox({ visible, uri, onClose, testID }: Props) {
   return (
     <Modal visible={visible} transparent={false} animationType="fade" onRequestClose={onClose}>
       <View testID={testID} style={styles.root}>
-        <Image source={{ uri }} style={styles.image} contentFit="contain" cachePolicy="memory-disk" />
+        <Image
+          source={{ uri }}
+          style={styles.image}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+        />
         <View style={[styles.closeWrap, { top: insets.top + 8 }]}>
           <IconButton
             testID={testID ? `${testID}-close` : undefined}

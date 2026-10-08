@@ -502,7 +502,7 @@ async function main() {
     'A second active custom exercise with the same name is refused',
     /duplicate key|unique/i,
   );
-  await admin.query("update public.exercises set is_active = false where id = $1", [reusable]);
+  await admin.query('update public.exercises set is_active = false where id = $1', [reusable]);
   // Succeeds, or the insert throws and the run stops here.
   await asUserCommitted(userA, (client) =>
     client.query(

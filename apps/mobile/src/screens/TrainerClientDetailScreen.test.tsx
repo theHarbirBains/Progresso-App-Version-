@@ -263,9 +263,9 @@ describe('TrainerClientDetailScreen', () => {
 
 describe('TrainerClientDetailScreen -- Progress tab', () => {
   it("shows the client's own lifetime stats, the same Progress section the client themselves sees", async () => {
-    const { fetchAllCompletedWorkouts } = jest.requireMock(
-      '../progress/progressStatsQueries',
-    ) as { fetchAllCompletedWorkouts: jest.Mock };
+    const { fetchAllCompletedWorkouts } = jest.requireMock('../progress/progressStatsQueries') as {
+      fetchAllCompletedWorkouts: jest.Mock;
+    };
     const { fetchAllExerciseHistory } = jest.requireMock(
       '../workouts/allExerciseHistoryQueries',
     ) as { fetchAllExerciseHistory: jest.Mock };

@@ -102,8 +102,12 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
 
-  const { setInputs, setSetInputs, changeWeight: changeSetWeight, changeReps: changeSetReps } =
-    useSetInputDrafts();
+  const {
+    setInputs,
+    setSetInputs,
+    changeWeight: changeSetWeight,
+    changeReps: changeSetReps,
+  } = useSetInputDrafts();
   // Mirrors what is typed into open sets to the device, so an app close or reset mid-set doesn't
   // lose it. Debounced so typing never waits on storage. Completed sets are saved on the server
   // instead, so only open sets are kept here.
