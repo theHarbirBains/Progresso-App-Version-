@@ -29,6 +29,28 @@ jest.mock('../progress/useProgressTheme', () => ({
   useProgressTheme: () => ({ weightUnit: 'kg', theme: { accent: '#3DDC97', onAccent: '#000000' } }),
 }));
 
+// The client-scoped Progress tab's own whole-history reads (see
+// TrainerClientDetailScreen's load()) -- real modules import lib/supabase.ts,
+// which throws outside a configured environment, same reason every other
+// Supabase-backed query module is mocked in this suite.
+jest.mock('../workouts/allExerciseHistoryQueries', () => ({
+  // groupByExercise is really exerciseHistoryGrouping.ts's own pure,
+  // dependency-free function (allExerciseHistoryQueries.ts only re-exports
+  // it) -- required directly from there so this mock never pulls in the
+  // real fetchAllExerciseHistory's own lib/supabase.ts import.
+  groupByExercise: jest.requireActual('../workouts/exerciseHistoryGrouping').groupByExercise,
+  fetchAllExerciseHistory: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../progress/progressStatsQueries', () => ({
+  fetchAllCompletedWorkouts: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../workouts/prSummaryQueries', () => ({
+  fetchAllRepPRs: jest.fn().mockResolvedValue([]),
+  fetchAllOneRepMaxes: jest.fn().mockResolvedValue([]),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockListTrainerClients = listTrainerClients as jest.Mock;
 const mockRegenerate = regenerateTrainerClaimCode as jest.Mock;
@@ -236,5 +258,65 @@ describe('TrainerClientDetailScreen', () => {
       clientId: 'client-1',
       clientName: 'Sam',
     });
+  });
+});
+
+describe('TrainerClientDetailScreen -- Progress tab', () => {
+  it("shows the client's own lifetime stats, the same Progress section the client themselves sees", async () => {
+    const { fetchAllCompletedWorkouts } = jest.requireMock(
+      '../progress/progressStatsQueries',
+    ) as { fetchAllCompletedWorkouts: jest.Mock };
+    const { fetchAllExerciseHistory } = jest.requireMock(
+      '../workouts/allExerciseHistoryQueries',
+    ) as { fetchAllExerciseHistory: jest.Mock };
+    const { fetchAllRepPRs, fetchAllOneRepMaxes } = jest.requireMock(
+      '../workouts/prSummaryQueries',
+    ) as { fetchAllRepPRs: jest.Mock; fetchAllOneRepMaxes: jest.Mock };
+
+    fetchAllCompletedWorkouts.mockResolvedValue([
+      {
+        id: 'cw1',
+        name: 'Leg Day',
+        performedAt: '2026-09-01T09:00:00.000Z',
+        completedAt: '2026-09-01T10:00:00.000Z',
+        workoutSplitDayId: null,
+      },
+      {
+        id: 'cw2',
+        name: 'Push Day',
+        performedAt: '2026-09-03T09:00:00.000Z',
+        completedAt: '2026-09-03T10:00:00.000Z',
+        workoutSplitDayId: null,
+      },
+    ]);
+    function set(id: string) {
+      return {
+        weightKg: 100,
+        reps: 5,
+        performedAt: '2026-09-01T09:00:00.000Z',
+        workoutExerciseId: id,
+        exerciseId: 'squat',
+        exerciseName: 'Barbell Back Squat',
+        muscleGroup: 'quadriceps' as const,
+        movementType: 'bilateral' as const,
+      };
+    }
+    fetchAllExerciseHistory.mockResolvedValue([set('s1'), set('s2'), set('s3')]);
+    fetchAllRepPRs.mockResolvedValue([{ id: 'pr1' }]);
+    fetchAllOneRepMaxes.mockResolvedValue([{ id: 'orm1' }]);
+
+    renderDetail();
+    await screen.findByTestId('trainer-client-workout-w1');
+    fireEvent.press(screen.getByText('Progress'));
+
+    expect(await screen.findByTestId('progress-overview-stat-workouts')).toHaveTextContent(/^2/);
+    expect(screen.getByTestId('progress-overview-stat-sets')).toHaveTextContent(/^3/);
+    // One rep-count PR plus one true 1RM.
+    expect(screen.getByTestId('progress-overview-stat-prs')).toHaveTextContent(/^2/);
+
+    expect(fetchAllCompletedWorkouts).toHaveBeenCalledWith('client-1');
+    expect(fetchAllExerciseHistory).toHaveBeenCalledWith('client-1');
+    expect(fetchAllRepPRs).toHaveBeenCalledWith('client-1');
+    expect(fetchAllOneRepMaxes).toHaveBeenCalledWith('client-1');
   });
 });

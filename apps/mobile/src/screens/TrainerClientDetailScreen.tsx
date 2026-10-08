@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -27,6 +27,13 @@ import {
 import { formatWeightKg, toKg } from '../lib/units';
 import { feetAndInchesFromCm } from '../onboarding/weightHeightConversion';
 import type { RootStackScreenProps } from '../navigation/types';
+import { AllTimeSection } from '../progress/AllTimeSection';
+import { computeLifetimeStats } from '../progress/lifetimeStats';
+import { OverviewSection } from '../progress/OverviewSection';
+import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
+import { progressStyles } from '../progress/progressStyles';
+import { StrengthProgressSection } from '../progress/StrengthProgressSection';
+import { TopSetsSection } from '../progress/TopSetsSection';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import {
   fetchClientPersonalRecords,
@@ -35,20 +42,37 @@ import {
   type ClientRecordRow,
 } from '../trainer/clientQueries';
 import { trainerClientStatusLabel } from '../trainer/trainerLabels';
+import {
+  fetchAllExerciseHistory,
+  groupByExercise,
+  type HistoricalSetWithExercise,
+} from '../workouts/allExerciseHistoryQueries';
+import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
+import {
+  fetchAllOneRepMaxes,
+  fetchAllRepPRs,
+  type OneRepMaxWithExercise,
+  type RepPRWithExercise,
+} from '../workouts/prSummaryQueries';
 import type { EnrichedWorkoutSummary } from '../workouts/workoutHistoryEnrichment';
+import type { WorkoutSummary } from '../workouts/workoutQueries';
 
 type Props = RootStackScreenProps<'TrainerClientDetail'>;
 
 /** A client's page always shows pounds, whatever the trainer's own unit setting is. */
 const CLIENT_WEIGHT_UNIT = 'lb';
 
-type Tab = 'workouts' | 'records';
+type Tab = 'workouts' | 'records' | 'progress';
 
 interface ClientData {
   client: TrainerClient | null;
   workouts: EnrichedWorkoutSummary[];
   hasMore: boolean;
   records: ClientRecordRow[];
+  allWorkouts: WorkoutSummary[];
+  allSetHistory: HistoricalSetWithExercise[];
+  repPRs: RepPRWithExercise[];
+  oneRepMaxes: OneRepMaxWithExercise[];
 }
 
 /** "5 ft 11 in" for a height stored in cm. */
@@ -73,6 +97,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
   const [data, setData] = useState<ClientData | null>(null);
   const [page, setPage] = useState(0);
   const [tab, setTab] = useState<Tab>('workouts');
+  const [progressSection, setProgressSection] = useState<ProgressSection>('Overview');
   const [manageOpen, setManageOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -92,16 +117,43 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
       const clients = await listTrainerClients(accessToken);
       const client = clients.find((row) => row.clientId === clientId) ?? null;
       if (!client) {
-        setData({ client: null, workouts: [], hasMore: false, records: [] });
+        setData({
+          client: null,
+          workouts: [],
+          hasMore: false,
+          records: [],
+          allWorkouts: [],
+          allSetHistory: [],
+          repPRs: [],
+          oneRepMaxes: [],
+        });
         return;
       }
-      const [feed, records] = await Promise.all([
+      // The same whole-history reads ProgressOverviewScreen's own
+      // AllTimeStatsProvider makes for the signed-in user, just scoped to
+      // this client -- the trainer RLS policies (trainer_mode migration)
+      // are what actually allow this, same as fetchClientPersonalRecords
+      // already does for rep_prs.
+      const [feed, records, allWorkouts, allSetHistory, repPRs, oneRepMaxes] = await Promise.all([
         fetchClientWorkoutFeed(clientId, 0),
         fetchClientPersonalRecords(clientId),
+        fetchAllCompletedWorkouts(clientId),
+        fetchAllExerciseHistory(clientId),
+        fetchAllRepPRs(clientId),
+        fetchAllOneRepMaxes(clientId),
       ]);
       setLiveSession(await fetchOpenLiveSession(clientId, user?.id ?? ''));
       setPage(0);
-      setData({ client, workouts: feed.workouts, hasMore: feed.hasMore, records });
+      setData({
+        client,
+        workouts: feed.workouts,
+        hasMore: feed.hasMore,
+        records,
+        allWorkouts,
+        allSetHistory,
+        repPRs,
+        oneRepMaxes,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this client');
     } finally {
@@ -200,6 +252,29 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
   const title = client?.displayName ?? clientName ?? 'Client';
   const initial = title.charAt(0).toUpperCase();
   const canLog = client?.status === 'active';
+
+  // Same derivations ProgressOverviewScreen makes from useAllTimeStats(),
+  // just over this client's own fetched history instead of the signed-in
+  // trainer's -- see the comment on fetchAllCompletedWorkouts/
+  // fetchAllExerciseHistory in load() above.
+  const progressGroups = useMemo(
+    () => groupByExercise(data?.allSetHistory ?? []),
+    [data?.allSetHistory],
+  );
+  const lifetimeStats = useMemo(
+    () => computeLifetimeStats(data?.allWorkouts ?? []),
+    [data?.allWorkouts],
+  );
+  const totalPRs = (data?.repPRs.length ?? 0) + (data?.oneRepMaxes.length ?? 0);
+  // The four Progress section components type their own `navigation` prop as
+  // RootStackScreenProps<'ProgressOverview'>['navigation'] -- cosmetic, since
+  // all they ever call on it is `.navigate()`, which accepts any route in the
+  // one shared RootStackParamList regardless of the current screen. Only
+  // setParams' route-specific params type actually differs, which these
+  // sections never call.
+  const progressNavigation = navigation as unknown as RootStackScreenProps<
+    'ProgressOverview'
+  >['navigation'];
 
   return (
     <Screen
@@ -305,6 +380,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
             categories={[
               { key: 'workouts', label: 'Workouts', icon: 'activity' },
               { key: 'records', label: 'Records', icon: 'award' },
+              { key: 'progress', label: 'Progress', icon: 'bar-chart-2' },
             ]}
             active={tab}
             onSelect={setTab}
@@ -352,7 +428,9 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                 />
               ) : null}
             </>
-          ) : (
+          ) : null}
+
+          {tab === 'records' ? (
             <AppCard testID="trainer-client-records">
               <SectionHeader label="Personal Records" />
               {data?.records.length === 0 ? (
@@ -369,7 +447,76 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                 />
               ))}
             </AppCard>
-          )}
+          ) : null}
+
+          {tab === 'progress' ? (
+            <>
+              <View style={progressStyles.tabsWrap}>
+                <UnderlineTabs
+                  testID="trainer-client-progress-tabs"
+                  categories={[...PROGRESS_SECTIONS]}
+                  active={progressSection}
+                  onSelect={setProgressSection}
+                  accentColor={theme.accent}
+                />
+              </View>
+
+              <AppCard testID="trainer-client-progress-section" style={progressStyles.sectionCard}>
+                {progressSection === 'Overview' ? (
+                  <OverviewSection
+                    groups={progressGroups}
+                    lifetimeStats={lifetimeStats}
+                    totalCompletedSets={data?.allSetHistory.length ?? 0}
+                    totalPRs={totalPRs}
+                    repPRs={data?.repPRs ?? []}
+                    oneRepMaxes={data?.oneRepMaxes ?? []}
+                    weightUnit={CLIENT_WEIGHT_UNIT}
+                    accentColor={theme.accent}
+                    navigation={progressNavigation}
+                    onViewDetails={() => setProgressSection('Strength')}
+                    onViewAllMilestones={() => setProgressSection('Strength')}
+                  />
+                ) : null}
+
+                {progressSection === 'Strength' ? (
+                  <StrengthProgressSection
+                    history={data?.allSetHistory ?? []}
+                    groups={progressGroups}
+                    weightUnit={CLIENT_WEIGHT_UNIT}
+                    accentColor={theme.accent}
+                    onAccentColor={theme.onAccent}
+                    navigation={progressNavigation}
+                  />
+                ) : null}
+
+                {progressSection === 'TopSets' ? (
+                  <TopSetsSection
+                    history={data?.allSetHistory ?? []}
+                    weightUnit={CLIENT_WEIGHT_UNIT}
+                    accentColor={theme.accent}
+                    onAccentColor={theme.onAccent}
+                    navigation={progressNavigation}
+                  />
+                ) : null}
+
+                {progressSection === 'AllTime' ? (
+                  <AllTimeSection
+                    groups={progressGroups}
+                    history={data?.allSetHistory ?? []}
+                    completedWorkouts={data?.allWorkouts ?? []}
+                    lifetimeStats={lifetimeStats}
+                    totalCompletedSets={data?.allSetHistory.length ?? 0}
+                    totalPRs={totalPRs}
+                    repPRs={data?.repPRs ?? []}
+                    oneRepMaxes={data?.oneRepMaxes ?? []}
+                    weightUnit={CLIENT_WEIGHT_UNIT}
+                    accentColor={theme.accent}
+                    navigation={progressNavigation}
+                  />
+                ) : null}
+              </AppCard>
+            </>
+          ) : null}
         </>
       ) : null}
 
