@@ -28,6 +28,7 @@ import {
   isValidDraft,
   type SetInputDraft,
 } from './setInputDrafts';
+import { useSetInputDrafts } from './useSetInputDrafts';
 import {
   addExerciseToWorkout,
   createSet,
@@ -83,7 +84,7 @@ export function GroupWorkoutEditor({
   const { theme: backgroundTheme } = useBackgroundTheme();
   const [details, setDetails] = useState<Record<string, WorkoutDetail>>({});
   const [selectedId, setSelectedId] = useState(userId);
-  const [setInputs, setSetInputs] = useState<Record<string, SetInputDraft>>({});
+  const { setInputs, setSetInputs, changeWeight, changeReps } = useSetInputDrafts();
   const [previous, setPrevious] = useState<
     Record<string, { performedAt: string; sets: SetRecord[] }>
   >({});
@@ -125,8 +126,10 @@ export function GroupWorkoutEditor({
         return next;
       });
       return detail;
+      // setSetInputs is useSetInputDrafts' own useState setter (stable for the life of the
+      // screen); listed for the linter, not because it ever actually changes.
     },
-    [weightUnit],
+    [weightUnit, setSetInputs],
   );
 
   /**
@@ -439,18 +442,8 @@ export function GroupWorkoutEditor({
             unilateralSets={
               row.movementType === 'unilateral' ? computeUnilateralSets(row.sets, setInputs) : []
             }
-            onChangeWeight={(setId, text) =>
-              setSetInputs((prev) => ({
-                ...prev,
-                [setId]: { weight: text, reps: prev[setId]?.reps ?? '' },
-              }))
-            }
-            onChangeReps={(setId, text) =>
-              setSetInputs((prev) => ({
-                ...prev,
-                [setId]: { weight: prev[setId]?.weight ?? '', reps: text },
-              }))
-            }
+            onChangeWeight={changeWeight}
+            onChangeReps={changeReps}
             onToggleComplete={(setId) => {
               const set = row.sets.find((s) => s.id === setId);
               if (!set) return;

@@ -47,6 +47,7 @@ import {
   pendingDraftsFor,
   saveLiveWorkoutDraft,
 } from '../workouts/liveWorkoutDraft';
+import { useSetInputDrafts } from '../workouts/useSetInputDrafts';
 import { computeTotalSets } from '../workouts/workoutSummary';
 import { WorkoutStats } from '../workouts/WorkoutStats';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
@@ -101,7 +102,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
 
-  const [setInputs, setSetInputs] = useState<Record<string, SetInputDraft>>({});
+  const { setInputs, setSetInputs, changeWeight: changeSetWeight, changeReps: changeSetReps } =
+    useSetInputDrafts();
   // Mirrors what is typed into open sets to the device, so an app close or reset mid-set doesn't
   // lose it. Debounced so typing never waits on storage. Completed sets are saved on the server
   // instead, so only open sets are kept here.
@@ -208,7 +210,9 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [workoutId, themeLoading, weightUnit, userId]);
+    // setSetInputs is useSetInputDrafts' own useState setter (stable for the life of the
+    // screen); listed for the linter, not because it ever actually changes.
+  }, [workoutId, themeLoading, weightUnit, userId, setSetInputs]);
 
   function updateExerciseSets(
     exerciseId: string,
@@ -423,26 +427,10 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   // pair is correct even across a reorder: the cached handler still means
   // "move whatever is at position N right now" for whichever exercise ends
   // up rendered there.
-  // Set-row handlers, stable for the life of the screen. Weight and reps use functional updates
-  // only, so they never need fresh state. Completion reads the latest workout and handler through
-  // refs, so it can stay stable too. A stable reference is what lets SetRow's memo skip the other
-  // rows while the user types into one.
-  const changeSetWeight = useCallback(
-    (setId: string, text: string) =>
-      setSetInputs((prev) => ({
-        ...prev,
-        [setId]: { weight: text, reps: prev[setId]?.reps ?? '' },
-      })),
-    [],
-  );
-  const changeSetReps = useCallback(
-    (setId: string, text: string) =>
-      setSetInputs((prev) => ({
-        ...prev,
-        [setId]: { weight: prev[setId]?.weight ?? '', reps: text },
-      })),
-    [],
-  );
+  // Weight/reps change handlers come from useSetInputDrafts, already stable (functional
+  // updates only, so they never need fresh state). Completion/removal read the latest
+  // workout and handler through refs below, so they can stay stable too. A stable
+  // reference is what lets SetRow's memo skip the other rows while the user types into one.
   const workoutRef = useRef(workout);
   workoutRef.current = workout;
   const toggleCompleteRef = useRef(handleToggleComplete);
