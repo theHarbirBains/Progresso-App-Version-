@@ -248,6 +248,16 @@ export const liveWorkoutStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // A quiet remove action beside the complete button -- only shown where
+  // removing a set mid-workout is actually offered (see SetRow/
+  // UnilateralSetRow's own onRemove prop), so it never widens a row where
+  // it isn't.
+  setRemoveButton: {
+    width: 40,
+    height: minTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   // A logical unilateral set: a Left and a Right row sharing one set number
   // and one complete button.

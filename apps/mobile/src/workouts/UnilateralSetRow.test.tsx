@@ -82,4 +82,19 @@ describe('UnilateralSetRow', () => {
       false,
     );
   });
+
+  it('offers no remove control when onRemove is omitted', () => {
+    render(<UnilateralSetRow {...baseProps} />);
+
+    expect(screen.queryByTestId('unilateral-set-remove')).toBeNull();
+  });
+
+  it("removes both sides together, by the left side's id, when onRemove is given", () => {
+    const onRemove = jest.fn();
+    render(<UnilateralSetRow {...baseProps} onRemove={onRemove} />);
+
+    fireEvent.press(screen.getByTestId('unilateral-set-remove'));
+
+    expect(onRemove).toHaveBeenCalledWith('left-set');
+  });
 });

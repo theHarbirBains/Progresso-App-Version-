@@ -22,6 +22,8 @@ interface Props {
   onChangeWeight: (setId: string, text: string) => void;
   onChangeReps: (setId: string, text: string) => void;
   onToggleComplete: (setId: string) => void;
+  /** Omitted where removing a set mid-workout isn't offered (see each caller). */
+  onRemove?: (setId: string) => void;
   accentColor: string;
   onAccentColor: string;
   testID?: string;
@@ -45,6 +47,7 @@ function SetRowComponent({
   onChangeWeight,
   onChangeReps,
   onToggleComplete,
+  onRemove,
   accentColor,
   onAccentColor,
   testID,
@@ -97,6 +100,17 @@ function SetRowComponent({
           color={completed ? onAccentColor : canToggle ? colors.textSecondary : colors.textMuted}
         />
       </TouchableOpacity>
+      {onRemove ? (
+        <TouchableOpacity
+          testID={testID ? `${testID}-remove` : undefined}
+          style={styles.setRemoveButton}
+          onPress={() => onRemove(setId)}
+          accessibilityRole="button"
+          accessibilityLabel={`Remove set ${setIndex}`}
+        >
+          <Feather name="trash-2" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

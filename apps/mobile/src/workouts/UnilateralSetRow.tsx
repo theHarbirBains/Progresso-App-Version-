@@ -30,6 +30,9 @@ interface Props {
   onChangeReps: (setId: string, text: string) => void;
   /** Completes or un-completes the whole logical set. Receives the left side's id. */
   onToggleComplete: (setId: string) => void;
+  /** Removes both sides together -- a unilateral logical set is one unit, same as completion.
+   * Receives the left side's id. Omitted where removing a set mid-workout isn't offered. */
+  onRemove?: (setId: string) => void;
   accentColor: string;
   onAccentColor: string;
   testID?: string;
@@ -60,6 +63,7 @@ function UnilateralSetRowComponent({
   onChangeWeight,
   onChangeReps,
   onToggleComplete,
+  onRemove,
   accentColor,
   onAccentColor,
   testID,
@@ -122,6 +126,17 @@ function UnilateralSetRowComponent({
           color={completed ? onAccentColor : canToggle ? colors.textSecondary : colors.textMuted}
         />
       </TouchableOpacity>
+      {onRemove ? (
+        <TouchableOpacity
+          testID={testID ? `${testID}-remove` : undefined}
+          style={styles.setRemoveButton}
+          onPress={() => onRemove(left.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`Remove set ${setIndex}`}
+        >
+          <Feather name="trash-2" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

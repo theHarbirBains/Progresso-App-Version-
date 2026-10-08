@@ -50,11 +50,17 @@ function formatDateTime(iso: string): string {
 // top set called out, and a row per logged set with a PR / 1RM badge while
 // that set is still the live record.
 export function WorkoutDetailScreen({ route, navigation }: Props) {
-  // A trainer removes a client's workout from the client's history. It can't be logged again.
+  const { workoutId, clientId, clientName } = route.params;
+
+  // A trainer removes a client's workout from the client's history, or the user
+  // removes one of their own, from their own history -- either way it's a soft
+  // delete (deleteWorkout) and can't be logged again.
   function confirmDeleteWorkout() {
     Alert.alert(
       'Delete this workout?',
-      'It will be removed from the client’s history. This cannot be undone.',
+      clientId
+        ? 'It will be removed from the client’s history. This cannot be undone.'
+        : 'It will be removed from your history. This cannot be undone.',
       [
         { text: 'Keep it', style: 'cancel' },
         {
@@ -72,7 +78,6 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  const { workoutId, clientId, clientName } = route.params;
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
@@ -308,14 +313,12 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         );
       })}
 
-      {clientId ? (
-        <TextButton
-          testID="workout-detail-delete"
-          label="Delete Workout"
-          destructive
-          onPress={confirmDeleteWorkout}
-        />
-      ) : null}
+      <TextButton
+        testID="workout-detail-delete"
+        label="Delete Workout"
+        destructive
+        onPress={confirmDeleteWorkout}
+      />
     </Screen>
   );
 }

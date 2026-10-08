@@ -30,6 +30,7 @@ import {
   cancelWorkout,
   completeWorkout,
   createSet,
+  deleteSet,
   fetchPreviousPerformance,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
@@ -344,6 +345,47 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     }
   }
 
+  function dropSetInputs(...setIds: string[]) {
+    setSetInputs((prev) => {
+      const next = { ...prev };
+      for (const id of setIds) delete next[id];
+      return next;
+    });
+  }
+
+  async function handleRemoveSet(exerciseId: string, set: SetRecord) {
+    setError(null);
+    try {
+      await deleteSet(set.id);
+      updateExerciseSets(exerciseId, (ex) => ({
+        ...ex,
+        sets: ex.sets.filter((s) => s.id !== set.id),
+      }));
+      dropSetInputs(set.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove set');
+    }
+  }
+
+  /** Removes both sides of one unilateral logical set together -- it's one unit, same as completion. */
+  async function handleRemoveUnilateralSet(exercise: WorkoutExerciseWithSets, setIndex: number) {
+    const left = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'left');
+    const right = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'right');
+    if (!left || !right) return;
+
+    setError(null);
+    try {
+      await Promise.all([deleteSet(left.id), deleteSet(right.id)]);
+      updateExerciseSets(exercise.id, (ex) => ({
+        ...ex,
+        sets: ex.sets.filter((s) => s.id !== left.id && s.id !== right.id),
+      }));
+      dropSetInputs(left.id, right.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove set');
+    }
+  }
+
   async function handleMoveExercise(index: number, direction: -1 | 1) {
     if (!workout) return;
     const target = index + direction;
@@ -418,6 +460,27 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           void toggleUnilateralRef.current(exercise, set.setIndex);
         } else {
           void toggleCompleteRef.current(exercise, set);
+        }
+        return;
+      }
+    }
+  }, []);
+
+  const removeSetRef = useRef(handleRemoveSet);
+  removeSetRef.current = handleRemoveSet;
+  const removeUnilateralSetRef = useRef(handleRemoveUnilateralSet);
+  removeUnilateralSetRef.current = handleRemoveUnilateralSet;
+  const removeSet = useCallback((setId: string) => {
+    const current = workoutRef.current;
+    if (!current) return;
+    for (const exercise of current.exercises) {
+      const set = exercise.sets.find((candidate) => candidate.id === setId);
+      if (set) {
+        // A unilateral set is removed as one unit, same as completion above.
+        if (exercise.movementType === 'unilateral') {
+          void removeUnilateralSetRef.current(exercise, set.setIndex);
+        } else {
+          void removeSetRef.current(exercise.id, set);
         }
         return;
       }
@@ -665,6 +728,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               onChangeReps={changeSetReps}
               onToggleComplete={toggleSetComplete}
               onAddSet={() => handleAddSet(exercise)}
+              onRemoveSet={removeSet}
               onRemoveExercise={() => handleRemoveExercise(exercise.id)}
               onMoveUp={index > 0 ? getMoveHandler(index, -1) : undefined}
               onMoveDown={

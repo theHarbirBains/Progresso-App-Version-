@@ -8,7 +8,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
-import { fetchWorkoutDetail } from '../workouts/workoutQueries';
+import { deleteWorkout, fetchWorkoutDetail } from '../workouts/workoutQueries';
 import { WorkoutDetailScreen } from './WorkoutDetailScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -36,6 +36,7 @@ const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 const mockFetchRepPRs = fetchRepPRs as jest.Mock;
 const mockFetchOneRepMax = fetchOneRepMax as jest.Mock;
+const mockDeleteWorkout = deleteWorkout as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
@@ -79,6 +80,7 @@ beforeEach(() => {
   mockFetchWorkoutDetail.mockReset().mockResolvedValue(workout);
   mockFetchRepPRs.mockReset().mockResolvedValue([]);
   mockFetchOneRepMax.mockReset().mockResolvedValue(null);
+  mockDeleteWorkout.mockClear().mockResolvedValue(undefined);
   mockGoBack.mockClear();
   mockNavigate.mockClear();
 });
@@ -476,6 +478,8 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
 
     fireEvent.press(await screen.findByTestId('workout-detail-delete'));
     expect(deleteWorkout).not.toHaveBeenCalled();
+    // A client's workout, not the trainer's own -- the confirmation reads "the client's history".
+    expect(alert.mock.calls[0][1]).toMatch(/client.s history/);
     const buttons = (alert.mock.calls[0][2] ?? []) as { text?: string; onPress?: () => void }[];
     buttons.find((button) => button.text === 'Delete')?.onPress?.();
 
@@ -484,12 +488,25 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     alert.mockRestore();
   });
 
-  it('shows no delete for the user own workout', async () => {
+  it('lets the user delete their own workout, once confirmed', async () => {
+    const { Alert } = jest.requireActual('react-native');
+    const { deleteWorkout } = jest.requireMock('../workouts/workoutQueries') as {
+      deleteWorkout: jest.Mock;
+    };
+    const alert = jest.spyOn(Alert, 'alert');
     render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
 
-    await screen.findByText('Push Day');
-    expect(screen.queryByTestId('workout-detail-delete')).toBeNull();
+    fireEvent.press(await screen.findByTestId('workout-detail-delete'));
+    expect(deleteWorkout).not.toHaveBeenCalled();
+    // Own workout, not a client's -- the confirmation reads "your history", not "the client's".
+    expect(alert.mock.calls[0][1]).toMatch(/your history/);
+    const buttons = (alert.mock.calls[0][2] ?? []) as { text?: string; onPress?: () => void }[];
+    buttons.find((button) => button.text === 'Delete')?.onPress?.();
+
+    await waitFor(() => expect(deleteWorkout).toHaveBeenCalledWith('w1'));
+    await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
+    alert.mockRestore();
   });
 });

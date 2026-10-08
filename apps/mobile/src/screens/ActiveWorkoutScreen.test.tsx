@@ -18,6 +18,7 @@ import {
   cancelWorkout,
   completeWorkout,
   createSet,
+  deleteSet,
   fetchPreviousPerformance,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
@@ -68,6 +69,7 @@ jest.mock('../workouts/workoutQueries', () => ({
   updateSet: jest.fn(),
   addExerciseToWorkout: jest.fn(),
   removeExerciseFromWorkout: jest.fn(),
+  deleteSet: jest.fn(),
   reorderExercises: jest.fn(),
   completeWorkout: jest.fn(),
   cancelWorkout: jest.fn(),
@@ -97,6 +99,7 @@ const mockUpdateSet = updateSet as jest.Mock;
 const mockAddExerciseToWorkout = addExerciseToWorkout as jest.Mock;
 const mockFetchNextExerciseOrderIndex = fetchNextExerciseOrderIndex as jest.Mock;
 const mockRemoveExerciseFromWorkout = removeExerciseFromWorkout as jest.Mock;
+const mockDeleteSet = deleteSet as jest.Mock;
 const mockReorderExercises = reorderExercises as jest.Mock;
 const mockCompleteWorkout = completeWorkout as jest.Mock;
 const mockCancelWorkout = cancelWorkout as jest.Mock;
@@ -169,6 +172,7 @@ beforeEach(() => {
   mockAddExerciseToWorkout.mockReset().mockResolvedValue('we2');
   mockFetchNextExerciseOrderIndex.mockReset().mockResolvedValue(2);
   mockRemoveExerciseFromWorkout.mockReset().mockResolvedValue(undefined);
+  mockDeleteSet.mockReset().mockResolvedValue(undefined);
   mockReorderExercises.mockReset().mockResolvedValue(undefined);
   mockCompleteWorkout.mockReset().mockResolvedValue(undefined);
   mockFetchPreviousPerformance.mockReset().mockResolvedValue(null);
@@ -350,6 +354,23 @@ describe('ActiveWorkoutScreen', () => {
 
     await waitFor(() => expect(mockRemoveExerciseFromWorkout).toHaveBeenCalledWith('we1'));
     expect(screen.queryByTestId('exercise-card-we1')).toBeNull();
+  });
+
+  it('removes a set using the existing soft-delete function, updating Total Sets', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+      { wrapper: TestProviders },
+    );
+    await screen.findByTestId('exercise-card-we1-set-s2');
+    expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('2');
+
+    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-remove'));
+
+    await waitFor(() => expect(mockDeleteSet).toHaveBeenCalledWith('s2'));
+    expect(screen.queryByTestId('exercise-card-we1-set-s2')).toBeNull();
+    expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('1');
   });
 
   it('adds an exercise mid-workout, which starts with exactly one blank set', async () => {
@@ -688,6 +709,24 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
     expect(mockUpdateSet).not.toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ weightKg: 82.5 }),
+    );
+  });
+
+  it('removes both sides of a unilateral set together, by the left side id', async () => {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+      { wrapper: TestProviders },
+    );
+    await screen.findByTestId('exercise-card-we-bss-set-1-left-weight');
+
+    fireEvent.press(screen.getByTestId('exercise-card-we-bss-set-1-remove'));
+
+    await waitFor(() => expect(mockDeleteSet).toHaveBeenCalledWith('s-left'));
+    expect(mockDeleteSet).toHaveBeenCalledWith('s-right');
+    await waitFor(() =>
+      expect(screen.queryByTestId('exercise-card-we-bss-set-1-left-weight')).toBeNull(),
     );
   });
 

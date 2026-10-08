@@ -71,6 +71,21 @@ describe('SetRow', () => {
 
     expect(screen.getByTestId('set-row-complete').props.accessibilityState.disabled).toBe(false);
   });
+
+  it('offers no remove control when onRemove is omitted', () => {
+    render(<SetRow {...baseProps} />);
+
+    expect(screen.queryByTestId('set-row-remove')).toBeNull();
+  });
+
+  it('removes the set, by id, when onRemove is given', () => {
+    const onRemove = jest.fn();
+    render(<SetRow {...baseProps} setId="set-9" onRemove={onRemove} />);
+
+    fireEvent.press(screen.getByTestId('set-row-remove'));
+
+    expect(onRemove).toHaveBeenCalledWith('set-9');
+  });
 });
 
 describe('SetRow render behaviour', () => {

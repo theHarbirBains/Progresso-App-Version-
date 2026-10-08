@@ -65,6 +65,8 @@ interface Props {
   onToggleComplete: (setId: string) => void;
   /** Only used for a unilateral exercise -- completes/uncompletes both sides of one logical set together, since a unilateral set is one unit, not two independent ones. */
   onAddSet: () => void;
+  /** Omitted where removing a set mid-workout isn't offered (see each caller). */
+  onRemoveSet?: (setId: string) => void;
   onRemoveExercise: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -93,6 +95,7 @@ function ExerciseCardComponent({
   onChangeReps,
   onToggleComplete,
   onAddSet,
+  onRemoveSet,
   onRemoveExercise,
   onMoveUp,
   onMoveDown,
@@ -248,6 +251,7 @@ function ExerciseCardComponent({
               onChangeWeight={onChangeWeight}
               onChangeReps={onChangeReps}
               onToggleComplete={onToggleComplete}
+              onRemove={onRemoveSet}
               accentColor={accentColor}
               onAccentColor={onAccentColor}
             />
@@ -265,6 +269,7 @@ function ExerciseCardComponent({
               onChangeWeight={onChangeWeight}
               onChangeReps={onChangeReps}
               onToggleComplete={onToggleComplete}
+              onRemove={onRemoveSet}
               accentColor={accentColor}
               onAccentColor={onAccentColor}
             />

@@ -65,6 +65,37 @@ describe('ExerciseCard', () => {
     expect(onRemoveExercise).toHaveBeenCalled();
   });
 
+  it('offers no remove control on a set row when onRemoveSet is omitted', () => {
+    render(<ExerciseCard {...baseProps} />);
+
+    expect(screen.queryByTestId('exercise-card-set-s1-remove')).toBeNull();
+  });
+
+  it('calls onRemoveSet, by set id, when a set row is removed', () => {
+    const onRemoveSet = jest.fn();
+    render(<ExerciseCard {...baseProps} onRemoveSet={onRemoveSet} />);
+
+    fireEvent.press(screen.getByTestId('exercise-card-set-s1-remove'));
+
+    expect(onRemoveSet).toHaveBeenCalledWith('s1');
+  });
+
+  it("calls onRemoveSet with the left side's id when a unilateral set row is removed", () => {
+    const onRemoveSet = jest.fn();
+    render(
+      <ExerciseCard
+        {...baseProps}
+        movementType="unilateral"
+        unilateralSets={oneUnilateralSet}
+        onRemoveSet={onRemoveSet}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('exercise-card-set-1-remove'));
+
+    expect(onRemoveSet).toHaveBeenCalledWith('l1');
+  });
+
   it('does not render reorder controls when onMoveUp/onMoveDown are omitted', () => {
     render(<ExerciseCard {...baseProps} />);
 
