@@ -130,28 +130,83 @@ export interface FetchAllExercisesParams {
 }
 
 /**
+ * The per-user cache fetchAllExercises/fetchExerciseSourceCounts both read from: every
+ * active exercise (built-ins plus this user's own customs), unfiltered, sorted by name
+ * ascending. Built-ins never change at runtime, and a user's own customs only change
+ * through ExerciseFormScreen's create/update calls -- which explicitly invalidate this
+ * via invalidateExerciseCache -- so there is no time-based expiry. This is what lets the
+ * Exercise Library and the live-workout exercise picker (ExerciseBrowser, shared by
+ * both) open repeatedly in one session -- picker opened for every "Add Exercise" tap --
+ * without re-querying Supabase for data that has not changed.
+ */
+const fullExerciseListCache = new Map<string, ExerciseRow[]>();
+
+async function fetchFullExerciseList(userId: string): Promise<ExerciseRow[]> {
+  const cached = fullExerciseListCache.get(userId);
+  if (cached) return cached;
+
+  const { data, error } = await supabase
+    .from('exercises')
+    .select(
+      'id, name, muscle_group, movement_type, logging_style, photo_url, is_active, created_by',
+    )
+    .eq('is_active', true)
+    .order('name', { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const rows = ((data ?? []) as ExerciseDbRow[]).map(toExerciseRow);
+  fullExerciseListCache.set(userId, rows);
+  return rows;
+}
+
+/**
+ * Clears the cache fetchAllExercises/fetchExerciseSourceCounts read from, for this user.
+ * Called after a custom exercise is created or updated (including deleted, which is a
+ * deactivating update -- see ExerciseFormScreen), the only two ways this data changes.
+ */
+export function invalidateExerciseCache(userId: string): void {
+  fullExerciseListCache.delete(userId);
+}
+
+/** search/muscleGroup/source filtering, done in memory over an already-fetched list --
+ * the same semantics buildExerciseQuery applies in SQL (a plain case-insensitive
+ * substring match on name, since the cached list is never re-escaped-ilike'd). The list
+ * is already sorted ascending by name, and `.filter` preserves that order, so only a
+ * descending request needs any re-ordering. */
+function filterExerciseRows(
+  rows: ExerciseRow[],
+  params: {
+    userId: string;
+    search: string;
+    muscleGroup: MuscleGroup | null;
+    source: ExerciseSource;
+  },
+): ExerciseRow[] {
+  const { userId, search, muscleGroup, source } = params;
+  const trimmedSearch = search.trim().toLowerCase();
+  return rows.filter((row) => {
+    if (trimmedSearch && !row.name.toLowerCase().includes(trimmedSearch)) return false;
+    if (muscleGroup && row.muscleGroup !== muscleGroup) return false;
+    if (source === 'builtin' && row.createdBy !== null) return false;
+    if (source === 'mine' && row.createdBy !== userId) return false;
+    return true;
+  });
+}
+
+/**
  * Every exercise matching the current filters, unpaginated -- for the A-Z
  * indexed library list (same "load the whole filtered set up front" trade-
  * off foodLibraryGrouping.ts's own fetchAllFoods already makes: a real jump-
  * to-letter index needs the whole result set in memory, not one page at a
- * time).
+ * time). Filters the cached full list in memory (see fetchFullExerciseList)
+ * rather than a fresh Supabase query every time.
  */
 export async function fetchAllExercises(params: FetchAllExercisesParams): Promise<ExerciseRow[]> {
   const { userId, search, muscleGroup, source, ascending = true } = params;
 
-  const { data, error } = await buildExerciseQuery({
-    userId,
-    search,
-    muscleGroup,
-    source,
-    ascending,
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return ((data ?? []) as ExerciseDbRow[]).map(toExerciseRow);
+  const base = await fetchFullExerciseList(userId);
+  const filtered = filterExerciseRows(base, { userId, search, muscleGroup, source });
+  return ascending ? filtered : [...filtered].reverse();
 }
 
 export interface ExerciseSourceCounts {
@@ -163,33 +218,19 @@ export interface ExerciseSourceCounts {
 /**
  * The total number of active exercises in each source category, independent
  * of the current search/muscle-group filters -- what the library's "All /
- * Built-in / Mine" category cards show. Three minimal `count: 'exact',
- * head: true` requests (no rows fetched, just a count each), not a
- * duplicate of fetchExercises' own filtered/paginated query above.
+ * Built-in / Mine" category cards show. Derived from the same cached full
+ * list fetchAllExercises reads (see fetchFullExerciseList): no separate
+ * count queries at all once that list is cached, and the one query it costs
+ * on a cold cache is shared with whichever of fetchAllExercises/this one
+ * asks first in the same session.
  */
-async function countExercises(refine?: 'builtin' | 'mine', userId?: string): Promise<number> {
-  let query = supabase
-    .from('exercises')
-    .select('id', { count: 'exact', head: true })
-    .eq('is_active', true);
-  if (refine === 'builtin') {
-    query = query.is('created_by', null);
-  } else if (refine === 'mine' && userId) {
-    query = query.eq('created_by', userId);
-  }
-  const { count, error } = await query;
-  if (error) {
-    throw new Error(error.message);
-  }
-  return count ?? 0;
-}
-
 export async function fetchExerciseSourceCounts(userId: string): Promise<ExerciseSourceCounts> {
-  const [all, builtin, mine] = await Promise.all([
-    countExercises(),
-    countExercises('builtin'),
-    countExercises('mine', userId),
-  ]);
-
-  return { all, builtin, mine };
+  const base = await fetchFullExerciseList(userId);
+  let builtin = 0;
+  let mine = 0;
+  for (const row of base) {
+    if (row.createdBy === null) builtin += 1;
+    else if (row.createdBy === userId) mine += 1;
+  }
+  return { all: base.length, builtin, mine };
 }

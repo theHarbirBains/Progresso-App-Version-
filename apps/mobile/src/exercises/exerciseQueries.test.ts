@@ -1,5 +1,10 @@
 import { supabase } from '../lib/supabase';
-import { fetchAllExercises, fetchExerciseSourceCounts, fetchExercises } from './exerciseQueries';
+import {
+  fetchAllExercises,
+  fetchExerciseSourceCounts,
+  fetchExercises,
+  invalidateExerciseCache,
+} from './exerciseQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
 
@@ -56,6 +61,11 @@ const baseParams = {
 
 beforeEach(() => {
   mockFrom.mockReset();
+  // fetchAllExercises/fetchExerciseSourceCounts share a per-user cache that outlives a
+  // single test otherwise (see exerciseQueries.ts) -- clear it for every userId any test
+  // below uses, so each test starts from a cold cache regardless of run order.
+  invalidateExerciseCache('user-1');
+  invalidateExerciseCache('user-2');
 });
 
 describe('fetchExercises', () => {
@@ -207,36 +217,105 @@ describe('fetchExercises', () => {
   });
 });
 
+// fetchAllExercises and fetchExerciseSourceCounts both read a per-user cache of every
+// active exercise, fetched unfiltered (no search/muscle-group/source/pagination) and
+// filtered/derived in memory -- see exerciseQueries.ts's own comment on why: built-ins
+// never change, and a user's own customs only change through an explicit invalidation
+// call, so the same cached list can serve every picker/library open in a session with
+// at most one real query.
+const customBenchPress = {
+  id: 'ex-mine',
+  name: 'My Bench Press Variant',
+  muscle_group: 'chest',
+  movement_type: 'bilateral',
+  logging_style: null,
+  photo_url: null,
+  is_active: true,
+  created_by: 'user-1',
+};
+const builtinSquat = {
+  id: 'ex-builtin',
+  name: 'Barbell Back Squat',
+  muscle_group: 'quadriceps',
+  movement_type: 'bilateral',
+  logging_style: null,
+  photo_url: null,
+  is_active: true,
+  created_by: null,
+};
+
 describe('fetchAllExercises', () => {
   const allParams = { userId: 'user-1', search: '', muscleGroup: null, source: 'all' as const };
 
-  it('queries active exercises ordered by name, with no range/pagination at all', async () => {
-    const calls = mockQueryBuilder({ data: [], error: null });
+  it('fetches every active exercise unfiltered -- no search/muscle-group/source/range at all', async () => {
+    const calls = mockQueryBuilder({ data: [builtinSquat, customBenchPress], error: null });
 
     await fetchAllExercises(allParams);
 
     expect(mockFrom).toHaveBeenCalledWith('exercises');
     expect(calls.eq).toEqual([['is_active', true]]);
     expect(calls.order).toEqual([['name', { ascending: true }]]);
+    expect(calls.ilike).toEqual([]);
+    expect(calls.is).toEqual([]);
     expect(calls.range).toEqual([]);
   });
 
-  it('applies the same search/muscle-group/source filters fetchExercises does', async () => {
-    const calls = mockQueryBuilder({ data: [], error: null });
+  it('applies search/muscle-group/source filters in memory, over the one fetched list', async () => {
+    mockQueryBuilder({ data: [builtinSquat, customBenchPress], error: null });
 
-    await fetchAllExercises({
-      ...allParams,
-      search: 'bench',
-      muscleGroup: 'chest',
-      source: 'mine',
-    });
+    const bySearch = await fetchAllExercises({ ...allParams, search: 'bench' });
+    const byMuscleGroup = await fetchAllExercises({ ...allParams, muscleGroup: 'quadriceps' });
+    const builtinOnly = await fetchAllExercises({ ...allParams, source: 'builtin' });
+    const mineOnly = await fetchAllExercises({ ...allParams, source: 'mine' });
 
-    expect(calls.ilike).toEqual([['name', '%bench%']]);
-    expect(calls.eq).toContainEqual(['muscle_group', 'chest']);
-    expect(calls.eq).toContainEqual(['created_by', 'user-1']);
+    expect(bySearch.map((r) => r.id)).toEqual(['ex-mine']);
+    expect(byMuscleGroup.map((r) => r.id)).toEqual(['ex-builtin']);
+    expect(builtinOnly.map((r) => r.id)).toEqual(['ex-builtin']);
+    expect(mineOnly.map((r) => r.id)).toEqual(['ex-mine']);
+    // All four were answered from the one cached fetch above -- no further query.
+    expect(mockFrom).toHaveBeenCalledTimes(1);
   });
 
-  it('maps every returned row, with no pageSize-based truncation', async () => {
+  it('reverses the already-ascending cached order for a descending request', async () => {
+    mockQueryBuilder({ data: [builtinSquat, customBenchPress], error: null });
+
+    const result = await fetchAllExercises({ ...allParams, ascending: false });
+
+    expect(result.map((r) => r.id)).toEqual(['ex-mine', 'ex-builtin']);
+  });
+
+  it('fetches once per user, then serves every later call from the cache', async () => {
+    mockQueryBuilder({ data: [builtinSquat], error: null });
+
+    await fetchAllExercises(allParams);
+    await fetchAllExercises({ ...allParams, search: 'squat' });
+    await fetchAllExercises({ ...allParams, muscleGroup: 'quadriceps' });
+
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+  });
+
+  it('fetches again for a different user -- the cache is per user, not shared', async () => {
+    mockQueryBuilder({ data: [builtinSquat], error: null });
+
+    await fetchAllExercises(allParams);
+    await fetchAllExercises({ ...allParams, userId: 'user-2' });
+
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+  });
+
+  it('fetches fresh again after invalidateExerciseCache, as after a create/edit/delete', async () => {
+    mockQueryBuilder({ data: [builtinSquat], error: null });
+    await fetchAllExercises(allParams);
+
+    invalidateExerciseCache('user-1');
+    mockQueryBuilder({ data: [builtinSquat, customBenchPress], error: null });
+    const result = await fetchAllExercises(allParams);
+
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+    expect(result).toHaveLength(2);
+  });
+
+  it('maps every returned row, with no truncation', async () => {
     const rows = Array.from({ length: 50 }, (_, i) => ({
       id: `ex-${i}`,
       name: `Exercise ${i}`,
@@ -254,66 +333,38 @@ describe('fetchAllExercises', () => {
     expect(result).toHaveLength(50);
   });
 
-  it('throws when the query returns an error', async () => {
+  it('throws when the query returns an error, and does not cache the failure', async () => {
     mockQueryBuilder({ data: null, error: { message: 'network error' } });
 
     await expect(fetchAllExercises(allParams)).rejects.toThrow('network error');
+
+    mockQueryBuilder({ data: [builtinSquat], error: null });
+    await expect(fetchAllExercises(allParams)).resolves.toHaveLength(1);
   });
 });
 
-// A thenable, infinitely-chainable stand-in for Supabase's
-// PostgrestFilterBuilder. fetchExerciseSourceCounts fires its three count
-// queries concurrently (Promise.all), each via its own supabase.from(...)
-// call -- so mockFrom builds a FRESH, independent builder per call (via
-// mockImplementation, not a single shared mockReturnValue), each one
-// tracking which filter it saw and resolving to that source's own result.
-// A single shared builder object would race: all three call chains would
-// mutate the same "current source" flag before any of them actually
-// resolved, so every query would resolve to whichever ran last.
-function mockCountQueryBuilder(results: Record<'all' | 'builtin' | 'mine', MockResult>) {
-  mockFrom.mockImplementation(() => {
-    let source: 'all' | 'builtin' | 'mine' = 'all';
-    interface Builder {
-      select: jest.Mock;
-      eq: jest.Mock;
-      is: jest.Mock;
-      then: (resolve: (v: unknown) => void) => void;
-    }
-    const builder: Builder = {
-      select: jest.fn(() => builder),
-      eq: jest.fn((column: string) => {
-        if (column === 'created_by') source = 'mine';
-        return builder;
-      }),
-      is: jest.fn(() => {
-        source = 'builtin';
-        return builder;
-      }),
-      then: (resolve: (v: unknown) => void) => resolve(results[source]),
-    };
-    return builder;
-  });
-}
-
 describe('fetchExerciseSourceCounts', () => {
-  it('returns the real, independent count for each source', async () => {
-    mockCountQueryBuilder({
-      all: { data: null, error: null, count: 328 },
-      builtin: { data: null, error: null, count: 245 },
-      mine: { data: null, error: null, count: 12 },
-    });
+  it('derives each source count from the cached list, with one query, not three', async () => {
+    mockQueryBuilder({ data: [builtinSquat, customBenchPress], error: null });
 
     const result = await fetchExerciseSourceCounts('user-1');
 
-    expect(result).toEqual({ all: 328, builtin: 245, mine: 12 });
+    expect(result).toEqual({ all: 2, builtin: 1, mine: 1 });
+    expect(mockFrom).toHaveBeenCalledTimes(1);
   });
 
-  it('throws when any of the three count queries errors', async () => {
-    mockCountQueryBuilder({
-      all: { data: null, error: null, count: 328 },
-      builtin: { data: null, error: { message: 'network error' }, count: null },
-      mine: { data: null, error: null, count: 12 },
-    });
+  it('shares its cache with fetchAllExercises -- asking either first costs the only query', async () => {
+    mockQueryBuilder({ data: [builtinSquat, customBenchPress], error: null });
+
+    await fetchAllExercises({ userId: 'user-1', search: '', muscleGroup: null, source: 'all' });
+    const counts = await fetchExerciseSourceCounts('user-1');
+
+    expect(counts).toEqual({ all: 2, builtin: 1, mine: 1 });
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws when the underlying query errors', async () => {
+    mockQueryBuilder({ data: null, error: { message: 'network error' } });
 
     await expect(fetchExerciseSourceCounts('user-1')).rejects.toThrow('network error');
   });

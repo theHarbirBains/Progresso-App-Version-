@@ -8,6 +8,7 @@ import { ExercisePickerModal } from './ExercisePickerModal';
 
 jest.mock('../exercises/exerciseQueries', () => ({
   fetchAllExercises: jest.fn(),
+  invalidateExerciseCache: jest.fn(),
   fetchExerciseSourceCounts: jest.fn().mockResolvedValue({ all: 2, builtin: 2, mine: 0 }),
 }));
 

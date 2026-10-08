@@ -17,6 +17,7 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../exercises/exerciseQueries', () => ({
   fetchAllExercises: jest.fn(),
+  invalidateExerciseCache: jest.fn(),
   fetchExerciseSourceCounts: jest.fn(),
 }));
 

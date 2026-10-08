@@ -55,6 +55,7 @@ jest.mock('../lib/equipmentPhotoUpload', () => ({
 
 jest.mock('../exercises/exerciseQueries', () => ({
   fetchAllExercises: jest.fn(),
+  invalidateExerciseCache: jest.fn(),
   fetchExerciseSourceCounts: jest.fn().mockResolvedValue({ all: 0, builtin: 0, mine: 0 }),
 }));
 

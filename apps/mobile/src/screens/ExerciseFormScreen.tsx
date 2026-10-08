@@ -11,7 +11,7 @@ import { Section } from '../design/Section';
 import { TextInput } from '../design/TextInput';
 import { Toggle } from '../design/Toggle';
 import { colors, radii, spacing, typeScale } from '../design/theme';
-import type { ExerciseRow } from '../exercises/exerciseQueries';
+import { invalidateExerciseCache, type ExerciseRow } from '../exercises/exerciseQueries';
 import { MuscleGroupSelect } from '../exercises/MuscleGroupSelect';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import type { MovementType } from '../exercises/movementTypes';
@@ -150,6 +150,8 @@ export function ExerciseFormScreen(props: Props) {
         });
       }
 
+      // The library/picker's cached exercise list no longer reflects what was just saved.
+      if (userId) invalidateExerciseCache(userId);
       props.onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save exercise');
@@ -178,6 +180,7 @@ export function ExerciseFormScreen(props: Props) {
     setSaving(true);
     try {
       await updateExercise(accessToken, props.exercise.id, { isActive: false });
+      if (userId) invalidateExerciseCache(userId);
       props.onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete the exercise');

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
 import { createExercise, updateExercise } from '../lib/api';
+import { invalidateExerciseCache } from '../exercises/exerciseQueries';
 import { uploadEquipmentPhoto } from '../lib/equipmentPhotoUpload';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
@@ -14,6 +15,10 @@ jest.mock('../auth/AuthProvider', () => ({
 jest.mock('../lib/api', () => ({
   createExercise: jest.fn(),
   updateExercise: jest.fn(),
+}));
+
+jest.mock('../exercises/exerciseQueries', () => ({
+  invalidateExerciseCache: jest.fn(),
 }));
 
 jest.mock('../lib/equipmentPhotoUpload', () => ({
@@ -28,6 +33,7 @@ jest.mock('../lib/equipmentPhotoUpload', () => ({
 const mockUseAuth = useAuth as jest.Mock;
 const mockCreateExercise = createExercise as jest.Mock;
 const mockUpdateExercise = updateExercise as jest.Mock;
+const mockInvalidateExerciseCache = invalidateExerciseCache as jest.Mock;
 const mockUploadEquipmentPhoto = uploadEquipmentPhoto as jest.Mock;
 
 const ownedExercise = {
@@ -53,6 +59,7 @@ beforeEach(() => {
   });
   mockCreateExercise.mockReset().mockResolvedValue({ id: 'ex-new' });
   mockUpdateExercise.mockReset().mockResolvedValue({});
+  mockInvalidateExerciseCache.mockClear();
   mockUploadEquipmentPhoto.mockReset().mockResolvedValue('https://example.com/uploaded.jpg');
 });
 
@@ -88,6 +95,7 @@ describe('ExerciseFormScreen (create mode)', () => {
         movementType: 'bilateral',
       }),
     );
+    expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');
     expect(onDone).toHaveBeenCalled();
   });
 
@@ -243,6 +251,7 @@ describe('ExerciseFormScreen (edit mode)', () => {
         isActive: true,
       }),
     );
+    expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');
     expect(onDone).toHaveBeenCalled();
   });
 
@@ -267,6 +276,7 @@ describe('ExerciseFormScreen (edit mode)', () => {
     await waitFor(() =>
       expect(mockUpdateExercise).toHaveBeenCalledWith('token-123', 'ex-mine', { isActive: false }),
     );
+    expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');
     expect(onDone).toHaveBeenCalled();
     alert.mockRestore();
   });
