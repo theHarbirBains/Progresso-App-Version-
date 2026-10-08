@@ -119,27 +119,6 @@ const olderWorkoutItem = {
   },
 };
 
-const foodLogItem = {
-  kind: 'foodLog' as const,
-  id: 'foodLog-log-1',
-  timestamp: '2026-01-01T18:00:00Z',
-  log: {
-    id: 'log-1',
-    foodId: 'food-1',
-    foodNameSnapshot: 'Chicken Breast',
-    servingSize: 100,
-    servingUnit: 'g',
-    quantity: 1,
-    calories: 165,
-    proteinG: 31,
-    carbsG: 0,
-    fatG: 3.6,
-    mealType: 'lunch' as const,
-    loggedAt: '2026-01-01T18:00:00Z',
-    imageUrl: null,
-  },
-};
-
 // FeedScreen opens the app-level side menu (via AppMenuContext) from its own
 // header, same as every other tab-root screen -- this stands in for that
 // root-level provider.
@@ -306,30 +285,13 @@ describe('FeedScreen', () => {
     expect(await card.findByText('Harbir Bains')).toBeTruthy();
   });
 
-  it('shows a logged food as a card: name, meal, calories, and all three macros', async () => {
-    mockFetchFeedItems.mockResolvedValue(feedPage([foodLogItem]));
-    renderScreen();
-
-    const card = within(await screen.findByTestId('feed-item-foodlog-log-1'));
-    expect(card.getByText('Chicken Breast')).toBeTruthy();
-    expect(card.getByText(/Lunch/)).toBeTruthy();
-    expect(screen.getByTestId('feed-item-foodlog-log-1-calories')).toHaveTextContent(/165/);
-    expect(screen.getByTestId('feed-item-foodlog-log-1-protein')).toHaveTextContent(/31/);
-    expect(screen.getByTestId('feed-item-foodlog-log-1-carbs')).toHaveTextContent(/0/);
-    // fatG is 3.6 in the fixture, rounded for display -> "4g".
-    expect(screen.getByTestId('feed-item-foodlog-log-1-fat')).toHaveTextContent(/4/);
-  });
-
-  it('navigates to the workout on tap, and to Nutrition on a food log tap', async () => {
-    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, foodLogItem]));
+  it('navigates to the workout on tap', async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
     renderScreen();
     await screen.findByTestId('feed-item-workout-w1');
 
     fireEvent.press(screen.getByTestId('feed-item-workout-w1'));
     expect(mockNavigate).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' });
-
-    fireEvent.press(screen.getByTestId('feed-item-foodlog-log-1'));
-    expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
   });
 
   it('navigates to Find People from the header search icon', async () => {
@@ -490,13 +452,13 @@ describe('FeedScreen', () => {
 
     const calls = navigation.addListener.mock.calls;
     const [, focusCallback] = calls[calls.length - 1];
-    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, foodLogItem]));
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, olderWorkoutItem]));
     await act(async () => {
       focusCallback();
     });
 
     expect(screen.queryByTestId('feed-loading')).toBeNull();
-    expect(await screen.findByTestId('feed-item-foodlog-log-1')).toBeTruthy();
+    expect(await screen.findByTestId('feed-item-workout-w0')).toBeTruthy();
   });
 
   it('skips reloading friends, badges, and the next-workout preview on a quick second focus, but always reloads your own feed and the live check', async () => {
@@ -556,9 +518,9 @@ describe('FeedScreen', () => {
   });
 
   it('renders no bare text outside <Text>', async () => {
-    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, foodLogItem]));
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, olderWorkoutItem]));
     renderScreen();
-    await screen.findByTestId('feed-item-foodlog-log-1');
+    await screen.findByTestId('feed-item-workout-w0');
 
     expectNoBareText();
   });
@@ -578,21 +540,21 @@ describe('FeedScreen -- Strava-style activity cards', () => {
       workoutAccentColor: '#2F80FF',
       nutritionAccentColor: '#10B981',
     });
-    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, foodLogItem]));
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, olderWorkoutItem]));
     renderScreen();
-    await screen.findByTestId('feed-item-foodlog-log-1');
+    await screen.findByTestId('feed-item-workout-w0');
 
-    const workoutCard = StyleSheet.flatten(screen.getByTestId('feed-item-workout-w1').props.style);
-    const foodCard = StyleSheet.flatten(screen.getByTestId('feed-item-foodlog-log-1').props.style);
-    expect(workoutCard.backgroundColor).toBe(foodCard.backgroundColor);
-    expect(workoutCard.backgroundColor).not.toBe('#2F80FF');
-    expect(workoutCard.backgroundColor).not.toBe('#10B981');
+    const newerCard = StyleSheet.flatten(screen.getByTestId('feed-item-workout-w1').props.style);
+    const olderCard = StyleSheet.flatten(screen.getByTestId('feed-item-workout-w0').props.style);
+    expect(newerCard.backgroundColor).toBe(olderCard.backgroundColor);
+    expect(newerCard.backgroundColor).not.toBe('#2F80FF');
+    expect(newerCard.backgroundColor).not.toBe('#10B981');
   });
 
   it('draws one flat card per item -- no plain rows', async () => {
-    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, foodLogItem]));
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, olderWorkoutItem]));
     renderScreen();
-    await screen.findByTestId('feed-item-foodlog-log-1');
+    await screen.findByTestId('feed-item-workout-w0');
 
     expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(2);
   });
@@ -617,23 +579,6 @@ describe('FeedScreen -- merged Friends activity', () => {
       topSets: [
         { exerciseId: 'row', exerciseName: 'Barbell Row', photoUrl: null, weightKg: 135, reps: 6 },
       ],
-    },
-  };
-
-  const friendFoodLogItem = {
-    kind: 'foodLog' as const,
-    id: 'foodLog-flog-1',
-    timestamp: '2026-01-02T18:00:00Z',
-    author: { id: 'user-2', username: 'jane', displayName: 'Jane Doe', avatarUrl: null },
-    log: {
-      id: 'flog-1',
-      foodNameSnapshot: 'Oatmeal',
-      calories: 300,
-      proteinG: 10,
-      carbsG: 50,
-      fatG: 5,
-      mealType: 'breakfast' as const,
-      imageUrl: null,
     },
   };
 
@@ -667,13 +612,12 @@ describe('FeedScreen -- merged Friends activity', () => {
     expect(await card.findByText('Jane Doe')).toBeTruthy();
   });
 
-  it("does not navigate on tap -- a friend's workout/food log isn't the signed-in user's to open", async () => {
-    mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem, friendFoodLogItem]));
+  it("does not navigate on tap -- a friend's workout isn't the signed-in user's to open", async () => {
+    mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
     renderScreen();
-    await screen.findByTestId('feed-item-foodlog-flog-1');
+    await screen.findByTestId('feed-item-workout-fw1');
 
     fireEvent.press(screen.getByTestId('feed-item-workout-fw1'));
-    fireEvent.press(screen.getByTestId('feed-item-foodlog-flog-1'));
 
     expect(mockNavigate).not.toHaveBeenCalled();
   });
@@ -702,11 +646,17 @@ describe('FeedScreen -- merged Friends activity', () => {
     await screen.findByTestId('feed-item-workout-fw1');
     expect(screen.getByTestId('feed-load-more')).toBeTruthy();
 
-    mockFetchFriendsFeed.mockResolvedValueOnce(feedPage([friendFoodLogItem], false));
+    const olderFriendWorkoutItem = {
+      ...friendWorkoutItem,
+      id: 'workout-fw0',
+      timestamp: '2026-01-01T13:00:00Z',
+      workout: { ...friendWorkoutItem.workout, id: 'fw0' },
+    };
+    mockFetchFriendsFeed.mockResolvedValueOnce(feedPage([olderFriendWorkoutItem], false));
     fireEvent.press(screen.getByTestId('feed-load-more'));
 
     expect(mockFetchFriendsFeed).toHaveBeenLastCalledWith('token-123', 1);
-    expect(await screen.findByTestId('feed-item-foodlog-flog-1')).toBeTruthy();
+    expect(await screen.findByTestId('feed-item-workout-fw0')).toBeTruthy();
     expect(screen.getByTestId('feed-item-workout-fw1')).toBeTruthy();
     expect(screen.getByTestId('feed-item-workout-w1')).toBeTruthy();
     // Neither source has more left, so the button is gone.

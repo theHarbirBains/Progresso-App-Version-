@@ -3,13 +3,15 @@ import {
   type EnrichedWorkoutSummary,
 } from '../workouts/workoutHistoryEnrichment';
 import { fetchWorkoutHistory } from '../workouts/workoutQueries';
-import { fetchWeeklyFoodLogs, type FoodLogRow } from '../nutrition/foodLogQueries';
 
 const WORKOUT_PAGE_SIZE = 20;
 
-export type FeedItem =
-  | { kind: 'workout'; id: string; timestamp: string; workout: EnrichedWorkoutSummary }
-  | { kind: 'foodLog'; id: string; timestamp: string; log: FoodLogRow };
+export type FeedItem = {
+  kind: 'workout';
+  id: string;
+  timestamp: string;
+  workout: EnrichedWorkoutSummary;
+};
 
 export interface FeedPage {
   items: FeedItem[];
@@ -18,40 +20,29 @@ export interface FeedPage {
 }
 
 /**
- * The Feed tab's one data source: the user's own completed workouts and
- * logged foods, merged into a single reverse-chronological list -- "what did
- * I actually do", never anyone else's data (there is no following/social
- * graph yet -- see DESIGN.md's Feed section). Two existing queries, no new
- * tables:
+ * The Feed tab's one data source: the user's own completed workouts,
+ * reverse-chronological -- "what did I actually do", never anyone else's
+ * data (there is no following/social graph yet -- see DESIGN.md's Feed
+ * section). The same paginated history WorkoutHistoryScreen's own list
+ * already fetches (`fetchWorkoutHistory` + `enrichWorkoutSummaries`), so a
+ * workout card can show its muscle groups, sets and volume without a second
+ * round trip per item. `page` (0-based) lets Feed load further back -- see
+ * `hasMore`.
  *
- * - Workouts: the same paginated history WorkoutHistoryScreen's own list
- *   already fetches (`fetchWorkoutHistory` + `enrichWorkoutSummaries`), so a
- *   workout card can show its muscle groups, sets and volume without a
- *   second round trip per item. `page` (0-based) lets Feed load further back
- *   -- see `hasMore`.
- * - Food logs: the current week's logs (`fetchWeeklyFoodLogs`) -- the same
- *   week boundary Nutrition Today's own weekly widgets use. Only fetched on
- *   `page` 0: there is no paginated food-log-history query yet, so scrolling
- *   further back surfaces older workouts only, never older food logs. A
- *   dedicated paginated food history is a future enhancement, not required
- *   to make Feed usable.
+ * Nutrition logs are deliberately not part of Feed -- see Nutrition
+ * Today/History for logged food instead.
  *
- * Never throws for a partial failure: if one source fails, the feed still
- * shows what the other returned (same "degrade gracefully" pattern the food
- * search backend uses for its external provider).
+ * Never throws for a failure: an empty page comes back instead, same
+ * "degrade gracefully" philosophy the rest of Feed's loading uses.
  */
 export async function fetchFeedItems(userId: string, page = 0): Promise<FeedPage> {
-  const [workoutsResult, foodLogsResult] = await Promise.allSettled([
-    fetchWorkoutHistory(userId, page, WORKOUT_PAGE_SIZE),
-    page === 0 ? fetchWeeklyFoodLogs(userId) : Promise.resolve<FoodLogRow[]>([]),
-  ]);
-
   const items: FeedItem[] = [];
   let hasMore = false;
 
-  if (workoutsResult.status === 'fulfilled') {
-    hasMore = workoutsResult.value.hasMore;
-    const enriched = await enrichWorkoutSummaries(workoutsResult.value.rows);
+  try {
+    const { rows, hasMore: more } = await fetchWorkoutHistory(userId, page, WORKOUT_PAGE_SIZE);
+    hasMore = more;
+    const enriched = await enrichWorkoutSummaries(rows);
     for (const workout of enriched) {
       // A workout only belongs in the feed once it's actually finished --
       // an in-progress one has no completedAt yet and shouldn't appear as
@@ -71,12 +62,9 @@ export async function fetchFeedItems(userId: string, page = 0): Promise<FeedPage
         workout,
       });
     }
-  }
-
-  if (foodLogsResult.status === 'fulfilled') {
-    for (const log of foodLogsResult.value) {
-      items.push({ kind: 'foodLog', id: `foodLog-${log.id}`, timestamp: log.loggedAt, log });
-    }
+  } catch {
+    // Degrade to an empty page rather than throw -- same philosophy as
+    // the rest of Feed's loading (a failed source never blocks the screen).
   }
 
   items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

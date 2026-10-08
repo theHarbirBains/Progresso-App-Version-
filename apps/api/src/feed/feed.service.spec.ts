@@ -62,7 +62,7 @@ describe('FeedService', () => {
       });
     });
 
-    it("merges followees' workouts and food logs, newest first, annotated with the author", async () => {
+    it("merges followees' workouts, newest first, annotated with the author", async () => {
       const client = createMockClient();
       client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
       client.queue('workouts', {
@@ -79,23 +79,6 @@ describe('FeedService', () => {
         error: null,
       });
       client.queue('workout_exercises', { data: [], error: null });
-      client.queue('food_logs', {
-        data: [
-          {
-            id: 'f1',
-            user_id: 'user-2',
-            food_name_snapshot: 'Chicken Rice',
-            calories: 600,
-            protein_g: 50,
-            carbs_g: 60,
-            fat_g: 10,
-            meal_type: 'lunch',
-            image_url: null,
-            logged_at: '2026-09-21T12:00:00.000Z',
-          },
-        ],
-        error: null,
-      });
       client.queue('users', {
         data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
         error: null,
@@ -105,10 +88,8 @@ describe('FeedService', () => {
       const result = await service.getFriendsFeed('user-1', 0);
 
       expect(result.hasMore).toBe(false);
-      expect(result.items).toHaveLength(2);
-      // Newest first: the food log (Sep 21) before the workout (Sep 20).
-      expect(result.items[0]).toMatchObject({ kind: 'foodLog', id: 'foodLog-f1' });
-      expect(result.items[1]).toMatchObject({ kind: 'workout', id: 'workout-w1' });
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({ kind: 'workout', id: 'workout-w1' });
       for (const item of result.items) {
         expect(item.author).toEqual({
           id: 'user-2',
@@ -139,7 +120,6 @@ describe('FeedService', () => {
         error: null,
       });
       client.queue('workout_exercises', { data: [], error: null });
-      client.queue('food_logs', { data: [], error: null });
       client.queue('users', {
         data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
         error: null,
@@ -204,7 +184,6 @@ describe('FeedService', () => {
         ],
         error: null,
       });
-      client.queue('food_logs', { data: [], error: null });
       client.queue('users', {
         data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
         error: null,
@@ -231,22 +210,10 @@ describe('FeedService', () => {
       });
     });
 
-    it('skips food logs on pages after the first', async () => {
-      const client = createMockClient();
-      client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
-      client.queue('workouts', { data: [], error: null });
-      const service = serviceWith(client);
-
-      const result = await service.getFriendsFeed('user-1', 1);
-
-      expect(result.items).toEqual([]);
-    });
-
     it('leaves workouts a trainer logged for a client out of the friends feed', async () => {
       const client = createMockClient();
       client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
       client.queue('workouts', { data: [], error: null });
-      client.queue('food_logs', { data: [], error: null });
       const service = serviceWith(client);
 
       await service.getFriendsFeed('user-1', 0);
@@ -269,7 +236,6 @@ describe('FeedService', () => {
       }));
       client.queue('workouts', { data: fullPage, error: null });
       client.queue('workout_exercises', { data: [], error: null });
-      client.queue('food_logs', { data: [], error: null });
       client.queue('users', {
         data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
         error: null,

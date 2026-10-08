@@ -3,49 +3,31 @@ import { FollowsService, type FollowUserSummary } from '../follows/follows.servi
 import { SupabaseService } from '../supabase/supabase.service';
 
 const WORKOUT_PAGE_SIZE = 20;
-const FOOD_LOG_LIMIT = 20;
 
-export type FeedItem =
-  | {
-      kind: 'workout';
-      id: string;
-      timestamp: string;
-      author: FollowUserSummary;
-      workout: {
-        id: string;
-        name: string;
-        splitDayName: string | null;
-        muscleGroups: string[];
-        durationMinutes: number | null;
-        exerciseCount: number;
-        completedSetCount: number;
-        totalVolumeKg: number;
-        completedExerciseCount: number;
-        topSets: {
-          exerciseId: string;
-          exerciseName: string;
-          photoUrl: string | null;
-          weightKg: number;
-          reps: number;
-        }[];
-      };
-    }
-  | {
-      kind: 'foodLog';
-      id: string;
-      timestamp: string;
-      author: FollowUserSummary;
-      log: {
-        id: string;
-        foodNameSnapshot: string;
-        calories: number;
-        proteinG: number;
-        carbsG: number;
-        fatG: number;
-        mealType: string | null;
-        imageUrl: string | null;
-      };
-    };
+export type FeedItem = {
+  kind: 'workout';
+  id: string;
+  timestamp: string;
+  author: FollowUserSummary;
+  workout: {
+    id: string;
+    name: string;
+    splitDayName: string | null;
+    muscleGroups: string[];
+    durationMinutes: number | null;
+    exerciseCount: number;
+    completedSetCount: number;
+    totalVolumeKg: number;
+    completedExerciseCount: number;
+    topSets: {
+      exerciseId: string;
+      exerciseName: string;
+      photoUrl: string | null;
+      weightKg: number;
+      reps: number;
+    }[];
+  };
+};
 
 export interface FeedPage {
   items: FeedItem[];
@@ -61,18 +43,15 @@ function computeDurationMinutes(performedAt: string, completedAt: string | null)
 
 /**
  * The Friends tab of Feed: the signed-in user's accepted followees' own
- * completed workouts and logged foods, merged and sorted the same way
- * apps/mobile/src/feed/feedQueries.ts already does for "my" feed -- ported
- * server-side because reading another user's workouts/food_logs is exactly
- * the cross-user-trusted read CLAUDE.md's hybrid pattern reserves for the
- * backend (workouts/food_logs RLS is strictly own-row, so this can only
- * work via the service-role client after FollowsService confirms an
- * accepted follow).
+ * completed workouts, sorted the same way apps/mobile/src/feed/feedQueries.ts
+ * already does for "my" feed -- ported server-side because reading another
+ * user's workouts is exactly the cross-user-trusted read CLAUDE.md's hybrid
+ * pattern reserves for the backend (workouts RLS is strictly own-row, so
+ * this can only work via the service-role client after FollowsService
+ * confirms an accepted follow).
  *
- * Food logs are the most recent N across all followees rather than
- * "this week" (unlike the self-feed) -- a server-local "current week"
- * would use the wrong timezone for the viewer, so recency-based is both
- * simpler and more correct here.
+ * Nutrition logs are deliberately not part of Feed, for either source -- see
+ * apps/mobile/src/feed/feedQueries.ts's own comment.
  */
 @Injectable()
 export class FeedService {
@@ -92,33 +71,17 @@ export class FeedService {
 
     const from = page * WORKOUT_PAGE_SIZE;
     const to = from + WORKOUT_PAGE_SIZE - 1;
-    // Workouts and food logs depend only on the followee list, so they run together.
-    const foodLogsQuery =
-      page === 0
-        ? client
-            .from('food_logs')
-            .select(
-              'id, user_id, food_name_snapshot, calories, protein_g, carbs_g, fat_g, meal_type, image_url, logged_at',
-            )
-            .in('user_id', followeeIds)
-            .order('logged_at', { ascending: false })
-            .limit(FOOD_LOG_LIMIT)
-        : null;
-    const [workoutsResult, foodLogsResult] = await Promise.all([
-      client
-        .from('workouts')
-        .select('id, user_id, name, performed_at, completed_at, workout_split_day_id')
-        .in('user_id', followeeIds)
-        .not('completed_at', 'is', null)
-        .is('deleted_at', null)
-        // A workout a trainer logged for a client is the client's own, but it is not
-        // something the client chose to share with followers (trainer mode, workouts only).
-        .is('logged_by', null)
-        .order('performed_at', { ascending: false })
-        .range(from, to),
-      foodLogsQuery,
-    ]);
-    const { data: workoutRows, error: workoutsError } = workoutsResult;
+    const { data: workoutRows, error: workoutsError } = await client
+      .from('workouts')
+      .select('id, user_id, name, performed_at, completed_at, workout_split_day_id')
+      .in('user_id', followeeIds)
+      .not('completed_at', 'is', null)
+      .is('deleted_at', null)
+      // A workout a trainer logged for a client is the client's own, but it is not
+      // something the client chose to share with followers (trainer mode, workouts only).
+      .is('logged_by', null)
+      .order('performed_at', { ascending: false })
+      .range(from, to);
     if (workoutsError) throw new InternalServerErrorException('Failed to load friends feed');
 
     const hasMore = (workoutRows ?? []).length === WORKOUT_PAGE_SIZE;
@@ -150,33 +113,6 @@ export class FeedService {
             totalVolumeKg: workout.totalVolumeKg,
             completedExerciseCount: workout.completedExerciseCount,
             topSets: workout.topSets,
-          },
-        });
-      }
-    }
-
-    // Food logs: only on the first page, matching the self-feed's own
-    // "food logs aren't paginated yet" limitation (see feedQueries.ts).
-    if (page === 0 && foodLogsResult) {
-      const { data: logRows, error: logsError } = foodLogsResult;
-      if (logsError) throw new InternalServerErrorException('Failed to load friends feed');
-
-      for (const log of logRows ?? []) {
-        authorIds.add(log.user_id as string);
-        items.push({
-          kind: 'foodLog',
-          id: `foodLog-${log.id}`,
-          timestamp: log.logged_at as string,
-          author: { id: log.user_id as string, username: null, displayName: null, avatarUrl: null },
-          log: {
-            id: log.id as string,
-            foodNameSnapshot: log.food_name_snapshot as string,
-            calories: Number(log.calories),
-            proteinG: Number(log.protein_g),
-            carbsG: Number(log.carbs_g),
-            fatG: Number(log.fat_g),
-            mealType: (log.meal_type as string | null) ?? null,
-            imageUrl: (log.image_url as string | null) ?? null,
           },
         });
       }

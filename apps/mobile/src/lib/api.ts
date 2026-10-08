@@ -518,52 +518,36 @@ export function unfollowUser(
   );
 }
 
-// The Friends tab of Feed -- accepted followees' own completed workouts and
-// logged foods, merged server-side (apps/api/src/feed) the same way
-// feedQueries.ts merges "my" feed client-side. Each item carries its
-// author's public profile fields, since (unlike the self-feed) the byline
-// isn't always the signed-in user.
-export type FriendsFeedItem =
-  | {
-      kind: 'workout';
-      id: string;
-      timestamp: string;
-      author: FollowUser;
-      workout: {
-        id: string;
-        name: string;
-        splitDayName: string | null;
-        muscleGroups: string[];
-        durationMinutes: number | null;
-        exerciseCount: number;
-        completedSetCount: number;
-        totalVolumeKg: number;
-        completedExerciseCount: number;
-        topSets: {
-          exerciseId: string;
-          exerciseName: string;
-          photoUrl: string | null;
-          weightKg: number;
-          reps: number;
-        }[];
-      };
-    }
-  | {
-      kind: 'foodLog';
-      id: string;
-      timestamp: string;
-      author: FollowUser;
-      log: {
-        id: string;
-        foodNameSnapshot: string;
-        calories: number;
-        proteinG: number;
-        carbsG: number;
-        fatG: number;
-        mealType: string | null;
-        imageUrl: string | null;
-      };
-    };
+// The Friends tab of Feed -- accepted followees' own completed workouts,
+// merged server-side (apps/api/src/feed) the same way feedQueries.ts merges
+// "my" feed client-side. Each item carries its author's public profile
+// fields, since (unlike the self-feed) the byline isn't always the signed-in
+// user. Nutrition logs are deliberately not part of Feed -- see Nutrition
+// Today/History for logged food instead.
+export type FriendsFeedItem = {
+  kind: 'workout';
+  id: string;
+  timestamp: string;
+  author: FollowUser;
+  workout: {
+    id: string;
+    name: string;
+    splitDayName: string | null;
+    muscleGroups: string[];
+    durationMinutes: number | null;
+    exerciseCount: number;
+    completedSetCount: number;
+    totalVolumeKg: number;
+    completedExerciseCount: number;
+    topSets: {
+      exerciseId: string;
+      exerciseName: string;
+      photoUrl: string | null;
+      weightKg: number;
+      reps: number;
+    }[];
+  };
+};
 
 export interface FriendsFeedPage {
   items: FriendsFeedItem[];

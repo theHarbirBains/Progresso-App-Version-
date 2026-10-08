@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
-import { Avatar } from '../design/Avatar';
 import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { Card } from '../design/Card';
@@ -12,8 +10,6 @@ import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
-import { StatBlock } from '../design/StatBlock';
-import { StatValue } from '../design/StatValue';
 import { colors } from '../design/theme';
 import { withAlpha } from '../theme/accentColor';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
@@ -28,8 +24,6 @@ import { fetchMyOpenLiveSessions, type TrainerOpenSession } from '../trainer/cli
 import { isStale } from '../lib/focusFreshness';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
-import { mealTypeLabel, type MealType } from '../nutrition/mealTypes';
-import { FoodImage } from '../nutrition/FoodImage';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
@@ -43,7 +37,6 @@ import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
 } from '../workouts/workoutSplitQueries';
-import { formatCardDate } from '../workouts/workoutFormat';
 import { feedStyles as styles } from './feedStyles';
 
 type Props = RootStackScreenProps<'Feed'>;
@@ -61,12 +54,12 @@ function musclesLabel(day: NextWorkoutPlan['day']): string {
 // there's a real "someone else's read-only detail" screen to send it to.
 interface DisplayItem {
   key: string;
-  kind: 'workout' | 'foodLog';
+  kind: 'workout';
   timestamp: string;
   authorName: string;
   avatarUrl: string | null;
   onPress?: () => void;
-  workout?: {
+  workout: {
     id: string;
     name: string;
     splitDayName: string | null;
@@ -77,16 +70,6 @@ interface DisplayItem {
     totalVolumeKg: number;
     completedExerciseCount: number;
     topSets: WorkoutTopSet[];
-  };
-  log?: {
-    id: string;
-    foodNameSnapshot: string;
-    calories: number;
-    proteinG: number;
-    carbsG: number;
-    fatG: number;
-    mealType: MealType | null;
-    imageUrl: string | null;
   };
 }
 
@@ -112,9 +95,8 @@ interface DisplayItem {
 // Each card's own numbers are the most relevant ones actually available: a
 // workout's stat area is a 2x2 grid (Duration/Exercises, Sets/Volume) --
 // the same shape WorkoutDetailScreen's own hero uses, not a cramped 3-up
-// row -- and a food card leads with a hero-sized photo (FoodFacts.tsx's own
-// sizing) beside its name and calorie readout, then all three macros
-// (Protein/Carbs/Fat), not just Protein.
+// row. Feed shows workouts only -- logged food is deliberately not a feed
+// item (see Nutrition Today/History for that instead).
 //
 // The header's "+" mirrors Strava's own top-bar button: a shortcut menu
 // (Start Workout / Log Food) to the same destinations Train's and
@@ -315,8 +297,8 @@ export function FeedScreen({ navigation }: Props) {
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       // Your own feed items and the live-workout/group/session check are never gated:
-      // the first is exactly what a one-hop edit-and-return (finish a workout, log
-      // food, edit a past workout) changes, and the second must always be current.
+      // the first is exactly what a one-hop edit-and-return (finish a workout, edit a
+      // past workout) changes, and the second must always be current.
       // Friends' activity, the notification/goal badges, and the next-workout preview
       // only change from elsewhere (someone else's activity, a notification you acted
       // on minutes ago, a split you edited) -- not from anything reachable in one hop
@@ -378,91 +360,47 @@ export function FeedScreen({ navigation }: Props) {
 
   const byline = displayName ?? username ?? 'You';
 
-  const mineDisplayItems: DisplayItem[] = items.map((item) =>
-    item.kind === 'workout'
-      ? {
-          key: item.id,
-          kind: 'workout',
-          timestamp: item.timestamp,
-          authorName: byline,
-          avatarUrl,
-          onPress: () => navigation.navigate('WorkoutDetail', { workoutId: item.workout.id }),
-          workout: {
-            id: item.workout.id,
-            name: item.workout.splitDayName ?? item.workout.name,
-            splitDayName: item.workout.splitDayName,
-            muscleGroups: item.workout.muscleGroups,
-            durationMinutes: item.workout.durationMinutes,
-            exerciseCount: item.workout.exerciseCount,
-            completedSetCount: item.workout.completedSetCount,
-            totalVolumeKg: item.workout.totalVolumeKg,
-            completedExerciseCount: item.workout.completedExerciseCount,
-            topSets: item.workout.topSets,
-          },
-        }
-      : {
-          key: item.id,
-          kind: 'foodLog',
-          timestamp: item.timestamp,
-          authorName: byline,
-          avatarUrl,
-          onPress: () => navigation.navigate('Nutrition'),
-          log: {
-            id: item.log.id,
-            foodNameSnapshot: item.log.foodNameSnapshot,
-            calories: item.log.calories,
-            proteinG: item.log.proteinG,
-            carbsG: item.log.carbsG,
-            fatG: item.log.fatG,
-            mealType: item.log.mealType,
-            imageUrl: item.log.imageUrl ?? null,
-          },
-        },
-  );
+  const mineDisplayItems: DisplayItem[] = items.map((item) => ({
+    key: item.id,
+    kind: 'workout',
+    timestamp: item.timestamp,
+    authorName: byline,
+    avatarUrl,
+    onPress: () => navigation.navigate('WorkoutDetail', { workoutId: item.workout.id }),
+    workout: {
+      id: item.workout.id,
+      name: item.workout.splitDayName ?? item.workout.name,
+      splitDayName: item.workout.splitDayName,
+      muscleGroups: item.workout.muscleGroups,
+      durationMinutes: item.workout.durationMinutes,
+      exerciseCount: item.workout.exerciseCount,
+      completedSetCount: item.workout.completedSetCount,
+      totalVolumeKg: item.workout.totalVolumeKg,
+      completedExerciseCount: item.workout.completedExerciseCount,
+      topSets: item.workout.topSets,
+    },
+  }));
 
-  const friendsDisplayItems: DisplayItem[] = friendsItems.map((item) =>
-    item.kind === 'workout'
-      ? {
-          key: item.id,
-          kind: 'workout',
-          timestamp: item.timestamp,
-          authorName:
-            item.author.displayName ??
-            (item.author.username ? `@${item.author.username}` : 'Someone'),
-          avatarUrl: item.author.avatarUrl,
-          workout: {
-            id: item.workout.id,
-            name: item.workout.splitDayName ?? item.workout.name,
-            splitDayName: item.workout.splitDayName,
-            muscleGroups: item.workout.muscleGroups as SplitMuscleGroup[],
-            durationMinutes: item.workout.durationMinutes,
-            exerciseCount: item.workout.exerciseCount,
-            completedSetCount: item.workout.completedSetCount,
-            totalVolumeKg: item.workout.totalVolumeKg,
-            completedExerciseCount: item.workout.completedExerciseCount,
-            topSets: item.workout.topSets,
-          },
-        }
-      : {
-          key: item.id,
-          kind: 'foodLog',
-          timestamp: item.timestamp,
-          authorName:
-            item.author.displayName ??
-            (item.author.username ? `@${item.author.username}` : 'Someone'),
-          avatarUrl: item.author.avatarUrl,
-          log: {
-            id: item.log.id,
-            foodNameSnapshot: item.log.foodNameSnapshot,
-            calories: item.log.calories,
-            proteinG: item.log.proteinG,
-            carbsG: item.log.carbsG,
-            fatG: item.log.fatG,
-            mealType: item.log.mealType as MealType | null,
-            imageUrl: item.log.imageUrl,
-          },
-        },
-  );
+  const friendsDisplayItems: DisplayItem[] = friendsItems.map((item) => ({
+    key: item.id,
+    kind: 'workout',
+    timestamp: item.timestamp,
+    authorName:
+      item.author.displayName ?? (item.author.username ? `@${item.author.username}` : 'Someone'),
+    avatarUrl: item.author.avatarUrl,
+    workout: {
+      id: item.workout.id,
+      name: item.workout.splitDayName ?? item.workout.name,
+      splitDayName: item.workout.splitDayName,
+      muscleGroups: item.workout.muscleGroups as SplitMuscleGroup[],
+      durationMinutes: item.workout.durationMinutes,
+      exerciseCount: item.workout.exerciseCount,
+      completedSetCount: item.workout.completedSetCount,
+      totalVolumeKg: item.workout.totalVolumeKg,
+      completedExerciseCount: item.workout.completedExerciseCount,
+      topSets: item.workout.topSets,
+    },
+  }));
 
   const displayItems = [...mineDisplayItems, ...friendsDisplayItems].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
@@ -472,9 +410,9 @@ export function FeedScreen({ navigation }: Props) {
   // once -- same reasoning useSignedInResource's own loading flag uses.
   const initialLoading = loading || friendsLoading;
   // Graceful degradation, same philosophy as feedQueries.ts's own
-  // Promise.allSettled merge of workouts/food logs: a failure on one source
-  // only blocks the whole screen if there's genuinely nothing else to show;
-  // otherwise this quietly shows whatever the other source returned.
+  // degrade-to-empty-page on failure: a failure on one source only blocks
+  // the whole screen if there's genuinely nothing else to show; otherwise
+  // this quietly shows whatever the other source returned.
   const blockingError = displayItems.length === 0 ? (error ?? friendsError) : null;
   const hasMoreOfEither = hasMore || friendsHasMore;
   const loadingMoreEither = loadingMore || friendsLoadingMore;
@@ -689,84 +627,18 @@ export function FeedScreen({ navigation }: Props) {
         </View>
       ) : (
         <>
-          {displayItems.map((item) =>
-            item.kind === 'workout' && item.workout ? (
-              <WorkoutFeedCard
-                idPrefix="feed-item-workout"
-                workout={item.workout}
-                authorName={item.authorName}
-                avatarUrl={item.avatarUrl}
-                timestamp={item.timestamp}
-                weightUnit={weightUnit}
-                onPress={item.onPress}
-                key={item.key}
-              />
-            ) : item.log ? (
-              <Card
-                key={item.key}
-                testID={`feed-item-foodlog-${item.log.id}`}
-                onPress={item.onPress}
-              >
-                <View style={styles.metaRow}>
-                  <View style={styles.avatarWrap}>
-                    <Avatar
-                      uri={item.avatarUrl}
-                      initial={item.authorName.charAt(0).toUpperCase()}
-                      size={32}
-                      iconSize={16}
-                      iconColor={colors.textSecondary}
-                      initialStyle={styles.avatarInitial}
-                    />
-                  </View>
-                  <View style={styles.metaBody}>
-                    <Text style={styles.metaName} numberOfLines={1}>
-                      {item.authorName}
-                    </Text>
-                    <View style={styles.metaSubRow}>
-                      <Feather name="coffee" size={11} color={colors.textMuted} />
-                      <Text style={styles.metaTimestamp}>
-                        {item.log.mealType ? `${mealTypeLabel(item.log.mealType)} · ` : ''}
-                        {formatCardDate(item.timestamp)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.foodTitleRow}>
-                  <FoodImage uri={item.log.imageUrl} name={item.log.foodNameSnapshot} size={88} />
-                  <View style={styles.foodTitleBody}>
-                    <Text style={styles.foodTitle} numberOfLines={2}>
-                      {item.log.foodNameSnapshot}
-                    </Text>
-                    <StatValue
-                      testID={`feed-item-foodlog-${item.log.id}-calories`}
-                      value={String(item.log.calories)}
-                      unit=" cal"
-                      color={colors.textPrimary}
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.statRow}>
-                  <StatBlock
-                    testID={`feed-item-foodlog-${item.log.id}-protein`}
-                    value={`${Math.round(item.log.proteinG)}g`}
-                    label="Protein"
-                  />
-                  <StatBlock
-                    testID={`feed-item-foodlog-${item.log.id}-carbs`}
-                    value={`${Math.round(item.log.carbsG)}g`}
-                    label="Carbs"
-                  />
-                  <StatBlock
-                    testID={`feed-item-foodlog-${item.log.id}-fat`}
-                    value={`${Math.round(item.log.fatG)}g`}
-                    label="Fat"
-                  />
-                </View>
-              </Card>
-            ) : null,
-          )}
+          {displayItems.map((item) => (
+            <WorkoutFeedCard
+              idPrefix="feed-item-workout"
+              workout={item.workout}
+              authorName={item.authorName}
+              avatarUrl={item.avatarUrl}
+              timestamp={item.timestamp}
+              weightUnit={weightUnit}
+              onPress={item.onPress}
+              key={item.key}
+            />
+          ))}
 
           {hasMoreOfEither ? (
             <TextButton

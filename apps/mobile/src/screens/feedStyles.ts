@@ -9,10 +9,9 @@ import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 // Card anatomy (byline row -> bold title -> stat strip) mirrors Strava's
 // activity-card structure -- see DESIGN.md's Feed section. Regular cards
 // stay black-and-white/monochrome (textPrimary/textSecondary/textMuted
-// only) -- a workout vs. a food log still reads from its icon, not a color
-// -- restrained accent use is the point: the one Next Workout hero is the
-// only place accent appears, filled solid rather than every card carrying
-// a tinted band.
+// only) -- restrained accent use is the point: the one Next Workout hero is
+// the only place accent appears, filled solid rather than every card
+// carrying a tinted band.
 export const feedStyles = StyleSheet.create({
   content: {
     gap: widgetGap,
@@ -114,23 +113,5 @@ export const feedStyles = StyleSheet.create({
   statRow: {
     flexDirection: 'row',
     gap: widgetGap,
-  },
-
-  // The food-log title row: a real hero-sized photo (FoodFacts.tsx's own
-  // "found a food" sizing) where one exists, rather than fabricated
-  // location data standing in for Strava's route map.
-  foodTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  foodTitleBody: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  foodTitle: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
   },
 });
