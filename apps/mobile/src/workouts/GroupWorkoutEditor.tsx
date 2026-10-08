@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, StyleSheet, View } from 'react-native';
+import { useBackgroundTheme } from '../design/backgroundThemeStore';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { Text } from '../design/Text';
@@ -79,6 +80,7 @@ export function GroupWorkoutEditor({
   testID = 'group-workout',
 }: Props) {
   const { weightUnit } = useProgressTheme();
+  const { theme: backgroundTheme } = useBackgroundTheme();
   const [details, setDetails] = useState<Record<string, WorkoutDetail>>({});
   const [selectedId, setSelectedId] = useState(userId);
   const [setInputs, setSetInputs] = useState<Record<string, SetInputDraft>>({});
@@ -484,16 +486,25 @@ export function GroupWorkoutEditor({
         onAccentColor={onAccentColor}
       />
       <Modal visible={customOpen} animationType="slide" onRequestClose={() => setCustomOpen(false)}>
-        <ExerciseFormScreen
-          mode="create"
-          accentColor={accentColor}
-          onAccentColor={onAccentColor}
-          onDone={() => {
-            setCustomOpen(false);
-            setPickerOpen(true);
-          }}
-          onCancel={() => setCustomOpen(false)}
-        />
+        {/* A native Modal opens its own window, outside AppBackgroundLayer, so it needs its
+            own fill from the current Background Theme -- same reason ExercisePickerModal's
+            own root does this. Without it, Screen's deliberately transparent root (see that
+            component's own comment) has nothing behind it and falls back to plain white. */}
+        <View
+          testID={`${testID}-create-custom-modal`}
+          style={[styles.customExerciseModal, { backgroundColor: backgroundTheme.colors.background }]}
+        >
+          <ExerciseFormScreen
+            mode="create"
+            accentColor={accentColor}
+            onAccentColor={onAccentColor}
+            onDone={() => {
+              setCustomOpen(false);
+              setPickerOpen(true);
+            }}
+            onCancel={() => setCustomOpen(false)}
+          />
+        </View>
       </Modal>
     </View>
   );
@@ -510,5 +521,8 @@ const styles = StyleSheet.create({
   error: {
     ...typeScale.secondary,
     color: colors.destructive,
+  },
+  customExerciseModal: {
+    flex: 1,
   },
 });
