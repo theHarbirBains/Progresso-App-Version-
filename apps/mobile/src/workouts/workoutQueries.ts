@@ -43,9 +43,9 @@ export interface SetRecord {
 }
 
 // Defined in setCompletion.ts (no supabase import) rather than here, so
-// purely client-side consumers (progressiveOverload.ts) can use it without
-// pulling in supabase/AsyncStorage under Jest. Re-exported for every other
-// existing import site.
+// purely client-side consumers can use it without pulling in
+// supabase/AsyncStorage under Jest. Re-exported for every other existing
+// import site.
 export { completedSetsOnly, type CompletedSetRecord } from './setCompletion';
 
 export interface WorkoutExerciseWithSets {
