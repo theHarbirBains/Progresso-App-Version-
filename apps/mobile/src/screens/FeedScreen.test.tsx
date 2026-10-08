@@ -499,6 +499,62 @@ describe('FeedScreen', () => {
     expect(await screen.findByTestId('feed-item-foodlog-log-1')).toBeTruthy();
   });
 
+  it('skips reloading friends, badges, and the next-workout preview on a quick second focus, but always reloads your own feed and the live check', async () => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue({ id: 'split-1', days: [] });
+    renderScreen();
+    await screen.findByTestId('feed-empty');
+    await waitFor(() => expect(mockFetchWorkoutSplitDetail).toHaveBeenCalledTimes(1));
+
+    // The navigation mock re-registers (and so re-fires) 'focus' a few times of its own
+    // accord while dependencies settle during mount, before this test's own explicit
+    // extra focus below -- so absolute counts aren't meaningful here, only whether this
+    // one additional focus, at the same real-world moment as the one before it, adds
+    // another call or not.
+    const friendsBefore = mockFetchFriendsFeed.mock.calls.length;
+    const badgeBefore = mockListFollowNotifications.mock.calls.length;
+    const nextWorkoutBefore = mockFetchWorkoutSplitDetail.mock.calls.length;
+    const ownFeedBefore = mockFetchFeedItems.mock.calls.length;
+    const liveBefore = mockFetchActiveWorkout.mock.calls.length;
+
+    const calls = navigation.addListener.mock.calls;
+    const [, focusCallback] = calls[calls.length - 1];
+    await act(async () => {
+      focusCallback();
+    });
+
+    // Well inside the stale window -- skipped.
+    expect(mockFetchFriendsFeed.mock.calls.length).toBe(friendsBefore);
+    expect(mockListFollowNotifications.mock.calls.length).toBe(badgeBefore);
+    expect(mockFetchWorkoutSplitDetail.mock.calls.length).toBe(nextWorkoutBefore);
+    // Your own feed and the live-workout check have no staleness window at all.
+    expect(mockFetchFeedItems.mock.calls.length).toBeGreaterThan(ownFeedBefore);
+    expect(mockFetchActiveWorkout.mock.calls.length).toBeGreaterThan(liveBefore);
+  });
+
+  it('reloads friends, badges, and the next-workout preview again once the stale window has passed', async () => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue({ id: 'split-1', days: [] });
+    renderScreen();
+    await screen.findByTestId('feed-empty');
+    await waitFor(() => expect(mockFetchWorkoutSplitDetail).toHaveBeenCalledTimes(1));
+
+    const friendsBefore = mockFetchFriendsFeed.mock.calls.length;
+    const badgeBefore = mockListFollowNotifications.mock.calls.length;
+    const nextWorkoutBefore = mockFetchWorkoutSplitDetail.mock.calls.length;
+
+    const calls = navigation.addListener.mock.calls;
+    const [, focusCallback] = calls[calls.length - 1];
+    const now = jest.spyOn(Date, 'now');
+    now.mockReturnValue(Date.now() + 46_000);
+    await act(async () => {
+      focusCallback();
+    });
+    now.mockRestore();
+
+    expect(mockFetchFriendsFeed.mock.calls.length).toBeGreaterThan(friendsBefore);
+    expect(mockListFollowNotifications.mock.calls.length).toBeGreaterThan(badgeBefore);
+    expect(mockFetchWorkoutSplitDetail.mock.calls.length).toBeGreaterThan(nextWorkoutBefore);
+  });
+
   it('renders no bare text outside <Text>', async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem, foodLogItem]));
     renderScreen();

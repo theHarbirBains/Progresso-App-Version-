@@ -25,6 +25,7 @@ import {
   type GroupSummary,
 } from '../lib/api';
 import { fetchMyOpenLiveSessions, type TrainerOpenSession } from '../trainer/clientQueries';
+import { isStale } from '../lib/focusFreshness';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { mealTypeLabel, type MealType } from '../nutrition/mealTypes';
@@ -204,6 +205,14 @@ export function FeedScreen({ navigation }: Props) {
     }
   }, [userId]);
 
+  // Set only once a load actually succeeds, and read by the focus listener below to
+  // skip reloading data that only needs to feel "recent" -- never by handleLoadMore,
+  // retryAll, or any other explicit call, which always run for real. See
+  // lib/focusFreshness.ts.
+  const lastFriendsLoadAtRef = useRef<number | null>(null);
+  const lastBadgeLoadAtRef = useRef<number | null>(null);
+  const lastNextWorkoutLoadAtRef = useRef<number | null>(null);
+
   const loadFriends = useCallback(async () => {
     if (!accessToken) return;
     if (!hasLoadedFriendsOnce.current) setFriendsLoading(true);
@@ -213,6 +222,7 @@ export function FeedScreen({ navigation }: Props) {
       setFriendsItems(result.items);
       setFriendsHasMore(result.hasMore);
       setFriendsPage(0);
+      lastFriendsLoadAtRef.current = Date.now();
     } catch (err) {
       setFriendsError(err instanceof Error ? err.message : 'Failed to load your friends feed');
     } finally {
@@ -230,6 +240,7 @@ export function FeedScreen({ navigation }: Props) {
       ]);
       setPendingRequestCount(notifications.filter((n) => n.kind === 'request').length);
       setNutritionGoalsMissing(goals.calories === null);
+      lastBadgeLoadAtRef.current = Date.now();
     } catch {
       // A missing badge count isn't worth surfacing as a screen-level error.
     }
@@ -246,6 +257,7 @@ export function FeedScreen({ navigation }: Props) {
         fetchLastWorkoutSplitDayId(userId),
       ]);
       setNextPlan(computeNextWorkout(detail, lastDayId));
+      lastNextWorkoutLoadAtRef.current = Date.now();
     } catch {
       // A preview widget failing to load isn't worth a screen-level error --
       // it just doesn't show, same as a missing badge count above.
@@ -283,21 +295,17 @@ export function FeedScreen({ navigation }: Props) {
   const [liveSessions, setLiveSessions] = useState<TrainerOpenSession[]>([]);
   const loadLiveWorkout = useCallback(async () => {
     if (!userId) return;
-    try {
-      setLiveWorkout(await fetchActiveWorkout(userId));
-    } catch {
-      setLiveWorkout(null);
-    }
-    try {
-      setLiveGroups(accessToken ? await listGroups(accessToken) : []);
-    } catch {
-      setLiveGroups([]);
-    }
-    try {
-      setLiveSessions(await fetchMyOpenLiveSessions(userId));
-    } catch {
-      setLiveSessions([]);
-    }
+    // Three independent checks, run concurrently -- none needs the others' result. Each
+    // is deferred into its own `.then` so a failure, including the call itself throwing,
+    // is isolated to that one entry and never stops the other two from settling.
+    const [workoutResult, groupsResult, sessionsResult] = await Promise.allSettled([
+      Promise.resolve().then(() => fetchActiveWorkout(userId)),
+      Promise.resolve().then(() => (accessToken ? listGroups(accessToken) : [])),
+      Promise.resolve().then(() => fetchMyOpenLiveSessions(userId)),
+    ]);
+    setLiveWorkout(workoutResult.status === 'fulfilled' ? workoutResult.value : null);
+    setLiveGroups(groupsResult.status === 'fulfilled' ? groupsResult.value : []);
+    setLiveSessions(sessionsResult.status === 'fulfilled' ? sessionsResult.value : []);
   }, [userId, accessToken]);
   // While any workout is open, its Live now card takes the place of the next-workout widget.
   const anyWorkoutLive = liveWorkout !== null || liveGroups.length > 0 || liveSessions.length > 0;
@@ -306,10 +314,18 @@ export function FeedScreen({ navigation }: Props) {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      // Your own feed items and the live-workout/group/session check are never gated:
+      // the first is exactly what a one-hop edit-and-return (finish a workout, log
+      // food, edit a past workout) changes, and the second must always be current.
+      // Friends' activity, the notification/goal badges, and the next-workout preview
+      // only change from elsewhere (someone else's activity, a notification you acted
+      // on minutes ago, a split you edited) -- not from anything reachable in one hop
+      // from here -- so a short-lived cache is safe; skipping a reload that only
+      // happened a few seconds ago is the whole point of switching tabs quickly.
       void load();
-      void loadFriends();
-      void loadNotificationBadgeCount();
-      void loadNextWorkoutRef.current();
+      if (isStale(lastFriendsLoadAtRef.current)) void loadFriends();
+      if (isStale(lastBadgeLoadAtRef.current)) void loadNotificationBadgeCount();
+      if (isStale(lastNextWorkoutLoadAtRef.current)) void loadNextWorkoutRef.current();
       void loadLiveWorkoutRef.current();
     });
     return unsubscribe;

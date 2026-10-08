@@ -22,16 +22,18 @@ export function useTrainerStatus(): boolean {
     }
     let cancelled = false;
     async function load() {
-      try {
-        await claimTrainerInvites(accessToken!);
-      } catch {
-        // Invites are attached on the next launch; nothing to show now.
-      }
-      try {
-        const status = await getTrainerStatus(accessToken!);
-        if (!cancelled) setIsTrainer(status.isTrainer);
-      } catch {
-        if (!cancelled) setIsTrainer(false);
+      // Independent of each other -- attaching an invite doesn't change whether this
+      // account is a trainer, so there is nothing for one to wait on from the other.
+      // Each call is deferred into its own `.then` (rather than invoked directly as a
+      // Promise.allSettled array element) so a failure -- including the call itself
+      // throwing, not just its promise rejecting -- is isolated to that one entry and
+      // never stops the other from settling.
+      const [, statusResult] = await Promise.allSettled([
+        Promise.resolve().then(() => claimTrainerInvites(accessToken!)),
+        Promise.resolve().then(() => getTrainerStatus(accessToken!)),
+      ]);
+      if (!cancelled) {
+        setIsTrainer(statusResult.status === 'fulfilled' ? statusResult.value.isTrainer : false);
       }
     }
     void load();
