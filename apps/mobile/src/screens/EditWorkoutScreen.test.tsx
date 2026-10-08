@@ -18,6 +18,7 @@ import {
   removeExerciseFromWorkout,
   updateSet,
   updateWorkout,
+  fetchNextExerciseOrderIndex,
 } from '../workouts/workoutQueries';
 import { EditWorkoutScreen } from './EditWorkoutScreen';
 
@@ -76,6 +77,7 @@ jest.mock('../workouts/prSummaryQueries', () => ({
 
 jest.mock('../workouts/workoutQueries', () => ({
   fetchWorkoutDetail: jest.fn(),
+  fetchNextExerciseOrderIndex: jest.fn(),
   updateWorkout: jest.fn(),
   addExerciseToWorkout: jest.fn(),
   removeExerciseFromWorkout: jest.fn(),
@@ -94,6 +96,7 @@ const mockFetchAllOneRepMaxes = fetchAllOneRepMaxes as jest.Mock;
 const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 const mockUpdateWorkout = updateWorkout as jest.Mock;
 const mockAddExerciseToWorkout = addExerciseToWorkout as jest.Mock;
+const mockFetchNextExerciseOrderIndex = fetchNextExerciseOrderIndex as jest.Mock;
 const mockRemoveExerciseFromWorkout = removeExerciseFromWorkout as jest.Mock;
 const mockCreateSet = createSet as jest.Mock;
 const mockUpdateSet = updateSet as jest.Mock;
@@ -158,6 +161,7 @@ beforeEach(() => {
   mockFetchWorkoutDetail.mockReset().mockResolvedValue(baseWorkout);
   mockUpdateWorkout.mockReset().mockResolvedValue(undefined);
   mockAddExerciseToWorkout.mockReset().mockResolvedValue('we2');
+  mockFetchNextExerciseOrderIndex.mockReset().mockResolvedValue(2);
   mockRemoveExerciseFromWorkout.mockReset().mockResolvedValue(undefined);
   mockCreateSet
     .mockReset()
@@ -313,9 +317,12 @@ describe('EditWorkoutScreen -- saving changes', () => {
     renderScreen();
     await screen.findByTestId(EX);
 
-    // The 1st of the workout's own displayed month is always in the past and
-    // always visible, so this moves the date without navigating the calendar.
-    const firstOfMonth = new Date(aWeekAgo.getFullYear(), aWeekAgo.getMonth(), 1);
+    // The 1st of the workout's own displayed month is always in the past and always
+    // visible, so this moves the date without navigating the calendar -- unless the
+    // workout itself is already dated the 1st, in which case the 2nd is used instead,
+    // so the picked day always actually differs from the original.
+    const targetDay = aWeekAgo.getDate() === 1 ? 2 : 1;
+    const firstOfMonth = new Date(aWeekAgo.getFullYear(), aWeekAgo.getMonth(), targetDay);
     fireEvent.press(screen.getByTestId('edit-workout-date'));
     fireEvent.press(await screen.findByTestId(`calendar-day-${toLocalDateKey(firstOfMonth)}`));
     fireEvent.press(screen.getByTestId('edit-workout-save'));

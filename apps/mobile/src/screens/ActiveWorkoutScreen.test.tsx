@@ -23,6 +23,7 @@ import {
   removeExerciseFromWorkout,
   reorderExercises,
   updateSet,
+  fetchNextExerciseOrderIndex,
 } from '../workouts/workoutQueries';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ActiveWorkoutScreen } from './ActiveWorkoutScreen';
@@ -61,6 +62,7 @@ jest.mock('../exercises/exerciseQueries', () => ({
 
 jest.mock('../workouts/workoutQueries', () => ({
   fetchWorkoutDetail: jest.fn(),
+  fetchNextExerciseOrderIndex: jest.fn(),
   createSet: jest.fn(),
   updateSet: jest.fn(),
   addExerciseToWorkout: jest.fn(),
@@ -92,6 +94,7 @@ const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 const mockCreateSet = createSet as jest.Mock;
 const mockUpdateSet = updateSet as jest.Mock;
 const mockAddExerciseToWorkout = addExerciseToWorkout as jest.Mock;
+const mockFetchNextExerciseOrderIndex = fetchNextExerciseOrderIndex as jest.Mock;
 const mockRemoveExerciseFromWorkout = removeExerciseFromWorkout as jest.Mock;
 const mockReorderExercises = reorderExercises as jest.Mock;
 const mockCompleteWorkout = completeWorkout as jest.Mock;
@@ -163,6 +166,7 @@ beforeEach(() => {
     ...(updates as object),
   }));
   mockAddExerciseToWorkout.mockReset().mockResolvedValue('we2');
+  mockFetchNextExerciseOrderIndex.mockReset().mockResolvedValue(2);
   mockRemoveExerciseFromWorkout.mockReset().mockResolvedValue(undefined);
   mockReorderExercises.mockReset().mockResolvedValue(undefined);
   mockCompleteWorkout.mockReset().mockResolvedValue(undefined);

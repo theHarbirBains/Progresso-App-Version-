@@ -11,6 +11,7 @@ import { ExercisePickerModal } from './ExercisePickerModal';
 import {
   addExerciseToWorkout,
   createSet,
+  fetchNextExerciseOrderIndex,
   deleteSet,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
@@ -81,8 +82,9 @@ export function LiveWorkoutEditor({
     setPickerOpen(false);
     await change(async () => {
       const exerciseId = resolveExerciseId ? await resolveExerciseId(exercise.id) : exercise.id;
-      const order =
-        (detail?.exercises.reduce((max, ex) => Math.max(max, ex.orderIndex), 0) ?? 0) + 1;
+      // Continues after every order index this workout has ever used, not just its
+      // currently visible exercises -- a removed one still holds its slot.
+      const order = await fetchNextExerciseOrderIndex(workoutId);
       await addExerciseToWorkout(workoutId, exerciseId, order);
     });
   }

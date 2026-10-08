@@ -30,6 +30,7 @@ import {
 import {
   addExerciseToWorkout,
   createSet,
+  fetchNextExerciseOrderIndex,
   fetchPreviousPerformance,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
@@ -145,7 +146,7 @@ export function GroupWorkoutEditor({
         const have = new Set(loaded[i].exercises.map((ex) => ex.exerciseId));
         for (const [exerciseId, shape] of byExercise) {
           if (have.has(exerciseId)) continue;
-          await addToWorkout(members[i].workoutId, exerciseId, shape.movementType, loaded[i]);
+          await addToWorkout(members[i].workoutId, exerciseId, shape.movementType);
           added = true;
         }
       }
@@ -164,13 +165,15 @@ export function GroupWorkoutEditor({
   }, [loadAll]);
 
   // One exercise into one workout: the next order, then its first set (both sides if unilateral).
+  // The next order comes from every order index that workout has ever used, not just its
+  // currently visible exercises -- a removed one still holds its slot (see
+  // fetchNextExerciseOrderIndex).
   async function addToWorkout(
     workoutId: string,
     exerciseId: string,
     movementType: WorkoutExerciseWithSets['movementType'],
-    detail: WorkoutDetail,
   ) {
-    const order = detail.exercises.reduce((max, ex) => Math.max(max, ex.orderIndex), 0) + 1;
+    const order = await fetchNextExerciseOrderIndex(workoutId);
     const workoutExerciseId = await addExerciseToWorkout(workoutId, exerciseId, order);
     if (movementType === 'unilateral') {
       await createSet(workoutExerciseId, 1, 'left');
@@ -276,7 +279,7 @@ export function GroupWorkoutEditor({
         const detail = details[member.userId];
         if (!detail) continue;
         const exerciseId = resolveExerciseId ? await resolveExerciseId(exercise.id) : exercise.id;
-        await addToWorkout(member.workoutId, exerciseId, exercise.movementType, detail);
+        await addToWorkout(member.workoutId, exerciseId, exercise.movementType);
       }
     });
   }

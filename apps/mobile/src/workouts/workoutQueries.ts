@@ -409,6 +409,26 @@ export async function cancelWorkout(workoutId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * The order index for the next exercise added to this workout. Looks at every
+ * workout_exercises row this workout has ever had -- including removed ones, which stay
+ * as soft-deleted rows -- never just the currently visible exercises. workout_exercises'
+ * (workout_id, order_index) unique constraint applies to those rows too, so computing
+ * this from only the visible exercises can try to reuse a slot a removed exercise still
+ * holds, and the add would fail with no visible cause. This never reuses a slot.
+ */
+export async function fetchNextExerciseOrderIndex(workoutId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('workout_exercises')
+    .select('order_index')
+    .eq('workout_id', workoutId)
+    .order('order_index', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return ((data as { order_index: number } | null)?.order_index ?? 0) + 1;
+}
+
 export async function addExerciseToWorkout(
   workoutId: string,
   exerciseId: string,

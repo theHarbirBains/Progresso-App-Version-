@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { LiveWorkoutEditor } from './LiveWorkoutEditor';
 import {
   addExerciseToWorkout,
   createSet,
   deleteSet,
+  fetchNextExerciseOrderIndex,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
   updateSet,
@@ -14,13 +15,14 @@ jest.mock('../progress/useProgressTheme', () => ({
 }));
 
 jest.mock('./ExercisePickerModal', () => ({
-  ExercisePickerModal: () => null,
+  ExercisePickerModal: jest.fn(() => null),
 }));
 
 jest.mock('./workoutQueries', () => ({
   addExerciseToWorkout: jest.fn(),
   createSet: jest.fn(),
   deleteSet: jest.fn(),
+  fetchNextExerciseOrderIndex: jest.fn(),
   fetchWorkoutDetail: jest.fn(),
   removeExerciseFromWorkout: jest.fn(),
   updateSet: jest.fn(),
@@ -30,6 +32,7 @@ const mockDetail = fetchWorkoutDetail as jest.Mock;
 const mockCreateSet = createSet as jest.Mock;
 const mockUpdateSet = updateSet as jest.Mock;
 const mockAdd = addExerciseToWorkout as jest.Mock;
+const mockNextOrderIndex = fetchNextExerciseOrderIndex as jest.Mock;
 const mockDeleteSet = deleteSet as jest.Mock;
 const mockRemove = removeExerciseFromWorkout as jest.Mock;
 
@@ -70,6 +73,7 @@ beforeEach(() => {
   mockCreateSet.mockResolvedValue({});
   mockUpdateSet.mockResolvedValue({});
   mockAdd.mockResolvedValue('we2');
+  mockNextOrderIndex.mockResolvedValue(7);
   mockDeleteSet.mockResolvedValue(undefined);
   mockRemove.mockResolvedValue(undefined);
 });
@@ -140,5 +144,42 @@ describe('LiveWorkoutEditor', () => {
     // The picker is mocked closed; exercise to add is exercised through the resolver contract.
     expect(resolveExerciseId).not.toHaveBeenCalled();
     expect(mockAdd).not.toHaveBeenCalled();
+  });
+
+  it("adds a picked exercise at the order index the workout has never used, resolved to the client's copy", async () => {
+    // A removed exercise still holds its order index, so the right next one can be far
+    // ahead of what the one currently visible exercise alone would suggest (which would be 2).
+    mockNextOrderIndex.mockResolvedValue(7);
+    const resolveExerciseId = jest.fn(async () => 'client-copy-1');
+    render(
+      <LiveWorkoutEditor
+        workoutId="w1"
+        userId="trainer-1"
+        resolveExerciseId={resolveExerciseId}
+        testID="ed"
+      />,
+    );
+    await screen.findByText('Barbell Back Squat');
+
+    const { ExercisePickerModal } = jest.requireMock('./ExercisePickerModal') as {
+      ExercisePickerModal: jest.Mock;
+    };
+    const onSelect = ExercisePickerModal.mock.calls.at(-1)?.[0].onSelect as (
+      exercise: unknown,
+    ) => void;
+    await act(async () => {
+      onSelect({
+        id: 'ex-lat-pulldown',
+        name: 'Lat Pulldown',
+        muscleGroup: 'back',
+        movementType: 'bilateral',
+        photoUrl: null,
+        isActive: true,
+        createdBy: null,
+      });
+    });
+
+    await waitFor(() => expect(resolveExerciseId).toHaveBeenCalledWith('ex-lat-pulldown'));
+    expect(mockAdd).toHaveBeenCalledWith('w1', 'client-copy-1', 7);
   });
 });

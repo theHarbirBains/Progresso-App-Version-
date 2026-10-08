@@ -854,6 +854,73 @@ async function main() {
     /violates check constraint/i,
   );
 
+  // A removed exercise is soft-deleted, not hard-deleted, so its row -- and the order
+  // index it held -- still exists. workout_exercises' (workout_id, order_index) unique
+  // constraint applies to it too. The next order index for a new exercise must be
+  // computed from every order index the workout has ever used, including removed
+  // exercises', never just the currently visible ones -- otherwise re-adding one after
+  // removing the highest-ordered exercise collides with its still-reserved slot.
+  //
+  // Each step below is its own asUserCommitted call -- its own committed transaction,
+  // same as the real app's separate requests -- since the unique constraint is
+  // deferrable initially deferred: bundling these into one transaction would only
+  // check it once, at that transaction's own single commit, not after each insert.
+  {
+    const orderWorkout = await asUserCommitted(
+      userA,
+      async (client) =>
+        (
+          await client.query(
+            "insert into public.workouts (user_id, name, completed_at) values ($1, 'Order Index Check', now()) returning id",
+            [userA],
+          )
+        ).rows[0],
+    );
+    const highest = await asUserCommitted(
+      userA,
+      async (client) =>
+        (
+          await client.query(
+            'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 3) returning id',
+            [orderWorkout.id, benchPress],
+          )
+        ).rows[0],
+    );
+    await asUserCommitted(userA, (client) =>
+      client.query('update public.workout_exercises set deleted_at = now() where id = $1', [
+        highest.id,
+      ]),
+    );
+    await expectThrows(
+      asUserCommitted(userA, (client) =>
+        client.query(
+          'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 3)',
+          [orderWorkout.id, benchPress],
+        ),
+      ),
+      "A removed exercise's order index is still reserved by its soft-deleted row",
+      /duplicate key|unique constraint/i,
+    );
+    try {
+      await asUserCommitted(userA, (client) =>
+        client.query(
+          'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 4)',
+          [orderWorkout.id, benchPress],
+        ),
+      );
+      record(
+        'Continuing past every order index ever used, including removed exercises, always succeeds',
+        true,
+      );
+    } catch (err) {
+      record(
+        'Continuing past every order index ever used, including removed exercises, always succeeds',
+        false,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   console.log('\nRunning set completion-state tests...\n');
 
   // Own isolated exercise, not shared with any other test's PR expectations

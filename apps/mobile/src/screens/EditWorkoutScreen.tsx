@@ -29,6 +29,7 @@ import { formatCardDate } from '../workouts/workoutFormat';
 import { computeDurationMinutes } from '../workouts/topSetSummary';
 import {
   addExerciseToWorkout,
+  fetchNextExerciseOrderIndex,
   createSet,
   deleteSet,
   deleteWorkout,
@@ -390,8 +391,9 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
         original.exercises.flatMap((ex) => ex.sets.map((s) => [s.id, s] as const)),
       );
 
-      let nextOrderIndex =
-        original.exercises.reduce((max, ex) => Math.max(max, ex.orderIndex), 0) + 1;
+      // Starts from every order index this workout has ever used, not just the visible
+      // exercises -- a removed one still holds its slot (see fetchNextExerciseOrderIndex).
+      let nextOrderIndex = await fetchNextExerciseOrderIndex(workoutId);
 
       for (const exercise of exercises) {
         const validSets =

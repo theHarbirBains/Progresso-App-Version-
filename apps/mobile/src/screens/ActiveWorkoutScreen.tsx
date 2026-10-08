@@ -26,6 +26,7 @@ import {
 } from '../workouts/setInputDrafts';
 import {
   addExerciseToWorkout,
+  fetchNextExerciseOrderIndex,
   cancelWorkout,
   completeWorkout,
   createSet,
@@ -438,8 +439,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     setPickerOpen(false);
     setError(null);
     try {
-      const nextOrderIndex =
-        workout.exercises.reduce((max, ex) => Math.max(max, ex.orderIndex), 0) + 1;
+      const nextOrderIndex = await fetchNextExerciseOrderIndex(workout.id);
       const workoutExerciseId = await addExerciseToWorkout(workout.id, exercise.id, nextOrderIndex);
 
       const isUnilateral = exercise.movementType === 'unilateral';

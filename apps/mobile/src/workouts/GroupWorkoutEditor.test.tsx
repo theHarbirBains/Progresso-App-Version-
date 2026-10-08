@@ -1,6 +1,8 @@
 import { Alert } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import {
+  addExerciseToWorkout,
+  fetchNextExerciseOrderIndex,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
   type WorkoutDetail,
@@ -10,6 +12,7 @@ import { GroupWorkoutEditor } from './GroupWorkoutEditor';
 jest.mock('./workoutQueries', () => ({
   addExerciseToWorkout: jest.fn(),
   createSet: jest.fn(),
+  fetchNextExerciseOrderIndex: jest.fn(),
   fetchPreviousPerformance: jest.fn(async () => null),
   fetchWorkoutDetail: jest.fn(),
   removeExerciseFromWorkout: jest.fn(async () => undefined),
@@ -17,7 +20,7 @@ jest.mock('./workoutQueries', () => ({
 }));
 
 jest.mock('./ExercisePickerModal', () => ({
-  ExercisePickerModal: () => null,
+  ExercisePickerModal: jest.fn(() => null),
 }));
 
 jest.mock('../screens/ExerciseFormScreen', () => ({
@@ -30,6 +33,8 @@ jest.mock('../progress/useProgressTheme', () => ({
 
 const mockFetch = fetchWorkoutDetail as jest.Mock;
 const mockRemove = removeExerciseFromWorkout as jest.Mock;
+const mockAdd = addExerciseToWorkout as jest.Mock;
+const mockNextOrderIndex = fetchNextExerciseOrderIndex as jest.Mock;
 
 /** One person's workout: the shared squat, with their own weight and reps on its set. */
 function workoutFor(workoutId: string, weightKg: number, reps: number): WorkoutDetail {
@@ -76,6 +81,8 @@ beforeEach(() => {
       workoutId === 'w-me' ? workoutFor('w-me', 100, 5) : workoutFor('w-sam', 60, 8),
     );
   mockRemove.mockClear();
+  mockAdd.mockReset().mockResolvedValue('we-new');
+  mockNextOrderIndex.mockReset().mockResolvedValue(7);
 });
 
 function renderEditor() {
@@ -131,5 +138,34 @@ describe('GroupWorkoutEditor', () => {
     renderEditor();
 
     expect(await screen.findByTestId('group-workout-create-custom')).toBeTruthy();
+  });
+
+  it("adds a picked exercise to every person's workout, at the order index the workout has never used", async () => {
+    // A removed exercise still holds its order index, so the right next one can be far
+    // ahead of what the currently visible exercises alone would suggest.
+    mockNextOrderIndex.mockResolvedValue(7);
+    renderEditor();
+    await screen.findByTestId('group-workout-exercise-squat');
+
+    const { ExercisePickerModal } = jest.requireMock('./ExercisePickerModal') as {
+      ExercisePickerModal: jest.Mock;
+    };
+    const onSelect = ExercisePickerModal.mock.calls.at(-1)?.[0].onSelect as (
+      exercise: unknown,
+    ) => void;
+    await act(async () => {
+      onSelect({
+        id: 'ex-lat-pulldown',
+        name: 'Lat Pulldown',
+        muscleGroup: 'back',
+        movementType: 'bilateral',
+        photoUrl: null,
+        isActive: true,
+        createdBy: null,
+      });
+    });
+
+    await waitFor(() => expect(mockAdd).toHaveBeenCalledWith('w-me', 'ex-lat-pulldown', 7));
+    expect(mockAdd).toHaveBeenCalledWith('w-sam', 'ex-lat-pulldown', 7);
   });
 });
