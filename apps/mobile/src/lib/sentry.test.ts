@@ -87,7 +87,10 @@ describe('recordApiRequestOutcome', () => {
     recordApiRequestOutcome('/api/v1/users/me', 'PATCH', 80, 'http_error');
 
     expect(mockAddBreadcrumb).toHaveBeenCalledWith(
-      expect.objectContaining({ level: 'warning', data: { durationMs: 80, outcome: 'http_error' } }),
+      expect.objectContaining({
+        level: 'warning',
+        data: { durationMs: 80, outcome: 'http_error' },
+      }),
     );
   });
 
