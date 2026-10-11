@@ -18,7 +18,7 @@ interface Props {
 }
 
 // Shared by every place a profile picture (or its fallback) is shown
-// (ProfileScreen, DashboardScreen, AccountCategory) -- decides only what
+// (ProfileScreen, DashboardScreen, SettingsPersonalInfoScreen) -- decides only what
 // renders INSIDE an existing avatar container (image vs. initial-letter
 // text vs. person icon); background color, border, and outer layout stay
 // exactly as each call site already had them. Falls back to the

@@ -25,7 +25,7 @@ interface Props {
  * tab, see `showHeading` -- a compact eyebrow + heading + supporting text
  * ("PROGRESS" / "Track Your Growth" / "Consistency today. A stronger
  * tomorrow."). Progress's *internal* section navigation is the horizontal
- * CategoryTabs row below this header, not this component -- the two are
+ * UnderlineTabs row below this header, not this component -- the two are
  * unrelated concerns.
  */
 export function ProgressHeader({

@@ -44,11 +44,12 @@ interface Props {
 
 /**
  * Progresso's app-level global navigation drawer -- distinct from the
- * 5-destination bottom nav (quick access) and from Progress/Settings' own
- * internal section navigation (each a horizontal CategoryTabs row scoped to
- * that one screen). Section/item content lives entirely in
- * appMenuSections.ts, so adding a future destination (once its screen
- * actually exists) never requires touching this component. Built with
+ * 5-destination bottom nav (quick access) and from Progress's own internal
+ * section navigation (a horizontal UnderlineTabs row scoped to that one
+ * screen; Settings has no internal tabs of its own any more -- it's a root
+ * list of rows, each pushing its own subpage). Section/item content lives
+ * entirely in appMenuSections.ts, so adding a future destination (once its
+ * screen actually exists) never requires touching this component. Built with
  * Animated/Pressable -- no drawer-navigator/gesture-handler dependency.
  */
 export function AppSideMenu({

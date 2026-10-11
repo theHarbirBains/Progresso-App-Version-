@@ -1,11 +1,11 @@
 import { StyleSheet } from 'react-native';
 import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 
-// Shared styles for the Settings hub (shell + every category). Settings is
-// app-level/global, not a per-mode screen, so unlike Dashboard/Progress it
-// has no independent theme concept of its own -- the one dynamic color used
-// here (the category tabs' selected state, primary buttons) is always the
-// user's Workout accent, passed in as a prop.
+// Shared styles for the Settings hub (root list + every subpage). Settings
+// is app-level/global, not a per-mode screen, so unlike Dashboard/Progress
+// it has no independent theme concept of its own -- the one dynamic color
+// used here (primary buttons) is always the user's Workout accent, passed
+// in as a prop.
 export const settingsStyles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -13,29 +13,19 @@ export const settingsStyles = StyleSheet.create({
     // paints the selected Background Theme; screens no longer hardcode it.
     backgroundColor: 'transparent',
   },
-  // ScrollView defaults to flexGrow: 1 internally -- without this explicit
-  // `flex: 1` on the *component* (not just its contentContainerStyle), this
-  // content area and the category tabs' own ScrollView (below) would both
-  // compete for leftover vertical space on any category with short content,
-  // stretching the tabs bar into tall ovals instead of leaving it compact.
   contentScroll: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: spacing.xxl,
   },
-  // Category tabs, inset to the screen margin under the header.
-  tabsWrap: {
-    paddingHorizontal: spacing.xxl,
-  },
-  // Vertical rhythm between a category's sections, plus the screen gutter
-  // every category needs -- Settings deliberately stays flat rows, not
+  // Vertical rhythm between a subpage's sections, plus the screen gutter
+  // every subpage needs -- Settings deliberately stays flat rows, not
   // AppCard widgets (see DESIGN.md's own Settings entry), so unlike a
   // card's own spacing.lg internal padding, nothing else in the chain
   // (Screen's intentionally edge-to-edge body, Section, ListRow) was ever
   // giving row text/icons a gutter of their own -- same class of bug as
-  // AppHeader's, fixed the same way: match tabsWrap's spacing.xxl so a
-  // category's rows line up with the tabs above them.
+  // AppHeader's, fixed the same way: spacing.xxl on both sides.
   categoryGap: {
     gap: spacing.xxl,
     paddingHorizontal: spacing.xxl,
@@ -49,48 +39,6 @@ export const settingsStyles = StyleSheet.create({
     ...typeScale.callout,
     color: colors.destructive,
     marginBottom: spacing.md,
-  },
-
-  // Category tabs. flexGrow: 0 keeps this ScrollView pinned to its own
-  // content height regardless of how much space the category below it
-  // leaves unclaimed. alignItems: 'center' is a second, independent guard --
-  // a flex row's cross-axis (height) defaults to 'stretch', which would
-  // otherwise stretch every pill to match whatever height this row ends up
-  // with, even if that height were ever wrong again for some other reason.
-  tabsScroll: {
-    flexGrow: 0,
-    marginBottom: spacing.xl,
-  },
-  tabsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  tab: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    overflow: 'hidden',
-    // Centers a lone label (Settings' own tabs) exactly as before, and
-    // centers an icon-above-label stack (a caller that opts into
-    // CategoryTabs' optional `icon`, e.g. Progress) with a small gap
-    // between them -- a no-op for text-only callers since gap has no
-    // effect with a single child.
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  tabLabel: {
-    ...typeScale.callout,
-    fontFamily: fonts.semibold,
-    color: colors.textSecondary,
-  },
-  // Selection changes color only -- never size, weight, padding, or border
-  // width, all of which stay identical to `tab`/`tabLabel` above so a
-  // selected pill never grows relative to its own unselected size.
-  tabLabelSelected: {
-    color: colors.textPrimary,
   },
 
   section: {
@@ -108,7 +56,7 @@ export const settingsStyles = StyleSheet.create({
     height: spacing.lg,
   },
 
-  // Rows shared by Account Actions / App / Notifications / Help
+  // Rows shared by every Settings subpage
   row: {
     flexDirection: 'row',
     alignItems: 'center',
