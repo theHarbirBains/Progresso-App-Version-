@@ -1,5 +1,12 @@
 import { request } from './apiClient';
 
+// AI Food Search's own endpoints call a third-party LLM server-side, with
+// their own internal retry logic (see apps/api's AnthropicNutritionProvider)
+// -- legitimately slower than a normal request, so request()'s default 15s
+// timeout would risk failing a real, still-in-progress AI response, not
+// just a cold backend instance.
+const AI_REQUEST_TIMEOUT_MS = 45_000;
+
 // Food search combines Progresso's own cached catalog with a live external
 // provider (Open Food Facts) call on the backend -- never called directly
 // from the mobile app, since that orchestration (provider call, dedup-safe
@@ -149,10 +156,12 @@ export function interpretFoodDescription(
   accessToken: string,
   description: string,
 ): Promise<InterpretFoodResponse> {
-  return request<InterpretFoodResponse>('/api/v1/foods/interpret', accessToken, {
-    method: 'POST',
-    body: JSON.stringify({ description }),
-  });
+  return request<InterpretFoodResponse>(
+    '/api/v1/foods/interpret',
+    accessToken,
+    { method: 'POST', body: JSON.stringify({ description }) },
+    { timeoutMs: AI_REQUEST_TIMEOUT_MS },
+  );
 }
 
 /** Resolves one pending component: after the user picks a candidate, or gives an amount. */
@@ -161,8 +170,10 @@ export function resolveFoodComponent(
   componentRequest: ComponentRequest,
   pick: ComponentPick | null,
 ): Promise<ComponentStatus> {
-  return request<ComponentStatus>('/api/v1/foods/resolve-component', accessToken, {
-    method: 'POST',
-    body: JSON.stringify({ request: componentRequest, pick }),
-  });
+  return request<ComponentStatus>(
+    '/api/v1/foods/resolve-component',
+    accessToken,
+    { method: 'POST', body: JSON.stringify({ request: componentRequest, pick }) },
+    { timeoutMs: AI_REQUEST_TIMEOUT_MS },
+  );
 }

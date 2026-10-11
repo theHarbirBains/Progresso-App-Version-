@@ -1,5 +1,14 @@
 import type * as ApiModule from './api';
 
+// Keeps this test out of Expo/Sentry's native module resolution (not
+// relevant to what's under test here) -- same convention as sentry.test.ts.
+// jest.mock calls are hoisted above these imports regardless of source
+// order, and registered mocks survive the jest.resetModules() calls below.
+jest.mock('@sentry/react-native', () => ({
+  addBreadcrumb: jest.fn(),
+  captureMessage: jest.fn(),
+}));
+
 const originalFetch = global.fetch;
 const originalApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 
@@ -62,6 +71,7 @@ describe('getMyProfile', () => {
       headers: {
         Authorization: 'Bearer token-123',
       },
+      signal: expect.anything(),
     });
   });
 
@@ -156,6 +166,7 @@ describe('updateMyProfile', () => {
         'Content-Type': 'application/json',
         Authorization: 'Bearer token-123',
       },
+      signal: expect.anything(),
     });
   });
 
@@ -196,6 +207,7 @@ describe('getFoodByBarcode', () => {
         headers: {
           Authorization: 'Bearer token-123',
         },
+        signal: expect.anything(),
       },
     );
   });
@@ -214,5 +226,63 @@ describe('getFoodByBarcode', () => {
     mockFetchOnce(500, { message: 'Internal server error' });
 
     await expect(getFoodByBarcode('token-123', '123')).rejects.toThrow('Internal server error');
+  });
+});
+
+describe('request timeout and retry', () => {
+  // A cold Render instance (see the production startup investigation) never
+  // sends a real HTTP response in time -- simulated here as a fetch() that
+  // only ever settles when its own AbortSignal fires, the same thing a real
+  // timed-out connection looks like from request()'s point of view.
+  function neverRespondUntilAborted(_url: string, init: RequestInit) {
+    return new Promise((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => {
+        reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+      });
+    });
+  }
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('retries once after a timeout, succeeding once the retry gets a real response', async () => {
+    jest.useFakeTimers();
+    const { getMyProfile } = api;
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockImplementationOnce(neverRespondUntilAborted);
+    mockFetchOnce(200, { id: 'user-1' });
+
+    const result = getMyProfile('token-123');
+    await jest.advanceTimersByTimeAsync(15_000); // the first attempt's own timeout fires
+    await jest.advanceTimersByTimeAsync(1_000); // the retry delay
+
+    await expect(result).resolves.toEqual({ id: 'user-1' });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws a timeout error if the retry times out too, rather than retrying forever', async () => {
+    jest.useFakeTimers();
+    const { getMyProfile } = api;
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockImplementation(neverRespondUntilAborted);
+
+    const result = getMyProfile('token-123');
+    const assertion = expect(result).rejects.toThrow('Request timed out');
+    await jest.advanceTimersByTimeAsync(15_000); // first attempt times out
+    await jest.advanceTimersByTimeAsync(1_000); // retry delay
+    await jest.advanceTimersByTimeAsync(15_000); // the retry times out too
+
+    await assertion;
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('never retries a real backend error (only a timeout is retried)', async () => {
+    const { getMyProfile } = api;
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetchOnce(401, { message: 'Unauthorized' });
+
+    await expect(getMyProfile('bad-token')).rejects.toThrow('Unauthorized');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
