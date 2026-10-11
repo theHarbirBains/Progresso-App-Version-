@@ -50,6 +50,17 @@ Social v1 (explicitly requested and implemented — a one-directional, accept-ga
 - **Mobile builds:** Expo EAS
 - **Backend pattern:** Hybrid — simple RLS-protected reads/writes may go direct to Supabase; anything needing server-side business logic, cross-user-trusted computation, or a third-party integration (exercise/equipment-profile/food-library writes, admin ops, RevenueCat webhooks, account export/deletion) goes through the NestJS API. Workout/set CRUD and nutrition logging are direct-to-Supabase from the client, own-row RLS-protected — this is intentional, not a gap: PR/1RM recomputation is enforced entirely by a security-definer Postgres trigger chain (`recompute_prs_for_exercise`, see `supabase/migrations/20260823100008_pr_infrastructure.sql`) with client write access to `rep_prs`/`one_rep_maxes` revoked, so correctness holds regardless of which client path wrote the set. Nutrition log totals are computed client-side at log time and are not server-verified against the live food row — a deliberate simplicity tradeoff, not an oversight.
 
+## Caching & Data Freshness (mobile)
+
+No caching library is used or needed — every rule below is built on plain React state/Context plus two small shared primitives (`useSignedInResource`, the exercise cache). Do not add a caching library without explaining why these can't meet the requirement first.
+
+- **Fetch-once-per-sign-in resources** (profile, nutrition goals, the week's food log, and the signed-in user's whole workout/set/PR history) go through `useSignedInResource` (`src/lib/useSignedInResource.ts`): fetched once when the user signs in, reset on sign-out, never re-fetched on focus/navigation. A write path (`updateProfile`, `saveGoals`, `logFoodEntry`, `completeWorkout`, ...) updates the shared cache directly from its own save's response (or calls `refetch()`), so every other screen already mounted sees the change immediately with no second round trip.
+- **Exercise library/picker data** uses its own per-user in-memory cache (`src/exercises/exerciseQueries.ts`), not time-based — built-ins never change, and a custom exercise only changes through `ExerciseFormScreen`, which calls `invalidateExerciseCache(userId)` after every create/update/delete.
+- **Feed's own items** (the signed-in user's own workouts) and **the live-workout/group/session check** are never staleness-gated — they're refetched on every focus, because they're exactly what a one-hop edit-and-return (finish a workout, edit a past workout) changes, and a live session must always be current.
+- **Feed's friends section, its notification/goal badges, and its next-workout preview** — things that only change from elsewhere (someone else's activity, a notification acted on minutes ago, a split edited) — use a 45s staleness window (`src/lib/focusFreshness.ts`) before refocusing refetches them, so switching tabs quickly doesn't re-fire these needlessly.
+- **Workout History's and Profile's own recent-workout lists** always refetch on focus, for the same one-hop-mutation reason as Feed's own items.
+- Do not add a staleness gate to a screen's own just-mutated data, and do not remove one from data that only ever changes elsewhere, without re-checking which case it is first.
+
 ## Key Domain Concepts (do not conflate these)
 
 - **Top set:** heaviest weight completed for an exercise within one specific workout.
