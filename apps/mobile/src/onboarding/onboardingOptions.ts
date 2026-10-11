@@ -1,5 +1,4 @@
 import type {
-  AppleHealthPreference,
   AverageWorkoutLength,
   FitnessGoal,
   Gender,
@@ -57,8 +56,6 @@ export const TRAINING_STYLE_OPTIONS: {
     description: 'I want complete control over my workouts and exercises.',
   },
 ];
-
-export const APPLE_HEALTH_PREFERENCE_VALUES: AppleHealthPreference[] = ['connected', 'not_now'];
 
 export const REFERRAL_SOURCE_OPTIONS: { value: ReferralSource; label: string }[] = [
   { value: 'tiktok', label: 'TikTok' },

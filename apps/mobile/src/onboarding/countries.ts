@@ -207,8 +207,3 @@ export function countryFlagEmoji(code: string): string {
     .map((char) => String.fromCodePoint(REGIONAL_INDICATOR_OFFSET + char.charCodeAt(0)))
     .join('');
 }
-
-export function findCountry(code: string | null): Country | null {
-  if (!code) return null;
-  return COUNTRIES.find((c) => c.code === code) ?? null;
-}

@@ -1,4 +1,3 @@
-import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
 import { supabase } from '../lib/supabase';
 import { calculateLogTotals, recalculateForQuantity } from './nutritionCalculations';
 import type { MealType } from './mealTypes';
@@ -96,31 +95,6 @@ export async function fetchTodaysFoodLogs(
   const { data, error } = await supabase
     .from('food_logs')
     .select(TODAYS_FOOD_LOG_COLUMNS)
-    .eq('user_id', userId)
-    .gte('logged_at', start.toISOString())
-    .lt('logged_at', end.toISOString())
-    .order('logged_at', { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
-}
-
-/**
- * Every food log within the current Monday-start local week (through the
- * following Monday, exclusive) -- same week boundary Workout Mode's own
- * weekly widget already uses (dashboard/weeklyProgress.ts's
- * getCurrentWeekRange), so "this week" means the same span everywhere in
- * the app, not a second, differently-anchored definition.
- */
-export async function fetchWeeklyFoodLogs(
-  userId: string,
-  now: Date = new Date(),
-): Promise<FoodLogRow[]> {
-  const { start, end } = getCurrentWeekRange(now);
-
-  const { data, error } = await supabase
-    .from('food_logs')
-    .select(FOOD_LOG_COLUMNS)
     .eq('user_id', userId)
     .gte('logged_at', start.toISOString())
     .lt('logged_at', end.toISOString())

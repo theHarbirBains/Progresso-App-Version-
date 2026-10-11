@@ -1,26 +1,11 @@
-// The one meal-type catalog for the whole app -- LogFoodStep's meal
-// selector, NutritionTodayScreen's per-row meal label, and food_logs.meal_type
-// (see the food_log_meals_and_images migration) all share this same set,
-// rather than each place hand-rolling its own list/labels.
+// The meal-type catalog for the whole app -- food_logs.meal_type (see the
+// food_log_meals_and_images migration) and defaultMealTypeForTime below
+// share this same set, rather than each place hand-rolling its own. There
+// is no meal-selector UI today (LogFoodStep always logs under whichever
+// meal defaultMealTypeForTime picks for the current time) and no screen
+// displays a meal's label -- if either is added back, MEAL_TYPES/
+// mealTypeLabel-style helpers belong here again.
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
-
-export const MEAL_TYPES: { value: MealType; label: string }[] = [
-  { value: 'breakfast', label: 'Breakfast' },
-  { value: 'lunch', label: 'Lunch' },
-  { value: 'dinner', label: 'Dinner' },
-  { value: 'snack', label: 'Snack' },
-];
-
-const MEAL_TYPE_LABELS: Record<MealType, string> = {
-  breakfast: 'Breakfast',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  snack: 'Snack',
-};
-
-export function mealTypeLabel(mealType: MealType): string {
-  return MEAL_TYPE_LABELS[mealType];
-}
 
 /**
  * A sensible starting selection based on the current time of day -- the

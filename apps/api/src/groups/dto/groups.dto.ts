@@ -63,11 +63,6 @@ export class SetMyWorkoutDayDto {
   splitDayId?: string | null;
 }
 
-export class AddGroupClientDto {
-  @IsUUID()
-  clientId!: string;
-}
-
 export class AddGuestDto {
   @IsString()
   @MinLength(1)
