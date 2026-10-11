@@ -8,7 +8,15 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 export type RootStackParamList = {
   /** The app's landing screen: a personal activity feed, replacing the old Dashboard + Workout/Nutrition toggle. */
   Feed: undefined;
+  /** Settings' own root: a compact list of category rows, each pushing one of the subpages below. */
   AccountSettings: undefined;
+  SettingsPersonalInfo: undefined;
+  SettingsWorkoutPreferences: undefined;
+  SettingsNutrition: undefined;
+  SettingsAppearance: undefined;
+  SettingsNotifications: undefined;
+  SettingsAccountSecurity: undefined;
+  SettingsSupport: undefined;
   ExerciseLibrary: undefined;
   WorkoutHistory: undefined;
   /** clientId is set when a trainer opens one of a client’s workouts. */

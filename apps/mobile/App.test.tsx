@@ -381,10 +381,11 @@ describe('Authentication flow', () => {
     fireEvent.press(screen.getByTestId('sign-in-submit'));
     await screen.findByTestId('feed-screen');
 
-    // Sign out lives on AccountSettingsScreen, reached via the You tab's
-    // own settings affordance.
+    // Sign out lives on SettingsAccountSecurityScreen, reached via the You
+    // tab's own settings affordance, then the Account & Security subpage.
     fireEvent.press(screen.getByTestId('bottom-nav-you'));
     fireEvent.press(await screen.findByTestId('profile-open-settings'));
+    fireEvent.press(await screen.findByTestId('settings-category-account-security'));
     await screen.findByTestId('sign-out-button');
     fireEvent.press(screen.getByTestId('sign-out-button'));
 
@@ -821,6 +822,8 @@ describe('Persistent bottom navigation', () => {
     await screen.findByTestId('profile-scroll');
 
     fireEvent.press(screen.getByTestId('profile-open-settings'));
+    await screen.findByTestId('settings-screen');
+    fireEvent.press(screen.getByTestId('settings-category-account-security'));
 
     expect(await screen.findByTestId('sign-out-button')).toBeTruthy();
     expect(screen.getByTestId('app-bottom-nav')).toBeTruthy();

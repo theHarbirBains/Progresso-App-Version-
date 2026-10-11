@@ -1,256 +1,103 @@
-import { useEffect, useRef, useState } from 'react';
-import { Alert, View } from 'react-native';
-import { Text } from '../design/Text';
-import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
-import { LoadingState } from '../design/LoadingState';
+import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
-import { registerPushToken, unregisterPushToken } from '../lib/api';
-import { requestPushToken } from '../lib/pushNotifications';
+import { Section } from '../design/Section';
 import type { RootStackScreenProps } from '../navigation/types';
-import { useProfile } from '../profile/ProfileProvider';
-import { useProgressTheme } from '../progress/useProgressTheme';
-import { AccountCategory } from '../settings/AccountCategory';
-import { AppCategory } from '../settings/AppCategory';
-import { AppearanceCategory } from '../settings/AppearanceCategory';
-import { CategoryTabs } from '../settings/CategoryTabs';
-import { HelpCategory } from '../settings/HelpCategory';
-import { NotificationsCategory } from '../settings/NotificationsCategory';
-import { PrivacyCategory } from '../settings/PrivacyCategory';
-import { SETTINGS_CATEGORIES, type SettingsCategory } from '../settings/settingsCategories';
 import { settingsStyles as styles } from '../settings/settingsStyles';
-import { DEFAULT_NUTRITION_COLOR, DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 
 type Props = RootStackScreenProps<'AccountSettings'>;
 
-// The app's global Settings hub, reached from the existing gear/menu
-// affordances (Dashboard's avatar button, the side menu's "Settings" item --
-// see appMenuSections.ts). Reorganizes the same account/appearance/app-link
-// functionality that used to live on one long scroll into six categories;
-// no account behavior, API integration, or navigation target changed, only
-// how it's grouped and presented. Route name stays `AccountSettings` (an
-// internal identifier only) so nothing elsewhere in the navigation needs to
-// change.
+/**
+ * The app's global Settings hub, reached from the existing gear/menu
+ * affordances (Profile's header, the side menu's "Settings" item -- see
+ * appMenuSections.ts). A compact, scannable list of category rows -- each
+ * one pushes its own focused subpage rather than showing every setting
+ * inline, per the current Settings information-architecture pass (see
+ * DESIGN.md's own Settings entry for the full reasoning/history).
+ *
+ * "App" (links to Workout History/Splits/Exercise Library/Nutrition/
+ * Trainer Access) is deliberately not a category here any more -- every one
+ * of those is already one tap away from the side menu, so a whole Settings
+ * category that only re-links them added navigation depth with no new
+ * value. "Subscription" isn't a category either: there is no subscription/
+ * purchase UI anywhere in the mobile app today (entitlement is checked
+ * server-side only, no RevenueCat SDK is even installed on this app) --
+ * unlike Notifications/Privacy/Help, CLAUDE.md doesn't list this as an
+ * intentionally-incomplete-but-visible area, so adding a placeholder for it
+ * would be inventing a feature, not reorganizing an existing one.
+ */
 export function AccountSettingsScreen({ navigation }: Props) {
-  const { user, session, signOut } = useAuth();
-  const accessToken = session?.access_token;
-  const { theme, themeLoading } = useProgressTheme();
-  const { profile, loading, error: loadError, updateProfile } = useProfile();
-
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('Account');
-
-  // Only the fields this screen's own form actually edits get local state --
-  // avatarUrl/workoutAccentColor/nutritionAccentColor are read straight off
-  // the shared profile cache below instead, since they're only ever changed
-  // elsewhere (the avatar picker on Profile, the two color-picker screens).
-  const [displayName, setDisplayName] = useState('');
-  const [username, setUsername] = useState('');
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('lb');
-  const [pushNotificationsOptIn, setPushNotificationsOptIn] = useState(false);
-  const [emailOptIn, setEmailOptIn] = useState(false);
-
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [savedMessage, setSavedMessage] = useState<string | null>(null);
-  const [resetting, setResetting] = useState(false);
-  const [notifSaving, setNotifSaving] = useState(false);
-
-  // Seeds the editable fields from the shared profile cache exactly once,
-  // the first time it resolves -- not on every later change to `profile`
-  // (e.g. a color reset elsewhere), which would silently blow away text the
-  // user is actively editing in this screen's own form.
-  const hasSeededRef = useRef(false);
-  useEffect(() => {
-    if (!profile || hasSeededRef.current) return;
-    hasSeededRef.current = true;
-    setDisplayName(profile.displayName ?? '');
-    setUsername(profile.username ?? '');
-    setWeightUnit(profile.weightUnit);
-    setPushNotificationsOptIn(profile.pushNotificationsOptIn ?? false);
-    setEmailOptIn(profile.emailOptIn ?? false);
-  }, [profile]);
-
-  async function handleSave() {
-    setSaveError(null);
-    setSavedMessage(null);
-    setSaving(true);
-    try {
-      const updated = await updateProfile({
-        displayName: displayName.trim(),
-        username: username.trim() || undefined,
-        weightUnit,
-      });
-      setDisplayName(updated.displayName ?? '');
-      setUsername(updated.username ?? '');
-      setSavedMessage('Saved');
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function handleResetThemeColors() {
-    Alert.alert(
-      'Reset Theme Colors',
-      'This will restore Workout and Nutrition to the default Pure White.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: async () => {
-            setResetting(true);
-            try {
-              await updateProfile({
-                workoutAccentColor: DEFAULT_WORKOUT_COLOR,
-                nutritionAccentColor: DEFAULT_NUTRITION_COLOR,
-              });
-            } catch (err) {
-              setSaveError(err instanceof Error ? err.message : 'Failed to reset theme colors');
-            } finally {
-              setResetting(false);
-            }
-          },
-        },
-      ],
-    );
-  }
-
-  async function handleTogglePush(value: boolean) {
-    const previous = pushNotificationsOptIn;
-    setPushNotificationsOptIn(value);
-    setNotifSaving(true);
-    try {
-      // requestPushToken() is iOS-only and returns the SAME token every
-      // call once permission is granted (no new prompt) -- so re-deriving
-      // it here rather than holding it in state also works for turning the
-      // preference back off, with no separate "remember the token" plumbing.
-      if (accessToken) {
-        const token = await requestPushToken();
-        if (token) {
-          if (value) {
-            await registerPushToken(accessToken, token, 'ios');
-          } else {
-            await unregisterPushToken(accessToken, token);
-          }
-        }
-        // A null token (denied permission, or Android for now) just means
-        // there's nothing to register/unregister yet -- the preference
-        // itself still saves below, same as it always has.
-      }
-      await updateProfile({ pushNotificationsOptIn: value });
-    } catch {
-      setPushNotificationsOptIn(previous);
-    } finally {
-      setNotifSaving(false);
-    }
-  }
-
-  async function handleToggleEmail(value: boolean) {
-    const previous = emailOptIn;
-    setEmailOptIn(value);
-    setNotifSaving(true);
-    try {
-      await updateProfile({ emailOptIn: value });
-    } catch {
-      setEmailOptIn(previous);
-    } finally {
-      setNotifSaving(false);
-    }
-  }
-
-  if (loading || themeLoading) {
-    return <LoadingState testID="account-loading" />;
-  }
-
   return (
     <Screen
       testID="settings-screen"
       scrollTestID="settings-scroll"
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={styles.categoryGap}
       header={
-        <View>
-          <AppHeader
-            testID="settings-header"
-            title="Settings"
-            subtitle="Customize your experience."
-            onBack={() => navigation.goBack()}
-          />
-          <View style={styles.tabsWrap}>
-            <CategoryTabs
-              testID="settings-tabs"
-              categories={[...SETTINGS_CATEGORIES]}
-              active={activeCategory}
-              onSelect={setActiveCategory}
-              accentColor={theme.accent}
-            />
-          </View>
-        </View>
+        <AppHeader
+          testID="settings-header"
+          title="Settings"
+          subtitle="Customize your experience."
+          onBack={() => navigation.goBack()}
+        />
       }
     >
-      {loadError ? (
-        <Text testID="account-load-error" style={styles.errorText}>
-          {loadError}
-        </Text>
-      ) : null}
-
-      {activeCategory === 'Account' ? (
-        <AccountCategory
-          email={user?.email ?? ''}
-          avatarUrl={profile?.avatarUrl ?? null}
-          displayName={displayName}
-          onChangeDisplayName={setDisplayName}
-          username={username}
-          onChangeUsername={setUsername}
-          weightUnit={weightUnit}
-          onChangeWeightUnit={setWeightUnit}
-          saving={saving}
-          saveError={saveError}
-          savedMessage={savedMessage}
-          onSave={handleSave}
-          onSignOut={() => signOut()}
-          accentColor={theme.accent}
-          onAccentColor={theme.onAccent}
+      <Section title="Categories">
+        <ListRow
+          testID="settings-category-personal-info"
+          icon="user"
+          title="Profile & Personal Information"
+          subtitle="Picture, name, username, body measurements"
+          onPress={() => navigation.navigate('SettingsPersonalInfo')}
         />
-      ) : null}
-
-      {activeCategory === 'Appearance' ? (
-        <AppearanceCategory
-          workoutAccentColor={profile?.workoutAccentColor ?? null}
-          nutritionAccentColor={profile?.nutritionAccentColor ?? null}
-          resetting={resetting}
-          onNavigateWorkoutColor={() => navigation.navigate('WorkoutColorSettings')}
-          onNavigateNutritionColor={() => navigation.navigate('NutritionColorSettings')}
-          onNavigateBackgroundTheme={() => navigation.navigate('BackgroundThemeSettings')}
-          onResetThemeColors={handleResetThemeColors}
+        <ListRow
+          testID="settings-category-workout-preferences"
+          icon="activity"
+          title="Workout Preferences"
+          subtitle="Weekly workout goal"
+          divider
+          onPress={() => navigation.navigate('SettingsWorkoutPreferences')}
         />
-      ) : null}
-
-      {activeCategory === 'App' ? (
-        <AppCategory
-          onNavigateWorkoutSplits={() => navigation.navigate('WorkoutSplits')}
-          onNavigateWorkoutHistory={() => navigation.navigate('WorkoutHistory')}
-          onNavigateExerciseLibrary={() => navigation.navigate('ExerciseLibrary')}
-          onNavigateNutrition={() => navigation.navigate('Nutrition')}
-          onNavigateTrainerAccess={() => navigation.navigate('TrainerAccess')}
+        <ListRow
+          testID="settings-category-nutrition"
+          icon="pie-chart"
+          title="Nutrition & Goals"
+          subtitle="Calorie and macro targets"
+          divider
+          onPress={() => navigation.navigate('SettingsNutrition')}
         />
-      ) : null}
-
-      {activeCategory === 'Notifications' ? (
-        <NotificationsCategory
-          pushNotificationsOptIn={pushNotificationsOptIn}
-          onTogglePush={handleTogglePush}
-          emailOptIn={emailOptIn}
-          onToggleEmail={handleToggleEmail}
-          saving={notifSaving}
-          accentColor={theme.accent}
+        <ListRow
+          testID="settings-category-appearance"
+          icon="eye"
+          title="Appearance"
+          subtitle="Background theme, accent colors"
+          divider
+          onPress={() => navigation.navigate('SettingsAppearance')}
         />
-      ) : null}
-
-      {activeCategory === 'Privacy' ? <PrivacyCategory /> : null}
-
-      {activeCategory === 'Help' ? <HelpCategory /> : null}
+        <ListRow
+          testID="settings-category-notifications"
+          icon="bell"
+          title="Notifications"
+          subtitle="Push and email preferences"
+          divider
+          onPress={() => navigation.navigate('SettingsNotifications')}
+        />
+        <ListRow
+          testID="settings-category-account-security"
+          icon="lock"
+          title="Account & Security"
+          subtitle="Email, password, sign out, delete account"
+          divider
+          onPress={() => navigation.navigate('SettingsAccountSecurity')}
+        />
+        <ListRow
+          testID="settings-category-support"
+          icon="help-circle"
+          title="Support & About"
+          subtitle="Help, contact, app version"
+          divider
+          onPress={() => navigation.navigate('SettingsSupport')}
+        />
+      </Section>
     </Screen>
   );
 }

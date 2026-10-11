@@ -72,6 +72,13 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { ProgressExerciseDetailScreen } from './src/screens/ProgressExerciseDetailScreen';
 import { ProgressOverviewScreen } from './src/screens/ProgressOverviewScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
+import { SettingsAccountSecurityScreen } from './src/screens/SettingsAccountSecurityScreen';
+import { SettingsAppearanceScreen } from './src/screens/SettingsAppearanceScreen';
+import { SettingsNotificationsScreen } from './src/screens/SettingsNotificationsScreen';
+import { SettingsNutritionScreen } from './src/screens/SettingsNutritionScreen';
+import { SettingsPersonalInfoScreen } from './src/screens/SettingsPersonalInfoScreen';
+import { SettingsSupportScreen } from './src/screens/SettingsSupportScreen';
+import { SettingsWorkoutPreferencesScreen } from './src/screens/SettingsWorkoutPreferencesScreen';
 import { ShareWorkoutScreen } from './src/screens/ShareWorkoutScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { WorkoutColorScreen } from './src/screens/WorkoutColorScreen';
@@ -263,6 +270,22 @@ function Root() {
               >
                 <Stack.Screen name="Feed" component={FeedScreen} />
                 <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+                <Stack.Screen name="SettingsPersonalInfo" component={SettingsPersonalInfoScreen} />
+                <Stack.Screen
+                  name="SettingsWorkoutPreferences"
+                  component={SettingsWorkoutPreferencesScreen}
+                />
+                <Stack.Screen name="SettingsNutrition" component={SettingsNutritionScreen} />
+                <Stack.Screen name="SettingsAppearance" component={SettingsAppearanceScreen} />
+                <Stack.Screen
+                  name="SettingsNotifications"
+                  component={SettingsNotificationsScreen}
+                />
+                <Stack.Screen
+                  name="SettingsAccountSecurity"
+                  component={SettingsAccountSecurityScreen}
+                />
+                <Stack.Screen name="SettingsSupport" component={SettingsSupportScreen} />
                 <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
                 <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
                 <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
