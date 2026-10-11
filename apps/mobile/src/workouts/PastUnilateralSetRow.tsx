@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { TextInput, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
@@ -26,7 +27,7 @@ const SIDES = [
 ] as const;
 
 /** UnilateralSetRow's shape for LogPastWorkoutScreen -- see PastSetRow's own comment on why there's a remove button instead of a complete toggle here. */
-export function PastUnilateralSetRow({
+function PastUnilateralSetRowComponent({
   setIndex,
   left,
   right,
@@ -81,3 +82,23 @@ export function PastUnilateralSetRow({
     </View>
   );
 }
+
+function sideEqual(a: PastUnilateralSideInput, b: PastUnilateralSideInput): boolean {
+  return a.weight === b.weight && a.reps === b.reps;
+}
+
+// Same reasoning as PastSetRow's own comparator: the caller rebuilds left/right as fresh
+// objects every render (groupUnilateralSets runs inline, not memoized) and never stabilizes
+// its callbacks, so only the data props are compared -- that's what actually lets typing
+// into one set skip re-rendering every other one. Exported for the same reason
+// ExerciseCard/PastSetRow export theirs: direct, deterministic unit testing.
+export function arePropsEqual(prev: Props, next: Props): boolean {
+  return (
+    prev.setIndex === next.setIndex &&
+    prev.testID === next.testID &&
+    sideEqual(prev.left, next.left) &&
+    sideEqual(prev.right, next.right)
+  );
+}
+
+export const PastUnilateralSetRow = memo(PastUnilateralSetRowComponent, arePropsEqual);

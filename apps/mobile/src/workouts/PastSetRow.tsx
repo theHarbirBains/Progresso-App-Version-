@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { TextInput, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
@@ -22,7 +23,7 @@ interface Props {
  * freely (add one too many, take it back) rather than stepped through one
  * at a time.
  */
-export function PastSetRow({
+function PastSetRowComponent({
   setIndex,
   weight,
   reps,
@@ -66,3 +67,23 @@ export function PastSetRow({
     </View>
   );
 }
+
+// EditWorkoutScreen/LogPastWorkoutScreen rebuild their whole exercise list as a fresh array
+// on every render (a flat state array, mapped over directly -- no per-exercise memoized
+// component the way ActiveWorkoutScreen's ExerciseCard is), and their onChangeWeight/
+// onChangeReps/onRemove are plain inline closures, not stabilized via useCallback -- so
+// comparing them would never match and defeat the memo entirely. Comparing only the data
+// props instead (same reasoning as ExerciseCard's own arePropsEqual) is what actually lets
+// typing into one set skip re-rendering every other one. Exported (not just used
+// internally), same reasoning as ExerciseCard's own arePropsEqual: its exact equality
+// semantics can be unit tested directly and deterministically this way.
+export function arePropsEqual(prev: Props, next: Props): boolean {
+  return (
+    prev.setIndex === next.setIndex &&
+    prev.weight === next.weight &&
+    prev.reps === next.reps &&
+    prev.testID === next.testID
+  );
+}
+
+export const PastSetRow = memo(PastSetRowComponent, arePropsEqual);
