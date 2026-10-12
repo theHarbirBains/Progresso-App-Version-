@@ -44,5 +44,10 @@ jobs:
       - name: Mobile tests
         run: npm run test --workspace apps/mobile
 
+      # Catches a bundling or config error here instead of in an EAS build.
+      - name: Mobile iOS bundle
+        working-directory: apps/mobile
+        run: npx expo export --platform ios --output-dir "$RUNNER_TEMP/ios-bundle"
+
       - name: Database tests
         run: npm run db:test
