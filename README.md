@@ -176,6 +176,17 @@ cd apps/mobile
 npx eas-cli build --platform ios --profile production
 ```
 
+Links can open a screen once the user is signed in; a link that arrives before sign-in waits until then. Each opens on top of Feed:
+
+| Link                             | Opens                                                      |
+| -------------------------------- | ---------------------------------------------------------- |
+| `progresso://feed`               | Feed                                                       |
+| `progresso://nutrition`          | Nutrition Today                                            |
+| `progresso://workouts/<id>`      | That workout's detail                                      |
+| `progresso://workouts/<id>/live` | That workout, live (its detail instead once it's finished) |
+
+On a simulator: `xcrun simctl openurl booted progresso://nutrition`. The sign-in, email-confirmation and password-reset links are handled by the auth flow, not these.
+
 ## Project Status
 
 Progresso is **actively under development**. The core loop — accounts, onboarding, workout splits, live workout logging, workout history, and progress/PR analytics — is implemented and working end to end, along with a functional (if simpler) nutrition-logging feature and an app-wide Settings hub.

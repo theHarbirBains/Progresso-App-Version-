@@ -381,6 +381,9 @@ describe('Authentication flow', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
     await screen.findByTestId('feed-screen');
+    // The bottom nav appears once the navigator is ready, which is a moment after its first
+    // screen: the navigator first checks whether a link opened the app (navigation/linking.ts).
+    await screen.findByTestId('app-bottom-nav');
 
     // Sign out lives on SettingsAccountSecurityScreen, reached via the You
     // tab's own settings affordance, then the Account & Security subpage.
@@ -528,6 +531,7 @@ describe('App-level side menu', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
     await screen.findByTestId('feed-screen');
+    await screen.findByTestId('app-bottom-nav');
   }
 
   it('renders as a sibling of the screen stack, not clipped inside Feed', async () => {
@@ -590,6 +594,7 @@ describe('Universal side menu', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
     await screen.findByTestId('feed-screen');
+    await screen.findByTestId('app-bottom-nav');
   }
 
   it('shows the same universal menu -- both Workout and Nutrition destinations -- from a Train screen', async () => {
@@ -673,6 +678,7 @@ describe('Train/Nutrition tab accents', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
     await screen.findByTestId('feed-screen');
+    await screen.findByTestId('app-bottom-nav');
   }
 
   // There is no Workout/Nutrition toggle any more -- Train and Nutrition are
@@ -704,6 +710,7 @@ describe('App background', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
     await screen.findByTestId('feed-screen');
+    await screen.findByTestId('app-bottom-nav');
   }
 
   // There is no photograph anywhere any more, and no screen treated
@@ -772,6 +779,7 @@ describe('Persistent bottom navigation', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
     await screen.findByTestId('feed-screen');
+    await screen.findByTestId('app-bottom-nav');
   }
 
   // There is exactly one bottom navigation in the app, a sibling of the
@@ -866,6 +874,7 @@ describe('Bottom navigation backdrop', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
     fireEvent.press(screen.getByTestId('sign-in-submit'));
     await screen.findByTestId('feed-screen');
+    await screen.findByTestId('app-bottom-nav');
     expect(stripBackground()).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('bottom-nav-train'));

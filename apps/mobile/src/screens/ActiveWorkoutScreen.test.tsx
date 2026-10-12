@@ -116,8 +116,14 @@ const mockFetchAllOneRepMaxes = fetchAllOneRepMaxes as jest.Mock;
 const mockGoBack = jest.fn();
 const mockReset = jest.fn();
 const mockNavigate = jest.fn();
+const mockReplace = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { goBack: mockGoBack, reset: mockReset, navigate: mockNavigate };
+const navigation: any = {
+  goBack: mockGoBack,
+  reset: mockReset,
+  navigate: mockNavigate,
+  replace: mockReplace,
+};
 const route = { params: { workoutId: 'w1' } } as never;
 
 const baseWorkout = {
@@ -188,6 +194,7 @@ beforeEach(() => {
   mockGoBack.mockClear();
   mockReset.mockClear();
   mockNavigate.mockClear();
+  mockReplace.mockClear();
 });
 
 describe('ActiveWorkoutScreen', () => {
@@ -604,6 +611,27 @@ describe('ActiveWorkoutScreen', () => {
     // scrollable content, so it renders regardless of exercise count.
     expect(await screen.findByTestId('complete-workout')).toBeTruthy();
     expect(screen.getByTestId('active-workout-add-exercise')).toBeTruthy();
+  });
+
+  it('opens the detail instead for a workout that was already finished, such as from an old link', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      completedAt: '2026-01-01T01:00:00Z',
+    });
+
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+      { wrapper: TestProviders },
+    );
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' }),
+    );
+    // Never shown as live, so it can't be cancelled or finished again from here.
+    expect(screen.queryByTestId('cancel-workout')).toBeNull();
+    expect(screen.queryByTestId('complete-workout')).toBeNull();
   });
 
   it('shows an error message when loading fails', async () => {

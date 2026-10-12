@@ -165,6 +165,12 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       try {
         const detail = await fetchWorkoutDetail(workoutId);
         if (cancelled) return;
+        // Only an open workout is tracked live. A link to one that has since been finished
+        // opens its detail instead, where it can't be cancelled or changed by accident.
+        if (detail.completedAt) {
+          navigation.replace('WorkoutDetail', { workoutId });
+          return;
+        }
         setWorkout(detail);
 
         const savedInputs: Record<string, SetInputDraft> = {};
@@ -219,9 +225,9 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-    // setSetInputs is useSetInputDrafts' own useState setter (stable for the life of the
-    // screen); listed for the linter, not because it ever actually changes.
-  }, [workoutId, themeLoading, weightUnit, userId, setSetInputs]);
+    // setSetInputs is useSetInputDrafts' own useState setter and navigation is the screen's own
+    // (both stable for the life of the screen); listed for the linter, not because they change.
+  }, [workoutId, themeLoading, weightUnit, userId, setSetInputs, navigation]);
 
   function updateExerciseSets(
     exerciseId: string,

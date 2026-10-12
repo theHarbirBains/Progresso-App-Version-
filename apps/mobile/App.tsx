@@ -22,6 +22,7 @@ import { wrapApp } from './src/lib/sentry';
 import { AppMenuContext } from './src/navigation/AppMenuContext';
 import { appMenuSectionsFor, type AppMenuRoute } from './src/navigation/appMenuSections';
 import { routeToBottomNavTab } from './src/navigation/bottomNavRouting';
+import { useAppLinking } from './src/navigation/linking';
 import { getDefaultScreenOptions } from './src/navigation/navigationTransitions';
 import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
@@ -138,6 +139,9 @@ function Root() {
   // it to open.
   const [menuOpen, setMenuOpen] = useState(false);
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
+  // Links to screens (progresso://workouts/<id> and the rest, see navigation/linking.ts) open
+  // only once signed in; one that arrives before then is held until the navigator exists.
+  const linking = useAppLinking(status === 'signedIn');
   const { theme: menuTheme, nutritionTheme: nutritionMenuTheme } = useProgressTheme();
   const insets = useSafeAreaInsets();
   // AppSideMenu itself is one universal list now (APP_MENU_SECTIONS) --
@@ -251,6 +255,7 @@ function Root() {
           <View style={styles.navigatorContent}>
             <NavigationContainer
               ref={navigationRef}
+              linking={linking}
               onReady={() => setCurrentRouteName(navigationRef.current?.getCurrentRoute()?.name)}
               onStateChange={() =>
                 setCurrentRouteName(navigationRef.current?.getCurrentRoute()?.name)
