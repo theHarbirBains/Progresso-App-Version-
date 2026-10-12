@@ -6,7 +6,7 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchTodaysFoodLogs } from '../nutrition/foodLogQueries';
@@ -21,14 +21,18 @@ import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQuerie
 import { enrichWorkoutSummaries } from '../workouts/workoutHistoryEnrichment';
 import { fetchWorkoutHistory } from '../workouts/workoutQueries';
 import { ProfileScreen } from './ProfileScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../lib/avatarUpload', () => ({
@@ -66,7 +70,7 @@ jest.mock('../workouts/workoutHistoryEnrichment', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 const mockUploadAvatar = uploadAvatar as jest.Mock;
 const mockRemoveAvatarFile = removeAvatarFile as jest.Mock;
@@ -127,7 +131,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUploadAvatar.mockReset();
   mockRemoveAvatarFile.mockReset();
@@ -225,7 +229,7 @@ describe('ProfileScreen identity', () => {
   });
 
   it('falls back to username when displayName is unset', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, displayName: null });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, displayName: null });
     renderProfile();
 
     expect(await screen.findByTestId('profile-display-name')).toHaveTextContent('harbir');
@@ -315,7 +319,7 @@ describe('ProfileScreen profile picture', () => {
   });
 
   it('displays the saved picture once the profile has one', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       avatarUrl: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
     });
@@ -339,7 +343,7 @@ describe('ProfileScreen profile picture', () => {
   });
 
   it('offers Remove Photo once a picture is already set', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       avatarUrl: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
     });
@@ -387,7 +391,7 @@ describe('ProfileScreen profile picture', () => {
   });
 
   it('changing an existing photo replaces it (same Choose Photo action, new upload)', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       avatarUrl:
         'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg?v=1',
@@ -421,7 +425,7 @@ describe('ProfileScreen profile picture', () => {
   });
 
   it('removing the photo deletes the file and clears the profile field, reverting to the fallback', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       avatarUrl: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
     });
@@ -714,7 +718,7 @@ describe('ProfileScreen navigation', () => {
     renderProfile();
     await screen.findByTestId('profile-display-name');
 
-    await waitFor(() => expect(mockGetMyProfile).toHaveBeenCalled());
+    await waitFor(() => expect(mockFetchMyProfile).toHaveBeenCalled());
   });
 });
 

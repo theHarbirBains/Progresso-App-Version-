@@ -51,23 +51,16 @@ describe('bodyless POST requests', () => {
   });
 });
 
-describe('getMyProfile', () => {
-  it('sends a GET with the bearer token and returns the parsed profile', async () => {
-    const { getMyProfile } = api;
-    const profile = {
-      id: 'user-1',
-      email: 'athlete@example.com',
-      role: 'user',
-      displayName: 'Athlete',
-      username: 'athlete1',
-      weightUnit: 'kg',
-    };
-    mockFetchOnce(200, profile);
+// Shared GET behaviour (auth header, error messages, missing config), shown through one plain GET.
+describe('GET requests', () => {
+  it('sends a GET with the bearer token and returns the parsed body', async () => {
+    const { getTrainerStatus } = api;
+    mockFetchOnce(200, { isTrainer: true });
 
-    const result = await getMyProfile('token-123');
+    const result = await getTrainerStatus('token-123');
 
-    expect(result).toEqual(profile);
-    expect(global.fetch).toHaveBeenCalledWith('http://localhost:4000/api/v1/users/me', {
+    expect(result).toEqual({ isTrainer: true });
+    expect(global.fetch).toHaveBeenCalledWith('http://localhost:4000/api/v1/trainer/status', {
       headers: {
         Authorization: 'Bearer token-123',
       },
@@ -76,49 +69,49 @@ describe('getMyProfile', () => {
   });
 
   it('throws with the backend message on a non-OK response', async () => {
-    const { getMyProfile } = api;
+    const { getTrainerStatus } = api;
     mockFetchOnce(401, { message: 'Unauthorized' });
 
-    await expect(getMyProfile('bad-token')).rejects.toThrow('Unauthorized');
+    await expect(getTrainerStatus('bad-token')).rejects.toThrow('Unauthorized');
   });
 
   it('joins array-form validation messages into a single error', async () => {
-    const { getMyProfile } = api;
+    const { getTrainerStatus } = api;
     mockFetchOnce(400, { message: ['username must be lowercase', 'username too short'] });
 
-    await expect(getMyProfile('token-123')).rejects.toThrow(
+    await expect(getTrainerStatus('token-123')).rejects.toThrow(
       'username must be lowercase, username too short',
     );
   });
 
   it("extracts the nested message from the backend's exception-filter wrapper shape", async () => {
-    const { getMyProfile } = api;
+    const { getTrainerStatus } = api;
     mockFetchOnce(401, {
       statusCode: 401,
-      path: '/api/v1/users/me',
+      path: '/api/v1/trainer/status',
       timestamp: '2026-08-26T00:00:00Z',
       message: { message: 'Missing bearer token', error: 'Unauthorized', statusCode: 401 },
     });
 
-    await expect(getMyProfile('token-123')).rejects.toThrow('Missing bearer token');
+    await expect(getTrainerStatus('token-123')).rejects.toThrow('Missing bearer token');
   });
 
   it('falls back to a generic message for an unknown/malformed nested shape', async () => {
-    const { getMyProfile } = api;
+    const { getTrainerStatus } = api;
     mockFetchOnce(401, { message: { error: 'Unauthorized', statusCode: 401 } });
 
-    await expect(getMyProfile('token-123')).rejects.toThrow('Request failed');
+    await expect(getTrainerStatus('token-123')).rejects.toThrow('Request failed');
   });
 
   it('falls back to a generic message when the error body has no message', async () => {
-    const { getMyProfile } = api;
+    const { getTrainerStatus } = api;
     mockFetchOnce(500, {});
 
-    await expect(getMyProfile('token-123')).rejects.toThrow('Request failed');
+    await expect(getTrainerStatus('token-123')).rejects.toThrow('Request failed');
   });
 
   it('falls back to a generic message when the response body is not JSON', async () => {
-    const { getMyProfile } = api;
+    const { getTrainerStatus } = api;
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,
       status: 500,
@@ -127,14 +120,14 @@ describe('getMyProfile', () => {
       },
     });
 
-    await expect(getMyProfile('token-123')).rejects.toThrow('Request failed');
+    await expect(getTrainerStatus('token-123')).rejects.toThrow('Request failed');
   });
 
   it('throws a clear error when EXPO_PUBLIC_API_BASE_URL is not set', async () => {
     delete process.env.EXPO_PUBLIC_API_BASE_URL;
-    const { getMyProfile } = api;
+    const { getTrainerStatus } = api;
 
-    await expect(getMyProfile('token-123')).rejects.toThrow('Missing EXPO_PUBLIC_API_BASE_URL');
+    await expect(getTrainerStatus('token-123')).rejects.toThrow('Missing EXPO_PUBLIC_API_BASE_URL');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 });
@@ -248,26 +241,26 @@ describe('request timeout and retry', () => {
 
   it('retries once after a timeout, succeeding once the retry gets a real response', async () => {
     jest.useFakeTimers();
-    const { getMyProfile } = api;
+    const { getTrainerStatus } = api;
     const mockFetch = global.fetch as jest.Mock;
     mockFetch.mockImplementationOnce(neverRespondUntilAborted);
-    mockFetchOnce(200, { id: 'user-1' });
+    mockFetchOnce(200, { isTrainer: false });
 
-    const result = getMyProfile('token-123');
+    const result = getTrainerStatus('token-123');
     await jest.advanceTimersByTimeAsync(15_000); // the first attempt's own timeout fires
     await jest.advanceTimersByTimeAsync(1_000); // the retry delay
 
-    await expect(result).resolves.toEqual({ id: 'user-1' });
+    await expect(result).resolves.toEqual({ isTrainer: false });
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it('throws a timeout error if the retry times out too, rather than retrying forever', async () => {
     jest.useFakeTimers();
-    const { getMyProfile } = api;
+    const { getTrainerStatus } = api;
     const mockFetch = global.fetch as jest.Mock;
     mockFetch.mockImplementation(neverRespondUntilAborted);
 
-    const result = getMyProfile('token-123');
+    const result = getTrainerStatus('token-123');
     const assertion = expect(result).rejects.toThrow('Request timed out');
     await jest.advanceTimersByTimeAsync(15_000); // first attempt times out
     await jest.advanceTimersByTimeAsync(1_000); // retry delay
@@ -278,11 +271,11 @@ describe('request timeout and retry', () => {
   });
 
   it('never retries a real backend error (only a timeout is retried)', async () => {
-    const { getMyProfile } = api;
+    const { getTrainerStatus } = api;
     const mockFetch = global.fetch as jest.Mock;
     mockFetchOnce(401, { message: 'Unauthorized' });
 
-    await expect(getMyProfile('bad-token')).rejects.toThrow('Unauthorized');
+    await expect(getTrainerStatus('bad-token')).rejects.toThrow('Unauthorized');
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 

@@ -2,18 +2,22 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { SettingsPersonalInfoScreen } from './SettingsPersonalInfoScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../lib/avatarUpload', () => ({
@@ -22,7 +26,7 @@ jest.mock('../lib/avatarUpload', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 const mockUploadAvatar = uploadAvatar as jest.Mock;
 const mockRemoveAvatarFile = removeAvatarFile as jest.Mock;
@@ -50,7 +54,7 @@ beforeEach(() => {
     user: { id: 'user-1', email: 'athlete@example.com' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset();
   mockUploadAvatar.mockReset().mockResolvedValue('https://example.test/avatar.jpg');
   mockRemoveAvatarFile.mockReset().mockResolvedValue(undefined);
@@ -158,7 +162,7 @@ describe('SettingsPersonalInfoScreen', () => {
   });
 
   it('offers Remove Photo, and removes it, once a photo already exists', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       avatarUrl: 'https://example.test/existing.jpg',
     });

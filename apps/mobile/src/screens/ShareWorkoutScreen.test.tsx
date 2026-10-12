@@ -7,17 +7,17 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchShareCardData } from '../sharing/shareCardData';
 import { ShareWorkoutScreen } from './ShareWorkoutScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
-}));
-
-jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
 }));
 
 jest.mock('../sharing/shareCardData', () => ({
@@ -40,7 +40,7 @@ jest.mock('expo-media-library', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchShareCardData = fetchShareCardData as jest.Mock;
 const mockCaptureRef = captureRef as jest.Mock;
 const mockIsAvailableAsync = Sharing.isAvailableAsync as jest.Mock;
@@ -74,7 +74,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',

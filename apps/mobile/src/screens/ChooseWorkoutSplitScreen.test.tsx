@@ -5,20 +5,23 @@ import { AppCard } from '../design/AppCard';
 import { Badge } from '../design/Badge';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchWorkoutSplits, materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { ChooseWorkoutSplitScreen } from './ChooseWorkoutSplitScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn().mockResolvedValue({
+  updateMyProfile: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn().mockResolvedValue({
     id: 'user-1',
-    email: 'a@example.com',
-    role: 'user',
     displayName: null,
     username: null,
     weightUnit: 'kg',
@@ -26,7 +29,6 @@ jest.mock('../lib/api', () => ({
     nutritionAccentColor: null,
     activeWorkoutSplitId: null,
   }),
-  updateMyProfile: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutSplitQueries', () => ({
@@ -35,7 +37,7 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 const mockMaterializeWorkoutSplitPreset = materializeWorkoutSplitPreset as jest.Mock;
 const mockFetchWorkoutSplits = fetchWorkoutSplits as jest.Mock;
@@ -54,7 +56,7 @@ beforeEach(() => {
   mockMaterializeWorkoutSplitPreset
     .mockReset()
     .mockResolvedValue({ id: 'split-new', name: 'Push / Pull / Legs' });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',
@@ -220,7 +222,7 @@ describe('ChooseWorkoutSplitScreen', () => {
   });
 
   it("shows the preset matching the user's current active split as already selected", async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',
@@ -245,7 +247,7 @@ describe('ChooseWorkoutSplitScreen', () => {
   });
 
   it('shows no preset as selected when the active split matches no preset name (custom split)', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',

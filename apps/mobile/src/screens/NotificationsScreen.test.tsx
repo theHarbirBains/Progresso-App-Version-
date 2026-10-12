@@ -1,20 +1,24 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, listFollowNotifications, respondToFollowRequest } from '../lib/api';
+import { listFollowNotifications, respondToFollowRequest } from '../lib/api';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { NotificationsScreen } from './NotificationsScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   listFollowNotifications: jest.fn(),
   respondToFollowRequest: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../nutrition/nutritionGoalQueries', () => ({
@@ -26,7 +30,7 @@ jest.mock('../workouts/allExerciseHistoryQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockListFollowNotifications = listFollowNotifications as jest.Mock;
 const mockRespondToFollowRequest = respondToFollowRequest as jest.Mock;
 const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
@@ -104,7 +108,7 @@ beforeEach(() => {
   // Defaults keep both new setup reminders quiet -- an active split and
   // saved goals already -- so existing insight/activity tests, which don't
   // care about either, see the same behavior as before these were added.
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockListFollowNotifications.mockReset().mockResolvedValue([]);
   mockRespondToFollowRequest.mockReset().mockResolvedValue({ success: true });
   mockFetchNutritionGoals.mockReset().mockResolvedValue(setGoals);
@@ -159,7 +163,7 @@ describe('NotificationsScreen -- insights', () => {
 
 describe('NotificationsScreen -- setup reminders', () => {
   it('reminds a user with no active split to set one up, and taps through to Choose Workout Split', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: null });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: null });
     renderScreen();
 
     const card = await screen.findByTestId('notifications-insight-no-split');
@@ -189,7 +193,7 @@ describe('NotificationsScreen -- setup reminders', () => {
   });
 
   it('shows both reminders together for a brand-new user with neither set up', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: null });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, activeWorkoutSplitId: null });
     mockFetchNutritionGoals.mockResolvedValue(noGoals);
     renderScreen();
 

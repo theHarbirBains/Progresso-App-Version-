@@ -25,6 +25,11 @@ jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
+// The profile isn't part of these tests; leave it loading.
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(() => new Promise(() => {})),
+}));
+
 jest.mock('../nutrition/foodLogQueries', () => ({
   fetchTodaysFoodLogs: jest.fn(),
   updateFoodLogQuantity: jest.fn(),

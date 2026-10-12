@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, StyleSheet } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { AppCard } from '../design/AppCard';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
@@ -12,14 +12,18 @@ import {
   fetchWorkoutSplits,
 } from '../workouts/workoutSplitQueries';
 import { WorkoutSplitsScreen } from './WorkoutSplitsScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutSplitQueries', () => ({
@@ -49,7 +53,7 @@ jest.mock('../workouts/WorkoutSplitPresetPicker', () => {
 /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 const mockFetchWorkoutSplits = fetchWorkoutSplits as jest.Mock;
 const mockDuplicateWorkoutSplit = duplicateWorkoutSplit as jest.Mock;
@@ -100,7 +104,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockFetchWorkoutSplits.mockReset().mockResolvedValue([
     { id: 'split-1', name: 'PPL - Hypertrophy' },

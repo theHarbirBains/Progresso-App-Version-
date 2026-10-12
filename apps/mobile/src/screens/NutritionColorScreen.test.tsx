@@ -1,21 +1,25 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_NUTRITION_COLOR } from '../theme/accentColor';
 import { NutritionColorScreen } from './NutritionColorScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
 }));
 
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 
 const mockGoBack = jest.fn();
@@ -24,8 +28,8 @@ const navigation: any = { goBack: mockGoBack };
 const route = {} as never;
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' } });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' }, user: { id: 'user-1' } });
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@test.local',
     role: 'user',
@@ -53,7 +57,7 @@ describe('NutritionColorScreen', () => {
   });
 
   it("loads the user's previously saved nutrition color", async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@test.local',
       role: 'user',

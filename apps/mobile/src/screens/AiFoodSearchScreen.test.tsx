@@ -1,20 +1,24 @@
 import type { PropsWithChildren } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, interpretFoodDescription, resolveFoodComponent } from '../lib/api';
+import { interpretFoodDescription, resolveFoodComponent } from '../lib/api';
 import { createFood, findOwnFoodByName } from '../nutrition/foodQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { AiFoodSearchScreen } from './AiFoodSearchScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   interpretFoodDescription: jest.fn(),
   resolveFoodComponent: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../nutrition/foodQueries', () => ({
@@ -27,7 +31,7 @@ function TestProviders({ children }: PropsWithChildren) {
 }
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockInterpret = interpretFoodDescription as jest.Mock;
 const mockResolve = resolveFoodComponent as jest.Mock;
 const mockCreateFood = createFood as jest.Mock;
@@ -172,7 +176,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',

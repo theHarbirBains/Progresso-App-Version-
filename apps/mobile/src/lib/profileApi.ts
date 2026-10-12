@@ -28,8 +28,6 @@ export type AverageWorkoutLength = '20_30' | '30_45' | '45_60' | '60_plus';
 
 export interface ProfileResponse {
   id: string;
-  email: string;
-  role: string;
   displayName: string | null;
   username: string | null;
   weightUnit: 'kg' | 'lb';
@@ -85,10 +83,6 @@ export interface UpdateProfileInput {
   referralSource?: ReferralSource;
   country?: string;
   averageWorkoutLength?: AverageWorkoutLength;
-}
-
-export function getMyProfile(accessToken: string): Promise<ProfileResponse> {
-  return request<ProfileResponse>('/api/v1/users/me', accessToken);
 }
 
 export function updateMyProfile(

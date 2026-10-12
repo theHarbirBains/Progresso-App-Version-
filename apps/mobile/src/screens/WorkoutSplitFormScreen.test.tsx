@@ -22,10 +22,12 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn().mockResolvedValue({
+  updateMyProfile: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn().mockResolvedValue({
     id: 'user-1',
-    email: 'a@example.com',
-    role: 'user',
     displayName: null,
     username: null,
     weightUnit: 'kg',
@@ -33,7 +35,6 @@ jest.mock('../lib/api', () => ({
     nutritionAccentColor: null,
     activeWorkoutSplitId: null,
   }),
-  updateMyProfile: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutSplitQueries', () => ({

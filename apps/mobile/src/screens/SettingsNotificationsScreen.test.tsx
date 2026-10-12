@@ -2,23 +2,27 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import * as Notifications from 'expo-notifications';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, registerPushToken, unregisterPushToken, updateMyProfile } from '../lib/api';
+import { registerPushToken, unregisterPushToken, updateMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { SettingsNotificationsScreen } from './SettingsNotificationsScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
   registerPushToken: jest.fn(),
   unregisterPushToken: jest.fn(),
 }));
 
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 const mockRegisterPushToken = registerPushToken as jest.Mock;
 const mockUnregisterPushToken = unregisterPushToken as jest.Mock;
@@ -36,8 +40,8 @@ const mockGoBack = jest.fn();
 const navigation: any = { navigate: jest.fn(), goBack: mockGoBack };
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' } });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' }, user: { id: 'user-1' } });
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset();
   mockRegisterPushToken.mockReset().mockResolvedValue({ registered: true });
   mockUnregisterPushToken.mockReset().mockResolvedValue({ removed: true });
@@ -63,7 +67,7 @@ describe('SettingsNotificationsScreen', () => {
   });
 
   it('reflects the real saved push/email preferences', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       pushNotificationsOptIn: true,
       emailOptIn: false,

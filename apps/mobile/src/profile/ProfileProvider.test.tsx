@@ -1,25 +1,27 @@
 import { act, render, renderHook, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { ProfileProvider, useProfile } from './ProfileProvider';
+import { fetchMyProfile } from './profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
 }));
 
+jest.mock('./profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 
 const baseProfile = {
   id: 'user-1',
-  email: 'a@example.com',
-  role: 'user',
   displayName: 'Harbir',
   username: 'harbir',
   weightUnit: 'kg' as const,
@@ -27,9 +29,11 @@ const baseProfile = {
   nutritionAccentColor: null,
 };
 
+const signedIn = { session: { access_token: 'token-123' }, user: { id: 'user-1' } };
+
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' } });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockUseAuth.mockReturnValue(signedIn);
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset();
 });
 
@@ -42,7 +46,33 @@ describe('ProfileProvider', () => {
 
     expect(result.current.profile).toEqual(baseProfile);
     expect(result.current.error).toBeNull();
-    expect(mockGetMyProfile).toHaveBeenCalledWith('token-123');
+    expect(mockFetchMyProfile).toHaveBeenCalledWith('user-1');
+  });
+
+  it('does not refetch when only the access token refreshes', async () => {
+    const { result, rerender } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    mockUseAuth.mockReturnValue({ ...signedIn, session: { access_token: 'token-456' } });
+    rerender({});
+    await act(async () => {});
+
+    expect(mockFetchMyProfile).toHaveBeenCalledTimes(1);
+    expect(result.current.profile).toEqual(baseProfile);
+  });
+
+  it('saves with the current access token after a token refresh', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, displayName: 'New Name' });
+    const { result, rerender } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    mockUseAuth.mockReturnValue({ ...signedIn, session: { access_token: 'token-456' } });
+    rerender({});
+    await act(async () => {
+      await result.current.updateProfile({ displayName: 'New Name' });
+    });
+
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-456', { displayName: 'New Name' });
   });
 
   // The entire point of this provider: previously, every screen using
@@ -66,27 +96,27 @@ describe('ProfileProvider', () => {
       </ProfileProvider>,
     );
 
-    await waitFor(() => expect(mockGetMyProfile).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockFetchMyProfile).toHaveBeenCalledTimes(1));
     // Give any accidental second effect a chance to fire before asserting
     // it never does.
     await act(async () => {});
-    expect(mockGetMyProfile).toHaveBeenCalledTimes(1);
+    expect(mockFetchMyProfile).toHaveBeenCalledTimes(1);
   });
 
   it('does not fetch while signed out, and leaves profile null', async () => {
-    mockUseAuth.mockReturnValue({ session: null });
+    mockUseAuth.mockReturnValue({ session: null, user: null });
 
     const { result } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
 
     expect(result.current.profile).toBeNull();
-    expect(mockGetMyProfile).not.toHaveBeenCalled();
+    expect(mockFetchMyProfile).not.toHaveBeenCalled();
   });
 
   it('clears the cached profile on sign-out, so a later sign-in never flashes the previous account', async () => {
     const { result, rerender } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
     await waitFor(() => expect(result.current.profile).toEqual(baseProfile));
 
-    mockUseAuth.mockReturnValue({ session: null });
+    mockUseAuth.mockReturnValue({ session: null, user: null });
     rerender({});
 
     expect(result.current.profile).toBeNull();
@@ -94,7 +124,7 @@ describe('ProfileProvider', () => {
   });
 
   it('sets error, without throwing, when the fetch fails', async () => {
-    mockGetMyProfile.mockRejectedValue(new Error('network down'));
+    mockFetchMyProfile.mockRejectedValue(new Error('network down'));
 
     const { result } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
 
@@ -108,7 +138,7 @@ describe('ProfileProvider', () => {
 
     const { result } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
     await waitFor(() => expect(result.current.loading).toBe(false));
-    mockGetMyProfile.mockClear();
+    mockFetchMyProfile.mockClear();
 
     await act(async () => {
       await result.current.updateProfile({ displayName: 'New Name' });
@@ -116,14 +146,14 @@ describe('ProfileProvider', () => {
 
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', { displayName: 'New Name' });
     expect(result.current.profile?.displayName).toBe('New Name');
-    expect(mockGetMyProfile).not.toHaveBeenCalled();
+    expect(mockFetchMyProfile).not.toHaveBeenCalled();
   });
 
   it('refetch re-fetches from the server', async () => {
     const { result } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, displayName: 'Refetched' });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, displayName: 'Refetched' });
     await act(async () => {
       await result.current.refetch();
     });

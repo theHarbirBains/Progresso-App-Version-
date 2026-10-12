@@ -5,17 +5,17 @@ import { fonts } from '../design/theme';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import { PRHistoryScreen } from './PRHistoryScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
-}));
-
-jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
 }));
 
 jest.mock('../workouts/prQueries', () => ({
@@ -24,7 +24,7 @@ jest.mock('../workouts/prQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchRepPRs = fetchRepPRs as jest.Mock;
 const mockFetchOneRepMax = fetchOneRepMax as jest.Mock;
 
@@ -39,7 +39,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',
@@ -101,7 +101,7 @@ describe('PRHistoryScreen', () => {
   });
 
   it("converts PR and 1RM weights to the user's preferred unit", async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',

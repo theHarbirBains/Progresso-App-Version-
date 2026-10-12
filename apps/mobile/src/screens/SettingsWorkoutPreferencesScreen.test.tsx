@@ -1,21 +1,25 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { SettingsWorkoutPreferencesScreen } from './SettingsWorkoutPreferencesScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
 }));
 
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 
 const baseProfile = {
@@ -33,8 +37,8 @@ const mockGoBack = jest.fn();
 const navigation: any = { navigate: jest.fn(), goBack: mockGoBack };
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' } });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' }, user: { id: 'user-1' } });
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset();
   mockGoBack.mockClear();
 });
@@ -64,7 +68,7 @@ describe('SettingsWorkoutPreferencesScreen', () => {
   });
 
   it('shows the saved weekly goal', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, workoutFrequencyDays: 4 });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, workoutFrequencyDays: 4 });
     renderScreen();
 
     expect(await screen.findByTestId('open-weekly-workout-goal')).toHaveTextContent(/4 days/);

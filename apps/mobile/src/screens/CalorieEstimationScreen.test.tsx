@@ -4,22 +4,26 @@ import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { CalorieEstimationScreen } from './CalorieEstimationScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
 }));
 
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 
 const mockGoBack = jest.fn();
@@ -78,7 +82,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockGoBack.mockClear();
   mockOpenMenu.mockClear();
@@ -117,7 +121,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('shows the current birthday as a compact readout', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, birthday: '1996-03-10' });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, birthday: '1996-03-10' });
     await renderScreen();
 
     expect(screen.getByTestId('calorie-estimation-birthday-value')).toHaveTextContent(
@@ -126,7 +130,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('opens the birthday picker sheet, lets a wheel value be picked, and reflects it once closed', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, birthday: '1996-03-10' });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, birthday: '1996-03-10' });
     await renderScreen();
 
     fireEvent.press(screen.getByTestId('calorie-estimation-birthday-expand'));
@@ -141,7 +145,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('shows the current height/weight as a compact readout, in the current unit', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       heightValue: 180,
       heightUnit: 'cm',
@@ -155,7 +159,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('switching the height unit toggle updates the compact readout without opening the picker', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, heightValue: 180, heightUnit: 'cm' });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, heightValue: 180, heightUnit: 'cm' });
     await renderScreen();
 
     fireEvent.press(screen.getByTestId('calorie-estimation-height-unit-ft_in'));
@@ -165,7 +169,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('switching the weight unit toggle updates the compact readout without opening the picker', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, weightValue: 79.2, weightUnit: 'kg' });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, weightValue: 79.2, weightUnit: 'kg' });
     await renderScreen();
 
     fireEvent.press(screen.getByTestId('calorie-estimation-weight-unit-lb'));
@@ -174,7 +178,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('opens the height picker sheet, lets a wheel value be picked, and reflects it once closed', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, heightValue: 170, heightUnit: 'cm' });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, heightValue: 170, heightUnit: 'cm' });
     await renderScreen();
 
     fireEvent.press(screen.getByTestId('calorie-estimation-height-expand'));
@@ -187,7 +191,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('opens the weight picker sheet, lets a wheel value be picked, and reflects it once closed', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, weightValue: 70, weightUnit: 'kg' });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, weightValue: 70, weightUnit: 'kg' });
     await renderScreen();
 
     fireEvent.press(screen.getByTestId('calorie-estimation-weight-expand'));
@@ -227,7 +231,7 @@ describe('CalorieEstimationScreen', () => {
 
   it('rejects a birthday that makes the user too young', async () => {
     const now = new Date();
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       birthday: `${now.getFullYear() - 9}-01-01`,
     });
@@ -251,7 +255,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('saves gender, birthday, height, weight, and activity level to the profile, then goes back', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       birthday: '1998-05-20',
       heightValue: 180,
@@ -280,7 +284,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('shows a save error and does not navigate back when the save fails', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, birthday: '1998-05-20' });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, birthday: '1998-05-20' });
     mockUpdateMyProfile.mockRejectedValue(new Error('network error'));
     await renderScreen();
     fireEvent.press(screen.getByTestId('calorie-estimation-gender-male'));
@@ -295,7 +299,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('prefills gender, birthday, height, weight, and activity level from the existing profile', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       gender: 'female',
       birthday: '1996-03-10',
@@ -320,7 +324,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('never prefills gender from a profile value this screen does not offer (e.g. "other")', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, gender: 'other' });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, gender: 'other' });
 
     await renderScreen();
 
@@ -343,7 +347,7 @@ describe('CalorieEstimationScreen', () => {
   });
 
   it('degrades to the default nutrition theme when the profile fetch fails', async () => {
-    mockGetMyProfile.mockRejectedValue(new Error('network error'));
+    mockFetchMyProfile.mockRejectedValue(new Error('network error'));
 
     await renderScreen();
 

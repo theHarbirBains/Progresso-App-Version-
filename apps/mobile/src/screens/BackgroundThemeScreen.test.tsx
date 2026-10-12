@@ -1,21 +1,25 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { BackgroundThemeScreen } from './BackgroundThemeScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
 }));
 
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 
 const mockGoBack = jest.fn();
@@ -35,7 +39,7 @@ function renderScreen() {
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' } });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     workoutAccentColor: '#2F80FF',
     backgroundTheme: 'obsidian',
     weightUnit: 'kg',

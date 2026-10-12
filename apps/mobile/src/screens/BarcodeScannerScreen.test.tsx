@@ -5,19 +5,23 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
-import { getFoodByBarcode, getMyProfile } from '../lib/api';
+import { getFoodByBarcode } from '../lib/api';
 import { fetchTodaysFoodLogs, logFood } from '../nutrition/foodLogQueries';
 import { FoodLogProvider } from '../nutrition/FoodLogProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { BarcodeScannerScreen } from './BarcodeScannerScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   getFoodByBarcode: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../nutrition/foodLogQueries', () => ({
@@ -56,7 +60,7 @@ jest.mock('expo-camera', () => {
 });
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockGetFoodByBarcode = getFoodByBarcode as jest.Mock;
 const mockLogFood = logFood as jest.Mock;
 const mockFetchTodaysFoodLogs = fetchTodaysFoodLogs as jest.Mock;
@@ -108,7 +112,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockGetFoodByBarcode.mockReset().mockResolvedValue(null);
   mockLogFood.mockReset();
   mockFetchTodaysFoodLogs.mockReset().mockResolvedValue([]);

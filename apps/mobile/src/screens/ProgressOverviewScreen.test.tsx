@@ -2,7 +2,6 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import {
@@ -14,13 +13,14 @@ import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
 import { ProgressOverviewScreen } from './ProgressOverviewScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
-}));
-
-jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
 }));
 
 jest.mock('../workouts/allExerciseHistoryQueries', () => ({
@@ -39,7 +39,7 @@ jest.mock('../progress/progressStatsQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
 const mockFetchAllRepPRs = fetchAllRepPRs as jest.Mock;
 const mockFetchAllOneRepMaxes = fetchAllOneRepMaxes as jest.Mock;
@@ -155,7 +155,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',

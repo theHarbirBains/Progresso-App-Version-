@@ -5,21 +5,25 @@ import { PrimaryButton } from '../design/Button';
 import { fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals, saveNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
 import { computeCalorieTargets } from '../nutrition/calorieTargets';
 import { ProfileProvider, useProfile, type ProfileContextValue } from '../profile/ProfileProvider';
 import { NutritionGoalsScreen } from './NutritionGoalsScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../nutrition/nutritionGoalQueries', () => ({
@@ -28,7 +32,7 @@ jest.mock('../nutrition/nutritionGoalQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 const mockSaveNutritionGoals = saveNutritionGoals as jest.Mock;
@@ -87,7 +91,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset().mockImplementation(async (_token: string, updates: object) => ({
     ...baseProfile,
     ...updates,
@@ -162,7 +166,7 @@ describe('NutritionGoalsScreen', () => {
   });
 
   it('shows a "complete your information" state instead of fake targets when the profile is incomplete', async () => {
-    mockGetMyProfile.mockResolvedValue({ ...baseProfile, activityLevel: null });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, activityLevel: null });
     renderScreen();
 
     await screen.findByTestId('nutrition-goals-incomplete');
@@ -263,7 +267,7 @@ describe('NutritionGoalsScreen', () => {
   });
 
   it('shows an error message when loading fails', async () => {
-    mockGetMyProfile.mockRejectedValue(new Error('network error'));
+    mockFetchMyProfile.mockRejectedValue(new Error('network error'));
 
     renderScreen();
 

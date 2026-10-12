@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { toLocalDateKey } from '../design/calendarGrid';
 import { fetchAllExercises } from '../exercises/exerciseQueries';
-import { getMyProfile, logWorkoutForClient } from '../lib/api';
+import { logWorkoutForClient } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
@@ -18,6 +18,7 @@ import {
   updateSet,
 } from '../workouts/workoutQueries';
 import { LogPastWorkoutScreen } from './LogPastWorkoutScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 // Same fixture-date convention as WorkoutHistoryScreen.test.tsx: derived from
 // the real clock so this never rots into a flaky date-dependent test, but
@@ -41,12 +42,15 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
   createExercise: jest.fn(),
   updateExercise: jest.fn(),
   createEquipmentProfile: jest.fn(),
   logWorkoutForClient: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../lib/equipmentPhotoUpload', () => ({
@@ -80,7 +84,7 @@ jest.mock('../workouts/workoutQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchExercises = fetchAllExercises as jest.Mock;
 const mockFetchAllCompletedWorkouts = fetchAllCompletedWorkouts as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
@@ -111,7 +115,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',

@@ -9,7 +9,7 @@ import { colors, fonts } from '../design/theme';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
-import { createExercise, getMyProfile } from '../lib/api';
+import { createExercise } from '../lib/api';
 import { fetchAllExercises } from '../exercises/exerciseQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
@@ -28,6 +28,7 @@ import {
 } from '../workouts/workoutQueries';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ActiveWorkoutScreen } from './ActiveWorkoutScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 // completeWorkout is the one thing that invalidates AllTimeStatsProvider's
 // shared cache (see that provider's own comment) -- present so it fetches
@@ -45,11 +46,14 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
   createExercise: jest.fn(),
   updateExercise: jest.fn(),
   createEquipmentProfile: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../lib/equipmentPhotoUpload', () => ({
@@ -90,7 +94,7 @@ jest.mock('../workouts/prSummaryQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockCreateExercise = createExercise as jest.Mock;
 const mockFetchExercises = fetchAllExercises as jest.Mock;
 const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
@@ -141,7 +145,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',
@@ -451,7 +455,7 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it("uses the user's own saved Workout accent theme", async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',
@@ -553,7 +557,7 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it("the Finish Workout button follows the user's own saved Workout accent", async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',

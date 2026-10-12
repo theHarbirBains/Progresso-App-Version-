@@ -5,19 +5,19 @@ import { fonts, widgetGap } from '../design/theme';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import { deleteWorkout, fetchWorkoutDetail } from '../workouts/workoutQueries';
 import { WorkoutDetailScreen } from './WorkoutDetailScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
-}));
-
-jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
@@ -39,7 +39,7 @@ jest.mock('../progress/AllTimeStatsProvider', () => ({
 const mockUseAuth = useAuth as jest.Mock;
 const mockUseAllTimeStats = useAllTimeStats as jest.Mock;
 const mockRefetchAllTimeStats = jest.fn();
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 const mockFetchRepPRs = fetchRepPRs as jest.Mock;
 const mockFetchOneRepMax = fetchOneRepMax as jest.Mock;
@@ -76,7 +76,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',
@@ -111,7 +111,7 @@ describe('WorkoutDetailScreen', () => {
   it('shows a pound user volume as a whole number, never a decimal like 3149.9', async () => {
     // 225 lb x 8 and 135 lb x 10, stored in kg (rounded to 2dp, as the
     // database does) -- the true total is 3,150 lb.
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',
@@ -183,7 +183,7 @@ describe('WorkoutDetailScreen', () => {
   });
 
   it("displays weights converted to the user's preferred unit", async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',
@@ -395,7 +395,7 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
   });
 
   it("shows the volume in the user's unit, without a trailing .0", async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',

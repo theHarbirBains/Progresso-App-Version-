@@ -2,22 +2,26 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_NUTRITION_COLOR, DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 import { SettingsAppearanceScreen } from './SettingsAppearanceScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
 }));
 
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 
 const baseProfile = {
@@ -34,8 +38,8 @@ const mockGoBack = jest.fn();
 const navigation: any = { navigate: mockNavigate, goBack: mockGoBack };
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' } });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' }, user: { id: 'user-1' } });
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset();
   mockNavigate.mockClear();
   mockGoBack.mockClear();
@@ -69,7 +73,7 @@ describe('SettingsAppearanceScreen', () => {
   });
 
   it("shows 'Custom' when the saved color doesn't match any preset", async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       workoutAccentColor: '#123456',
       nutritionAccentColor: '#654321',
@@ -109,7 +113,7 @@ describe('SettingsAppearanceScreen', () => {
 
   it('asks for confirmation before resetting, and does nothing if cancelled', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       workoutAccentColor: '#EF4444',
       nutritionAccentColor: '#8B5CF6',
@@ -129,7 +133,7 @@ describe('SettingsAppearanceScreen', () => {
   });
 
   it('resets both colors to the defaults when the confirmation is accepted', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       ...baseProfile,
       workoutAccentColor: '#EF4444',
       nutritionAccentColor: '#8B5CF6',

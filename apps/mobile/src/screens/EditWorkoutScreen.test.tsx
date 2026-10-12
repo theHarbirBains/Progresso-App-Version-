@@ -4,7 +4,6 @@ import { useAuth } from '../auth/AuthProvider';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { toLocalDateKey } from '../design/calendarGrid';
 import { fetchAllExercises } from '../exercises/exerciseQueries';
-import { getMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
@@ -21,6 +20,7 @@ import {
   fetchNextExerciseOrderIndex,
 } from '../workouts/workoutQueries';
 import { EditWorkoutScreen } from './EditWorkoutScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 // Derived from the real clock (same convention as LogPastWorkoutScreen.test.tsx
 // and WorkoutHistoryScreen.test.tsx) so this never rots into a flaky
@@ -46,11 +46,14 @@ jest.mock('../auth/AuthProvider', () => ({
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
   createExercise: jest.fn(),
   updateExercise: jest.fn(),
   createEquipmentProfile: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../lib/equipmentPhotoUpload', () => ({
@@ -88,7 +91,7 @@ jest.mock('../workouts/workoutQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchExercises = fetchAllExercises as jest.Mock;
 const mockFetchAllCompletedWorkouts = fetchAllCompletedWorkouts as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
@@ -143,7 +146,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',

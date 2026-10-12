@@ -1,29 +1,33 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, updateMyProfile } from '../lib/api';
+import { updateMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { DEFAULT_BACKGROUND_THEME } from './backgroundThemes';
 import { BackgroundThemeProvider, useBackgroundTheme } from './BackgroundThemeContext';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
 }));
 
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
 
 const STORAGE_KEY = '@progresso/backgroundTheme';
 
 beforeEach(async () => {
-  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' } });
-  mockGetMyProfile.mockReset().mockResolvedValue({ backgroundTheme: null });
+  mockUseAuth.mockReturnValue({ session: { access_token: 'token-123' }, user: { id: 'user-1' } });
+  mockFetchMyProfile.mockReset().mockResolvedValue({ backgroundTheme: null });
   mockUpdateMyProfile.mockReset().mockResolvedValue({});
   await AsyncStorage.clear();
 });
@@ -50,7 +54,7 @@ describe('BackgroundThemeContext', () => {
   it('restores the theme from the local cache instantly, without waiting on the profile fetch', async () => {
     await AsyncStorage.setItem(STORAGE_KEY, 'midnight');
     // Never resolves -- proves the cache alone is enough to pick a theme.
-    mockGetMyProfile.mockReturnValue(new Promise(() => {}));
+    mockFetchMyProfile.mockReturnValue(new Promise(() => {}));
 
     const { result } = renderInProvider();
 
@@ -60,7 +64,7 @@ describe('BackgroundThemeContext', () => {
 
   it('reconciles with the backend profile once signed in, overriding a stale local cache', async () => {
     await AsyncStorage.setItem(STORAGE_KEY, 'midnight');
-    mockGetMyProfile.mockResolvedValue({ backgroundTheme: 'forest' });
+    mockFetchMyProfile.mockResolvedValue({ backgroundTheme: 'forest' });
 
     const { result } = renderInProvider();
 
@@ -69,7 +73,7 @@ describe('BackgroundThemeContext', () => {
   });
 
   it('ignores an invalid/unknown value from the profile rather than crashing', async () => {
-    mockGetMyProfile.mockResolvedValue({ backgroundTheme: 'not-a-real-theme' });
+    mockFetchMyProfile.mockResolvedValue({ backgroundTheme: 'not-a-real-theme' });
 
     const { result } = renderInProvider();
 

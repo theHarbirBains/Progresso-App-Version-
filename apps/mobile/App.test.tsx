@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import { getMyProfile } from './src/lib/api';
 import App from './App';
+import { fetchMyProfile } from './src/profile/profileQueries';
 
 interface MockAuthHandles {
   signInWithPassword: jest.Mock;
@@ -33,16 +33,17 @@ jest.mock('./src/lib/sentry', () => ({
 // existed; the fresh-signup path (which DOES need onboarding) is covered
 // separately below and in OnboardingScreen.test.tsx.
 jest.mock('./src/lib/api', () => ({
-  getMyProfile: jest.fn().mockResolvedValue({
+  updateMyProfile: jest.fn(),
+}));
+
+jest.mock('./src/profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn().mockResolvedValue({
     id: 'user-1',
-    email: 'athlete@example.com',
-    role: 'user',
     displayName: null,
     username: null,
     weightUnit: 'kg',
     onboardingCompletedAt: '2020-01-01T00:00:00.000Z',
   }),
-  updateMyProfile: jest.fn(),
 }));
 
 // FeedScreen is now the post-sign-in landing screen. Its own data
@@ -226,7 +227,7 @@ const mockSentry = jest.requireMock('./src/lib/sentry') as {
   setSentryUser: jest.Mock;
   clearSentryUser: jest.Mock;
 };
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 
 beforeEach(async () => {
   mockAuth.reset();
@@ -268,14 +269,14 @@ describe('Authentication flow', () => {
     }
   });
 
-  // Root's own onboarding check used to call getMyProfile a second time,
+  // Root's own onboarding check used to fetch the profile a second time,
   // racing ProfileProvider's already-in-flight fetch of the exact same
   // data -- doubling this request on every cold start, and showing a
   // second, unbranded loading screen behind LaunchScreen's branded one
   // while it resolved. Root now reads ProfileProvider's shared cache
   // instead.
   it('fetches the profile only once on sign-in, not twice', async () => {
-    mockGetMyProfile.mockClear();
+    mockFetchMyProfile.mockClear();
     render(<App />);
     await screen.findByTestId('sign-in-email');
 
@@ -284,7 +285,7 @@ describe('Authentication flow', () => {
     fireEvent.press(screen.getByTestId('sign-in-submit'));
 
     expect(await screen.findByTestId('feed-screen')).toBeTruthy();
-    expect(mockGetMyProfile).toHaveBeenCalledTimes(1);
+    expect(mockFetchMyProfile).toHaveBeenCalledTimes(1);
   });
 
   it('shows an error message on invalid credentials and does not sign in', async () => {

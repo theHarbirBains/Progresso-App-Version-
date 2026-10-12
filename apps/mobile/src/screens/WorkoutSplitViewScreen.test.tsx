@@ -2,17 +2,17 @@ import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
-import { getMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchWorkoutSplitDetail } from '../workouts/workoutSplitQueries';
 import { WorkoutSplitViewScreen } from './WorkoutSplitViewScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
-}));
-
-jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutSplitQueries', () => ({
@@ -20,7 +20,7 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchWorkoutSplitDetail = fetchWorkoutSplitDetail as jest.Mock;
 
 const mockNavigate = jest.fn();
@@ -50,7 +50,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',

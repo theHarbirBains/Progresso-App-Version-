@@ -4,7 +4,6 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
-import { getMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { createWorkout } from '../workouts/workoutQueries';
 import {
@@ -12,14 +11,18 @@ import {
   fetchWorkoutSplitDetail,
 } from '../workouts/workoutSplitQueries';
 import { NewWorkoutScreen } from './NewWorkoutScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   updateMyProfile: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
@@ -32,7 +35,7 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockCreateWorkout = createWorkout as jest.Mock;
 const mockFetchWorkoutSplitDetail = fetchWorkoutSplitDetail as jest.Mock;
 const mockFetchLastWorkoutSplitDayId = fetchLastWorkoutSplitDayId as jest.Mock;
@@ -87,7 +90,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile('split-1'));
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile('split-1'));
   mockFetchWorkoutSplitDetail.mockReset().mockResolvedValue(splitDetail);
   mockFetchLastWorkoutSplitDayId.mockReset().mockResolvedValue(null);
   mockCreateWorkout.mockReset().mockResolvedValue({
@@ -296,7 +299,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
 
 describe('NewWorkoutScreen without an active split', () => {
   it('blocks with "Choose Your Workout Split" and shows no day rows or exercise UI', async () => {
-    mockGetMyProfile.mockResolvedValue(baseProfile(null));
+    mockFetchMyProfile.mockResolvedValue(baseProfile(null));
 
     render(
       <BackgroundThemeProvider>
@@ -311,7 +314,7 @@ describe('NewWorkoutScreen without an active split', () => {
   });
 
   it('navigates to ChooseWorkoutSplit when the button is pressed', async () => {
-    mockGetMyProfile.mockResolvedValue(baseProfile(null));
+    mockFetchMyProfile.mockResolvedValue(baseProfile(null));
 
     render(
       <BackgroundThemeProvider>
@@ -349,7 +352,7 @@ describe('NewWorkoutScreen background refresh on focus', () => {
     await screen.findByTestId('start-workout-next');
 
     const refresh = deferred<ReturnType<typeof baseProfile>>();
-    mockGetMyProfile.mockReturnValue(refresh.promise);
+    mockFetchMyProfile.mockReturnValue(refresh.promise);
 
     const calls = navigation.addListener.mock.calls;
     const [, focusCallback] = calls[calls.length - 1];

@@ -1,17 +1,17 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchExerciseSetHistory } from '../workouts/exerciseHistoryQueries';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import { ProgressExerciseDetailScreen } from './ProgressExerciseDetailScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
+}));
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
-}));
-
-jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
 }));
 
 jest.mock('../workouts/exerciseHistoryQueries', () => ({
@@ -24,7 +24,7 @@ jest.mock('../workouts/prQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchExerciseSetHistory = fetchExerciseSetHistory as jest.Mock;
 const mockFetchRepPRs = fetchRepPRs as jest.Mock;
 const mockFetchOneRepMax = fetchOneRepMax as jest.Mock;
@@ -51,7 +51,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',

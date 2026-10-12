@@ -5,7 +5,7 @@ import { Card } from '../design/Card';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchFeedItems } from '../feed/feedQueries';
-import { fetchFriendsFeed, getMyProfile, listFollowNotifications } from '../lib/api';
+import { fetchFriendsFeed, listFollowNotifications } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
@@ -15,16 +15,20 @@ import {
   fetchWorkoutSplitDetail,
 } from '../workouts/workoutSplitQueries';
 import { FeedScreen } from './FeedScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   fetchFriendsFeed: jest.fn(),
   listFollowNotifications: jest.fn(),
   listGroups: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../trainer/clientQueries', () => ({
@@ -49,7 +53,7 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchActiveWorkout = fetchActiveWorkout as jest.Mock;
 const mockFetchFeedItems = fetchFeedItems as jest.Mock;
 const mockFetchFriendsFeed = fetchFriendsFeed as jest.Mock;
@@ -137,7 +141,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue({
+  mockFetchMyProfile.mockReset().mockResolvedValue({
     id: 'user-1',
     email: 'a@example.com',
     role: 'user',
@@ -340,7 +344,7 @@ describe('FeedScreen', () => {
   });
 
   it('badges the bell for a user with no active workout split, even with zero pending requests', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',
@@ -370,7 +374,7 @@ describe('FeedScreen', () => {
   });
 
   it('adds pending requests and both setup reminders together into one total', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',
@@ -528,7 +532,7 @@ describe('FeedScreen', () => {
 
 describe('FeedScreen -- Strava-style activity cards', () => {
   it('never tints a regular card with an accent color -- Feed is black-and-white, kind comes across via icon, not color', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',
@@ -724,7 +728,7 @@ describe('FeedScreen -- Next Workout widget', () => {
   });
 
   it('is absent for a user with no active workout split', async () => {
-    mockGetMyProfile.mockResolvedValue({
+    mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
       role: 'user',

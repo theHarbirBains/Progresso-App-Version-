@@ -18,7 +18,7 @@ import {
  * Also exposes the identity fields (`displayName`, `username`,
  * `avatarUrl`) and `weightUnit`/`activeWorkoutSplitId` off the one shared
  * profile fetch `ProfileProvider` already makes -- no fetch of its own.
- * This used to be its own independent `getMyProfile` call (one per mount,
+ * This used to be its own independent profile fetch (one per mount,
  * of which there were 20+ across the app -- see ProfileProvider's own
  * comment on why that was a real performance problem); it is now a pure
  * derivation over the shared cache, kept as a hook (rather than inlining

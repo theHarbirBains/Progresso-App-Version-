@@ -6,19 +6,23 @@ import { PrimaryButton } from '../design/Button';
 import { fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { getMyProfile, searchFoods } from '../lib/api';
+import { searchFoods } from '../lib/api';
 import { fetchTodaysFoodLogs, logFood } from '../nutrition/foodLogQueries';
 import { FoodLogProvider } from '../nutrition/FoodLogProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { FoodSearchScreen } from './FoodSearchScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
-  getMyProfile: jest.fn(),
   searchFoods: jest.fn(),
+}));
+
+jest.mock('../profile/profileQueries', () => ({
+  fetchMyProfile: jest.fn(),
 }));
 
 jest.mock('../nutrition/foodLogQueries', () => ({
@@ -35,7 +39,7 @@ function TestProviders({ children }: PropsWithChildren) {
 }
 
 const mockUseAuth = useAuth as jest.Mock;
-const mockGetMyProfile = getMyProfile as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockSearchFoods = searchFoods as jest.Mock;
 const mockLogFood = logFood as jest.Mock;
 const mockFetchTodaysFoodLogs = fetchTodaysFoodLogs as jest.Mock;
@@ -111,7 +115,7 @@ beforeEach(() => {
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
-  mockGetMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockSearchFoods.mockReset().mockResolvedValue({ foods: [chickenBreast], hasMore: false });
   mockLogFood.mockReset();
   mockFetchTodaysFoodLogs.mockReset().mockResolvedValue([]);
