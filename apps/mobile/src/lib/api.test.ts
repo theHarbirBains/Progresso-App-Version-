@@ -285,4 +285,49 @@ describe('request timeout and retry', () => {
     await expect(getMyProfile('bad-token')).rejects.toThrow('Unauthorized');
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it('never repeats a POST that timed out, since the server may still complete it', async () => {
+    jest.useFakeTimers();
+    const { createGroup } = api;
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockImplementation(neverRespondUntilAborted);
+
+    const result = createGroup('token-123', { name: 'Push Day', workoutId: 'w1' });
+    const assertion = expect(result).rejects.toThrow('Request timed out');
+    await jest.advanceTimersByTimeAsync(15_000);
+    await jest.advanceTimersByTimeAsync(20_000); // long enough for any retry to have started
+
+    await assertion;
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('never repeats a PATCH that timed out', async () => {
+    jest.useFakeTimers();
+    const { updateMyProfile } = api;
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockImplementation(neverRespondUntilAborted);
+
+    const result = updateMyProfile('token-123', { displayName: 'Sam' });
+    const assertion = expect(result).rejects.toThrow('Request timed out');
+    await jest.advanceTimersByTimeAsync(15_000);
+    await jest.advanceTimersByTimeAsync(20_000);
+
+    await assertion;
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('still retries a DELETE, which is safe to repeat', async () => {
+    jest.useFakeTimers();
+    const { unregisterPushToken } = api;
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockImplementationOnce(neverRespondUntilAborted);
+    mockFetchOnce(200, { removed: true });
+
+    const result = unregisterPushToken('token-123', 'ExponentPushToken[test]');
+    await jest.advanceTimersByTimeAsync(15_000);
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    await expect(result).resolves.toEqual({ removed: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
 });

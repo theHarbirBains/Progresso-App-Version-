@@ -47,6 +47,8 @@ function extractErrorMessage(body: unknown): string {
 // instance is actually warm.
 const DEFAULT_TIMEOUT_MS = 15_000;
 const RETRY_DELAY_MS = 1_000;
+// A timed-out POST or PATCH may still complete on the server, so repeating it could apply it twice.
+const RETRY_SAFE_METHODS = new Set(['GET', 'HEAD', 'PUT', 'DELETE']);
 
 /**
  * Thrown when a request is aborted for taking longer than its timeout --
@@ -116,10 +118,11 @@ async function requestOnce<T>(
  * legitimately slower by nature, e.g. an AI-backed one with its own
  * server-side retries). A timeout specifically -- never a real 4xx/5xx the
  * backend actively returned -- is retried exactly once, after a short
- * delay: that's the signature of a cold instance waking up, not a real
- * failure, so a second attempt a moment later usually lands on one that's
- * now warm. A second timeout (or any other error) propagates as-is, for
- * the caller's own existing error handling/Retry affordance.
+ * delay, for methods that are safe to repeat: that's the signature of a cold
+ * instance waking up, not a real failure, so a second attempt a moment later
+ * usually lands on one that's now warm. A second timeout, a timed-out POST or
+ * PATCH, or any other error propagates as-is, for the caller's own existing
+ * error handling/Retry affordance.
  */
 export async function request<T>(
   path: string,
@@ -132,6 +135,7 @@ export async function request<T>(
     return await requestOnce<T>(path, accessToken, init, timeoutMs);
   } catch (err) {
     if (!(err instanceof RequestTimeoutError)) throw err;
+    if (!RETRY_SAFE_METHODS.has((init?.method ?? 'GET').toUpperCase())) throw err;
     await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
     return requestOnce<T>(path, accessToken, init, timeoutMs);
   }
