@@ -3,6 +3,7 @@ import type { AuthenticatedUser } from '../auth/types/authenticated-request';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { AiUsage } from './ai-usage-limit';
 import { InterpretFoodDto } from './dto/interpret-food.dto';
 import { ResolveComponentDto } from './dto/resolve-component.dto';
 import { SearchFoodsDto } from './dto/search-foods.dto';
@@ -47,6 +48,7 @@ export class FoodsController {
   // food -- see FoodsService.interpretDescription. Nothing here is scoped to
   // who asked, so no @CurrentUser() is needed.
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @AiUsage('interpret')
   @Post('interpret')
   async interpret(@Body() dto: InterpretFoodDto) {
     return this.foodsService.interpretDescription(dto.description);
@@ -55,6 +57,7 @@ export class FoodsController {
   // Resolves one component the user was still deciding: a candidate they picked, or an amount
   // they gave. Only that component is re-run; the rest of the interpretation is kept client-side.
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @AiUsage('resolveComponent')
   @Post('resolve-component')
   async resolveComponent(@Body() dto: ResolveComponentDto) {
     const request: ComponentRequest = {

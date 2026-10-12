@@ -170,6 +170,7 @@ interface AnthropicToolUseBlock {
 
 interface AnthropicMessageResponse {
   content?: Array<AnthropicToolUseBlock | { type: string }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -284,7 +285,7 @@ export class AnthropicNutritionProvider {
 
   async parse(description: string): Promise<ParsedFoodDescription> {
     return this.withOneRetry('parse', async () => {
-      const body = await this.call(description, PARSE_SYSTEM_PROMPT, PARSE_TOOL);
+      const body = await this.call('parse', description, PARSE_SYSTEM_PROMPT, PARSE_TOOL);
       const parsed = toParsed(body);
       if (!parsed) throw new UnusableReplyError('food_parse reply was not usable');
       return parsed;
@@ -293,7 +294,7 @@ export class AnthropicNutritionProvider {
 
   async estimate(description: string): Promise<NutritionEstimate> {
     return this.withOneRetry('estimate', async () => {
-      const body = await this.call(description, ESTIMATE_SYSTEM_PROMPT, ESTIMATE_TOOL);
+      const body = await this.call('estimate', description, ESTIMATE_SYSTEM_PROMPT, ESTIMATE_TOOL);
       const result = toEstimate(body);
       if (!result) throw new UnusableReplyError('nutrition_estimate reply was not usable');
       return result;
@@ -328,6 +329,7 @@ export class AnthropicNutritionProvider {
   }
 
   private async call(
+    label: string,
     description: string,
     system: string,
     tool: { name: string; description: string; input_schema: object },
@@ -337,8 +339,12 @@ export class AnthropicNutritionProvider {
       throw new ServiceUnavailableException('AI food search is not configured');
     }
 
+    const startedAt = Date.now();
     const response = await this.request(apiKey, description, system, tool);
     const reply = (await response.json()) as AnthropicMessageResponse;
+    this.logger.log(
+      `Anthropic ${label}: ${reply.usage?.input_tokens ?? '?'} input / ${reply.usage?.output_tokens ?? '?'} output tokens, ${Date.now() - startedAt} ms`,
+    );
     const toolUse = (reply.content ?? []).find(
       (block): block is AnthropicToolUseBlock =>
         block.type === 'tool_use' && 'name' in block && block.name === tool.name,

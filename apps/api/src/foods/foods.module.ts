@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AiUsageLimiter } from './ai-usage-limit';
 import { FOOD_PROVIDER } from './food-provider.interface';
 import { FoodsController } from './foods.controller';
 import { FoodsService } from './foods.service';
@@ -11,6 +12,7 @@ import { OpenFoodFactsProvider } from './providers/open-food-facts.provider';
     FoodsService,
     { provide: FOOD_PROVIDER, useClass: OpenFoodFactsProvider },
     AnthropicNutritionProvider,
+    AiUsageLimiter,
   ],
 })
 export class FoodsModule {}
