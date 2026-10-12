@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { requestPushToken } from './pushNotifications';
+import { requestNotificationPermission, requestPushToken } from './pushNotifications';
 
 const mockGetPermissions = Notifications.getPermissionsAsync as jest.Mock;
 const mockRequestPermissions = Notifications.requestPermissionsAsync as jest.Mock;
@@ -10,6 +10,48 @@ beforeEach(() => {
   mockGetPermissions.mockReset().mockResolvedValue({ status: 'granted' });
   mockRequestPermissions.mockReset().mockResolvedValue({ status: 'granted' });
   mockGetExpoPushToken.mockReset().mockResolvedValue({ data: 'ExponentPushToken[test]' });
+});
+
+describe('requestNotificationPermission', () => {
+  it('reports granted without prompting when permission was already given', async () => {
+    Platform.OS = 'ios';
+
+    await expect(requestNotificationPermission()).resolves.toBe(true);
+    expect(mockRequestPermissions).not.toHaveBeenCalled();
+  });
+
+  it('shows the iOS prompt when undecided, and reports what the user chose', async () => {
+    Platform.OS = 'ios';
+    mockGetPermissions.mockResolvedValue({ status: 'undetermined' });
+    mockRequestPermissions.mockResolvedValueOnce({ status: 'granted' });
+
+    await expect(requestNotificationPermission()).resolves.toBe(true);
+    expect(mockRequestPermissions).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports false when the user declines the prompt', async () => {
+    Platform.OS = 'ios';
+    mockGetPermissions.mockResolvedValue({ status: 'undetermined' });
+    mockRequestPermissions.mockResolvedValueOnce({ status: 'denied' });
+
+    await expect(requestNotificationPermission()).resolves.toBe(false);
+  });
+
+  it('never fetches a push token -- asking permission is all it does', async () => {
+    Platform.OS = 'ios';
+
+    await requestNotificationPermission();
+
+    expect(mockGetExpoPushToken).not.toHaveBeenCalled();
+  });
+
+  it('reports false on Android without prompting', async () => {
+    Platform.OS = 'android';
+
+    await expect(requestNotificationPermission()).resolves.toBe(false);
+    expect(mockGetPermissions).not.toHaveBeenCalled();
+    Platform.OS = 'ios';
+  });
 });
 
 describe('requestPushToken', () => {

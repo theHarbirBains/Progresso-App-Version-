@@ -3,7 +3,8 @@ import { KeyboardAvoidingView, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { updateMyProfile } from '../lib/api';
-import { STEP_ORDER } from '../onboarding/onboardingDraft';
+import { requestNotificationPermission } from '../lib/pushNotifications';
+import { EMPTY_DRAFT, STEP_ORDER, type OnboardingDraft } from '../onboarding/onboardingDraft';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { OnboardingScreen } from './OnboardingScreen';
 
@@ -15,6 +16,11 @@ jest.mock('../lib/api', () => ({
   updateMyProfile: jest.fn(),
 }));
 
+jest.mock('../lib/pushNotifications', () => ({
+  requestNotificationPermission: jest.fn(),
+  requestPushToken: jest.fn(),
+}));
+
 jest.mock('../workouts/workoutSplitQueries', () => ({
   materializeWorkoutSplitPreset: jest.fn(),
 }));
@@ -23,6 +29,7 @@ const mockUseAuth = useAuth as jest.Mock;
 const mockSignUpWithPassword = jest.fn();
 const mockSignInWithProvider = jest.fn();
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
+const mockRequestNotificationPermission = requestNotificationPermission as jest.Mock;
 const mockMaterialize = materializeWorkoutSplitPreset as jest.Mock;
 const mockSwitchToSignIn = jest.fn();
 
@@ -40,6 +47,7 @@ beforeEach(async () => {
   });
   mockSignInWithProvider.mockReset().mockResolvedValue(null);
   mockUpdateMyProfile.mockReset().mockResolvedValue({ id: 'user-1' });
+  mockRequestNotificationPermission.mockReset().mockResolvedValue(true);
   mockMaterialize.mockReset().mockResolvedValue({ id: 'split-new', name: 'Push / Pull / Legs' });
   mockSwitchToSignIn.mockClear();
 });
@@ -530,5 +538,96 @@ describe('OnboardingScreen', () => {
     );
     const stored = await AsyncStorage.getItem('@progresso/onboardingDraft');
     expect(stored).not.toBeNull();
+  });
+});
+
+describe('OnboardingScreen -- notifications step', () => {
+  const ANSWERED_UNTIL_NOTIFICATIONS: OnboardingDraft = {
+    ...EMPTY_DRAFT,
+    referralSource: 'tiktok',
+    country: 'CA',
+    gender: 'male',
+    fitnessGoal: 'build_muscle',
+    trainingExperience: 'intermediate',
+    workoutFrequencyDays: 4,
+    averageWorkoutLength: '45_60',
+    trainingStylePreference: 'guided',
+    selectedSplitPresetId: 'ppl',
+    appleHealthPreference: 'not_now',
+    emailOptIn: true,
+  };
+
+  async function startAtNotificationsStep() {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: STEP_ORDER.indexOf('pushNotifications'),
+        draft: ANSWERED_UNTIL_NOTIFICATIONS,
+      }),
+    );
+    renderScreen();
+    await screen.findByTestId('onboarding-step-push-notifications');
+  }
+
+  async function savedChoice(): Promise<boolean | null> {
+    await settle();
+    const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft')) ?? '{}');
+    return stored.draft?.pushNotificationsOptIn ?? null;
+  }
+
+  it('Allow shows the iOS prompt and saves notifications as on when it is granted', async () => {
+    await startAtNotificationsStep();
+
+    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-connect'));
+
+    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+    expect(mockRequestNotificationPermission).toHaveBeenCalledTimes(1);
+    expect(await savedChoice()).toBe(true);
+  });
+
+  it('saves notifications as off when the user declines the iOS prompt', async () => {
+    mockRequestNotificationPermission.mockResolvedValue(false);
+    await startAtNotificationsStep();
+
+    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-connect'));
+
+    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+    expect(await savedChoice()).toBe(false);
+  });
+
+  it('treats a failed permission request as declined, and still moves on', async () => {
+    mockRequestNotificationPermission.mockRejectedValue(new Error('unavailable'));
+    await startAtNotificationsStep();
+
+    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-connect'));
+
+    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+    expect(await savedChoice()).toBe(false);
+  });
+
+  it('Not Now saves notifications as off without ever showing the iOS prompt', async () => {
+    await startAtNotificationsStep();
+
+    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
+
+    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+    expect(mockRequestNotificationPermission).not.toHaveBeenCalled();
+    expect(await savedChoice()).toBe(false);
+  });
+
+  it('shows Allow as busy and stays on the step while the iOS prompt is open', async () => {
+    mockRequestNotificationPermission.mockReturnValue(new Promise(() => {}));
+    await startAtNotificationsStep();
+
+    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-connect'));
+    await settle();
+
+    expect(screen.getByTestId('onboarding-step-push-notifications-connect')).toHaveProp(
+      'accessibilityState',
+      expect.objectContaining({ busy: true }),
+    );
+    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
+    expect(screen.getByTestId('onboarding-step-push-notifications')).toBeTruthy();
+    expect(mockRequestNotificationPermission).toHaveBeenCalledTimes(1);
   });
 });

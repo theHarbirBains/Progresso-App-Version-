@@ -13,17 +13,11 @@ interface Props {
   skipLabel: string;
   onConnect: () => void;
   onSkip: () => void;
+  /** True while Connect's own work (e.g. a system permission prompt) is in progress; blocks both actions. */
+  connectBusy?: boolean;
 }
 
-/**
- * Generic "ask for a permission/connection, or skip" step, shared by the
- * Apple Health and push-notification onboarding steps. Both are currently
- * preference-only placeholders (no real HealthKit/expo-notifications
- * dependency has been approved yet) -- pressing Connect/Allow here just
- * records the user's preference, exactly like pressing Not Now does. Real
- * OS permission requests are a follow-up once a specific dependency is
- * approved.
- */
+/** Generic "ask for a permission or connection, or skip" onboarding step; the caller decides what Connect does. */
 export function PermissionStep({
   testID,
   icon,
@@ -33,6 +27,7 @@ export function PermissionStep({
   skipLabel,
   onConnect,
   onSkip,
+  connectBusy = false,
 }: Props) {
   return (
     <View testID={testID} style={styles.container}>
@@ -43,8 +38,18 @@ export function PermissionStep({
       <Text style={styles.description}>{description}</Text>
 
       <View style={styles.actions}>
-        <PrimaryButton testID={`${testID}-connect`} label={connectLabel} onPress={onConnect} />
-        <TextButton testID={`${testID}-skip`} label={skipLabel} onPress={onSkip} />
+        <PrimaryButton
+          testID={`${testID}-connect`}
+          label={connectLabel}
+          onPress={onConnect}
+          loading={connectBusy}
+        />
+        <TextButton
+          testID={`${testID}-skip`}
+          label={skipLabel}
+          onPress={onSkip}
+          disabled={connectBusy}
+        />
       </View>
     </View>
   );

@@ -1,4 +1,5 @@
 import {
+  registerPushToken,
   updateMyProfile,
   type AppleHealthPreference,
   type AverageWorkoutLength,
@@ -11,6 +12,7 @@ import {
   type TrainingStylePreference,
   type UpdateProfileInput,
 } from '../lib/api';
+import { requestPushToken } from '../lib/pushNotifications';
 import { toDateStringUTC } from './dateWheelValues';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { WORKOUT_SPLIT_PRESETS } from '../workouts/workoutSplitPresets';
@@ -212,6 +214,9 @@ function draftToProfileInput(draft: OnboardingDraft): UpdateProfileInput {
  * can't run yet at signup time. App.tsx's Root calls this again once such
  * a session actually appears (a pending local draft still on disk, profile
  * not yet onboardingCompleted) -- same function, same result either way.
+ *
+ * When notifications were allowed during onboarding, this device's push
+ * token is registered here too: it needs the account that only now exists.
  */
 export async function submitOnboardingDraft(
   accessToken: string,
@@ -229,5 +234,17 @@ export async function submitOnboardingDraft(
   }
 
   input.onboardingCompleted = true;
-  return updateMyProfile(accessToken, input);
+  const profile = await updateMyProfile(accessToken, input);
+  if (draft.pushNotificationsOptIn) await registerThisDevice(accessToken);
+  return profile;
+}
+
+async function registerThisDevice(accessToken: string): Promise<void> {
+  try {
+    // Permission was granted at the notifications step, so iOS doesn't prompt again here.
+    const token = await requestPushToken();
+    if (token) await registerPushToken(accessToken, token, 'ios');
+  } catch {
+    // Best effort: a failed registration must not fail onboarding, which has already been saved.
+  }
 }

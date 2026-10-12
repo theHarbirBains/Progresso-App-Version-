@@ -42,6 +42,7 @@ import { OnboardingProgress } from '../onboarding/OnboardingProgress';
 import { PermissionStep } from '../onboarding/PermissionStep';
 import { WeightWheelPicker } from '../onboarding/WeightWheelPicker';
 import { WorkoutPreferenceSelector } from '../onboarding/WorkoutPreferenceSelector';
+import { requestNotificationPermission } from '../lib/pushNotifications';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { WorkoutSplitPresetPicker } from '../workouts/WorkoutSplitPresetPicker';
 import { onboardingStyles as styles } from './onboardingStyles';
@@ -93,6 +94,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
   const [draft, setDraft] = useState<OnboardingDraft>(EMPTY_DRAFT);
   const [stepIndex, setStepIndex] = useState(0);
   const [restoringDraft, setRestoringDraft] = useState(true);
+  const [requestingNotifications, setRequestingNotifications] = useState(false);
   const [saving, setSaving] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -525,9 +527,17 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
             description="Would you like Progresso to send you notifications? You can change this later from Settings."
             connectLabel="Allow"
             skipLabel="Not Now"
+            connectBusy={requestingNotifications}
             onConnect={() => {
-              updateDraft({ pushNotificationsOptIn: true });
-              advance();
+              setRequestingNotifications(true);
+              void requestNotificationPermission()
+                .catch(() => false)
+                .then((granted) => {
+                  // Saves what iOS actually allowed, so Settings never shows push on without permission.
+                  updateDraft({ pushNotificationsOptIn: granted });
+                  setRequestingNotifications(false);
+                  advance();
+                });
             }}
             onSkip={() => {
               updateDraft({ pushNotificationsOptIn: false });

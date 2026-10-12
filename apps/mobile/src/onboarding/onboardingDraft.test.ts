@@ -1,4 +1,5 @@
-import { updateMyProfile } from '../lib/api';
+import { registerPushToken, updateMyProfile } from '../lib/api';
+import { requestPushToken } from '../lib/pushNotifications';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import {
   computeStartStepIndex,
@@ -11,6 +12,11 @@ import {
 
 jest.mock('../lib/api', () => ({
   updateMyProfile: jest.fn(),
+  registerPushToken: jest.fn(),
+}));
+
+jest.mock('../lib/pushNotifications', () => ({
+  requestPushToken: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutSplitQueries', () => ({
@@ -18,10 +24,14 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
 }));
 
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
+const mockRegisterPushToken = registerPushToken as jest.Mock;
+const mockRequestPushToken = requestPushToken as jest.Mock;
 const mockMaterialize = materializeWorkoutSplitPreset as jest.Mock;
 
 beforeEach(() => {
   mockUpdateMyProfile.mockReset().mockResolvedValue({ id: 'user-1' });
+  mockRegisterPushToken.mockReset().mockResolvedValue({ registered: true });
+  mockRequestPushToken.mockReset().mockResolvedValue('ExponentPushToken[test]');
   mockMaterialize.mockReset().mockResolvedValue({ id: 'split-new', name: 'Push / Pull / Legs' });
 });
 
@@ -131,5 +141,53 @@ describe('submitOnboardingDraft', () => {
     expect(mockMaterialize).not.toHaveBeenCalled();
     const patch = mockUpdateMyProfile.mock.calls[0][1];
     expect(patch.activeWorkoutSplitId).toBeUndefined();
+  });
+
+  it('registers this device for push once the account exists, when notifications were allowed', async () => {
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...FULL_DRAFT,
+      pushNotificationsOptIn: true,
+    });
+
+    expect(mockRegisterPushToken).toHaveBeenCalledWith(
+      'token-123',
+      'ExponentPushToken[test]',
+      'ios',
+    );
+    // The profile is saved first; the device registration needs the new account.
+    expect(mockUpdateMyProfile.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRegisterPushToken.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('registers nothing when notifications were declined or skipped', async () => {
+    await submitOnboardingDraft('token-123', 'user-1', FULL_DRAFT);
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...FULL_DRAFT,
+      pushNotificationsOptIn: null,
+    });
+
+    expect(mockRequestPushToken).not.toHaveBeenCalled();
+    expect(mockRegisterPushToken).not.toHaveBeenCalled();
+  });
+
+  it('skips registration when no token is available, such as on Android', async () => {
+    mockRequestPushToken.mockResolvedValue(null);
+
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...FULL_DRAFT,
+      pushNotificationsOptIn: true,
+    });
+
+    expect(mockRegisterPushToken).not.toHaveBeenCalled();
+  });
+
+  it('still finishes onboarding when the device registration fails', async () => {
+    mockRegisterPushToken.mockRejectedValue(new Error('network down'));
+
+    await expect(
+      submitOnboardingDraft('token-123', 'user-1', { ...FULL_DRAFT, pushNotificationsOptIn: true }),
+    ).resolves.toEqual({ id: 'user-1' });
+    expect(mockUpdateMyProfile).toHaveBeenCalledTimes(1);
   });
 });
