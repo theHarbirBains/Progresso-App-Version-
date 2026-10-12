@@ -55,4 +55,33 @@ describe('useTrainerStatus', () => {
     expect(mockClaim).not.toHaveBeenCalled();
     expect(mockStatus).not.toHaveBeenCalled();
   });
+
+  it('does not call the API again when only the access token refreshes', async () => {
+    mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' }, user: { id: 'u1' } });
+    mockStatus.mockResolvedValue({ isTrainer: true });
+    const { result, rerender } = renderHook(() => useTrainerStatus());
+    await waitFor(() => expect(result.current).toBe(true));
+
+    mockUseAuth.mockReturnValue({ session: { access_token: 'token-2' }, user: { id: 'u1' } });
+    rerender({});
+
+    expect(mockClaim).toHaveBeenCalledTimes(1);
+    expect(mockStatus).toHaveBeenCalledTimes(1);
+    expect(result.current).toBe(true);
+  });
+
+  it('checks again, with the new token, when a different person signs in', async () => {
+    mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' }, user: { id: 'u1' } });
+    mockStatus
+      .mockResolvedValueOnce({ isTrainer: true })
+      .mockResolvedValueOnce({ isTrainer: false });
+    const { result, rerender } = renderHook(() => useTrainerStatus());
+    await waitFor(() => expect(result.current).toBe(true));
+
+    mockUseAuth.mockReturnValue({ session: { access_token: 'token-9' }, user: { id: 'u2' } });
+    rerender({});
+
+    await waitFor(() => expect(result.current).toBe(false));
+    expect(mockStatus).toHaveBeenLastCalledWith('token-9');
+  });
 });

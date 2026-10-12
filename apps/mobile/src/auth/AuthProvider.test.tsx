@@ -1,4 +1,4 @@
-import { Text } from 'react-native';
+import { AppState, Text, type AppStateStatus } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { supabase } from '../lib/supabase';
 import { AuthProvider, useAuth } from './AuthProvider';
@@ -28,6 +28,8 @@ jest.mock('../lib/supabase', () => ({
       updateUser: jest.fn(),
       getSession: jest.fn().mockResolvedValue({ data: { session: null } }),
       onAuthStateChange: jest.fn(() => ({ data: { subscription: { unsubscribe: jest.fn() } } })),
+      startAutoRefresh: jest.fn().mockResolvedValue(undefined),
+      stopAutoRefresh: jest.fn().mockResolvedValue(undefined),
     },
   },
 }));
@@ -71,5 +73,52 @@ describe('AuthProvider -- signUpWithPassword', () => {
       password: 'password123',
       options: { emailRedirectTo: 'progresso://confirm-email' },
     });
+  });
+});
+
+describe('AuthProvider -- token refresh while backgrounded', () => {
+  beforeEach(() => {
+    (supabase.auth.startAutoRefresh as jest.Mock).mockClear();
+    (supabase.auth.stopAutoRefresh as jest.Mock).mockClear();
+  });
+
+  function appStateHandler(spy: jest.SpyInstance): (state: AppStateStatus) => void {
+    const call = spy.mock.calls.find(([event]) => event === 'change');
+    return call?.[1] as (state: AppStateStatus) => void;
+  }
+
+  it('stops token refresh in the background and restarts it when the app is active again', () => {
+    const addEventListenerSpy = jest.spyOn(AppState, 'addEventListener');
+    render(
+      <AuthProvider>
+        <Text>child</Text>
+      </AuthProvider>,
+    );
+    const handler = appStateHandler(addEventListenerSpy);
+
+    act(() => handler('background'));
+    expect(supabase.auth.stopAutoRefresh).toHaveBeenCalledTimes(1);
+    expect(supabase.auth.startAutoRefresh).not.toHaveBeenCalled();
+
+    act(() => handler('active'));
+    expect(supabase.auth.startAutoRefresh).toHaveBeenCalledTimes(1);
+    addEventListenerSpy.mockRestore();
+  });
+
+  it('stops listening for app state changes once unmounted', () => {
+    const remove = jest.fn();
+    const addEventListenerSpy = jest
+      .spyOn(AppState, 'addEventListener')
+      .mockReturnValue({ remove } as unknown as ReturnType<typeof AppState.addEventListener>);
+    const { unmount } = render(
+      <AuthProvider>
+        <Text>child</Text>
+      </AuthProvider>,
+    );
+
+    unmount();
+
+    expect(remove).toHaveBeenCalled();
+    addEventListenerSpy.mockRestore();
   });
 });

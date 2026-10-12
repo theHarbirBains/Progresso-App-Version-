@@ -8,6 +8,7 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
+import { AppState } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { clearSentryUser, setSentryUser } from '../lib/sentry';
 import { signInWithOAuthProvider, type OAuthProvider } from './oauth';
@@ -97,10 +98,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
     });
 
+    // Supabase's React Native guidance: JS timers pause in the background, so restart token
+    // refresh the moment the app is active again rather than waiting for the next timer tick.
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void supabase.auth.startAutoRefresh();
+      } else {
+        void supabase.auth.stopAutoRefresh();
+      }
+    });
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
       urlSubscription.remove();
+      appStateSubscription.remove();
     };
   }, []);
 

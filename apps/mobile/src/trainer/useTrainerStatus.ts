@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { claimTrainerInvites, getTrainerStatus } from '../lib/api';
 
@@ -11,17 +11,20 @@ import { claimTrainerInvites, getTrainerStatus } from '../lib/api';
  */
 export function useTrainerStatus(): boolean {
   const { session, user } = useAuth();
-  const accessToken = session?.access_token;
   const userId = user?.id;
+  // Read at call time, so the hourly token refresh doesn't re-run both calls for the same person.
+  const accessTokenRef = useRef(session?.access_token);
+  accessTokenRef.current = session?.access_token;
   const [isTrainer, setIsTrainer] = useState(false);
 
   useEffect(() => {
+    const accessToken = accessTokenRef.current;
     if (!accessToken || !userId) {
       setIsTrainer(false);
       return;
     }
     let cancelled = false;
-    async function load() {
+    async function load(token: string) {
       // Independent of each other -- attaching an invite doesn't change whether this
       // account is a trainer, so there is nothing for one to wait on from the other.
       // Each call is deferred into its own `.then` (rather than invoked directly as a
@@ -29,18 +32,18 @@ export function useTrainerStatus(): boolean {
       // throwing, not just its promise rejecting -- is isolated to that one entry and
       // never stops the other from settling.
       const [, statusResult] = await Promise.allSettled([
-        Promise.resolve().then(() => claimTrainerInvites(accessToken!)),
-        Promise.resolve().then(() => getTrainerStatus(accessToken!)),
+        Promise.resolve().then(() => claimTrainerInvites(token)),
+        Promise.resolve().then(() => getTrainerStatus(token)),
       ]);
       if (!cancelled) {
         setIsTrainer(statusResult.status === 'fulfilled' ? statusResult.value.isTrainer : false);
       }
     }
-    void load();
+    void load(accessToken);
     return () => {
       cancelled = true;
     };
-  }, [accessToken, userId]);
+  }, [userId]);
 
   return isTrainer;
 }
