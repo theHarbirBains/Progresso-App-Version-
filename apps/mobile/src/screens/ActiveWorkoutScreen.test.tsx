@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from 'react';
 import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet } from 'react-native';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
@@ -785,6 +785,39 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
     expect(screen.getByTestId('exercise-card-we-bss-set-2-right-weight')).toBeTruthy();
   });
 
+  it('fills each side of a new unilateral set from the same side of the set before it', async () => {
+    mockCreateSet
+      .mockReset()
+      .mockImplementation(async (_weId: string, setIndex: number, side?: string) => ({
+        id: side === 'left' ? 's-left-2' : 's-right-2',
+        setIndex,
+        side: side ?? null,
+        weightKg: null,
+        reps: null,
+        completedAt: null,
+      }));
+
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+      { wrapper: TestProviders },
+    );
+    await screen.findByTestId('exercise-card-we-bss');
+
+    fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-weight'), '42.5');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-reps'), '10');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-right-weight'), '40');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-right-reps'), '9');
+    fireEvent.press(screen.getByTestId('exercise-card-we-bss-add-set'));
+
+    const leftWeight = await screen.findByTestId('exercise-card-we-bss-set-2-left-weight');
+    expect(leftWeight.props.value).toBe('42.5');
+    expect(screen.getByTestId('exercise-card-we-bss-set-2-left-reps').props.value).toBe('10');
+    expect(screen.getByTestId('exercise-card-we-bss-set-2-right-weight').props.value).toBe('40');
+    expect(screen.getByTestId('exercise-card-we-bss-set-2-right-reps').props.value).toBe('9');
+  });
+
   it('adds a unilateral exercise from the picker, creating both a left and a right blank row for its first set', async () => {
     mockFetchExercises.mockResolvedValue([
       {
@@ -825,6 +858,150 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
     const card = await screen.findByTestId('exercise-card-we2');
     expect(within(card).getByTestId('exercise-card-we2-set-1-left-weight')).toBeTruthy();
     expect(within(card).getByTestId('exercise-card-we2-set-1-right-weight')).toBeTruthy();
+  });
+});
+
+describe('Pre-filled sets', () => {
+  const lastBench = {
+    performedAt: '2026-01-05T00:00:00Z',
+    sets: [
+      { id: 'prev-1', setIndex: 1, weightKg: 100, reps: 10, completedAt: '...', side: null },
+      { id: 'prev-2', setIndex: 2, weightKg: 100, reps: 9, completedAt: '...', side: null },
+      { id: 'prev-3', setIndex: 3, weightKg: 95, reps: 8, completedAt: '...', side: null },
+    ],
+  };
+
+  function renderScreen() {
+    render(
+      <BackgroundThemeProvider>
+        <ActiveWorkoutScreen navigation={navigation} route={route} />
+      </BackgroundThemeProvider>,
+      { wrapper: TestProviders },
+    );
+  }
+
+  beforeEach(() => {
+    mockCreateSet.mockResolvedValue({
+      id: 's3',
+      setIndex: 3,
+      side: null,
+      weightKg: null,
+      reps: null,
+      completedAt: null,
+    });
+  });
+
+  it('after completing 100 kg x 8, a new set shows 100 and 8 ready to edit, and is not completed', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '100');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '8');
+    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        's2',
+        expect.objectContaining({ completedAt: expect.any(String) }),
+      ),
+    );
+
+    fireEvent.press(screen.getByTestId('exercise-card-we1-add-set'));
+
+    const weight = await screen.findByTestId('exercise-card-we1-set-s3-weight');
+    expect(weight.props.value).toBe('100');
+    expect(weight.props.editable).toBe(true);
+    expect(screen.getByTestId('exercise-card-we1-set-s3-reps').props.value).toBe('8');
+    expect(
+      screen.getByTestId('exercise-card-we1-set-s3-complete').props.accessibilityState,
+    ).toEqual({ selected: false, disabled: false });
+    expect(mockUpdateSet).not.toHaveBeenCalledWith('s3', expect.anything());
+  });
+
+  it('uses the same set number from last session when the set before it is empty', async () => {
+    mockFetchPreviousPerformance.mockResolvedValue(lastBench);
+    renderScreen();
+    await screen.findByTestId('exercise-card-we1-previous-session');
+
+    fireEvent.press(screen.getByTestId('exercise-card-we1-add-set'));
+
+    const weight = await screen.findByTestId('exercise-card-we1-set-s3-weight');
+    expect(weight.props.value).toBe('95');
+    expect(screen.getByTestId('exercise-card-we1-set-s3-reps').props.value).toBe('8');
+  });
+
+  it("starts a newly added exercise's first set from set 1 of last session", async () => {
+    mockFetchExercises.mockResolvedValue([
+      { id: 'ex2', name: 'Barbell Back Squat', muscleGroup: 'quadriceps', isActive: true },
+    ]);
+    mockFetchPreviousPerformance.mockImplementation(async (_userId: string, exerciseId: string) =>
+      exerciseId === 'ex2'
+        ? {
+            performedAt: '2026-01-04T00:00:00Z',
+            sets: [
+              { id: 'prev-x', setIndex: 1, weightKg: 60, reps: 8, completedAt: '...', side: null },
+            ],
+          }
+        : null,
+    );
+    mockCreateSet.mockResolvedValue({
+      id: 's3',
+      setIndex: 1,
+      side: null,
+      weightKg: null,
+      reps: null,
+      completedAt: null,
+    });
+    renderScreen();
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
+    fireEvent.press(await screen.findByTestId('exercise-item-ex2'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('exercise-card-we2-set-s3-weight').props.value).toBe('60'),
+    );
+    expect(screen.getByTestId('exercise-card-we2-set-s3-reps').props.value).toBe('8');
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it("keeps what was typed into a new exercise's first set while last session was loading", async () => {
+    mockFetchExercises.mockResolvedValue([
+      { id: 'ex2', name: 'Barbell Back Squat', muscleGroup: 'quadriceps', isActive: true },
+    ]);
+    let finishLoading: (value: unknown) => void = () => {};
+    mockFetchPreviousPerformance.mockImplementation((_userId: string, exerciseId: string) =>
+      exerciseId === 'ex2'
+        ? new Promise((resolve) => {
+            finishLoading = resolve;
+          })
+        : Promise.resolve(null),
+    );
+    mockCreateSet.mockResolvedValue({
+      id: 's3',
+      setIndex: 1,
+      side: null,
+      weightKg: null,
+      reps: null,
+      completedAt: null,
+    });
+    renderScreen();
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
+    fireEvent.press(await screen.findByTestId('exercise-item-ex2'));
+    fireEvent.changeText(await screen.findByTestId('exercise-card-we2-set-s3-weight'), '70');
+    await act(async () => {
+      finishLoading({
+        performedAt: '2026-01-04T00:00:00Z',
+        sets: [
+          { id: 'prev-x', setIndex: 1, weightKg: 60, reps: 8, completedAt: '...', side: null },
+        ],
+      });
+    });
+
+    await screen.findByTestId('exercise-card-we2-previous-session');
+    expect(screen.getByTestId('exercise-card-we2-set-s3-weight').props.value).toBe('70');
+    expect(screen.getByTestId('exercise-card-we2-set-s3-reps').props.value).toBe('');
   });
 });
 

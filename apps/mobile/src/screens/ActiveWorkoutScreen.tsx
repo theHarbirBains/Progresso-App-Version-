@@ -22,6 +22,7 @@ import {
   buildPreviousSessionDisplay,
   computeUnilateralSets,
   isValidDraft,
+  withPrefilledSets,
   type SetInputDraft,
 } from '../workouts/setInputDrafts';
 import {
@@ -57,7 +58,9 @@ type Props = RootStackScreenProps<'ActiveWorkout'>;
 
 // The live-tracking half of the Start Workout experience (see
 // NewWorkoutScreen.tsx for the pre-start planning half), sharing the same
-// "exactly one blank set per new exercise" rule.
+// "exactly one set per new exercise" rule. A new set's fields start filled
+// in from the set before it or from last session (see withPrefilledSets);
+// completing it still takes a tap.
 //
 // Layout, built for one-handed use between sets: the header carries the
 // workout's name and muscles; under it a pinned strip keeps duration, total
@@ -135,16 +138,18 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   >({});
 
   async function loadPreviousPerformance(exerciseId: string) {
-    if (!userId) return;
+    if (!userId) return null;
     try {
       const previous = await fetchPreviousPerformance(userId, exerciseId, workoutId);
       if (previous && previous.sets.length > 0) {
         setPreviousPerformance((prev) => ({ ...prev, [exerciseId]: previous }));
+        return previous;
       }
     } catch {
       // Non-critical context -- leave this exercise's entry absent rather
       // than surfacing a workout-level error banner for it.
     }
+    return null;
   }
 
   useEffect(() => {
@@ -234,6 +239,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
 
   async function handleAddSet(exercise: WorkoutExerciseWithSets) {
     setError(null);
+    const lastSession = previousPerformance[exercise.exerciseId]?.sets;
     try {
       const nextIndex = exercise.sets.reduce((max, s) => Math.max(max, s.setIndex), 0) + 1;
       if (exercise.movementType === 'unilateral') {
@@ -245,16 +251,16 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           createSet(exercise.id, nextIndex, 'right'),
         ]);
         updateExerciseSets(exercise.id, (ex) => ({ ...ex, sets: [...ex.sets, left, right] }));
-        setSetInputs((prev) => ({
-          ...prev,
-          [left.id]: { weight: '', reps: '' },
-          [right.id]: { weight: '', reps: '' },
-        }));
+        setSetInputs((prev) =>
+          withPrefilledSets(prev, [left, right], exercise.sets, lastSession, weightUnit),
+        );
         return;
       }
       const created = await createSet(exercise.id, nextIndex);
       updateExerciseSets(exercise.id, (ex) => ({ ...ex, sets: [...ex.sets, created] }));
-      setSetInputs((prev) => ({ ...prev, [created.id]: { weight: '', reps: '' } }));
+      setSetInputs((prev) =>
+        withPrefilledSets(prev, [created], exercise.sets, lastSession, weightUnit),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add set');
     }
@@ -493,6 +499,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     if (!workout) return;
     setPickerOpen(false);
     setError(null);
+    // Loads while the exercise and its first set are created; that set starts from it.
+    const lastSessionLoad =
+      exercise.id in previousPerformance
+        ? Promise.resolve(previousPerformance[exercise.id])
+        : loadPreviousPerformance(exercise.id);
     try {
       const nextOrderIndex = await fetchNextExerciseOrderIndex(workout.id);
       const workoutExerciseId = await addExerciseToWorkout(workout.id, exercise.id, nextOrderIndex);
@@ -526,14 +537,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
             }
           : prev,
       );
-      setSetInputs((prev) => {
-        const next = { ...prev };
-        for (const created of createdSets) {
-          next[created.id] = { weight: '', reps: '' };
-        }
-        return next;
-      });
-      if (!(exercise.id in previousPerformance)) void loadPreviousPerformance(exercise.id);
+      const lastSession = await lastSessionLoad;
+      // Anything typed into the new set while last session loaded is kept.
+      setSetInputs((prev) =>
+        withPrefilledSets(prev, createdSets, [], lastSession?.sets, weightUnit),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add exercise');
     }

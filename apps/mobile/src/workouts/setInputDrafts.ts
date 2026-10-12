@@ -1,11 +1,12 @@
 import { formatWeightKg, isValidWeightIncrement } from '../lib/units';
 import { formatShortDate } from './workoutFormat';
 import type { PreviousSessionDisplay, UnilateralExerciseCardSet } from './ExerciseCard';
-import type { SetRecord } from './workoutQueries';
+import type { SetRecord, SetSide } from './workoutQueries';
 
-// The set-entry rules every live workout shares: what counts as a valid draft, how a
-// unilateral exercise groups its two sides, and how last session is shown. The regular
-// Active Workout and the group workout both read from here so they cannot drift apart.
+// The set-entry rules every live workout shares: what counts as a valid draft, what a new
+// set starts with, how a unilateral exercise groups its two sides, and how last session is
+// shown. The regular Active Workout and the group workout both read from here so they cannot
+// drift apart.
 
 export interface SetInputDraft {
   weight: string;
@@ -42,6 +43,62 @@ export function isValidDraft(draft: SetInputDraft | undefined): boolean {
     Number.isInteger(repsNum) &&
     repsNum > 0
   );
+}
+
+function hasInput(draft: SetInputDraft | undefined): draft is SetInputDraft {
+  return draft !== undefined && (draft.weight !== '' || draft.reps !== '');
+}
+
+/**
+ * The inputs with each new set filled in as editable values: a copy of the set before it in
+ * this workout when that set has anything in it, otherwise the same set number from last
+ * session. A unilateral exercise fills each side from the same side. A set that already has
+ * something typed in it is left alone. Filling never completes a set: that still takes a tap.
+ */
+export function withPrefilledSets(
+  setInputs: Record<string, SetInputDraft>,
+  newSets: SetRecord[],
+  setsBefore: SetRecord[],
+  lastSession: SetRecord[] | undefined,
+  unit: 'kg' | 'lb',
+): Record<string, SetInputDraft> {
+  const next = { ...setInputs };
+  for (const set of newSets) {
+    if (hasInput(setInputs[set.id])) continue;
+    next[set.id] = prefillFor(set.side, setsBefore, setInputs, lastSession, unit);
+  }
+  return next;
+}
+
+function prefillFor(
+  side: SetSide,
+  setsBefore: SetRecord[],
+  setInputs: Record<string, SetInputDraft>,
+  lastSession: SetRecord[] | undefined,
+  unit: 'kg' | 'lb',
+): SetInputDraft {
+  const onSide = (set: SetRecord) => side === null || set.side === side;
+  const before = setsBefore
+    .filter(onSide)
+    .reduce<SetRecord | undefined>(
+      (latest, set) => (latest && latest.setIndex > set.setIndex ? latest : set),
+      undefined,
+    );
+  const beforeInput = before ? setInputs[before.id] : undefined;
+  if (hasInput(beforeInput)) return { ...beforeInput };
+
+  // Set numbers count a left/right pair as one set, in the order the sets were logged.
+  const setNumber = new Set(setsBefore.map((set) => set.setIndex)).size + 1;
+  const lastIndexes = Array.from(new Set((lastSession ?? []).map((set) => set.setIndex))).sort(
+    (a, b) => a - b,
+  );
+  const match = lastSession?.find(
+    (set) => set.setIndex === lastIndexes[setNumber - 1] && onSide(set),
+  );
+  return {
+    weight: match?.weightKg != null ? formatWeightKg(match.weightKg, unit) : '',
+    reps: match?.reps != null ? String(match.reps) : '',
+  };
 }
 
 /** Groups a unilateral exercise's flat sets array into one row per LOGICAL

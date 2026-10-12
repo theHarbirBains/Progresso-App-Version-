@@ -27,6 +27,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 - Create, edit, view, duplicate, and delete workout splits, including a set of built-in split presets (e.g. Push/Pull/Legs) that can be copied into an editable, user-owned split
 - Live workout tracking: log exercises, sets, reps, and weight against a split in progress, with a running workout timer
+- New sets start filled in from the set before them, or the same set from last session, ready to edit; a set only completes when you tap it
 - Custom exercises alongside a shared default exercise library, each tagged with a muscle group
 - Workout history with a month calendar view and per-day/per-workout detail
 - Workout sharing (generates a shareable summary card)

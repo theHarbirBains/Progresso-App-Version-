@@ -2,9 +2,12 @@ import { Alert, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import {
   addExerciseToWorkout,
+  createSet,
   fetchNextExerciseOrderIndex,
+  fetchPreviousPerformance,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
+  type SetRecord,
   type WorkoutDetail,
 } from './workoutQueries';
 import { GroupWorkoutEditor } from './GroupWorkoutEditor';
@@ -41,6 +44,21 @@ const mockFetch = fetchWorkoutDetail as jest.Mock;
 const mockRemove = removeExerciseFromWorkout as jest.Mock;
 const mockAdd = addExerciseToWorkout as jest.Mock;
 const mockNextOrderIndex = fetchNextExerciseOrderIndex as jest.Mock;
+const mockCreateSet = createSet as jest.Mock;
+const mockFetchPrevious = fetchPreviousPerformance as jest.Mock;
+
+// Exercises and sets a test adds through the editor, returned by the next load of their workout.
+let addedExercises: Record<string, WorkoutDetail['exercises']> = {};
+let addedSets: Record<string, SetRecord[]> = {};
+
+function loadWorkout(workoutId: string): WorkoutDetail {
+  const base = workoutId === 'w-me' ? workoutFor('w-me', 100, 5) : workoutFor('w-sam', 60, 8);
+  const exercises = [...base.exercises, ...(addedExercises[workoutId] ?? [])].map((exercise) => ({
+    ...exercise,
+    sets: [...exercise.sets, ...(addedSets[exercise.id] ?? [])],
+  }));
+  return { ...base, exercises };
+}
 
 /** One person's workout: the shared squat, with their own weight and reps on its set. */
 function workoutFor(workoutId: string, weightKg: number, reps: number): WorkoutDetail {
@@ -81,14 +99,29 @@ const members = [
 ];
 
 beforeEach(() => {
-  mockFetch
-    .mockReset()
-    .mockImplementation(async (workoutId: string) =>
-      workoutId === 'w-me' ? workoutFor('w-me', 100, 5) : workoutFor('w-sam', 60, 8),
-    );
+  addedExercises = {};
+  addedSets = {};
+  mockFetch.mockReset().mockImplementation(async (workoutId: string) => loadWorkout(workoutId));
   mockRemove.mockClear();
   mockAdd.mockReset().mockResolvedValue('we-new');
   mockNextOrderIndex.mockReset().mockResolvedValue(7);
+  mockCreateSet
+    .mockReset()
+    .mockImplementation(
+      async (workoutExerciseId: string, setIndex: number, side?: 'left' | 'right') => {
+        const set: SetRecord = {
+          id: `${workoutExerciseId}-set-${setIndex}${side ? `-${side}` : ''}`,
+          setIndex,
+          side: side ?? null,
+          weightKg: null,
+          reps: null,
+          completedAt: null,
+        };
+        addedSets[workoutExerciseId] = [...(addedSets[workoutExerciseId] ?? []), set];
+        return set;
+      },
+    );
+  mockFetchPrevious.mockReset().mockResolvedValue(null);
 });
 
 function renderEditor() {
@@ -184,5 +217,99 @@ describe('GroupWorkoutEditor', () => {
 
     await waitFor(() => expect(mockAdd).toHaveBeenCalledWith('w-me', 'ex-lat-pulldown', 7));
     expect(mockAdd).toHaveBeenCalledWith('w-sam', 'ex-lat-pulldown', 7);
+  });
+
+  it('starts a new set from the set before it', async () => {
+    renderEditor();
+    await screen.findByDisplayValue('100');
+
+    fireEvent.press(screen.getByTestId('group-workout-exercise-squat-add-set'));
+
+    const weight = await screen.findByTestId(
+      'group-workout-exercise-squat-set-w-me-we-1-set-2-weight',
+    );
+    expect(weight.props.value).toBe('100');
+    expect(
+      screen.getByTestId('group-workout-exercise-squat-set-w-me-we-1-set-2-reps').props.value,
+    ).toBe('5');
+  });
+
+  it("fills each person's first set of a new exercise from their own last session", async () => {
+    mockAdd.mockImplementation(
+      async (workoutId: string, exerciseId: string, orderIndex: number) => {
+        const id = `${workoutId}-we-lat`;
+        addedExercises[workoutId] = [
+          {
+            id,
+            exerciseId,
+            exerciseName: 'Lat Pulldown',
+            photoUrl: null,
+            muscleGroup: 'back',
+            movementType: 'bilateral',
+            loggingStyle: null,
+            orderIndex,
+            sets: [],
+          },
+        ];
+        return id;
+      },
+    );
+    mockFetchPrevious.mockImplementation(async (userId: string, exerciseId: string) =>
+      exerciseId === 'ex-lat-pulldown'
+        ? {
+            performedAt: '2026-10-01T09:00:00.000Z',
+            sets: [
+              {
+                id: `${userId}-last-1`,
+                setIndex: 1,
+                side: null,
+                weightKg: userId === 'me' ? 50 : 40,
+                reps: userId === 'me' ? 10 : 12,
+                completedAt: '2026-10-01T09:30:00.000Z',
+              },
+            ],
+          }
+        : null,
+    );
+    renderEditor();
+    await screen.findByTestId('group-workout-exercise-squat');
+
+    const { ExercisePickerModal } = jest.requireMock('./ExercisePickerModal') as {
+      ExercisePickerModal: jest.Mock;
+    };
+    const onSelect = ExercisePickerModal.mock.calls.at(-1)?.[0].onSelect as (
+      exercise: unknown,
+    ) => void;
+    await act(async () => {
+      onSelect({
+        id: 'ex-lat-pulldown',
+        name: 'Lat Pulldown',
+        muscleGroup: 'back',
+        movementType: 'bilateral',
+        photoUrl: null,
+        isActive: true,
+        createdBy: null,
+      });
+    });
+
+    const mine = await screen.findByTestId(
+      'group-workout-exercise-ex-lat-pulldown-set-w-me-we-lat-set-1-weight',
+    );
+    expect(mine.props.value).toBe('50');
+    expect(
+      screen.getByTestId('group-workout-exercise-ex-lat-pulldown-set-w-me-we-lat-set-1-reps').props
+        .value,
+    ).toBe('10');
+
+    fireEvent.press(screen.getByText('Sam'));
+
+    const sams = await screen.findByTestId(
+      'group-workout-exercise-ex-lat-pulldown-set-w-sam-we-lat-set-1-weight',
+    );
+    expect(sams.props.value).toBe('40');
+    expect(
+      screen.getByTestId('group-workout-exercise-ex-lat-pulldown-set-w-sam-we-lat-set-1-reps').props
+        .value,
+    ).toBe('12');
   });
 });

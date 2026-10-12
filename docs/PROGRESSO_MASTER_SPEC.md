@@ -160,7 +160,7 @@ Progresso is **past the Phase 0 foundation** and has an implemented core loop, n
 - Authentication: Supabase email/password sign up and sign in, password reset, plus Google sign-in/sign-up via web-redirect OAuth (`apps/mobile/src/auth/oauth.ts`) -- Google sign-up lives on onboarding's account-creation step, Google sign-in on the Sign In screen. An Apple button exists on the same code path but isn't yet production-polished (real native Sign-In-with-Apple is a later, EAS-build-dependent milestone). MFA from Section 9 is not yet implemented.
 - Onboarding: a guided flow collecting profile basics (first name, last name, username, display name — each independent, none derived from another) and unit preference.
 - Workout splits: create, edit, view, duplicate, delete, plus built-in presets that copy into an editable user-owned split.
-- Workout tracking: live workout logging (exercises, sets, reps, weight) against a split, workout history with a month calendar, workout sharing.
+- Workout tracking: live workout logging (exercises, sets, reps, weight) against a split, with each new set pre-filled from the set before it or the same set last session (never completed without the user's tap), workout history with a month calendar, workout sharing.
 - Progressive overload / PRs: top sets, rep-count PRs, and true 1RM (only from a logged 1-rep set), correct across set/workout edit, soft-delete, and restore.
 - Progress/strength analytics: a tabbed Progress section (Overview, Strength, PRs, Exercises, Top Sets, 1-Rep Max), strength trend charts, and muscle-group visualization.
 - Nutrition: a basic food library and food log against user-set daily goals (calories/protein/carbs/fat). Manual entry only — no barcode scanning or external food database.
