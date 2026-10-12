@@ -49,13 +49,14 @@ These are three distinct concepts — do not conflate them.
 - **Rep-count PR:** the heaviest weight ever logged for an exercise _at a specific rep count_, across all history. E.g., logging 135×10, 145×10, 155×8, 160×10 makes 160×10 the 10-rep PR. Identified in real time while logging.
 - **True 1RM:** comes **only** from an actual logged set of exactly 1 rep. Never estimated from higher-rep sets (e.g., 155×8 does NOT create a 1RM; 165×1 does). Lives in a dedicated "Maxes" section, separate from PRs.
 
-## 6. Dashboard
+## 6. Home (Feed)
 
-Data-focused: no greeting or welcome header -- the widgets themselves lead. Visually clean, not overloaded.
+The landing screen is a personal activity feed, which replaced the original Dashboard. Data-focused: no greeting or welcome header -- the cards themselves lead. Visually clean, not overloaded.
 
-- **Nutrition section (one only):** calories, protein, carbs, fat — concise.
-- **Workout section:** current workout/split — name, muscles trained, athletic/premium visual muscle representation.
-- **Top Sets section:** top sets from the most recently completed workout (e.g., Bench Press 165 lb × 6). Top sets are **not** automatically labeled PRs — if a top set is also a PR, that distinction is shown separately.
+- **Your activity:** your own completed workouts and logged foods as activity cards, newest first, with a Friends tab for the people you follow (Section 7).
+- **Next workout:** the next day in your active split; a workout in progress gets its own card.
+- **Workout cards:** duration, exercises and sets, then a Top Sets strip — the top set of each exercise in that workout (e.g., Bench Press 165 lb × 6). Top sets are **not** automatically labeled PRs — a PR is a separate distinction.
+- Today's calories and macros are on Nutrition Today and the You tab.
 
 ## 7. Social/Athlete Experience
 
@@ -67,7 +68,7 @@ UI should have social-media-app engagement and visual language: athlete profile,
 
 Tracks calories, protein, carbs, fat. No micronutrients in v1.
 
-Logging methods (eventual): manual entry, food database search, barcode scanning, custom foods.
+Logging methods: custom foods entered by hand (with an optional photo), food search (Progresso's catalog and Open Food Facts), barcode scanning, and AI Food Search, which takes its figures from food data (Progresso's catalog, USDA, Open Food Facts) and uses an AI estimate only as a labelled last resort. A weight-based serving can be logged in grams or ounces, and a recently logged food can be logged again in two taps.
 
 Users may optionally set daily targets for calories/protein/carbs/fat.
 
@@ -75,7 +76,7 @@ Users may optionally set daily targets for calories/protein/carbs/fat.
 
 ## 9. Accounts
 
-Auth: email/password, Google, Apple, MFA. No forced guided onboarding in v1 — after auth, users enter the app directly.
+Auth: email/password, Google, Apple, MFA (MFA is not built yet). Signing up goes through a guided onboarding that ends with creating the account; signing in goes straight into the app.
 
 ## 10. Admin System
 
@@ -102,8 +103,8 @@ Administrative actions must be auditable. **User-data isolation must be enforced
 
 **Hybrid architecture.**
 
-- Simple authenticated reads, properly protected by Supabase RLS, may go direct to Supabase.
-- Operations involving important business logic or side effects go through the backend API: set writes, PR operations, workout delete/restore, nutrition logging requiring snapshots, administrative operations, RevenueCat webhooks, account export/deletion.
+- Simple authenticated reads and own-row writes, properly protected by Supabase RLS, may go direct to Supabase. This includes workout and set writes — PR correctness is enforced by database triggers whichever path wrote a set, not by the API — and nutrition logging, whose snapshot values are computed at log time.
+- Operations needing server-side logic, cross-user trust or a third-party integration go through the backend API: exercise and equipment-profile writes, food search, barcode lookup and AI food search, social, trainer and group features, push tokens, administrative operations, RevenueCat webhooks, account export/deletion.
 
 Never bypass security or business logic just because direct Supabase access is technically possible.
 
@@ -133,23 +134,23 @@ Users should eventually be able to export their data and delete their account/da
 
 ## 16. Development Roadmap
 
-| Phase | Scope                              | Status                                                                                                                                               |
-| ----- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Foundation                         | Done                                                                                                                                                 |
-| 1     | Accounts                           | Done — email/password auth, onboarding, account settings                                                                                             |
-| 2     | Exercise Library                   | Done — default + custom exercises, muscle-group tagging, backend endpoints                                                                           |
-| 3     | Workout Logging                    | Done — splits (incl. presets), live workout tracking, history, calendar                                                                              |
-| 4     | Progressive Overload Engine        | Done — top sets, rep-count PRs, true 1RM, PR correctness across edit/delete/restore                                                                  |
-| 5     | Strength Analytics                 | Done — tabbed Progress section (Overview/Strength/PRs/Exercises/Top Sets/1RM), charts, muscle visualization                                          |
-| 6     | Nutrition Logging                  | Done, simpler than final vision — manual food entry/log/goals only; no barcode scanning or food database search                                      |
-| 7     | Nutrition Analytics                | Not started — daily totals only, no trend/history analytics                                                                                          |
-| 8     | Subscriptions                      | In progress — RevenueCat webhook handling (signature verification, event projection) is implemented; no client-side purchase/paywall flow yet        |
-| 9     | Admin Dashboard                    | Not started — role-based authorization is implemented and tested end to end; the admin surface itself is a single placeholder route, not a dashboard |
-| 10    | Privacy Tooling                    | Not started — no account export or account deletion yet (Delete Account is a visible "Coming Soon" placeholder)                                      |
-| 11    | Design Polish + Push Notifications | Partial — theme/accent design system is implemented; push/email notifications are opt-in preferences only, with no delivery mechanism                |
-| 12    | Beta Launch Preparation            | Not started                                                                                                                                          |
+| Phase | Scope                              | Status                                                                                                                                                                                            |
+| ----- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Foundation                         | Done                                                                                                                                                                                              |
+| 1     | Accounts                           | Done — email/password, Google and (web) Apple sign-in, onboarding, account settings, Change Password                                                                                              |
+| 2     | Exercise Library                   | Done — default + custom exercises, muscle-group tagging, backend endpoints                                                                                                                        |
+| 3     | Workout Logging                    | Done — splits (incl. presets), live workout tracking, history, calendar                                                                                                                           |
+| 4     | Progressive Overload Engine        | Done — top sets, rep-count PRs, true 1RM, PR correctness across edit/delete/restore                                                                                                               |
+| 5     | Strength Analytics                 | Done — tabbed Progress section (Overview/Top Sets/Strength/All Time), charts, muscle visualization, PRs and true 1RMs                                                                             |
+| 6     | Nutrition Logging                  | Done — custom foods, food search, barcode scanning, AI food search, recent foods, logging by servings or weight, daily goals                                                                      |
+| 7     | Nutrition Analytics                | Not started — daily totals and a day-by-day history calendar only; no trend analytics                                                                                                             |
+| 8     | Subscriptions                      | Paused by decision — RevenueCat webhook handling (signature verification, event projection) is implemented; no in-app purchase or paywall until approved                                          |
+| 9     | Admin Dashboard                    | Not started — role-based authorization is implemented and tested end to end; the admin surface itself is a single placeholder route, not a dashboard                                              |
+| 10    | Privacy Tooling                    | Not started — no account export or account deletion yet (Delete Account is a visible "Coming Soon" placeholder)                                                                                   |
+| 11    | Design Polish + Push Notifications | Partial — theme/accent design system is implemented; devices register for push and a daily reminder job exists, but nothing triggers it yet and iOS delivery needs an APNs key; no email delivery |
+| 12    | Beta Launch Preparation            | In progress — internal TestFlight builds through EAS, Sentry, CI checks including an iOS bundle export                                                                                            |
 
-**Post-v1:** likes/comments/leaderboards and other deeper social features, home screen widgets, Apple Watch/Wear OS, exercise form media, AI features, other advanced functionality. Social v1 (follow graph + Friends feed) is implemented ahead of schedule as an approved, explicitly-scoped exception — see Section 17.
+**Post-v1:** likes/comments/leaderboards and other deeper social features, home screen widgets, Apple Watch/Wear OS, exercise form media, AI features beyond the existing AI Food Search, other advanced functionality. Social v1 (follow graph + Friends feed) is implemented ahead of schedule as an approved, explicitly-scoped exception — see Section 17.
 
 ## 17. Current Implementation State
 
@@ -157,26 +158,30 @@ Progresso is **past the Phase 0 foundation** and has an implemented core loop, n
 
 **Implemented:**
 
-- Authentication: Supabase email/password sign up and sign in, password reset, plus Google sign-in/sign-up via web-redirect OAuth (`apps/mobile/src/auth/oauth.ts`) -- Google sign-up lives on onboarding's account-creation step, Google sign-in on the Sign In screen. An Apple button exists on the same code path but isn't yet production-polished (real native Sign-In-with-Apple is a later, EAS-build-dependent milestone). MFA from Section 9 is not yet implemented.
-- Onboarding: a guided flow collecting profile basics (first name, last name, username, display name — each independent, none derived from another) and unit preference.
+- Authentication: Supabase email/password sign up and sign in, password reset, plus Google sign-in/sign-up via web-redirect OAuth (`apps/mobile/src/auth/oauth.ts`) -- Google sign-up lives on onboarding's account-creation step, Google sign-in on the Sign In screen. An Apple button exists on the same code path but isn't yet production-polished (real native Sign-In-with-Apple is a later, EAS-build-dependent milestone). Change Password in Settings. MFA from Section 9 is not yet implemented.
+- Onboarding: a guided flow that ends in creating the account — referral source, country, gender, birthday, weight, height, fitness goal, training experience, weekly frequency, workout length, training style, a starting split, and email and push preferences, then a first name (the display name), a username, email and password (or Google). Allowing notifications asks iOS for permission and registers the device for push.
+- Feed (Section 6): the landing screen, with your own activity and a Friends tab.
 - Workout splits: create, edit, view, duplicate, delete, plus built-in presets that copy into an editable user-owned split.
 - Workout tracking: live workout logging (exercises, sets, reps, weight) against a split, with each new set pre-filled from the set before it or the same set last session (never completed without the user's tap), workout history with a month calendar, workout sharing.
 - Progressive overload / PRs: top sets, rep-count PRs, and true 1RM (only from a logged 1-rep set), correct across set/workout edit, soft-delete, and restore.
-- Progress/strength analytics: a tabbed Progress section (Overview, Strength, PRs, Exercises, Top Sets, 1-Rep Max), strength trend charts, and muscle-group visualization.
-- Nutrition: a basic food library and food log against user-set daily goals (calories/protein/carbs/fat). Manual entry only — no barcode scanning or external food database.
-- Settings: an app-wide Settings hub (Account, Appearance, App, Notifications, Privacy, Help) with theme/accent customization applied consistently across the app.
-- Backend: JWT-authenticated NestJS API with role-based authorization (`user`/`support_admin`/`full_admin`), user profile endpoints, exercise library endpoints, and RevenueCat webhook processing (signature verification, idempotent event handling, subscription projection).
+- Progress/strength analytics: a tabbed Progress section (Overview, Top Sets, Strength, All Time), strength trend charts, muscle-group visualization, and PRs and true 1RMs (also listed on the You tab).
+- Nutrition: today's calories and macros against user-set daily goals (with goal estimates from body data), a history calendar, and every logging method in Section 8 — custom foods, food search, barcode scanning, AI Food Search (with a per-user hourly and daily limit), recent foods and logging by weight.
+- Trainer mode and group workouts: a trainer manages clients, logs workouts for them and runs live sessions, behind a "trainer" entitlement with no purchase flow yet (switched on by hand during internal testing); anyone can start a group from a workout, with each person's sets in their own tab.
+- Deep links: `progresso://feed`, `progresso://nutrition`, `progresso://workouts/<id>` and `progresso://workouts/<id>/live`, opened once the user is signed in.
+- Settings: an app-wide Settings hub — a root list of Profile & Personal Information, Workout Preferences, Nutrition & Goals, Appearance, Notifications, Account & Security and Support & About, each its own page — with theme/accent customization applied consistently across the app.
+- Backend: JWT-authenticated NestJS API with role-based authorization (`user`/`support_admin`/`full_admin`), user profile endpoints, exercise and equipment-profile endpoints, food search, barcode lookup and AI food search, follows and the Friends feed, trainer and group endpoints, push token registration with a daily reminder job, and RevenueCat webhook processing (signature verification, idempotent event handling, subscription projection).
 - Social v1: a one-directional, accept-gated follow graph (send/accept/reject/unfollow, user search) and a read-only Friends tab on Feed showing accepted followees' own completed workouts and logged foods. No likes, comments, or leaderboards yet.
 
 **In progress / partial (do not treat as complete):**
 
-- Subscriptions: webhook/backend projection exists; there is no in-app purchase or paywall flow yet.
-- Notifications: push/email opt-in preferences are real and persisted; there is no actual push or email delivery mechanism.
+- Subscriptions: webhook/backend projection exists; there is no in-app purchase or paywall flow yet, and none is built until approved.
+- Notifications: push/email opt-in preferences are real and persisted, and devices register their push tokens. The API's daily reminder job sends through Expo's push service, but nothing triggers it (no scheduler; its trigger secret is unset), and iOS delivery also needs an APNs key in EAS. There is no email delivery.
 - Admin: authorization is real and tested end to end; the admin dashboard itself does not exist yet beyond a single placeholder route proving the auth chain.
 
 **Explicitly placeholder (visible in the UI, not backed by real functionality):**
 
-- Delete Account (Settings → Account & Security).
+- Change Email and Delete Account (Settings → Account & Security).
+- Help & FAQ, Contact Support and Report a Problem (Settings → Support & About), and the finer notification categories (Settings → Notifications).
 - Apple Health — not offered; onboarding's former placeholder step was removed until HealthKit is approved.
 
-**Not yet started:** nutrition analytics/trends, privacy tooling (data export, account deletion), full admin dashboard, design-polish pass beyond the current theme system, beta launch preparation, and everything listed under Post-v1 in Section 16.
+**Not yet started:** nutrition analytics/trends, privacy tooling (data export, account deletion), full admin dashboard, design-polish pass beyond the current theme system, and everything listed under Post-v1 in Section 16.

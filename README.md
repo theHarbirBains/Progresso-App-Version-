@@ -18,54 +18,70 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Accounts & onboarding**
 
-- Email/password sign up and sign in (Supabase Auth), password reset flow
-- Signup collects first name, last name, username, and a user-chosen display name (independently — none is derived from another)
-- Guided onboarding flow (profile basics, unit preference, permission steps)
-- Account settings: edit display name, username, and weight unit (kg/lb)
+- Email/password sign-up and sign-in (Supabase Auth), password reset, and Google sign-in; an Apple button uses the same web sign-in flow
+- A guided onboarding that ends in creating the account: where you heard about Progresso, country, gender, birthday, weight and height, fitness goal, training experience, weekly frequency, workout length, training style, a starting split, and email and push preferences — then a first name (shown as the display name), a username, email and password, or Google
+- Allowing notifications during onboarding asks iOS for permission and registers the device for push
+- Change Password in Settings, for accounts that sign in with email
+
+**Feed**
+
+- The landing screen: your own completed workouts and logged foods as activity cards, and a Friends tab with the people you follow
+- Your next workout in the active split, a card for a workout that's in progress, and a "+" shortcut to Start Workout or Log Food
 
 **Workouts**
 
 - Create, edit, view, duplicate, and delete workout splits, including a set of built-in split presets (e.g. Push/Pull/Legs) that can be copied into an editable, user-owned split
-- Live workout tracking: log exercises, sets, reps, and weight against a split in progress, with a running workout timer
+- Live workout tracking: log exercises, sets, reps, and weight against a split in progress, with a running workout timer and each exercise's last session shown above its sets
 - New sets start filled in from the set before them, or the same set from last session, ready to edit; a set only completes when you tap it
-- Custom exercises alongside a shared default exercise library, each tagged with a muscle group
-- Workout history with a month calendar view and per-day/per-workout detail
+- Unilateral exercises are logged per side, left and right
+- Group workouts: start a group from a workout; each person has their own tab of sets, and anyone in the group can enter them
+- Custom exercises alongside a shared default exercise library, each tagged with a muscle group, with optional equipment profiles and machine photos
+- Workout history with a month calendar view and per-day/per-workout detail; past workouts can be logged and completed ones edited
 - Workout sharing (generates a shareable summary card)
 
 **Progress & analytics**
 
-- A tabbed Progress section (Overview, Strength, PRs, Exercises, Top Sets, 1-Rep Max), mirroring the same category-tab pattern used in Settings
+- A Progress tab with Overview, Top Sets, Strength and All Time sections
 - Per-exercise and lifetime top sets, rep-count PRs, and true 1RM tracking (1RM is only ever recorded from an actual 1-rep set)
 - Strength trend charts and progress metrics per exercise
 - Muscle-group visualization based on which exercises the user has actually logged
 
 **Nutrition**
 
-- A food library (create/search/edit custom foods) and a food log for tracking daily intake
-- Log Food lists your most recently logged foods first, ready to re-log at last time's quantity; a food whose serving is a weight can be logged in grams or ounces
-- Daily nutrition totals against user-set nutrition goals
-- No integration with an external food database — all food entries are user-entered
+- Today's calories and macros against your goals, with goal estimates calculated from your body data, and a history calendar
+- Log Food opens your Food Library: your own foods (with photos), with your most recently logged foods first, ready to re-log at last time's quantity
+- Search Food covers Progresso's food catalog and Open Food Facts; Scan Barcode looks products up on Open Food Facts, with Enter Manually when one isn't found
+- AI Food Search turns a description into its parts and takes their figures from Progresso's catalog, USDA data and Open Food Facts; Claude's own estimate is used only as a labelled last resort. Each user has an hourly and a daily limit
+- A food whose serving is a weight can be logged in grams or ounces; every log keeps the figures it was logged with, even if the food changes later
+
+**Trainer mode**
+
+- Trainers manage clients, log workouts for them and run live sessions, behind a "trainer" entitlement; there's no in-app purchase for it yet, so it's switched on by hand during internal testing (`supabase/dev/trainer-access.sql`)
 
 **Settings**
 
-- App-level Settings hub organized into horizontal category tabs: Account, Appearance, App, Notifications, Privacy, Help
+- A root list of seven categories, each its own page: Profile & Personal Information, Workout Preferences, Nutrition & Goals, Appearance, Notifications, Account & Security, Support & About
 - Theme/accent color customization, applied consistently across primary buttons and controls app-wide
-- Notification preferences: push and email opt-in toggles are real and persisted; more granular categories (workout reminders, PR alerts, weekly summaries) are shown as explicit "Coming Soon" rows rather than toggles that wouldn't do anything
-- Delete Account is visible in the UI but not yet implemented ("Coming Soon")
+- Notification preferences: push and email opt-in toggles are real and saved; more granular categories (workout reminders, PR alerts, weekly summaries) are shown as explicit "Coming Soon" rows rather than toggles that wouldn't do anything
+- Change Email, Delete Account and the help and contact rows are visible but not yet implemented ("Coming Soon")
 - There is no Apple Health (HealthKit) integration, and onboarding doesn't offer one
 
 **Social**
 
 - A one-directional, accept-gated follow graph (Instagram-style follow requests) — send/accept/reject a request, unfollow, search for people by name/username
 - A Friends tab on Feed showing accepted followees' own completed workouts and logged foods, reverse-chronological, reusing the same activity-card visual language as your own feed
+- A Notifications screen with follow requests and recent follows, plus suggestions from your own data
 - No likes, comments, or leaderboards yet
 
 **Backend (NestJS API)**
 
-- JWT authorization middleware validating Supabase-issued tokens on every route except `GET /health`
+- JWT authorization validating Supabase-issued tokens on every route except the health check and two endpoints called by machines (the RevenueCat webhook and the reminder job's trigger), which check their own secrets
 - Role-based authorization (`user` / `support_admin` / `full_admin`) backed by an `admin_users` table, proven end-to-end by a minimal `GET /api/v1/admin/ping` route
 - User profile read/update endpoints (`GET/PATCH /api/v1/users/me`) and username-availability check
-- Exercise library endpoints for managing default and custom exercises
+- Exercise library and equipment profile endpoints
+- Food search, barcode lookup and AI food search, with per-user usage limits; AI food search answers within 30 seconds
+- Follows and the Friends feed, trainer clients and live sessions, and group workouts
+- Push token registration and a daily reminder job that sends through Expo's push service (see Project Status: nothing triggers it yet)
 - RevenueCat webhook handling: signature verification and event processing that projects subscription entitlement into the app's own subscription table (RevenueCat itself remains the source of truth)
 - Structured observability/logging via Sentry (mobile and backend)
 
@@ -74,7 +90,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - **Mobile:** React Native 0.86 + Expo SDK 57, TypeScript, React Navigation (native stack)
 - **Backend:** NestJS 11 on the Fastify adapter, TypeScript
 - **Database:** PostgreSQL via Supabase, version-controlled SQL migrations, Row-Level Security
-- **Auth:** Supabase Auth (email/password)
+- **Auth:** Supabase Auth (email/password, plus Google and Apple through a web sign-in flow)
 - **Subscriptions:** RevenueCat (authoritative entitlement source; the backend table is a projection/cache)
 - **Testing:** Jest (`jest-expo` for mobile, `ts-jest` for the API), React Native Testing Library, Supertest for API e2e tests
 - **Tooling:** ESLint (flat config), Prettier, npm workspaces
@@ -83,7 +99,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 Progresso is an npm-workspaces monorepo:
 
-- **`apps/mobile`** — the Expo/React Native client. For simple, RLS-protected reads it talks to Supabase directly; anything with business logic or side effects (writes with derived state, PR recomputation, account actions, RevenueCat events) goes through the backend API instead.
+- **`apps/mobile`** — the Expo/React Native client. Reads protected by RLS, workout and set writes, nutrition logs and the user's own foods go straight to Supabase (PRs are recomputed by database triggers, whichever path wrote the set); food search, social, trainer and group features, push tokens and admin operations go through the backend API.
 - **`apps/api`** — the NestJS backend. Validates the caller's Supabase-issued JWT on every request, resolves their role from `admin_users`, and owns any operation that needs server-side logic or elevated privileges.
 - **`supabase`** — version-controlled SQL migrations (the only way the schema changes), seed data, and a local database test suite.
 - **`docs`** — product and technical specification.
@@ -97,42 +113,59 @@ Authentication is issued by Supabase Auth; the mobile app holds the session, and
 ├── apps/
 │   ├── mobile/              # React Native + Expo + TypeScript
 │   │   └── src/
-│   │       ├── auth/        # Session/auth context
-│   │       ├── dashboard/   # Dashboard screen logic
+│   │       ├── auth/        # Session/auth context, OAuth
+│   │       ├── charts/      # Chart components
+│   │       ├── dashboard/   # Weekly progress and recent-workout helpers (from the old Dashboard)
 │   │       ├── design/      # Shared design-system components
 │   │       ├── exercises/   # Exercise library + muscle-group data
-│   │       ├── navigation/  # Navigation stack, side menu, quick actions
+│   │       ├── feed/        # Feed cards and queries
+│   │       ├── lib/         # API client, Supabase client, units, Sentry, push
+│   │       ├── navigation/  # Navigation types, side menu, bottom nav, deep links
+│   │       ├── notifications/ # Insights for the Notifications screen
 │   │       ├── nutrition/   # Food library, food log, nutrition goals
 │   │       ├── onboarding/  # Guided onboarding flow
+│   │       ├── profile/     # Profile loading and cache
 │   │       ├── progress/    # Progress tab sections, charts, PR/1RM logic
 │   │       ├── screens/     # Screen components
-│   │       ├── settings/    # Settings hub categories
+│   │       ├── settings/    # Settings styles and helpers
 │   │       ├── sharing/     # Workout share-card generation
-│   │       └── workouts/    # Splits, live workout, history, calendar, PRs
+│   │       ├── theme/       # Accent colours
+│   │       ├── trainer/     # Trainer mode helpers
+│   │       └── workouts/    # Splits, live and group workouts, history, calendar, PRs
 │   └── api/                 # NestJS + Fastify backend
 │       └── src/
 │           ├── admin/       # Role-gated admin routes
 │           ├── auth/        # JWT verification, roles/guards
+│           ├── equipment-profiles/ # Machine/equipment profiles
 │           ├── exercises/   # Exercise library endpoints
+│           ├── feed/        # Friends feed
+│           ├── follows/     # Follow requests and people search
+│           ├── foods/       # Food search, barcode lookup, AI food search
+│           ├── groups/      # Group workouts
 │           ├── health/      # Public health check
+│           ├── notifications/ # Push tokens and the daily reminder job
+│           ├── nutrition-resolution/ # Matching AI-parsed foods to food data
 │           ├── observability/ # Sentry wiring
 │           ├── revenuecat/  # Subscription webhook handling
 │           ├── supabase/    # Supabase service client
+│           ├── trainer/     # Trainer clients and live sessions
 │           └── users/       # Profile read/update endpoints
 ├── supabase/
 │   ├── migrations/          # Version-controlled schema changes
-│   ├── seed/                # Seed data
-│   └── tests/                # Local database test runner
-├── docs/                     # Product/technical spec
-└── CLAUDE.md                 # Permanent working rules for coding agents
+│   ├── seed.sql             # Seed data
+│   ├── dev/                 # Development-only scripts (e.g. trainer access)
+│   └── tests/               # Local database test runner
+├── docs/                    # Product/technical spec
+└── CLAUDE.md                # Permanent working rules for coding agents
 ```
 
 ## Testing
 
-- **Mobile:** 127 test files under `apps/mobile/src` (Jest + `jest-expo` + React Native Testing Library), covering screens, components, and business logic (query builders, PR/1RM calculations, progressive-overload logic, calendar/date logic).
-- **Backend:** 9 unit-test (`.spec.ts`) files alongside their modules, plus 6 end-to-end suites under `apps/api/test` (auth/authorization, exercises, observability, RevenueCat webhook, user profile, and a general app smoke test) using Supertest against a mocked Supabase layer.
+- **Mobile:** 223 test files in `apps/mobile` (Jest + `jest-expo` + React Native Testing Library), covering screens, components, and business logic (query builders, PR/1RM calculations, progressive-overload logic, calendar/date logic).
+- **Backend:** 27 unit-test (`.spec.ts`) files alongside their modules, plus 6 end-to-end suites under `apps/api/test` (auth/authorization, exercises, observability, RevenueCat webhook, user profile, and a general app smoke test) using Supertest against a mocked Supabase layer.
 - **Database:** `npm run db:test` applies every migration to a real, ephemeral, local Postgres instance (via the `embedded-postgres` package — no Docker or live Supabase project required) and runs correctness/security tests against it, including RLS isolation checks.
-- Run everything: `npm run test:api` (backend unit tests), `npm run test --workspace apps/mobile` (mobile tests), `npm run db:test` (database tests).
+- Run everything: `npm run test:api` (backend unit tests), `npm run test:e2e --workspace apps/api` (backend end-to-end tests), `npm run test --workspace apps/mobile` (mobile tests), `npm run db:test` (database tests).
+- CI (GitHub Actions) runs lint, typecheck, the format check, all of the above and an iOS bundle export on every push and pull request to `main`.
 
 ## Getting Started
 
@@ -187,16 +220,24 @@ Links can open a screen once the user is signed in; a link that arrives before s
 
 On a simulator: `xcrun simctl openurl booted progresso://nutrition`. The sign-in, email-confirmation and password-reset links are handled by the auth flow, not these.
 
+## Deployment
+
+- **API:** the `progresso-api` web service on Render, in Oregon, described by `render.yaml`. Secrets are set in the Render dashboard, never in the file.
+- **Database:** a Supabase project in Canada Central. Migrations reach it only by hand, with `npx supabase db push` from the repository root; nothing in CI or Render applies them. `npx supabase migration list` compares what's applied with the files, changing nothing.
+- **There is no separate development database yet:** local `.env` files point at the same project as production, so local work and `db push` both touch real data.
+- **iOS app:** built with EAS from `apps/mobile` (see Development) and distributed to internal testers through TestFlight.
+
 ## Project Status
 
-Progresso is **actively under development**. The core loop — accounts, onboarding, workout splits, live workout logging, workout history, and progress/PR analytics — is implemented and working end to end, along with a functional (if simpler) nutrition-logging feature and an app-wide Settings hub.
+Progresso is **actively under development**. The core loop — accounts, onboarding, workout splits, live workout logging, workout history, and progress/PR analytics — is implemented and working end to end, along with nutrition logging (food search, barcode scanning and AI food search included), social features, trainer mode, group workouts and an app-wide Settings hub.
 
 Some areas are intentionally incomplete rather than hidden:
 
-- **Notifications**: opt-in preferences are real and saved; actual notification delivery (push or email) is not implemented.
-- **Account actions**: Delete Account is visible in Settings but marked "Coming Soon."
+- **Notifications**: opt-in preferences are real and saved, and devices register for push. The API's daily reminder job sends through Expo's push service, but nothing triggers it yet (there's no scheduler, and its trigger secret is unset), and iOS delivery also needs an APNs key in EAS. There is no email delivery.
+- **Account actions**: Change Email and Delete Account are visible in Settings but marked "Coming Soon."
 - **Apple Health**: not offered; there is no HealthKit integration.
 - **Admin**: role-based authorization is implemented and tested end to end, but the admin surface itself is a minimal placeholder route, not a full admin dashboard.
+- **Subscriptions**: RevenueCat webhook handling exists, but there is no in-app purchase or paywall yet.
 
 Social v1 (a follow graph and a read-only Friends feed) is implemented and real, not a placeholder — see the Social section above. Likes, comments, and leaderboards are not built yet.
 
@@ -205,7 +246,7 @@ Social v1 (a follow graph and a read-only Friends feed) is implemented and real,
 Planned, not yet built:
 
 - Real notification delivery (push/email) behind the existing opt-in preferences
-- Account actions: account deletion
+- Account actions: Change Email and account deletion
 - A fuller admin dashboard (user management, support tooling, analytics) on top of the existing role/authorization system
 - Milestones (a scoped-but-not-yet-designed addition to the Progress section)
 
