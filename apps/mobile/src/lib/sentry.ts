@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import * as Sentry from '@sentry/react-native';
 import type { ComponentType } from 'react';
 
@@ -40,7 +39,8 @@ export function initSentry(): void {
   Sentry.init({
     dsn,
     environment: __DEV__ ? 'development' : 'production',
-    release: Constants.expoConfig?.version,
+    // No release override: the SDK's default (bundle id, version and build number, with the build
+    // number as dist) tells TestFlight builds apart and matches what the build uploads maps under.
     tracesSampleRate: 0,
     beforeSend: scrubSentryEvent,
   });

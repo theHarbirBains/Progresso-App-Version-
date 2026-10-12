@@ -13,9 +13,9 @@ type Props = RootStackScreenProps<'SettingsSupport'>;
  * Support & About: help/contact links (same "Coming Soon" precedent
  * HelpCategory already used -- nothing here pretends to work yet) plus the
  * app's own version/build, informational only (not a setting -- there's
- * nothing to save), read from the same build metadata lib/sentry.ts already
- * uses for its own release tag. Omits a version/build line entirely rather
- * than showing "undefined" when either isn't available (e.g. inside Expo Go).
+ * nothing to save), read from the app's build metadata. Omits a version/build
+ * line entirely rather than showing "undefined" when either isn't available
+ * (e.g. inside Expo Go).
  */
 export function SettingsSupportScreen({ navigation }: Props) {
   const version = Constants.expoConfig?.version;

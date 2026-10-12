@@ -1,13 +1,11 @@
 import * as Sentry from '@sentry/react-native';
 import type { ErrorEvent } from '@sentry/react-native';
-import { recordApiRequestOutcome, scrubSentryEvent } from './sentry';
+import { initSentry, recordApiRequestOutcome, scrubSentryEvent } from './sentry';
 
-// scrubSentryEvent is a pure data transform and never touches either of
-// these at call time; mocked purely to keep this test out of Expo/Sentry's
-// native module resolution, which isn't relevant to what's under test.
-// jest.mock calls are hoisted above the imports above by Jest's transform
-// regardless of source order, so this still applies before ./sentry loads.
-jest.mock('expo-constants', () => ({ default: { expoConfig: { version: '0.0.0-test' } } }));
+// Mocked to keep this test out of Sentry's native module resolution, which
+// isn't relevant to what's under test. jest.mock calls are hoisted above the
+// imports above by Jest's transform regardless of source order, so this
+// still applies before ./sentry loads.
 jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
   wrap: (c: unknown) => c,
@@ -18,10 +16,44 @@ jest.mock('@sentry/react-native', () => ({
 
 const mockAddBreadcrumb = Sentry.addBreadcrumb as jest.Mock;
 const mockCaptureMessage = Sentry.captureMessage as jest.Mock;
+const mockInit = Sentry.init as jest.Mock;
 
 beforeEach(() => {
   mockAddBreadcrumb.mockClear();
   mockCaptureMessage.mockClear();
+  mockInit.mockClear();
+});
+
+describe('initSentry', () => {
+  const originalDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+
+  afterEach(() => {
+    process.env.EXPO_PUBLIC_SENTRY_DSN = originalDsn;
+  });
+
+  it('stays off when no DSN is configured', () => {
+    delete process.env.EXPO_PUBLIC_SENTRY_DSN;
+
+    initSentry();
+
+    expect(mockInit).not.toHaveBeenCalled();
+  });
+
+  it('leaves release and dist to the SDK, so each build reports its own build number', () => {
+    process.env.EXPO_PUBLIC_SENTRY_DSN = 'https://key@o0.ingest.sentry.io/1';
+
+    initSentry();
+
+    expect(mockInit).toHaveBeenCalledTimes(1);
+    const options = mockInit.mock.calls[0][0];
+    expect(options).toMatchObject({
+      dsn: 'https://key@o0.ingest.sentry.io/1',
+      tracesSampleRate: 0,
+      beforeSend: scrubSentryEvent,
+    });
+    expect(options).not.toHaveProperty('release');
+    expect(options).not.toHaveProperty('dist');
+  });
 });
 
 describe('scrubSentryEvent', () => {
