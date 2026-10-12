@@ -3,6 +3,7 @@ import {
   createFood,
   fetchAllFoods,
   fetchFoods,
+  fetchRecentFoods,
   findOwnFoodByName,
   updateFood,
 } from './foodQueries';
@@ -24,6 +25,7 @@ function createQueryBuilder(result: Result) {
     'select',
     'eq',
     'is',
+    'not',
     'ilike',
     'order',
     'range',
@@ -195,6 +197,76 @@ describe('fetchAllFoods', () => {
     await expect(fetchAllFoods({ userId: 'user-1', search: '', ascending: true })).rejects.toThrow(
       'boom',
     );
+  });
+});
+
+describe('fetchRecentFoods', () => {
+  function logRow(foodId: string, quantity: string, food: unknown) {
+    return { food_id: foodId, quantity, foods: food };
+  }
+
+  it("reads the user's own latest logs, newest first, through each log's food", async () => {
+    const { calls } = mockTable({ data: [logRow('food-1', '2.00', dbRow)], error: null });
+
+    const result = await fetchRecentFoods('user-1');
+
+    expect(result).toEqual([
+      { food: expect.objectContaining({ id: 'food-1', name: 'Chicken Breast' }), quantity: 2 },
+    ]);
+    expect(mockFrom).toHaveBeenCalledWith('food_logs');
+    expect(calls.eq).toEqual([['user_id', 'user-1']]);
+    expect(calls.not).toEqual([['food_id', 'is', null]]);
+    expect(calls.order).toEqual([['logged_at', { ascending: false }]]);
+    expect(calls.limit).toEqual([[50]]);
+  });
+
+  it('lists each food once, with the quantity from its latest log', async () => {
+    mockTable({
+      data: [
+        logRow('food-1', '2.00', dbRow),
+        logRow('food-2', '1.00', { ...dbRow, id: 'food-2', name: 'Rice' }),
+        logRow('food-1', '5.00', dbRow),
+      ],
+      error: null,
+    });
+
+    const result = await fetchRecentFoods('user-1');
+
+    expect(result.map((entry) => [entry.food.id, entry.quantity])).toEqual([
+      ['food-1', 2],
+      ['food-2', 1],
+    ]);
+  });
+
+  it('leaves out a food that is gone or deactivated, however the food comes back', async () => {
+    mockTable({
+      data: [
+        logRow('food-1', '1.00', null),
+        logRow('food-2', '1.00', { ...dbRow, id: 'food-2', is_active: false }),
+        logRow('food-3', '1.00', [{ ...dbRow, id: 'food-3' }]),
+      ],
+      error: null,
+    });
+
+    const result = await fetchRecentFoods('user-1');
+
+    expect(result.map((entry) => entry.food.id)).toEqual(['food-3']);
+  });
+
+  it('stops at the limit', async () => {
+    const rows = Array.from({ length: 12 }, (_, i) =>
+      logRow(`food-${i}`, '1.00', { ...dbRow, id: `food-${i}` }),
+    );
+    mockTable({ data: rows, error: null });
+
+    expect(await fetchRecentFoods('user-1')).toHaveLength(8);
+    expect(await fetchRecentFoods('user-1', 3)).toHaveLength(3);
+  });
+
+  it('throws on a query error', async () => {
+    mockTable({ data: null, error: { message: 'boom' } });
+
+    await expect(fetchRecentFoods('user-1')).rejects.toThrow('boom');
   });
 });
 

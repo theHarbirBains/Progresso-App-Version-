@@ -200,6 +200,50 @@ export async function fetchAllFoods(params: FetchAllFoodsParams): Promise<FoodRo
   return ((data ?? []) as FoodDbRow[]).map(toFoodRow);
 }
 
+export interface RecentFood {
+  food: FoodRow;
+  /** The quantity logged last time, in servings. */
+  quantity: number;
+}
+
+// How many of the user's latest logs Recent looks through for its foods.
+const RECENT_LOGS_SCANNED = 50;
+
+/**
+ * The foods the user logged most recently, newest first, one entry per food, each with the
+ * quantity logged last time -- Log Food's Recent list. Read from the user's own logs through
+ * each log's food, so a food logged from Search or a scan is included as well as library foods.
+ * A food that is gone or deactivated is left out: logging it again needs the food itself.
+ */
+export async function fetchRecentFoods(userId: string, limit = 8): Promise<RecentFood[]> {
+  const { data, error } = await supabase
+    .from('food_logs')
+    .select(`food_id, quantity, foods(${FOOD_COLUMNS})`)
+    .eq('user_id', userId)
+    .not('food_id', 'is', null)
+    .order('logged_at', { ascending: false })
+    .limit(RECENT_LOGS_SCANNED);
+  if (error) throw new Error(error.message);
+
+  type RecentLogRow = {
+    food_id: string;
+    quantity: string | number;
+    // A to-one embed comes back as an object; the client's inferred type says array, so both are read.
+    foods: FoodDbRow | FoodDbRow[] | null;
+  };
+  const recent: RecentFood[] = [];
+  const seen = new Set<string>();
+  for (const row of (data ?? []) as unknown as RecentLogRow[]) {
+    if (recent.length === limit) break;
+    if (seen.has(row.food_id)) continue;
+    seen.add(row.food_id);
+    const food = Array.isArray(row.foods) ? row.foods[0] : row.foods;
+    if (!food || !food.is_active) continue;
+    recent.push({ food: toFoodRow(food), quantity: Number(row.quantity) });
+  }
+  return recent;
+}
+
 /**
  * The user's own active food with exactly this name (case-insensitive, trimmed),
  * or null. Used to stop AI Food Search adding a second copy of a food the

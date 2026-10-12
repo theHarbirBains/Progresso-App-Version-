@@ -42,6 +42,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Nutrition**
 
 - A food library (create/search/edit custom foods) and a food log for tracking daily intake
+- Log Food lists your most recently logged foods first, ready to re-log at last time's quantity; a food whose serving is a weight can be logged in grams or ounces
 - Daily nutrition totals against user-set nutrition goals
 - No integration with an external food database — all food entries are user-entered
 

@@ -20,7 +20,12 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { FoodImage } from '../nutrition/FoodImage';
 import { ALPHABET_INDEX_LETTERS, groupFoodsByLetter } from '../nutrition/foodLibraryGrouping';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
-import { fetchAllFoods, type FoodRow } from '../nutrition/foodQueries';
+import {
+  fetchAllFoods,
+  fetchRecentFoods,
+  type FoodRow,
+  type RecentFood,
+} from '../nutrition/foodQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { foodLibraryStyles as styles } from './foodLibraryStyles';
 import { FoodFormScreen } from './FoodFormScreen';
@@ -33,7 +38,13 @@ type Mode =
   | { type: 'list' }
   | { type: 'create'; initialBarcode?: string }
   | { type: 'edit'; food: FoodRow }
-  | { type: 'log'; food: FoodRow; fromScan?: boolean };
+  | { type: 'log'; food: FoodRow; fromScan?: boolean; quantity?: number };
+
+/** A heading's foods: Recent, or one letter of the library. */
+interface LibrarySection {
+  title: string;
+  recent: boolean;
+}
 
 // The "Food" bottom-tab destination in Nutrition mode -- the user's own
 // saved/custom foods, sorted and sectioned alphabetically (A-Z, like iOS
@@ -47,7 +58,10 @@ type Mode =
 // count and a quiet sort action, and the foods -- each with its picture (or
 // category glyph), name, serving and calories as a mono value -- under
 // letter headings, with the A-Z rail on the right. Tapping a row logs it;
-// the pencil edits it.
+// the pencil edits it. Above the letters, while nothing is searched for, Recent
+// lists the foods logged most recently -- from the user's own logs, so it also
+// has foods logged from Search or a scan -- and tapping one opens the log step
+// at last time's quantity, so re-logging takes two taps.
 //
 // Reached from the barcode scanner's "Enter Manually", it opens straight into
 // the create form (barcode prefilled) and, once saved, on into logging that
@@ -75,7 +89,9 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeLetter, setActiveLetter] = useState<string | undefined>(undefined);
-  const sectionListRef = useRef<SectionList<FoodRow, { title: string }>>(null);
+  // Null until the first read finishes, so the list doesn't shift when Recent arrives.
+  const [recentFoods, setRecentFoods] = useState<RecentFood[] | null>(null);
+  const sectionListRef = useRef<SectionList<FoodRow, LibrarySection>>(null);
 
   // Debounce free-text input before it drives a query, so every keystroke
   // doesn't fire its own request -- same pattern as FoodSearchScreen.
@@ -102,6 +118,16 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
     void load();
   }, [load]);
 
+  // Recent is a shortcut, so a failure only leaves it out.
+  const loadRecent = useCallback(async () => {
+    if (!userId) return;
+    setRecentFoods(await fetchRecentFoods(userId).catch(() => []));
+  }, [userId]);
+
+  useEffect(() => {
+    void loadRecent();
+  }, [loadRecent]);
+
   function handleDone(saved?: FoodRow) {
     // A food entered by hand for a scanned barcode goes straight on to logging.
     if (saved && mode.type === 'create' && mode.initialBarcode) {
@@ -110,6 +136,8 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
       setMode({ type: 'list' });
     }
     void load();
+    // An edited or deactivated food must not be logged from Recent's older copy.
+    void loadRecent();
   }
 
   const sections = useMemo(() => groupFoodsByLetter(rows), [rows]);
@@ -117,14 +145,27 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
     () => new Set(sections.map((section) => section.letter)),
     [sections],
   );
-  const listSections = useMemo(
-    () => sections.map((section) => ({ title: section.letter, data: section.data })),
-    [sections],
+  const listSections = useMemo(() => {
+    const letters = sections.map((section) => ({
+      title: section.letter,
+      recent: false,
+      data: section.data,
+    }));
+    if (search || !recentFoods || recentFoods.length === 0) return letters;
+    return [
+      { title: 'Recent', recent: true, data: recentFoods.map((entry) => entry.food) },
+      ...letters,
+    ];
+  }, [sections, search, recentFoods]);
+
+  const recentQuantities = useMemo(
+    () => new Map((recentFoods ?? []).map((entry) => [entry.food.id, entry.quantity])),
+    [recentFoods],
   );
 
   const jumpToLetter = useCallback(
     (letter: string) => {
-      const sectionIndex = sections.findIndex((section) => section.letter === letter);
+      const sectionIndex = listSections.findIndex((section) => section.title === letter);
       if (sectionIndex === -1) return;
       setActiveLetter(letter);
       sectionListRef.current?.scrollToLocation({
@@ -134,11 +175,11 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         animated: true,
       });
     },
-    [sections],
+    [listSections],
   );
 
   const renderSectionHeader = useCallback(
-    ({ section }: { section: SectionListData<FoodRow, { title: string }> }) => (
+    ({ section }: { section: SectionListData<FoodRow, LibrarySection> }) => (
       <View testID={`food-library-section-${section.title}`}>
         <SectionHeader label={section.title} />
       </View>
@@ -147,29 +188,46 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: FoodRow; index: number }) => (
+    ({
+      item,
+      index,
+      section,
+    }: {
+      item: FoodRow;
+      index: number;
+      section: SectionListData<FoodRow, LibrarySection>;
+    }) => (
       <View style={[styles.row, index > 0 && styles.rowDivider]}>
         <View style={styles.flex}>
           <ListRow
-            testID={`food-item-${item.id}`}
+            testID={section.recent ? `food-recent-${item.id}` : `food-item-${item.id}`}
             leading={<FoodImage uri={item.imageUrl} name={item.name} size={44} />}
             title={item.name}
             subtitle={`${item.servingSize}${item.servingUnit}`}
             value={`${item.calories} cal`}
             chevron={false}
-            onPress={() => setMode({ type: 'log', food: item })}
+            onPress={() =>
+              setMode({
+                type: 'log',
+                food: item,
+                quantity: section.recent ? recentQuantities.get(item.id) : undefined,
+              })
+            }
           />
         </View>
-        <IconButton
-          testID={`food-edit-${item.id}`}
-          icon="edit-2"
-          onPress={() => setMode({ type: 'edit', food: item })}
-          accessibilityLabel={`Edit ${item.name}`}
-          color={colors.textSecondary}
-        />
+        {/* A recent food can come from Search, which isn't the user's to edit. */}
+        {section.recent ? null : (
+          <IconButton
+            testID={`food-edit-${item.id}`}
+            icon="edit-2"
+            onPress={() => setMode({ type: 'edit', food: item })}
+            accessibilityLabel={`Edit ${item.name}`}
+            color={colors.textSecondary}
+          />
+        )}
       </View>
     ),
-    [],
+    [recentQuantities],
   );
 
   if (mode.type === 'create') {
@@ -202,6 +260,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
     return (
       <LogFoodStep
         food={mode.food}
+        initialQuantity={mode.quantity}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
         onDone={() => (mode.fromScan ? navigation.navigate('Nutrition') : navigation.goBack())}
@@ -277,7 +336,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
                 }}
               />
             </View>
-          ) : loading ? (
+          ) : loading || recentFoods === null ? (
             <View style={styles.loading}>
               <ActivityIndicator
                 testID="food-library-loading"
@@ -285,7 +344,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
                 color={colors.textPrimary}
               />
             </View>
-          ) : rows.length === 0 ? (
+          ) : listSections.length === 0 ? (
             <View>
               <EmptyState
                 testID="food-library-empty"

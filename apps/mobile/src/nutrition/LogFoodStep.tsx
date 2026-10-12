@@ -5,10 +5,12 @@ import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';
 import { Screen } from '../design/Screen';
+import { SegmentedControl } from '../design/SegmentedControl';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import { FoodImage } from './FoodImage';
 import { useFoodLog } from './FoodLogProvider';
+import { fromServings, gramsPerServing, toServings, type QuantityUnit } from './logQuantity';
 import { defaultMealTypeForTime } from './mealTypes';
 import { calculateLogTotals } from './nutritionCalculations';
 import type { FoodRow } from './foodQueries';
@@ -23,11 +25,19 @@ export type LoggableFood = Pick<
 
 interface LogFoodStepProps {
   food: LoggableFood;
+  /** The quantity the field starts at, in servings -- last time's, when re-logging from Recent. */
+  initialQuantity?: number;
   accentColor: string;
   onAccentColor: string;
   onDone: () => void;
   onCancel: () => void;
 }
+
+const QUANTITY_LABELS: Record<QuantityUnit, string> = {
+  servings: 'Quantity',
+  g: 'Grams',
+  oz: 'Ounces',
+};
 
 /**
  * The one quantity-entry-and-log step for every "found a food, now log it"
@@ -41,23 +51,35 @@ interface LogFoodStepProps {
  *
  * Layout: two widgets `widgetGap` apart -- the food (its picture and serving)
  * and the Quantity field with a live preview of what that quantity adds up
- * to -- then the one filled Log Food button.
+ * to -- then the one filled Log Food button. When the serving is a weight, a
+ * Servings / g / oz switch above the field lets the amount be typed by weight;
+ * it is turned into servings, which is what the log stores.
  */
 export function LogFoodStep({
   food,
+  initialQuantity = 1,
   accentColor,
   onAccentColor,
   onDone,
   onCancel,
 }: LogFoodStepProps) {
   const { logFoodEntry } = useFoodLog();
-  const [quantity, setQuantity] = useState('1');
+  const servingGrams = gramsPerServing(food);
+  const [unit, setUnit] = useState<QuantityUnit>('servings');
+  const [quantity, setQuantity] = useState(String(initialQuantity));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const quantityNum = Number(quantity);
-  const canLog = Number.isFinite(quantityNum) && quantityNum > 0 && !saving;
-  const preview = canLog ? calculateLogTotals(food, quantityNum) : null;
+  const servings = toServings(Number(quantity), unit, servingGrams);
+  const validAmount = Number.isFinite(servings) && servings > 0;
+  const canLog = validAmount && !saving;
+  const preview = canLog ? calculateLogTotals(food, servings) : null;
+
+  function changeUnit(next: QuantityUnit) {
+    // The amount carries over: 1 serving of a 100 g food becomes 100 g.
+    setQuantity(validAmount ? fromServings(servings, next, servingGrams) : '');
+    setUnit(next);
+  }
 
   async function handleLog() {
     if (!canLog) return;
@@ -67,7 +89,7 @@ export function LogFoodStep({
       // Through the shared cache's own write path -- NutritionTodayScreen and
       // ProfileScreen, wherever they're mounted, see this the instant it
       // resolves, with no re-fetch of their own.
-      await logFoodEntry(food, quantityNum, defaultMealTypeForTime());
+      await logFoodEntry(food, servings, defaultMealTypeForTime());
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to log food');
@@ -92,9 +114,26 @@ export function LogFoodStep({
       </AppCard>
 
       <AppCard testID="log-food-quantity-card">
+        {servingGrams !== null ? (
+          <View style={styles.unitSwitch}>
+            <SegmentedControl
+              testID="log-food-unit"
+              options={[
+                { label: 'Servings', value: 'servings' },
+                { label: 'g', value: 'g', accessibilityLabel: 'Grams' },
+                { label: 'oz', value: 'oz', accessibilityLabel: 'Ounces' },
+              ]}
+              value={unit}
+              onChange={changeUnit}
+              accentColor={accentColor}
+              onAccentColor={onAccentColor}
+            />
+          </View>
+        ) : null}
+
         <TextInput
           testID="log-food-quantity"
-          label="Quantity"
+          label={QUANTITY_LABELS[unit]}
           value={quantity}
           onChangeText={setQuantity}
           keyboardType="decimal-pad"
@@ -102,6 +141,7 @@ export function LogFoodStep({
 
         {preview ? (
           <Text testID="log-food-preview" style={styles.preview}>
+            {unit !== 'servings' ? `${servings} ${servings === 1 ? 'serving' : 'servings'} · ` : ''}
             {preview.calories} cal · {preview.proteinG}g protein · {preview.carbsG}g carbs ·{' '}
             {preview.fatG}g fat
           </Text>
@@ -140,6 +180,9 @@ const styles = StyleSheet.create({
     ...typeScale.body,
     color: colors.textSecondary,
     flex: 1,
+  },
+  unitSwitch: {
+    marginBottom: spacing.md,
   },
   preview: {
     ...typeScale.callout,

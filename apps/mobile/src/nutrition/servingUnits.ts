@@ -9,7 +9,9 @@ export interface ServingUnitOption {
 // so no new spelling enters the database, and labels use the wording users
 // read. Nothing in the nutrition math depends on the unit: calories and macros
 // scale by quantity alone, so the unit is a label for the serving and a choice
-// of list never changes a number.
+// of list never changes a number. The one place a unit matters is the log
+// step, where a weight serving (g, kg, oz) can be logged by weight -- see
+// logQuantity.ts.
 export const SERVING_UNITS: readonly ServingUnitOption[] = [
   { value: 'serving', label: 'serving' },
   { value: 'piece', label: 'piece' },

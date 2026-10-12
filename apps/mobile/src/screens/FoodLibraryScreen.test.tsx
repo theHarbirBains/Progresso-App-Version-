@@ -1,6 +1,6 @@
 import { Alert, Image, StyleSheet } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
@@ -9,7 +9,7 @@ import { AppMenuContext } from '../navigation/AppMenuContext';
 import { uploadFoodPhoto } from '../lib/foodPhotoUpload';
 import { fetchTodaysFoodLogs, logFood } from '../nutrition/foodLogQueries';
 import { FoodLogProvider } from '../nutrition/FoodLogProvider';
-import { createFood, fetchAllFoods, updateFood } from '../nutrition/foodQueries';
+import { createFood, fetchAllFoods, fetchRecentFoods, updateFood } from '../nutrition/foodQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { FoodLibraryScreen } from './FoodLibraryScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
@@ -24,6 +24,7 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../nutrition/foodQueries', () => ({
   fetchAllFoods: jest.fn(),
+  fetchRecentFoods: jest.fn(),
   createFood: jest.fn(),
   updateFood: jest.fn(),
 }));
@@ -40,6 +41,7 @@ jest.mock('../nutrition/foodLogQueries', () => ({
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchAllFoods = fetchAllFoods as jest.Mock;
+const mockFetchRecentFoods = fetchRecentFoods as jest.Mock;
 const mockCreateFood = createFood as jest.Mock;
 const mockUpdateFood = updateFood as jest.Mock;
 const mockLogFood = logFood as jest.Mock;
@@ -110,6 +112,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({ user: { id: 'user-1' }, session: { access_token: 'token-1' } });
   mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockFetchAllFoods.mockReset().mockResolvedValue([apple, banana]);
+  mockFetchRecentFoods.mockReset().mockResolvedValue([]);
   mockCreateFood.mockReset();
   mockUpdateFood.mockReset();
   mockLogFood.mockReset();
@@ -517,6 +520,120 @@ describe('FoodLibraryScreen', () => {
     fireEvent.press(screen.getByTestId('app-header-back'));
 
     expect(await screen.findByTestId('food-item-food-apple')).toBeTruthy();
+  });
+});
+
+describe('FoodLibraryScreen -- Recent', () => {
+  // Logged from Search, so it is not one of the user's own library foods.
+  const yogurt = {
+    id: 'food-yogurt',
+    name: 'Greek Yogurt',
+    brand: 'Fage',
+    servingSize: 170,
+    servingUnit: 'g',
+    calories: 100,
+    proteinG: 18,
+    carbsG: 6,
+    fatG: 0,
+    isActive: true,
+  };
+
+  it('lists the foods logged most recently above the letters, without an edit button', async () => {
+    mockFetchRecentFoods.mockResolvedValue([
+      { food: yogurt, quantity: 2 },
+      { food: apple, quantity: 1 },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('food-recent-food-yogurt')).toHaveTextContent(/Greek Yogurt/);
+    expect(screen.getByTestId('food-recent-food-apple')).toBeTruthy();
+    expect(
+      screen.getAllByTestId(/^food-library-section-/).map((node) => node.props.testID),
+    ).toEqual(['food-library-section-Recent', 'food-library-section-A', 'food-library-section-B']);
+    expect(screen.getByTestId('food-library-section-Recent')).toHaveTextContent('Recent');
+    // The library is still listed underneath, and only its own foods can be edited.
+    expect(screen.getByTestId('food-item-food-apple')).toBeTruthy();
+    expect(screen.queryByTestId('food-edit-food-yogurt')).toBeNull();
+    expect(mockFetchRecentFoods).toHaveBeenCalledWith('user-1');
+  });
+
+  it('re-logs a recent food in two taps, at the quantity logged last time', async () => {
+    mockFetchRecentFoods.mockResolvedValue([{ food: yogurt, quantity: 2 }]);
+    mockLogFood.mockResolvedValue({});
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('food-recent-food-yogurt'));
+    expect(await screen.findByTestId('log-food-quantity')).toHaveProp('value', '2');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('log-food-submit'));
+    });
+
+    expect(mockLogFood).toHaveBeenCalledWith(
+      'user-1',
+      yogurt,
+      2,
+      expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
+    );
+    expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('re-reads Recent after a food is edited, so it never logs the older copy', async () => {
+    const edited = { ...apple, calories: 100 };
+    mockFetchRecentFoods
+      .mockResolvedValueOnce([{ food: apple, quantity: 1 }])
+      .mockResolvedValue([{ food: edited, quantity: 1 }]);
+    mockUpdateFood.mockResolvedValue(edited);
+    mockLogFood.mockResolvedValue({});
+    renderScreen();
+    await screen.findByTestId('food-recent-food-apple');
+
+    fireEvent.press(screen.getByTestId('food-edit-food-apple'));
+    fireEvent.changeText(await screen.findByTestId('food-form-calories'), '100');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('food-form-save'));
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('food-recent-food-apple')).toHaveTextContent(/100 cal/),
+    );
+    fireEvent.press(screen.getByTestId('food-recent-food-apple'));
+    await screen.findByTestId('log-food-quantity');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('log-food-submit'));
+    });
+
+    expect(mockLogFood).toHaveBeenCalledWith('user-1', edited, 1, expect.any(String));
+  });
+
+  it('hides Recent while searching', async () => {
+    mockFetchRecentFoods.mockResolvedValue([{ food: yogurt, quantity: 2 }]);
+    renderScreen();
+    await screen.findByTestId('food-library-section-Recent');
+
+    fireEvent.changeText(screen.getByTestId('food-search'), 'app');
+
+    await waitFor(() =>
+      expect(mockFetchAllFoods).toHaveBeenCalledWith(expect.objectContaining({ search: 'app' })),
+    );
+    expect(await screen.findByTestId('food-item-food-apple')).toBeTruthy();
+    expect(screen.queryByTestId('food-library-section-Recent')).toBeNull();
+  });
+
+  it('shows Recent instead of the empty state when the library itself has no foods', async () => {
+    mockFetchAllFoods.mockResolvedValue([]);
+    mockFetchRecentFoods.mockResolvedValue([{ food: yogurt, quantity: 1 }]);
+    renderScreen();
+
+    expect(await screen.findByTestId('food-recent-food-yogurt')).toBeTruthy();
+    expect(screen.queryByTestId('food-library-empty')).toBeNull();
+  });
+
+  it('still lists the library when Recent cannot load', async () => {
+    mockFetchRecentFoods.mockRejectedValue(new Error('network error'));
+    renderScreen();
+
+    expect(await screen.findByTestId('food-item-food-apple')).toBeTruthy();
+    expect(screen.queryByTestId('food-library-section-Recent')).toBeNull();
+    expect(screen.queryByTestId('food-library-error')).toBeNull();
   });
 });
 
