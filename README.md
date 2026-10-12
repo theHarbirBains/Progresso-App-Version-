@@ -167,6 +167,13 @@ npm run format         # check formatting
 
 `apps/mobile` is currently pinned to Expo SDK 57 to match the version shipped by Expo Go; check compatibility before upgrading.
 
+iOS builds run from `apps/mobile`, which holds the project's only `app.json` and `eas.json`:
+
+```bash
+cd apps/mobile
+npx eas-cli build --platform ios --profile production
+```
+
 ## Project Status
 
 Progresso is **actively under development**. The core loop — accounts, onboarding, workout splits, live workout logging, workout history, and progress/PR analytics — is implemented and working end to end, along with a functional (if simpler) nutrition-logging feature and an app-wide Settings hub.
