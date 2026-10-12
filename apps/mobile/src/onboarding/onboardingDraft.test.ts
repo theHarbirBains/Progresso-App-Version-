@@ -49,7 +49,6 @@ const FULL_DRAFT: OnboardingDraft = {
   averageWorkoutLength: '45_60',
   trainingStylePreference: 'guided',
   selectedSplitPresetId: 'ppl',
-  appleHealthPreference: 'not_now',
   emailOptIn: true,
   pushNotificationsOptIn: false,
   pendingUsername: 'harbirb',
@@ -122,7 +121,6 @@ describe('submitOnboardingDraft', () => {
         averageWorkoutLength: '45_60',
         trainingStylePreference: 'guided',
         activeWorkoutSplitId: 'split-new',
-        appleHealthPreference: 'not_now',
         emailOptIn: true,
         pushNotificationsOptIn: false,
         username: 'harbirb',
@@ -130,6 +128,8 @@ describe('submitOnboardingDraft', () => {
         onboardingCompleted: true,
       }),
     );
+    // Onboarding no longer asks about Apple Health; there is no HealthKit integration.
+    expect(mockUpdateMyProfile.mock.calls[0][1]).not.toHaveProperty('appleHealthPreference');
   });
 
   it('skips materializing a split entirely when none was chosen', async () => {

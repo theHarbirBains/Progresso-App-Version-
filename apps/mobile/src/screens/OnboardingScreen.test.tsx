@@ -185,9 +185,6 @@ describe('OnboardingScreen', () => {
     await screen.findByTestId('onboarding-step-workout-split');
     fireEvent.press(screen.getByTestId('onboarding-step-workout-split-preset-ppl'));
 
-    await screen.findByTestId('onboarding-step-apple-health');
-    fireEvent.press(screen.getByTestId('onboarding-step-apple-health-skip'));
-
     await screen.findByTestId('onboarding-step-email-preference');
     fireEvent.press(screen.getByTestId('onboarding-email-yes'));
     fireEvent.press(screen.getByTestId('onboarding-continue'));
@@ -230,7 +227,6 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingStylePreference: 'guided',
           activeWorkoutSplitId: 'split-new',
-          appleHealthPreference: 'not_now',
           emailOptIn: true,
           pushNotificationsOptIn: false,
           username: 'harbirb',
@@ -247,7 +243,7 @@ describe('OnboardingScreen', () => {
     await AsyncStorage.setItem(
       '@progresso/onboardingDraft',
       JSON.stringify({
-        stepIndex: 15,
+        stepIndex: STEP_ORDER.indexOf('createAccount'),
         draft: {
           referralSource: 'tiktok',
           country: 'CA',
@@ -263,7 +259,6 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingStylePreference: 'guided',
           selectedSplitPresetId: 'ppl',
-          appleHealthPreference: 'not_now',
           emailOptIn: true,
           pushNotificationsOptIn: false,
         },
@@ -292,7 +287,7 @@ describe('OnboardingScreen', () => {
     await AsyncStorage.setItem(
       '@progresso/onboardingDraft',
       JSON.stringify({
-        stepIndex: 15,
+        stepIndex: STEP_ORDER.indexOf('createAccount'),
         draft: {
           referralSource: 'tiktok',
           country: 'CA',
@@ -308,7 +303,6 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingStylePreference: 'guided',
           selectedSplitPresetId: 'ppl',
-          appleHealthPreference: 'not_now',
           emailOptIn: true,
           pushNotificationsOptIn: false,
         },
@@ -380,14 +374,12 @@ describe('OnboardingScreen', () => {
 
     fireEvent.press(screen.getByTestId('onboarding-step-workout-split-create-own'));
 
-    expect(await screen.findByTestId('onboarding-step-apple-health')).toBeTruthy();
+    expect(await screen.findByTestId('onboarding-step-email-preference')).toBeTruthy();
     const stored = await AsyncStorage.getItem('@progresso/onboardingDraft');
     const draft = JSON.parse(stored as string).draft;
     expect(draft.wantsCustomSplit).toBe(true);
     expect(draft.selectedSplitPresetId).toBeNull();
 
-    fireEvent.press(screen.getByTestId('onboarding-step-apple-health-skip'));
-    await screen.findByTestId('onboarding-step-email-preference');
     fireEvent.press(screen.getByTestId('onboarding-email-yes'));
     fireEvent.press(screen.getByTestId('onboarding-continue'));
     await screen.findByTestId('onboarding-step-push-notifications');
@@ -432,7 +424,7 @@ describe('OnboardingScreen', () => {
     await AsyncStorage.setItem(
       '@progresso/onboardingDraft',
       JSON.stringify({
-        stepIndex: 15,
+        stepIndex: STEP_ORDER.indexOf('createAccount'),
         draft: {
           referralSource: 'tiktok',
           country: 'CA',
@@ -448,7 +440,6 @@ describe('OnboardingScreen', () => {
           averageWorkoutLength: '45_60',
           trainingStylePreference: 'guided',
           selectedSplitPresetId: 'ppl',
-          appleHealthPreference: 'not_now',
           emailOptIn: true,
           pushNotificationsOptIn: false,
         },
@@ -496,7 +487,6 @@ describe('OnboardingScreen', () => {
     averageWorkoutLength: '45_60',
     trainingStylePreference: 'guided',
     selectedSplitPresetId: 'ppl',
-    appleHealthPreference: 'not_now',
     emailOptIn: true,
     pushNotificationsOptIn: false,
   };
@@ -504,7 +494,7 @@ describe('OnboardingScreen', () => {
   it('requires Display Name and Username before Google sign-up, same as the email path', async () => {
     await AsyncStorage.setItem(
       '@progresso/onboardingDraft',
-      JSON.stringify({ stepIndex: 15, draft: fullyAnsweredDraft }),
+      JSON.stringify({ stepIndex: STEP_ORDER.indexOf('createAccount'), draft: fullyAnsweredDraft }),
     );
     renderScreen();
     await screen.findByTestId('onboarding-step-create-account');
@@ -519,7 +509,7 @@ describe('OnboardingScreen', () => {
     mockSignInWithProvider.mockResolvedValue('Google sign-in failed');
     await AsyncStorage.setItem(
       '@progresso/onboardingDraft',
-      JSON.stringify({ stepIndex: 15, draft: fullyAnsweredDraft }),
+      JSON.stringify({ stepIndex: STEP_ORDER.indexOf('createAccount'), draft: fullyAnsweredDraft }),
     );
     renderScreen();
     await screen.findByTestId('onboarding-step-create-account');
@@ -553,7 +543,6 @@ describe('OnboardingScreen -- notifications step', () => {
     averageWorkoutLength: '45_60',
     trainingStylePreference: 'guided',
     selectedSplitPresetId: 'ppl',
-    appleHealthPreference: 'not_now',
     emailOptIn: true,
   };
 

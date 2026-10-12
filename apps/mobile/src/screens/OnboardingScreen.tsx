@@ -480,25 +480,6 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
           </>
         ) : null}
 
-        {step === 'appleHealth' ? (
-          <PermissionStep
-            testID="onboarding-step-apple-health"
-            icon="heart"
-            title="Connect Apple Health"
-            description="Sync activity and workouts with Apple Health. You can connect this later from Settings."
-            connectLabel="Connect Apple Health"
-            skipLabel="Not Now"
-            onConnect={() => {
-              updateDraft({ appleHealthPreference: 'connected' });
-              advance();
-            }}
-            onSkip={() => {
-              updateDraft({ appleHealthPreference: 'not_now' });
-              advance();
-            }}
-          />
-        ) : null}
-
         {step === 'emailPreference' ? (
           <>
             <Text style={styles.stepTitle}>Would you like to receive emails from Progresso?</Text>

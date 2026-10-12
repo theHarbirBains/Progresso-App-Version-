@@ -5,39 +5,39 @@ describe('PermissionStep', () => {
   it('renders the title/description and both actions', () => {
     render(
       <PermissionStep
-        testID="apple-health"
-        icon="heart"
-        title="Apple Health"
-        description="Sync your activity"
-        connectLabel="Connect Apple Health"
+        testID="notifications"
+        icon="bell"
+        title="Stay in the loop"
+        description="Get workout reminders"
+        connectLabel="Allow"
         skipLabel="Not Now"
         onConnect={jest.fn()}
         onSkip={jest.fn()}
       />,
     );
 
-    expect(screen.getByText('Apple Health')).toBeTruthy();
-    expect(screen.getByText('Sync your activity')).toBeTruthy();
-    expect(screen.getByTestId('apple-health-connect')).toBeTruthy();
-    expect(screen.getByTestId('apple-health-skip')).toBeTruthy();
+    expect(screen.getByText('Stay in the loop')).toBeTruthy();
+    expect(screen.getByText('Get workout reminders')).toBeTruthy();
+    expect(screen.getByTestId('notifications-connect')).toBeTruthy();
+    expect(screen.getByTestId('notifications-skip')).toBeTruthy();
   });
 
   it('calls onConnect when the primary action is pressed', () => {
     const onConnect = jest.fn();
     render(
       <PermissionStep
-        testID="apple-health"
-        icon="heart"
+        testID="notifications"
+        icon="bell"
         title="t"
         description="d"
-        connectLabel="Connect"
+        connectLabel="Allow"
         skipLabel="Not Now"
         onConnect={onConnect}
         onSkip={jest.fn()}
       />,
     );
 
-    fireEvent.press(screen.getByTestId('apple-health-connect'));
+    fireEvent.press(screen.getByTestId('notifications-connect'));
 
     expect(onConnect).toHaveBeenCalled();
   });
@@ -46,18 +46,18 @@ describe('PermissionStep', () => {
     const onSkip = jest.fn();
     render(
       <PermissionStep
-        testID="apple-health"
-        icon="heart"
+        testID="notifications"
+        icon="bell"
         title="t"
         description="d"
-        connectLabel="Connect"
+        connectLabel="Allow"
         skipLabel="Not Now"
         onConnect={jest.fn()}
         onSkip={onSkip}
       />,
     );
 
-    fireEvent.press(screen.getByTestId('apple-health-skip'));
+    fireEvent.press(screen.getByTestId('notifications-skip'));
 
     expect(onSkip).toHaveBeenCalled();
   });

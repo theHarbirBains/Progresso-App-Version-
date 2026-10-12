@@ -1,7 +1,6 @@
 import {
   registerPushToken,
   updateMyProfile,
-  type AppleHealthPreference,
   type AverageWorkoutLength,
   type FitnessGoal,
   type Gender,
@@ -53,7 +52,6 @@ export interface OnboardingDraft {
    * split" gate sends a user to ChooseWorkoutSplitScreen's real, working
    * "Create Custom Split" from -- no separate post-signup routing needed. */
   wantsCustomSplit: boolean;
-  appleHealthPreference: AppleHealthPreference | null;
   emailOptIn: boolean | null;
   pushNotificationsOptIn: boolean | null;
   /** Set by CreateAccountStep's own form, right as it submits -- kept here
@@ -90,7 +88,6 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   trainingStylePreference: null,
   selectedSplitPresetId: null,
   wantsCustomSplit: false,
-  appleHealthPreference: null,
   emailOptIn: null,
   pushNotificationsOptIn: null,
   pendingUsername: null,
@@ -116,7 +113,6 @@ export const STEP_ORDER = [
   'averageWorkoutLength',
   'trainingStyle',
   'workoutSplit',
-  'appleHealth',
   'emailPreference',
   'pushNotifications',
   'createAccount',
@@ -153,8 +149,6 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
       return draft.trainingStylePreference != null;
     case 'workoutSplit':
       return draft.selectedSplitPresetId != null || draft.wantsCustomSplit;
-    case 'appleHealth':
-      return draft.appleHealthPreference != null;
     case 'emailPreference':
       return draft.emailOptIn != null;
     case 'pushNotifications':
@@ -189,8 +183,6 @@ function draftToProfileInput(draft: OnboardingDraft): UpdateProfileInput {
   if (draft.trainingStylePreference != null) {
     input.trainingStylePreference = draft.trainingStylePreference;
   }
-  if (draft.appleHealthPreference != null)
-    input.appleHealthPreference = draft.appleHealthPreference;
   if (draft.emailOptIn != null) input.emailOptIn = draft.emailOptIn;
   if (draft.pushNotificationsOptIn != null) {
     input.pushNotificationsOptIn = draft.pushNotificationsOptIn;

@@ -177,6 +177,6 @@ Progresso is **past the Phase 0 foundation** and has an implemented core loop, n
 **Explicitly placeholder (visible in the UI, not backed by real functionality):**
 
 - Delete Account (Settings → Account & Security).
-- Apple Health connection (onboarding) — no HealthKit integration.
+- Apple Health — not offered; onboarding's former placeholder step was removed until HealthKit is approved.
 
 **Not yet started:** nutrition analytics/trends, privacy tooling (data export, account deletion), full admin dashboard, design-polish pass beyond the current theme system, beta launch preparation, and everything listed under Post-v1 in Section 16.

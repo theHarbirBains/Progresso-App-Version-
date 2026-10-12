@@ -50,7 +50,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Theme/accent color customization, applied consistently across primary buttons and controls app-wide
 - Notification preferences: push and email opt-in toggles are real and persisted; more granular categories (workout reminders, PR alerts, weekly summaries) are shown as explicit "Coming Soon" rows rather than toggles that wouldn't do anything
 - Delete Account is visible in the UI but not yet implemented ("Coming Soon")
-- Apple Health connection is a preference-only placeholder in onboarding — there is no HealthKit integration
+- There is no Apple Health (HealthKit) integration, and onboarding doesn't offer one
 
 **Social**
 
@@ -182,7 +182,7 @@ Some areas are intentionally incomplete rather than hidden:
 
 - **Notifications**: opt-in preferences are real and saved; actual notification delivery (push or email) is not implemented.
 - **Account actions**: Delete Account is visible in Settings but marked "Coming Soon."
-- **Apple Health**: onboarding shows a connect step, but it's a preference placeholder with no real HealthKit integration.
+- **Apple Health**: not offered; there is no HealthKit integration.
 - **Admin**: role-based authorization is implemented and tested end to end, but the admin surface itself is a minimal placeholder route, not a full admin dashboard.
 
 Social v1 (a follow graph and a read-only Friends feed) is implemented and real, not a placeholder — see the Social section above. Likes, comments, and leaderboards are not built yet.
