@@ -13,6 +13,7 @@ import { colors } from '../design/theme';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import { computeDurationMinutes } from '../workouts/topSetSummary';
@@ -51,6 +52,7 @@ function formatDateTime(iso: string): string {
 // that set is still the live record.
 export function WorkoutDetailScreen({ route, navigation }: Props) {
   const { workoutId, clientId, clientName } = route.params;
+  const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   // A trainer removes a client's workout from the client's history, or the user
   // removes one of their own, from their own history -- either way it's a soft
@@ -68,7 +70,11 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           style: 'destructive',
           onPress: () => {
             deleteWorkout(workoutId)
-              .then(() => navigation.goBack())
+              .then(() => {
+                // A client's workout was never part of the trainer's own stats.
+                if (!clientId) void refetchAllTimeStats();
+                navigation.goBack();
+              })
               .catch((err: unknown) =>
                 Alert.alert('Could not delete', err instanceof Error ? err.message : 'Try again'),
               );

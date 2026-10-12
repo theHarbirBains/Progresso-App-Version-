@@ -7,6 +7,7 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { getMyProfile } from '../lib/api';
 import { ProfileProvider } from '../profile/ProfileProvider';
+import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import { deleteWorkout, fetchWorkoutDetail } from '../workouts/workoutQueries';
 import { WorkoutDetailScreen } from './WorkoutDetailScreen';
@@ -31,7 +32,13 @@ jest.mock('../workouts/prQueries', () => ({
   fetchOneRepMax: jest.fn(),
 }));
 
+jest.mock('../progress/AllTimeStatsProvider', () => ({
+  useAllTimeStats: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
+const mockUseAllTimeStats = useAllTimeStats as jest.Mock;
+const mockRefetchAllTimeStats = jest.fn();
 const mockGetMyProfile = getMyProfile as jest.Mock;
 const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 const mockFetchRepPRs = fetchRepPRs as jest.Mock;
@@ -81,6 +88,8 @@ beforeEach(() => {
   mockFetchRepPRs.mockReset().mockResolvedValue([]);
   mockFetchOneRepMax.mockReset().mockResolvedValue(null);
   mockDeleteWorkout.mockClear().mockResolvedValue(undefined);
+  mockRefetchAllTimeStats.mockReset().mockResolvedValue(true);
+  mockUseAllTimeStats.mockReturnValue({ refetch: mockRefetchAllTimeStats });
   mockGoBack.mockClear();
   mockNavigate.mockClear();
 });
@@ -485,6 +494,8 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
 
     await waitFor(() => expect(deleteWorkout).toHaveBeenCalledWith('w1'));
     await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
+    // The client's workout never counted toward the trainer's own stats.
+    expect(mockRefetchAllTimeStats).not.toHaveBeenCalled();
     alert.mockRestore();
   });
 
@@ -507,6 +518,26 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
 
     await waitFor(() => expect(deleteWorkout).toHaveBeenCalledWith('w1'));
     await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
+    // Profile stats, Progress and PRs drop the deleted workout right away.
+    expect(mockRefetchAllTimeStats).toHaveBeenCalledTimes(1);
+    alert.mockRestore();
+  });
+
+  it('keeps the stats untouched when the delete fails', async () => {
+    const { Alert } = jest.requireActual('react-native');
+    mockDeleteWorkout.mockRejectedValueOnce(new Error('Network down'));
+    const alert = jest.spyOn(Alert, 'alert');
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    fireEvent.press(await screen.findByTestId('workout-detail-delete'));
+    const buttons = (alert.mock.calls[0][2] ?? []) as { text?: string; onPress?: () => void }[];
+    buttons.find((button) => button.text === 'Delete')?.onPress?.();
+
+    await waitFor(() => expect(alert).toHaveBeenCalledWith('Could not delete', 'Network down'));
+    expect(mockRefetchAllTimeStats).not.toHaveBeenCalled();
+    expect(mockGoBack).not.toHaveBeenCalled();
     alert.mockRestore();
   });
 });
