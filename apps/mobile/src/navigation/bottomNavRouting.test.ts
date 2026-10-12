@@ -27,6 +27,7 @@ describe('routeToBottomNavTab', () => {
     expect(routeToBottomNavTab('SettingsAppearance')).toBe('you');
     expect(routeToBottomNavTab('SettingsNotifications')).toBe('you');
     expect(routeToBottomNavTab('SettingsAccountSecurity')).toBe('you');
+    expect(routeToBottomNavTab('SettingsChangePassword')).toBe('you');
     expect(routeToBottomNavTab('SettingsSupport')).toBe('you');
   });
 

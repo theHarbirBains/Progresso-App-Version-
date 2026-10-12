@@ -15,17 +15,13 @@ type Props = RootStackScreenProps<'SettingsAccountSecurity'>;
  * Account & Security: credentials, sign-out, account deletion, and the two
  * legal links -- grouped together per their shared "account access/privacy
  * action" purpose, rather than split across Account/Privacy the way the old
- * in-screen tabs had them. Change Password/Change Email/Delete Account are
- * visible but not yet backed by real functionality (same "Coming Soon"
- * precedent used throughout Settings); Sign Out reuses the existing
- * signOut() exactly as before.
+ * in-screen tabs had them. Change Email/Delete Account are visible but not
+ * yet backed by real functionality (same "Coming Soon" precedent used
+ * throughout Settings); Change Password opens its own subpage; Sign Out
+ * reuses the existing signOut() exactly as before.
  */
 export function SettingsAccountSecurityScreen({ navigation }: Props) {
   const { user, signOut } = useAuth();
-
-  function handleNotYetAvailable(feature: string) {
-    Alert.alert(feature, `${feature} isn't available yet -- check back in a future update.`);
-  }
 
   function handleDeleteAccount() {
     Alert.alert(
@@ -64,7 +60,7 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
           testID="account-change-password"
           icon="lock"
           title="Change Password"
-          onPress={() => handleNotYetAvailable('Change Password')}
+          onPress={() => navigation.navigate('SettingsChangePassword')}
         />
       </Section>
 

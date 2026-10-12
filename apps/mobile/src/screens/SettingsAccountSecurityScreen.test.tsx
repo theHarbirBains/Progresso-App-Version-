@@ -47,14 +47,12 @@ describe('SettingsAccountSecurityScreen', () => {
     expect(screen.getByTestId('account-change-email')).toHaveTextContent(/Coming Soon/);
   });
 
-  it('shows Change Password as not yet available rather than performing a fake action', () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  it('opens Change Password', () => {
     renderScreen();
 
     fireEvent.press(screen.getByTestId('account-change-password'));
 
-    expect(alertSpy).toHaveBeenCalledWith('Change Password', expect.any(String));
-    alertSpy.mockRestore();
+    expect(navigation.navigate).toHaveBeenCalledWith('SettingsChangePassword');
   });
 
   it('calls signOut when the sign-out row is pressed', () => {

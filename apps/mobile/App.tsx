@@ -74,6 +74,7 @@ import { ProgressOverviewScreen } from './src/screens/ProgressOverviewScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { SettingsAccountSecurityScreen } from './src/screens/SettingsAccountSecurityScreen';
 import { SettingsAppearanceScreen } from './src/screens/SettingsAppearanceScreen';
+import { SettingsChangePasswordScreen } from './src/screens/SettingsChangePasswordScreen';
 import { SettingsNotificationsScreen } from './src/screens/SettingsNotificationsScreen';
 import { SettingsNutritionScreen } from './src/screens/SettingsNutritionScreen';
 import { SettingsPersonalInfoScreen } from './src/screens/SettingsPersonalInfoScreen';
@@ -284,6 +285,10 @@ function Root() {
                 <Stack.Screen
                   name="SettingsAccountSecurity"
                   component={SettingsAccountSecurityScreen}
+                />
+                <Stack.Screen
+                  name="SettingsChangePassword"
+                  component={SettingsChangePasswordScreen}
                 />
                 <Stack.Screen name="SettingsSupport" component={SettingsSupportScreen} />
                 <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />

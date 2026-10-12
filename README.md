@@ -49,7 +49,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - App-level Settings hub organized into horizontal category tabs: Account, Appearance, App, Notifications, Privacy, Help
 - Theme/accent color customization, applied consistently across primary buttons and controls app-wide
 - Notification preferences: push and email opt-in toggles are real and persisted; more granular categories (workout reminders, PR alerts, weekly summaries) are shown as explicit "Coming Soon" rows rather than toggles that wouldn't do anything
-- Change Password and Delete Account are visible in the UI but not yet implemented ("Coming Soon")
+- Delete Account is visible in the UI but not yet implemented ("Coming Soon")
 - Apple Health connection is a preference-only placeholder in onboarding — there is no HealthKit integration
 
 **Social**
@@ -181,7 +181,7 @@ Progresso is **actively under development**. The core loop — accounts, onboard
 Some areas are intentionally incomplete rather than hidden:
 
 - **Notifications**: opt-in preferences are real and saved; actual notification delivery (push or email) is not implemented.
-- **Account actions**: Change Password and Delete Account are visible in Settings but marked "Coming Soon."
+- **Account actions**: Delete Account is visible in Settings but marked "Coming Soon."
 - **Apple Health**: onboarding shows a connect step, but it's a preference placeholder with no real HealthKit integration.
 - **Admin**: role-based authorization is implemented and tested end to end, but the admin surface itself is a minimal placeholder route, not a full admin dashboard.
 
@@ -192,7 +192,7 @@ Social v1 (a follow graph and a read-only Friends feed) is implemented and real,
 Planned, not yet built:
 
 - Real notification delivery (push/email) behind the existing opt-in preferences
-- Account actions: password change and account deletion
+- Account actions: account deletion
 - A fuller admin dashboard (user management, support tooling, analytics) on top of the existing role/authorization system
 - Milestones (a scoped-but-not-yet-designed addition to the Progress section)
 
