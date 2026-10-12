@@ -11,6 +11,7 @@ import type { NutritionSource } from '../nutrition-resolution/source.interface';
 import { cookingWordsIn, withoutCookingWords } from '../nutrition-resolution/cooking';
 import { CatalogNutritionSource } from './sources/catalog.source';
 import { OpenFoodFactsNutritionSource } from './sources/open-food-facts.source';
+import { timeLimited } from './sources/time-limited.source';
 import { UsdaNutritionSource } from './sources/usda.source';
 import {
   buildInterpretation,
@@ -54,6 +55,16 @@ const AMOUNT_QUESTION = /\b(how much|how many|what amount|quantity|serving size)
 const LEADING_AMOUNT = /^\s*\d+(?:\.\d+)?\s*[a-zA-Z]{0,12}\s+/;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The app waits 45 s for an AI Food Search request (see the mobile foodsApi). The server stops
+// looking well before that, so the user gets what was found in time instead of a timeout.
+const AI_REQUEST_BUDGET_MS = 30_000;
+// How long one source may take per search. Progresso's own tables answer in well under a
+// second; Open Food Facts is a public service that is sometimes slow.
+const DATABASE_SOURCE_LIMIT_MS = 5_000;
+const OPEN_FOOD_FACTS_LIMIT_MS = 8_000;
+// An AI estimate is only started with at least this much of the budget left.
+const MIN_ESTIMATE_MS = 5_000;
 
 const FOOD_COLUMNS =
   'id, name, brand, image_url, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, provider, barcode';
@@ -108,11 +119,16 @@ export class FoodsService {
    * come from data. Claude's memory is used only as a labelled last resort, for a component
    * no source matched and whose amount is known. Nothing is saved here: the client saves only
    * when the user taps Add to Food Library.
+   *
+   * The whole request answers within AI_REQUEST_BUDGET_MS. The parts are looked up at the same
+   * time, so a meal takes about as long as its slowest part.
    */
   async interpretDescription(description: string): Promise<InterpretFoodResponse> {
+    const startedAt = Date.now();
+    const deadline = startedAt + AI_REQUEST_BUDGET_MS;
     const parsed = await this.withFoodFromAmountQuestion(
       description,
-      await this.nutritionProvider.parse(description),
+      await this.nutritionProvider.parse(description, deadline),
     );
     // Only a description with no food to look up is sent back as a question. A missing amount is
     // handled by the resolver, which asks for it with the source's own options.
@@ -123,10 +139,10 @@ export class FoodsService {
       };
     }
 
-    const statuses: ComponentStatus[] = [];
-    for (const request of requestsFromParsed(parsed)) {
-      statuses.push(await this.resolveRequest(request, null));
-    }
+    const statuses = await Promise.all(
+      requestsFromParsed(parsed).map((request) => this.resolveRequest(request, null, deadline)),
+    );
+    this.logger.log(`AI food search: ${statuses.length} parts in ${Date.now() - startedAt} ms`);
     return {
       status: 'ok',
       interpretation: buildInterpretation(parsed.main.name, parsed.preparation, statuses),
@@ -135,13 +151,14 @@ export class FoodsService {
 
   /**
    * Resolves one component the user was still waiting on: after they picked a candidate
-   * (pick is set), or after they gave an amount. Only that component is re-run.
+   * (pick is set), or after they gave an amount. Only that component is re-run, within the same
+   * time budget as a whole search.
    */
   async resolveComponent(
     request: ComponentRequest,
     pick: ComponentPick | null,
   ): Promise<ComponentStatus> {
-    return this.resolveRequest(request, pick);
+    return this.resolveRequest(request, pick, Date.now() + AI_REQUEST_BUDGET_MS);
   }
 
   /**
@@ -168,6 +185,7 @@ export class FoodsService {
   private async resolveRequest(
     request: ComponentRequest,
     pick: ComponentPick | null,
+    deadline: number,
   ): Promise<ComponentStatus> {
     const outcome = await resolveComponent(
       {
@@ -181,7 +199,7 @@ export class FoodsService {
         quantity: request.quantity,
         pick,
       },
-      this.sourcesFor(request),
+      this.sourcesFor(request, deadline),
     );
     const status = statusFromOutcome(request, outcome);
     if (status.state !== 'not_found' || pick !== null) return status;
@@ -197,7 +215,7 @@ export class FoodsService {
           quantity: request.quantity,
           pick: null,
         },
-        this.sourcesFor(request),
+        this.sourcesFor(request, deadline),
       );
       const retried = statusFromOutcome(request, retry);
       if (retried.state === 'resolved') {
@@ -219,19 +237,33 @@ export class FoodsService {
         reason: 'No food data matched this. How much did you have?',
       };
     }
-    return this.estimateRequest(request, request.quantity);
+    return this.estimateRequest(request, request.quantity, deadline);
   }
 
   /**
    * The order sources are tried in. A named brand or a barcode points at a product, so branded
    * sources come before generic data. Otherwise generic data comes first, and branded products
-   * after it. The Progresso catalog is always first.
+   * after it. The Progresso catalog is always first. Each source has a time limit (see
+   * timeLimited): one that runs out is skipped, so the next source still gets its turn.
    */
-  private sourcesFor(request: ComponentRequest): NutritionSource[] {
-    const catalog = new CatalogNutritionSource(this.supabaseService);
-    const usda = new UsdaNutritionSource(this.supabaseService);
-    const offSearch = new OpenFoodFactsNutritionSource(this.provider, 'search');
-    const offBarcode = new OpenFoodFactsNutritionSource(this.provider, 'barcode');
+  private sourcesFor(request: ComponentRequest, deadline: number): NutritionSource[] {
+    const limit = (source: NutritionSource, limitMs: number) =>
+      timeLimited(source, limitMs, deadline, (slow, waitedMs) =>
+        this.logger.warn(`Nutrition source ${slow.kind} took longer than ${waitedMs} ms; skipped`),
+      );
+    const catalog = limit(
+      new CatalogNutritionSource(this.supabaseService),
+      DATABASE_SOURCE_LIMIT_MS,
+    );
+    const usda = limit(new UsdaNutritionSource(this.supabaseService), DATABASE_SOURCE_LIMIT_MS);
+    const offSearch = limit(
+      new OpenFoodFactsNutritionSource(this.provider, 'search'),
+      OPEN_FOOD_FACTS_LIMIT_MS,
+    );
+    const offBarcode = limit(
+      new OpenFoodFactsNutritionSource(this.provider, 'barcode'),
+      OPEN_FOOD_FACTS_LIMIT_MS,
+    );
     if (request.barcode) return [catalog, offBarcode, offSearch];
     if (request.brand) return [catalog, offSearch, usda];
     return [catalog, usda, offSearch];
@@ -240,10 +272,20 @@ export class FoodsService {
   private async estimateRequest(
     request: ComponentRequest,
     quantity: Amount,
+    deadline: number,
   ): Promise<ComponentStatus> {
+    // Too little of the budget is left for an estimate; the user can search again.
+    if (deadline - Date.now() < MIN_ESTIMATE_MS) {
+      return {
+        state: 'not_found',
+        request,
+        reason: 'This took too long to look up. Please try again.',
+      };
+    }
     try {
       const estimate = await this.nutritionProvider.estimate(
         `${quantity.amount} ${quantity.unit} of ${request.name}`,
+        deadline,
       );
       return {
         state: 'ai_estimate',

@@ -740,7 +740,10 @@ describe('FoodsService.interpretDescription', () => {
 
     const result = interpretation(await service.interpretDescription('100 g dragon fruit'));
 
-    expect(nutritionProvider.estimate).toHaveBeenCalledWith('100 g of dragon fruit');
+    expect(nutritionProvider.estimate).toHaveBeenCalledWith(
+      '100 g of dragon fruit',
+      expect.any(Number),
+    );
     const main = result.components[0]!;
     if (main.state !== 'ai_estimate') throw new Error('expected ai_estimate');
     expect(main.component.provenance).toMatchObject({
@@ -895,6 +898,140 @@ describe('FoodsService: resolver outcomes are never retried', () => {
     await service.interpretDescription('potato');
 
     expect(nutritionProvider.parse).toHaveBeenCalledTimes(2);
+    expect(nutritionProvider.estimate).not.toHaveBeenCalled();
+  });
+});
+
+describe('FoodsService: AI Food Search answers within its time budget', () => {
+  const dragonFruit = {
+    clarification: null,
+    preparation: null,
+    main: parsedComponent('dragon fruit', 'dragon fruit', 100, 'g'),
+    addedIngredients: [],
+  };
+
+  /** An Open Food Facts search that never answers. */
+  function hangingProvider() {
+    return mockProvider({ searchFoods: jest.fn(() => new Promise<never>(() => undefined)) });
+  }
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('gives the parser the deadline for the whole request, 30 s from the start', async () => {
+    const { service, nutritionProvider } = interpreter(dragonFruit);
+
+    const before = Date.now();
+    await service.interpretDescription('100 g dragon fruit');
+
+    const deadline = nutritionProvider.parse.mock.calls[0][1] as number;
+    expect(deadline).toBeGreaterThanOrEqual(before + 30_000);
+    expect(deadline).toBeLessThanOrEqual(Date.now() + 30_000);
+  });
+
+  it('looks up the parts of a meal at the same time, keeping their order', async () => {
+    // Counts catalog queries in flight, each answering a little later.
+    let inFlight = 0;
+    let mostAtOnce = 0;
+    const catalog = catalogSupabase(CATALOG).getClient();
+    const from = jest.fn((table: string) => {
+      const builder = catalog.from(table) as unknown as Record<string, unknown>;
+      const answer = builder.then as (
+        resolve: (v: Result) => unknown,
+        reject: (e: unknown) => unknown,
+      ) => Promise<unknown>;
+      builder.then = (resolve: (v: Result) => unknown, reject: (e: unknown) => unknown) => {
+        inFlight += 1;
+        mostAtOnce = Math.max(mostAtOnce, inFlight);
+        return new Promise((wait) => setTimeout(wait, 20)).then(() => {
+          inFlight -= 1;
+          return answer(resolve, reject);
+        });
+      };
+      return builder;
+    });
+    const nutritionProvider = {
+      parse: jest.fn().mockResolvedValue({
+        clarification: null,
+        preparation: 'scrambled',
+        main: parsedComponent('eggs', 'egg', 2, 'large'),
+        addedIngredients: [
+          parsedComponent('butter', 'butter', 1, 'tbsp'),
+          parsedComponent('banana', 'banana', 1, 'medium'),
+        ],
+      }),
+      estimate: jest.fn(),
+    };
+    const service = new FoodsService(
+      { getClient: () => ({ from }) } as unknown as SupabaseService,
+      mockProvider(),
+      nutritionProvider as unknown as AnthropicNutritionProvider,
+    );
+
+    const result = interpretation(
+      await service.interpretDescription('2 large scrambled eggs with butter and a banana'),
+    );
+
+    expect(mostAtOnce).toBe(3);
+    expect(result.components.map((component) => component.request.name)).toEqual([
+      'eggs',
+      'butter',
+      'banana',
+    ]);
+    expect(result.components.every((component) => component.state === 'resolved')).toBe(true);
+  });
+
+  it('skips a source that takes too long, so the next step still runs', async () => {
+    jest.useFakeTimers();
+    const nutritionProvider = {
+      parse: jest.fn().mockResolvedValue(dragonFruit),
+      estimate: jest.fn().mockResolvedValue(DEFAULT_ESTIMATE),
+    };
+    const service = new FoodsService(
+      catalogSupabase(CATALOG),
+      hangingProvider(),
+      nutritionProvider as unknown as AnthropicNutritionProvider,
+    );
+
+    let finished = false;
+    const pending = service.interpretDescription('100 g dragon fruit').then((result) => {
+      finished = true;
+      return result;
+    });
+    await jest.advanceTimersByTimeAsync(7_999);
+    expect(finished).toBe(false);
+    await jest.advanceTimersByTimeAsync(1);
+
+    const result = interpretation(await pending);
+    // Open Food Facts gave up after 8 s; the labelled estimate still had time to run.
+    expect(result.components[0]).toMatchObject({ state: 'ai_estimate' });
+    expect(nutritionProvider.estimate).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up on a part when the budget runs out, rather than keeping the app waiting', async () => {
+    jest.useFakeTimers();
+    const nutritionProvider = {
+      // The parser alone takes 26 of the 30 seconds.
+      parse: jest.fn(
+        () => new Promise((resolve) => setTimeout(() => resolve(dragonFruit), 26_000)),
+      ),
+      estimate: jest.fn().mockResolvedValue(DEFAULT_ESTIMATE),
+    };
+    const service = new FoodsService(
+      catalogSupabase(CATALOG),
+      hangingProvider(),
+      nutritionProvider as unknown as AnthropicNutritionProvider,
+    );
+
+    const pending = service.interpretDescription('100 g dragon fruit');
+    await jest.advanceTimersByTimeAsync(30_000);
+
+    const result = interpretation(await pending);
+    expect(result.components[0]).toMatchObject({
+      state: 'not_found',
+      reason: 'This took too long to look up. Please try again.',
+    });
     expect(nutritionProvider.estimate).not.toHaveBeenCalled();
   });
 });

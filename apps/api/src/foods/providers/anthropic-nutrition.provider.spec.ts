@@ -367,3 +367,57 @@ describe('AnthropicNutritionProvider: one retry for transient failures', () => {
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('AnthropicNutritionProvider: the request deadline', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  /** Requests that only end when they are aborted. */
+  function hangUntilAborted() {
+    (global.fetch as jest.Mock).mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+  }
+
+  it('waits no longer than the deadline, and then gives up without a retry', async () => {
+    hangUntilAborted();
+    const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));
+
+    const error = provider.parse('100 g rice', Date.now() + 5000).catch((e: unknown) => e);
+    await jest.advanceTimersByTimeAsync(5000);
+
+    expect(await error).toBeInstanceOf(BadGatewayException);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the retry when too little time is left for one', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 503 });
+    const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));
+
+    const error = await provider.estimate('anything', Date.now() + 3000).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(BadGatewayException);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('still retries a quick failure when there is time left', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 503 });
+    mockFetchOnce(parseToolResponse(VALID_PARSE));
+    const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));
+
+    const result = provider.parse('100 grams of air fried potatoes', Date.now() + 10_000);
+    await jest.advanceTimersByTimeAsync(400);
+
+    await expect(result).resolves.toEqual(VALID_PARSE);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+});

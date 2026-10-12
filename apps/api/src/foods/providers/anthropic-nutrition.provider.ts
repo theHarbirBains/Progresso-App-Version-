@@ -16,6 +16,8 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 const REQUEST_TIMEOUT_MS = 20000;
 const RETRY_DELAY_MS = 400;
+// A second attempt is only made when the request still has at least this long left for it.
+const MIN_RETRY_MS = 3000;
 const MAX_TOKENS = 1024;
 
 /** The one message a user sees when AI food search can't complete. */
@@ -276,6 +278,9 @@ function toParsed(input: unknown): ParsedFoodDescription | null {
  * Both use forced tool use, so the API itself validates the reply's shape
  * before our own checks run. Either throws on any failure: there's no local
  * data to degrade to for an arbitrary free-text description.
+ *
+ * Both take the time the whole request must answer by, as `deadline`: no
+ * attempt waits past it, so the app gets an answer before it gives up.
  */
 @Injectable()
 export class AnthropicNutritionProvider {
@@ -283,18 +288,30 @@ export class AnthropicNutritionProvider {
 
   constructor(private readonly configService: ConfigService<EnvironmentVariables, true>) {}
 
-  async parse(description: string): Promise<ParsedFoodDescription> {
-    return this.withOneRetry('parse', async () => {
-      const body = await this.call('parse', description, PARSE_SYSTEM_PROMPT, PARSE_TOOL);
+  async parse(description: string, deadline?: number): Promise<ParsedFoodDescription> {
+    return this.withOneRetry('parse', deadline, async (timeoutMs) => {
+      const body = await this.call(
+        'parse',
+        description,
+        PARSE_SYSTEM_PROMPT,
+        PARSE_TOOL,
+        timeoutMs,
+      );
       const parsed = toParsed(body);
       if (!parsed) throw new UnusableReplyError('food_parse reply was not usable');
       return parsed;
     });
   }
 
-  async estimate(description: string): Promise<NutritionEstimate> {
-    return this.withOneRetry('estimate', async () => {
-      const body = await this.call('estimate', description, ESTIMATE_SYSTEM_PROMPT, ESTIMATE_TOOL);
+  async estimate(description: string, deadline?: number): Promise<NutritionEstimate> {
+    return this.withOneRetry('estimate', deadline, async (timeoutMs) => {
+      const body = await this.call(
+        'estimate',
+        description,
+        ESTIMATE_SYSTEM_PROMPT,
+        ESTIMATE_TOOL,
+        timeoutMs,
+      );
       const result = toEstimate(body);
       if (!result) throw new UnusableReplyError('nutrition_estimate reply was not usable');
       return result;
@@ -306,19 +323,30 @@ export class AnthropicNutritionProvider {
    * timeout, a 5xx response, or a reply that failed validation. Anything else (a 4xx, a missing
    * key) is not retried, because another attempt would fail the same way. The delay only happens
    * after a failure, so a successful call is never slowed down. A second failure becomes one clean
-   * error for the user, never a raw network message.
+   * error for the user, never a raw network message. Each attempt waits only until the deadline,
+   * and there is no second attempt when too little time is left for one.
    */
-  private async withOneRetry<T>(label: string, run: () => Promise<T>): Promise<T> {
+  private async withOneRetry<T>(
+    label: string,
+    deadline: number | undefined,
+    run: (timeoutMs: number) => Promise<T>,
+  ): Promise<T> {
     try {
-      return await run();
+      return await run(attemptTimeout(deadline));
     } catch (error) {
       if (!isTransient(error)) throw error;
+      if (attemptTimeout(deadline) < RETRY_DELAY_MS + MIN_RETRY_MS) {
+        this.logger.warn(
+          `Anthropic ${label} failed transiently, with no time left to retry: ${errorText(error)}`,
+        );
+        throw new BadGatewayException(AI_FAILURE_MESSAGE);
+      }
       this.logger.warn(`Anthropic ${label} failed transiently; retrying once: ${errorText(error)}`);
     }
 
     await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
     try {
-      return await run();
+      return await run(attemptTimeout(deadline));
     } catch (error) {
       if (isTransient(error)) {
         this.logger.warn(`Anthropic ${label} failed again: ${errorText(error)}`);
@@ -333,6 +361,7 @@ export class AnthropicNutritionProvider {
     description: string,
     system: string,
     tool: { name: string; description: string; input_schema: object },
+    timeoutMs: number,
   ): Promise<unknown> {
     const apiKey = this.configService.get('ANTHROPIC_API_KEY', { infer: true });
     if (!apiKey) {
@@ -340,7 +369,7 @@ export class AnthropicNutritionProvider {
     }
 
     const startedAt = Date.now();
-    const response = await this.request(apiKey, description, system, tool);
+    const response = await this.request(apiKey, description, system, tool, timeoutMs);
     const reply = (await response.json()) as AnthropicMessageResponse;
     this.logger.log(
       `Anthropic ${label}: ${reply.usage?.input_tokens ?? '?'} input / ${reply.usage?.output_tokens ?? '?'} output tokens, ${Date.now() - startedAt} ms`,
@@ -358,9 +387,10 @@ export class AnthropicNutritionProvider {
     description: string,
     system: string,
     tool: { name: string; description: string; input_schema: object },
+    timeoutMs: number,
   ): Promise<Response> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     let response: Response;
     try {
       response = await fetch(API_URL, {
@@ -395,6 +425,12 @@ export class AnthropicNutritionProvider {
     }
     return response;
   }
+}
+
+/** How long one attempt may wait: the usual limit, or less when the request's deadline is sooner. */
+function attemptTimeout(deadline: number | undefined): number {
+  if (deadline === undefined) return REQUEST_TIMEOUT_MS;
+  return Math.max(0, Math.min(REQUEST_TIMEOUT_MS, deadline - Date.now()));
 }
 
 /** A failure another attempt could fix: a network error, a timeout, a 5xx, or an unusable reply. */

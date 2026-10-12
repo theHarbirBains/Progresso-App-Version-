@@ -64,6 +64,16 @@ function escapeCell(text: string): string {
   return text.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 }
 
+/** The time within which `share` of the runs finished, e.g. 0.95 for the 95th percentile. */
+function percentile(durationsMs: number[], share: number): number {
+  const sorted = [...durationsMs].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil(share * sorted.length) - 1)] ?? 0;
+}
+
+function seconds(ms: number): string {
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
 async function main(): Promise<void> {
   const config = { get: (key: string) => process.env[key] } as never;
   const live = process.env.EVAL_PARSER === 'live';
@@ -86,9 +96,11 @@ async function main(): Promise<void> {
   );
 
   const rows: string[] = [];
+  const durationsMs: number[] = [];
   let passed = 0;
   for (const entry of REPRESENTATIVE_QUERIES) {
     let described: ReturnType<typeof describeMain>;
+    const startedAt = Date.now();
     try {
       described = describeMain(await service.interpretDescription(entry.text));
     } catch (error) {
@@ -99,23 +111,26 @@ async function main(): Promise<void> {
         source: '',
       };
     }
+    const durationMs = Date.now() - startedAt;
+    durationsMs.push(durationMs);
     const ok = entry.acceptable.includes(described.state as MainState);
     if (ok) passed += 1;
     rows.push(
-      `| ${escapeCell(entry.text)} | ${described.state} | ${ok ? 'yes' : 'no'} | ${escapeCell(described.confidence)} | ${escapeCell(described.source)} | ${escapeCell(described.detail)} |`,
+      `| ${escapeCell(entry.text)} | ${described.state} | ${ok ? 'yes' : 'no'} | ${seconds(durationMs)} | ${escapeCell(described.confidence)} | ${escapeCell(described.source)} | ${escapeCell(described.detail)} |`,
     );
     console.log(
-      `${ok ? 'PASS' : 'FAIL'}  ${entry.text}  ->  ${described.state}  ${described.detail}`,
+      `${ok ? 'PASS' : 'FAIL'}  ${entry.text}  ->  ${described.state}  ${described.detail}  (${seconds(durationMs)})`,
     );
   }
+  const timing = `Time per query: median ${seconds(percentile(durationsMs, 0.5))}, 95th percentile ${seconds(percentile(durationsMs, 0.95))}, slowest ${seconds(Math.max(0, ...durationsMs))}.`;
 
   const report = [
     `# Nutrition resolution: representative query results`,
     '',
-    `Run: ${new Date().toISOString()}. ${passed} of ${REPRESENTATIVE_QUERIES.length} queries behaved as intended.`,
+    `Run: ${new Date().toISOString()}. ${passed} of ${REPRESENTATIVE_QUERIES.length} queries behaved as intended. ${timing}`,
     '',
-    '| Query | Main state | As intended | Confidence | Source | Detail |',
-    '| --- | --- | --- | --- | --- | --- |',
+    '| Query | Main state | As intended | Time | Confidence | Source | Detail |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
     ...rows,
     '',
     '## Acceptable states, written before the run',
@@ -128,7 +143,7 @@ async function main(): Promise<void> {
 
   const output = process.argv[2];
   if (output) writeFileSync(output, report);
-  console.log(`\n${passed} of ${REPRESENTATIVE_QUERIES.length} as intended`);
+  console.log(`\n${passed} of ${REPRESENTATIVE_QUERIES.length} as intended. ${timing}`);
 }
 
 main().catch((error: unknown) => {
