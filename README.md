@@ -37,7 +37,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Group workouts: start a group from a workout; each person has their own tab of sets, and anyone in the group can enter them
 - Custom exercises alongside a shared default exercise library, each tagged with a muscle group, with optional equipment profiles and machine photos
 - Workout history with a month calendar view and per-day/per-workout detail; past workouts can be logged and completed ones edited
-- Workout sharing (generates a shareable summary card)
+- Workout sharing: a story-sized (9:16) workout card, shared to Instagram, TikTok and other apps through the share sheet
 
 **Progress & analytics**
 

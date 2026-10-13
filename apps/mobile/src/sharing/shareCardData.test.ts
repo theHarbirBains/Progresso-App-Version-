@@ -112,22 +112,11 @@ describe('fetchShareCardData', () => {
     const result = await fetchShareCardData('w1', 'user-1');
 
     expect(result.topSets).toEqual([
-      { exerciseName: 'Bench Press', weightKg: 110, reps: 8, prLabel: null },
+      { exerciseName: 'Bench Press', photoUrl: null, weightKg: 110, reps: 8, prLabel: null },
     ]);
   });
 
-  it('shows all exercises when there are 5 or fewer', async () => {
-    const exercises = Array.from({ length: 5 }, (_, i) =>
-      exercise({ id: `we${i}`, exerciseId: `ex${i}`, exerciseName: `Exercise ${i}` }),
-    );
-    mockFetchWorkoutDetail.mockResolvedValue(workoutDetail({ exercises }));
-
-    const result = await fetchShareCardData('w1', 'user-1');
-
-    expect(result.topSets).toHaveLength(5);
-  });
-
-  it('caps at the first 5 exercises in existing workout order when there are more than 5', async () => {
+  it("returns every exercise's top set, in existing workout order, so the card's PR count covers the whole workout", async () => {
     const exercises = Array.from({ length: 8 }, (_, i) =>
       exercise({ id: `we${i}`, exerciseId: `ex${i}`, exerciseName: `Exercise ${i}` }),
     );
@@ -135,12 +124,27 @@ describe('fetchShareCardData', () => {
 
     const result = await fetchShareCardData('w1', 'user-1');
 
-    expect(result.topSets.map((s) => s.exerciseName)).toEqual([
-      'Exercise 0',
-      'Exercise 1',
-      'Exercise 2',
-      'Exercise 3',
-      'Exercise 4',
+    expect(result.topSets.map((s) => s.exerciseName)).toEqual(
+      Array.from({ length: 8 }, (_, i) => `Exercise ${i}`),
+    );
+    expect(mockFetchRepPRs).toHaveBeenCalledTimes(8);
+  });
+
+  it("carries each exercise's machine photo, or null when it has none", async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(
+      workoutDetail({
+        exercises: [
+          exercise({ photoUrl: 'https://example.com/leg-press.jpg' }),
+          exercise({ id: 'we2', exerciseId: 'ex2', exerciseName: 'Hack Squat' }),
+        ],
+      }),
+    );
+
+    const result = await fetchShareCardData('w1', 'user-1');
+
+    expect(result.topSets.map((s) => s.photoUrl)).toEqual([
+      'https://example.com/leg-press.jpg',
+      null,
     ]);
   });
 
@@ -216,6 +220,7 @@ describe('fetchShareCardData', () => {
 
     expect(result.topSets[0]).toEqual({
       exerciseName: 'Bench Press',
+      photoUrl: null,
       weightKg: 500.5,
       reps: 50,
       prLabel: null,
@@ -271,6 +276,38 @@ describe('fetchShareCardData totals', () => {
     expect(result.totalVolumeKg).toBe(100 * 5 + 100 * 5 + 60 * 10);
   });
 
+  it('counts only exercises with at least one logged set', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(
+      workoutDetail({
+        exercises: [
+          exercise({
+            sets: [
+              {
+                id: 's1',
+                setIndex: 1,
+                weightKg: 100,
+                reps: 5,
+                completedAt: '2026-01-01T10:05:00Z',
+              },
+            ],
+          }),
+          // Planned, never logged.
+          exercise({
+            id: 'we2',
+            exerciseId: 'ex2',
+            exerciseName: 'Row',
+            sets: [{ id: 's2', setIndex: 1, weightKg: null, reps: null, completedAt: null }],
+          }),
+          exercise({ id: 'we3', exerciseId: 'ex3', exerciseName: 'Curl', sets: [] }),
+        ],
+      }),
+    );
+
+    const result = await fetchShareCardData('w1', 'user-1');
+
+    expect(result.exerciseCount).toBe(1);
+  });
+
   it('reports zero sets and zero volume for a workout with nothing logged', async () => {
     mockFetchWorkoutDetail.mockResolvedValue(workoutDetail({ exercises: [] }));
 
@@ -278,5 +315,6 @@ describe('fetchShareCardData totals', () => {
 
     expect(result.totalSets).toBe(0);
     expect(result.totalVolumeKg).toBe(0);
+    expect(result.exerciseCount).toBe(0);
   });
 });

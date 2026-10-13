@@ -6,7 +6,8 @@ import { withAlpha } from '../theme/accentColor';
 import { colors } from './theme';
 
 // The warm gym photo behind every screen (Warm Minimal -- see DESIGN.md §3a).
-const BACKGROUND_IMAGE = require('../../assets/background-gym-warm.jpg');
+// Exported for the one other place it appears: the top of the workout share card.
+export const BACKGROUND_IMAGE = require('../../assets/background-gym-warm.jpg');
 // The photo's own width / height, so it is pinned to the top at full width, uncropped.
 const BACKGROUND_ASPECT = 852 / 900;
 // How dark the photo is kept, and how far down it starts fading into the solid fill. Chosen by

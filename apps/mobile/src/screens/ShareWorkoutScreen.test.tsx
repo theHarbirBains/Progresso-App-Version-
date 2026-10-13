@@ -1,9 +1,8 @@
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { PrimaryButton } from '../design/Button';
 import { colors, fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
-import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { useAuth } from '../auth/AuthProvider';
@@ -33,21 +32,12 @@ jest.mock('expo-sharing', () => ({
   shareAsync: jest.fn(),
 }));
 
-jest.mock('expo-media-library', () => ({
-  getPermissionsAsync: jest.fn(),
-  requestPermissionsAsync: jest.fn(),
-  saveToLibraryAsync: jest.fn(),
-}));
-
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchShareCardData = fetchShareCardData as jest.Mock;
 const mockCaptureRef = captureRef as jest.Mock;
 const mockIsAvailableAsync = Sharing.isAvailableAsync as jest.Mock;
 const mockShareAsync = Sharing.shareAsync as jest.Mock;
-const mockGetPermissionsAsync = MediaLibrary.getPermissionsAsync as jest.Mock;
-const mockRequestPermissionsAsync = MediaLibrary.requestPermissionsAsync as jest.Mock;
-const mockSaveToLibraryAsync = MediaLibrary.saveToLibraryAsync as jest.Mock;
 
 const mockGoBack = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,11 +49,18 @@ const cardData = {
   performedAt: '2026-01-01T10:00:00Z',
   musclesTrained: 'Chest, Shoulders',
   durationMinutes: 45,
+  exerciseCount: 2,
+  totalSets: 9,
+  totalVolumeKg: 8620,
   topSets: [
-    { exerciseName: 'Bench Press', weightKg: 110, reps: 8, prLabel: '8 Rep PR' },
-    { exerciseName: 'Overhead Press', weightKg: 60, reps: 8, prLabel: null },
+    { exerciseName: 'Bench Press', photoUrl: null, weightKg: 110, reps: 8, prLabel: '8 Rep PR' },
+    { exerciseName: 'Overhead Press', photoUrl: null, weightKg: 60, reps: 8, prLabel: null },
   ],
 };
+
+function topSet(name: string, prLabel: string | null = null) {
+  return { exerciseName: name, photoUrl: null, weightKg: 50, reps: 10, prLabel };
+}
 
 async function settle() {
   await new Promise((resolve) => setTimeout(resolve, 500));
@@ -86,9 +83,6 @@ beforeEach(() => {
   mockCaptureRef.mockReset().mockResolvedValue('file:///tmp/share.png');
   mockIsAvailableAsync.mockReset().mockResolvedValue(true);
   mockShareAsync.mockReset().mockResolvedValue(undefined);
-  mockGetPermissionsAsync.mockReset().mockResolvedValue({ granted: true, canAskAgain: true });
-  mockRequestPermissionsAsync.mockReset().mockResolvedValue({ granted: true, canAskAgain: true });
-  mockSaveToLibraryAsync.mockReset().mockResolvedValue(undefined);
   mockGoBack.mockClear();
 });
 
@@ -104,42 +98,44 @@ describe('ShareWorkoutScreen loading and preview', () => {
     await settle();
   });
 
-  it('renders the workout name, date, muscles, and top sets on the card', async () => {
+  it('renders the workout name, date and muscles over the photo at the top of the card', async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
 
     expect(await screen.findByTestId('share-card-workout-name')).toHaveTextContent('Push Day');
     expect(screen.getByTestId('share-card-muscles')).toHaveTextContent('Chest, Shoulders');
-    // Bench Press is a PR, so it's headlined in the PR section, not repeated
-    // in TOP LIFTS -- only Overhead Press (no PR) lands there.
-    expect(screen.getByTestId('share-card-pr-value-0')).toHaveTextContent('110kg×8');
-    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('60kg×8');
+    // No year on the date.
+    expect(screen.getByTestId('share-card-date')).not.toHaveTextContent('2026');
+    expect(screen.getByTestId('share-card-photo')).toBeTruthy();
     await settle();
   });
 
-  it('shows duration when it is non-null', async () => {
+  it("shows the session as four stats -- duration, exercises, sets and volume in the user's unit", async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
 
     expect(await screen.findByTestId('share-card-duration')).toHaveTextContent('45 min');
+    expect(screen.getByTestId('share-card-exercises')).toHaveTextContent('2');
+    expect(screen.getByTestId('share-card-sets')).toHaveTextContent('9');
+    expect(screen.getByTestId('share-card-volume')).toHaveTextContent('8,620');
+    expect(screen.getByTestId('share-card-stats')).toHaveTextContent(/Volume \(kg\)/);
     await settle();
   });
 
-  it('hides duration when it is null', async () => {
+  it('shows a dash for duration when it is unknown', async () => {
     mockFetchShareCardData.mockResolvedValue({ ...cardData, durationMinutes: null });
 
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
-    await screen.findByTestId('share-card-workout-name');
 
-    expect(screen.queryByTestId('share-card-duration')).toBeNull();
+    expect(await screen.findByTestId('share-card-duration')).toHaveTextContent('—');
     await settle();
   });
 
-  it('shows a PR highlight only for the exercise that actually achieved one', async () => {
+  it('lists personal records with their label and value, only for exercises that set one', async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
@@ -147,6 +143,29 @@ describe('ShareWorkoutScreen loading and preview', () => {
     const prSection = await screen.findByTestId('share-card-pr-section');
     expect(prSection).toHaveTextContent(/Bench Press.*8 Rep PR/);
     expect(prSection).not.toHaveTextContent('Overhead Press');
+    expect(screen.getByTestId('share-card-pr-value-0')).toHaveTextContent('110 kg × 8');
+    expect(screen.getByTestId('share-card-pr-count')).toHaveTextContent('1 PR');
+    await settle();
+  });
+
+  it('counts every record in the workout but lists at most two', async () => {
+    mockFetchShareCardData.mockResolvedValue({
+      ...cardData,
+      topSets: [
+        topSet('Squat', '5 Rep PR'),
+        topSet('Leg Press', '7 Rep PR'),
+        topSet('Lunge'),
+        topSet('Leg Curl', '1RM'),
+      ],
+    });
+
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('share-card-pr-count')).toHaveTextContent('3 PRs');
+    expect(screen.getByTestId('share-card-pr-value-1')).toBeTruthy();
+    expect(screen.queryByTestId('share-card-pr-value-2')).toBeNull();
     await settle();
   });
 
@@ -165,18 +184,25 @@ describe('ShareWorkoutScreen loading and preview', () => {
     await settle();
   });
 
-  it('renders a single-exercise workout correctly', async () => {
-    // cardData's first set (Bench Press) is a PR, so it renders in the PR
-    // section, not TOP LIFTS.
-    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: [cardData.topSets[0]] });
+  it("numbers the workout's first three exercises, in order, records included", async () => {
+    mockFetchShareCardData.mockResolvedValue({
+      ...cardData,
+      topSets: [
+        topSet('Leg Press', '7 Rep PR'),
+        topSet('Leg Extension'),
+        topSet('Hack Squat'),
+        topSet('Calf Raise'),
+      ],
+    });
 
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
-    await screen.findByTestId('share-card-workout-name');
 
-    expect(screen.getByTestId('share-card-pr-value-0')).toBeTruthy();
-    expect(screen.queryByTestId('share-card-pr-value-1')).toBeNull();
+    const lifts = await screen.findByTestId('share-card-lifts');
+    expect(lifts).toHaveTextContent(/1.*Leg Press.*2.*Leg Extension.*3.*Hack Squat/);
+    expect(lifts).not.toHaveTextContent('Calf Raise');
+    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('50 kg × 10');
     await settle();
   });
 
@@ -184,7 +210,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
     mockFetchShareCardData.mockResolvedValue({
       ...cardData,
       workoutName: 'A'.repeat(120),
-      topSets: [{ exerciseName: 'B'.repeat(120), weightKg: 999, reps: 999, prLabel: null }],
+      topSets: [
+        { exerciseName: 'B'.repeat(120), photoUrl: null, weightKg: 999, reps: 999, prLabel: null },
+      ],
     });
 
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
@@ -192,7 +220,7 @@ describe('ShareWorkoutScreen loading and preview', () => {
     });
 
     expect(await screen.findByTestId('share-card-workout-name')).toHaveTextContent('A'.repeat(120));
-    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('999kg×999');
+    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('999 kg × 999');
     await settle();
   });
 
@@ -300,96 +328,55 @@ describe('ShareWorkoutScreen share action', () => {
   });
 });
 
-describe('ShareWorkoutScreen save action', () => {
-  it('saves the captured image to the device after granted permission', async () => {
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card-workout-name');
-
-    fireEvent.press(screen.getByTestId('share-workout-save'));
-
-    expect(await screen.findByTestId('share-workout-saved')).toBeTruthy();
-    expect(mockSaveToLibraryAsync).toHaveBeenCalledWith('file:///tmp/share.png');
-    await settle();
-  });
-
-  it('requests permission when not already granted', async () => {
-    mockGetPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: true });
-    mockRequestPermissionsAsync.mockResolvedValue({ granted: true, canAskAgain: true });
-
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card-workout-name');
-
-    fireEvent.press(screen.getByTestId('share-workout-save'));
-
-    await waitFor(() => expect(mockRequestPermissionsAsync).toHaveBeenCalledWith(true));
-    expect(await screen.findByTestId('share-workout-saved')).toBeTruthy();
-    await settle();
-  });
-
-  it('handles permission denial gracefully without crashing', async () => {
-    mockGetPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: true });
-    mockRequestPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false });
-
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card-workout-name');
-
-    fireEvent.press(screen.getByTestId('share-workout-save'));
-
-    expect(await screen.findByTestId('share-workout-save-error')).toHaveTextContent(
-      'Permission to save photos was denied.',
-    );
-    expect(mockSaveToLibraryAsync).not.toHaveBeenCalled();
-    expect(screen.getByTestId('share-card-workout-name')).toHaveTextContent('Push Day');
-    await settle();
-  });
-
-  it('does not re-prompt when permission cannot be asked again', async () => {
-    mockGetPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false });
-
-    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('share-card-workout-name');
-
-    fireEvent.press(screen.getByTestId('share-workout-save'));
-
-    await screen.findByTestId('share-workout-save-error');
-    expect(mockRequestPermissionsAsync).not.toHaveBeenCalled();
-    await settle();
-  });
-});
-
 describe('ShareWorkoutScreen -- the card, then one primary action', () => {
-  it('has one filled button -- Share -- with Save to Photos as the outlined secondary', async () => {
+  it('is just the card and one button, Share to Story -- no size switch, background photo, toggles or Save', async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
     await screen.findByTestId('share-card');
 
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    expect(screen.getByTestId('share-workout-share')).toHaveTextContent('Share');
-    const save = StyleSheet.flatten(screen.getByTestId('share-workout-save').props.style);
-    expect(save.backgroundColor).toBeUndefined();
-    expect(save.borderWidth).toBe(1);
+    expect(screen.getByTestId('share-workout-share')).toHaveTextContent('Share to Story');
+    expect(screen.queryByTestId('share-format')).toBeNull();
+    expect(screen.queryByTestId('share-photo-choose')).toBeNull();
+    expect(screen.queryByTestId('share-toggle-volume')).toBeNull();
+    expect(screen.queryByTestId('share-workout-save')).toBeNull();
     await settle();
   });
 
-  it('draws the card from the brand palette and app typography, not hardcoded colours', async () => {
+  it('lays the card out at its one story size and scales only the preview to fit the space', async () => {
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    const card = StyleSheet.flatten((await screen.findByTestId('share-card')).props.style);
+    expect(card.width).toBe(360);
+    expect(card.height).toBe(640);
+
+    act(() => {
+      fireEvent(screen.getByTestId('share-card-stage'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 480 } },
+      });
+    });
+
+    // Height-bound: 480 / 640 = 0.75.
+    const preview = StyleSheet.flatten(screen.getByTestId('share-card-preview').props.style);
+    expect(preview.width).toBe(270);
+    expect(preview.height).toBe(480);
+    // The card itself is untouched, so the image is the same on every phone.
+    expect(StyleSheet.flatten(screen.getByTestId('share-card').props.style).width).toBe(360);
+    await settle();
+  });
+
+  it('draws the card from the app palette and typography, not hardcoded colours', async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
     const card = StyleSheet.flatten((await screen.findByTestId('share-card')).props.style);
 
-    expect(card.backgroundColor).toBe(colors.background);
-    expect(card.borderColor).toBe(colors.border);
+    expect(card.backgroundColor).toBe(colors.surface);
+    expect(card.borderColor).toBe(colors.glassBorderStrong);
     const set = StyleSheet.flatten(screen.getByTestId('share-card-top-set-0').props.style);
-    expect(set.fontFamily).toBe(fonts.monoBold);
+    expect(set.fontFamily).toBe(fonts.mono);
     // The PR *value* (not its name/label line, which stays plain text) is
     // the one accented element on the card.
     const prValue = screen.getByTestId('share-card-pr-value-0');

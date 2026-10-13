@@ -18,6 +18,8 @@ import { computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 
 export interface ShareTopSet {
   exerciseName: string;
+  /** The exercise's machine photo, when it has one (most don't -- the card shows its initial instead). */
+  photoUrl: string | null;
   weightKg: number;
   reps: number;
   /** "8 Rep PR" / "1RM" when this set is CURRENTLY the live record -- never "estimated". */
@@ -29,15 +31,19 @@ export interface ShareCardData {
   performedAt: string;
   musclesTrained: string;
   durationMinutes: number | null;
+  /** Exercises with at least one logged set -- never one that was only planned. */
+  exerciseCount: number;
   /** Sets actually logged (completed) -- never planned or blank ones. */
   totalSets: number;
   /** Sum of weight x reps over the logged sets, in canonical kilograms; the card converts it to the user's unit. Never estimated. */
   totalVolumeKg: number;
-  /** Up to 5 exercises, in the workout's existing order -- never re-sorted by weight. */
+  /**
+   * Every exercise's top set, in the workout's existing order -- never
+   * re-sorted by weight. All of them, not just the few the card lists, so the
+   * card's personal-record count covers the whole workout.
+   */
   topSets: ShareTopSet[];
 }
-
-const MAX_EXERCISES = 5;
 
 /**
  * Assembles the share card's data. Throws if the workout is not completed --
@@ -59,10 +65,9 @@ export async function fetchShareCardData(
 
   const durationMinutes = computeDurationMinutes(detail.performedAt, detail.completedAt);
 
-  const shownExercises = detail.exercises.slice(0, MAX_EXERCISES);
   const topSets = (
     await Promise.all(
-      shownExercises.map(async (exercise): Promise<ShareTopSet | null> => {
+      detail.exercises.map(async (exercise): Promise<ShareTopSet | null> => {
         const topSet = heaviestSet(completedSetsOnly(exercise.sets));
         if (!topSet) return null;
 
@@ -75,6 +80,7 @@ export async function fetchShareCardData(
 
         return {
           exerciseName: exercise.exerciseName,
+          photoUrl: exercise.photoUrl ?? null,
           weightKg: topSet.weightKg,
           reps: topSet.reps,
           prLabel,
@@ -84,12 +90,14 @@ export async function fetchShareCardData(
   ).filter((entry): entry is ShareTopSet => entry !== null);
 
   const loggedSets = detail.exercises.flatMap((e) => completedSetsOnly(e.sets));
+  const exerciseCount = detail.exercises.filter((e) => completedSetsOnly(e.sets).length > 0).length;
 
   return {
     workoutName: detail.name,
     performedAt: detail.performedAt,
     musclesTrained,
     durationMinutes,
+    exerciseCount,
     totalSets: loggedSets.length,
     totalVolumeKg: computeLifetimeVolumeKg(loggedSets),
     topSets,
