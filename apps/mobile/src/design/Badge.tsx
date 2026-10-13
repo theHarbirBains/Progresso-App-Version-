@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { Text } from './Text';
+import { withAlpha } from '../theme/accentColor';
 import { colors, radii, typeScale } from './theme';
 
 interface Props {
@@ -28,7 +29,7 @@ export function Badge({ label, testID, color, backgroundColor }: Props) {
 const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(41, 227, 199, 0.14)',
+    backgroundColor: withAlpha(colors.accent, 0.14),
     borderRadius: radii.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,

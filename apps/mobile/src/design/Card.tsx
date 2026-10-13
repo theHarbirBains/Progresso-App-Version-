@@ -8,18 +8,26 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { withAlpha } from '../theme/accentColor';
 import { colors, radii, spacing } from './theme';
+
+// The warm gym photograph behind a hero card (Warm Minimal, DESIGN.md §10).
+const HERO_IMAGE = require('../../assets/hero-gym-warm.jpg');
 
 interface Props {
   children: ReactNode;
   /**
-   * Fills the card solid with this color instead of the quiet neutral
-   * surface every other card uses -- for the one hero card on a screen
-   * (e.g. Feed's Next Workout), filled with the mode accent. Pair with
-   * light-on-dark text/icon colors inside (the caller's job, same as
-   * AppCard's hero convention).
+   * The one hero card on a screen (e.g. Feed's Next Workout): the warm gym
+   * photo, darkened across the left where the text sits (enough for AA
+   * contrast even over its brightest highlights) and letting the window
+   * light through only at the right edge, instead of
+   * the quiet surface every other card uses. Pair with light text inside and
+   * a `colors.heroAction` button (the caller's job, same as AppCard's hero
+   * convention).
    */
-  heroColor?: string;
+  hero?: boolean;
   onPress?: () => void;
   testID?: string;
   style?: StyleProp<ViewStyle>;
@@ -30,18 +38,15 @@ interface Props {
 }
 
 // The redesign's card: a flat, opaque surface -- no glass tint, no blur, no
-// border, no glow -- raised above the page purely by being a visibly
-// lighter fill (`colors.surfaceRaised`) than the near-black background, the
-// same way elevation reads in a dark OS theme (iOS/Material dark mode use a
-// lighter fill at higher elevation, never a drop shadow, since a shadow is
-// invisible against black). Bigger, softer corners than the old AppCard.
-// Scoped to FeedScreen for now, as the first screen in the app's visual
-// redesign -- see DESIGN.md once this direction is confirmed and the
-// rest of the app migrates over; AppCard/GlassBackground are untouched and
-// still used everywhere else.
+// glow -- raised above the page purely by being a visibly lighter fill
+// (`colors.surfaceRaised`) than the near-black background, the same way
+// elevation reads in a dark OS theme. A faint warm hairline traces its edge.
+// Bigger, softer corners than AppCard. The photo and the hairline are both
+// absolutely positioned layers behind the content, so neither changes the
+// card's size or where its content sits.
 export function Card({
   children,
-  heroColor,
+  hero,
   onPress,
   testID,
   style,
@@ -49,11 +54,38 @@ export function Card({
   accessibilityLabel,
   accessibilityState,
 }: Props) {
-  const cardStyle = [
-    styles.card,
-    heroColor ? { backgroundColor: heroColor } : styles.surface,
-    style,
-  ];
+  const cardStyle = [styles.card, hero ? styles.heroSurface : styles.surface, style];
+  const content = (
+    <>
+      {hero ? (
+        <View
+          testID={testID ? `${testID}-photo` : undefined}
+          style={styles.layer}
+          pointerEvents="none"
+        >
+          <Image source={HERO_IMAGE} style={styles.layer} contentFit="cover" />
+          <LinearGradient
+            colors={[
+              withAlpha(colors.background, 0.9),
+              withAlpha(colors.background, 0.8),
+              withAlpha(colors.background, 0.3),
+            ]}
+            locations={[0, 0.7, 1]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.layer}
+          />
+        </View>
+      ) : null}
+      {children}
+      {/* Drawn last, so nothing inside the card can cover its edge. */}
+      <View
+        testID={testID ? `${testID}-edge` : undefined}
+        style={[styles.layer, styles.edge]}
+        pointerEvents="none"
+      />
+    </>
+  );
 
   if (onPress) {
     return (
@@ -66,14 +98,14 @@ export function Card({
         accessibilityLabel={accessibilityLabel}
         accessibilityState={accessibilityState}
       >
-        {children}
+        {content}
       </TouchableOpacity>
     );
   }
 
   return (
     <View testID={testID} style={cardStyle}>
-      {children}
+      {content}
     </View>
   );
 }
@@ -86,5 +118,21 @@ const styles = StyleSheet.create({
   },
   surface: {
     backgroundColor: colors.surfaceRaised,
+  },
+  // Shown under the photo while it loads, and if it ever fails to.
+  heroSurface: {
+    backgroundColor: colors.surface,
+  },
+  layer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  edge: {
+    borderRadius: radii.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
   },
 });

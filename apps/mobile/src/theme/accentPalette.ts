@@ -108,6 +108,9 @@ export const ACCENT_PRESET_GROUPS: AccentPresetGroup[] = [
   {
     label: 'Earth / Luxury',
     colors: [
+      // The app's default accent (accentColor.ts), so the picker shows it as a
+      // named preset rather than opening on a custom color.
+      { name: 'Warm Amber', hex: '#D99A50' },
       { name: 'Bronze', hex: '#CD7F32' },
       { name: 'Copper', hex: '#B87333' },
       { name: 'Terracotta', hex: '#E76F51' },

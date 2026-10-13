@@ -682,23 +682,23 @@ describe('Train/Nutrition tab accents', () => {
   }
 
   // There is no Workout/Nutrition toggle any more -- Train and Nutrition are
-  // just two of the five fixed bottom-nav tabs. Since the app-wide
-  // black-and-white redesign, both modes share the same neutral default
-  // accent (colors.accent) when active -- they're told apart by label and
-  // icon, not by color -- rather than the earlier fixed blue/green.
-  it('colors the active Train and Nutrition tabs in the same neutral accent', async () => {
+  // just two of the five fixed bottom-nav tabs. Since the Warm Minimal
+  // redesign, both modes share the same soft amber default accent
+  // (colors.accent) when active -- they're told apart by label and icon, not
+  // by color -- rather than the earlier fixed blue/green or neutral white.
+  it('colors the active Train and Nutrition tabs in the same amber accent', async () => {
     await signIn();
     expect(screen.getByTestId('bottom-nav-train')).toHaveTextContent(/Train/);
 
     fireEvent.press(screen.getByTestId('bottom-nav-train'));
     await screen.findByTestId('workout-history-open-menu');
     let label = within(screen.getByTestId('bottom-nav-train')).getByText('Train');
-    expect(StyleSheet.flatten(label.props.style).color).toBe('#FFFFFF');
+    expect(StyleSheet.flatten(label.props.style).color).toBe('#D99A50');
 
     fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
     await screen.findByTestId('nutrition-today-open-menu');
     label = within(screen.getByTestId('bottom-nav-nutrition')).getByText('Nutrition');
-    expect(StyleSheet.flatten(label.props.style).color).toBe('#FFFFFF');
+    expect(StyleSheet.flatten(label.props.style).color).toBe('#D99A50');
   });
 });
 
@@ -738,28 +738,28 @@ describe('App background', () => {
     expect(screen.getAllByTestId('screen-backdrop').length).toBeGreaterThan(0);
   });
 
-  // Since the app-wide black-and-white redesign, Workout and Nutrition share
-  // the same neutral default accent, so the glow no longer changes color
-  // between modes -- these confirm it stays the one neutral white
-  // throughout, rather than testing a color difference that no longer exists.
-  it('glows in the neutral accent on Feed by default', async () => {
+  // Workout and Nutrition share the same soft amber default accent (Warm
+  // Minimal), so the glow no longer changes color between modes -- these
+  // confirm it stays the one warm amber throughout, rather than testing a
+  // color difference that no longer exists.
+  it('glows in the amber accent on Feed by default', async () => {
     await signIn();
 
-    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.08)');
+    expect(currentGlowColor()).toBe('rgba(217, 154, 80, 0.08)');
   });
 
-  it('keeps glowing in the same neutral accent after visiting Nutrition, even back on Feed', async () => {
+  it('keeps glowing in the same amber accent after visiting Nutrition, even back on Feed', async () => {
     await signIn();
     fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
     await screen.findByTestId('nutrition-today-open-menu');
-    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.08)');
+    expect(currentGlowColor()).toBe('rgba(217, 154, 80, 0.08)');
 
     fireEvent.press(screen.getByTestId('bottom-nav-feed'));
     await screen.findByTestId('feed-screen');
-    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.08)');
+    expect(currentGlowColor()).toBe('rgba(217, 154, 80, 0.08)');
   });
 
-  it('keeps glowing in the same neutral accent once back on a Train screen', async () => {
+  it('keeps glowing in the same amber accent once back on a Train screen', async () => {
     await signIn();
     fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
     await screen.findByTestId('nutrition-today-open-menu');
@@ -767,7 +767,7 @@ describe('App background', () => {
     fireEvent.press(screen.getByTestId('bottom-nav-train'));
     await screen.findByTestId('workout-history-open-menu');
 
-    expect(currentGlowColor()).toBe('rgba(255, 255, 255, 0.08)');
+    expect(currentGlowColor()).toBe('rgba(217, 154, 80, 0.08)');
   });
 });
 

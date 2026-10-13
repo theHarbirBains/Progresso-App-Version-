@@ -1,6 +1,6 @@
 // Background Theme definitions -- the "environment" layer behind Progresso's
 // existing dark UI (Appearance settings > Background Theme). Deliberately
-// separate from theme.ts's `colors` (kept as the static Obsidian default for
+// separate from theme.ts's `colors` (kept as the static default theme's values for
 // anything not yet wired to the reactive layer) and from the Workout/
 // Nutrition accent system (theme/accentColor.ts) -- three independent
 // configuration layers, per the approved design direction.
@@ -52,20 +52,22 @@ export interface BackgroundThemeDefinition {
 
 export const DEFAULT_BACKGROUND_THEME: BackgroundThemeId = 'obsidian';
 
-// Obsidian's environment colors are exactly theme.ts's existing colors.
+// The default theme's environment colors are exactly theme.ts's colors. It is
+// shown as "Warm Minimal" but keeps the stored id 'obsidian': the id is what
+// users.background_theme's check constraint and the API's update DTO accept,
+// so renaming it would need a migration, and every account already on the
+// default moves to the warm look with nothing to migrate.
 export const BACKGROUND_THEMES: Record<BackgroundThemeId, BackgroundThemeDefinition> = {
   obsidian: {
     id: 'obsidian',
-    name: 'Obsidian',
-    description: 'Clean, pitch-black',
+    name: 'Warm Minimal',
+    description: 'Warm charcoal, soft golden light',
     colors: {
-      // Pitch black -- the app-wide black-and-white redesign's own explicit
-      // call, over the earlier near-black #0B0D0F.
-      background: '#000000',
-      surface: '#131719',
-      surfaceRaised: '#1A2023',
-      border: '#212B2D',
-      divider: '#1B2123',
+      background: '#12110F',
+      surface: '#1C1916',
+      surfaceRaised: '#26211C',
+      border: '#393129',
+      divider: '#2C2620',
     },
     treatment: 'flat',
     animated: false,

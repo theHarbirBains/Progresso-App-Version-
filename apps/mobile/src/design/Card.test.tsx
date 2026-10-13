@@ -59,14 +59,44 @@ describe('Card', () => {
     expect(style.borderRadius).toBe(radii.xl);
   });
 
-  it('fills solid with the given color for the one hero card on a screen', () => {
+  it('traces its edge with a warm hairline that takes no layout space', () => {
     render(
-      <Card testID="card" heroColor="#FF6B4A">
+      <Card testID="card">
         <Text>Content</Text>
       </Card>,
     );
 
     const style = StyleSheet.flatten(screen.getByTestId('card').props.style);
-    expect(style.backgroundColor).toBe('#FF6B4A');
+    // The edge is an absolutely positioned overlay, never the card's own border.
+    expect(style.borderWidth).toBeUndefined();
+    const edge = StyleSheet.flatten(screen.getByTestId('card-edge').props.style);
+    expect(edge.position).toBe('absolute');
+    expect(edge.borderColor).toBe(colors.glassBorder);
+  });
+
+  it('puts the warm gym photo behind a hero card, without changing its padding', () => {
+    render(
+      <Card testID="card" hero>
+        <Text>Content</Text>
+      </Card>,
+    );
+
+    const photo = screen.getByTestId('card-photo');
+    expect(StyleSheet.flatten(photo.props.style).position).toBe('absolute');
+    expect(photo.props.pointerEvents).toBe('none');
+    const style = StyleSheet.flatten(screen.getByTestId('card').props.style);
+    expect(style.backgroundColor).toBe(colors.surface);
+    expect(style.padding).toBe(16);
+    expect(screen.getByText('Content')).toBeTruthy();
+  });
+
+  it('shows no photo on an ordinary card', () => {
+    render(
+      <Card testID="card">
+        <Text>Content</Text>
+      </Card>,
+    );
+
+    expect(screen.queryByTestId('card-photo')).toBeNull();
   });
 });

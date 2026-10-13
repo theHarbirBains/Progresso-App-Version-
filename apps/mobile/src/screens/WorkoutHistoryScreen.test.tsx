@@ -3,13 +3,12 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { Feather } from '@expo/vector-icons';
 import { Card } from '../design/Card';
 import { PrimaryButton } from '../design/Button';
-import { fonts } from '../design/theme';
+import { colors, fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { addMonths, MONTH_LABELS, toLocalDateKey } from '../design/calendarGrid';
-import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { enrichWorkoutSummaries } from '../workouts/workoutHistoryEnrichment';
 import {
   completeWorkout,
@@ -463,13 +462,15 @@ describe('WorkoutHistoryScreen -- a stack of widgets', () => {
     await settle();
   });
 
-  it("fills the start-workout action card solid with the mode accent -- the redesign's one hero", async () => {
+  it('makes the start-workout action card the one hero, over the warm gym photo', async () => {
     mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: false });
     renderScreen();
     await screen.findByTestId('workout-item-w1');
 
-    const card = screen.getByTestId('workout-history-start');
-    expect(StyleSheet.flatten(card.props.style).backgroundColor).toBe(DEFAULT_WORKOUT_THEME.accent);
+    expect(screen.getByTestId('workout-history-start-photo')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(screen.getByTestId('start-new-workout').props.style).backgroundColor,
+    ).toBe(colors.heroAction);
     await settle();
   });
 

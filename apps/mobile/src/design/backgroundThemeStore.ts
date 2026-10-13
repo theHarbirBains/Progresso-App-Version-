@@ -28,7 +28,7 @@ export interface BackgroundThemeContextValue {
 
 export const BackgroundThemeContext = createContext<BackgroundThemeContextValue | null>(null);
 
-// Falls back to the default (Obsidian) theme, rather than throwing, when
+// Falls back to the default (Warm Minimal) theme, rather than throwing, when
 // there's no Provider in the tree. The real app always mounts
 // BackgroundThemeProvider once at the root (App.tsx), so this only matters
 // for isolated rendering -- component-level tests, storybook-style

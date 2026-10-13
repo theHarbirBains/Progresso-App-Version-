@@ -85,8 +85,9 @@ interface DisplayItem {
 //
 // Card anatomy deliberately borrows Strava's activity-feed structure (a
 // byline row, a bold title, a stat strip) -- see DESIGN.md's Feed section
-// -- but stays black-and-white/monochrome rather than Strava's orange, and
-// has no GPS map or streak/"congratulate" banner: Progresso has no
+// -- but in the Warm Minimal palette (warm charcoal, off-white, one soft
+// amber accent; the Next Workout hero over the warm gym photo) rather than
+// Strava's orange, and has no GPS map or streak/"congratulate" banner: Progresso has no
 // location data to draw a route from, and Feed stays purely informational
 // (no kudos/social prompts). `topAccent` is a neutral top band on every
 // card; which activity a card is comes across via its byline icon, not a
@@ -125,8 +126,7 @@ export function FeedScreen({ navigation }: Props) {
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
-  const { theme, weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId } =
-    useProgressTheme();
+  const { weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId } = useProgressTheme();
 
   const [items, setItems] = useState<FeedItem[]>([]);
   const [page, setPage] = useState(0);
@@ -543,25 +543,27 @@ export function FeedScreen({ navigation }: Props) {
 
       {nextPlan && !anyWorkoutLive ? (
         <Card
-          heroColor={theme.accent}
+          hero
           testID="feed-next-workout"
           onPress={() => navigation.navigate('NewWorkout')}
           accessibilityLabel={`Next workout: ${nextPlan.day.name}${
             nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
           }`}
         >
-          <Text style={[styles.nextWorkoutEyebrow, { color: withAlpha(theme.onAccent, 0.72) }]}>
+          <Text style={[styles.nextWorkoutEyebrow, { color: withAlpha(colors.textPrimary, 0.72) }]}>
             Next Workout
           </Text>
-          <Text style={[styles.nextWorkoutDayName, { color: theme.onAccent }]}>
+          <Text style={[styles.nextWorkoutDayName, { color: colors.textPrimary }]}>
             {nextPlan.day.name}
           </Text>
           {nextPlan.day.muscleGroups.length > 0 ? (
-            <Text style={[styles.nextWorkoutMuscles, { color: withAlpha(theme.onAccent, 0.85) }]}>
+            <Text
+              style={[styles.nextWorkoutMuscles, { color: withAlpha(colors.textPrimary, 0.85) }]}
+            >
               {musclesLabel(nextPlan.day)}
             </Text>
           ) : null}
-          <Text style={[styles.nextWorkoutMeta, { color: withAlpha(theme.onAccent, 0.72) }]}>
+          <Text style={[styles.nextWorkoutMeta, { color: withAlpha(colors.textPrimary, 0.72) }]}>
             {nextPlan.previousDayName
               ? `Up next after ${nextPlan.previousDayName}`
               : "Let's get started"}
@@ -569,9 +571,9 @@ export function FeedScreen({ navigation }: Props) {
           {/* The card is the one tap target (into NewWorkoutScreen, which
               actually starts it); this is the real button, shown for the eye,
               with its own touches off -- same convention as NewWorkoutScreen's
-              own hero card. Inverted from the card's own accent fill: a solid
-              onAccent pill with accent-colored text, so it reads as a real
-              button against the bold hero rather than disappearing into it. */}
+              own hero card. A solid warm-cream pill with dark text, so it
+              reads as a real button against the photo rather than disappearing
+              into it. */}
           <View
             style={styles.nextWorkoutAction}
             pointerEvents="none"
@@ -581,8 +583,8 @@ export function FeedScreen({ navigation }: Props) {
             <PrimaryButton
               label="Start Workout"
               onPress={() => undefined}
-              accentColor={theme.onAccent}
-              onAccentColor={theme.accent}
+              accentColor={colors.heroAction}
+              onAccentColor={colors.onAccent}
             />
           </View>
         </Card>

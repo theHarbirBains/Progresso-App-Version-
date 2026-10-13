@@ -27,10 +27,10 @@ export const feedStyles = StyleSheet.create({
   },
 
   // The "Next Workout" widget pinned above everything else -- the redesign's
-  // one bold hero, filled solid with the mode accent (see Card's `heroColor`)
-  // rather than a neutral surface, so these are layout-only: color comes
-  // from `theme.onAccent` at render time (FeedScreen), since it has to
-  // invert for a light vs. dark accent.
+  // one bold hero, a photo `hero` Card (the warm gym photo) rather than a
+  // neutral surface, so these are layout-only: color comes from
+  // `colors.textPrimary` at render time (FeedScreen), off-white over the
+  // photo's darkened text side.
   nextWorkoutEyebrow: {
     ...typeScale.sectionHeading,
     marginBottom: spacing.xs,

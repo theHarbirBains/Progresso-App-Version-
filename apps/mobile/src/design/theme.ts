@@ -1,62 +1,62 @@
-// Progresso design tokens. Pitch-black/monochrome ("black and white") is
-// the current direction, replacing the earlier "Dark + Electric" teal
-// accent -- see DESIGN.md. Every screen's styling should derive from these
-// values rather than hand-picking colors/sizes, so the visual system stays
-// coherent as it's propagated screen by screen.
+// Progresso design tokens. "Warm Minimal" is the current direction: warm
+// charcoal and near-black surfaces, warm off-white text and one soft amber
+// accent, replacing the earlier pitch-black/monochrome look -- see DESIGN.md.
+// Every screen's styling should derive from these values rather than
+// hand-picking colors/sizes, so the visual system stays coherent.
 
 export const colors = {
-  // Pitch black -- the app-wide black-and-white redesign's own explicit
-  // call, over the earlier near-black #0B0D0F. Surfaces (below) stay
-  // distinct so cards still read as raised against it.
-  background: '#000000',
-  surface: '#131719',
-  surfaceRaised: '#1A2023',
-  // Used only for the single "hero" card per screen (Dashboard's Recent
-  // Workout) -- a thin accent-tinted border instead of a fill, so elevation
-  // reads as "this is the important one" without another color block.
-  surfaceHero: '#0F1D1C',
-  borderHero: '#1E4A45',
-  border: '#212B2D',
-  divider: '#1B2123',
+  // Warm near-black. Surfaces (below) stay distinct so cards still read as
+  // raised against it.
+  background: '#12110F',
+  surface: '#1C1916',
+  surfaceRaised: '#26211C',
+  // Used only for the single "hero" card per screen -- a thin amber-tinted
+  // border over a warm dark tint instead of a fill, so elevation reads as
+  // "this is the important one" without another color block.
+  surfaceHero: '#211A13',
+  borderHero: '#4F3A24',
+  border: '#393129',
+  divider: '#2C2620',
 
-  textPrimary: '#F1F6F6',
-  textSecondary: '#8FA0A2',
+  textPrimary: '#F5F0E8',
+  textSecondary: '#B6ADA1',
   // A brighter step between textSecondary and textPrimary -- for secondary
-  // text sitting directly over a busy photographic background (no card
-  // behind it, or a card whose own tint isn't enough on its own), where
-  // textSecondary's normal contrast reads as too dim against the photo.
-  // Introduced for the Workout Mode dashboard readability pass; reach for
-  // this instead of a one-off hex wherever textSecondary tests too dim in
-  // the same way.
-  textSecondaryBright: '#B4C4C6',
-  textMuted: '#5E7072',
+  // text sitting where textSecondary's normal contrast reads as too dim
+  // (no card behind it, or a card whose own tint isn't enough on its own).
+  // Reach for this instead of a one-off hex wherever textSecondary tests
+  // too dim in the same way.
+  textSecondaryBright: '#D3CBBF',
+  textMuted: '#7E7569',
 
-  // The single Progresso brand accent. Used for: primary CTA, active states,
-  // key performance numbers, chart line, and PR indicators. Neutral
-  // (matches textPrimary) rather than a hue -- the app-wide black-and-white
-  // redesign's own explicit call, replacing the earlier teal. `onAccent`
-  // below is computed per-accent by buildAccentTheme for the two mode
-  // accents (accentColor.ts); this literal only backs direct `colors.accent`
-  // consumers (Button, Toggle, SegmentedControl, Badge, etc.), so it stays
-  // hand-picked for the same near-black-on-near-white contrast.
-  accent: '#FFFFFF',
-  onAccent: '#000000',
+  // The single Progresso brand accent: soft amber. Used for: primary CTA,
+  // active states, key performance numbers, chart line, and PR indicators.
+  // `onAccent` below is computed per-accent by buildAccentTheme for the two
+  // mode accents (accentColor.ts); this literal only backs direct
+  // `colors.accent` consumers (Button, Toggle, SegmentedControl, Badge,
+  // etc.), so it stays hand-picked for the same dark-ink-on-amber contrast.
+  accent: '#D99A50',
+  onAccent: '#12110F',
+
+  // The warm cream fill of the one action on a photo hero (Card's `hero`),
+  // read against the photo the way Option 4's Start Workout button does --
+  // a light pill with dark text, never the amber accent itself.
+  heroAction: '#F2E3CD',
 
   destructive: '#F0555C',
   destructiveBorder: '#3A2226',
 
-  chartAccent: '#FFFFFF',
-  chartMuted: '#212B2D',
+  chartAccent: '#D99A50',
+  chartMuted: '#393129',
 
-  // Glass-surface hairline borders (see GlassBackground.tsx) -- a neutral
+  // Glass-surface hairline borders (see GlassBackground.tsx) -- a warm
   // light-alpha edge that reads as "catching light" against any of the
   // Background Theme environments, rather than each theme's own (much
   // darker) `border` token. `glassBorder` is the default weight (cards,
   // controls); `glassBorderStrong` is for the few persistent chrome
   // surfaces (bottom nav, side menu, bottom sheet) that want a slightly
   // more defined edge against constantly-changing content behind them.
-  glassBorder: 'rgba(255, 255, 255, 0.08)',
-  glassBorderStrong: 'rgba(255, 255, 255, 0.14)',
+  glassBorder: 'rgba(245, 230, 210, 0.08)',
+  glassBorderStrong: 'rgba(245, 230, 210, 0.14)',
 } as const;
 
 // Three working radii plus the pill, each with one role so nested surfaces

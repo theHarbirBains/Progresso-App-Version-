@@ -42,7 +42,7 @@ export function SettingsAppearanceScreen({ navigation }: Props) {
   function handleResetThemeColors() {
     Alert.alert(
       'Reset Theme Colors',
-      'This will restore Workout and Nutrition to the default Pure White.',
+      'This will restore Workout and Nutrition to the default Warm Amber.',
       [
         { text: 'Cancel', style: 'cancel' },
         {

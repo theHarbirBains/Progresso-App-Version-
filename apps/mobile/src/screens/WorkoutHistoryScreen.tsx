@@ -296,14 +296,14 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       }
     >
       {activeWorkout ? (
-        <Card heroColor={theme.accent} testID="active-workout-banner">
-          <Text style={[styles.actionLine, { color: withAlpha(theme.onAccent, 0.85) }]}>
+        <Card hero testID="active-workout-banner">
+          <Text style={[styles.actionLine, { color: withAlpha(colors.textPrimary, 0.85) }]}>
             You have a workout in progress
           </Text>
           {activeAssessment?.state === 'possibly_inactive' ? (
             <Text
               testID="active-workout-idle-indicator"
-              style={[styles.actionLine, { color: withAlpha(theme.onAccent, 0.7) }]}
+              style={[styles.actionLine, { color: withAlpha(colors.textPrimary, 0.72) }]}
             >
               {`Last set logged ${formatIdleMinutes(activeAssessment.idleMinutes)}`}
             </Text>
@@ -312,21 +312,21 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
             testID="resume-active-workout"
             label={`Resume "${activeWorkout.name}"`}
             onPress={() => navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id })}
-            accentColor={theme.onAccent}
-            onAccentColor={theme.accent}
+            accentColor={colors.heroAction}
+            onAccentColor={colors.onAccent}
           />
         </Card>
       ) : (
-        <Card heroColor={theme.accent} testID="workout-history-start">
-          <Text style={[styles.actionLine, { color: withAlpha(theme.onAccent, 0.85) }]}>
+        <Card hero testID="workout-history-start">
+          <Text style={[styles.actionLine, { color: withAlpha(colors.textPrimary, 0.85) }]}>
             Ready to train?
           </Text>
           <PrimaryButton
             testID="start-new-workout"
             label="Start New Workout"
             onPress={() => navigation.navigate('NewWorkout')}
-            accentColor={theme.onAccent}
-            onAccentColor={theme.accent}
+            accentColor={colors.heroAction}
+            onAccentColor={colors.onAccent}
           />
         </Card>
       )}

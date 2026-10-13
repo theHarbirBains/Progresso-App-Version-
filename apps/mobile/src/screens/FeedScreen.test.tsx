@@ -9,7 +9,8 @@ import { fetchFriendsFeed, listFollowNotifications } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
-import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
+import { PrimaryButton } from '../design/Button';
+import { colors } from '../design/theme';
 import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
@@ -766,13 +767,16 @@ describe('FeedScreen -- Next Workout widget', () => {
     expect(await screen.findByTestId('feed-next-workout')).toBeTruthy();
   });
 
-  it("is the one card filled solid with the mode accent -- the redesign's single bold hero", async () => {
+  it('is the one hero card, over the warm gym photo with a cream Start Workout button', async () => {
     mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
     mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
     renderScreen();
 
-    const card = await screen.findByTestId('feed-next-workout');
-    expect(StyleSheet.flatten(card.props.style).backgroundColor).toBe(DEFAULT_WORKOUT_THEME.accent);
+    await screen.findByTestId('feed-next-workout');
+    expect(screen.getByTestId('feed-next-workout-photo')).toBeTruthy();
+    const button = screen.UNSAFE_getByType(PrimaryButton);
+    expect(button.props.accentColor).toBe(colors.heroAction);
+    expect(button.props.onAccentColor).toBe(colors.onAccent);
   });
 });
 

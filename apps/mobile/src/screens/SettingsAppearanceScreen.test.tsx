@@ -67,9 +67,9 @@ describe('SettingsAppearanceScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('open-workout-color-settings')).toHaveTextContent(
-      /Pure White/,
+      /Warm Amber/,
     );
-    expect(screen.getByTestId('open-nutrition-color-settings')).toHaveTextContent(/Pure White/);
+    expect(screen.getByTestId('open-nutrition-color-settings')).toHaveTextContent(/Warm Amber/);
   });
 
   it("shows 'Custom' when the saved color doesn't match any preset", async () => {
@@ -157,7 +157,7 @@ describe('SettingsAppearanceScreen', () => {
       nutritionAccentColor: DEFAULT_NUTRITION_COLOR,
     });
     expect(await screen.findByTestId('open-workout-color-settings')).toHaveTextContent(
-      /Pure White/,
+      /Warm Amber/,
     );
     alertSpy.mockRestore();
   });

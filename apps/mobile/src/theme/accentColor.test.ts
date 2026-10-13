@@ -104,8 +104,13 @@ describe('buildAccentTheme', () => {
 });
 
 describe('default colors', () => {
-  it('are both the same neutral white -- the app-wide black-and-white redesign', () => {
-    expect(DEFAULT_WORKOUT_COLOR).toBe('#FFFFFF');
-    expect(DEFAULT_NUTRITION_COLOR).toBe('#FFFFFF');
+  it('are both the same soft amber -- the Warm Minimal redesign -- and match the brand accent', () => {
+    expect(DEFAULT_WORKOUT_COLOR).toBe('#D99A50');
+    expect(DEFAULT_NUTRITION_COLOR).toBe('#D99A50');
+    expect(DEFAULT_WORKOUT_COLOR).toBe(colors.accent);
+  });
+
+  it('puts dark ink on the amber, never light', () => {
+    expect(buildAccentTheme(DEFAULT_WORKOUT_COLOR).onAccent).toBe(colors.background);
   });
 });
