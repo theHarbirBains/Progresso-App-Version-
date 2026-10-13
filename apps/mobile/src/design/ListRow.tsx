@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: radii.md,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: colors.surfaceLift,
     alignItems: 'center',
     justifyContent: 'center',
   },

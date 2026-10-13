@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radii.md,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: colors.surfaceLift,
   },
   macroLabel: {
     ...typeScale.caption,

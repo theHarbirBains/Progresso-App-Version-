@@ -46,7 +46,7 @@ describe('Card', () => {
     expect(card.props.accessibilityState).toEqual({ disabled: true });
   });
 
-  it('is a flat, opaque surface -- no translucent glass tint underneath', () => {
+  it('is a flat surface (no glass layer underneath) whose fill lets the background photo show through', () => {
     render(
       <Card testID="card">
         <Text>Content</Text>
@@ -55,7 +55,8 @@ describe('Card', () => {
 
     expect(screen.queryByTestId('glass-background')).toBeNull();
     const style = StyleSheet.flatten(screen.getByTestId('card').props.style);
-    expect(style.backgroundColor).toBe(colors.surfaceRaised);
+    // surfaceRaised (#26211C) at 70%: translucent, not opaque.
+    expect(style.backgroundColor).toBe('rgba(38, 33, 28, 0.7)');
     expect(style.borderRadius).toBe(radii.xl);
   });
 

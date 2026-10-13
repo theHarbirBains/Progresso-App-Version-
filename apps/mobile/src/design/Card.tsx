@@ -8,7 +8,8 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { colors, radii, spacing } from './theme';
+import { withAlpha } from '../theme/accentColor';
+import { colors, radii, spacing, widgetFillAlpha } from './theme';
 
 interface Props {
   children: ReactNode;
@@ -29,10 +30,11 @@ interface Props {
   accessibilityState?: AccessibilityState;
 }
 
-// The redesign's card: a flat, opaque surface -- no glass tint, no blur, no
-// glow -- raised above the page purely by being a visibly lighter fill
-// (`colors.surfaceRaised`) than the near-black background, the same way
-// elevation reads in a dark OS theme. A faint warm hairline traces its edge,
+// The redesign's card: a flat surface -- no blur, no glow -- raised above
+// the page by being a visibly lighter fill (`colors.surfaceRaised`) than the
+// near-black background, the same way elevation reads in a dark OS theme.
+// The fill is translucent (`widgetFillAlpha`), so the background photo stays
+// faintly visible through the card. A faint warm hairline traces its edge,
 // drawn as an absolutely positioned layer so it never changes the card's
 // size or where its content sits. Bigger, softer corners than AppCard.
 export function Card({
@@ -90,7 +92,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   surface: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: withAlpha(colors.surfaceRaised, widgetFillAlpha),
   },
   layer: {
     position: 'absolute',

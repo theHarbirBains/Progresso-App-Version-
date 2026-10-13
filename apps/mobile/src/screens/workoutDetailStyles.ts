@@ -56,7 +56,7 @@ export const workoutDetailStyles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: colors.surfaceLift,
     borderRadius: radii.md,
   },
   topSet: {

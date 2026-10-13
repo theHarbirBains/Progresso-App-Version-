@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { withAlpha } from '../theme/accentColor';
-import { colors } from './theme';
+import { colors, widgetFillAlpha } from './theme';
 
 export type GlassVariant = 'surface' | 'chrome';
 
@@ -26,14 +26,12 @@ interface Props {
   testID?: string;
 }
 
-// `surface` readability pass: the app's photographic backgrounds (Workout
-// and Nutrition mode) proved busier than a 60% tint could reliably
-// separate content from -- see DESIGN.md §19/§3b -- so every `surface`
-// glass card (AppCard, controls, etc.) now sits on a strong, mostly-opaque
-// dark foundation instead. The background stays visible (never fully
-// opaque), just clearly subordinate to the content on top of it, app-wide,
-// from this one shared token rather than per-screen overrides.
-const FILL_ALPHA: Record<GlassVariant, number> = { surface: 0.86, chrome: 0.8 };
+// Every `surface` glass widget (AppCard, controls, etc.) shares Card's fill
+// opacity (`widgetFillAlpha`), so the background photo stays faintly
+// visible through it while its text keeps measured contrast -- see
+// DESIGN.md §3b -- app-wide, from this one shared token rather than
+// per-screen overrides.
+const FILL_ALPHA: Record<GlassVariant, number> = { surface: widgetFillAlpha, chrome: 0.8 };
 const BLUR_INTENSITY: Record<GlassVariant, number> = { surface: 24, chrome: 46 };
 
 /**
@@ -62,6 +60,7 @@ export function GlassBackground({
         <BlurView intensity={BLUR_INTENSITY[variant]} tint="dark" style={StyleSheet.absoluteFill} />
       ) : null}
       <View
+        testID={testID ? `${testID}-fill` : undefined}
         style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(base, FILL_ALPHA[variant]) }]}
       />
       {bordered ? (

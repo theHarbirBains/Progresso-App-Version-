@@ -30,7 +30,7 @@ export const notificationsStyles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: colors.surfaceLift,
     alignItems: 'center',
     justifyContent: 'center',
   },

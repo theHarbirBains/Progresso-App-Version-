@@ -21,11 +21,13 @@ describe('StatBlock', () => {
     expect(StyleSheet.flatten(screen.getByText('12').props.style).color).toBe('#2F80FF');
   });
 
-  it('is a quiet raised block: a fill and the control radius, but no border', () => {
+  it('is a quiet raised block: a translucent lift and the control radius, but no border', () => {
     render(<StatBlock testID="s" value="12" label="Sets" />);
 
     const style = StyleSheet.flatten(screen.getByTestId('s').props.style);
-    expect(style.backgroundColor).toBe(colors.surfaceRaised);
+    // A see-through lift, so the block never covers up the background photo
+    // its (translucent) card lets through.
+    expect(style.backgroundColor).toBe(colors.surfaceLift);
     expect(style.borderRadius).toBe(radii.md);
     expect(style.borderWidth).toBeUndefined();
     expect(style.flex).toBe(1);

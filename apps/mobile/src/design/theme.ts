@@ -57,6 +57,12 @@ export const colors = {
   // more defined edge against constantly-changing content behind them.
   glassBorder: 'rgba(245, 230, 210, 0.08)',
   glassBorderStrong: 'rgba(245, 230, 210, 0.14)',
+
+  // A raised block inside a widget (StatBlock, icon wells): a faint warm
+  // lift over whatever card it sits in, translucent like the card itself, so
+  // it never reads as an opaque patch blocking the background photo the
+  // card lets through (see `widgetFillAlpha`).
+  surfaceLift: 'rgba(245, 230, 210, 0.06)',
 } as const;
 
 // Three working radii plus the pill, each with one role so nested surfaces
@@ -94,6 +100,13 @@ export const spacing = {
 // internal padding. Applied once, as `gap` on each widget stack, so no
 // individual widget carries its own outer margin.
 export const widgetGap = 6;
+
+// How opaque a widget's fill is -- Card's surface and GlassBackground's
+// `surface` tint (AppCard, controls) -- so the background photo stays faintly
+// visible through every widget. Measured over the photo's brightest pixels:
+// at 0.7, textSecondary keeps WCAG AA (4.5:1) inside a card, a StatBlock's
+// `surfaceLift` included. Don't lower it without re-measuring.
+export const widgetFillAlpha = 0.7;
 
 // Loaded via useFonts() in App.tsx before anything renders. Plus Jakarta
 // Sans carries ALL text (headings, body, labels) -- warmer and closer to

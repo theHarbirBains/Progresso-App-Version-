@@ -73,7 +73,7 @@ export const settingsStyles = StyleSheet.create({
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: colors.surfaceLift,
   },
   rowBody: {
     flex: 1,
