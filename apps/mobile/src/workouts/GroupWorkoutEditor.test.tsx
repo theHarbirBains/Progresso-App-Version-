@@ -11,6 +11,7 @@ import {
   type WorkoutDetail,
 } from './workoutQueries';
 import { GroupWorkoutEditor } from './GroupWorkoutEditor';
+import { colors } from '../design/theme';
 
 jest.mock('./workoutQueries', () => ({
   addExerciseToWorkout: jest.fn(),
@@ -32,12 +33,6 @@ jest.mock('../screens/ExerciseFormScreen', () => ({
 
 jest.mock('../progress/useProgressTheme', () => ({
   useProgressTheme: () => ({ weightUnit: 'kg', theme: { accent: '#3DDC97', onAccent: '#000000' } }),
-}));
-
-jest.mock('../design/backgroundThemeStore', () => ({
-  useBackgroundTheme: () => ({
-    theme: { colors: { background: '#0B0B0C' } },
-  }),
 }));
 
 const mockFetch = fetchWorkoutDetail as jest.Mock;
@@ -179,7 +174,7 @@ describe('GroupWorkoutEditor', () => {
     expect(await screen.findByTestId('group-workout-create-custom')).toBeTruthy();
   });
 
-  it("fills the Create Custom Exercise modal with the current Background Theme -- it's a native Modal, so Screen's own transparent root has nothing behind it otherwise", async () => {
+  it("fills the Create Custom Exercise modal with the warm background -- it's a native Modal, so Screen's own transparent root has nothing behind it otherwise", async () => {
     renderEditor();
 
     fireEvent.press(await screen.findByTestId('group-workout-create-custom'));
@@ -187,7 +182,7 @@ describe('GroupWorkoutEditor', () => {
     const modal = StyleSheet.flatten(
       screen.getByTestId('group-workout-create-custom-modal').props.style,
     );
-    expect(modal.backgroundColor).toBe('#0B0B0C');
+    expect(modal.backgroundColor).toBe(colors.background);
   });
 
   it("adds a picked exercise to every person's workout, at the order index the workout has never used", async () => {

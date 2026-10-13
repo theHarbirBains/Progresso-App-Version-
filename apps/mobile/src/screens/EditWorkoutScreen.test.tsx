@@ -1,7 +1,6 @@
 import type { PropsWithChildren } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { toLocalDateKey } from '../design/calendarGrid';
 import { fetchAllExercises } from '../exercises/exerciseQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
@@ -113,12 +112,9 @@ const navigation: any = { goBack: mockGoBack, replace: mockReplace };
 const route = { params: { workoutId: 'w1' } } as never;
 
 function renderScreen() {
-  return render(
-    <BackgroundThemeProvider>
-      <EditWorkoutScreen navigation={navigation} route={route} />
-    </BackgroundThemeProvider>,
-    { wrapper: TestProviders },
-  );
+  return render(<EditWorkoutScreen navigation={navigation} route={route} />, {
+    wrapper: TestProviders,
+  });
 }
 
 const baseWorkout = {

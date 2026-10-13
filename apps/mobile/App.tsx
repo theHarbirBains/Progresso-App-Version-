@@ -16,8 +16,8 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 import { AppBackgroundLayer, ScreenBackdrop } from './src/design/AppBackgroundLayer';
 import { AppSideMenu } from './src/design/AppSideMenu';
-import { BackgroundThemeProvider, useBackgroundTheme } from './src/design/BackgroundThemeContext';
 import { BottomNavBar } from './src/design/BottomNavBar';
+import { colors } from './src/design/theme';
 import { wrapApp } from './src/lib/sentry';
 import { AppMenuContext } from './src/navigation/AppMenuContext';
 import { appMenuSectionsFor, type AppMenuRoute } from './src/navigation/appMenuSections';
@@ -36,7 +36,6 @@ import { useProgressTheme } from './src/progress/useProgressTheme';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
 import { ActiveWorkoutScreen } from './src/screens/ActiveWorkoutScreen';
 import { AiFoodSearchScreen } from './src/screens/AiFoodSearchScreen';
-import { BackgroundThemeScreen } from './src/screens/BackgroundThemeScreen';
 import { CalorieEstimationScreen } from './src/screens/CalorieEstimationScreen';
 import { ChooseWorkoutSplitScreen } from './src/screens/ChooseWorkoutSplitScreen';
 import { BarcodeScannerScreen } from './src/screens/BarcodeScannerScreen';
@@ -63,7 +62,6 @@ import { EditWorkoutScreen } from './src/screens/EditWorkoutScreen';
 import { LogPastWorkoutScreen } from './src/screens/LogPastWorkoutScreen';
 import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
-import { NutritionColorScreen } from './src/screens/NutritionColorScreen';
 import { NutritionGoalsScreen } from './src/screens/NutritionGoalsScreen';
 import { NutritionHistoryScreen } from './src/screens/NutritionHistoryScreen';
 import { NutritionTodayScreen } from './src/screens/NutritionTodayScreen';
@@ -74,7 +72,6 @@ import { ProgressExerciseDetailScreen } from './src/screens/ProgressExerciseDeta
 import { ProgressOverviewScreen } from './src/screens/ProgressOverviewScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { SettingsAccountSecurityScreen } from './src/screens/SettingsAccountSecurityScreen';
-import { SettingsAppearanceScreen } from './src/screens/SettingsAppearanceScreen';
 import { SettingsChangePasswordScreen } from './src/screens/SettingsChangePasswordScreen';
 import { SettingsNotificationsScreen } from './src/screens/SettingsNotificationsScreen';
 import { SettingsNutritionScreen } from './src/screens/SettingsNutritionScreen';
@@ -83,7 +80,6 @@ import { SettingsSupportScreen } from './src/screens/SettingsSupportScreen';
 import { SettingsWorkoutPreferencesScreen } from './src/screens/SettingsWorkoutPreferencesScreen';
 import { ShareWorkoutScreen } from './src/screens/ShareWorkoutScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
-import { WorkoutColorScreen } from './src/screens/WorkoutColorScreen';
 import { WorkoutDetailScreen } from './src/screens/WorkoutDetailScreen';
 import { WorkoutHistoryScreen } from './src/screens/WorkoutHistoryScreen';
 import { WorkoutSplitFormScreen } from './src/screens/WorkoutSplitFormScreen';
@@ -115,7 +111,6 @@ const MODE_AGNOSTIC_ROUTES = new Set(['Feed', 'ProgressOverview', 'Profile']);
 // separate Onboarding screen or shown a one-time Welcome screen here.
 function Root() {
   const { status, session, user } = useAuth();
-  const { theme: backgroundTheme } = useBackgroundTheme();
   // Trainer status decides whether the side menu lists the trainer's clients.
   const isTrainer = useTrainerStatus();
   const { profile, loading: profileLoading } = useProfile();
@@ -268,7 +263,7 @@ function Root() {
                   // Transparent so each screen's own (transparent) root
                   // container reveals its backdrop -- every screen is wrapped
                   // in an opaque ScreenBackdrop by `screenLayout` -- see the
-                  // Background Theme architecture in AppBackgroundLayer.tsx.
+                  // warm background in AppBackgroundLayer.tsx.
                   contentStyle: { backgroundColor: 'transparent' },
                   ...getDefaultScreenOptions(),
                 }}
@@ -282,7 +277,6 @@ function Root() {
                   component={SettingsWorkoutPreferencesScreen}
                 />
                 <Stack.Screen name="SettingsNutrition" component={SettingsNutritionScreen} />
-                <Stack.Screen name="SettingsAppearance" component={SettingsAppearanceScreen} />
                 <Stack.Screen
                   name="SettingsNotifications"
                   component={SettingsNotificationsScreen}
@@ -315,9 +309,6 @@ function Root() {
                 <Stack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
                 <Stack.Screen name="NutritionHistory" component={NutritionHistoryScreen} />
                 <Stack.Screen name="CalorieEstimation" component={CalorieEstimationScreen} />
-                <Stack.Screen name="WorkoutColorSettings" component={WorkoutColorScreen} />
-                <Stack.Screen name="NutritionColorSettings" component={NutritionColorScreen} />
-                <Stack.Screen name="BackgroundThemeSettings" component={BackgroundThemeScreen} />
                 <Stack.Screen name="ProgressOverview" component={ProgressOverviewScreen} />
                 <Stack.Screen
                   name="ProgressExerciseDetail"
@@ -357,7 +348,7 @@ function Root() {
             // The strip behind the bar is opaque flat theme colour -- every
             // screen paints its own opaque backdrop now, so nothing behind
             // the bar is ever a photograph.
-            <View style={{ backgroundColor: backgroundTheme.colors.background }}>
+            <View style={{ backgroundColor: colors.background }}>
               <BottomNavBar
                 testID="app-bottom-nav"
                 active={routeToBottomNavTab(currentRouteName)}
@@ -423,11 +414,7 @@ function Root() {
 // logo up for as long as it actually takes.
 function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { status } = useAuth();
-  const { ready: backgroundThemeReady } = useBackgroundTheme();
-  // backgroundThemeReady gates first paint the same way fontsLoaded already
-  // does, so the app never briefly shows the default (Obsidian) theme
-  // before switching to the user's saved one.
-  const ready = fontsLoaded && status !== 'loading' && backgroundThemeReady;
+  const ready = fontsLoaded && status !== 'loading';
 
   return (
     <View style={styles.shell}>
@@ -462,10 +449,8 @@ function App() {
           <NutritionGoalsProvider>
             <FoodLogProvider>
               <AllTimeStatsProvider>
-                <BackgroundThemeProvider>
-                  <AppShell fontsLoaded={fontsLoaded} />
-                  <StatusBar style="light" />
-                </BackgroundThemeProvider>
+                <AppShell fontsLoaded={fontsLoaded} />
+                <StatusBar style="light" />
               </AllTimeStatsProvider>
             </FoodLogProvider>
           </NutritionGoalsProvider>

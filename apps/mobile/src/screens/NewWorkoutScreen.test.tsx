@@ -3,7 +3,6 @@ import { Feather } from '@expo/vector-icons';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
-import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { createWorkout } from '../workouts/workoutQueries';
 import {
@@ -108,12 +107,9 @@ beforeEach(() => {
 
 describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
   it('shows the real next workout day (order 1, since nothing has been completed yet), not a hardcoded name', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     const hero = await screen.findByTestId('start-workout-next');
     expect(hero).toBeTruthy();
@@ -122,12 +118,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
   });
 
   it('lists every other split day under All Workout Days, excluding the day already shown as next', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('start-workout-next');
 
     expect(screen.queryByTestId('start-workout-day-day-1')).toBeNull();
@@ -138,12 +131,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
   });
 
   it('starting the next workout creates it tagged with that day and enters ActiveWorkout', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     fireEvent.press(await screen.findByTestId('start-workout-next'));
 
@@ -154,12 +144,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
   });
 
   it('starting a different (non-recommended) split day tags the workout with THAT day, not the recommended one', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     fireEvent.press(await screen.findByTestId('start-workout-day-day-2'));
 
@@ -168,24 +155,18 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
   });
 
   it('offers starting a group workout from the Start Workout page', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     fireEvent.press(await screen.findByTestId('start-workout-group'));
     expect(mockNavigate).toHaveBeenCalledWith('GroupStart');
   });
 
   it('Do a Different Workout opens a naming sheet; confirming starts an untagged workout with the given name', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     fireEvent.press(await screen.findByTestId('start-workout-custom'));
     fireEvent.changeText(await screen.findByTestId('start-workout-custom-name'), 'Arms + Abs');
@@ -199,12 +180,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
   });
 
   it('disables the custom-workout confirm button until a name is entered', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     fireEvent.press(await screen.findByTestId('start-workout-custom'));
 
     const confirmButton = await screen.findByTestId('start-workout-custom-confirm');
@@ -217,12 +195,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
   });
 
   it('navigates to Log a Past Workout', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     fireEvent.press(await screen.findByTestId('start-workout-log-past'));
 
@@ -239,12 +214,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
         completedAt: null,
       },
     });
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     fireEvent.press(await screen.findByTestId('start-workout-next'));
     fireEvent.press(await screen.findByTestId('resume-instead'));
@@ -253,12 +225,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
   });
 
   it('never renders exercise selection, Add Exercise, or Create Custom Exercise on this screen', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('start-workout-next');
 
     expect(screen.queryByTestId('new-workout-add-exercise')).toBeNull();
@@ -268,12 +237,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
   });
 
   it('has no back arrow in the header', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('start-workout-next');
 
     expect(screen.queryByTestId('app-header-back')).toBeNull();
@@ -282,12 +248,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
 
   it('recommends the day after whichever split day was actually last completed', async () => {
     mockFetchLastWorkoutSplitDayId.mockResolvedValue('day-1');
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByText('Recovery')).toBeTruthy();
     const hero = screen.getByTestId('start-workout-next');
@@ -301,12 +264,9 @@ describe('NewWorkoutScreen without an active split', () => {
   it('blocks with "Choose Your Workout Split" and shows no day rows or exercise UI', async () => {
     mockFetchMyProfile.mockResolvedValue(baseProfile(null));
 
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
 
     expect(await screen.findByTestId('new-workout-no-split')).toBeTruthy();
     expect(screen.queryByTestId('start-workout-next')).toBeNull();
@@ -316,12 +276,9 @@ describe('NewWorkoutScreen without an active split', () => {
   it('navigates to ChooseWorkoutSplit when the button is pressed', async () => {
     mockFetchMyProfile.mockResolvedValue(baseProfile(null));
 
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     fireEvent.press(await screen.findByTestId('new-workout-choose-split'));
 
     expect(mockNavigate).toHaveBeenCalledWith('ChooseWorkoutSplit');
@@ -343,12 +300,9 @@ describe('NewWorkoutScreen background refresh on focus', () => {
   }
 
   it('does not show the full-screen loading indicator on a focus-triggered refresh', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
     await screen.findByTestId('start-workout-next');
 
     const refresh = deferred<ReturnType<typeof baseProfile>>();
@@ -372,12 +326,9 @@ describe('NewWorkoutScreen background refresh on focus', () => {
 
 describe('NewWorkoutScreen -- one primary action, everything else plain rows', () => {
   function renderScreen() {
-    return render(
-      <BackgroundThemeProvider>
-        <NewWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: ProfileProvider },
-    );
+    return render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
   }
 
   it('has exactly one card -- the Next Workout hero -- and no card per day or per option', async () => {

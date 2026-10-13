@@ -1,11 +1,7 @@
 import { renderHook } from '@testing-library/react-native';
 import { useProfile, type ProfileContextValue } from '../profile/ProfileProvider';
 import type { ProfileResponse } from '../lib/api';
-import {
-  buildAccentTheme,
-  DEFAULT_NUTRITION_THEME,
-  DEFAULT_WORKOUT_THEME,
-} from '../theme/accentColor';
+import { DEFAULT_NUTRITION_THEME, DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { useProgressTheme } from './useProgressTheme';
 
 jest.mock('../profile/ProfileProvider', () => ({
@@ -52,7 +48,7 @@ describe('useProgressTheme', () => {
     expect(result.current.avatarUrl).toBe('https://example.com/avatar.jpg');
   });
 
-  it("derives theme/nutritionTheme from the user's own saved accent colors, per mode", () => {
+  it('always uses the one amber accent, ignoring any colors an account saved with the old pickers', () => {
     mockUseProfile.mockReturnValue(
       profileContext({
         profile: {
@@ -64,24 +60,10 @@ describe('useProgressTheme', () => {
 
     const { result } = renderHook(() => useProgressTheme());
 
-    expect(result.current.theme).toEqual(buildAccentTheme('#EF4444'));
-    expect(result.current.nutritionTheme).toEqual(buildAccentTheme('#22C55E'));
-  });
-
-  it('falls back to the fixed neutral default per mode when no custom accent is saved', () => {
-    mockUseProfile.mockReturnValue(
-      profileContext({
-        profile: {
-          workoutAccentColor: null,
-          nutritionAccentColor: null,
-        } as ProfileResponse,
-      }),
-    );
-
-    const { result } = renderHook(() => useProgressTheme());
-
     expect(result.current.theme).toBe(DEFAULT_WORKOUT_THEME);
     expect(result.current.nutritionTheme).toBe(DEFAULT_NUTRITION_THEME);
+    expect(result.current.theme.accent).toBe('#D99A50');
+    expect(result.current.nutritionTheme.accent).toBe('#D99A50');
   });
 
   it('falls back to safe defaults, without throwing, while the shared cache has no profile yet', () => {

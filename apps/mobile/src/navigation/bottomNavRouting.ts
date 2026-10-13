@@ -35,14 +35,10 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination>
   SettingsPersonalInfo: 'you',
   SettingsWorkoutPreferences: 'you',
   SettingsNutrition: 'you',
-  SettingsAppearance: 'you',
   SettingsNotifications: 'you',
   SettingsAccountSecurity: 'you',
   SettingsChangePassword: 'you',
   SettingsSupport: 'you',
-  WorkoutColorSettings: 'you',
-  NutritionColorSettings: 'you',
-  BackgroundThemeSettings: 'you',
   Profile: 'you',
 };
 

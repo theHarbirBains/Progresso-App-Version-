@@ -1,7 +1,6 @@
 import type { PropsWithChildren } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { toLocalDateKey } from '../design/calendarGrid';
 import { fetchAllExercises } from '../exercises/exerciseQueries';
 import { logWorkoutForClient } from '../lib/api';
@@ -102,12 +101,9 @@ const navigation: any = { goBack: mockGoBack, replace: mockReplace };
 const route = {} as never;
 
 function renderScreen() {
-  return render(
-    <BackgroundThemeProvider>
-      <LogPastWorkoutScreen navigation={navigation} route={route} />
-    </BackgroundThemeProvider>,
-    { wrapper: TestProviders },
-  );
+  return render(<LogPastWorkoutScreen navigation={navigation} route={route} />, {
+    wrapper: TestProviders,
+  });
 }
 
 beforeEach(() => {
@@ -375,12 +371,10 @@ describe('LogPastWorkoutScreen -- trainer mode', () => {
     mockLogWorkoutForClient.mockReset().mockResolvedValue({ workoutId: 'client-w1' });
     mockFetchExercises.mockResolvedValue([squat]);
     render(
-      <BackgroundThemeProvider>
-        <LogPastWorkoutScreen
-          navigation={navigation}
-          route={{ params: { clientId: 'client-1', clientName: 'Sam' } } as never}
-        />
-      </BackgroundThemeProvider>,
+      <LogPastWorkoutScreen
+        navigation={navigation}
+        route={{ params: { clientId: 'client-1', clientName: 'Sam' } } as never}
+      />,
       { wrapper: TestProviders },
     );
     await screen.findByTestId('log-past-workout-date');

@@ -9,8 +9,8 @@ import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 export const settingsStyles = StyleSheet.create({
   screen: {
     flex: 1,
-    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
-    // paints the selected Background Theme; screens no longer hardcode it.
+    // Transparent -- the warm background (photo included) is painted once,
+    // behind every screen; screens never hardcode it.
     backgroundColor: 'transparent',
   },
   contentScroll: {
@@ -96,14 +96,6 @@ export const settingsStyles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  swatch: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-
   comingSoonBadge: {
     backgroundColor: colors.surfaceRaised,
   },

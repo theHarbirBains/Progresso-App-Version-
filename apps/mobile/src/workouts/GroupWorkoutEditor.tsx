@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, StyleSheet, View } from 'react-native';
-import { useBackgroundTheme } from '../design/backgroundThemeStore';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { Text } from '../design/Text';
@@ -82,7 +81,6 @@ export function GroupWorkoutEditor({
   testID = 'group-workout',
 }: Props) {
   const { weightUnit } = useProgressTheme();
-  const { theme: backgroundTheme } = useBackgroundTheme();
   const [details, setDetails] = useState<Record<string, WorkoutDetail>>({});
   const [selectedId, setSelectedId] = useState(userId);
   const { setInputs, setSetInputs, changeWeight, changeReps } = useSetInputDrafts();
@@ -495,15 +493,12 @@ export function GroupWorkoutEditor({
       />
       <Modal visible={customOpen} animationType="slide" onRequestClose={() => setCustomOpen(false)}>
         {/* A native Modal opens its own window, outside AppBackgroundLayer, so it needs its
-            own fill from the current Background Theme -- same reason ExercisePickerModal's
+            own warm background fill -- same reason ExercisePickerModal's
             own root does this. Without it, Screen's deliberately transparent root (see that
             component's own comment) has nothing behind it and falls back to plain white. */}
         <View
           testID={`${testID}-create-custom-modal`}
-          style={[
-            styles.customExerciseModal,
-            { backgroundColor: backgroundTheme.colors.background },
-          ]}
+          style={[styles.customExerciseModal, { backgroundColor: colors.background }]}
         >
           <ExerciseFormScreen
             mode="create"

@@ -99,13 +99,11 @@ export function buildAccentTheme(hex: string): AccentTheme {
   };
 }
 
-// Both defaults are the same "Warm Amber" preset (accentPalette.ts's Earth /
-// Luxury group, matching colors.accent) -- the Warm Minimal redesign's soft
-// amber, replacing the earlier neutral white. Train and Nutrition are told
+// The app's one accent, soft amber (Warm Minimal, matching colors.accent),
+// for both modes. There is no color picker: Train and Nutrition are told
 // apart by label and icon, not by color (the same approach Feed's cards
-// already use -- see DESIGN.md's Feed section). A user who picks a custom
-// color via AccentColorPickerScreen still overrides this per-mode, same as
-// before.
+// already use -- see DESIGN.md's Feed section), and the page you're on is
+// always highlighted in this amber.
 export const DEFAULT_WORKOUT_COLOR = '#D99A50';
 export const DEFAULT_NUTRITION_COLOR = '#D99A50';
 

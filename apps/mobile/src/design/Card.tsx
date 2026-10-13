@@ -8,24 +8,16 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { withAlpha } from '../theme/accentColor';
 import { colors, radii, spacing } from './theme';
-
-// The warm gym photograph behind a hero card (Warm Minimal, DESIGN.md §10).
-const HERO_IMAGE = require('../../assets/hero-gym-warm.jpg');
 
 interface Props {
   children: ReactNode;
   /**
-   * The one hero card on a screen (e.g. Feed's Next Workout): the warm gym
-   * photo, darkened across the left where the text sits (enough for AA
-   * contrast even over its brightest highlights) and letting the window
-   * light through only at the right edge, instead of
-   * the quiet surface every other card uses. Pair with light text inside and
-   * a `colors.heroAction` button (the caller's job, same as AppCard's hero
-   * convention).
+   * The one hero card on a screen (e.g. Feed's Next Workout): no fill and no
+   * edge, so its content sits straight on the warm gym photo behind the top
+   * of every screen (AppBackgroundLayer), the way Option 4's hero does. Pair
+   * with light text inside and a `colors.heroAction` button (the caller's
+   * job, same as AppCard's hero convention).
    */
   hero?: boolean;
   onPress?: () => void;
@@ -40,10 +32,9 @@ interface Props {
 // The redesign's card: a flat, opaque surface -- no glass tint, no blur, no
 // glow -- raised above the page purely by being a visibly lighter fill
 // (`colors.surfaceRaised`) than the near-black background, the same way
-// elevation reads in a dark OS theme. A faint warm hairline traces its edge.
-// Bigger, softer corners than AppCard. The photo and the hairline are both
-// absolutely positioned layers behind the content, so neither changes the
-// card's size or where its content sits.
+// elevation reads in a dark OS theme. A faint warm hairline traces its edge,
+// drawn as an absolutely positioned layer so it never changes the card's
+// size or where its content sits. Bigger, softer corners than AppCard.
 export function Card({
   children,
   hero,
@@ -54,36 +45,18 @@ export function Card({
   accessibilityLabel,
   accessibilityState,
 }: Props) {
-  const cardStyle = [styles.card, hero ? styles.heroSurface : styles.surface, style];
+  const cardStyle = [styles.card, hero ? null : styles.surface, style];
   const content = (
     <>
-      {hero ? (
-        <View
-          testID={testID ? `${testID}-photo` : undefined}
-          style={styles.layer}
-          pointerEvents="none"
-        >
-          <Image source={HERO_IMAGE} style={styles.layer} contentFit="cover" />
-          <LinearGradient
-            colors={[
-              withAlpha(colors.background, 0.9),
-              withAlpha(colors.background, 0.8),
-              withAlpha(colors.background, 0.3),
-            ]}
-            locations={[0, 0.7, 1]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.layer}
-          />
-        </View>
-      ) : null}
       {children}
       {/* Drawn last, so nothing inside the card can cover its edge. */}
-      <View
-        testID={testID ? `${testID}-edge` : undefined}
-        style={[styles.layer, styles.edge]}
-        pointerEvents="none"
-      />
+      {hero ? null : (
+        <View
+          testID={testID ? `${testID}-edge` : undefined}
+          style={[styles.layer, styles.edge]}
+          pointerEvents="none"
+        />
+      )}
     </>
   );
 
@@ -118,10 +91,6 @@ const styles = StyleSheet.create({
   },
   surface: {
     backgroundColor: colors.surfaceRaised,
-  },
-  // Shown under the photo while it loads, and if it ever fails to.
-  heroSurface: {
-    backgroundColor: colors.surface,
   },
   layer: {
     position: 'absolute',

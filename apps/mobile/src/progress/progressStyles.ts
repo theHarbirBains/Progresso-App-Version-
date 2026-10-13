@@ -9,8 +9,8 @@ import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 export const progressStyles = StyleSheet.create({
   screen: {
     flex: 1,
-    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
-    // paints the selected Background Theme; screens no longer hardcode it.
+    // Transparent -- the warm background (photo included) is painted once,
+    // behind every screen; screens never hardcode it.
     backgroundColor: 'transparent',
   },
   // A section (PRs/Exercises/Top Sets/1RM) that owns a FlatList rather than

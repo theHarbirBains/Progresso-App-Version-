@@ -5,7 +5,6 @@ import { PrimaryButton } from '../design/Button';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
-import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { updateMyProfile } from '../lib/api';
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { AppMenuContext } from '../navigation/AppMenuContext';
@@ -195,11 +194,9 @@ function renderProfile(currentMode: 'workout' | 'nutrition' = 'workout') {
       <NutritionGoalsProvider>
         <FoodLogProvider>
           <AllTimeStatsProvider>
-            <BackgroundThemeProvider>
-              <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
-                <ProfileScreen navigation={navigation} route={route} />
-              </AppMenuContext.Provider>
-            </BackgroundThemeProvider>
+            <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
+              <ProfileScreen navigation={navigation} route={route} />
+            </AppMenuContext.Provider>
           </AllTimeStatsProvider>
         </FoodLogProvider>
       </NutritionGoalsProvider>

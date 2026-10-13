@@ -60,8 +60,8 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Settings**
 
-- A root list of seven categories, each its own page: Profile & Personal Information, Workout Preferences, Nutrition & Goals, Appearance, Notifications, Account & Security, Support & About
-- Theme/accent color customization, applied consistently across primary buttons and controls app-wide
+- A root list of six categories, each its own page: Profile & Personal Information, Workout Preferences, Nutrition & Goals, Notifications, Account & Security, Support & About
+- One fixed Warm Minimal look: the warm gym photo behind the top of every screen and one amber accent. There are no background themes or colour pickers, so the app always looks as designed
 - Notification preferences: push and email opt-in toggles are real and saved; more granular categories (workout reminders, PR alerts, weekly summaries) are shown as explicit "Coming Soon" rows rather than toggles that wouldn't do anything
 - Change Email, Delete Account and the help and contact rows are visible but not yet implemented ("Coming Soon")
 - There is no Apple Health (HealthKit) integration, and onboarding doesn't offer one

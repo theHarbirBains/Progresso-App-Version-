@@ -13,7 +13,6 @@ export type RootStackParamList = {
   SettingsPersonalInfo: undefined;
   SettingsWorkoutPreferences: undefined;
   SettingsNutrition: undefined;
-  SettingsAppearance: undefined;
   SettingsNotifications: undefined;
   SettingsAccountSecurity: undefined;
   SettingsChangePassword: undefined;
@@ -67,9 +66,6 @@ export type RootStackParamList = {
   NutritionGoals: undefined;
   NutritionHistory: undefined;
   CalorieEstimation: undefined;
-  WorkoutColorSettings: undefined;
-  NutritionColorSettings: undefined;
-  BackgroundThemeSettings: undefined;
   ProgressOverview: undefined;
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
   WorkoutSplits: undefined;

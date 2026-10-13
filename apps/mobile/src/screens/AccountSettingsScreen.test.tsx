@@ -36,7 +36,6 @@ describe('AccountSettingsScreen', () => {
     ['settings-category-personal-info', 'SettingsPersonalInfo'],
     ['settings-category-workout-preferences', 'SettingsWorkoutPreferences'],
     ['settings-category-nutrition', 'SettingsNutrition'],
-    ['settings-category-appearance', 'SettingsAppearance'],
     ['settings-category-notifications', 'SettingsNotifications'],
     ['settings-category-account-security', 'SettingsAccountSecurity'],
     ['settings-category-support', 'SettingsSupport'],

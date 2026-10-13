@@ -10,8 +10,8 @@ import { colors, fonts, radii, spacing, typeScale, widgetGap } from '../design/t
 export const profileStyles = StyleSheet.create({
   screen: {
     flex: 1,
-    // Transparent -- AppBackgroundLayer (mounted once behind the navigator)
-    // paints the selected Background Theme; screens no longer hardcode it.
+    // Transparent -- the warm background (photo included) is painted once,
+    // behind every screen; screens never hardcode it.
     backgroundColor: 'transparent',
   },
   scrollContent: {

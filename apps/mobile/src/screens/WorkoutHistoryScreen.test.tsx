@@ -462,12 +462,14 @@ describe('WorkoutHistoryScreen -- a stack of widgets', () => {
     await settle();
   });
 
-  it('makes the start-workout action card the one hero, over the warm gym photo', async () => {
+  it('makes the start-workout action card the one hero, see-through over the background photo', async () => {
     mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: false });
     renderScreen();
     await screen.findByTestId('workout-item-w1');
 
-    expect(screen.getByTestId('workout-history-start-photo')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(screen.getByTestId('workout-history-start').props.style).backgroundColor,
+    ).toBeUndefined();
     expect(
       StyleSheet.flatten(screen.getByTestId('start-new-workout').props.style).backgroundColor,
     ).toBe(colors.heroAction);

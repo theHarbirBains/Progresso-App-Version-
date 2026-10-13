@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, View } from 'react-native';
 import { AppHeader } from '../design/AppHeader';
-import { useBackgroundTheme } from '../design/BackgroundThemeContext';
 import { ListRow } from '../design/ListRow';
 import { PhotoLightbox } from '../design/PhotoLightbox';
 import { colors } from '../design/theme';
@@ -52,7 +51,6 @@ export function ExercisePickerModal({
   accentColor = colors.accent,
   onAccentColor = colors.onAccent,
 }: Props) {
-  const { theme: backgroundTheme } = useBackgroundTheme();
   const reduceMotion = useReduceMotionPreference();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -117,10 +115,10 @@ export function ExercisePickerModal({
       onRequestClose={onClose}
     >
       {/* A native Modal opens its own window, outside AppBackgroundLayer, so it takes the
-          current Background Theme colour itself. */}
+          warm background colour itself. */}
       <View
         testID="exercise-picker-root"
-        style={[styles.flex, { backgroundColor: backgroundTheme.colors.background }]}
+        style={[styles.flex, { backgroundColor: colors.background }]}
       >
         <AppHeader
           title="Add Exercise"

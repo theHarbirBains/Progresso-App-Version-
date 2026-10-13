@@ -9,12 +9,11 @@ describe('isNutritionRoute', () => {
     'NutritionGoals',
     'NutritionHistory',
     'CalorieEstimation',
-    'NutritionColorSettings',
   ])('treats %s as a Nutrition Mode route', (route) => {
     expect(isNutritionRoute(route)).toBe(true);
   });
 
-  it.each(['Dashboard', 'WorkoutHistory', 'Profile', 'WorkoutColorSettings'])(
+  it.each(['Dashboard', 'WorkoutHistory', 'Profile', 'ActiveWorkout'])(
     'treats %s as a Workout Mode route',
     (route) => {
       expect(isNutritionRoute(route)).toBe(false);

@@ -1,8 +1,7 @@
 import { Modal, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { fetchAllExercises } from '../exercises/exerciseQueries';
-import { BACKGROUND_THEMES } from '../design/backgroundThemes';
-import { useBackgroundTheme } from '../design/BackgroundThemeContext';
+import { colors } from '../design/theme';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { ExercisePickerModal } from './ExercisePickerModal';
 
@@ -12,20 +11,14 @@ jest.mock('../exercises/exerciseQueries', () => ({
   fetchExerciseSourceCounts: jest.fn().mockResolvedValue({ all: 2, builtin: 2, mine: 0 }),
 }));
 
-jest.mock('../design/BackgroundThemeContext', () => ({
-  useBackgroundTheme: jest.fn(),
-}));
-
 jest.mock('../navigation/navigationTransitions', () => ({
   useReduceMotionPreference: jest.fn(),
 }));
 
 const mockFetchExercises = fetchAllExercises as jest.Mock;
-const mockUseBackgroundTheme = useBackgroundTheme as jest.Mock;
 const mockUseReduceMotionPreference = useReduceMotionPreference as jest.Mock;
 
 beforeEach(() => {
-  mockUseBackgroundTheme.mockReturnValue({ theme: BACKGROUND_THEMES.obsidian });
   mockUseReduceMotionPreference.mockReturnValue(false);
   mockFetchExercises.mockReset().mockResolvedValue([
     {
@@ -220,8 +213,7 @@ describe('ExercisePickerModal', () => {
     expect(StyleSheet.flatten(chip.props.style).backgroundColor).toBe('#8B5CF6');
   });
 
-  it('follows the current Background Theme for its own background -- unlike a normal screen, this Modal has no AppBackgroundLayer behind it', async () => {
-    mockUseBackgroundTheme.mockReturnValue({ theme: BACKGROUND_THEMES.midnight });
+  it('paints the warm background itself -- unlike a normal screen, this Modal has no AppBackgroundLayer behind it', async () => {
     render(
       <ExercisePickerModal
         visible={true}
@@ -235,9 +227,7 @@ describe('ExercisePickerModal', () => {
 
     await screen.findByText('Barbell Bench Press');
     const root = screen.getByTestId('exercise-picker-root');
-    expect(StyleSheet.flatten(root.props.style).backgroundColor).toBe(
-      BACKGROUND_THEMES.midnight.colors.background,
-    );
+    expect(StyleSheet.flatten(root.props.style).backgroundColor).toBe(colors.background);
   });
 
   it('respects Reduce Motion by disabling the modal slide animation', async () => {

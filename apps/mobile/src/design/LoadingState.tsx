@@ -16,10 +16,9 @@ export function LoadingState({ testID }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // Kept on the static default rather than 'transparent': this shared
-    // component is also used by OnboardingScreen, which is explicitly out
-    // of scope for the Background Theme feature.
-    backgroundColor: colors.background,
+    // Transparent, so a loading screen shows the same warm background
+    // (photo included) as the screen it is loading, with no flash.
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },

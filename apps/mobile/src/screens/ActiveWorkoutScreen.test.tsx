@@ -3,7 +3,6 @@ import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet } from 'react-nativ
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
-import { BackgroundThemeProvider } from '../design/BackgroundThemeContext';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { colors, fonts } from '../design/theme';
 import { ProfileProvider } from '../profile/ProfileProvider';
@@ -199,36 +198,27 @@ beforeEach(() => {
 
 describe('ActiveWorkoutScreen', () => {
   it('loads the workout for the given workoutId (resuming the correct session)', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     await waitFor(() => expect(mockFetchWorkoutDetail).toHaveBeenCalledWith('w1'));
     expect((await screen.findAllByText('Push Day')).length).toBeGreaterThan(0);
   });
 
   it('shows the muscle group from real exercise data, not hardcoded', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     const card = await screen.findByTestId('exercise-card-we1');
     expect(within(card).getByText('Chest')).toBeTruthy();
   });
 
   it('never renders RIR, RPE, estimated calories, or an exercise image', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     expect(screen.queryByText(/RIR/i)).toBeNull();
@@ -238,35 +228,26 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('shows Total Sets reflecting every set that exists, including an incomplete one', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     expect(await screen.findByTestId('workout-summary-total-sets')).toHaveTextContent('2');
   });
 
   it('shows the number of exercises added so far, not total volume', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     expect(await screen.findByTestId('workout-summary-total-exercises')).toHaveTextContent('1');
     expect(screen.queryByTestId('workout-summary-total-volume')).toBeNull();
   });
 
   it('completing a set requires a valid weight and reps first', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     const completeButton = screen.getByTestId('exercise-card-we1-set-s2-complete');
@@ -274,12 +255,9 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('marks a set complete once weight and reps are entered, using the existing set-update path', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '120');
@@ -295,12 +273,9 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('accepts a .5 weight increment', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '100.5');
@@ -312,12 +287,9 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('rejects arbitrary decimal precision -- only whole numbers or .5 increments are a valid weight', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     for (const invalid of ['100.1', '100.25', '100.75']) {
@@ -336,12 +308,9 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('Total Sets increases by exactly one when Add Set is pressed', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
     expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('2');
 
@@ -353,12 +322,9 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('removes an exercise using the existing soft-delete function', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('exercise-card-we1-remove'));
@@ -368,12 +334,9 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('removes a set using the existing soft-delete function, updating Total Sets', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1-set-s2');
     expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('2');
 
@@ -395,12 +358,9 @@ describe('ActiveWorkoutScreen', () => {
       },
     ]);
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
@@ -414,12 +374,9 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('opens the existing custom-exercise creation flow', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('active-workout-create-custom'));
@@ -443,12 +400,9 @@ describe('ActiveWorkoutScreen', () => {
       ],
     });
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we2');
 
     fireEvent.press(screen.getByTestId('exercise-card-we2-move-up'));
@@ -461,7 +415,7 @@ describe('ActiveWorkoutScreen', () => {
     );
   });
 
-  it("uses the user's own saved Workout accent theme", async () => {
+  it('uses the one amber accent, even if an old custom Workout color is saved on the account', async () => {
     mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
@@ -474,26 +428,20 @@ describe('ActiveWorkoutScreen', () => {
       activeWorkoutSplitId: null,
     });
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
-    // A completed set's check button is filled with the mode accent --
-    // the user's own saved custom color, not the fixed default.
+    // A completed set's check button is filled with the accent -- always the
+    // app's amber, never a color saved by the old color picker.
     const complete = await screen.findByTestId('exercise-card-we1-set-s1-complete');
-    expect(StyleSheet.flatten(complete.props.style).backgroundColor).toBe('#8B5CF6');
+    expect(StyleSheet.flatten(complete.props.style).backgroundColor).toBe('#D99A50');
   });
 
   it('has no back arrow or "..." options menu -- Finish Workout/Cancel Workout are the only exits', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     expect(screen.queryByTestId('workout-header-back')).toBeNull();
@@ -502,12 +450,9 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('shows a prominent Finish Workout button that completes the workout via the same existing completeWorkout function -- exactly once, no duplicate record', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     const button = screen.getByTestId('complete-workout');
@@ -527,12 +472,9 @@ describe('ActiveWorkoutScreen', () => {
   });
 
   it('refetches the shared all-time stats cache after completing a workout, so Profile/Progress are current without their own fetch', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
     await waitFor(() => expect(mockFetchAllCompletedWorkouts).toHaveBeenCalledTimes(1));
 
@@ -548,12 +490,9 @@ describe('ActiveWorkoutScreen', () => {
     jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
       buttons?.find((b) => b.text === 'Cancel Workout')?.onPress?.();
     });
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
     await waitFor(() => expect(mockFetchAllCompletedWorkouts).toHaveBeenCalledTimes(1));
 
@@ -563,7 +502,7 @@ describe('ActiveWorkoutScreen', () => {
     expect(mockFetchAllCompletedWorkouts).toHaveBeenCalledTimes(1);
   });
 
-  it("the Finish Workout button follows the user's own saved Workout accent", async () => {
+  it('the Finish Workout button is amber, even if an old custom Workout color is saved', async () => {
     mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
@@ -576,17 +515,14 @@ describe('ActiveWorkoutScreen', () => {
       activeWorkoutSplitId: null,
     });
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     const button = screen.getByTestId('complete-workout');
     const flat = StyleSheet.flatten(button.props.style);
-    expect(flat.backgroundColor).toBe('#8B5CF6');
+    expect(flat.backgroundColor).toBe('#D99A50');
   });
 
   it('is reachable without scrolling even with many exercises, and does not interfere with adding sets/exercises', async () => {
@@ -600,12 +536,9 @@ describe('ActiveWorkoutScreen', () => {
     }));
     mockFetchWorkoutDetail.mockResolvedValue({ ...baseWorkout, exercises: manyExercises });
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     // The footer button is a sibling of the ScrollView, not inside its
     // scrollable content, so it renders regardless of exercise count.
@@ -619,12 +552,9 @@ describe('ActiveWorkoutScreen', () => {
       completedAt: '2026-01-01T01:00:00Z',
     });
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' }),
@@ -637,12 +567,9 @@ describe('ActiveWorkoutScreen', () => {
   it('shows an error message when loading fails', async () => {
     mockFetchWorkoutDetail.mockRejectedValue(new Error('network error'));
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     expect(await screen.findByTestId('active-workout-error')).toHaveTextContent('network error');
   });
@@ -687,12 +614,9 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
   });
 
   it('shows the "weight is per side" note and Left/Right rows instead of a single weight/reps row', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
 
     const card = await screen.findByTestId('exercise-card-we-bss');
     expect(within(card).getByTestId('exercise-card-we-bss-per-side-note')).toHaveTextContent(
@@ -713,12 +637,9 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
       ...(updates as object),
     }));
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we-bss');
 
     fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-weight'), '42.5');
@@ -745,12 +666,9 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
   });
 
   it('removes both sides of a unilateral set together, by the left side id', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we-bss-set-1-left-weight');
 
     fireEvent.press(screen.getByTestId('exercise-card-we-bss-set-1-remove'));
@@ -763,12 +681,9 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
   });
 
   it('keeps the set incomplete (and Complete disabled) until BOTH sides have valid values', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we-bss');
 
     const completeButton = screen.getByTestId('exercise-card-we-bss-set-1-complete');
@@ -797,12 +712,9 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
         completedAt: null,
       }));
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we-bss');
 
     fireEvent.press(screen.getByTestId('exercise-card-we-bss-add-set'));
@@ -825,12 +737,9 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
         completedAt: null,
       }));
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we-bss');
 
     fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-weight'), '42.5');
@@ -869,12 +778,9 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
         completedAt: null,
       }));
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we-bss');
 
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
@@ -900,12 +806,9 @@ describe('Pre-filled sets', () => {
   };
 
   function renderScreen() {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
   }
 
   beforeEach(() => {
@@ -1038,12 +941,9 @@ describe('Last Time You Did This', () => {
   // extra vertical content mid-workout) -- this guards it doesn't quietly
   // come back.
   it('does not render anywhere on the live workout screen', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     expect(screen.queryByTestId('active-workout-last-time')).toBeNull();
@@ -1055,12 +955,9 @@ describe('Last Time You Did This', () => {
 describe('Cancel Workout', () => {
   it('asks for confirmation before cancelling', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('cancel-workout'));
@@ -1080,12 +977,9 @@ describe('Cancel Workout', () => {
     jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
       buttons?.find((b) => b.text === 'Keep Going')?.onPress?.();
     });
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('cancel-workout'));
@@ -1098,12 +992,9 @@ describe('Cancel Workout', () => {
     jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
       buttons?.find((b) => b.text === 'Cancel Workout')?.onPress?.();
     });
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('cancel-workout'));
@@ -1118,12 +1009,9 @@ describe('Cancel Workout', () => {
     jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
       buttons?.find((b) => b.text === 'Cancel Workout')?.onPress?.();
     });
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('cancel-workout'));
@@ -1135,12 +1023,9 @@ describe('Cancel Workout', () => {
 
 describe('Create Custom Exercise from Add Exercise', () => {
   it('opens the full New Exercise screen from inside the picker, and reopens the picker with the new exercise addable after saving', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
@@ -1175,12 +1060,9 @@ describe('Create Custom Exercise from Add Exercise', () => {
   });
 
   it('also opens the same full New Exercise screen from the standalone Create Custom button', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('active-workout-create-custom'));
@@ -1191,12 +1073,9 @@ describe('Create Custom Exercise from Add Exercise', () => {
 
 describe('Last Workout', () => {
   it('shows no section for an exercise with no prior session', async () => {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     expect(mockFetchPreviousPerformance).toHaveBeenCalledWith('user-1', 'ex1', 'w1');
@@ -1213,12 +1092,9 @@ describe('Last Workout', () => {
       ],
     });
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     const section = await screen.findByTestId('exercise-card-we1-previous-session');
@@ -1248,12 +1124,9 @@ describe('Last Workout', () => {
       },
     );
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
@@ -1272,12 +1145,9 @@ describe('Last Workout', () => {
       sets: [{ id: 'prev-1', setIndex: 1, weightKg: 100, reps: 5, completedAt: '...', side: null }],
     });
 
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1-previous-session');
 
     fireEvent.press(screen.getByTestId('exercise-card-we1-view-history'));
@@ -1306,12 +1176,9 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
   };
 
   async function renderReady() {
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1');
   }
 
@@ -1435,12 +1302,9 @@ describe('ActiveWorkoutScreen renders no bare text outside <Text>', () => {
       performedAt: '2026-01-05T00:00:00Z',
       sets: [{ id: 'p1', setIndex: 1, weightKg: 100, reps: 5, completedAt: '...', side: 'left' }],
     });
-    render(
-      <BackgroundThemeProvider>
-        <ActiveWorkoutScreen navigation={navigation} route={route} />
-      </BackgroundThemeProvider>,
-      { wrapper: TestProviders },
-    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
     await screen.findByTestId('exercise-card-we1-previous-session');
 
     expectNoBareText();

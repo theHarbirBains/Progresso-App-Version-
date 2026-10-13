@@ -74,29 +74,17 @@ describe('Card', () => {
     expect(edge.borderColor).toBe(colors.glassBorder);
   });
 
-  it('puts the warm gym photo behind a hero card, without changing its padding', () => {
+  it('leaves a hero card see-through, so its content sits on the background photo', () => {
     render(
       <Card testID="card" hero>
         <Text>Content</Text>
       </Card>,
     );
 
-    const photo = screen.getByTestId('card-photo');
-    expect(StyleSheet.flatten(photo.props.style).position).toBe('absolute');
-    expect(photo.props.pointerEvents).toBe('none');
     const style = StyleSheet.flatten(screen.getByTestId('card').props.style);
-    expect(style.backgroundColor).toBe(colors.surface);
+    expect(style.backgroundColor).toBeUndefined();
     expect(style.padding).toBe(16);
+    expect(screen.queryByTestId('card-edge')).toBeNull();
     expect(screen.getByText('Content')).toBeTruthy();
-  });
-
-  it('shows no photo on an ordinary card', () => {
-    render(
-      <Card testID="card">
-        <Text>Content</Text>
-      </Card>,
-    );
-
-    expect(screen.queryByTestId('card-photo')).toBeNull();
   });
 });

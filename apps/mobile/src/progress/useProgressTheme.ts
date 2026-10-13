@@ -1,19 +1,18 @@
 import { useProfile } from '../profile/ProfileProvider';
 import {
-  buildAccentTheme,
   DEFAULT_NUTRITION_THEME,
   DEFAULT_WORKOUT_THEME,
   type AccentTheme,
 } from '../theme/accentColor';
 
 /**
- * `theme`/`nutritionTheme` are the user's own saved `workoutAccentColor`/
- * `nutritionAccentColor` (via AccentColorPickerScreen), falling back to the
- * app's fixed neutral white default when neither is set -- real,
- * user-visible color customization, applied wherever a screen reads
- * `theme.accent`/`nutritionTheme.accent` off this hook (Feed/Workout
- * History's hero cards, the bottom nav's Train/Nutrition tabs via App.tsx,
- * every other screen built on this hook).
+ * `theme`/`nutritionTheme` are the app's one fixed soft amber accent (Warm
+ * Minimal) -- there is no color customization, so every screen, and the
+ * bottom nav's highlight of the page you're on, always shows the same
+ * accent. Any `workoutAccentColor`/`nutritionAccentColor` still stored on an
+ * account from the old color pickers is deliberately ignored. Kept as two
+ * fields so every existing `theme.accent`/`nutritionTheme.accent` call site
+ * stays unchanged.
  *
  * Also exposes the identity fields (`displayName`, `username`,
  * `avatarUrl`) and `weightUnit`/`activeWorkoutSplitId` off the one shared
@@ -38,12 +37,8 @@ export function useProgressTheme(): {
   const { profile, loading } = useProfile();
 
   return {
-    theme: profile?.workoutAccentColor
-      ? buildAccentTheme(profile.workoutAccentColor)
-      : DEFAULT_WORKOUT_THEME,
-    nutritionTheme: profile?.nutritionAccentColor
-      ? buildAccentTheme(profile.nutritionAccentColor)
-      : DEFAULT_NUTRITION_THEME,
+    theme: DEFAULT_WORKOUT_THEME,
+    nutritionTheme: DEFAULT_NUTRITION_THEME,
     weightUnit: profile?.weightUnit ?? 'lb',
     activeWorkoutSplitId: profile?.activeWorkoutSplitId ?? null,
     displayName: profile?.displayName ?? null,

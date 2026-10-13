@@ -49,9 +49,9 @@ export const colors = {
   chartMuted: '#393129',
 
   // Glass-surface hairline borders (see GlassBackground.tsx) -- a warm
-  // light-alpha edge that reads as "catching light" against any of the
-  // Background Theme environments, rather than each theme's own (much
-  // darker) `border` token. `glassBorder` is the default weight (cards,
+  // light-alpha edge that reads as "catching light" against the warm
+  // background and its photo, rather than the (much darker) `border`
+  // token. `glassBorder` is the default weight (cards,
   // controls); `glassBorderStrong` is for the few persistent chrome
   // surfaces (bottom nav, side menu, bottom sheet) that want a slightly
   // more defined edge against constantly-changing content behind them.

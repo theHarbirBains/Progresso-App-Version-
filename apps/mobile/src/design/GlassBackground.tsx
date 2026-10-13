@@ -1,7 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { withAlpha } from '../theme/accentColor';
-import { useBackgroundTheme } from './backgroundThemeStore';
 import { colors } from './theme';
 
 export type GlassVariant = 'surface' | 'chrome';
@@ -15,10 +14,9 @@ interface Props {
    * cost is bounded and these are exactly the surfaces DESIGN.md's
    * navigation section calls for blur on. */
   variant?: GlassVariant;
-  /** Overrides the tint's base color instead of deriving it from the
-   * current Background Theme's surface/surfaceRaised (e.g. AppCard's hero
-   * variant, which stays on the static, accent-adjacent surfaceHero hue
-   * rather than following the per-theme environment). */
+  /** Overrides the tint's base color instead of the warm surface/
+   * surfaceRaised (e.g. AppCard's hero variant, which uses the
+   * accent-adjacent surfaceHero hue). */
   tintColor?: string;
   borderColor?: string;
   /** Set false for a surface that draws its own partial border (e.g.
@@ -54,9 +52,7 @@ export function GlassBackground({
   bordered = true,
   testID,
 }: Props) {
-  const { theme } = useBackgroundTheme();
-  const base =
-    tintColor ?? (variant === 'chrome' ? theme.colors.surfaceRaised : theme.colors.surface);
+  const base = tintColor ?? (variant === 'chrome' ? colors.surfaceRaised : colors.surface);
   const edge =
     borderColor ?? (variant === 'chrome' ? colors.glassBorderStrong : colors.glassBorder);
 

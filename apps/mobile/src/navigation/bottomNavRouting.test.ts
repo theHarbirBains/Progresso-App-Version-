@@ -20,11 +20,9 @@ describe('routeToBottomNavTab', () => {
     expect(routeToBottomNavTab('ProgressExerciseDetail')).toBe('progress');
     expect(routeToBottomNavTab('PRHistory')).toBe('progress');
     expect(routeToBottomNavTab('AccountSettings')).toBe('you');
-    expect(routeToBottomNavTab('BackgroundThemeSettings')).toBe('you');
     expect(routeToBottomNavTab('SettingsPersonalInfo')).toBe('you');
     expect(routeToBottomNavTab('SettingsWorkoutPreferences')).toBe('you');
     expect(routeToBottomNavTab('SettingsNutrition')).toBe('you');
-    expect(routeToBottomNavTab('SettingsAppearance')).toBe('you');
     expect(routeToBottomNavTab('SettingsNotifications')).toBe('you');
     expect(routeToBottomNavTab('SettingsAccountSecurity')).toBe('you');
     expect(routeToBottomNavTab('SettingsChangePassword')).toBe('you');

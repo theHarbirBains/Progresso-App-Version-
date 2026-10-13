@@ -767,13 +767,13 @@ describe('FeedScreen -- Next Workout widget', () => {
     expect(await screen.findByTestId('feed-next-workout')).toBeTruthy();
   });
 
-  it('is the one hero card, over the warm gym photo with a cream Start Workout button', async () => {
+  it('is the one hero card, see-through over the background photo, with a cream Start Workout button', async () => {
     mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
     mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
     renderScreen();
 
-    await screen.findByTestId('feed-next-workout');
-    expect(screen.getByTestId('feed-next-workout-photo')).toBeTruthy();
+    const card = await screen.findByTestId('feed-next-workout');
+    expect(StyleSheet.flatten(card.props.style).backgroundColor).toBeUndefined();
     const button = screen.UNSAFE_getByType(PrimaryButton);
     expect(button.props.accentColor).toBe(colors.heroAction);
     expect(button.props.onAccentColor).toBe(colors.onAccent);
