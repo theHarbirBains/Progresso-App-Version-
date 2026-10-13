@@ -178,11 +178,13 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
   const header = (
     <AppHeader
       title="Share Workout"
+      // Sharing slides up as a short task (navigationTransitions.ts), so it
+      // closes rather than going back.
       leftAction={{
-        icon: 'arrow-left',
+        icon: 'x',
         onPress: () => navigation.goBack(),
-        accessibilityLabel: 'Back',
-        testID: 'share-workout-back',
+        accessibilityLabel: 'Close',
+        testID: 'share-workout-close',
       }}
     />
   );

@@ -101,11 +101,13 @@ export function ChooseWorkoutSplitScreen({ navigation }: Props) {
         <AppHeader
           title="Choose Your Split"
           subtitle="Pick a split that matches your goals and schedule."
+          // Picking a split slides up as a short task (navigationTransitions.ts),
+          // so it closes rather than going back.
           leftAction={{
-            icon: 'arrow-left',
+            icon: 'x',
             onPress: () => navigation.goBack(),
-            accessibilityLabel: 'Back',
-            testID: 'choose-split-back',
+            accessibilityLabel: 'Close',
+            testID: 'choose-split-close',
           }}
           rightAction={{
             icon: 'settings',

@@ -236,11 +236,12 @@ describe('FoodSearchScreen', () => {
     expect(screen.getByTestId('food-search-result-food-1')).toBeTruthy();
   });
 
-  it('goes back when Back is pressed on the search screen', async () => {
+  it('closes when Close is pressed on the search screen', async () => {
     render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
     await flush();
 
-    fireEvent.press(screen.getByTestId('app-header-back'));
+    expect(screen.getByTestId('food-search-close').props.accessibilityLabel).toBe('Close');
+    fireEvent.press(screen.getByTestId('food-search-close'));
 
     expect(mockGoBack).toHaveBeenCalled();
   });

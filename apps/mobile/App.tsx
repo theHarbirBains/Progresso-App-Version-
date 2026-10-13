@@ -23,7 +23,10 @@ import { AppMenuContext } from './src/navigation/AppMenuContext';
 import { appMenuSectionsFor, type AppMenuRoute } from './src/navigation/appMenuSections';
 import { routeToBottomNavTab } from './src/navigation/bottomNavRouting';
 import { useAppLinking } from './src/navigation/linking';
-import { getDefaultScreenOptions } from './src/navigation/navigationTransitions';
+import {
+  getScreenTransitionOptions,
+  useReduceMotionPreference,
+} from './src/navigation/navigationTransitions';
 import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
 import { FoodLogProvider } from './src/nutrition/FoodLogProvider';
@@ -134,6 +137,9 @@ function Root() {
   // it to open.
   const [menuOpen, setMenuOpen] = useState(false);
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
+  // Every page's transition comes from its route (see navigationTransitions.ts);
+  // with Reduce Motion on, every page switches instantly instead.
+  const reduceMotion = useReduceMotionPreference();
   // Links to screens (progresso://workouts/<id> and the rest, see navigation/linking.ts) open
   // only once signed in; one that arrives before then is held until the navigator exists.
   const linking = useAppLinking(status === 'signedIn');
@@ -145,8 +151,7 @@ function Root() {
   // the global BottomNavBar's Train accent (and, below, a screen's own
   // background glow when its mode is Workout); nutritionMenuTheme is its
   // Nutrition counterpart, for the same per-screen glow purpose. Both are
-  // the user's own saved accent color (useProgressTheme), falling back to
-  // the fixed neutral default when none is set.
+  // the one fixed amber accent (useProgressTheme).
   // Every screen gets an opaque, themed backdrop that is part of the screen
   // itself, so a push/pop never depends on JS to paint what's behind the
   // incoming page in time (see ScreenBackdrop). Its soft glow follows the
@@ -258,15 +263,15 @@ function Root() {
             >
               <Stack.Navigator
                 initialRouteName="Feed"
-                screenOptions={{
+                screenOptions={({ route }) => ({
                   headerShown: false,
                   // Transparent so each screen's own (transparent) root
                   // container reveals its backdrop -- every screen is wrapped
                   // in an opaque ScreenBackdrop by `screenLayout` -- see the
                   // warm background in AppBackgroundLayer.tsx.
                   contentStyle: { backgroundColor: 'transparent' },
-                  ...getDefaultScreenOptions(),
-                }}
+                  ...getScreenTransitionOptions(route.name, reduceMotion),
+                })}
                 screenLayout={renderScreenLayout}
               >
                 <Stack.Screen name="Feed" component={FeedScreen} />
@@ -330,16 +335,8 @@ function Root() {
                 <Stack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
                 <Stack.Screen name="TrainerEditClient" component={TrainerClientFormScreen} />
                 <Stack.Screen name="TrainerClientDetail" component={TrainerClientDetailScreen} />
-                <Stack.Screen
-                  name="FindPeople"
-                  component={FindPeopleScreen}
-                  options={{ animation: 'slide_from_right' }}
-                />
-                <Stack.Screen
-                  name="Notifications"
-                  component={NotificationsScreen}
-                  options={{ animation: 'slide_from_right' }}
-                />
+                <Stack.Screen name="FindPeople" component={FindPeopleScreen} />
+                <Stack.Screen name="Notifications" component={NotificationsScreen} />
               </Stack.Navigator>
             </NavigationContainer>
           </View>

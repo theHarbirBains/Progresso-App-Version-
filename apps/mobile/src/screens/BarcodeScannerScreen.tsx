@@ -98,7 +98,14 @@ export function BarcodeScannerScreen({ navigation }: Props) {
   const scanHeader = (
     <AppHeader
       title="Scan Barcode"
-      onBack={() => navigation.goBack()}
+      // The scanner slides up as a short task (navigationTransitions.ts), so
+      // it closes rather than going back.
+      leftAction={{
+        icon: 'x',
+        onPress: () => navigation.goBack(),
+        accessibilityLabel: 'Close',
+        testID: 'barcode-scanner-close',
+      }}
       testID="barcode-scanner-header"
     />
   );

@@ -201,12 +201,12 @@ describe('ChooseWorkoutSplitScreen', () => {
     expect(mockGoBack).not.toHaveBeenCalled();
   });
 
-  it('goes back when Back is pressed', () => {
+  it('closes when Close is pressed', () => {
     render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
 
-    fireEvent.press(screen.getByTestId('choose-split-back'));
+    fireEvent.press(screen.getByTestId('choose-split-close'));
 
     expect(mockGoBack).toHaveBeenCalled();
   });
@@ -335,12 +335,12 @@ describe('ChooseWorkoutSplitScreen -- plain rows, one secondary action', () => {
     expect(create).toHaveTextContent('Create Custom Split');
   });
 
-  it('puts Back and Manage-splits in the shared header, each named for assistive tech', () => {
+  it('puts Close and Manage-splits in the shared header, each named for assistive tech', () => {
     render(<ChooseWorkoutSplitScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
 
-    expect(screen.getByTestId('choose-split-back').props.accessibilityLabel).toBe('Back');
+    expect(screen.getByTestId('choose-split-close').props.accessibilityLabel).toBe('Close');
     expect(screen.getByTestId('choose-split-settings').props.accessibilityLabel).toBe(
       'Manage workout splits',
     );

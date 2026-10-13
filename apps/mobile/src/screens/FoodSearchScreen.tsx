@@ -169,7 +169,14 @@ export function FoodSearchScreen({ navigation }: Props) {
         <View>
           <AppHeader
             title="Search Food"
-            onBack={() => navigation.goBack()}
+            // Food search slides up as a short task (navigationTransitions.ts),
+            // so it closes rather than going back.
+            leftAction={{
+              icon: 'x',
+              onPress: () => navigation.goBack(),
+              accessibilityLabel: 'Close',
+              testID: 'food-search-close',
+            }}
             testID="food-search-header"
           />
           <View style={styles.searchRow}>

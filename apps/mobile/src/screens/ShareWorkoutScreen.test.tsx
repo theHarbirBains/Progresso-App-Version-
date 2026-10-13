@@ -228,13 +228,13 @@ describe('ShareWorkoutScreen loading and preview', () => {
     await settle();
   });
 
-  it('goes back when Back is pressed', async () => {
+  it('closes when Close is pressed', async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
     await screen.findByTestId('share-card-workout-name');
 
-    fireEvent.press(screen.getByTestId('share-workout-back'));
+    fireEvent.press(screen.getByTestId('share-workout-close'));
 
     expect(mockGoBack).toHaveBeenCalled();
     await settle();
@@ -397,13 +397,13 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     await settle();
   });
 
-  it('names the back control for assistive tech', async () => {
+  it('names the close control for assistive tech', async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
     await screen.findByTestId('share-card');
 
-    expect(screen.getByTestId('share-workout-back').props.accessibilityLabel).toBe('Back');
+    expect(screen.getByTestId('share-workout-close').props.accessibilityLabel).toBe('Close');
     await settle();
   });
 

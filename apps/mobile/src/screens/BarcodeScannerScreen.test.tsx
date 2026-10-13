@@ -142,6 +142,19 @@ describe('BarcodeScannerScreen permission states', () => {
     expect(await screen.findByTestId('barcode-scanner-camera')).toBeTruthy();
   });
 
+  it('closes from the header -- the scanner slides up as a short task, so it shows Close, not Back', async () => {
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('barcode-scanner-camera');
+
+    const close = screen.getByTestId('barcode-scanner-close');
+    expect(close.props.accessibilityLabel).toBe('Close');
+    fireEvent.press(close);
+
+    expect(mockGoBack).toHaveBeenCalled();
+  });
+
   it('offers to request permission when not yet granted but can still ask', async () => {
     mockPermission = { granted: false, canAskAgain: true };
     render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
