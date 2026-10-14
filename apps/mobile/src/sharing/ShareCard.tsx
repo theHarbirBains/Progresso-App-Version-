@@ -51,6 +51,12 @@ const PHOTO_STYLE = {
   height: PHOTO_WIDTH / BACKGROUND_ASPECT,
 } as const;
 const STAT_ICON_SIZE = cardPt(18);
+// The logo the app opens with (LaunchScreen's mark), cropped tight to the
+// mark, in place of a written brand name.
+const LOGO = require('../../assets/progresso-mark-share.png');
+const LOGO_ASPECT = 360 / 289;
+const LOGO_HEIGHT = cardPt(26);
+const LOGO_STYLE = { width: LOGO_HEIGHT * LOGO_ASPECT, height: LOGO_HEIGHT } as const;
 // How the photo is darkened so its text reads: a scrim heaviest on the left,
 // where the text sits, then a fade into the card's own fill. Chosen by
 // measurement over the photo's brightest pixels -- don't lighten it without
@@ -200,7 +206,13 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
         <LinearGradient colors={FADE} locations={[0, 0.3, 0.6, 1]} style={styles.fill} />
 
         <View style={card.heroTop}>
-          <Text style={card.wordmark}>PROGRESSO</Text>
+          <Image
+            testID="share-card-logo"
+            source={LOGO}
+            style={LOGO_STYLE}
+            contentFit="contain"
+            accessibilityLabel="Progresso"
+          />
           <Text testID="share-card-date" style={card.date}>
             {formatCardDate(data.performedAt)}
           </Text>

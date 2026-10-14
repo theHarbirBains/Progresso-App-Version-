@@ -91,6 +91,7 @@ export function PRsSection({
         key={item.key}
         testID={`progress-pr-row-${item.key}`}
         exerciseName={item.exerciseName}
+        photoUrl={item.photoUrl}
         weightDisplay={roundWeight(fromKg(item.weightKg, weightUnit))}
         reps={item.reps}
         unit={weightUnit}

@@ -90,11 +90,6 @@ export const shareCardBodyStyles = StyleSheet.create(
       justifyContent: 'space-between',
       gap: spacing.md,
     },
-    wordmark: {
-      ...typeScale.caption,
-      color: colors.textSecondaryBright,
-      letterSpacing: 4,
-    },
     date: {
       ...typeScale.caption,
       color: colors.textSecondaryBright,

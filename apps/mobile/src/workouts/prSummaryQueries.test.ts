@@ -41,7 +41,11 @@ describe('fetchAllRepPRs', () => {
           source_set_id: 'set-1',
           achieved_at: '2026-01-05T00:00:00Z',
           exercise_id: 'ex-1',
-          exercises: { name: 'Bench Press', muscle_group: 'chest' },
+          exercises: {
+            name: 'Bench Press',
+            muscle_group: 'chest',
+            photo_url: 'https://example.com/bench.jpg',
+          },
         },
       ],
       error: null,
@@ -58,6 +62,7 @@ describe('fetchAllRepPRs', () => {
         exerciseId: 'ex-1',
         exerciseName: 'Bench Press',
         muscleGroup: 'chest',
+        exercisePhotoUrl: 'https://example.com/bench.jpg',
       },
     ]);
   });
@@ -104,7 +109,7 @@ describe('fetchAllOneRepMaxes', () => {
           source_set_id: 'set-2',
           achieved_at: '2026-02-01T00:00:00Z',
           exercise_id: 'ex-2',
-          exercises: { name: 'Squat' },
+          exercises: { name: 'Squat', photo_url: null },
         },
       ],
       error: null,
@@ -119,6 +124,7 @@ describe('fetchAllOneRepMaxes', () => {
         achievedAt: '2026-02-01T00:00:00Z',
         exerciseId: 'ex-2',
         exerciseName: 'Squat',
+        exercisePhotoUrl: null,
       },
     ]);
   });

@@ -58,4 +58,48 @@ describe('PRRow', () => {
 
     expect(onPress).toHaveBeenCalled();
   });
+
+  it("shows the exercise's photo in place of the ribbon, opening it full-screen when tapped", () => {
+    const onPress = jest.fn();
+    render(
+      <PRRow
+        exerciseName="Leg Press"
+        photoUrl="https://example.com/leg-press.jpg"
+        weightDisplay={450}
+        reps={7}
+        unit="lb"
+        achievedAt="2026-10-03T00:00:00Z"
+        recordType="7-Rep PR"
+        accentColor="#D99A50"
+        onPress={onPress}
+        testID="row"
+      />,
+    );
+
+    expect(screen.queryByTestId('row-ribbon')).toBeNull();
+    fireEvent.press(screen.getByTestId('row-photo-zoom'));
+
+    // The machine, full-screen -- without also opening the exercise.
+    expect(screen.getByTestId('row-photo-lightbox')).toBeTruthy();
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('keeps the ribbon when the exercise has no photo', () => {
+    render(
+      <PRRow
+        exerciseName="Bench Press"
+        photoUrl={null}
+        weightDisplay={225}
+        reps={5}
+        unit="lb"
+        achievedAt="2026-10-03T00:00:00Z"
+        recordType="5-Rep PR"
+        accentColor="#D99A50"
+        testID="row"
+      />,
+    );
+
+    expect(screen.getByTestId('row-ribbon')).toBeTruthy();
+    expect(screen.queryByTestId('row-photo')).toBeNull();
+  });
 });

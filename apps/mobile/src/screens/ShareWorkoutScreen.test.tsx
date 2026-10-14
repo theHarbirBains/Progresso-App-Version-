@@ -109,6 +109,9 @@ describe('ShareWorkoutScreen loading and preview', () => {
     // No year on the date.
     expect(screen.getByTestId('share-card-date')).not.toHaveTextContent('2026');
     expect(screen.getByTestId('share-card-photo')).toBeTruthy();
+    // The logo the app opens with, not a written brand name.
+    expect(screen.getByTestId('share-card-logo')).toBeTruthy();
+    expect(screen.getByTestId('share-card')).not.toHaveTextContent(/PROGRESSO/);
     // The name is the user's own -- the muscles worked aren't spelled out under it.
     expect(screen.queryByTestId('share-card-muscles')).toBeNull();
     expect(screen.getByTestId('share-card')).not.toHaveTextContent('Chest, Shoulders');

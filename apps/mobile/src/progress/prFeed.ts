@@ -4,6 +4,8 @@ export interface PRFeedRow {
   key: string;
   exerciseId: string;
   exerciseName: string;
+  /** The exercise's machine photo, when it has one (most custom ones do; most built-ins don't). */
+  photoUrl: string | null;
   weightKg: number;
   /** null for a true-1RM record (a 1RM isn't described by a rep count the way a rep-count PR is). */
   reps: number | null;
@@ -29,6 +31,7 @@ export function mergeAndSortPRs(
     key: `pr-${pr.exerciseId}-${pr.reps}`,
     exerciseId: pr.exerciseId,
     exerciseName: pr.exerciseName,
+    photoUrl: pr.exercisePhotoUrl ?? null,
     weightKg: pr.bestWeightKg,
     reps: pr.reps,
     achievedAt: pr.achievedAt,
@@ -39,6 +42,7 @@ export function mergeAndSortPRs(
     key: `orm-${orm.exerciseId}`,
     exerciseId: orm.exerciseId,
     exerciseName: orm.exerciseName,
+    photoUrl: orm.exercisePhotoUrl ?? null,
     weightKg: orm.weightKg,
     reps: null,
     achievedAt: orm.achievedAt,

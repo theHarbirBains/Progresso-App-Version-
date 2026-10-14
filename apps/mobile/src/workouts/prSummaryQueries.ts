@@ -15,11 +15,15 @@ export interface RepPRWithExercise extends RepPR {
    * "Relevant PRs" widget) filter to PRs relevant to a specific muscle
    * group without a second query. */
   muscleGroup: MuscleGroup;
+  /** The exercise's machine photo (exercises.photo_url), when it has one. */
+  exercisePhotoUrl?: string | null;
 }
 
 export interface OneRepMaxWithExercise extends OneRepMax {
   exerciseId: string;
   exerciseName: string;
+  /** The exercise's machine photo (exercises.photo_url), when it has one. */
+  exercisePhotoUrl?: string | null;
 }
 
 interface RepPRRow {
@@ -28,7 +32,7 @@ interface RepPRRow {
   source_set_id: string;
   achieved_at: string;
   exercise_id: string;
-  exercises: { name: string; muscle_group: MuscleGroup } | null;
+  exercises: { name: string; muscle_group: MuscleGroup; photo_url: string | null } | null;
 }
 
 /** Every rep-count PR across every exercise for this user, most recently achieved first. */
@@ -36,7 +40,7 @@ export async function fetchAllRepPRs(userId: string): Promise<RepPRWithExercise[
   const { data, error } = await supabase
     .from('rep_prs')
     .select(
-      'reps, best_weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, muscle_group)',
+      'reps, best_weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, muscle_group, photo_url)',
     )
     .eq('user_id', userId)
     .order('achieved_at', { ascending: false });
@@ -49,6 +53,7 @@ export async function fetchAllRepPRs(userId: string): Promise<RepPRWithExercise[
     exerciseId: row.exercise_id,
     exerciseName: row.exercises?.name ?? 'Exercise',
     muscleGroup: row.exercises?.muscle_group ?? 'other',
+    exercisePhotoUrl: row.exercises?.photo_url ?? null,
   }));
 }
 
@@ -57,14 +62,14 @@ interface OneRepMaxRow {
   source_set_id: string;
   achieved_at: string;
   exercise_id: string;
-  exercises: { name: string } | null;
+  exercises: { name: string; photo_url: string | null } | null;
 }
 
 /** Every true 1RM across every exercise for this user, most recently achieved first. */
 export async function fetchAllOneRepMaxes(userId: string): Promise<OneRepMaxWithExercise[]> {
   const { data, error } = await supabase
     .from('one_rep_maxes')
-    .select('weight_kg, source_set_id, achieved_at, exercise_id, exercises(name)')
+    .select('weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, photo_url)')
     .eq('user_id', userId)
     .order('achieved_at', { ascending: false });
   if (error) throw new Error(error.message);
@@ -74,5 +79,6 @@ export async function fetchAllOneRepMaxes(userId: string): Promise<OneRepMaxWith
     achievedAt: row.achieved_at,
     exerciseId: row.exercise_id,
     exerciseName: row.exercises?.name ?? 'Exercise',
+    exercisePhotoUrl: row.exercises?.photo_url ?? null,
   }));
 }
