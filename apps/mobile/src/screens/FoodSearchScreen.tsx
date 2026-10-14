@@ -14,6 +14,7 @@ import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import { searchFoods, type FoodSearchResult } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { goToSection } from '../navigation/sectionNavigation';
 import { FoodFacts } from '../nutrition/FoodFacts';
 import { FoodImage } from '../nutrition/FoodImage';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
@@ -107,7 +108,7 @@ export function FoodSearchScreen({ navigation }: Props) {
         }}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
-        onDone={() => navigation.navigate('Nutrition')}
+        onDone={() => goToSection(navigation, 'Nutrition')}
         onCancel={() => setLogging(false)}
       />
     );

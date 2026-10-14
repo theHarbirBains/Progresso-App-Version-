@@ -1,3 +1,4 @@
+import { StackActions } from '@react-navigation/native';
 import type { PropsWithChildren } from 'react';
 import { Image, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
@@ -46,8 +47,15 @@ const mockFetchTodaysFoodLogs = fetchTodaysFoodLogs as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
+const mockDispatch = jest.fn();
+// Opened from Nutrition, so Done goes back to that Nutrition page (sectionNavigation.ts).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { goBack: mockGoBack, navigate: mockNavigate };
+const navigation: any = {
+  goBack: mockGoBack,
+  navigate: mockNavigate,
+  dispatch: mockDispatch,
+  getState: () => ({ routes: [{ name: 'Nutrition' }, { name: 'FoodSearch' }] }),
+};
 const route = {} as never;
 
 const chickenBreast = {
@@ -121,6 +129,7 @@ beforeEach(() => {
   mockFetchTodaysFoodLogs.mockReset().mockResolvedValue([]);
   mockGoBack.mockClear();
   mockNavigate.mockClear();
+  mockDispatch.mockClear();
 });
 
 afterEach(() => {
@@ -276,7 +285,8 @@ describe('FoodSearchScreen', () => {
       // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
     );
-    expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
+    expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
+    expect(mockNavigate).not.toHaveBeenCalledWith('Nutrition');
   });
 
   it('logs a macro the provider did not report as 0 (never fabricated for display, but food_logs requires a real number)', async () => {

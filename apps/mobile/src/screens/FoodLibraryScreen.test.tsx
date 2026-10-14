@@ -1,3 +1,4 @@
+import { StackActions } from '@react-navigation/native';
 import { Alert, Image, StyleSheet } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
@@ -51,8 +52,15 @@ const mockUploadFoodPhoto = uploadFoodPhoto as jest.Mock;
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
 const mockOpenMenu = jest.fn();
+const mockDispatch = jest.fn();
+// Opened from Nutrition, so Done goes back to that Nutrition page (sectionNavigation.ts).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { goBack: mockGoBack, navigate: mockNavigate };
+const navigation: any = {
+  goBack: mockGoBack,
+  navigate: mockNavigate,
+  dispatch: mockDispatch,
+  getState: () => ({ routes: [{ name: 'Nutrition' }, { name: 'FoodLibrary' }] }),
+};
 
 const apple = {
   id: 'food-apple',
@@ -120,6 +128,7 @@ beforeEach(() => {
   mockUploadFoodPhoto.mockReset();
   mockGoBack.mockClear();
   mockNavigate.mockClear();
+  mockDispatch.mockClear();
   mockOpenMenu.mockClear();
 });
 
@@ -310,7 +319,8 @@ describe('FoodLibraryScreen', () => {
       expect.anything(),
     );
     // Done returns to Nutrition, not back to the scanner's not-found screen.
-    expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
+    expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
+    expect(mockNavigate).not.toHaveBeenCalledWith('Nutrition');
   });
 
   it('goes back to the list, not to logging, after creating a food the ordinary way', async () => {

@@ -12,6 +12,7 @@ import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { getFoodByBarcode, type FoodSearchResult } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { goToSection } from '../navigation/sectionNavigation';
 import { FoodFacts } from '../nutrition/FoodFacts';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -167,7 +168,7 @@ export function BarcodeScannerScreen({ navigation }: Props) {
         }}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
-        onDone={() => navigation.navigate('Nutrition')}
+        onDone={() => goToSection(navigation, 'Nutrition')}
         onCancel={() => setState({ status: 'found', product: state.product })}
       />
     );

@@ -1,3 +1,4 @@
+import { StackActions } from '@react-navigation/native';
 import type { PropsWithChildren } from 'react';
 import { Linking, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
@@ -67,8 +68,15 @@ const mockFetchTodaysFoodLogs = fetchTodaysFoodLogs as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
+const mockDispatch = jest.fn();
+// Opened from Nutrition, so Done goes back to that Nutrition page (sectionNavigation.ts).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { goBack: mockGoBack, navigate: mockNavigate };
+const navigation: any = {
+  goBack: mockGoBack,
+  navigate: mockNavigate,
+  dispatch: mockDispatch,
+  getState: () => ({ routes: [{ name: 'Nutrition' }, { name: 'BarcodeScanner' }] }),
+};
 const route = {} as never;
 
 const baseProfile = {
@@ -118,6 +126,7 @@ beforeEach(() => {
   mockFetchTodaysFoodLogs.mockReset().mockResolvedValue([]);
   mockGoBack.mockClear();
   mockNavigate.mockClear();
+  mockDispatch.mockClear();
   mockRequestPermission.mockClear();
   mockPermission = { granted: true, canAskAgain: true };
   capturedCameraProps = undefined;
@@ -343,7 +352,8 @@ describe('BarcodeScannerScreen logging', () => {
       // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
     );
-    expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
+    expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
+    expect(mockNavigate).not.toHaveBeenCalledWith('Nutrition');
   });
 
   it('credits Open Food Facts on the found product, matching Search Food and Food Library', async () => {

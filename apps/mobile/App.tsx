@@ -10,7 +10,7 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
@@ -25,8 +25,10 @@ import { routeToBottomNavTab } from './src/navigation/bottomNavRouting';
 import { useAppLinking } from './src/navigation/linking';
 import {
   getScreenTransitionOptions,
+  screenTransitionFor,
   useReduceMotionPreference,
 } from './src/navigation/navigationTransitions';
+import { goToSection } from './src/navigation/sectionNavigation';
 import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
 import { FoodLogProvider } from './src/nutrition/FoodLogProvider';
@@ -140,6 +142,19 @@ function Root() {
   // Every page's transition comes from its route (see navigationTransitions.ts);
   // with Reduce Motion on, every page switches instantly instead.
   const reduceMotion = useReduceMotionPreference();
+  // The bottom nav and the side menu's section pages go to a section rather
+  // than stacking another copy of it (see sectionNavigation.ts).
+  const openSection = useCallback(
+    (route: keyof RootStackParamList) =>
+      goToSection(
+        {
+          getState: () => navigationRef.current?.getRootState(),
+          dispatch: (action) => navigationRef.current?.dispatch(action),
+        },
+        route,
+      ),
+    [navigationRef],
+  );
   // Links to screens (progresso://workouts/<id> and the rest, see navigation/linking.ts) open
   // only once signed in; one that arrives before then is held until the navigator exists.
   const linking = useAppLinking(status === 'signedIn');
@@ -195,6 +210,27 @@ function Root() {
     : isNutritionRoute(currentRouteName)
       ? 'nutrition'
       : 'workout';
+  // The same object until the mode actually changes, so the screens that read
+  // it (every page with a menu button) don't all redraw on every navigation.
+  const appMenu = useMemo(
+    () => ({ openMenu: () => setMenuOpen(true), currentMode: backgroundMode }),
+    [backgroundMode],
+  );
+  const screenOptions = useCallback(
+    ({ route }: { route: { name: string } }) => ({
+      headerShown: false,
+      // Transparent so each screen's own (transparent) root
+      // container reveals its backdrop -- every screen is wrapped
+      // in an opaque ScreenBackdrop by `screenLayout` -- see the
+      // warm background in AppBackgroundLayer.tsx.
+      contentStyle: { backgroundColor: 'transparent' },
+      // A page that isn't in view stops re-rendering until it is
+      // again, so the pages underneath never cost anything.
+      freezeOnBlur: true,
+      ...getScreenTransitionOptions(route.name, reduceMotion),
+    }),
+    [reduceMotion],
+  );
   // Keeps `sharedMode` current automatically as the user navigates, now that
   // there is no Workout/Nutrition toggle to report it explicitly: landing on
   // a route with an unambiguous mode (anything not in MODE_AGNOSTIC_ROUTES)
@@ -245,12 +281,7 @@ function Root() {
     const showGlobalBottomNav = currentRouteName !== undefined;
 
     return (
-      <AppMenuContext.Provider
-        value={{
-          openMenu: () => setMenuOpen(true),
-          currentMode: backgroundMode,
-        }}
-      >
+      <AppMenuContext.Provider value={appMenu}>
         <View style={styles.navigatorShell}>
           <View style={styles.navigatorContent}>
             <NavigationContainer
@@ -263,15 +294,7 @@ function Root() {
             >
               <Stack.Navigator
                 initialRouteName="Feed"
-                screenOptions={({ route }) => ({
-                  headerShown: false,
-                  // Transparent so each screen's own (transparent) root
-                  // container reveals its backdrop -- every screen is wrapped
-                  // in an opaque ScreenBackdrop by `screenLayout` -- see the
-                  // warm background in AppBackgroundLayer.tsx.
-                  contentStyle: { backgroundColor: 'transparent' },
-                  ...getScreenTransitionOptions(route.name, reduceMotion),
-                })}
+                screenOptions={screenOptions}
                 screenLayout={renderScreenLayout}
               >
                 <Stack.Screen name="Feed" component={FeedScreen} />
@@ -355,11 +378,11 @@ function Root() {
                   backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
                 }
                 paddingBottom={Math.max(insets.bottom, 8)}
-                onNavigateFeed={() => navigationRef.current?.navigate('Feed')}
-                onNavigateTrain={() => navigationRef.current?.navigate('WorkoutHistory')}
-                onNavigateNutrition={() => navigationRef.current?.navigate('Nutrition')}
-                onNavigateProgress={() => navigationRef.current?.navigate('ProgressOverview')}
-                onNavigateYou={() => navigationRef.current?.navigate('Profile')}
+                onNavigateFeed={() => openSection('Feed')}
+                onNavigateTrain={() => openSection('WorkoutHistory')}
+                onNavigateNutrition={() => openSection('Nutrition')}
+                onNavigateProgress={() => openSection('ProgressOverview')}
+                onNavigateYou={() => openSection('Profile')}
               />
             </View>
           ) : null}
@@ -372,6 +395,10 @@ function Root() {
             }
             onNavigate={(route) => {
               setMenuOpen(false);
+              if (screenTransitionFor(route) === 'section') {
+                openSection(route);
+                return;
+              }
               // Menu routes take no params, which the navigator's typed overloads cannot accept as one union.
               const navigateByName = navigationRef.current?.navigate as
                 ((name: AppMenuRoute) => void) | undefined;

@@ -10,6 +10,7 @@ import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
+import { useScreenFocused } from '../navigation/useScreenFocused';
 import { formatWeightKg } from '../lib/units';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 
@@ -24,13 +25,16 @@ interface Props {
 
 // A swipeable, self-advancing "Top Sets" strip for the most recent workout on
 // Feed: one slide per exercise with a real top set, paged by swipe, moving on
-// by itself every few seconds (held still while the user is dragging, and not
-// animated when Reduce Motion is on), with a quiet pagination indicator. Only
+// by itself every few seconds (held still while the user is dragging or Feed
+// isn't the page in view, and not animated when Reduce Motion is on), with a
+// quiet pagination indicator. Only
 // the exercise name and its top-set readout are the visual focus. When an
 // exercise has a machine photo it sits beside its readout, and tapping it opens
 // the full-size picture (ExercisePhoto's zoom) -- the same for everyone's cards.
 export function RecentWorkoutTopSets({ topSets, weightUnit, testID }: Props) {
   const reduceMotion = useReduceMotionPreference();
+  // Nobody sees it advance while another page is open on top of Feed.
+  const inView = useScreenFocused();
   const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
   const indexRef = useRef(0);
@@ -45,7 +49,7 @@ export function RecentWorkoutTopSets({ topSets, weightUnit, testID }: Props) {
   }
 
   useEffect(() => {
-    if (count < 2) return;
+    if (count < 2 || !inView) return;
     const id = setInterval(() => {
       if (draggingRef.current) return;
       goTo((indexRef.current + 1) % count);
@@ -53,7 +57,7 @@ export function RecentWorkoutTopSets({ topSets, weightUnit, testID }: Props) {
     return () => clearInterval(id);
     // goTo reads width/reduceMotion via closure; restart the timer if either changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [count, width, reduceMotion]);
+  }, [count, width, reduceMotion, inView]);
 
   if (count === 0) {
     return (

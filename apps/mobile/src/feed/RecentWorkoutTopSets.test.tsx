@@ -1,3 +1,4 @@
+import { NavigationContext } from '@react-navigation/native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import * as navigationTransitions from '../navigation/navigationTransitions';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
@@ -61,6 +62,37 @@ describe('RecentWorkoutTopSets', () => {
       jest.advanceTimersByTime(3500);
     });
     expect(selectedDot('top')).toBe(0);
+  });
+
+  it('holds still while another page covers Feed, and carries on once Feed is back in view', () => {
+    const listeners: Record<string, (() => void)[]> = { focus: [], blur: [] };
+    let focused = false;
+    const navigation = {
+      isFocused: () => focused,
+      addListener: (event: 'focus' | 'blur', cb: () => void) => {
+        listeners[event].push(cb);
+        return () => undefined;
+      },
+    };
+    render(
+      <NavigationContext.Provider value={navigation as never}>
+        <RecentWorkoutTopSets testID="ts" topSets={topSets} weightUnit="lb" />
+      </NavigationContext.Provider>,
+    );
+
+    act(() => {
+      jest.advanceTimersByTime(10000);
+    });
+    expect(selectedDot('ts')).toBe(0);
+
+    act(() => {
+      focused = true;
+      listeners.focus.forEach((cb) => cb());
+    });
+    act(() => {
+      jest.advanceTimersByTime(3500);
+    });
+    expect(selectedDot('ts')).toBe(1);
   });
 
   it('shows a single top set without any pagination or auto-advance', () => {

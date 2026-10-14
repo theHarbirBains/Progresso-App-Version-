@@ -17,6 +17,7 @@ import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
+import { goToSection } from '../navigation/sectionNavigation';
 import { FoodImage } from '../nutrition/FoodImage';
 import { ALPHABET_INDEX_LETTERS, groupFoodsByLetter } from '../nutrition/foodLibraryGrouping';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
@@ -263,7 +264,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         initialQuantity={mode.quantity}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
-        onDone={() => (mode.fromScan ? navigation.navigate('Nutrition') : navigation.goBack())}
+        onDone={() => (mode.fromScan ? goToSection(navigation, 'Nutrition') : navigation.goBack())}
         onCancel={() => setMode({ type: 'list' })}
       />
     );
