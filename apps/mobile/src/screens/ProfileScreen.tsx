@@ -19,6 +19,7 @@ import { greetingName } from '../dashboard/greeting';
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { fromKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
+import { recallShown, rememberShown } from '../lib/lastShown';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
@@ -148,15 +149,22 @@ export function ProfileScreen({ navigation }: Props) {
 
   const [tab, setTab] = useState<ProfileTab>('Workouts');
 
-  const [recentWorkouts, setRecentWorkouts] = useState<EnrichedWorkoutSummary[]>([]);
+  // What this page showed last time (lib/lastShown.ts): a reopened You page
+  // starts from it -- no spinner -- and refreshes in the background as always.
+  const [shownWorkouts] = useState(() =>
+    recallShown<EnrichedWorkoutSummary[]>(userId, 'profile.recentWorkouts'),
+  );
+  const [recentWorkouts, setRecentWorkouts] = useState<EnrichedWorkoutSummary[]>(
+    shownWorkouts ?? [],
+  );
   const [workoutsError, setWorkoutsError] = useState<string | null>(null);
 
   const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const hasLoadedOnce = useRef(false);
+  const [loading, setLoading] = useState(!shownWorkouts);
+  const hasLoadedOnce = useRef(Boolean(shownWorkouts));
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -165,7 +173,9 @@ export function ProfileScreen({ navigation }: Props) {
 
     try {
       const result = await fetchWorkoutHistory(userId, 0, RECENT_WORKOUTS_LIMIT);
-      setRecentWorkouts(await enrichWorkoutSummaries(result.rows));
+      const rows = await enrichWorkoutSummaries(result.rows);
+      setRecentWorkouts(rows);
+      rememberShown(userId, 'profile.recentWorkouts', rows);
     } catch (err) {
       setWorkoutsError(errorMessage(err));
     }

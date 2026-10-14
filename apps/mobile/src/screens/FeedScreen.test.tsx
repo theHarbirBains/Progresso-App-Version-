@@ -715,6 +715,30 @@ const oneDaySplit = {
   days: [{ id: 'day-push', name: 'Push', orderIndex: 1, muscleGroups: ['chest' as const] }],
 };
 
+describe('FeedScreen reopened', () => {
+  it('shows what it showed last time at once -- no placeholder -- while it refreshes', async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    const first = renderScreen();
+    expect(await screen.findByTestId('feed-item-workout-w1')).toBeTruthy();
+    first.unmount();
+
+    // Opened again (a section switch makes a fresh page); its refresh hasn't come back yet.
+    mockFetchFeedItems.mockReturnValue(new Promise(() => undefined));
+    renderScreen();
+
+    expect(screen.getByTestId('feed-item-workout-w1')).toBeTruthy();
+    expect(screen.queryByTestId('feed-loading')).toBeNull();
+    expect(mockFetchFeedItems).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows placeholders, not a spinner, the very first time', () => {
+    mockFetchFeedItems.mockReturnValue(new Promise(() => undefined));
+    renderScreen();
+
+    expect(screen.getByTestId('feed-loading').props.accessibilityLabel).toBe('Loading');
+  });
+});
+
 describe('FeedScreen -- Next Workout widget', () => {
   it("shows the next day in the active split's rotation, and taps through to Start Workout", async () => {
     mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);

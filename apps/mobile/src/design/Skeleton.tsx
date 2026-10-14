@@ -8,7 +8,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
-import { colors, radii, spacing } from './theme';
+import { colors, radii, spacing, widgetGap } from './theme';
 
 interface SkeletonProps {
   width?: DimensionValue;
@@ -92,7 +92,35 @@ export function SkeletonRows({ count = 4, testID }: SkeletonRowsProps) {
   );
 }
 
+interface SkeletonCardsProps {
+  /** Card heights, top to bottom. Defaults to one taller card and two shorter ones -- a typical page. */
+  heights?: number[];
+  testID?: string;
+}
+
+// The loading stand-in for a page of cards (Card/AppCard): plain card-shaped
+// blocks at the cards' own corner and spacing, so a page that is still
+// loading already has its shape and the content lands in place.
+export function SkeletonCards({ heights = [168, 112, 112], testID }: SkeletonCardsProps) {
+  return (
+    <View
+      testID={testID}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading"
+      style={styles.cards}
+    >
+      {heights.map((height, i) => (
+        <Skeleton key={i} height={height} radius={radii.xl} />
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  cards: {
+    gap: widgetGap,
+  },
   rows: {
     gap: spacing.xs,
   },

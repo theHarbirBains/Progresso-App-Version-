@@ -29,6 +29,7 @@ import {
   useReduceMotionPreference,
 } from './src/navigation/navigationTransitions';
 import { goToSection } from './src/navigation/sectionNavigation';
+import { forgetShown } from './src/lib/lastShown';
 import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
 import { FoodLogProvider } from './src/nutrition/FoodLogProvider';
@@ -210,6 +211,10 @@ function Root() {
     : isNutritionRoute(currentRouteName)
       ? 'nutrition'
       : 'workout';
+  // What pages last showed (lib/lastShown.ts) never outlives the session.
+  useEffect(() => {
+    if (status !== 'signedIn') forgetShown();
+  }, [status]);
   // The same object until the mode actually changes, so the screens that read
   // it (every page with a menu button) don't all redraw on every navigation.
   const appMenu = useMemo(

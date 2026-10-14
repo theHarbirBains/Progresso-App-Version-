@@ -196,7 +196,7 @@ export function GroupStartScreen({ navigation }: Props) {
       }
     >
       {error ? <ErrorState testID="group-start-error" message={error} /> : null}
-      {!loaded ? <LoadingState testID="group-start-loading" /> : null}
+      {!loaded ? <LoadingState testID="group-start-loading" inline /> : null}
 
       {loaded && step === 'people' ? (
         <>

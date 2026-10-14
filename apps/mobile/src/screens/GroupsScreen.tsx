@@ -80,7 +80,7 @@ export function GroupsScreen({ navigation }: Props) {
       {error ? (
         <ErrorState testID="groups-error" message={error} onRetry={() => void load()} />
       ) : null}
-      {groups === null && !error ? <LoadingState testID="groups-loading" /> : null}
+      {groups === null && !error ? <LoadingState testID="groups-loading" inline /> : null}
 
       {groups !== null ? (
         <>

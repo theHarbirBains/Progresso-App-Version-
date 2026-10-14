@@ -152,7 +152,7 @@ export function NewWorkoutScreen({ navigation }: Props) {
   if (loading) {
     return (
       <Screen header={header} scroll={false} padded={false}>
-        <LoadingState testID="new-workout-loading" />
+        <LoadingState testID="new-workout-loading" inline />
       </Screen>
     );
   }

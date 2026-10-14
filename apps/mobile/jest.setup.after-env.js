@@ -10,3 +10,11 @@
 const { configure } = require('@testing-library/react-native');
 
 configure({ asyncUtilTimeout: 5000 });
+
+// lib/lastShown.ts keeps what pages last showed in memory for the session;
+// each test starts as a fresh session.
+const { forgetShown } = require('./src/lib/lastShown');
+
+afterEach(() => {
+  forgetShown();
+});

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { useHeroBackdrop } from '../design/AppBackgroundLayer';
+import { recallShown, rememberShown } from '../lib/lastShown';
 import { AppHeader } from '../design/AppHeader';
 import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
 import { PrimaryButton, TextButton } from '../design/Button';
@@ -11,6 +12,7 @@ import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
+import { SkeletonCards } from '../design/Skeleton';
 import { colors } from '../design/theme';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
 import {
@@ -128,17 +130,25 @@ export function FeedScreen({ navigation }: Props) {
   const { openMenu } = useAppMenu();
   const { weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId } = useProgressTheme();
 
-  const [items, setItems] = useState<FeedItem[]>([]);
+  // What Feed showed last time (lib/lastShown.ts): a reopened Feed starts from
+  // it -- no spinner -- and refreshes in the background as always.
+  const [shown] = useState(() => ({
+    feed: recallShown<{ items: FeedItem[]; hasMore: boolean }>(userId, 'feed.items'),
+    friends: recallShown<{ items: FriendsFeedItem[]; hasMore: boolean }>(userId, 'feed.friends'),
+    nextPlan: recallShown<NextWorkoutPlan | null>(userId, 'feed.nextPlan'),
+  }));
+
+  const [items, setItems] = useState<FeedItem[]>(shown.feed?.items ?? []);
   const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(shown.feed?.hasMore ?? false);
+  const [loading, setLoading] = useState(!shown.feed);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [friendsItems, setFriendsItems] = useState<FriendsFeedItem[]>([]);
+  const [friendsItems, setFriendsItems] = useState<FriendsFeedItem[]>(shown.friends?.items ?? []);
   const [friendsPage, setFriendsPage] = useState(0);
-  const [friendsHasMore, setFriendsHasMore] = useState(false);
-  const [friendsLoading, setFriendsLoading] = useState(true);
+  const [friendsHasMore, setFriendsHasMore] = useState(shown.friends?.hasMore ?? false);
+  const [friendsLoading, setFriendsLoading] = useState(!shown.friends);
   const [friendsLoadingMore, setFriendsLoadingMore] = useState(false);
   const [friendsError, setFriendsError] = useState<string | null>(null);
 
@@ -161,14 +171,21 @@ export function FeedScreen({ navigation }: Props) {
   // entirely for a user with no active split, or an active split with no
   // days -- never a "choose a split" prompt here, since Notifications
   // already carries that reminder (see NotificationsScreen).
-  const [nextPlan, setNextPlan] = useState<NextWorkoutPlan | null>(null);
+  const [nextPlan, setNextPlanState] = useState<NextWorkoutPlan | null>(shown.nextPlan ?? null);
+  const setNextPlan = useCallback(
+    (plan: NextWorkoutPlan | null) => {
+      setNextPlanState(plan);
+      rememberShown(userId, 'feed.nextPlan', plan);
+    },
+    [userId],
+  );
 
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   // Only the very first load should replace the whole screen with a
   // spinner -- every later focus is a background refresh, same pattern as
   // WorkoutHistoryScreen/ProfileScreen.
-  const hasLoadedOnce = useRef(false);
-  const hasLoadedFriendsOnce = useRef(false);
+  const hasLoadedOnce = useRef(Boolean(shown.feed));
+  const hasLoadedFriendsOnce = useRef(Boolean(shown.friends));
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -179,6 +196,7 @@ export function FeedScreen({ navigation }: Props) {
       setItems(result.items);
       setHasMore(result.hasMore);
       setPage(0);
+      rememberShown(userId, 'feed.items', { items: result.items, hasMore: result.hasMore });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load your feed');
     } finally {
@@ -204,6 +222,7 @@ export function FeedScreen({ navigation }: Props) {
       setFriendsItems(result.items);
       setFriendsHasMore(result.hasMore);
       setFriendsPage(0);
+      rememberShown(userId, 'feed.friends', { items: result.items, hasMore: result.hasMore });
       lastFriendsLoadAtRef.current = Date.now();
     } catch (err) {
       setFriendsError(err instanceof Error ? err.message : 'Failed to load your friends feed');
@@ -211,7 +230,7 @@ export function FeedScreen({ navigation }: Props) {
       setFriendsLoading(false);
       hasLoadedFriendsOnce.current = true;
     }
-  }, [accessToken]);
+  }, [accessToken, userId]);
 
   const loadNotificationBadgeCount = useCallback(async () => {
     if (!accessToken || !userId) return;
@@ -245,7 +264,7 @@ export function FeedScreen({ navigation }: Props) {
       // it just doesn't show, same as a missing badge count above.
       setNextPlan(null);
     }
-  }, [userId, activeWorkoutSplitId]);
+  }, [userId, activeWorkoutSplitId, setNextPlan]);
 
   // Runs as soon as the active split becomes known, not just on the next
   // focus event -- activeWorkoutSplitId arrives asynchronously (it comes
@@ -595,9 +614,7 @@ export function FeedScreen({ navigation }: Props) {
       {blockingError ? (
         <ErrorState testID="feed-error" message={blockingError} onRetry={retryAll} />
       ) : initialLoading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator testID="feed-loading" size="large" color={colors.textPrimary} />
-        </View>
+        <SkeletonCards testID="feed-loading" heights={[220, 220]} />
       ) : displayItems.length === 0 ? (
         <View testID="feed-empty">
           <View style={styles.sectionHeaderWrap}>

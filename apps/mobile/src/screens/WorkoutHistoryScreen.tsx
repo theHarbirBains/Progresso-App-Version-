@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
@@ -13,9 +13,11 @@ import { PrimaryButton, TextButton } from '../design/Button';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { StatBlock } from '../design/StatBlock';
-import { colors } from '../design/theme';
+import { colors, radii } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
+import { Skeleton, SkeletonRows } from '../design/Skeleton';
+import { recallShown, rememberShown } from '../lib/lastShown';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
@@ -92,14 +94,25 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
 
   const [activeWorkout, setActiveWorkout] = useState<WorkoutSummary | null>(null);
 
-  const [monthWorkouts, setMonthWorkouts] = useState<EnrichedWorkoutSummary[]>([]);
-  const [monthLoading, setMonthLoading] = useState(true);
+  // What this page showed last time (lib/lastShown.ts): a reopened Train page
+  // starts from it -- no spinners -- and refreshes in the background as always.
+  const [shown] = useState(() => ({
+    month: recallShown<EnrichedWorkoutSummary[]>(userId, `history.month.${year}-${month}`),
+    recent: recallShown<{ rows: EnrichedWorkoutSummary[]; hasMore: boolean }>(
+      userId,
+      'history.recent',
+    ),
+  }));
+  const [monthWorkouts, setMonthWorkouts] = useState<EnrichedWorkoutSummary[]>(shown.month ?? []);
+  const [monthLoading, setMonthLoading] = useState(!shown.month);
   const [monthError, setMonthError] = useState<string | null>(null);
 
-  const [recentWorkouts, setRecentWorkouts] = useState<EnrichedWorkoutSummary[]>([]);
+  const [recentWorkouts, setRecentWorkouts] = useState<EnrichedWorkoutSummary[]>(
+    shown.recent?.rows ?? [],
+  );
   const [recentPage, setRecentPage] = useState(0);
-  const [recentHasMore, setRecentHasMore] = useState(false);
-  const [recentLoading, setRecentLoading] = useState(true);
+  const [recentHasMore, setRecentHasMore] = useState(shown.recent?.hasMore ?? false);
+  const [recentLoading, setRecentLoading] = useState(!shown.recent);
   const [recentLoadingMore, setRecentLoadingMore] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
 
@@ -181,7 +194,9 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       setMonthError(null);
       try {
         const raw = await fetchWorkoutsForMonth(userId, targetYear, targetMonth);
-        setMonthWorkouts(await enrichWorkoutSummaries(raw));
+        const enriched = await enrichWorkoutSummaries(raw);
+        setMonthWorkouts(enriched);
+        rememberShown(userId, `history.month.${targetYear}-${targetMonth}`, enriched);
       } catch (err) {
         setMonthError(err instanceof Error ? err.message : 'Failed to load workouts');
       } finally {
@@ -198,9 +213,11 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       setRecentError(null);
       try {
         const history = await fetchWorkoutHistory(userId, 0, RECENT_PAGE_SIZE);
-        setRecentWorkouts(await enrichWorkoutSummaries(history.rows));
+        const rows = await enrichWorkoutSummaries(history.rows);
+        setRecentWorkouts(rows);
         setRecentHasMore(history.hasMore);
         setRecentPage(0);
+        rememberShown(userId, 'history.recent', { rows, hasMore: history.hasMore });
       } catch (err) {
         setRecentError(err instanceof Error ? err.message : 'Failed to load workouts');
       } finally {
@@ -215,7 +232,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
   // a workout) is a background refresh, same pattern as
   // DashboardScreen/ProfileScreen. loadActive never blanks anything itself
   // (no loading flag of its own), so it isn't silenced.
-  const hasLoadedOnce = useRef(false);
+  const hasLoadedOnce = useRef(Boolean(shown.month && shown.recent));
 
   useEffect(() => {
     // Re-load every time this screen gains focus, not just on mount -- same
@@ -372,13 +389,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
             {monthError}
           </Text>
         ) : monthLoading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator
-              testID="workout-month-loading"
-              size="large"
-              color={colors.textPrimary}
-            />
-          </View>
+          <Skeleton testID="workout-month-loading" height={280} radius={radii.lg} />
         ) : (
           <View testID="workout-month-summary" style={styles.summaryRow}>
             <StatBlock
@@ -430,13 +441,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
         {recentError ? (
           <ErrorState testID="workout-history-error" message={recentError} onRetry={loadRecent} />
         ) : recentLoading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator
-              testID="workout-history-loading"
-              size="large"
-              color={colors.textPrimary}
-            />
-          </View>
+          <SkeletonRows testID="workout-history-loading" count={4} />
         ) : showEmptyState ? (
           <EmptyState
             testID="workout-history-empty"
