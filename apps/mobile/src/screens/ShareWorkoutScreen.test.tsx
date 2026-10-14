@@ -100,16 +100,18 @@ describe('ShareWorkoutScreen loading and preview', () => {
     await settle();
   });
 
-  it('renders the workout name, date and muscles over the photo at the top of the card', async () => {
+  it("renders the workout's own name and the date over the photo, with nothing under the name", async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
 
     expect(await screen.findByTestId('share-card-workout-name')).toHaveTextContent('Push Day');
-    expect(screen.getByTestId('share-card-muscles')).toHaveTextContent('Chest, Shoulders');
     // No year on the date.
     expect(screen.getByTestId('share-card-date')).not.toHaveTextContent('2026');
     expect(screen.getByTestId('share-card-photo')).toBeTruthy();
+    // The name is the user's own -- the muscles worked aren't spelled out under it.
+    expect(screen.queryByTestId('share-card-muscles')).toBeNull();
+    expect(screen.getByTestId('share-card')).not.toHaveTextContent('Chest, Shoulders');
     await settle();
   });
 
@@ -137,74 +139,91 @@ describe('ShareWorkoutScreen loading and preview', () => {
     await settle();
   });
 
-  it('lists personal records with their label and value, only for exercises that set one', async () => {
+  it("lists every exercise's top set, in workout order, under Top Sets", async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
 
-    const prSection = await screen.findByTestId('share-card-pr-section');
-    expect(prSection).toHaveTextContent(/Bench Press.*8 Rep PR/);
-    expect(prSection).not.toHaveTextContent('Overhead Press');
-    expect(screen.getByTestId('share-card-pr-value-0')).toHaveTextContent('110 kg × 8');
-    expect(screen.getByTestId('share-card-pr-count')).toHaveTextContent('1 PR');
+    const list = await screen.findByTestId('share-card-top-sets');
+    expect(list).toHaveTextContent(/TOP SETS.*Bench Press.*Overhead Press/);
+    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('110 kg × 8');
+    expect(screen.getByTestId('share-card-top-set-1')).toHaveTextContent('60 kg × 8');
+    // No separate Personal Records block.
+    expect(screen.getByTestId('share-card')).not.toHaveTextContent(/PERSONAL RECORDS/);
     await settle();
   });
 
-  it('counts every record in the workout but lists at most two', async () => {
+  it('marks a top set that is a personal record quietly -- its value in the accent and a small PR tag', async () => {
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    // Bench Press is a PR; Overhead Press isn't.
+    expect(await screen.findByTestId('share-card-top-set-0-pr')).toHaveTextContent(/^PR$/);
+    expect(StyleSheet.flatten(screen.getByTestId('share-card-top-set-0').props.style).color).toBe(
+      colors.accent,
+    );
+    expect(screen.queryByTestId('share-card-top-set-1-pr')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('share-card-top-set-1').props.style).color).toBe(
+      colors.textPrimary,
+    );
+    await settle();
+  });
+
+  it('tags a true one-rep max as 1RM', async () => {
     mockFetchShareCardData.mockResolvedValue({
       ...cardData,
-      topSets: [
-        topSet('Squat', '5 Rep PR'),
-        topSet('Leg Press', '7 Rep PR'),
-        topSet('Lunge'),
-        topSet('Leg Curl', '1RM'),
-      ],
+      topSets: [{ ...topSet('Deadlift', '1RM'), weightKg: 200, reps: 1 }],
     });
-
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
 
-    expect(await screen.findByTestId('share-card-pr-count')).toHaveTextContent('3 PRs');
-    expect(screen.getByTestId('share-card-pr-value-1')).toBeTruthy();
-    expect(screen.queryByTestId('share-card-pr-value-2')).toBeNull();
+    expect(await screen.findByTestId('share-card-top-set-0-pr')).toHaveTextContent(/^1RM$/);
     await settle();
   });
 
-  it('omits the PR section entirely for a workout with no PRs', async () => {
+  it('shows no tag at all for a workout with no records', async () => {
     mockFetchShareCardData.mockResolvedValue({
       ...cardData,
       topSets: cardData.topSets.map((s) => ({ ...s, prLabel: null })),
     });
-
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
-    await screen.findByTestId('share-card-workout-name');
+    await screen.findByTestId('share-card-top-sets');
 
-    expect(screen.queryByTestId('share-card-pr-section')).toBeNull();
+    expect(screen.queryByTestId('share-card-top-set-0-pr')).toBeNull();
+    expect(screen.queryByTestId('share-card-top-set-1-pr')).toBeNull();
     await settle();
   });
 
-  it("numbers the workout's first three exercises, in order, records included", async () => {
-    mockFetchShareCardData.mockResolvedValue({
-      ...cardData,
-      topSets: [
-        topSet('Leg Press', '7 Rep PR'),
-        topSet('Leg Extension'),
-        topSet('Hack Squat'),
-        topSet('Calf Raise'),
-      ],
-    });
-
+  it('gives each of up to seven exercises its own row, tightening the rows to fit', async () => {
+    const seven = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((n) => topSet(`Lift ${n}`));
+    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: seven });
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
+    await screen.findByTestId('share-card-top-sets');
 
-    const lifts = await screen.findByTestId('share-card-lifts');
-    expect(lifts).toHaveTextContent(/1.*Leg Press.*2.*Leg Extension.*3.*Hack Squat/);
-    expect(lifts).not.toHaveTextContent('Calf Raise');
-    expect(screen.getByTestId('share-card-top-set-0')).toHaveTextContent('50 kg × 10');
+    expect(screen.getByTestId('share-card-top-set-6')).toBeTruthy();
+    expect(screen.queryByTestId('share-card-top-sets-more')).toBeNull();
+    const tall = StyleSheet.flatten(screen.getByTestId('share-card-top-set-row-0').props.style);
+    expect(tall.height).toBeLessThan(46 * CARD_SCALE);
+    await settle();
+  });
+
+  it('past seven exercises, lists the first six and says how many more there are', async () => {
+    const nine = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'].map((n) => topSet(`Lift ${n}`));
+    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: nine });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    await screen.findByTestId('share-card-top-sets');
+
+    expect(screen.getByTestId('share-card-top-set-5')).toBeTruthy();
+    expect(screen.queryByTestId('share-card-top-set-6')).toBeNull();
+    expect(screen.getByTestId('share-card-top-sets-more')).toHaveTextContent('+3 more');
     await settle();
   });
 
@@ -422,9 +441,8 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     expect(card.borderColor).toBe(colors.glassBorderStrong);
     const set = StyleSheet.flatten(screen.getByTestId('share-card-top-set-0').props.style);
     expect(set.fontFamily).toBe(fonts.mono);
-    // The PR *value* (not its name/label line, which stays plain text) is
-    // the one accented element on the card.
-    const prValue = screen.getByTestId('share-card-pr-value-0');
+    // A record's value (Bench Press, here) is the one accented text on the card.
+    const prValue = screen.getByTestId('share-card-top-set-0');
     expect(StyleSheet.flatten(prValue.props.style).color).toBe(colors.accent);
     await settle();
   });

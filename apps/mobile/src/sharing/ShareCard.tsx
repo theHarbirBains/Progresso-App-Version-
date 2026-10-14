@@ -22,8 +22,13 @@ export {
   STORY_SAFE_AREA,
 } from './storyLayout';
 
-const MAX_RECORDS = 2;
-const MAX_TOP_EXERCISES = 3;
+// The top-sets list fills the room left under the stats (design units): rows
+// shrink a little for a longer workout, so up to MAX_ROWS exercises each get
+// their own row; past that, the last row says how many more there are.
+const TOP_SETS_SPACE = 270;
+const ROW_GAP = 5;
+const MAX_ROW_HEIGHT = 46;
+const MAX_ROWS = 7;
 
 // The frame around the card: a warm sunset gradient from the app's own amber
 // into its warm near-black, so the space Instagram or TikTok covers with its
@@ -46,8 +51,6 @@ const PHOTO_STYLE = {
   height: PHOTO_WIDTH / BACKGROUND_ASPECT,
 } as const;
 const STAT_ICON_SIZE = cardPt(18);
-const RECORD_THUMB_SIZE = cardPt(36);
-const LIFT_THUMB_SIZE = cardPt(30);
 // How the photo is darkened so its text reads: a scrim heaviest on the left,
 // where the text sits, then a fade into the card's own fill. Chosen by
 // measurement over the photo's brightest pixels -- don't lighten it without
@@ -161,16 +164,22 @@ const STORY_SAFE_AREA_STYLE = {
   bottom: STORY_SAFE_AREA.bottom,
 } as const;
 
-// The card: the sunset photo behind the brand mark, date, workout name and
-// muscles; then the session as four stats (duration, exercises, sets, volume),
-// the personal records set this workout (the one accented block) and its first
-// exercises, numbered. Everything is real logged data in the user's unit;
+// The card: the sunset photo behind the brand mark, date and the workout's
+// own name (nothing under it -- the name is the user's); then the session as
+// four stats (duration, exercises, sets, volume), and every exercise's top set
+// in workout order, a personal record marked quietly in the accent. Everything is real logged data in the user's unit;
 // nothing is estimated, and no account detail (name, email, id) is ever drawn.
 // Nothing on it looks tappable (no chevrons, no "View All") -- it's a picture.
 export function ShareCard({ data, weightUnit, accentColor }: Props) {
-  const allRecords = data.topSets.filter((s) => s.prLabel !== null);
-  const records = allRecords.slice(0, MAX_RECORDS);
-  const topExercises = data.topSets.slice(0, MAX_TOP_EXERCISES);
+  const overflow = data.topSets.length > MAX_ROWS;
+  const shown = overflow ? data.topSets.slice(0, MAX_ROWS - 1) : data.topSets;
+  const hiddenCount = data.topSets.length - shown.length;
+  const rowCount = shown.length + (overflow ? 1 : 0);
+  const rowHeight = Math.min(
+    MAX_ROW_HEIGHT,
+    (TOP_SETS_SPACE - (rowCount - 1) * ROW_GAP) / Math.max(rowCount, 1),
+  );
+  const thumbSize = cardPt(Math.min(32, rowHeight - 14));
 
   return (
     <View testID="share-card" style={[card.card, { width: cardPt(CARD_WIDTH) }]}>
@@ -206,11 +215,6 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
           >
             {data.workoutName}
           </Text>
-          {data.musclesTrained ? (
-            <Text testID="share-card-muscles" style={card.muscles} numberOfLines={1}>
-              {data.musclesTrained}
-            </Text>
-          ) : null}
         </View>
       </View>
 
@@ -237,62 +241,54 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
         />
       </View>
 
-      <View style={card.body}>
-        {records.length > 0 ? (
-          <View testID="share-card-pr-section" style={card.section}>
-            <View style={card.sectionHeader}>
-              <Text style={card.sectionLabel}>PERSONAL RECORDS</Text>
-              <Text testID="share-card-pr-count" style={[card.prCount, { color: accentColor }]}>
-                {allRecords.length === 1 ? '1 PR' : `${allRecords.length} PRs`}
-              </Text>
-            </View>
-            {records.map((set, index) => (
-              <View key={`${set.exerciseName}-pr-${index}`} style={[card.row, card.recordRow]}>
-                <Thumb set={set} size={RECORD_THUMB_SIZE} />
-                <View style={card.rowText}>
-                  <Text style={card.recordName} numberOfLines={1}>
+      {shown.length > 0 ? (
+        <View testID="share-card-top-sets" style={card.body}>
+          <Text style={card.sectionLabel}>TOP SETS</Text>
+          <View style={card.rows}>
+            {shown.map((set, index) => {
+              const isRecord = set.prLabel !== null;
+              return (
+                <View
+                  key={`${set.exerciseName}-${index}`}
+                  testID={`share-card-top-set-row-${index}`}
+                  style={[card.row, { height: cardPt(rowHeight) }]}
+                >
+                  <Thumb set={set} size={thumbSize} />
+                  <Text style={card.liftName} numberOfLines={1}>
                     {set.exerciseName}
                   </Text>
-                  <Text style={card.recordLabel} numberOfLines={1}>
-                    {set.prLabel}
+                  {/* A personal record: the same row, its value in the accent
+                      with a small tag -- quiet, never a separate block. */}
+                  {isRecord ? (
+                    <View
+                      testID={`share-card-top-set-${index}-pr`}
+                      style={[card.prTag, { backgroundColor: withAlpha(accentColor, 0.14) }]}
+                    >
+                      <Text style={[card.prTagText, { color: accentColor }]}>
+                        {set.prLabel === '1RM' ? '1RM' : 'PR'}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Text
+                    testID={`share-card-top-set-${index}`}
+                    style={[card.liftValue, isRecord && { color: accentColor }]}
+                    numberOfLines={1}
+                  >
+                    {setValue(set, weightUnit)}
                   </Text>
                 </View>
-                <Text
-                  testID={`share-card-pr-value-${index}`}
-                  style={[card.recordValue, { color: accentColor }]}
-                  numberOfLines={1}
-                >
-                  {setValue(set, weightUnit)}
+              );
+            })}
+            {overflow ? (
+              <View style={[card.moreRow, { height: cardPt(rowHeight) }]}>
+                <Text testID="share-card-top-sets-more" style={card.more}>
+                  {`+${hiddenCount} more`}
                 </Text>
               </View>
-            ))}
+            ) : null}
           </View>
-        ) : null}
-
-        {topExercises.length > 0 ? (
-          <View testID="share-card-lifts" style={card.section}>
-            <Text style={card.sectionLabel}>TOP EXERCISES</Text>
-            {topExercises.map((set, index) => (
-              <View key={`${set.exerciseName}-${index}`} style={[card.row, card.liftRow]}>
-                <View style={card.rank}>
-                  <Text style={card.rankText}>{index + 1}</Text>
-                </View>
-                <Thumb set={set} size={LIFT_THUMB_SIZE} />
-                <Text style={card.liftName} numberOfLines={1}>
-                  {set.exerciseName}
-                </Text>
-                <Text
-                  testID={`share-card-top-set-${index}`}
-                  style={card.liftValue}
-                  numberOfLines={1}
-                >
-                  {setValue(set, weightUnit)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -103,11 +103,6 @@ export const shareCardBodyStyles = StyleSheet.create(
       ...typeScale.display,
       color: colors.textPrimary,
     },
-    muscles: {
-      ...typeScale.callout,
-      color: colors.textSecondaryBright,
-      marginTop: spacing.xs,
-    },
 
     // Four stats in a row, hairlines between them.
     stats: {
@@ -141,15 +136,7 @@ export const shareCardBodyStyles = StyleSheet.create(
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.md,
       paddingBottom: spacing.lg,
-      gap: spacing.md,
-    },
-    section: {
       gap: 6,
-    },
-    sectionHeader: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      justifyContent: 'space-between',
     },
     sectionLabel: {
       ...typeScale.caption,
@@ -157,9 +144,8 @@ export const shareCardBodyStyles = StyleSheet.create(
       color: colors.textSecondary,
       marginBottom: 2,
     },
-    prCount: {
-      ...typeScale.callout,
-      fontFamily: fonts.display,
+    rows: {
+      gap: 5,
     },
 
     // A quiet raised row: a lift over the card's fill, no border.
@@ -171,9 +157,6 @@ export const shareCardBodyStyles = StyleSheet.create(
       backgroundColor: colors.surfaceLift,
       borderRadius: radii.md,
     },
-    rowText: {
-      flex: 1,
-    },
     thumb: {
       alignItems: 'center',
       justifyContent: 'center',
@@ -184,45 +167,29 @@ export const shareCardBodyStyles = StyleSheet.create(
       fontFamily: fonts.display,
       color: colors.textSecondary,
     },
-
-    // Personal records: the one place the accent appears.
-    recordRow: {
-      height: 52,
-    },
-    recordName: {
-      ...typeScale.callout,
-      fontFamily: fonts.semibold,
-      color: colors.textPrimary,
-    },
-    recordLabel: {
-      ...typeScale.secondary,
-      color: colors.textSecondary,
-    },
-    recordValue: {
-      ...typeScale.statSmall,
-    },
-
-    liftRow: {
-      height: 42,
-      gap: spacing.sm,
-    },
-    rank: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      borderWidth: 1,
-      borderColor: colors.textMuted,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    rankText: {
-      ...typeScale.caption,
-      color: colors.textSecondary,
-    },
     liftName: {
       ...typeScale.callout,
       color: colors.textPrimary,
       flex: 1,
+    },
+    // A personal record's small tag, beside its value (colour set per accent).
+    prTag: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: radii.pill,
+    },
+    prTagText: {
+      ...typeScale.caption,
+      fontFamily: fonts.display,
+      letterSpacing: 0.5,
+    },
+    moreRow: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    more: {
+      ...typeScale.callout,
+      color: colors.textSecondary,
     },
     liftValue: {
       fontFamily: fonts.mono,
