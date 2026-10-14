@@ -12,6 +12,7 @@ import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
+import { RiseIn, RiseInGroup } from '../design/RiseIn';
 import { SkeletonCards } from '../design/Skeleton';
 import { colors } from '../design/theme';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
@@ -459,218 +460,230 @@ export function FeedScreen({ navigation }: Props) {
   }
 
   return (
-    <Screen
-      scrollTestID="feed-scroll"
-      contentContainerStyle={styles.content}
-      testID="feed-screen"
-      header={
-        <AppHeader
-          testID="feed-header"
-          title="Progresso"
-          leftAction={{
-            icon: 'menu',
-            onPress: () => openMenu(),
-            accessibilityLabel: 'Open menu',
-            testID: 'feed-open-menu',
-          }}
-          leftAction2={{
-            icon: 'search',
-            onPress: () => navigation.navigate('FindPeople'),
-            accessibilityLabel: 'Find people',
-            testID: 'feed-find-people',
-          }}
-          rightAction={{
-            icon: 'plus',
-            onPress: () => setQuickActionsOpen(true),
-            accessibilityLabel: 'Quick actions',
-            testID: 'feed-quick-actions',
-          }}
-          rightAction2={{
-            icon: 'bell',
-            onPress: () => navigation.navigate('Notifications'),
-            accessibilityLabel: 'Notifications',
-            testID: 'feed-notifications',
-            badgeCount: notificationBadgeCount,
-          }}
-        />
-      }
-    >
-      <BubbleMenu
-        testID="feed-quick-actions-sheet"
-        visible={quickActionsOpen}
-        onClose={() => setQuickActionsOpen(false)}
+    <RiseInGroup>
+      <Screen
+        scrollTestID="feed-scroll"
+        contentContainerStyle={styles.content}
+        testID="feed-screen"
+        header={
+          <AppHeader
+            testID="feed-header"
+            title="Progresso"
+            leftAction={{
+              icon: 'menu',
+              onPress: () => openMenu(),
+              accessibilityLabel: 'Open menu',
+              testID: 'feed-open-menu',
+            }}
+            leftAction2={{
+              icon: 'search',
+              onPress: () => navigation.navigate('FindPeople'),
+              accessibilityLabel: 'Find people',
+              testID: 'feed-find-people',
+            }}
+            rightAction={{
+              icon: 'plus',
+              onPress: () => setQuickActionsOpen(true),
+              accessibilityLabel: 'Quick actions',
+              testID: 'feed-quick-actions',
+            }}
+            rightAction2={{
+              icon: 'bell',
+              onPress: () => navigation.navigate('Notifications'),
+              accessibilityLabel: 'Notifications',
+              testID: 'feed-notifications',
+              badgeCount: notificationBadgeCount,
+            }}
+          />
+        }
       >
-        <BubbleMenuRow
-          testID="feed-quick-action-start-workout"
-          icon="activity"
-          label="Start Workout"
-          onPress={() => {
-            setQuickActionsOpen(false);
-            navigation.navigate('NewWorkout');
-          }}
-        />
-        <BubbleMenuRow
-          testID="feed-quick-action-log-food"
-          icon="coffee"
-          label="Log Food"
-          onPress={() => {
-            setQuickActionsOpen(false);
-            navigation.navigate('FoodLibrary');
-          }}
-        />
-      </BubbleMenu>
-
-      {liveWorkout ? (
-        <LiveNowCard
-          testID="feed-live-workout"
-          title={liveWorkout.name}
-          subtitle="Your workout"
-          onPress={() => navigation.navigate('ActiveWorkout', { workoutId: liveWorkout.id })}
-        />
-      ) : null}
-
-      {liveGroups.length === 1 ? (
-        <LiveNowCard
-          testID={`feed-live-group-${liveGroups[0].id}`}
-          title={liveGroups[0].name}
-          subtitle="Group workout"
-          onPress={() => navigation.navigate('GroupSession', { groupId: liveGroups[0].id })}
-        />
-      ) : null}
-
-      {liveGroups.length > 1 ? (
-        <LiveNowCard
-          testID="feed-live-groups"
-          title={`${liveGroups.length} group workouts`}
-          subtitle="Open Group Workouts to choose one"
-          onPress={() => navigation.navigate('Groups')}
-        />
-      ) : null}
-
-      {liveSessions.map((session) => (
-        <LiveNowCard
-          key={session.workoutId}
-          testID={`feed-live-session-${session.workoutId}`}
-          title={session.clientName}
-          subtitle="Live session with your client"
-          onPress={() =>
-            navigation.navigate('TrainerLiveWorkout', {
-              workoutId: session.workoutId,
-              clientId: session.clientId,
-              clientName: session.clientName,
-              startedAt: session.startedAt,
-            })
-          }
-        />
-      ))}
-
-      {showNextWorkout && nextPlan ? (
-        <Card
-          hero
-          testID="feed-next-workout"
-          onPress={() => navigation.navigate('NewWorkout')}
-          accessibilityLabel={`Next workout: ${nextPlan.day.name}${
-            nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
-          }`}
+        <BubbleMenu
+          testID="feed-quick-actions-sheet"
+          visible={quickActionsOpen}
+          onClose={() => setQuickActionsOpen(false)}
         >
-          <Text style={[styles.nextWorkoutEyebrow, { color: colors.textPrimary }]}>
-            Next Workout
-          </Text>
-          <Text style={[styles.nextWorkoutDayName, { color: colors.textPrimary }]}>
-            {nextPlan.day.name}
-          </Text>
-          {nextPlan.day.muscleGroups.length > 0 ? (
-            <Text style={[styles.nextWorkoutMuscles, { color: colors.textPrimary }]}>
-              {musclesLabel(nextPlan.day)}
-            </Text>
-          ) : null}
-          <Text style={[styles.nextWorkoutMeta, { color: colors.textPrimary }]}>
-            {nextPlan.previousDayName
-              ? `Up next after ${nextPlan.previousDayName}`
-              : "Let's get started"}
-          </Text>
-          {/* The card is the one tap target (into NewWorkoutScreen, which
-              actually starts it); this is the real button, shown for the eye,
-              with its own touches off -- same convention as NewWorkoutScreen's
-              own hero card. A solid warm-cream pill with dark text, so it
-              reads as a real button against the photo rather than disappearing
-              into it. */}
-          <View
-            style={styles.nextWorkoutAction}
-            pointerEvents="none"
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-          >
-            <PrimaryButton
-              label="Start Workout"
-              onPress={() => undefined}
-              accentColor={colors.heroAction}
-              onAccentColor={colors.onAccent}
-            />
-          </View>
-        </Card>
-      ) : null}
+          <BubbleMenuRow
+            testID="feed-quick-action-start-workout"
+            icon="activity"
+            label="Start Workout"
+            onPress={() => {
+              setQuickActionsOpen(false);
+              navigation.navigate('NewWorkout');
+            }}
+          />
+          <BubbleMenuRow
+            testID="feed-quick-action-log-food"
+            icon="coffee"
+            label="Log Food"
+            onPress={() => {
+              setQuickActionsOpen(false);
+              navigation.navigate('FoodLibrary');
+            }}
+          />
+        </BubbleMenu>
 
-      {blockingError ? (
-        <ErrorState testID="feed-error" message={blockingError} onRetry={retryAll} />
-      ) : initialLoading ? (
-        <SkeletonCards testID="feed-loading" heights={[220, 220]} />
-      ) : displayItems.length === 0 ? (
-        <View testID="feed-empty">
-          <View style={styles.sectionHeaderWrap}>
-            <SectionHeader label="Get Started" />
-          </View>
-          <Card testID="feed-empty-actions">
-            <ListRow
-              testID="feed-empty-action-start-workout"
-              icon="activity"
-              title="Start a Workout"
-              subtitle="Track sets and reps as you train"
+        {liveWorkout ? (
+          <RiseIn>
+            <LiveNowCard
+              testID="feed-live-workout"
+              title={liveWorkout.name}
+              subtitle="Your workout"
+              onPress={() => navigation.navigate('ActiveWorkout', { workoutId: liveWorkout.id })}
+            />
+          </RiseIn>
+        ) : null}
+
+        {liveGroups.length === 1 ? (
+          <RiseIn>
+            <LiveNowCard
+              testID={`feed-live-group-${liveGroups[0].id}`}
+              title={liveGroups[0].name}
+              subtitle="Group workout"
+              onPress={() => navigation.navigate('GroupSession', { groupId: liveGroups[0].id })}
+            />
+          </RiseIn>
+        ) : null}
+
+        {liveGroups.length > 1 ? (
+          <RiseIn>
+            <LiveNowCard
+              testID="feed-live-groups"
+              title={`${liveGroups.length} group workouts`}
+              subtitle="Open Group Workouts to choose one"
+              onPress={() => navigation.navigate('Groups')}
+            />
+          </RiseIn>
+        ) : null}
+
+        {liveSessions.map((session) => (
+          <RiseIn key={session.workoutId}>
+            <LiveNowCard
+              testID={`feed-live-session-${session.workoutId}`}
+              title={session.clientName}
+              subtitle="Live session with your client"
+              onPress={() =>
+                navigation.navigate('TrainerLiveWorkout', {
+                  workoutId: session.workoutId,
+                  clientId: session.clientId,
+                  clientName: session.clientName,
+                  startedAt: session.startedAt,
+                })
+              }
+            />
+          </RiseIn>
+        ))}
+
+        {showNextWorkout && nextPlan ? (
+          <RiseIn>
+            <Card
+              hero
+              testID="feed-next-workout"
               onPress={() => navigation.navigate('NewWorkout')}
-            />
-            <ListRow
-              testID="feed-empty-action-log-food"
-              icon="coffee"
-              title="Log Food"
-              subtitle="Search or scan something you ate"
-              onPress={() => navigation.navigate('FoodLibrary')}
-              divider
-            />
-            <ListRow
-              testID="feed-empty-action-find-people"
-              icon="search"
-              title="Find People to Follow"
-              subtitle="See their workouts and meals here too"
-              onPress={() => navigation.navigate('FindPeople')}
-              divider
-            />
-          </Card>
-        </View>
-      ) : (
-        <>
-          {displayItems.map((item) => (
-            <WorkoutFeedCard
-              idPrefix="feed-item-workout"
-              workout={item.workout}
-              authorName={item.authorName}
-              avatarUrl={item.avatarUrl}
-              timestamp={item.timestamp}
-              weightUnit={weightUnit}
-              onPress={item.onPress}
-              key={item.key}
-            />
-          ))}
+              accessibilityLabel={`Next workout: ${nextPlan.day.name}${
+                nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
+              }`}
+            >
+              <Text style={[styles.nextWorkoutEyebrow, { color: colors.textPrimary }]}>
+                Next Workout
+              </Text>
+              <Text style={[styles.nextWorkoutDayName, { color: colors.textPrimary }]}>
+                {nextPlan.day.name}
+              </Text>
+              {nextPlan.day.muscleGroups.length > 0 ? (
+                <Text style={[styles.nextWorkoutMuscles, { color: colors.textPrimary }]}>
+                  {musclesLabel(nextPlan.day)}
+                </Text>
+              ) : null}
+              <Text style={[styles.nextWorkoutMeta, { color: colors.textPrimary }]}>
+                {nextPlan.previousDayName
+                  ? `Up next after ${nextPlan.previousDayName}`
+                  : "Let's get started"}
+              </Text>
+              {/* The card is the one tap target (into NewWorkoutScreen, which
+                actually starts it); this is the real button, shown for the eye,
+                with its own touches off -- same convention as NewWorkoutScreen's
+                own hero card. A solid warm-cream pill with dark text, so it
+                reads as a real button against the photo rather than disappearing
+                into it. */}
+              <View
+                style={styles.nextWorkoutAction}
+                pointerEvents="none"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                <PrimaryButton
+                  label="Start Workout"
+                  onPress={() => undefined}
+                  accentColor={colors.heroAction}
+                  onAccentColor={colors.onAccent}
+                />
+              </View>
+            </Card>
+          </RiseIn>
+        ) : null}
 
-          {hasMoreOfEither ? (
-            <TextButton
-              testID="feed-load-more"
-              label="Load More"
-              loading={loadingMoreEither}
-              onPress={handleLoadMoreAll}
-            />
-          ) : null}
-        </>
-      )}
-    </Screen>
+        {blockingError ? (
+          <ErrorState testID="feed-error" message={blockingError} onRetry={retryAll} />
+        ) : initialLoading ? (
+          <SkeletonCards testID="feed-loading" heights={[220, 220]} />
+        ) : displayItems.length === 0 ? (
+          <View testID="feed-empty">
+            <View style={styles.sectionHeaderWrap}>
+              <SectionHeader label="Get Started" />
+            </View>
+            <Card testID="feed-empty-actions">
+              <ListRow
+                testID="feed-empty-action-start-workout"
+                icon="activity"
+                title="Start a Workout"
+                subtitle="Track sets and reps as you train"
+                onPress={() => navigation.navigate('NewWorkout')}
+              />
+              <ListRow
+                testID="feed-empty-action-log-food"
+                icon="coffee"
+                title="Log Food"
+                subtitle="Search or scan something you ate"
+                onPress={() => navigation.navigate('FoodLibrary')}
+                divider
+              />
+              <ListRow
+                testID="feed-empty-action-find-people"
+                icon="search"
+                title="Find People to Follow"
+                subtitle="See their workouts and meals here too"
+                onPress={() => navigation.navigate('FindPeople')}
+                divider
+              />
+            </Card>
+          </View>
+        ) : (
+          <>
+            {displayItems.map((item) => (
+              <RiseIn key={item.key}>
+                <WorkoutFeedCard
+                  idPrefix="feed-item-workout"
+                  workout={item.workout}
+                  authorName={item.authorName}
+                  avatarUrl={item.avatarUrl}
+                  timestamp={item.timestamp}
+                  weightUnit={weightUnit}
+                  onPress={item.onPress}
+                />
+              </RiseIn>
+            ))}
+
+            {hasMoreOfEither ? (
+              <TextButton
+                testID="feed-load-more"
+                label="Load More"
+                loading={loadingMoreEither}
+                onPress={handleLoadMoreAll}
+              />
+            ) : null}
+          </>
+        )}
+      </Screen>
+    </RiseInGroup>
   );
 }
