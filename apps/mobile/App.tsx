@@ -29,6 +29,7 @@ import {
   useReduceMotionPreference,
 } from './src/navigation/navigationTransitions';
 import { goToSection } from './src/navigation/sectionNavigation';
+import { PageArrival } from './src/navigation/useAfterTransition';
 import { forgetShown } from './src/lib/lastShown';
 import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
@@ -179,7 +180,15 @@ function Root() {
   // component re-renders on every navigation event (see onStateChange
   // below), so a fresh function each time would do that needlessly.
   const renderScreenLayout = useCallback(
-    ({ route, children }: { route: { name: string }; children: ReactNode }) => {
+    ({
+      route,
+      navigation,
+      children,
+    }: {
+      route: { name: string };
+      navigation: Parameters<typeof PageArrival>[0]['navigation'];
+      children: ReactNode;
+    }) => {
       const screenMode = MODE_AGNOSTIC_ROUTES.has(route.name)
         ? sharedMode
         : isNutritionRoute(route.name)
@@ -189,7 +198,7 @@ function Root() {
         <ScreenBackdrop
           accentColor={screenMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent}
         >
-          {children}
+          <PageArrival navigation={navigation}>{children}</PageArrival>
         </ScreenBackdrop>
       );
     },

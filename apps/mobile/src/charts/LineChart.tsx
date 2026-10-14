@@ -1,6 +1,8 @@
 import { View } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
-import { colors } from '../design/theme';
+import { colors, radii } from '../design/theme';
+import { Skeleton } from '../design/Skeleton';
+import { usePageArrived } from '../navigation/useAfterTransition';
 
 export interface LineChartPoint {
   x: number;
@@ -23,6 +25,12 @@ interface Props {
  * (no charting library) decision.
  */
 export function LineChart({ points, width, height, color = colors.textPrimary, testID }: Props) {
+  // Drawn once the page has arrived; a same-size placeholder until then, so
+  // the chart never holds back the page's slide-in.
+  const arrived = usePageArrived();
+  if (!arrived) {
+    return <Skeleton testID={testID} width={width} height={height} radius={radii.md} />;
+  }
   if (points.length === 0) {
     return <View testID={testID} style={{ width, height }} />;
   }

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Pressable, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
-import { colors } from '../design/theme';
+import { colors, radii } from '../design/theme';
+import { Skeleton } from '../design/Skeleton';
+import { usePageArrived } from '../navigation/useAfterTransition';
 
 export interface ProgressionChartPoint {
   x: number;
@@ -45,6 +47,8 @@ export function ProgressionChart({
   accessibilityLabelForPoint,
 }: Props) {
   const [width, setWidth] = useState(0);
+  // Drawn once the page has arrived; a same-size placeholder until then.
+  const arrived = usePageArrived();
 
   function handleLayout(event: LayoutChangeEvent) {
     setWidth(event.nativeEvent.layout.width);
@@ -74,7 +78,9 @@ export function ProgressionChart({
 
   return (
     <View testID={testID} onLayout={handleLayout} style={{ height }}>
-      {width > 0 ? (
+      {!arrived ? (
+        <Skeleton height={height} radius={radii.md} />
+      ) : width > 0 ? (
         <>
           <Svg width={width} height={height} style={{ position: 'absolute' }}>
             {scaled.length > 1 ? (

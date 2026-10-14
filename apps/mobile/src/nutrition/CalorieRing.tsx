@@ -1,6 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { Skeleton } from '../design/Skeleton';
 import { Text } from '../design/Text';
+import { usePageArrived } from '../navigation/useAfterTransition';
 import { colors, spacing, typeScale } from '../design/theme';
 
 interface Props {
@@ -37,6 +39,8 @@ export function CalorieRing({
   const circumference = 2 * Math.PI * radius;
   const fraction = goal !== null && goal > 0 ? Math.min(consumed / goal, 1) : 0;
   const dashOffset = circumference * (1 - fraction);
+  // The ring is drawn once the page has arrived; its numbers show at once.
+  const arrived = usePageArrived();
 
   return (
     <View
@@ -49,30 +53,34 @@ export function CalorieRing({
           : `${consumed} calories logged today, no goal set`
       }
     >
-      <Svg width={size} height={size}>
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={colors.surfaceRaised}
-          strokeWidth={strokeWidth}
-          fill="none"
-        />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={accentColor}
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${circumference} ${circumference}`}
-          strokeDashoffset={dashOffset}
-          rotation={-90}
-          originX={size / 2}
-          originY={size / 2}
-        />
-      </Svg>
+      {arrived ? (
+        <Svg width={size} height={size}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={colors.surfaceRaised}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={accentColor}
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={dashOffset}
+            rotation={-90}
+            originX={size / 2}
+            originY={size / 2}
+          />
+        </Svg>
+      ) : (
+        <Skeleton width={size} height={size} radius={size / 2} />
+      )}
       <View style={StyleSheet.absoluteFill} importantForAccessibility="no-hide-descendants">
         <View style={styles.center}>
           <Text testID={testID ? `${testID}-value` : undefined} style={styles.value}>
