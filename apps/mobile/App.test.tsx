@@ -688,11 +688,11 @@ describe('Train/Nutrition tab accents', () => {
   // by color -- rather than the earlier fixed blue/green or neutral white.
   it('colors the active Train and Nutrition tabs in the same amber accent', async () => {
     await signIn();
-    expect(screen.getByTestId('bottom-nav-train')).toHaveTextContent(/Train/);
+    expect(screen.getByTestId('bottom-nav-train')).toHaveTextContent(/Workouts/);
 
     fireEvent.press(screen.getByTestId('bottom-nav-train'));
     await screen.findByTestId('workout-history-open-menu');
-    let label = within(screen.getByTestId('bottom-nav-train')).getByText('Train');
+    let label = within(screen.getByTestId('bottom-nav-train')).getByText('Workouts');
     expect(StyleSheet.flatten(label.props.style).color).toBe('#D99A50');
 
     fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));

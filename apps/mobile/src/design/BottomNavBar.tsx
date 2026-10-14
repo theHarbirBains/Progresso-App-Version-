@@ -78,7 +78,7 @@ export function BottomNavBar({
     {
       destination: 'train',
       testID: 'bottom-nav-train',
-      label: 'Train',
+      label: 'Workouts',
       icon: 'activity',
       onPress: onNavigateTrain,
       accentColor: workoutAccentColor,

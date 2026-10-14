@@ -53,17 +53,17 @@ describe('BottomNavBar', () => {
   // the same label/icon, regardless of where you currently are.
   it('always shows the same fixed labels, in both directions', () => {
     const { rerender } = render(<BottomNavBar {...baseProps} active="feed" />);
-    expect(screen.getByTestId('bottom-nav-train')).toHaveTextContent(/Train/);
+    expect(screen.getByTestId('bottom-nav-train')).toHaveTextContent(/Workouts/);
     expect(screen.getByTestId('bottom-nav-nutrition')).toHaveTextContent(/Nutrition/);
 
     rerender(<BottomNavBar {...baseProps} active="nutrition" />);
-    expect(screen.getByTestId('bottom-nav-train')).toHaveTextContent(/Train/);
+    expect(screen.getByTestId('bottom-nav-train')).toHaveTextContent(/Workouts/);
     expect(screen.getByTestId('bottom-nav-nutrition')).toHaveTextContent(/Nutrition/);
   });
 
   it("renders Train's active tab in the Workout accent and Nutrition's in the Nutrition accent", () => {
     const { rerender } = render(<BottomNavBar {...baseProps} active="train" />);
-    let label = within(screen.getByTestId('bottom-nav-train')).getByText('Train');
+    let label = within(screen.getByTestId('bottom-nav-train')).getByText('Workouts');
     expect(StyleSheet.flatten(label.props.style).color).toBe('#2F80FF');
 
     rerender(<BottomNavBar {...baseProps} active="nutrition" />);
@@ -81,7 +81,7 @@ describe('BottomNavBar', () => {
   it('leaves an inactive tab in the neutral secondary colour, regardless of accent', () => {
     render(<BottomNavBar {...baseProps} active="feed" />);
 
-    const label = within(screen.getByTestId('bottom-nav-train')).getByText('Train');
+    const label = within(screen.getByTestId('bottom-nav-train')).getByText('Workouts');
     expect(StyleSheet.flatten(label.props.style).color).not.toBe('#2F80FF');
   });
 
@@ -103,7 +103,7 @@ describe('BottomNavBar accessibility and touch targets', () => {
     expect(screen.getByTestId('bottom-nav-bar').props.accessibilityRole).toBe('tablist');
     for (const [id, name] of [
       ['bottom-nav-feed', 'Feed'],
-      ['bottom-nav-train', 'Train'],
+      ['bottom-nav-train', 'Workouts'],
       ['bottom-nav-nutrition', 'Nutrition'],
       ['bottom-nav-progress', 'Progress'],
       ['bottom-nav-you', 'You'],
