@@ -25,6 +25,7 @@ describe('screenTransitionFor', () => {
       'NutritionHistory',
       'CalorieEstimation',
       'LogPastWorkout',
+      'TrainerAccess',
     ]) {
       expect(screenTransitionFor(route)).toBe('section');
     }

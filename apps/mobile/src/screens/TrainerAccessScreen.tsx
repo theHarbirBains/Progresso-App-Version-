@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
-import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
+import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import {
@@ -22,6 +22,7 @@ import {
   type TrainerClient,
   type TrainerRequest,
 } from '../lib/api';
+import { AppMenuContext } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { clientName } from '../trainer/clientPicker';
@@ -38,24 +39,29 @@ interface AccessData {
 }
 
 /**
- * Trainer access, filling the screen. Requests waiting on you come first (Accept is the
- * one primary action). Then Add Client on its own, and the Clients widget, which takes
- * the rest of the height and scrolls its own list. Your trainers, and ending a link, are
- * always your choice. Linking tracked history is a discreet text link at the foot.
+ * Trainer access, as widgets: an overview of who can log for you (and, for a trainer,
+ * their clients); requests waiting on you (Accept is the one primary action); your
+ * trainers, each with End; the Clients widget, with Add Client for a trainer; how trainer
+ * access works; and linking history a trainer tracked before you joined. A side-menu page,
+ * so the menu button sits at the top left.
  */
 export function TrainerAccessScreen({ navigation }: Props) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   const { theme } = useProgressTheme();
 
+  // The side menu, for the menu button (absent outside the app shell, e.g. in a test).
+  const menu = useContext(AppMenuContext);
   const [data, setData] = useState<AccessData | null>(null);
   const [loading, setLoading] = useState(true);
+  // Only the first load shows placeholders; coming back refreshes in place.
+  const hasLoaded = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [busyTrainerId, setBusyTrainerId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!accessToken) return;
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
     setError(null);
     try {
       const [status, requests, trainers] = await Promise.all([
@@ -69,6 +75,7 @@ export function TrainerAccessScreen({ navigation }: Props) {
       setError(err instanceof Error ? err.message : 'Could not load trainer access');
     } finally {
       setLoading(false);
+      hasLoaded.current = true;
     }
   }, [accessToken]);
 
@@ -128,15 +135,35 @@ export function TrainerAccessScreen({ navigation }: Props) {
     }
   }
 
-  const nothingToShow =
-    data !== null && data.requests.length === 0 && data.trainers.length === 0 && !data.isTrainer;
+  const trainerCount = data?.trainers.length ?? 0;
+  const statusLine =
+    trainerCount === 0
+      ? 'No trainer can log workouts for you right now.'
+      : trainerCount === 1
+        ? 'One trainer can log workouts for you.'
+        : `${trainerCount} trainers can log workouts for you.`;
 
   return (
     <Screen
       contentContainerStyle={{ gap: widgetGap }}
-      header={<AppHeader title="Trainer Access" testID="trainer-access-header" />}
+      header={
+        <AppHeader
+          title="Trainer Access"
+          testID="trainer-access-header"
+          leftAction={
+            menu
+              ? {
+                  icon: 'menu',
+                  onPress: () => menu.openMenu(),
+                  accessibilityLabel: 'Open menu',
+                  testID: 'trainer-access-open-menu',
+                }
+              : undefined
+          }
+        />
+      }
     >
-      {loading ? <LoadingState testID="trainer-access-loading" /> : null}
+      {loading ? <LoadingState testID="trainer-access-loading" inline /> : null}
 
       {!loading && error ? (
         <ErrorState testID="trainer-access-error" message={error} onRetry={() => void load()} />
@@ -144,6 +171,37 @@ export function TrainerAccessScreen({ navigation }: Props) {
 
       {!loading && !error && data ? (
         <>
+          <AppCard
+            testID="trainer-access-overview"
+            topAccent={theme.accent}
+            hero={data.requests.length === 0}
+          >
+            <Text style={styles.eyebrow}>Overview</Text>
+            <Text testID="trainer-access-status" style={styles.lede}>
+              {statusLine}
+            </Text>
+            <View style={styles.stats}>
+              <StatBlock
+                testID="trainer-access-stat-trainers"
+                value={String(trainerCount)}
+                label={trainerCount === 1 ? 'Trainer' : 'Trainers'}
+              />
+              <StatBlock
+                testID="trainer-access-stat-requests"
+                value={String(data.requests.length)}
+                label={data.requests.length === 1 ? 'Request' : 'Requests'}
+                valueColor={data.requests.length > 0 ? theme.accent : undefined}
+              />
+              {data.isTrainer ? (
+                <StatBlock
+                  testID="trainer-access-stat-clients"
+                  value={String(data.clients.length)}
+                  label={data.clients.length === 1 ? 'Client' : 'Clients'}
+                />
+              ) : null}
+            </View>
+          </AppCard>
+
           {data.requests.length > 0 ? (
             <AppCard hero topAccent={theme.accent} testID="trainer-access-requests">
               <Text style={styles.eyebrow}>Waiting for you</Text>
@@ -182,64 +240,15 @@ export function TrainerAccessScreen({ navigation }: Props) {
             </AppCard>
           ) : null}
 
-          {data.isTrainer ? (
-            <PrimaryButton
-              testID="trainer-access-add-client"
-              label="Add Client"
-              onPress={() => navigation.navigate('TrainerClientForm')}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-          ) : null}
-
-          <AppCard
-            testID="trainer-access-clients"
-            topAccent={theme.accent}
-            hero={data.requests.length === 0}
-          >
-            <SectionHeader label="Clients" />
-            {!data.isTrainer ? (
-              <Text style={styles.empty}>Clients need a Trainer subscription.</Text>
-            ) : sortedClients.length === 0 ? (
-              <Text style={styles.empty} testID="trainer-access-no-clients">
-                No clients yet. Add someone, even if they do not use Progresso yet.
+          <AppCard testID="trainer-access-trainers">
+            <SectionHeader label="Your trainers" />
+            {data.trainers.length === 0 ? (
+              <Text testID="trainer-access-empty" style={styles.empty}>
+                A trainer can ask to log workouts for you. Their request will appear here, and you
+                decide whether to accept it.
               </Text>
             ) : (
-              <>
-                {sortedClients.map((client, index) => {
-                  const openable = client.clientId !== null;
-                  return (
-                    <ListRow
-                      key={client.clientId ?? client.inviteId ?? `client-${index}`}
-                      testID={
-                        openable
-                          ? `trainer-access-client-${client.clientId}`
-                          : `trainer-access-invite-${client.inviteId}`
-                      }
-                      title={clientName(client)}
-                      subtitle={trainerClientStatusLabel(client)}
-                      chevron={openable}
-                      divider={index > 0}
-                      onPress={
-                        openable
-                          ? () =>
-                              navigation.navigate('TrainerClientDetail', {
-                                clientId: client.clientId as string,
-                                clientName: client.displayName ?? undefined,
-                              })
-                          : undefined
-                      }
-                    />
-                  );
-                })}
-              </>
-            )}
-          </AppCard>
-
-          {data.trainers.length > 0 ? (
-            <AppCard testID="trainer-access-trainers" topAccent={theme.accent}>
-              <SectionHeader label="Your trainers" />
-              {data.trainers.map((trainer, index) => (
+              data.trainers.map((trainer, index) => (
                 <ListRow
                   key={trainer.trainerId}
                   testID={`trainer-active-${trainer.trainerId}`}
@@ -255,23 +264,90 @@ export function TrainerAccessScreen({ navigation }: Props) {
                     />
                   }
                 />
-              ))}
-            </AppCard>
-          ) : null}
+              ))
+            )}
+          </AppCard>
 
-          {nothingToShow ? (
-            <EmptyState
-              testID="trainer-access-empty"
-              title="No trainer links"
-              description="A trainer can ask to log workouts for you. Their request will appear here, and you decide whether to accept it."
+          <AppCard testID="trainer-access-clients">
+            <SectionHeader label="Clients" />
+            {!data.isTrainer ? (
+              <Text style={styles.empty}>Clients need a Trainer subscription.</Text>
+            ) : sortedClients.length === 0 ? (
+              <Text style={styles.empty} testID="trainer-access-no-clients">
+                No clients yet. Add someone, even if they do not use Progresso yet.
+              </Text>
+            ) : (
+              sortedClients.map((client, index) => {
+                const openable = client.clientId !== null;
+                return (
+                  <ListRow
+                    key={client.clientId ?? client.inviteId ?? `client-${index}`}
+                    testID={
+                      openable
+                        ? `trainer-access-client-${client.clientId}`
+                        : `trainer-access-invite-${client.inviteId}`
+                    }
+                    title={clientName(client)}
+                    subtitle={trainerClientStatusLabel(client)}
+                    chevron={openable}
+                    divider={index > 0}
+                    onPress={
+                      openable
+                        ? () =>
+                            navigation.navigate('TrainerClientDetail', {
+                              clientId: client.clientId as string,
+                              clientName: client.displayName ?? undefined,
+                            })
+                        : undefined
+                    }
+                  />
+                );
+              })
+            )}
+            {data.isTrainer ? (
+              <View style={styles.cardAction}>
+                <PrimaryButton
+                  testID="trainer-access-add-client"
+                  label="Add Client"
+                  onPress={() => navigation.navigate('TrainerClientForm')}
+                  accentColor={theme.accent}
+                  onAccentColor={theme.onAccent}
+                />
+              </View>
+            ) : null}
+          </AppCard>
+
+          <AppCard testID="trainer-access-how">
+            <SectionHeader label="How it works" />
+            <ListRow
+              icon="user-plus"
+              title="A trainer asks"
+              subtitle="Their request shows up here, waiting for you."
             />
-          ) : null}
+            <ListRow
+              icon="check-circle"
+              title="You decide"
+              subtitle="Accept, and they can log workouts for you and see your training."
+              divider
+            />
+            <ListRow
+              icon="x-circle"
+              title="End it any time"
+              subtitle="Workouts they already logged stay on your account."
+              divider
+            />
+          </AppCard>
 
-          <TextButton
-            testID="trainer-access-open-claim"
-            label="Link tracked history"
-            onPress={() => navigation.navigate('TrainerClaim')}
-          />
+          <AppCard testID="trainer-access-claim">
+            <SectionHeader label="Tracked before you joined?" />
+            <ListRow
+              testID="trainer-access-open-claim"
+              icon="link"
+              title="Link tracked history"
+              subtitle="Enter the code a trainer gave you to move that history onto your account."
+              onPress={() => navigation.navigate('TrainerClaim')}
+            />
+          </AppCard>
         </>
       ) : null}
     </Screen>
@@ -297,7 +373,14 @@ const styles = {
   },
   empty: {
     ...typeScale.secondary,
-    color: colors.textMuted,
+    color: colors.textSecondary,
     marginVertical: spacing.sm,
+  },
+  stats: {
+    flexDirection: 'row' as const,
+    gap: widgetGap,
+  },
+  cardAction: {
+    marginTop: spacing.md,
   },
 };

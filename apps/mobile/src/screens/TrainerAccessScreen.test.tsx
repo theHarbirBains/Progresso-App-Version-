@@ -10,6 +10,7 @@ import {
   respondToTrainerRequest,
 } from '../lib/api';
 import { TrainerAccessScreen } from './TrainerAccessScreen';
+import { AppMenuContext } from '../navigation/AppMenuContext';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -181,5 +182,56 @@ describe('TrainerAccessScreen', () => {
     expect(await screen.findByTestId('trainer-access-client-client-sam')).toBeTruthy();
     expect(screen.getByTestId('trainer-access-client-client-ana')).toBeTruthy();
     expect(screen.queryByLabelText('Back')).toBeNull();
+  });
+
+  it('opens the side menu from the top left -- it is a menu page', async () => {
+    const openMenu = jest.fn();
+    render(
+      <AppMenuContext.Provider value={{ openMenu, currentMode: 'workout' }}>
+        <TrainerAccessScreen navigation={navigation} route={{} as never} />
+      </AppMenuContext.Provider>,
+    );
+
+    fireEvent.press(await screen.findByTestId('trainer-access-open-menu'));
+    expect(openMenu).toHaveBeenCalled();
+  });
+
+  it("opens with an overview: who can log for you, requests, and a trainer's clients", async () => {
+    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
+    mockListTrainerClients.mockResolvedValue([sam]);
+    mockListMyTrainers.mockResolvedValue([
+      {
+        trainerId: TRAINER_ID,
+        trainerDisplayName: 'Coach Jo',
+        requestedAt: '2026-10-01T00:00:00.000Z',
+      },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('trainer-access-status')).toHaveTextContent(
+      'One trainer can log workouts for you.',
+    );
+    expect(screen.getByTestId('trainer-access-stat-trainers')).toHaveTextContent(/1/);
+    expect(screen.getByTestId('trainer-access-stat-requests')).toHaveTextContent(/0/);
+    expect(screen.getByTestId('trainer-access-stat-clients')).toHaveTextContent(/1/);
+  });
+
+  it('shows no clients count to someone who is not a trainer', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('trainer-access-status')).toHaveTextContent(
+      'No trainer can log workouts for you right now.',
+    );
+    expect(screen.queryByTestId('trainer-access-stat-clients')).toBeNull();
+  });
+
+  it('explains how trainer access works, and offers linking tracked history as its own widget', async () => {
+    renderScreen();
+
+    const how = await screen.findByTestId('trainer-access-how');
+    expect(how).toHaveTextContent(/A trainer asks/);
+    expect(how).toHaveTextContent(/You decide/);
+    expect(how).toHaveTextContent(/End it any time/);
+    expect(screen.getByTestId('trainer-access-claim')).toHaveTextContent(/Link tracked history/);
   });
 });
