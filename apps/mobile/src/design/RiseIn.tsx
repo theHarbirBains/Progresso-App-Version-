@@ -1,14 +1,17 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, type StyleProp, type ViewStyle } from 'react-native';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 
-// How a list of widgets rolls out: each one rises a little and fades in, one
+// How a list of widgets rolls out: each one springs up from below -- rising,
+// growing to full size and fading in, settling with a slight bounce -- one
 // after another, rather than all of them popping in at once.
-const DURATION_MS = 380;
-const STAGGER_MS = 70;
-const RISE = 18;
+const STAGGER_MS = 110;
+const RISE = 44;
+const START_SCALE = 0.94;
+// A soft spring: about half a second to settle, with a small overshoot.
+const SPRING = { stiffness: 140, damping: 14, mass: 1 } as const;
 // Only the first few in a rollout wait their turn; the rest are below the
-// fold anyway, so the whole cascade is over in well under a second.
+// fold anyway, so the whole cascade is over in about a second.
 const MAX_STAGGERED = 6;
 // Widgets that first appear within this long of each other roll out as one
 // cascade; one that appears on its own later (a new workout after a
@@ -61,11 +64,10 @@ export function RiseIn({
       progress.setValue(1);
       return undefined;
     }
-    const animation = Animated.timing(progress, {
+    const animation = Animated.spring(progress, {
       toValue: 1,
-      duration: DURATION_MS,
       delay,
-      easing: Easing.out(Easing.cubic),
+      ...SPRING,
       useNativeDriver: true,
     });
     animation.start();
@@ -78,9 +80,17 @@ export function RiseIn({
       style={[
         style,
         {
-          opacity: progress,
+          // Fully visible well before it settles, so the bounce reads as motion, not a fade.
+          opacity: progress.interpolate({
+            inputRange: [0, 0.6, 1],
+            outputRange: [0, 1, 1],
+            extrapolate: 'clamp',
+          }),
           transform: [
             { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [RISE, 0] }) },
+            {
+              scale: progress.interpolate({ inputRange: [0, 1], outputRange: [START_SCALE, 1] }),
+            },
           ],
         },
       ]}

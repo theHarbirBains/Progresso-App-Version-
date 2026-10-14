@@ -14,7 +14,7 @@ describe('RiseIn', () => {
   beforeEach(() => {
     jest.spyOn(navigationTransitions, 'useReduceMotionPreference').mockReturnValue(false);
     jest.spyOn(Date, 'now').mockImplementation(() => now);
-    timing = jest.spyOn(Animated, 'timing');
+    timing = jest.spyOn(Animated, 'spring');
   });
 
   afterEach(() => {
@@ -30,26 +30,26 @@ describe('RiseIn', () => {
   it('rolls widgets that appear together out one after another, the first few in turn', () => {
     render(<RiseInGroup>{Array.from({ length: 9 }, (_, n) => card(n))}</RiseInGroup>);
 
-    expect(delays(timing)).toEqual([0, 70, 140, 210, 280, 350, 420, 420, 420]);
+    expect(delays(timing)).toEqual([0, 110, 220, 330, 440, 550, 660, 660, 660]);
   });
 
   it('starts a widget that appears on its own later right away, and never replays one already shown', () => {
     const { rerender } = render(<RiseInGroup>{[card(0), card(1)]}</RiseInGroup>);
-    expect(delays(timing)).toEqual([0, 70]);
+    expect(delays(timing)).toEqual([0, 110]);
 
     // A refresh a while later adds one new workout at the top.
     now += 5_000;
     rerender(<RiseInGroup>{[card(9), card(0), card(1)]}</RiseInGroup>);
 
-    expect(delays(timing)).toEqual([0, 70, 0]);
+    expect(delays(timing)).toEqual([0, 110, 0]);
   });
 
-  it('starts hidden and slightly low, then rises into place', () => {
+  it('starts hidden, low and a little small, then springs up into place', () => {
     render(<RiseInGroup>{card(0)}</RiseInGroup>);
 
     const style = StyleSheet.flatten(screen.getByTestId('card-0').props.style);
     expect(style.opacity).toBe(0);
-    expect(style.transform).toEqual([{ translateY: 18 }]);
+    expect(style.transform).toEqual([{ translateY: 44 }, { scale: 0.94 }]);
     const config = timing.mock.calls[0][1] as { toValue: number; useNativeDriver: boolean };
     expect(config.toValue).toBe(1);
     expect(config.useNativeDriver).toBe(true);
