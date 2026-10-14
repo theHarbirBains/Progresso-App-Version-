@@ -7,6 +7,7 @@ import { Screen } from '../design/Screen';
 import { UnderlineTabs } from '../design/UnderlineTabs';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
+import { RiseIn, RiseInGroup } from '../design/RiseIn';
 import { AllTimeSection } from '../progress/AllTimeSection';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { computeLifetimeStats } from '../progress/lifetimeStats';
@@ -86,76 +87,83 @@ export function ProgressOverviewScreen({ navigation }: Props) {
         />
       }
     >
-      <View style={styles.tabsWrap}>
-        <UnderlineTabs
-          testID="progress-tabs"
-          categories={[...PROGRESS_SECTIONS]}
-          active={activeSection}
-          onSelect={setActiveSection}
-          accentColor={theme.accent}
-        />
+      <RiseInGroup>
+        <RiseIn>
+          <View style={styles.tabsWrap}>
+            <UnderlineTabs
+              testID="progress-tabs"
+              categories={[...PROGRESS_SECTIONS]}
+              active={activeSection}
+              onSelect={setActiveSection}
+              accentColor={theme.accent}
+            />
 
-        {error ? (
-          <Text testID="progress-overview-error" style={styles.errorText}>
-            {error}
-          </Text>
-        ) : null}
-      </View>
+            {error ? (
+              <Text testID="progress-overview-error" style={styles.errorText}>
+                {error}
+              </Text>
+            ) : null}
+          </View>
+        </RiseIn>
 
-      <AppCard testID="progress-section-card" style={styles.sectionCard}>
-        {activeSection === 'Overview' ? (
-          <OverviewSection
-            groups={groups}
-            lifetimeStats={lifetimeStats}
-            totalCompletedSets={history.length}
-            totalPRs={totalPRs}
-            repPRs={repPRs}
-            oneRepMaxes={oneRepMaxes}
-            weightUnit={weightUnit}
-            accentColor={theme.accent}
-            navigation={navigation}
-            onViewDetails={() => setActiveSection('Strength')}
-            onViewAllMilestones={() => setActiveSection('Strength')}
-          />
-        ) : null}
+        {/* Fills the rest of the screen, like the card inside it. */}
+        <RiseIn style={styles.sectionRise}>
+          <AppCard testID="progress-section-card" style={styles.sectionCard}>
+            {activeSection === 'Overview' ? (
+              <OverviewSection
+                groups={groups}
+                lifetimeStats={lifetimeStats}
+                totalCompletedSets={history.length}
+                totalPRs={totalPRs}
+                repPRs={repPRs}
+                oneRepMaxes={oneRepMaxes}
+                weightUnit={weightUnit}
+                accentColor={theme.accent}
+                navigation={navigation}
+                onViewDetails={() => setActiveSection('Strength')}
+                onViewAllMilestones={() => setActiveSection('Strength')}
+              />
+            ) : null}
 
-        {activeSection === 'Strength' ? (
-          <StrengthProgressSection
-            history={history}
-            groups={groups}
-            weightUnit={weightUnit}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
-            navigation={navigation}
-          />
-        ) : null}
+            {activeSection === 'Strength' ? (
+              <StrengthProgressSection
+                history={history}
+                groups={groups}
+                weightUnit={weightUnit}
+                accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
+                navigation={navigation}
+              />
+            ) : null}
 
-        {activeSection === 'TopSets' ? (
-          <TopSetsSection
-            history={history}
-            weightUnit={weightUnit}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
-            navigation={navigation}
-          />
-        ) : null}
+            {activeSection === 'TopSets' ? (
+              <TopSetsSection
+                history={history}
+                weightUnit={weightUnit}
+                accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
+                navigation={navigation}
+              />
+            ) : null}
 
-        {activeSection === 'AllTime' ? (
-          <AllTimeSection
-            groups={groups}
-            history={history}
-            completedWorkouts={completedWorkouts}
-            lifetimeStats={lifetimeStats}
-            totalCompletedSets={history.length}
-            totalPRs={totalPRs}
-            repPRs={repPRs}
-            oneRepMaxes={oneRepMaxes}
-            weightUnit={weightUnit}
-            accentColor={theme.accent}
-            navigation={navigation}
-          />
-        ) : null}
-      </AppCard>
+            {activeSection === 'AllTime' ? (
+              <AllTimeSection
+                groups={groups}
+                history={history}
+                completedWorkouts={completedWorkouts}
+                lifetimeStats={lifetimeStats}
+                totalCompletedSets={history.length}
+                totalPRs={totalPRs}
+                repPRs={repPRs}
+                oneRepMaxes={oneRepMaxes}
+                weightUnit={weightUnit}
+                accentColor={theme.accent}
+                navigation={navigation}
+              />
+            ) : null}
+          </AppCard>
+        </RiseIn>
+      </RiseInGroup>
     </Screen>
   );
 }

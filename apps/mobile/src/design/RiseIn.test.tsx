@@ -1,7 +1,7 @@
 import { Animated, StyleSheet, Text } from 'react-native';
 import { render, screen } from '@testing-library/react-native';
 import * as navigationTransitions from '../navigation/navigationTransitions';
-import { RiseIn, RiseInGroup } from './RiseIn';
+import { RiseIn, RiseInGroup, RiseInStack } from './RiseIn';
 
 function delays(timing: jest.SpyInstance) {
   return timing.mock.calls.map(([, config]) => (config as { delay: number }).delay);
@@ -61,5 +61,27 @@ describe('RiseIn', () => {
 
     expect(timing).not.toHaveBeenCalled();
     expect(StyleSheet.flatten(screen.getByTestId('card-0').props.style).opacity).toBe(1);
+  });
+
+  it("gives each of a page's widgets its own place in one cascade, skipping empty slots", () => {
+    render(
+      <RiseInStack>
+        <Text testID="widget-a">A</Text>
+        {null}
+        {false}
+        <Text testID="widget-b">B</Text>
+        <Text testID="widget-c">C</Text>
+      </RiseInStack>,
+    );
+
+    expect(delays(timing)).toEqual([0, 110, 220]);
+    // One rollout wrapper per widget, in page order, each holding just its
+    // widget -- no extra box around the stack, so the page's spacing is unchanged.
+    const wrappers = screen.UNSAFE_getAllByType(RiseIn);
+    expect(wrappers.map((w) => w.props.children.props.testID)).toEqual([
+      'widget-a',
+      'widget-b',
+      'widget-c',
+    ]);
   });
 });

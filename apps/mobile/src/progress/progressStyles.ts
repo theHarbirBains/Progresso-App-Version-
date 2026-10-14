@@ -115,6 +115,10 @@ export const progressStyles = StyleSheet.create({
   },
   // The active section's widget: a card filling the remaining height below
   // the tabs, inset to the same screen margin the tabs use.
+  // The section card's rollout wrapper (RiseIn) -- fills the same height.
+  sectionRise: {
+    flex: 1,
+  },
   sectionCard: {
     flex: 1,
     marginHorizontal: 0,

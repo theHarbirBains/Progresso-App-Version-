@@ -16,6 +16,7 @@ import { StatBlock } from '../design/StatBlock';
 import { colors, radii } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
+import { RiseInStack } from '../design/RiseIn';
 import { Skeleton, SkeletonRows } from '../design/Skeleton';
 import { recallShown, rememberShown } from '../lib/lastShown';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
@@ -311,117 +312,145 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
         />
       }
     >
-      {activeWorkout ? (
-        <Card hero testID="active-workout-banner">
-          <Text style={[styles.actionLine, { color: colors.textPrimary }]}>
-            You have a workout in progress
-          </Text>
-          {activeAssessment?.state === 'possibly_inactive' ? (
-            <Text
-              testID="active-workout-idle-indicator"
-              style={[styles.actionLine, { color: colors.textPrimary }]}
-            >
-              {`Last set logged ${formatIdleMinutes(activeAssessment.idleMinutes)}`}
+      <RiseInStack>
+        {activeWorkout ? (
+          <Card hero testID="active-workout-banner">
+            <Text style={[styles.actionLine, { color: colors.textPrimary }]}>
+              You have a workout in progress
             </Text>
-          ) : null}
-          <PrimaryButton
-            testID="resume-active-workout"
-            label={`Resume "${activeWorkout.name}"`}
-            onPress={() => navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id })}
-            accentColor={colors.heroAction}
-            onAccentColor={colors.onAccent}
+            {activeAssessment?.state === 'possibly_inactive' ? (
+              <Text
+                testID="active-workout-idle-indicator"
+                style={[styles.actionLine, { color: colors.textPrimary }]}
+              >
+                {`Last set logged ${formatIdleMinutes(activeAssessment.idleMinutes)}`}
+              </Text>
+            ) : null}
+            <PrimaryButton
+              testID="resume-active-workout"
+              label={`Resume "${activeWorkout.name}"`}
+              onPress={() => navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id })}
+              accentColor={colors.heroAction}
+              onAccentColor={colors.onAccent}
+            />
+          </Card>
+        ) : (
+          <Card hero testID="workout-history-start">
+            <Text style={[styles.actionLine, { color: colors.textPrimary }]}>Ready to train?</Text>
+            <PrimaryButton
+              testID="start-new-workout"
+              label="Start New Workout"
+              onPress={() => navigation.navigate('NewWorkout')}
+              accentColor={colors.heroAction}
+              onAccentColor={colors.onAccent}
+            />
+          </Card>
+        )}
+
+        <View style={styles.logPastWorkoutWrap}>
+          <TextButton
+            testID="workout-history-log-past"
+            label="Log a Past Workout"
+            onPress={() => navigation.navigate('LogPastWorkout')}
           />
-        </Card>
-      ) : (
-        <Card hero testID="workout-history-start">
-          <Text style={[styles.actionLine, { color: colors.textPrimary }]}>Ready to train?</Text>
-          <PrimaryButton
-            testID="start-new-workout"
-            label="Start New Workout"
-            onPress={() => navigation.navigate('NewWorkout')}
-            accentColor={colors.heroAction}
-            onAccentColor={colors.onAccent}
-          />
-        </Card>
-      )}
-
-      <View style={styles.logPastWorkoutWrap}>
-        <TextButton
-          testID="workout-history-log-past"
-          label="Log a Past Workout"
-          onPress={() => navigation.navigate('LogPastWorkout')}
-        />
-      </View>
-
-      <Card testID="workout-history-calendar-card">
-        <MonthCalendar
-          testID="workout-calendar"
-          year={year}
-          month={month}
-          markedDateKeys={markedDateKeys}
-          markedDescription="workout completed"
-          selectedDateKey={selectedDateKey}
-          todayKey={todayKey}
-          accentColor={theme.accent}
-          onAccentColor={theme.onAccent}
-          onSelectDate={handleSelectDate}
-          onPrevMonth={handlePrevMonth}
-          onNextMonth={handleNextMonth}
-        />
-
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
-            <Text style={styles.legendLabel}>Completed</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
-            <Text style={styles.legendLabel}>Today</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.border }]} />
-            <Text style={styles.legendLabel}>No workout</Text>
-          </View>
         </View>
 
-        {monthError ? (
-          <Text testID="workout-month-error" style={styles.errorText}>
-            {monthError}
-          </Text>
-        ) : monthLoading ? (
-          <Skeleton testID="workout-month-loading" height={280} radius={radii.lg} />
-        ) : (
-          <View testID="workout-month-summary" style={styles.summaryRow}>
-            <StatBlock
-              testID="workout-month-total"
-              value={String(monthSummary.totalWorkouts)}
-              label="Workouts"
-            />
-            <StatBlock
-              testID="workout-month-time"
-              value={formatTotalTime(monthSummary.totalMinutes)}
-              label="Total Time"
-            />
-            <StatBlock
-              testID="workout-month-sets"
-              value={String(monthSummary.totalSets)}
-              label="Total Sets"
-            />
-          </View>
-        )}
-      </Card>
-
-      {selectedDateKey ? (
-        <Card testID="selected-day-section">
-          <SectionHeader
-            label={new Date(selectedDateKey).toLocaleDateString(undefined, {
-              weekday: 'long',
-              month: 'long',
-              day: 'numeric',
-            })}
+        <Card testID="workout-history-calendar-card">
+          <MonthCalendar
+            testID="workout-calendar"
+            year={year}
+            month={month}
+            markedDateKeys={markedDateKeys}
+            markedDescription="workout completed"
+            selectedDateKey={selectedDateKey}
+            todayKey={todayKey}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+            onSelectDate={handleSelectDate}
+            onPrevMonth={handlePrevMonth}
+            onNextMonth={handleNextMonth}
           />
-          {selectedDayWorkouts.length > 0 ? (
-            selectedDayWorkouts.map((workout, index) => (
+
+          <View style={styles.legendRow}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
+              <Text style={styles.legendLabel}>Completed</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
+              <Text style={styles.legendLabel}>Today</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: colors.border }]} />
+              <Text style={styles.legendLabel}>No workout</Text>
+            </View>
+          </View>
+
+          {monthError ? (
+            <Text testID="workout-month-error" style={styles.errorText}>
+              {monthError}
+            </Text>
+          ) : monthLoading ? (
+            <Skeleton testID="workout-month-loading" height={280} radius={radii.lg} />
+          ) : (
+            <View testID="workout-month-summary" style={styles.summaryRow}>
+              <StatBlock
+                testID="workout-month-total"
+                value={String(monthSummary.totalWorkouts)}
+                label="Workouts"
+              />
+              <StatBlock
+                testID="workout-month-time"
+                value={formatTotalTime(monthSummary.totalMinutes)}
+                label="Total Time"
+              />
+              <StatBlock
+                testID="workout-month-sets"
+                value={String(monthSummary.totalSets)}
+                label="Total Sets"
+              />
+            </View>
+          )}
+        </Card>
+
+        {selectedDateKey ? (
+          <Card testID="selected-day-section">
+            <SectionHeader
+              label={new Date(selectedDateKey).toLocaleDateString(undefined, {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              })}
+            />
+            {selectedDayWorkouts.length > 0 ? (
+              selectedDayWorkouts.map((workout, index) => (
+                <WorkoutRow
+                  key={workout.id}
+                  workout={workout}
+                  divider={index > 0}
+                  onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout.id })}
+                />
+              ))
+            ) : (
+              <EmptyState testID="selected-day-empty" title="No workout on this day" />
+            )}
+          </Card>
+        ) : null}
+
+        <Card testID="workout-history-recent">
+          <SectionHeader label="Recent Workouts" />
+
+          {recentError ? (
+            <ErrorState testID="workout-history-error" message={recentError} onRetry={loadRecent} />
+          ) : recentLoading ? (
+            <SkeletonRows testID="workout-history-loading" count={4} />
+          ) : showEmptyState ? (
+            <EmptyState
+              testID="workout-history-empty"
+              title="No workouts yet. Complete your first workout and your training history will appear here."
+            />
+          ) : (
+            recentWorkouts.map((workout, index) => (
               <WorkoutRow
                 key={workout.id}
                 workout={workout}
@@ -429,59 +458,33 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
                 onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout.id })}
               />
             ))
-          ) : (
-            <EmptyState testID="selected-day-empty" title="No workout on this day" />
           )}
-        </Card>
-      ) : null}
 
-      <Card testID="workout-history-recent">
-        <SectionHeader label="Recent Workouts" />
-
-        {recentError ? (
-          <ErrorState testID="workout-history-error" message={recentError} onRetry={loadRecent} />
-        ) : recentLoading ? (
-          <SkeletonRows testID="workout-history-loading" count={4} />
-        ) : showEmptyState ? (
-          <EmptyState
-            testID="workout-history-empty"
-            title="No workouts yet. Complete your first workout and your training history will appear here."
-          />
-        ) : (
-          recentWorkouts.map((workout, index) => (
-            <WorkoutRow
-              key={workout.id}
-              workout={workout}
-              divider={index > 0}
-              onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout.id })}
+          {recentHasMore ? (
+            <TextButton
+              testID="workout-history-load-more"
+              label="Load More"
+              loading={recentLoadingMore}
+              onPress={handleLoadMoreRecent}
             />
-          ))
-        )}
-
-        {recentHasMore ? (
-          <TextButton
-            testID="workout-history-load-more"
-            label="Load More"
-            loading={recentLoadingMore}
-            onPress={handleLoadMoreRecent}
+          ) : null}
+        </Card>
+        {activeWorkout && activeAssessment ? (
+          <UnfinishedWorkoutSheet
+            visible={promptOpen}
+            workoutName={activeWorkout.name}
+            assessment={activeAssessment}
+            finishing={finishingSuggested}
+            onFinish={() => void finishSuggested()}
+            onResume={() => {
+              setPromptOpen(false);
+              navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id });
+            }}
+            onNotNow={notNowSuggested}
           />
         ) : null}
-      </Card>
-      {activeWorkout && activeAssessment ? (
-        <UnfinishedWorkoutSheet
-          visible={promptOpen}
-          workoutName={activeWorkout.name}
-          assessment={activeAssessment}
-          finishing={finishingSuggested}
-          onFinish={() => void finishSuggested()}
-          onResume={() => {
-            setPromptOpen(false);
-            navigation.navigate('ActiveWorkout', { workoutId: activeWorkout.id });
-          }}
-          onNotNow={notNowSuggested}
-        />
-      ) : null}
-      {finishError ? <Text testID="finish-suggested-error">{finishError}</Text> : null}
+        {finishError ? <Text testID="finish-suggested-error">{finishError}</Text> : null}
+      </RiseInStack>
     </Screen>
   );
 }

@@ -1,4 +1,13 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  Children,
+  createContext,
+  isValidElement,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Animated, type StyleProp, type ViewStyle } from 'react-native';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 
@@ -97,5 +106,21 @@ export function RiseIn({
     >
       {children}
     </Animated.View>
+  );
+}
+
+/**
+ * A page's widgets, each rolling out in turn -- every direct child (a card, a
+ * section) gets its own RiseIn, in one cascade. Adds no box of its own, so the
+ * page's spacing (its `gap`) is unchanged. A widget that appears later (a tab
+ * switched to) rolls in by itself.
+ */
+export function RiseInStack({ children }: { children: ReactNode }) {
+  return (
+    <RiseInGroup>
+      {Children.map(children, (child) =>
+        isValidElement(child) ? <RiseIn>{child}</RiseIn> : child,
+      )}
+    </RiseInGroup>
   );
 }
