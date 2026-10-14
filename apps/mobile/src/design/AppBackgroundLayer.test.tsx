@@ -1,7 +1,25 @@
 import { render, screen } from '@testing-library/react-native';
 import { StyleSheet, Text } from 'react-native';
-import { AppBackgroundLayer, ScreenBackdrop } from './AppBackgroundLayer';
+import * as navigationTransitions from '../navigation/navigationTransitions';
+import { AppBackgroundLayer, ScreenBackdrop, useHeroBackdrop } from './AppBackgroundLayer';
+import { Card } from './Card';
 import { colors } from './theme';
+
+const alphaOf = (rgba: string) => Number(/, ([\d.]+)\)$/.exec(rgba)![1]);
+
+// How dark the photo's top is: the hero darkening, plus the everyday layer at its opacity.
+function topDarkness(prefix: string) {
+  const hero = alphaOf(screen.getByTestId(`${prefix}-photo-fade`).props.colors[0]);
+  const everydayLayer = screen.getByTestId(`${prefix}-photo-everyday`);
+  const opacity = StyleSheet.flatten(everydayLayer.props.style).opacity as number;
+  const extra = alphaOf(everydayLayer.children[0].props.colors[0]) * opacity;
+  return 1 - (1 - hero) * (1 - extra);
+}
+
+beforeEach(() => {
+  // Brightening is instant with Reduce Motion, so the end state is checked without timers.
+  jest.spyOn(navigationTransitions, 'useReduceMotionPreference').mockReturnValue(true);
+});
 
 describe('AppBackgroundLayer', () => {
   it('is non-interactive (pointerEvents="none") so it never intercepts touches', () => {
@@ -10,19 +28,23 @@ describe('AppBackgroundLayer', () => {
     expect(screen.getByTestId('app-background-layer').props.pointerEvents).toBe('none');
   });
 
-  it('puts the warm gym photo across the top, before sign-in too', () => {
+  it('puts the warm gym photo across the top, a little zoomed and pinned left, before sign-in too', () => {
     render(<AppBackgroundLayer showAtmosphere={false} />);
 
     const photo = StyleSheet.flatten(screen.getByTestId('app-background-photo').props.style);
-    expect(photo).toMatchObject({ position: 'absolute', top: 0, left: 0, right: 0 });
+    expect(photo).toMatchObject({ position: 'absolute', top: 0, left: 0, width: '125%' });
     expect(photo.aspectRatio).toBeGreaterThan(0);
+    // The zoomed photo runs past the right edge, so the layer clips it.
+    expect(
+      StyleSheet.flatten(screen.getByTestId('app-background-layer').props.style).overflow,
+    ).toBe('hidden');
   });
 
-  it('darkens the photo for legibility and fades it into the solid warm background', () => {
+  it('darkens the photo to 60% for legibility and fades it into the solid warm background', () => {
     render(<AppBackgroundLayer />);
 
+    expect(topDarkness('app-background')).toBeCloseTo(0.6, 5);
     const fade = screen.getByTestId('app-background-photo-fade');
-    expect(fade.props.colors[0]).toBe('rgba(18, 17, 15, 0.6)');
     expect(fade.props.colors[fade.props.colors.length - 1]).toBe(colors.background);
   });
 });
@@ -128,5 +150,62 @@ describe('ScreenBackdrop glow', () => {
       }
       expect(sawNone).toBe(true);
     }
+  });
+});
+
+function Hero() {
+  useHeroBackdrop(true);
+  return <Text>hero</Text>;
+}
+
+describe('ScreenBackdrop behind a photo hero', () => {
+  it('keeps the everyday 60% darkening when no hero is on the screen', () => {
+    render(
+      <ScreenBackdrop>
+        <Text>page</Text>
+      </ScreenBackdrop>,
+    );
+
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.6, 5);
+  });
+
+  it('lightens the photo to 45% while a hero is on the screen, and back when it goes', () => {
+    const { rerender } = render(
+      <ScreenBackdrop>
+        <Hero />
+      </ScreenBackdrop>,
+    );
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.45, 5);
+
+    rerender(
+      <ScreenBackdrop>
+        <Text>page</Text>
+      </ScreenBackdrop>,
+    );
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.6, 5);
+  });
+
+  it('is lightened by a hero Card, never by a regular one', () => {
+    const { rerender } = render(
+      <ScreenBackdrop>
+        <Card testID="card">
+          <Text>widget</Text>
+        </Card>
+      </ScreenBackdrop>,
+    );
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.6, 5);
+
+    rerender(
+      <ScreenBackdrop>
+        <Card hero testID="card">
+          <Text>next workout</Text>
+        </Card>
+      </ScreenBackdrop>,
+    );
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.45, 5);
+  });
+
+  it('is a no-op outside a backdrop', () => {
+    expect(() => render(<Hero />)).not.toThrow();
   });
 });

@@ -18,7 +18,6 @@ import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { withAlpha } from '../theme/accentColor';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { UnfinishedWorkoutSheet } from '../workouts/UnfinishedWorkoutSheet';
 import {
@@ -297,13 +296,13 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
     >
       {activeWorkout ? (
         <Card hero testID="active-workout-banner">
-          <Text style={[styles.actionLine, { color: withAlpha(colors.textPrimary, 0.85) }]}>
+          <Text style={[styles.actionLine, { color: colors.textPrimary }]}>
             You have a workout in progress
           </Text>
           {activeAssessment?.state === 'possibly_inactive' ? (
             <Text
               testID="active-workout-idle-indicator"
-              style={[styles.actionLine, { color: withAlpha(colors.textPrimary, 0.72) }]}
+              style={[styles.actionLine, { color: colors.textPrimary }]}
             >
               {`Last set logged ${formatIdleMinutes(activeAssessment.idleMinutes)}`}
             </Text>
@@ -318,9 +317,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
         </Card>
       ) : (
         <Card hero testID="workout-history-start">
-          <Text style={[styles.actionLine, { color: withAlpha(colors.textPrimary, 0.85) }]}>
-            Ready to train?
-          </Text>
+          <Text style={[styles.actionLine, { color: colors.textPrimary }]}>Ready to train?</Text>
           <PrimaryButton
             testID="start-new-workout"
             label="Start New Workout"

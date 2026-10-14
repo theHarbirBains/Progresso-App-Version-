@@ -11,7 +11,6 @@ import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { colors } from '../design/theme';
-import { withAlpha } from '../theme/accentColor';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
 import {
   fetchFriendsFeed,
@@ -550,20 +549,18 @@ export function FeedScreen({ navigation }: Props) {
             nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
           }`}
         >
-          <Text style={[styles.nextWorkoutEyebrow, { color: withAlpha(colors.textPrimary, 0.72) }]}>
+          <Text style={[styles.nextWorkoutEyebrow, { color: colors.textPrimary }]}>
             Next Workout
           </Text>
           <Text style={[styles.nextWorkoutDayName, { color: colors.textPrimary }]}>
             {nextPlan.day.name}
           </Text>
           {nextPlan.day.muscleGroups.length > 0 ? (
-            <Text
-              style={[styles.nextWorkoutMuscles, { color: withAlpha(colors.textPrimary, 0.85) }]}
-            >
+            <Text style={[styles.nextWorkoutMuscles, { color: colors.textPrimary }]}>
               {musclesLabel(nextPlan.day)}
             </Text>
           ) : null}
-          <Text style={[styles.nextWorkoutMeta, { color: withAlpha(colors.textPrimary, 0.72) }]}>
+          <Text style={[styles.nextWorkoutMeta, { color: colors.textPrimary }]}>
             {nextPlan.previousDayName
               ? `Up next after ${nextPlan.previousDayName}`
               : "Let's get started"}

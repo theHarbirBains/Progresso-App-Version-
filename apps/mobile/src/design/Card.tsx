@@ -9,6 +9,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { withAlpha } from '../theme/accentColor';
+import { useHeroBackdrop } from './AppBackgroundLayer';
 import { colors, radii, spacing, widgetFillAlpha } from './theme';
 
 interface Props {
@@ -47,6 +48,9 @@ export function Card({
   accessibilityLabel,
   accessibilityState,
 }: Props) {
+  // A hero has no fill of its own, so the photo behind the screen is lightened while it's
+  // there, to show through it (see AppBackgroundLayer).
+  useHeroBackdrop(Boolean(hero));
   const cardStyle = [styles.card, hero ? null : styles.surface, style];
   const content = (
     <>
