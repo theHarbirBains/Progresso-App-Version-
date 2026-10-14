@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
+import { useHeroBackdrop } from '../design/AppBackgroundLayer';
 import { AppHeader } from '../design/AppHeader';
 import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
 import { PrimaryButton, TextButton } from '../design/Button';
@@ -290,6 +291,10 @@ export function FeedScreen({ navigation }: Props) {
   }, [userId, accessToken]);
   // While any workout is open, its Live now card takes the place of the next-workout widget.
   const anyWorkoutLive = liveWorkout !== null || liveGroups.length > 0 || liveSessions.length > 0;
+  const showNextWorkout = nextPlan !== null && !anyWorkoutLive;
+  // The Next Workout hero has no fill of its own; while it shows, the sunset photo behind Feed
+  // is brightened so it shows through the hero (see AppBackgroundLayer).
+  useHeroBackdrop(showNextWorkout);
   const loadLiveWorkoutRef = useRef(loadLiveWorkout);
   loadLiveWorkoutRef.current = loadLiveWorkout;
 
@@ -540,7 +545,7 @@ export function FeedScreen({ navigation }: Props) {
         />
       ))}
 
-      {nextPlan && !anyWorkoutLive ? (
+      {showNextWorkout && nextPlan ? (
         <Card
           hero
           testID="feed-next-workout"

@@ -7,10 +7,10 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { Screen } from '../design/Screen';
-import { colors } from '../design/theme';
+import { colors, radii } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { STORY_CAPTURE, STORY_CARD, ShareCard } from '../sharing/ShareCard';
+import { STORY_CANVAS, STORY_CAPTURE, ShareStory } from '../sharing/ShareCard';
 import { fetchShareCardData, type ShareCardData } from '../sharing/shareCardData';
 import { shareCardStyles as styles } from '../sharing/shareCardStyles';
 
@@ -61,7 +61,7 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
 
   function handleStageLayout(event: LayoutChangeEvent) {
     const { width, height } = event.nativeEvent.layout;
-    setPreviewScale(Math.min(1, width / STORY_CARD.width, height / STORY_CARD.height));
+    setPreviewScale(Math.min(1, width / STORY_CANVAS.width, height / STORY_CANVAS.height));
   }
 
   async function handleShare() {
@@ -134,25 +134,27 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
   return (
     <Screen scroll={false} contentContainerStyle={styles.content} header={header}>
       <View testID="share-card-stage" style={styles.stage} onLayout={handleStageLayout}>
-        {/* Shrinks the preview only: the card inside keeps its own story size, so the captured image is the same on every phone. */}
+        {/* Shrinks the preview only: the story inside keeps its own size, so the captured image is the same on every phone. Rounded like a phone screen -- the image itself is square. */}
         <View
           testID="share-card-preview"
           style={{
-            width: STORY_CARD.width * scale,
-            height: STORY_CARD.height * scale,
+            width: STORY_CANVAS.width * scale,
+            height: STORY_CANVAS.height * scale,
+            borderRadius: radii.lg,
+            overflow: 'hidden',
             opacity: previewScale === null ? 0 : 1,
           }}
         >
           <View
             style={{
               position: 'absolute',
-              left: (STORY_CARD.width * scale - STORY_CARD.width) / 2,
-              top: (STORY_CARD.height * scale - STORY_CARD.height) / 2,
+              left: (STORY_CANVAS.width * scale - STORY_CANVAS.width) / 2,
+              top: (STORY_CANVAS.height * scale - STORY_CANVAS.height) / 2,
               transform: [{ scale }],
             }}
           >
-            <ShareCard
-              cardRef={cardRef}
+            <ShareStory
+              storyRef={cardRef}
               data={cardData}
               weightUnit={weightUnit}
               accentColor={theme.accent}

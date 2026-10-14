@@ -37,6 +37,21 @@ export const shareCardStyles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  // ---- The story image ----------------------------------------------------
+  story: {
+    backgroundColor: colors.background,
+    overflow: 'hidden',
+  },
+  // What's left of the canvas once the social app's own controls are taken
+  // out; the card is centred in it.
+  safeArea: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   // ---- The card ------------------------------------------------------------
   card: {
     backgroundColor: colors.surface,
@@ -53,11 +68,14 @@ export const shareCardStyles = StyleSheet.create({
     bottom: 0,
   },
 
-  // The photo block: brand mark and date along the top, the workout at its foot.
+  // The photo block: brand mark and date along the top, the workout at its
+  // foot. A fixed height, so the photo -- and its sun -- always sits the same
+  // way behind the text it was measured against.
   hero: {
-    flex: 1,
+    height: 171,
     justifyContent: 'space-between',
     padding: spacing.xl,
+    overflow: 'hidden',
   },
   heroTop: {
     flexDirection: 'row',

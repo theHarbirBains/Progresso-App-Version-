@@ -55,8 +55,8 @@ describe('Card', () => {
 
     expect(screen.queryByTestId('glass-background')).toBeNull();
     const style = StyleSheet.flatten(screen.getByTestId('card').props.style);
-    // surfaceRaised (#26211C) at 70%: translucent, not opaque.
-    expect(style.backgroundColor).toBe('rgba(38, 33, 28, 0.7)');
+    // surfaceRaised (#26211C) at 80%: translucent, not opaque.
+    expect(style.backgroundColor).toBe('rgba(38, 33, 28, 0.8)');
     expect(style.borderRadius).toBe(radii.xl);
   });
 

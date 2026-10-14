@@ -102,11 +102,12 @@ export const spacing = {
 export const widgetGap = 6;
 
 // How opaque a widget's fill is -- Card's surface and GlassBackground's
-// `surface` tint (AppCard, controls) -- so the background photo stays faintly
-// visible through every widget. Measured over the photo's brightest pixels:
-// at 0.7, textSecondary keeps WCAG AA (4.5:1) inside a card, a StatBlock's
-// `surfaceLift` included. Don't lower it without re-measuring.
-export const widgetFillAlpha = 0.7;
+// `surface` tint (AppCard, controls) -- so the background photo stays visible
+// through every widget. Measured over the sunset photo's brightest pixels,
+// Feed's brighter hero state and scrolling included: at 0.8, textSecondary
+// keeps WCAG AA (4.5:1) inside a card, a StatBlock's `surfaceLift` included.
+// Don't lower it without re-measuring.
+export const widgetFillAlpha = 0.8;
 
 // Loaded via useFonts() in App.tsx before anything renders. Plus Jakarta
 // Sans carries ALL text (headings, body, labels) -- warmer and closer to

@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
 import { fetchActiveWorkout } from '../workouts/workoutQueries';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import * as backdrop from '../design/AppBackgroundLayer';
 import { Card } from '../design/Card';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
@@ -765,6 +766,18 @@ describe('FeedScreen -- Next Workout widget', () => {
     renderScreen();
 
     expect(await screen.findByTestId('feed-next-workout')).toBeTruthy();
+  });
+
+  it('brightens the sunset photo behind Feed while it shows, and only then', async () => {
+    const hero = jest.spyOn(backdrop, 'useHeroBackdrop');
+    mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
+    mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
+    renderScreen();
+
+    expect(hero).toHaveBeenLastCalledWith(false);
+    await screen.findByTestId('feed-next-workout');
+    expect(hero).toHaveBeenLastCalledWith(true);
+    hero.mockRestore();
   });
 
   it('is the one hero card, see-through over the background photo, with a cream Start Workout button', async () => {

@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react-native';
 import { StyleSheet, Text } from 'react-native';
 import * as navigationTransitions from '../navigation/navigationTransitions';
 import { AppBackgroundLayer, ScreenBackdrop, useHeroBackdrop } from './AppBackgroundLayer';
-import { Card } from './Card';
 import { colors } from './theme';
 
 const alphaOf = (rgba: string) => Number(/, ([\d.]+)\)$/.exec(rgba)![1]);
@@ -28,7 +27,7 @@ describe('AppBackgroundLayer', () => {
     expect(screen.getByTestId('app-background-layer').props.pointerEvents).toBe('none');
   });
 
-  it('puts the warm gym photo across the top, a little zoomed and pinned left, before sign-in too', () => {
+  it('puts the sunset photo across the top, a little zoomed and pinned left, before sign-in too', () => {
     render(<AppBackgroundLayer showAtmosphere={false} />);
 
     const photo = StyleSheet.flatten(screen.getByTestId('app-background-photo').props.style);
@@ -40,12 +39,26 @@ describe('AppBackgroundLayer', () => {
     ).toBe('hidden');
   });
 
-  it('darkens the photo to 60% for legibility and fades it into the solid warm background', () => {
+  it('darkens the photo to 70% for legibility and fades it into the solid warm background', () => {
     render(<AppBackgroundLayer />);
 
-    expect(topDarkness('app-background')).toBeCloseTo(0.6, 5);
+    expect(topDarkness('app-background')).toBeCloseTo(0.7, 2);
+    // Fully the warm fill at the photo's bottom edge.
     const fade = screen.getByTestId('app-background-photo-fade');
-    expect(fade.props.colors[fade.props.colors.length - 1]).toBe(colors.background);
+    expect(fade.props.colors[fade.props.colors.length - 1]).toBe('rgba(18, 17, 15, 1)');
+  });
+
+  it('darkens the text side and the header band, leaving the sun side of the photo clear', () => {
+    render(<AppBackgroundLayer />);
+
+    const side = screen.getByTestId('app-background-side-scrim');
+    expect(side.props.start).toEqual({ x: 0, y: 0 });
+    expect(side.props.end).toEqual({ x: 1, y: 0 });
+    expect(alphaOf(side.props.colors[0])).toBeGreaterThan(0.5);
+    expect(alphaOf(side.props.colors[side.props.colors.length - 1])).toBe(0);
+    const band = screen.getByTestId('app-background-header-band');
+    expect(alphaOf(band.props.colors[0])).toBe(0.5);
+    expect(alphaOf(band.props.colors[band.props.colors.length - 1])).toBe(0);
   });
 });
 
@@ -159,50 +172,30 @@ function Hero() {
 }
 
 describe('ScreenBackdrop behind a photo hero', () => {
-  it('keeps the everyday 60% darkening when no hero is on the screen', () => {
+  it('keeps the everyday 70% darkening when no hero is on the screen', () => {
     render(
       <ScreenBackdrop>
         <Text>page</Text>
       </ScreenBackdrop>,
     );
 
-    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.6, 5);
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.7, 2);
   });
 
-  it('lightens the photo to 45% while a hero is on the screen, and back when it goes', () => {
+  it('shows the sunset almost in full (10% darkening) while a hero is on the screen, and back when it goes', () => {
     const { rerender } = render(
       <ScreenBackdrop>
         <Hero />
       </ScreenBackdrop>,
     );
-    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.45, 5);
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.1, 2);
 
     rerender(
       <ScreenBackdrop>
         <Text>page</Text>
       </ScreenBackdrop>,
     );
-    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.6, 5);
-  });
-
-  it('is lightened by a hero Card, never by a regular one', () => {
-    const { rerender } = render(
-      <ScreenBackdrop>
-        <Card testID="card">
-          <Text>widget</Text>
-        </Card>
-      </ScreenBackdrop>,
-    );
-    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.6, 5);
-
-    rerender(
-      <ScreenBackdrop>
-        <Card hero testID="card">
-          <Text>next workout</Text>
-        </Card>
-      </ScreenBackdrop>,
-    );
-    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.45, 5);
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.7, 2);
   });
 
   it('is a no-op outside a backdrop', () => {

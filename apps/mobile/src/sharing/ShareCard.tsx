@@ -3,37 +3,74 @@ import { View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BACKGROUND_IMAGE } from '../design/AppBackgroundLayer';
+import { BACKGROUND_ASPECT, BACKGROUND_IMAGE } from '../design/AppBackgroundLayer';
 import { Avatar } from '../design/Avatar';
 import { Text } from '../design/Text';
 import { colors } from '../design/theme';
 import { formatWeightKg, fromKg, roundWeight } from '../lib/units';
-import { withAlpha } from '../theme/accentColor';
+import { mixHex, withAlpha } from '../theme/accentColor';
 import type { ShareCardData, ShareTopSet } from './shareCardData';
 import { shareCardStyles as styles } from './shareCardStyles';
 
 /**
- * The card's own size, in points. It is always laid out at exactly this size
+ * The whole story image, in points. It is always laid out at exactly this size
  * (the screen scales its preview to fit), so what is saved never depends on
  * the phone: 3x this is 1080x1920, a 9:16 story.
  */
-export const STORY_CARD = { width: 360, height: 640 } as const;
+export const STORY_CANVAS = { width: 360, height: 640 } as const;
 export const STORY_CAPTURE = { width: 1080, height: 1920 } as const;
+/**
+ * Where Instagram's and TikTok's own controls sit over a story -- the account
+ * row and progress bars along the top, the reply or caption bar along the
+ * bottom, buttons down the sides -- in canvas points (about 250px top, 290px
+ * bottom and 110px each side of the 1080x1920 image). The card stays inside
+ * what's left, so nothing of it is ever covered.
+ */
+export const STORY_SAFE_AREA = { top: 84, bottom: 96, side: 36 } as const;
+/** The card's own layout width, and its height at its tallest (two records, three exercises). */
+export const CARD_WIDTH = 360;
+export const CARD_MAX_HEIGHT = 600;
+/** One scale for every workout, so the card's type is always the same size: the tallest card just fits the safe area. */
+export const CARD_SCALE = Math.min(
+  (STORY_CANVAS.width - 2 * STORY_SAFE_AREA.side) / CARD_WIDTH,
+  (STORY_CANVAS.height - STORY_SAFE_AREA.top - STORY_SAFE_AREA.bottom) / CARD_MAX_HEIGHT,
+);
 
 const MAX_RECORDS = 2;
 const MAX_TOP_EXERCISES = 3;
 
-// How the photo at the top is darkened so its text reads: a scrim heaviest on
-// the left, where the text sits, then a fade into the card's own fill. Chosen
-// by measurement over the photo's brightest pixels -- don't lighten it
-// without re-measuring.
+// The frame around the card: a warm sunset gradient from the app's own amber
+// into its warm near-black, so the space Instagram or TikTok covers with its
+// own controls is still on-brand colour, never empty.
+export const STORY_FRAME = [
+  mixHex(colors.accent, colors.background, 0.62),
+  mixHex(colors.accent, colors.background, 0.84),
+  colors.background,
+] as const;
+
+// The photo at the top of the card: the sunset photo, a little larger than the
+// card and placed so the sun glows low on the right, clear of the date and the
+// workout's name.
+const PHOTO_WIDTH = CARD_WIDTH * 1.4;
+const PHOTO_STYLE = {
+  position: 'absolute',
+  left: 0,
+  top: -120,
+  width: PHOTO_WIDTH,
+  height: PHOTO_WIDTH / BACKGROUND_ASPECT,
+} as const;
+// How the photo is darkened so its text reads: a scrim heaviest on the left,
+// where the text sits, then a fade into the card's own fill. Chosen by
+// measurement over the photo's brightest pixels -- don't lighten it without
+// re-measuring.
 const SIDE_SCRIM = [
-  withAlpha(colors.surface, 0.6),
+  withAlpha(colors.surface, 0.55),
   withAlpha(colors.surface, 0.35),
-  withAlpha(colors.surface, 0.15),
+  withAlpha(colors.surface, 0.25),
 ] as const;
 const FADE = [
-  withAlpha(colors.surface, 0.4),
+  withAlpha(colors.surface, 0.5),
+  withAlpha(colors.surface, 0.25),
   withAlpha(colors.surface, 0.3),
   colors.surface,
 ] as const;
@@ -44,8 +81,6 @@ interface Props {
   weightUnit: 'kg' | 'lb';
   /** The accent -- used only for personal records. */
   accentColor: string;
-  /** The view that gets captured to PNG -- the preview IS the image. */
-  cardRef?: Ref<View>;
 }
 
 // The date with no year ("Mon, Sep 20") -- specific enough to be theirs,
@@ -108,25 +143,55 @@ function Thumb({ set, size }: { set: ShareTopSet; size: number }) {
   );
 }
 
-// The shareable workout image: a 9:16 story card. The warm gym photo sits
-// behind the brand mark, date, workout name and muscles; then the session as
-// four stats (duration, exercises, sets, volume), the personal records set
-// this workout (the one accented block) and its first exercises, numbered.
-// Everything is real logged data in the user's unit; nothing is estimated,
-// and no account detail (name, email, id) is ever drawn. Nothing on it looks
-// tappable (no chevrons, no "View All") -- it's a picture.
-export function ShareCard({ data, weightUnit, accentColor, cardRef }: Props) {
+// The shareable workout image: the card, inside its warm frame, on a 9:16
+// story canvas. This whole canvas is what gets captured -- the preview IS the
+// image.
+export function ShareStory({ storyRef, ...card }: Props & { storyRef?: Ref<View> }) {
+  return (
+    <View
+      ref={storyRef}
+      collapsable={false}
+      testID="share-story"
+      style={[styles.story, STORY_CANVAS]}
+    >
+      <LinearGradient
+        testID="share-story-frame"
+        colors={STORY_FRAME}
+        locations={[0, 0.5, 1]}
+        style={styles.fill}
+      />
+      <View testID="share-story-safe-area" style={[styles.safeArea, STORY_SAFE_AREA_STYLE]}>
+        <View testID="share-card-scale" style={{ transform: [{ scale: CARD_SCALE }] }}>
+          <ShareCard {...card} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const STORY_SAFE_AREA_STYLE = {
+  top: STORY_SAFE_AREA.top,
+  bottom: STORY_SAFE_AREA.bottom,
+} as const;
+
+// The card: the sunset photo behind the brand mark, date, workout name and
+// muscles; then the session as four stats (duration, exercises, sets, volume),
+// the personal records set this workout (the one accented block) and its first
+// exercises, numbered. Everything is real logged data in the user's unit;
+// nothing is estimated, and no account detail (name, email, id) is ever drawn.
+// Nothing on it looks tappable (no chevrons, no "View All") -- it's a picture.
+export function ShareCard({ data, weightUnit, accentColor }: Props) {
   const allRecords = data.topSets.filter((s) => s.prLabel !== null);
   const records = allRecords.slice(0, MAX_RECORDS);
   const topExercises = data.topSets.slice(0, MAX_TOP_EXERCISES);
 
   return (
-    <View ref={cardRef} collapsable={false} testID="share-card" style={[styles.card, STORY_CARD]}>
+    <View testID="share-card" style={[styles.card, { width: CARD_WIDTH }]}>
       <View style={styles.hero}>
         <Image
           testID="share-card-photo"
           source={BACKGROUND_IMAGE}
-          style={styles.fill}
+          style={PHOTO_STYLE}
           contentFit="cover"
         />
         <LinearGradient
@@ -136,7 +201,7 @@ export function ShareCard({ data, weightUnit, accentColor, cardRef }: Props) {
           end={{ x: 1, y: 0 }}
           style={styles.fill}
         />
-        <LinearGradient colors={FADE} locations={[0, 0.45, 1]} style={styles.fill} />
+        <LinearGradient colors={FADE} locations={[0, 0.3, 0.6, 1]} style={styles.fill} />
 
         <View style={styles.heroTop}>
           <Text style={styles.wordmark}>PROGRESSO</Text>

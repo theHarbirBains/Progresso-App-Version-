@@ -18,8 +18,8 @@ describe('GlassBackground', () => {
   it('tints a widget translucently, so the background photo shows through it', () => {
     render(<GlassBackground testID="glass" />);
 
-    // colors.surface (#1C1916) at 70%, the same opacity as Card's fill.
+    // colors.surface (#1C1916) at 80%, the same opacity as Card's fill.
     const fill = StyleSheet.flatten(screen.getByTestId('glass-fill').props.style);
-    expect(fill.backgroundColor).toBe('rgba(28, 25, 22, 0.7)');
+    expect(fill.backgroundColor).toBe('rgba(28, 25, 22, 0.8)');
   });
 });

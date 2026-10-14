@@ -8,6 +8,8 @@ import { captureRef } from 'react-native-view-shot';
 import { useAuth } from '../auth/AuthProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchShareCardData } from '../sharing/shareCardData';
+import { CARD_MAX_HEIGHT, CARD_SCALE, CARD_WIDTH, STORY_SAFE_AREA } from '../sharing/ShareCard';
+import { mixHex } from '../theme/accentColor';
 import { ShareWorkoutScreen } from './ShareWorkoutScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -344,13 +346,13 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     await settle();
   });
 
-  it('lays the card out at its one story size and scales only the preview to fit the space', async () => {
+  it('lays the story out at its one size and scales only the preview to fit the space', async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
-    const card = StyleSheet.flatten((await screen.findByTestId('share-card')).props.style);
-    expect(card.width).toBe(360);
-    expect(card.height).toBe(640);
+    const story = StyleSheet.flatten((await screen.findByTestId('share-story')).props.style);
+    expect(story.width).toBe(360);
+    expect(story.height).toBe(640);
 
     act(() => {
       fireEvent(screen.getByTestId('share-card-stage'), 'layout', {
@@ -362,8 +364,46 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     const preview = StyleSheet.flatten(screen.getByTestId('share-card-preview').props.style);
     expect(preview.width).toBe(270);
     expect(preview.height).toBe(480);
-    // The card itself is untouched, so the image is the same on every phone.
-    expect(StyleSheet.flatten(screen.getByTestId('share-card').props.style).width).toBe(360);
+    // The story itself is untouched, so the image is the same on every phone.
+    expect(StyleSheet.flatten(screen.getByTestId('share-story').props.style).width).toBe(360);
+    await settle();
+  });
+
+  it("keeps the card inside the story's safe area, clear of Instagram's and TikTok's own controls", async () => {
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    await screen.findByTestId('share-story');
+
+    const safe = StyleSheet.flatten(screen.getByTestId('share-story-safe-area').props.style);
+    expect(safe.top).toBe(STORY_SAFE_AREA.top);
+    expect(safe.bottom).toBe(STORY_SAFE_AREA.bottom);
+    const scale = StyleSheet.flatten(screen.getByTestId('share-card-scale').props.style)
+      .transform as { scale: number }[];
+    expect(scale[0].scale).toBe(CARD_SCALE);
+    // Even the tallest card, scaled, fits between the margins on every side.
+    expect(CARD_WIDTH * CARD_SCALE).toBeLessThanOrEqual(360 - 2 * STORY_SAFE_AREA.side);
+    expect(CARD_MAX_HEIGHT * CARD_SCALE).toBeCloseTo(
+      640 - STORY_SAFE_AREA.top - STORY_SAFE_AREA.bottom,
+      6,
+    );
+    // Roughly a quarter-safe margin top and bottom of the 1920px image.
+    expect(STORY_SAFE_AREA.top * 3).toBeGreaterThanOrEqual(250);
+    expect(STORY_SAFE_AREA.bottom * 3).toBeGreaterThanOrEqual(250);
+    await settle();
+  });
+
+  it('frames the card in a warm sunset gradient, from the amber accent into the warm near-black', async () => {
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    const frame = await screen.findByTestId('share-story-frame');
+
+    expect(frame.props.colors).toEqual([
+      mixHex(colors.accent, colors.background, 0.62),
+      mixHex(colors.accent, colors.background, 0.84),
+      colors.background,
+    ]);
     await settle();
   });
 
