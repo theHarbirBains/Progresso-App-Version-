@@ -1,3 +1,4 @@
+import type React from 'react';
 import type { PropsWithChildren } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
@@ -17,6 +18,7 @@ import {
   updateSet,
 } from '../workouts/workoutQueries';
 import { LogPastWorkoutScreen } from './LogPastWorkoutScreen';
+import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchMyProfile } from '../profile/profileQueries';
 
 // Same fixture-date convention as WorkoutHistoryScreen.test.tsx: derived from
@@ -362,6 +364,64 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
       "Pick a date that's already happened",
     );
     expect(mockCreateLoggedWorkout).not.toHaveBeenCalled();
+  });
+});
+
+describe('LogPastWorkoutScreen -- layout', () => {
+  const openMenu = jest.fn();
+  const withMenu = (ui: React.ReactElement) => (
+    <AppMenuContext.Provider value={{ openMenu, currentMode: 'workout' }}>
+      {ui}
+    </AppMenuContext.Provider>
+  );
+
+  it('opens the side menu from the top left -- it is a menu page, not a step back', async () => {
+    render(withMenu(<LogPastWorkoutScreen navigation={navigation} route={route} />), {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('log-past-workout-date');
+
+    expect(screen.queryByTestId('app-header-back')).toBeNull();
+    fireEvent.press(screen.getByTestId('log-past-workout-open-menu'));
+    expect(openMenu).toHaveBeenCalled();
+  });
+
+  it("keeps a back arrow when a trainer logs for a client -- that's a step inside the client's page", async () => {
+    render(
+      withMenu(
+        <LogPastWorkoutScreen
+          navigation={navigation}
+          route={{ params: { clientId: 'client-1', clientName: 'Sam' } } as never}
+        />,
+      ),
+      { wrapper: TestProviders },
+    );
+    await screen.findByTestId('log-past-workout-date');
+
+    expect(screen.queryByTestId('log-past-workout-open-menu')).toBeNull();
+    fireEvent.press(screen.getByTestId('app-header-back'));
+    expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it("is widgets: the workout's details, then the add-exercise card with a hint while it's empty", async () => {
+    renderScreen();
+
+    const details = await screen.findByTestId('log-past-workout-details');
+    expect(details).toHaveTextContent(/Workout/i);
+    expect(screen.getByTestId('log-past-workout-add-card')).toHaveTextContent(
+      /Add the exercises you did, then fill in their sets\./,
+    );
+  });
+
+  it('gives each exercise its own card, and drops the hint once there is one', async () => {
+    mockFetchExercises.mockResolvedValue([squat]);
+    renderScreen();
+    await screen.findByTestId('log-past-workout-date');
+
+    await addExerciseViaPicker(squat);
+
+    expect(screen.getByTestId(EX)).toBeTruthy();
+    expect(screen.queryByTestId('log-past-workout-empty')).toBeNull();
   });
 });
 

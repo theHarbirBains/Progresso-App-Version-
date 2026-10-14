@@ -16,6 +16,7 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination>
   WorkoutDetail: 'train',
   ShareWorkout: 'train',
   NewWorkout: 'train',
+  LogPastWorkout: 'train',
   ActiveWorkout: 'train',
   WorkoutSplits: 'train',
   WorkoutSplitView: 'train',

@@ -1,20 +1,24 @@
-import { useRef, useState } from 'react';
+import { useContext, useRef, useState } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { BottomSheet } from '../design/BottomSheet';
+import { Card } from '../design/Card';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { addMonths, toLocalDateKey } from '../design/calendarGrid';
 import { ListRow } from '../design/ListRow';
 import { MonthCalendar } from '../design/MonthCalendar';
+import { RiseInStack } from '../design/RiseIn';
 import { Screen } from '../design/Screen';
+import { SectionHeader } from '../design/SectionHeader';
 import { TextInput } from '../design/TextInput';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import type { MovementType } from '../exercises/movementTypes';
 import { logWorkoutForClient } from '../lib/api';
 import { isValidWeightIncrement, roundWeight, toKg } from '../lib/units';
+import { AppMenuContext } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -137,6 +141,8 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
   // The save then goes through the trainer API, never the trainer's own data.
   // Only TrainerLogWorkout carries these; the route type is shared with the plain
   // LogPastWorkout entry, which has no params, so they are read through a cast.
+  // The side menu, for the menu button (absent outside the app shell, e.g. in a test).
+  const menu = useContext(AppMenuContext);
   const trainerParams = route?.params as { clientId: string; clientName?: string } | undefined;
   const clientId = trainerParams?.clientId;
   const clientName = trainerParams?.clientName;
@@ -365,7 +371,16 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
           <AppHeader
             testID="log-past-workout-header"
             title={clientName ? `Log for ${clientName}` : 'Log a Past Workout'}
-            onBack={() => navigation.goBack()}
+            {...(menu && !clientId
+              ? {
+                  leftAction: {
+                    icon: 'menu' as const,
+                    onPress: () => menu.openMenu(),
+                    accessibilityLabel: 'Open menu',
+                    testID: 'log-past-workout-open-menu',
+                  },
+                }
+              : { onBack: () => navigation.goBack() })}
           />
         }
       >
@@ -375,150 +390,156 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {error ? (
-            <Text testID="log-past-workout-error" style={liveWorkoutStyles.errorText}>
-              {error}
-            </Text>
-          ) : null}
+          <RiseInStack>
+            {error ? (
+              <Text testID="log-past-workout-error" style={liveWorkoutStyles.errorText}>
+                {error}
+              </Text>
+            ) : null}
 
-          <ListRow
-            testID="log-past-workout-date"
-            title="Date"
-            value={formatCardDate(date.toISOString())}
-            onPress={() => setDatePickerOpen(true)}
-            accessibilityLabel={`Date, ${formatCardDate(date.toISOString())}`}
-          />
+            <Card testID="log-past-workout-details" style={styles.cardBody}>
+              <SectionHeader label="Workout" />
+              <ListRow
+                testID="log-past-workout-date"
+                title="Date"
+                value={formatCardDate(date.toISOString())}
+                onPress={() => setDatePickerOpen(true)}
+                accessibilityLabel={`Date, ${formatCardDate(date.toISOString())}`}
+              />
 
-          <TextInput
-            testID="log-past-workout-name"
-            label="Workout name"
-            placeholder="e.g. Push Day"
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-            returnKeyType="done"
-          />
+              <TextInput
+                testID="log-past-workout-name"
+                label="Workout name"
+                placeholder="e.g. Push Day"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                returnKeyType="done"
+              />
 
-          <DurationInput
-            testID="log-past-workout-duration"
-            hours={durationHours}
-            minutes={durationMinutes}
-            onChangeHours={setDurationHours}
-            onChangeMinutes={setDurationMinutes}
-          />
+              <DurationInput
+                testID="log-past-workout-duration"
+                hours={durationHours}
+                minutes={durationMinutes}
+                onChangeHours={setDurationHours}
+                onChangeMinutes={setDurationMinutes}
+              />
+            </Card>
 
-          {exercises.map((exercise, index) => {
-            const isUnilateral = exercise.movementType === 'unilateral';
-            const unilateralRows = isUnilateral ? groupUnilateralSets(exercise.sets) : [];
-            const hasRows = isUnilateral ? unilateralRows.length > 0 : exercise.sets.length > 0;
-            return (
-              <View
-                key={exercise.localId}
-                testID={`log-past-workout-exercise-${exercise.localId}`}
-                style={[
-                  liveWorkoutStyles.exerciseBlock,
-                  index > 0 && liveWorkoutStyles.exerciseDivider,
-                ]}
-              >
-                <View style={liveWorkoutStyles.exerciseHeader}>
-                  <View style={liveWorkoutStyles.exerciseTitleBlock}>
-                    <Text style={liveWorkoutStyles.exerciseName}>{exercise.exerciseName}</Text>
-                    <Text style={liveWorkoutStyles.exerciseMuscle}>
-                      {MUSCLE_GROUP_LABELS[exercise.muscleGroup]}
-                    </Text>
-                    {isUnilateral ? (
-                      <Text style={liveWorkoutStyles.perSideNote}>Weight is per side</Text>
-                    ) : null}
+            {exercises.map((exercise) => {
+              const isUnilateral = exercise.movementType === 'unilateral';
+              const unilateralRows = isUnilateral ? groupUnilateralSets(exercise.sets) : [];
+              const hasRows = isUnilateral ? unilateralRows.length > 0 : exercise.sets.length > 0;
+              return (
+                <Card
+                  key={exercise.localId}
+                  testID={`log-past-workout-exercise-${exercise.localId}`}
+                >
+                  <View style={liveWorkoutStyles.exerciseHeader}>
+                    <View style={liveWorkoutStyles.exerciseTitleBlock}>
+                      <Text style={liveWorkoutStyles.exerciseName}>{exercise.exerciseName}</Text>
+                      <Text style={liveWorkoutStyles.exerciseMuscle}>
+                        {MUSCLE_GROUP_LABELS[exercise.muscleGroup]}
+                      </Text>
+                      {isUnilateral ? (
+                        <Text style={liveWorkoutStyles.perSideNote}>Weight is per side</Text>
+                      ) : null}
+                    </View>
+                    <View style={liveWorkoutStyles.exerciseActions}>
+                      <TouchableOpacity
+                        testID={`log-past-workout-exercise-${exercise.localId}-remove`}
+                        style={liveWorkoutStyles.exerciseAction}
+                        onPress={() => handleRemoveExercise(exercise.localId)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Remove exercise"
+                      >
+                        <Text style={styles.removeExerciseGlyph}>×</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={liveWorkoutStyles.exerciseActions}>
-                    <TouchableOpacity
-                      testID={`log-past-workout-exercise-${exercise.localId}-remove`}
-                      style={liveWorkoutStyles.exerciseAction}
-                      onPress={() => handleRemoveExercise(exercise.localId)}
-                      accessibilityRole="button"
-                      accessibilityLabel="Remove exercise"
-                    >
-                      <Text style={styles.removeExerciseGlyph}>×</Text>
-                    </TouchableOpacity>
+
+                  {hasRows ? (
+                    <View style={liveWorkoutStyles.setHeaderRow}>
+                      <Text style={liveWorkoutStyles.setHeaderIndex}>Set</Text>
+                      <Text style={liveWorkoutStyles.setHeaderInput}>Weight</Text>
+                      <Text style={liveWorkoutStyles.setHeaderInput}>Reps</Text>
+                      <View style={liveWorkoutStyles.setHeaderComplete} />
+                    </View>
+                  ) : null}
+
+                  {isUnilateral
+                    ? unilateralRows.map((row) => (
+                        <PastUnilateralSetRow
+                          key={row.setIndex}
+                          testID={`log-past-workout-exercise-${exercise.localId}-set-${row.setIndex}`}
+                          setIndex={row.setIndex}
+                          left={row.left}
+                          right={row.right}
+                          onChangeWeight={(side, text) =>
+                            handleChangeSetField(
+                              exercise.localId,
+                              side === 'left' ? row.left.localId : row.right.localId,
+                              'weight',
+                              text,
+                            )
+                          }
+                          onChangeReps={(side, text) =>
+                            handleChangeSetField(
+                              exercise.localId,
+                              side === 'left' ? row.left.localId : row.right.localId,
+                              'reps',
+                              text,
+                            )
+                          }
+                          onRemove={() => handleRemoveUnilateralSet(exercise.localId, row.setIndex)}
+                        />
+                      ))
+                    : exercise.sets.map((set) => (
+                        <PastSetRow
+                          key={set.localId}
+                          testID={`log-past-workout-exercise-${exercise.localId}-set-${set.setIndex}`}
+                          setIndex={set.setIndex}
+                          weight={set.weight}
+                          reps={set.reps}
+                          onChangeWeight={(text) =>
+                            handleChangeSetField(exercise.localId, set.localId, 'weight', text)
+                          }
+                          onChangeReps={(text) =>
+                            handleChangeSetField(exercise.localId, set.localId, 'reps', text)
+                          }
+                          onRemove={() => handleRemoveSet(exercise.localId, set.localId)}
+                        />
+                      ))}
+
+                  <View style={liveWorkoutStyles.addSet}>
+                    <SecondaryButton
+                      testID={`log-past-workout-exercise-${exercise.localId}-add-set`}
+                      size="md"
+                      label="+ Add Set"
+                      accessibilityLabel="Add Set"
+                      onPress={() => handleAddSet(exercise)}
+                    />
                   </View>
-                </View>
+                </Card>
+              );
+            })}
 
-                {hasRows ? (
-                  <View style={liveWorkoutStyles.setHeaderRow}>
-                    <Text style={liveWorkoutStyles.setHeaderIndex}>Set</Text>
-                    <Text style={liveWorkoutStyles.setHeaderInput}>Weight</Text>
-                    <Text style={liveWorkoutStyles.setHeaderInput}>Reps</Text>
-                    <View style={liveWorkoutStyles.setHeaderComplete} />
-                  </View>
-                ) : null}
-
-                {isUnilateral
-                  ? unilateralRows.map((row) => (
-                      <PastUnilateralSetRow
-                        key={row.setIndex}
-                        testID={`log-past-workout-exercise-${exercise.localId}-set-${row.setIndex}`}
-                        setIndex={row.setIndex}
-                        left={row.left}
-                        right={row.right}
-                        onChangeWeight={(side, text) =>
-                          handleChangeSetField(
-                            exercise.localId,
-                            side === 'left' ? row.left.localId : row.right.localId,
-                            'weight',
-                            text,
-                          )
-                        }
-                        onChangeReps={(side, text) =>
-                          handleChangeSetField(
-                            exercise.localId,
-                            side === 'left' ? row.left.localId : row.right.localId,
-                            'reps',
-                            text,
-                          )
-                        }
-                        onRemove={() => handleRemoveUnilateralSet(exercise.localId, row.setIndex)}
-                      />
-                    ))
-                  : exercise.sets.map((set) => (
-                      <PastSetRow
-                        key={set.localId}
-                        testID={`log-past-workout-exercise-${exercise.localId}-set-${set.setIndex}`}
-                        setIndex={set.setIndex}
-                        weight={set.weight}
-                        reps={set.reps}
-                        onChangeWeight={(text) =>
-                          handleChangeSetField(exercise.localId, set.localId, 'weight', text)
-                        }
-                        onChangeReps={(text) =>
-                          handleChangeSetField(exercise.localId, set.localId, 'reps', text)
-                        }
-                        onRemove={() => handleRemoveSet(exercise.localId, set.localId)}
-                      />
-                    ))}
-
-                <View style={liveWorkoutStyles.addSet}>
-                  <SecondaryButton
-                    testID={`log-past-workout-exercise-${exercise.localId}-add-set`}
-                    size="md"
-                    label="+ Add Set"
-                    accessibilityLabel="Add Set"
-                    onPress={() => handleAddSet(exercise)}
-                  />
-                </View>
-              </View>
-            );
-          })}
-
-          <View style={liveWorkoutStyles.endActions}>
-            <AddExerciseButton
-              testID="log-past-workout-add-exercise"
-              onPress={() => setPickerOpen(true)}
-            />
-            <CreateCustomExerciseButton
-              testID="log-past-workout-create-custom"
-              onPress={() => setCustomExerciseOpen(true)}
-            />
-          </View>
+            <Card testID="log-past-workout-add-card" style={styles.cardBody}>
+              {exercises.length === 0 ? (
+                <Text testID="log-past-workout-empty" style={styles.hint}>
+                  Add the exercises you did, then fill in their sets.
+                </Text>
+              ) : null}
+              <AddExerciseButton
+                testID="log-past-workout-add-exercise"
+                onPress={() => setPickerOpen(true)}
+              />
+              <CreateCustomExerciseButton
+                testID="log-past-workout-create-custom"
+                onPress={() => setCustomExerciseOpen(true)}
+              />
+            </Card>
+          </RiseInStack>
         </ScrollView>
 
         <View style={liveWorkoutStyles.footer}>
