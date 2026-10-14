@@ -9,7 +9,6 @@ import { Section } from '../design/Section';
 import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
-import { RiseInStack } from '../design/RiseIn';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { CalorieRing } from '../nutrition/CalorieRing';
 import { FoodImage } from '../nutrition/FoodImage';
@@ -152,109 +151,107 @@ export function NutritionTodayScreen({ navigation }: Props) {
 
   return (
     <Screen contentContainerStyle={styles.content} header={header}>
-      <RiseInStack>
-        {displayError ? (
-          <Text testID="nutrition-today-error" style={styles.errorText}>
-            {displayError}
-          </Text>
-        ) : null}
+      {displayError ? (
+        <Text testID="nutrition-today-error" style={styles.errorText}>
+          {displayError}
+        </Text>
+      ) : null}
 
-        <AppCard hero topAccent={nutritionTheme.accent} testID="nutrition-today-macros">
-          <View style={styles.ringWrap}>
-            <CalorieRing
-              testID="nutrition-today-calorie-ring"
-              consumed={consumed.calories}
-              goal={goals.calories}
-              accentColor={nutritionTheme.accent}
-            />
-            {remaining.calories !== null ? (
-              <Text testID="calories-remaining" style={styles.macroRemaining}>
-                {remaining.calories} cal remaining
+      <AppCard hero topAccent={nutritionTheme.accent} testID="nutrition-today-macros">
+        <View style={styles.ringWrap}>
+          <CalorieRing
+            testID="nutrition-today-calorie-ring"
+            consumed={consumed.calories}
+            goal={goals.calories}
+            accentColor={nutritionTheme.accent}
+          />
+          {remaining.calories !== null ? (
+            <Text testID="calories-remaining" style={styles.macroRemaining}>
+              {remaining.calories} cal remaining
+            </Text>
+          ) : null}
+        </View>
+        {macros.map((macro) => (
+          <View key={macro.key} style={[styles.macro, styles.macroDivider]}>
+            <Text testID={`${macro.key}-consumed`} style={styles.macroLine}>
+              {macro.label}: {macro.consumed}
+              {macro.unit}
+              {macro.goal !== null ? ` / ${macro.goal}${macro.unit}` : ''}
+            </Text>
+            {macro.remaining !== null ? (
+              <Text testID={`${macro.key}-remaining`} style={styles.macroRemaining}>
+                {macro.remaining}
+                {macro.unit} remaining
               </Text>
             ) : null}
           </View>
-          {macros.map((macro) => (
-            <View key={macro.key} style={[styles.macro, styles.macroDivider]}>
-              <Text testID={`${macro.key}-consumed`} style={styles.macroLine}>
-                {macro.label}: {macro.consumed}
-                {macro.unit}
-                {macro.goal !== null ? ` / ${macro.goal}${macro.unit}` : ''}
-              </Text>
-              {macro.remaining !== null ? (
-                <Text testID={`${macro.key}-remaining`} style={styles.macroRemaining}>
-                  {macro.remaining}
-                  {macro.unit} remaining
-                </Text>
-              ) : null}
-            </View>
-          ))}
-        </AppCard>
+        ))}
+      </AppCard>
 
-        <AppCard testID="nutrition-today-actions" style={styles.actions}>
-          <PrimaryButton
-            testID="log-food-button"
-            label="Log Food"
-            onPress={() => navigation.navigate('FoodLibrary')}
-            accentColor={nutritionTheme.accent}
-            onAccentColor={nutritionTheme.onAccent}
-          />
-          <SecondaryButton
-            testID="scan-barcode-button"
-            label="Scan Barcode"
-            onPress={() => navigation.navigate('BarcodeScanner')}
-          />
-          <SecondaryButton
-            testID="search-food-button"
-            label="Search Food"
-            onPress={() => navigation.navigate('FoodSearch')}
-          />
-        </AppCard>
+      <AppCard testID="nutrition-today-actions" style={styles.actions}>
+        <PrimaryButton
+          testID="log-food-button"
+          label="Log Food"
+          onPress={() => navigation.navigate('FoodLibrary')}
+          accentColor={nutritionTheme.accent}
+          onAccentColor={nutritionTheme.onAccent}
+        />
+        <SecondaryButton
+          testID="scan-barcode-button"
+          label="Scan Barcode"
+          onPress={() => navigation.navigate('BarcodeScanner')}
+        />
+        <SecondaryButton
+          testID="search-food-button"
+          label="Search Food"
+          onPress={() => navigation.navigate('FoodSearch')}
+        />
+      </AppCard>
 
-        <AppCard testID="nutrition-today-foods">
-          <Section title="Today's Foods">
-            {logs.length === 0 ? (
-              <Text testID="food-log-empty" style={styles.emptyText}>
-                No foods logged today
-              </Text>
-            ) : (
-              logs.map((log, index) => (
-                <View
-                  key={log.id}
-                  testID={`food-log-row-${log.id}`}
-                  style={[styles.logRow, index > 0 && styles.macroDivider]}
-                >
-                  <FoodImage uri={log.imageUrl} name={log.foodNameSnapshot} size={44} />
-                  <View style={styles.logInfo}>
-                    <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
-                    <Text style={styles.logMeta}>
-                      {log.calories} cal · {log.proteinG}g protein · {log.carbsG}g carbs ·{' '}
-                      {log.fatG}g fat
-                    </Text>
-                  </View>
-                  <TextInput
-                    testID={`food-log-quantity-${log.id}`}
-                    style={styles.quantityInput}
-                    accessibilityLabel={`Quantity of ${log.foodNameSnapshot}`}
-                    keyboardType="decimal-pad"
-                    value={quantityInputs[log.id] ?? ''}
-                    onChangeText={(text) =>
-                      setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))
-                    }
-                    onEndEditing={() => handleUpdateQuantity(log)}
-                  />
-                  <TextButton
-                    testID={`food-log-delete-${log.id}`}
-                    label="Delete"
-                    accessibilityLabel={`Delete ${log.foodNameSnapshot}`}
-                    destructive
-                    onPress={() => handleDelete(log.id)}
-                  />
+      <AppCard testID="nutrition-today-foods">
+        <Section title="Today's Foods">
+          {logs.length === 0 ? (
+            <Text testID="food-log-empty" style={styles.emptyText}>
+              No foods logged today
+            </Text>
+          ) : (
+            logs.map((log, index) => (
+              <View
+                key={log.id}
+                testID={`food-log-row-${log.id}`}
+                style={[styles.logRow, index > 0 && styles.macroDivider]}
+              >
+                <FoodImage uri={log.imageUrl} name={log.foodNameSnapshot} size={44} />
+                <View style={styles.logInfo}>
+                  <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
+                  <Text style={styles.logMeta}>
+                    {log.calories} cal · {log.proteinG}g protein · {log.carbsG}g carbs · {log.fatG}g
+                    fat
+                  </Text>
                 </View>
-              ))
-            )}
-          </Section>
-        </AppCard>
-      </RiseInStack>
+                <TextInput
+                  testID={`food-log-quantity-${log.id}`}
+                  style={styles.quantityInput}
+                  accessibilityLabel={`Quantity of ${log.foodNameSnapshot}`}
+                  keyboardType="decimal-pad"
+                  value={quantityInputs[log.id] ?? ''}
+                  onChangeText={(text) =>
+                    setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))
+                  }
+                  onEndEditing={() => handleUpdateQuantity(log)}
+                />
+                <TextButton
+                  testID={`food-log-delete-${log.id}`}
+                  label="Delete"
+                  accessibilityLabel={`Delete ${log.foodNameSnapshot}`}
+                  destructive
+                  onPress={() => handleDelete(log.id)}
+                />
+              </View>
+            ))
+          )}
+        </Section>
+      </AppCard>
     </Screen>
   );
 }

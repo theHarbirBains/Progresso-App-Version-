@@ -137,6 +137,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     <Screen
       scroll={false}
       padded={false}
+      rollout={false}
       testID="exercise-library-screen"
       contentContainerStyle={styles.page}
       header={

@@ -19,7 +19,6 @@ import { greetingName } from '../dashboard/greeting';
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { fromKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
-import { RiseInStack } from '../design/RiseIn';
 import { recallShown, rememberShown } from '../lib/lastShown';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { sumDailyTotals } from '../nutrition/nutritionCalculations';
@@ -331,321 +330,313 @@ export function ProfileScreen({ navigation }: Props) {
           />
         }
       >
-        <RiseInStack>
-          {profileError ? (
-            <Text testID="profile-error" style={styles.errorText}>
-              {profileError}
-            </Text>
-          ) : null}
+        {profileError ? (
+          <Text testID="profile-error" style={styles.errorText}>
+            {profileError}
+          </Text>
+        ) : null}
 
-          {avatarError ? (
-            <Text testID="profile-avatar-error" style={styles.errorText}>
-              {avatarError}
-            </Text>
-          ) : null}
+        {avatarError ? (
+          <Text testID="profile-avatar-error" style={styles.errorText}>
+            {avatarError}
+          </Text>
+        ) : null}
 
-          <AppCard hero topAccent={theme.accent} testID="profile-identity">
-            <View style={styles.identityRow}>
-              <TouchableOpacity
-                testID="profile-avatar"
-                style={styles.avatarWrap}
-                onPress={() => setAvatarSheetOpen(true)}
-                disabled={avatarSaving}
-                accessibilityRole="button"
-                accessibilityLabel="Change profile picture"
-              >
-                <View style={[styles.avatar, { backgroundColor: theme.accentBg }]}>
-                  {avatarSaving ? (
-                    <ActivityIndicator testID="profile-avatar-saving" color={theme.accent} />
-                  ) : (
-                    <Avatar
-                      uri={profile?.avatarUrl}
-                      initial={avatarInitial}
-                      size={72}
-                      iconSize={32}
-                      iconColor={theme.accent}
-                      initialStyle={[styles.avatarInitial, { color: theme.accent }]}
-                    />
-                  )}
-                </View>
-                <View style={[styles.avatarEditBadge, { backgroundColor: theme.accent }]}>
-                  <Feather name="camera" size={12} color={theme.onAccent} />
-                </View>
-              </TouchableOpacity>
-              <View style={styles.identityBlock}>
-                <Text testID="profile-display-name" style={styles.displayName}>
-                  {name ?? 'Your Profile'}
-                </Text>
-                <Text testID="profile-activity-count" style={styles.activityCount}>
-                  {formatCount(lifetimeStats.totalWorkouts)}{' '}
-                  {lifetimeStats.totalWorkouts === 1 ? 'workout' : 'workouts'}
-                </Text>
-                {profile?.username ? (
-                  <Text testID="profile-username" style={styles.username}>
-                    @{profile.username}
-                  </Text>
-                ) : null}
+        <AppCard hero topAccent={theme.accent} testID="profile-identity">
+          <View style={styles.identityRow}>
+            <TouchableOpacity
+              testID="profile-avatar"
+              style={styles.avatarWrap}
+              onPress={() => setAvatarSheetOpen(true)}
+              disabled={avatarSaving}
+              accessibilityRole="button"
+              accessibilityLabel="Change profile picture"
+            >
+              <View style={[styles.avatar, { backgroundColor: theme.accentBg }]}>
+                {avatarSaving ? (
+                  <ActivityIndicator testID="profile-avatar-saving" color={theme.accent} />
+                ) : (
+                  <Avatar
+                    uri={profile?.avatarUrl}
+                    initial={avatarInitial}
+                    size={72}
+                    iconSize={32}
+                    iconColor={theme.accent}
+                    initialStyle={[styles.avatarInitial, { color: theme.accent }]}
+                  />
+                )}
               </View>
+              <View style={[styles.avatarEditBadge, { backgroundColor: theme.accent }]}>
+                <Feather name="camera" size={12} color={theme.onAccent} />
+              </View>
+            </TouchableOpacity>
+            <View style={styles.identityBlock}>
+              <Text testID="profile-display-name" style={styles.displayName}>
+                {name ?? 'Your Profile'}
+              </Text>
+              <Text testID="profile-activity-count" style={styles.activityCount}>
+                {formatCount(lifetimeStats.totalWorkouts)}{' '}
+                {lifetimeStats.totalWorkouts === 1 ? 'workout' : 'workouts'}
+              </Text>
+              {profile?.username ? (
+                <Text testID="profile-username" style={styles.username}>
+                  @{profile.username}
+                </Text>
+              ) : null}
             </View>
+          </View>
 
-            <View style={styles.editProfileWrap}>
-              <SecondaryButton
-                testID="profile-edit"
-                label="Edit Profile"
-                onPress={() => navigation.navigate('AccountSettings')}
-              />
-            </View>
-          </AppCard>
+          <View style={styles.editProfileWrap}>
+            <SecondaryButton
+              testID="profile-edit"
+              label="Edit Profile"
+              onPress={() => navigation.navigate('AccountSettings')}
+            />
+          </View>
+        </AppCard>
 
-          <AppCard testID="profile-stats">
-            {statsError ? (
-              <Text testID="profile-stats-error" style={styles.errorText}>
-                {statsError}
+        <AppCard testID="profile-stats">
+          {statsError ? (
+            <Text testID="profile-stats-error" style={styles.errorText}>
+              {statsError}
+            </Text>
+          ) : null}
+          <View style={styles.statsRow}>
+            <StatBlock
+              testID="profile-stat-workouts"
+              value={formatCount(lifetimeStats.totalWorkouts)}
+              label="Workouts"
+            />
+            <StatBlock
+              testID="profile-stat-sets"
+              value={formatCount(totalSets)}
+              label="Total Sets"
+            />
+            <StatBlock
+              testID="profile-stat-volume"
+              value={formatCount(fromKg(totalVolumeKg, weightUnit))}
+              label={`Total Volume (${weightUnit})`}
+            />
+          </View>
+        </AppCard>
+
+        <AppCard
+          testID="profile-nutrition"
+          topAccent={nutritionTheme.accent}
+          onPress={() => navigation.navigate('Nutrition')}
+        >
+          <Text style={styles.nutritionTitle}>Today&apos;s Calories & Macros</Text>
+          {displayNutritionError ? (
+            <Text testID="profile-nutrition-error" style={styles.errorText}>
+              {displayNutritionError}
+            </Text>
+          ) : null}
+          <View style={styles.statTileGrid}>
+            <StatTile
+              testID="profile-nutrition-calories"
+              label="Calories"
+              value={formatMacro(
+                todaysNutritionTotals.calories,
+                nutritionGoals?.calories ?? null,
+                '',
+              )}
+            />
+            <StatTile
+              testID="profile-nutrition-protein"
+              label="Protein"
+              value={formatMacro(
+                todaysNutritionTotals.proteinG,
+                nutritionGoals?.proteinG ?? null,
+                'g',
+              )}
+            />
+            <StatTile
+              testID="profile-nutrition-carbs"
+              label="Carbs"
+              value={formatMacro(todaysNutritionTotals.carbsG, nutritionGoals?.carbsG ?? null, 'g')}
+            />
+            <StatTile
+              testID="profile-nutrition-fat"
+              label="Fat"
+              value={formatMacro(todaysNutritionTotals.fatG, nutritionGoals?.fatG ?? null, 'g')}
+            />
+          </View>
+        </AppCard>
+
+        <View style={styles.tabsWrap}>
+          <UnderlineTabs
+            testID="profile-tabs"
+            categories={PROFILE_TABS}
+            active={tab}
+            onSelect={setTab}
+            accentColor={theme.accent}
+          />
+        </View>
+
+        {tab === 'Workouts' ? (
+          <AppCard testID="profile-tab-content">
+            {workoutsError ? (
+              <Text testID="profile-workouts-error" style={styles.errorText}>
+                {workoutsError}
               </Text>
             ) : null}
-            <View style={styles.statsRow}>
+            {recentWorkouts.length === 0 ? (
+              <EmptyState
+                testID="profile-workouts-empty"
+                title="Your workout history will appear here."
+              />
+            ) : (
+              <>
+                {recentWorkouts.map((workout, index) => (
+                  <ProfileWorkoutRow
+                    key={workout.id}
+                    workout={workout}
+                    weightUnit={weightUnit}
+                    divider={index > 0}
+                    onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout.id })}
+                  />
+                ))}
+                <TextButton
+                  testID="profile-view-all-workouts"
+                  label="View All Workouts"
+                  onPress={() => navigation.navigate('WorkoutHistory')}
+                />
+              </>
+            )}
+          </AppCard>
+        ) : null}
+
+        {tab === 'Stats' ? (
+          <AppCard testID="profile-tab-content">
+            <Text style={styles.thisWeekTitle}>This Week</Text>
+            <View style={styles.thisWeekRow}>
               <StatBlock
-                testID="profile-stat-workouts"
-                value={formatCount(lifetimeStats.totalWorkouts)}
+                testID="profile-this-week-workouts"
+                value={formatCount(thisWeekWorkouts)}
                 label="Workouts"
               />
               <StatBlock
-                testID="profile-stat-sets"
-                value={formatCount(totalSets)}
-                label="Total Sets"
+                testID="profile-this-week-sets"
+                value={formatCount(thisWeekSets)}
+                label="Sets"
               />
               <StatBlock
-                testID="profile-stat-volume"
-                value={formatCount(fromKg(totalVolumeKg, weightUnit))}
-                label={`Total Volume (${weightUnit})`}
+                testID="profile-this-week-volume"
+                value={formatCount(thisWeekVolume)}
+                label={`Volume (${weightUnit})`}
               />
             </View>
-          </AppCard>
 
-          <AppCard
-            testID="profile-nutrition"
-            topAccent={nutritionTheme.accent}
-            onPress={() => navigation.navigate('Nutrition')}
-          >
-            <Text style={styles.nutritionTitle}>Today&apos;s Calories & Macros</Text>
-            {displayNutritionError ? (
-              <Text testID="profile-nutrition-error" style={styles.errorText}>
-                {displayNutritionError}
-              </Text>
-            ) : null}
             <View style={styles.statTileGrid}>
               <StatTile
-                testID="profile-nutrition-calories"
-                label="Calories"
-                value={formatMacro(
-                  todaysNutritionTotals.calories,
-                  nutritionGoals?.calories ?? null,
-                  '',
-                )}
+                testID="profile-stat-tile-workouts"
+                label="Workouts"
+                value={formatCount(lifetimeStats.totalWorkouts)}
               />
               <StatTile
-                testID="profile-nutrition-protein"
-                label="Protein"
-                value={formatMacro(
-                  todaysNutritionTotals.proteinG,
-                  nutritionGoals?.proteinG ?? null,
-                  'g',
-                )}
+                testID="profile-stat-tile-sets"
+                label="Total Sets"
+                value={formatCount(totalSets)}
               />
               <StatTile
-                testID="profile-nutrition-carbs"
-                label="Carbs"
-                value={formatMacro(
-                  todaysNutritionTotals.carbsG,
-                  nutritionGoals?.carbsG ?? null,
-                  'g',
-                )}
+                testID="profile-stat-tile-volume"
+                label={`Total Volume (${weightUnit})`}
+                value={formatCount(fromKg(totalVolumeKg, weightUnit))}
               />
               <StatTile
-                testID="profile-nutrition-fat"
-                label="Fat"
-                value={formatMacro(todaysNutritionTotals.fatG, nutritionGoals?.fatG ?? null, 'g')}
+                testID="profile-stat-tile-time"
+                label="Training Time"
+                value={formatTotalTime(lifetimeStats.totalMinutes)}
               />
             </View>
-          </AppCard>
 
-          <View style={styles.tabsWrap}>
-            <UnderlineTabs
-              testID="profile-tabs"
-              categories={PROFILE_TABS}
-              active={tab}
-              onSelect={setTab}
+            <WeeklyTrendChart
+              testID="profile-trend-workouts"
+              label="Weekly Workouts"
+              points={weeklyWorkoutPoints}
               accentColor={theme.accent}
+              formatTotal={(total) =>
+                `${formatCount(total)} ${total === 1 ? 'workout' : 'workouts'} · last ${TREND_WEEKS} weeks`
+              }
+              emptyMessage="Log a workout to see your weekly trend."
             />
-          </View>
 
-          {tab === 'Workouts' ? (
-            <AppCard testID="profile-tab-content">
-              {workoutsError ? (
-                <Text testID="profile-workouts-error" style={styles.errorText}>
-                  {workoutsError}
+            <WeeklyTrendChart
+              testID="profile-trend-volume"
+              label="Volume Over Time"
+              points={weeklyVolumePoints}
+              accentColor={theme.accent}
+              formatTotal={(total) =>
+                `${formatCount(total)} ${weightUnit} · last ${TREND_WEEKS} weeks`
+              }
+              emptyMessage="Log some sets to see your volume trend."
+            />
+
+            <WeeklyTrendChart
+              testID="profile-trend-sets"
+              label="Sets Over Time"
+              points={weeklySetPoints}
+              accentColor={theme.accent}
+              formatTotal={(total) =>
+                `${formatCount(total)} ${total === 1 ? 'set' : 'sets'} · last ${TREND_WEEKS} weeks`
+              }
+              emptyMessage="Log some sets to see your sets trend."
+            />
+
+            <View style={styles.section}>
+              <Text style={styles.muscleGroupsTitle}>Most Trained Muscle Groups</Text>
+              {muscleGroupCounts.length === 0 ? (
+                <Text style={styles.emptyText}>
+                  Your most-trained muscle groups will appear here.
                 </Text>
-              ) : null}
-              {recentWorkouts.length === 0 ? (
-                <EmptyState
-                  testID="profile-workouts-empty"
-                  title="Your workout history will appear here."
-                />
               ) : (
-                <>
-                  {recentWorkouts.map((workout, index) => (
-                    <ProfileWorkoutRow
-                      key={workout.id}
-                      workout={workout}
-                      weightUnit={weightUnit}
-                      divider={index > 0}
-                      onPress={() =>
-                        navigation.navigate('WorkoutDetail', { workoutId: workout.id })
-                      }
-                    />
-                  ))}
-                  <TextButton
-                    testID="profile-view-all-workouts"
-                    label="View All Workouts"
-                    onPress={() => navigation.navigate('WorkoutHistory')}
-                  />
-                </>
-              )}
-            </AppCard>
-          ) : null}
-
-          {tab === 'Stats' ? (
-            <AppCard testID="profile-tab-content">
-              <Text style={styles.thisWeekTitle}>This Week</Text>
-              <View style={styles.thisWeekRow}>
-                <StatBlock
-                  testID="profile-this-week-workouts"
-                  value={formatCount(thisWeekWorkouts)}
-                  label="Workouts"
-                />
-                <StatBlock
-                  testID="profile-this-week-sets"
-                  value={formatCount(thisWeekSets)}
-                  label="Sets"
-                />
-                <StatBlock
-                  testID="profile-this-week-volume"
-                  value={formatCount(thisWeekVolume)}
-                  label={`Volume (${weightUnit})`}
-                />
-              </View>
-
-              <View style={styles.statTileGrid}>
-                <StatTile
-                  testID="profile-stat-tile-workouts"
-                  label="Workouts"
-                  value={formatCount(lifetimeStats.totalWorkouts)}
-                />
-                <StatTile
-                  testID="profile-stat-tile-sets"
-                  label="Total Sets"
-                  value={formatCount(totalSets)}
-                />
-                <StatTile
-                  testID="profile-stat-tile-volume"
-                  label={`Total Volume (${weightUnit})`}
-                  value={formatCount(fromKg(totalVolumeKg, weightUnit))}
-                />
-                <StatTile
-                  testID="profile-stat-tile-time"
-                  label="Training Time"
-                  value={formatTotalTime(lifetimeStats.totalMinutes)}
-                />
-              </View>
-
-              <WeeklyTrendChart
-                testID="profile-trend-workouts"
-                label="Weekly Workouts"
-                points={weeklyWorkoutPoints}
-                accentColor={theme.accent}
-                formatTotal={(total) =>
-                  `${formatCount(total)} ${total === 1 ? 'workout' : 'workouts'} · last ${TREND_WEEKS} weeks`
-                }
-                emptyMessage="Log a workout to see your weekly trend."
-              />
-
-              <WeeklyTrendChart
-                testID="profile-trend-volume"
-                label="Volume Over Time"
-                points={weeklyVolumePoints}
-                accentColor={theme.accent}
-                formatTotal={(total) =>
-                  `${formatCount(total)} ${weightUnit} · last ${TREND_WEEKS} weeks`
-                }
-                emptyMessage="Log some sets to see your volume trend."
-              />
-
-              <WeeklyTrendChart
-                testID="profile-trend-sets"
-                label="Sets Over Time"
-                points={weeklySetPoints}
-                accentColor={theme.accent}
-                formatTotal={(total) =>
-                  `${formatCount(total)} ${total === 1 ? 'set' : 'sets'} · last ${TREND_WEEKS} weeks`
-                }
-                emptyMessage="Log some sets to see your sets trend."
-              />
-
-              <View style={styles.section}>
-                <Text style={styles.muscleGroupsTitle}>Most Trained Muscle Groups</Text>
-                {muscleGroupCounts.length === 0 ? (
-                  <Text style={styles.emptyText}>
-                    Your most-trained muscle groups will appear here.
-                  </Text>
-                ) : (
-                  muscleGroupCounts.map((mg) => {
-                    const percent = maxMuscleGroupCount > 0 ? mg.count / maxMuscleGroupCount : 0;
-                    return (
-                      <View
-                        key={mg.group}
-                        testID={`profile-muscle-group-${mg.group}`}
-                        style={styles.muscleGroupRow}
-                      >
-                        <View style={styles.muscleGroupLabelRow}>
-                          <Text style={styles.muscleGroupLabel}>{mg.label}</Text>
-                          <Text style={styles.muscleGroupCount}>
-                            {mg.count} {mg.count === 1 ? 'set' : 'sets'}
-                          </Text>
-                        </View>
-                        <View style={styles.muscleGroupBarTrack}>
-                          <View
-                            style={[
-                              styles.muscleGroupBarFill,
-                              { width: `${percent * 100}%`, backgroundColor: theme.accent },
-                            ]}
-                          />
-                        </View>
+                muscleGroupCounts.map((mg) => {
+                  const percent = maxMuscleGroupCount > 0 ? mg.count / maxMuscleGroupCount : 0;
+                  return (
+                    <View
+                      key={mg.group}
+                      testID={`profile-muscle-group-${mg.group}`}
+                      style={styles.muscleGroupRow}
+                    >
+                      <View style={styles.muscleGroupLabelRow}>
+                        <Text style={styles.muscleGroupLabel}>{mg.label}</Text>
+                        <Text style={styles.muscleGroupCount}>
+                          {mg.count} {mg.count === 1 ? 'set' : 'sets'}
+                        </Text>
                       </View>
-                    );
-                  })
-                )}
-              </View>
-            </AppCard>
-          ) : null}
+                      <View style={styles.muscleGroupBarTrack}>
+                        <View
+                          style={[
+                            styles.muscleGroupBarFill,
+                            { width: `${percent * 100}%`, backgroundColor: theme.accent },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </AppCard>
+        ) : null}
 
-          {tab === 'PRs' ? (
-            <AppCard testID="profile-tab-content">
-              {prsError ? (
-                <Text testID="profile-prs-error" style={styles.errorText}>
-                  {prsError}
-                </Text>
-              ) : null}
-              <PRsSection
-                repPRs={repPRs}
-                oneRepMaxes={oneRepMaxes}
-                weightUnit={weightUnit}
-                accentColor={theme.accent}
-                navigation={navigation}
-                scrollable={false}
-              />
-            </AppCard>
-          ) : null}
-        </RiseInStack>
+        {tab === 'PRs' ? (
+          <AppCard testID="profile-tab-content">
+            {prsError ? (
+              <Text testID="profile-prs-error" style={styles.errorText}>
+                {prsError}
+              </Text>
+            ) : null}
+            <PRsSection
+              repPRs={repPRs}
+              oneRepMaxes={oneRepMaxes}
+              weightUnit={weightUnit}
+              accentColor={theme.accent}
+              navigation={navigation}
+              scrollable={false}
+            />
+          </AppCard>
+        ) : null}
       </Screen>
 
       <BottomSheet

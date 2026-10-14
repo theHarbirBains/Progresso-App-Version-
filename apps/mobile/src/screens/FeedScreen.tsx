@@ -462,6 +462,7 @@ export function FeedScreen({ navigation }: Props) {
   return (
     <RiseInGroup>
       <Screen
+        rollout={false}
         scrollTestID="feed-scroll"
         contentContainerStyle={styles.content}
         testID="feed-screen"

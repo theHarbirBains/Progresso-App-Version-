@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from './theme';
+import { RiseInStack } from './RiseIn';
 
 interface Props {
   children: ReactNode;
@@ -27,6 +28,13 @@ interface Props {
   testID?: string;
   /** testID for the scrolling body itself (when scroll is true), for tests/automation that address the scroll view. */
   scrollTestID?: string;
+  /**
+   * Default true: the page's widgets roll out when it opens (RiseInStack --
+   * each direct child in turn). False for a page that rolls out its own
+   * (Feed, Progress) or whose content is one custom block filling the screen
+   * (the Exercise Library).
+   */
+  rollout?: boolean;
 }
 
 // The one screen frame. Every screen that isn't a special case (Dashboard's
@@ -51,8 +59,10 @@ export function Screen({
   refreshControl,
   testID,
   scrollTestID,
+  rollout = true,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const content = rollout ? <RiseInStack>{children}</RiseInStack> : children;
   const topInset = header ? 0 : insets.top + spacing.lg;
   const horizontal = padded ? styles.padded : null;
 
@@ -65,10 +75,10 @@ export function Screen({
       showsVerticalScrollIndicator={false}
       refreshControl={refreshControl}
     >
-      {children}
+      {content}
     </ScrollView>
   ) : (
-    <View style={[styles.flex, horizontal, contentContainerStyle]}>{children}</View>
+    <View style={[styles.flex, horizontal, contentContainerStyle]}>{content}</View>
   );
 
   const framed = keyboardAvoiding ? (

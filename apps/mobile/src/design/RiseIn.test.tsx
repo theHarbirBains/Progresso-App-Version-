@@ -1,4 +1,4 @@
-import { Animated, StyleSheet, Text } from 'react-native';
+import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { render, screen } from '@testing-library/react-native';
 import * as navigationTransitions from '../navigation/navigationTransitions';
 import { RiseIn, RiseInGroup, RiseInStack } from './RiseIn';
@@ -83,5 +83,30 @@ describe('RiseIn', () => {
       'widget-b',
       'widget-c',
     ]);
+  });
+
+  it("keeps the page's layout: a widget that fills the page still does, a pinned one isn't wrapped", () => {
+    render(
+      <RiseInStack>
+        <View testID="fills" style={{ flex: 1 }} />
+        <View testID="pinned" style={{ position: 'absolute', top: 0 }} />
+        <ScrollView testID="list" />
+        <>
+          <Text testID="in-fragment-a">A</Text>
+          <Text testID="in-fragment-b">B</Text>
+        </>
+      </RiseInStack>,
+    );
+
+    const wrappers = screen.UNSAFE_getAllByType(RiseIn);
+    const byChild = (id: string) =>
+      wrappers.find((w) => w.props.children.props.testID === id)?.props.style;
+    expect(byChild('fills')).toEqual({ flex: 1 });
+    expect(byChild('list')).toEqual({ flexGrow: 1, flexShrink: 1 });
+    expect(byChild('pinned')).toBeUndefined();
+    // A fragment's children each take their own turn.
+    expect(byChild('in-fragment-a')).toEqual({});
+    expect(byChild('in-fragment-b')).toEqual({});
+    expect(wrappers).toHaveLength(4);
   });
 });

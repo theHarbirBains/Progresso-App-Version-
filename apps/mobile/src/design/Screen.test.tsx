@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from './Screen';
 import { spacing } from './theme';
+import { RiseIn } from './RiseIn';
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: jest.fn(),
@@ -95,8 +96,9 @@ describe('Screen', () => {
   });
 
   it('applies the standard (edge-to-edge, 0) horizontal padding, and none at all when padded is false', () => {
+    // (rollout off, so the body is the text's direct parent's parent.)
     const { rerender } = render(
-      <Screen scroll={false} testID="screen">
+      <Screen scroll={false} rollout={false} testID="screen">
         <RNText testID="body">x</RNText>
       </Screen>,
     );
@@ -104,12 +106,30 @@ describe('Screen', () => {
     expect(StyleSheet.flatten(paddedBody.props.style).paddingHorizontal).toBe(0);
 
     rerender(
-      <Screen scroll={false} padded={false} testID="screen">
+      <Screen scroll={false} padded={false} rollout={false} testID="screen">
         <RNText testID="body">x</RNText>
       </Screen>,
     );
     const bareBody = screen.getByTestId('body').parent!.parent!;
     expect(StyleSheet.flatten(bareBody.props.style).paddingHorizontal).toBeUndefined();
+  });
+
+  it("rolls out each of the page's widgets by default, and not when the page opts out", () => {
+    const { rerender } = render(
+      <Screen>
+        <RNText>A</RNText>
+        <RNText>B</RNText>
+      </Screen>,
+    );
+    expect(screen.UNSAFE_queryAllByType(RiseIn)).toHaveLength(2);
+
+    rerender(
+      <Screen rollout={false}>
+        <RNText>A</RNText>
+        <RNText>B</RNText>
+      </Screen>,
+    );
+    expect(screen.UNSAFE_queryAllByType(RiseIn)).toHaveLength(0);
   });
 
   it('only wraps the body in a keyboard-avoiding view on request', () => {

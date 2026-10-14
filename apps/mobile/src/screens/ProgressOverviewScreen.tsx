@@ -73,6 +73,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
     <Screen
       scroll={false}
       padded={false}
+      rollout={false}
       testID="progress-screen"
       header={
         <ProgressHeader

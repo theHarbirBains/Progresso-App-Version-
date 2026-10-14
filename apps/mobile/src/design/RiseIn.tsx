@@ -1,14 +1,24 @@
 import {
   Children,
   createContext,
+  Fragment,
   isValidElement,
   useContext,
   useEffect,
   useRef,
   useState,
+  type ReactElement,
   type ReactNode,
 } from 'react';
-import { Animated, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Animated,
+  FlatList,
+  ScrollView,
+  SectionList,
+  StyleSheet,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 
 // How a list of widgets rolls out: each one springs up from below -- rising,
@@ -109,18 +119,43 @@ export function RiseIn({
   );
 }
 
+// How a wrapped widget sits in its page, copied onto its rollout wrapper so
+// wrapping it never changes the layout -- e.g. a card or list that fills the
+// rest of the screen keeps filling it.
+const LAYOUT_KEYS = ['flex', 'flexGrow', 'flexShrink', 'flexBasis', 'alignSelf'] as const;
+// Scrolling lists fill the space they're given by default, without saying so
+// in their own style.
+const FILLS_BY_DEFAULT = new Set<unknown>([ScrollView, FlatList, SectionList]);
+
+function riseInChildren(children: ReactNode): ReactNode {
+  return Children.map(children, (child) => {
+    if (!isValidElement(child)) return child;
+    const element = child as ReactElement<{ style?: StyleProp<ViewStyle>; children?: ReactNode }>;
+    // A fragment's own children take their own turns.
+    if (element.type === Fragment) return riseInChildren(element.props.children);
+    const style = StyleSheet.flatten(element.props.style) ?? {};
+    // Something pinned in place (an overlay, a floating button) stays exactly
+    // where it is.
+    if (style.position === 'absolute') return element;
+    const layout: ViewStyle = FILLS_BY_DEFAULT.has(element.type)
+      ? { flexGrow: 1, flexShrink: 1 }
+      : {};
+    for (const key of LAYOUT_KEYS) {
+      if (style[key] !== undefined) (layout as Record<string, unknown>)[key] = style[key];
+    }
+    return <RiseIn style={layout}>{element}</RiseIn>;
+  });
+}
+
 /**
  * A page's widgets, each rolling out in turn -- every direct child (a card, a
- * section) gets its own RiseIn, in one cascade. Adds no box of its own, so the
- * page's spacing (its `gap`) is unchanged. A widget that appears later (a tab
- * switched to) rolls in by itself.
+ * section) gets its own RiseIn, in one cascade; a fragment's children each
+ * take their own turn. Adds no box of its own, and each wrapper takes on how
+ * its widget sits in the page (filling the rest of the screen, say), so the
+ * layout is unchanged; anything pinned in place isn't wrapped at all. A
+ * widget that appears later (a tab switched to) rolls in by itself. Screen
+ * applies this to every page (its `rollout` prop).
  */
 export function RiseInStack({ children }: { children: ReactNode }) {
-  return (
-    <RiseInGroup>
-      {Children.map(children, (child) =>
-        isValidElement(child) ? <RiseIn>{child}</RiseIn> : child,
-      )}
-    </RiseInGroup>
-  );
+  return <RiseInGroup>{riseInChildren(children)}</RiseInGroup>;
 }

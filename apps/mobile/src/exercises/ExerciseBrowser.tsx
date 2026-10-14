@@ -15,6 +15,7 @@ import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
+import { RiseInStack } from '../design/RiseIn';
 import { exerciseLibraryStyles as styles } from '../screens/exerciseLibraryStyles';
 import { groupExercisesByLetter } from './exerciseLibraryGrouping';
 import { ExercisePhoto } from './ExercisePhoto';
@@ -156,8 +157,10 @@ export function ExerciseBrowser({
     [accent.color, isRowDisabled, onOpenMine, onPhotoPress, onSelectRow, rowSuffix],
   );
 
+  // Its two cards roll out in turn (the list card keeps filling the rest of
+  // the page) -- the Exercise Library page leaves this to it.
   return (
-    <>
+    <RiseInStack>
       <AppCard testID={`${testID}-browse`}>
         <View style={styles.searchWrap}>
           <TextInput
@@ -253,6 +256,6 @@ export function ExerciseBrowser({
           </View>
         )}
       </AppCard>
-    </>
+    </RiseInStack>
   );
 }

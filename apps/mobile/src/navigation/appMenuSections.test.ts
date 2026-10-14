@@ -38,7 +38,9 @@ describe('APP_MENU_SECTIONS', () => {
   });
 
   it("doesn't list Group Workouts -- it's reached from Feed's live group card, not the menu", () => {
-    const allRoutes = APP_MENU_SECTIONS.flatMap((section) => section.items.map((i) => i.route));
+    const allRoutes = APP_MENU_SECTIONS.flatMap((section) =>
+      section.items.map((i) => ('route' in i ? i.route : null)),
+    );
     expect(allRoutes).not.toContain('Groups');
   });
 
