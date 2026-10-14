@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { withAlpha } from '../theme/accentColor';
 import { colors, radii, spacing, widgetFillAlpha } from './theme';
+import { InsideCardContext } from './insideCard';
 
 interface Props {
   children: ReactNode;
@@ -49,7 +50,7 @@ export function Card({
 }: Props) {
   const cardStyle = [styles.card, hero ? null : styles.surface, style];
   const content = (
-    <>
+    <InsideCardContext.Provider value={true}>
       {children}
       {/* Drawn last, so nothing inside the card can cover its edge. */}
       {hero ? null : (
@@ -59,7 +60,7 @@ export function Card({
           pointerEvents="none"
         />
       )}
-    </>
+    </InsideCardContext.Provider>
   );
 
   if (onPress) {

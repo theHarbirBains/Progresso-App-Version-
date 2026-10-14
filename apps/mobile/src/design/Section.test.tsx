@@ -1,6 +1,9 @@
-import { Text as RNText } from 'react-native';
+import { StyleSheet, Text as RNText } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { AppCard } from './AppCard';
+import { Card } from './Card';
 import { Section } from './Section';
+import { colors } from './theme';
 
 describe('Section', () => {
   it('renders its title and children', () => {
@@ -54,5 +57,38 @@ describe('Section', () => {
       left: 8,
       right: 8,
     });
+  });
+
+  it('is a widget on its own -- a card with its heading inside, like every other widget', () => {
+    render(
+      <Section title="Account" testID="section">
+        <RNText>Row</RNText>
+      </Section>,
+    );
+
+    expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(1);
+    const style = StyleSheet.flatten(screen.getByTestId('section').props.style);
+    expect(style.backgroundColor).toBe('rgba(38, 33, 28, 0.8)');
+    expect(screen.getByTestId('section')).toHaveTextContent(/ACCOUNT|Account/);
+  });
+
+  it('is just a titled group inside a card already -- never a card in a card', () => {
+    for (const Outer of [Card, AppCard]) {
+      const { unmount } = render(
+        <Outer>
+          <Section title="Account" testID="section">
+            <RNText>Row</RNText>
+          </Section>
+        </Outer>,
+      );
+      expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(Outer === Card ? 1 : 0);
+      expect(
+        StyleSheet.flatten(screen.getByTestId('section').props.style)?.backgroundColor,
+      ).not.toBe(colors.surfaceRaised);
+      expect(
+        StyleSheet.flatten(screen.getByTestId('section').props.style)?.backgroundColor,
+      ).toBeUndefined();
+      unmount();
+    }
   });
 });

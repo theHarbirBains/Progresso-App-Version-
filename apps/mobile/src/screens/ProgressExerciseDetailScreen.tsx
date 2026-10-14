@@ -5,8 +5,9 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
-import { SectionHeader } from '../design/SectionHeader';
 import { colors } from '../design/theme';
+import { Card } from '../design/Card';
+import { Section } from '../design/Section';
 import { fromKg, roundWeight, formatWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { ChartPointDetail } from '../progress/ChartPointDetail';
@@ -149,77 +150,80 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
       ) : (
         <>
           {latest ? (
-            <Text testID="progress-exercise-detail-current" style={styles.featuredCurrent}>
-              {formatWeight(roundWeight(fromKg(latest.weightKg, weightUnit)))}
-              {weightUnit} × {latest.reps}
-            </Text>
+            <Card testID="progress-exercise-detail-current-card">
+              <Text testID="progress-exercise-detail-current" style={styles.featuredCurrent}>
+                {formatWeight(roundWeight(fromKg(latest.weightKg, weightUnit)))}
+                {weightUnit} × {latest.reps}
+              </Text>
+              {summary ? (
+                <Text
+                  testID="progress-exercise-detail-delta"
+                  style={[
+                    styles.featuredDelta,
+                    { color: summary.deltaKg >= 0 ? theme.accent : colors.destructive },
+                  ]}
+                >
+                  {summary.deltaKg >= 0 ? '+' : ''}
+                  {formatWeight(roundWeight(fromKg(summary.deltaKg, weightUnit)))}
+                  {weightUnit} since first recorded
+                </Text>
+              ) : null}
+            </Card>
           ) : null}
-          {summary ? (
-            <Text
-              testID="progress-exercise-detail-delta"
-              style={[
-                styles.featuredDelta,
-                { color: summary.deltaKg >= 0 ? theme.accent : colors.destructive },
-              ]}
-            >
-              {summary.deltaKg >= 0 ? '+' : ''}
-              {formatWeight(roundWeight(fromKg(summary.deltaKg, weightUnit)))}
-              {weightUnit} since first recorded
-            </Text>
-          ) : null}
 
-          <TimeRangeSelector
-            value={range}
-            onChange={setRange}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
-          />
-
-          {chartPoints.length > 0 ? (
-            <ProgressionChart
-              testID="progress-exercise-detail-chart"
-              points={chartPoints}
-              color={theme.accent}
-              selectedIndex={selectedPointIndex}
-              onSelectIndex={setSelectedPointIndex}
-            />
-          ) : (
-            <ProgressEmptyState
-              testID="progress-exercise-detail-chart-empty"
-              title="Not enough data yet"
-            />
-          )}
-
-          {selectedDetail ? (
-            <ChartPointDetail
-              testID="progress-exercise-detail-point-detail"
+          <Card testID="progress-exercise-detail-chart-card">
+            <TimeRangeSelector
+              value={range}
+              onChange={setRange}
               accentColor={theme.accent}
-              onDismiss={() => setSelectedPointIndex(null)}
-              data={{
-                exerciseName,
-                weightDisplay: roundWeight(fromKg(selectedDetail.weightKg, weightUnit)),
-                reps: selectedDetail.reps,
-                performedAt: selectedDetail.performedAt,
-                unit: weightUnit,
-                volumeDisplay: roundWeight(
-                  fromKg(selectedDetail.weightKg, weightUnit) * selectedDetail.reps,
-                ),
-                previous: previousDetail
-                  ? {
-                      weightDisplay: roundWeight(fromKg(previousDetail.weightKg, weightUnit)),
-                      reps: previousDetail.reps,
-                    }
-                  : null,
-                trueOneRepMaxDisplay:
-                  selectedDetail.reps === 1
-                    ? roundWeight(fromKg(selectedDetail.weightKg, weightUnit))
-                    : null,
-              }}
+              onAccentColor={theme.onAccent}
             />
-          ) : null}
 
-          <View style={styles.section}>
-            <SectionHeader label="Best Performances" />
+            {chartPoints.length > 0 ? (
+              <ProgressionChart
+                testID="progress-exercise-detail-chart"
+                points={chartPoints}
+                color={theme.accent}
+                selectedIndex={selectedPointIndex}
+                onSelectIndex={setSelectedPointIndex}
+              />
+            ) : (
+              <ProgressEmptyState
+                testID="progress-exercise-detail-chart-empty"
+                title="Not enough data yet"
+              />
+            )}
+
+            {selectedDetail ? (
+              <ChartPointDetail
+                testID="progress-exercise-detail-point-detail"
+                accentColor={theme.accent}
+                onDismiss={() => setSelectedPointIndex(null)}
+                data={{
+                  exerciseName,
+                  weightDisplay: roundWeight(fromKg(selectedDetail.weightKg, weightUnit)),
+                  reps: selectedDetail.reps,
+                  performedAt: selectedDetail.performedAt,
+                  unit: weightUnit,
+                  volumeDisplay: roundWeight(
+                    fromKg(selectedDetail.weightKg, weightUnit) * selectedDetail.reps,
+                  ),
+                  previous: previousDetail
+                    ? {
+                        weightDisplay: roundWeight(fromKg(previousDetail.weightKg, weightUnit)),
+                        reps: previousDetail.reps,
+                      }
+                    : null,
+                  trueOneRepMaxDisplay:
+                    selectedDetail.reps === 1
+                      ? roundWeight(fromKg(selectedDetail.weightKg, weightUnit))
+                      : null,
+                }}
+              />
+            ) : null}
+          </Card>
+
+          <Section title="Best Performances">
             <View style={styles.metricsGrid}>
               <MetricCard
                 testID="progress-exercise-detail-metric-1rm"
@@ -234,11 +238,10 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
                 value={repPRs.length}
               />
             </View>
-          </View>
+          </Section>
 
           {milestones.length > 0 ? (
-            <View style={styles.section}>
-              <SectionHeader label="Progression Journey" />
+            <Section title="Progression Journey">
               {milestones.map((m, i) => (
                 <View
                   key={`${m.kind}-${m.achievedAt}-${i}`}
@@ -254,7 +257,7 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
                   </View>
                 </View>
               ))}
-            </View>
+            </Section>
           ) : null}
         </>
       )}

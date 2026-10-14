@@ -9,6 +9,7 @@ import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { TextInput } from '../design/TextInput';
 import { spacing } from '../design/theme';
+import { Card } from '../design/Card';
 import {
   addTrainerClient,
   listTrainerClients,
@@ -273,7 +274,7 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
       ) : null}
 
       {!loading && !loadError ? (
-        <View style={{ gap: spacing.md }}>
+        <Card style={{ gap: spacing.md }}>
           {isNew ? (
             <SegmentedControl
               testID="trainer-client-mode"
@@ -413,7 +414,7 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
             loading={saving}
             disabled={saving}
           />
-        </View>
+        </Card>
       ) : null}
     </Screen>
   );

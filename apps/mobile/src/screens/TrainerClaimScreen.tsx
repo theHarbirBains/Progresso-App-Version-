@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';
@@ -7,6 +7,7 @@ import { Screen } from '../design/Screen';
 import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale } from '../design/theme';
+import { Card } from '../design/Card';
 import { claimTrainerHistory } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 
@@ -61,7 +62,7 @@ export function TrainerClaimScreen({ navigation }: Props) {
         />
       }
     >
-      <View style={styles.body}>
+      <Card style={styles.body}>
         <Text style={styles.note}>
           If a trainer tracked you before you had a Progresso account, they can give you a code.
           Enter it here to move that history onto your account.
@@ -84,7 +85,7 @@ export function TrainerClaimScreen({ navigation }: Props) {
           loading={saving}
           disabled={saving}
         />
-      </View>
+      </Card>
     </Screen>
   );
 }

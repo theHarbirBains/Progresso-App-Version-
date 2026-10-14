@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import {
   StyleSheet,
   TouchableOpacity,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { GlassBackground } from './GlassBackground';
 import { colors, radii, spacing } from './theme';
+import { InsideCardContext, useInsideCard } from './insideCard';
 
 export type CardVariant = 'surface' | 'outline';
 
@@ -41,11 +42,10 @@ interface Props {
   accessibilityState?: AccessibilityState;
 }
 
-// True for everything rendered inside a card. A card inside a card is the
-// "floating rectangles" look this design system exists to avoid, so a nested
-// AppCard says so in development (never in tests/production -- it never
-// changes rendering, it only points the author at the fix).
-const InsideCardContext = createContext(false);
+// A card inside a card is the "floating rectangles" look this design system
+// exists to avoid, so a nested AppCard says so in development (never in
+// tests/production -- it never changes rendering, it only points the author
+// at the fix). See insideCard.ts.
 
 let warnedNested = false;
 function warnNestedCard() {
@@ -82,7 +82,7 @@ export function AppCard({
   accessibilityLabel,
   accessibilityState,
 }: Props) {
-  const nested = useContext(InsideCardContext);
+  const nested = useInsideCard();
   if (nested) warnNestedCard();
 
   const outline = variant === 'outline';

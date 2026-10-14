@@ -3,6 +3,8 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SectionHeader } from './SectionHeader';
 import { Text } from './Text';
 import { colors, minTouchTarget, spacing, typeScale } from './theme';
+import { Card } from './Card';
+import { useInsideCard } from './insideCard';
 
 interface SectionAction {
   label: string;
@@ -22,10 +24,11 @@ interface Props {
   testID?: string;
 }
 
-// A titled group of content. This is how a screen is organised by default:
-// sections separated by whitespace, not a stack of cards each carrying its
-// own heading. The heading uses SectionHeader's exact treatment, so a screen
-// migrating from a bare SectionHeader looks identical.
+// A titled group of content -- a widget: standing on its own on a page it is
+// a Card with its heading inside, the same as every other widget, so a page
+// built from Sections (Settings, the forms) reads as widgets like the rest of
+// the app. Inside a card already it is just a titled group, never a card in a
+// card (insideCard.ts). The heading uses SectionHeader's exact treatment.
 export function Section({
   title,
   titleTestID,
@@ -34,8 +37,9 @@ export function Section({
   children,
   testID,
 }: Props) {
-  return (
-    <View testID={testID}>
+  const insideCard = useInsideCard();
+  const body = (
+    <>
       <View style={styles.header}>
         <SectionHeader label={title} testID={titleTestID} />
         {action ? (
@@ -53,8 +57,10 @@ export function Section({
         ) : null}
       </View>
       {children}
-    </View>
+    </>
   );
+  if (insideCard) return <View testID={testID}>{body}</View>;
+  return <Card testID={testID}>{body}</Card>;
 }
 
 const styles = StyleSheet.create({
