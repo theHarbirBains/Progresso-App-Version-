@@ -37,6 +37,11 @@ describe('APP_MENU_SECTIONS', () => {
     expect(allLabels).not.toContain('Settings');
   });
 
+  it("doesn't list Group Workouts -- it's reached from Feed's live group card, not the menu", () => {
+    const allRoutes = APP_MENU_SECTIONS.flatMap((section) => section.items.map((i) => i.route));
+    expect(allRoutes).not.toContain('Groups');
+  });
+
   it("routes the 'Log a Past Workout' item to the LogPastWorkout screen", () => {
     expect(findItem('Log a Past Workout')).toEqual({
       route: 'LogPastWorkout',
