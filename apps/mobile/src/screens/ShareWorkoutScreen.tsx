@@ -17,7 +17,7 @@ import { shareCardStyles as styles } from '../sharing/shareCardStyles';
 type Props = RootStackScreenProps<'ShareWorkout'>;
 
 // A finished workout as a story image (9:16) for Instagram, TikTok and the
-// like: the screen is just the card and Share to Story. The card on screen IS
+// like: the screen is just the card and Share. The card on screen IS
 // the view that gets captured (via cardRef) -- it is always laid out at its
 // one story size and only the preview is scaled to fit the phone, so the
 // image never depends on the device. The image is made on the phone and only
@@ -166,7 +166,7 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
       <View style={styles.actions}>
         <PrimaryButton
           testID="share-workout-share"
-          label="Share to Story"
+          label="Share"
           loading={sharing}
           onPress={handleShare}
           accentColor={theme.accent}

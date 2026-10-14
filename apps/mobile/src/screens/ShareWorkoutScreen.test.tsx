@@ -331,14 +331,14 @@ describe('ShareWorkoutScreen share action', () => {
 });
 
 describe('ShareWorkoutScreen -- the card, then one primary action', () => {
-  it('is just the card and one button, Share to Story -- no size switch, background photo, toggles or Save', async () => {
+  it('is just the card and one button, Share -- no size switch, background photo, toggles or Save', async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
     await screen.findByTestId('share-card');
 
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    expect(screen.getByTestId('share-workout-share')).toHaveTextContent('Share to Story');
+    expect(screen.getByTestId('share-workout-share')).toHaveTextContent(/^Share$/);
     expect(screen.queryByTestId('share-format')).toBeNull();
     expect(screen.queryByTestId('share-photo-choose')).toBeNull();
     expect(screen.queryByTestId('share-toggle-volume')).toBeNull();
@@ -378,9 +378,14 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     const safe = StyleSheet.flatten(screen.getByTestId('share-story-safe-area').props.style);
     expect(safe.top).toBe(STORY_SAFE_AREA.top);
     expect(safe.bottom).toBe(STORY_SAFE_AREA.bottom);
-    const scale = StyleSheet.flatten(screen.getByTestId('share-card-scale').props.style)
-      .transform as { scale: number }[];
-    expect(scale[0].scale).toBe(CARD_SCALE);
+    // The card is laid out at its drawn size -- every length scaled, no shrinking
+    // transform -- so its text is drawn sharp at the size it's shown.
+    const card = StyleSheet.flatten(screen.getByTestId('share-card').props.style);
+    expect(card.width).toBeCloseTo(CARD_WIDTH * CARD_SCALE, 6);
+    expect(card.transform).toBeUndefined();
+    expect(screen.queryByTestId('share-card-scale')).toBeNull();
+    const name = StyleSheet.flatten(screen.getByTestId('share-card-workout-name').props.style);
+    expect(name.fontSize).toBeCloseTo(32 * CARD_SCALE, 6);
     // Even the tallest card, scaled, fits between the margins on every side.
     expect(CARD_WIDTH * CARD_SCALE).toBeLessThanOrEqual(360 - 2 * STORY_SAFE_AREA.side);
     expect(CARD_MAX_HEIGHT * CARD_SCALE).toBeCloseTo(

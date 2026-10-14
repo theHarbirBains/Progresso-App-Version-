@@ -10,31 +10,17 @@ import { colors } from '../design/theme';
 import { formatWeightKg, fromKg, roundWeight } from '../lib/units';
 import { mixHex, withAlpha } from '../theme/accentColor';
 import type { ShareCardData, ShareTopSet } from './shareCardData';
-import { shareCardStyles as styles } from './shareCardStyles';
+import { shareCardBodyStyles as card, shareCardStyles as styles } from './shareCardStyles';
+import { CARD_WIDTH, STORY_CANVAS, STORY_SAFE_AREA, cardPt } from './storyLayout';
 
-/**
- * The whole story image, in points. It is always laid out at exactly this size
- * (the screen scales its preview to fit), so what is saved never depends on
- * the phone: 3x this is 1080x1920, a 9:16 story.
- */
-export const STORY_CANVAS = { width: 360, height: 640 } as const;
-export const STORY_CAPTURE = { width: 1080, height: 1920 } as const;
-/**
- * Where Instagram's and TikTok's own controls sit over a story -- the account
- * row and progress bars along the top, the reply or caption bar along the
- * bottom, buttons down the sides -- in canvas points (about 250px top, 290px
- * bottom and 110px each side of the 1080x1920 image). The card stays inside
- * what's left, so nothing of it is ever covered.
- */
-export const STORY_SAFE_AREA = { top: 84, bottom: 96, side: 36 } as const;
-/** The card's own layout width, and its height at its tallest (two records, three exercises). */
-export const CARD_WIDTH = 360;
-export const CARD_MAX_HEIGHT = 600;
-/** One scale for every workout, so the card's type is always the same size: the tallest card just fits the safe area. */
-export const CARD_SCALE = Math.min(
-  (STORY_CANVAS.width - 2 * STORY_SAFE_AREA.side) / CARD_WIDTH,
-  (STORY_CANVAS.height - STORY_SAFE_AREA.top - STORY_SAFE_AREA.bottom) / CARD_MAX_HEIGHT,
-);
+export {
+  CARD_MAX_HEIGHT,
+  CARD_SCALE,
+  CARD_WIDTH,
+  STORY_CANVAS,
+  STORY_CAPTURE,
+  STORY_SAFE_AREA,
+} from './storyLayout';
 
 const MAX_RECORDS = 2;
 const MAX_TOP_EXERCISES = 3;
@@ -51,14 +37,17 @@ export const STORY_FRAME = [
 // The photo at the top of the card: the sunset photo, a little larger than the
 // card and placed so the sun glows low on the right, clear of the date and the
 // workout's name.
-const PHOTO_WIDTH = CARD_WIDTH * 1.4;
+const PHOTO_WIDTH = cardPt(CARD_WIDTH * 1.4);
 const PHOTO_STYLE = {
   position: 'absolute',
   left: 0,
-  top: -120,
+  top: cardPt(-120),
   width: PHOTO_WIDTH,
   height: PHOTO_WIDTH / BACKGROUND_ASPECT,
 } as const;
+const STAT_ICON_SIZE = cardPt(18);
+const RECORD_THUMB_SIZE = cardPt(36);
+const LIFT_THUMB_SIZE = cardPt(30);
 // How the photo is darkened so its text reads: a scrim heaviest on the left,
 // where the text sits, then a fade into the card's own fill. Chosen by
 // measurement over the photo's brightest pixels -- don't lighten it without
@@ -115,12 +104,12 @@ function Stat({
   testID: string;
 }) {
   return (
-    <View style={[styles.stat, !first && styles.statDivided]}>
-      <Feather name={icon} size={18} color={colors.textSecondary} />
-      <Text testID={testID} style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+    <View style={[card.stat, !first && card.statDivided]}>
+      <Feather name={icon} size={STAT_ICON_SIZE} color={colors.textSecondary} />
+      <Text testID={testID} style={card.statValue} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
-      <Text style={styles.statLabel} numberOfLines={1}>
+      <Text style={card.statLabel} numberOfLines={1}>
         {label}
       </Text>
     </View>
@@ -130,14 +119,14 @@ function Stat({
 // An exercise's machine photo, or its initial -- static, since the card is a picture.
 function Thumb({ set, size }: { set: ShareTopSet; size: number }) {
   return (
-    <View style={[styles.thumb, { width: size, height: size, borderRadius: size / 2 }]}>
+    <View style={[card.thumb, { width: size, height: size, borderRadius: size / 2 }]}>
       <Avatar
         uri={set.photoUrl}
         initial={set.exerciseName.trim().charAt(0).toUpperCase() || null}
         size={size}
         iconSize={Math.round(size * 0.5)}
         iconColor={colors.textSecondary}
-        initialStyle={[styles.thumbInitial, { fontSize: Math.round(size * 0.4) }]}
+        initialStyle={[card.thumbInitial, { fontSize: size * 0.4 }]}
       />
     </View>
   );
@@ -146,7 +135,7 @@ function Thumb({ set, size }: { set: ShareTopSet; size: number }) {
 // The shareable workout image: the card, inside its warm frame, on a 9:16
 // story canvas. This whole canvas is what gets captured -- the preview IS the
 // image.
-export function ShareStory({ storyRef, ...card }: Props & { storyRef?: Ref<View> }) {
+export function ShareStory({ storyRef, ...cardProps }: Props & { storyRef?: Ref<View> }) {
   return (
     <View
       ref={storyRef}
@@ -161,9 +150,7 @@ export function ShareStory({ storyRef, ...card }: Props & { storyRef?: Ref<View>
         style={styles.fill}
       />
       <View testID="share-story-safe-area" style={[styles.safeArea, STORY_SAFE_AREA_STYLE]}>
-        <View testID="share-card-scale" style={{ transform: [{ scale: CARD_SCALE }] }}>
-          <ShareCard {...card} />
-        </View>
+        <ShareCard {...cardProps} />
       </View>
     </View>
   );
@@ -186,8 +173,8 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
   const topExercises = data.topSets.slice(0, MAX_TOP_EXERCISES);
 
   return (
-    <View testID="share-card" style={[styles.card, { width: CARD_WIDTH }]}>
-      <View style={styles.hero}>
+    <View testID="share-card" style={[card.card, { width: cardPt(CARD_WIDTH) }]}>
+      <View style={card.hero}>
         <Image
           testID="share-card-photo"
           source={BACKGROUND_IMAGE}
@@ -203,16 +190,16 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
         />
         <LinearGradient colors={FADE} locations={[0, 0.3, 0.6, 1]} style={styles.fill} />
 
-        <View style={styles.heroTop}>
-          <Text style={styles.wordmark}>PROGRESSO</Text>
-          <Text testID="share-card-date" style={styles.date}>
+        <View style={card.heroTop}>
+          <Text style={card.wordmark}>PROGRESSO</Text>
+          <Text testID="share-card-date" style={card.date}>
             {formatCardDate(data.performedAt)}
           </Text>
         </View>
         <View>
           <Text
             testID="share-card-workout-name"
-            style={styles.workoutName}
+            style={card.workoutName}
             numberOfLines={2}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
@@ -220,14 +207,14 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
             {data.workoutName}
           </Text>
           {data.musclesTrained ? (
-            <Text testID="share-card-muscles" style={styles.muscles} numberOfLines={1}>
+            <Text testID="share-card-muscles" style={card.muscles} numberOfLines={1}>
               {data.musclesTrained}
             </Text>
           ) : null}
         </View>
       </View>
 
-      <View testID="share-card-stats" style={styles.stats}>
+      <View testID="share-card-stats" style={card.stats}>
         <Stat
           first
           icon="clock"
@@ -250,29 +237,29 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
         />
       </View>
 
-      <View style={styles.body}>
+      <View style={card.body}>
         {records.length > 0 ? (
-          <View testID="share-card-pr-section" style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>PERSONAL RECORDS</Text>
-              <Text testID="share-card-pr-count" style={[styles.prCount, { color: accentColor }]}>
+          <View testID="share-card-pr-section" style={card.section}>
+            <View style={card.sectionHeader}>
+              <Text style={card.sectionLabel}>PERSONAL RECORDS</Text>
+              <Text testID="share-card-pr-count" style={[card.prCount, { color: accentColor }]}>
                 {allRecords.length === 1 ? '1 PR' : `${allRecords.length} PRs`}
               </Text>
             </View>
             {records.map((set, index) => (
-              <View key={`${set.exerciseName}-pr-${index}`} style={[styles.row, styles.recordRow]}>
-                <Thumb set={set} size={36} />
-                <View style={styles.rowText}>
-                  <Text style={styles.recordName} numberOfLines={1}>
+              <View key={`${set.exerciseName}-pr-${index}`} style={[card.row, card.recordRow]}>
+                <Thumb set={set} size={RECORD_THUMB_SIZE} />
+                <View style={card.rowText}>
+                  <Text style={card.recordName} numberOfLines={1}>
                     {set.exerciseName}
                   </Text>
-                  <Text style={styles.recordLabel} numberOfLines={1}>
+                  <Text style={card.recordLabel} numberOfLines={1}>
                     {set.prLabel}
                   </Text>
                 </View>
                 <Text
                   testID={`share-card-pr-value-${index}`}
-                  style={[styles.recordValue, { color: accentColor }]}
+                  style={[card.recordValue, { color: accentColor }]}
                   numberOfLines={1}
                 >
                   {setValue(set, weightUnit)}
@@ -283,20 +270,20 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
         ) : null}
 
         {topExercises.length > 0 ? (
-          <View testID="share-card-lifts" style={styles.section}>
-            <Text style={styles.sectionLabel}>TOP EXERCISES</Text>
+          <View testID="share-card-lifts" style={card.section}>
+            <Text style={card.sectionLabel}>TOP EXERCISES</Text>
             {topExercises.map((set, index) => (
-              <View key={`${set.exerciseName}-${index}`} style={[styles.row, styles.liftRow]}>
-                <View style={styles.rank}>
-                  <Text style={styles.rankText}>{index + 1}</Text>
+              <View key={`${set.exerciseName}-${index}`} style={[card.row, card.liftRow]}>
+                <View style={card.rank}>
+                  <Text style={card.rankText}>{index + 1}</Text>
                 </View>
-                <Thumb set={set} size={30} />
-                <Text style={styles.liftName} numberOfLines={1}>
+                <Thumb set={set} size={LIFT_THUMB_SIZE} />
+                <Text style={card.liftName} numberOfLines={1}>
                   {set.exerciseName}
                 </Text>
                 <Text
                   testID={`share-card-top-set-${index}`}
-                  style={styles.liftValue}
+                  style={card.liftValue}
                   numberOfLines={1}
                 >
                   {setValue(set, weightUnit)}
