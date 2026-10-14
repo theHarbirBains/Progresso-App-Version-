@@ -15,9 +15,10 @@ import { withAlpha } from '../theme/accentColor';
 import { colors } from './theme';
 
 // The sunset gym photo behind every screen (Warm Minimal -- see DESIGN.md §3a): the bright
-// window of the original workout photo, warm-graded, softly defocused and with the sun's glow
-// bloomed, so text over it sits on smooth colour rather than detail. Exported for the one other
-// place it appears: the top of the workout share card.
+// window of the original workout photo, warm-graded and sharp, with the sun's glow bloomed;
+// upscaled 1.5x with light sharpening so a phone stretches it less. Text over it stays readable
+// through the darkening layers below, not blur. Exported for the one other place it appears:
+// the top of the workout share card.
 export const BACKGROUND_IMAGE = require('../../assets/background-gym-sunset.jpg');
 // The photo's own width / height, so it keeps its proportions.
 export const BACKGROUND_ASPECT = 852 / 1300;
@@ -53,13 +54,14 @@ const EVERYDAY: Stops = [
   [0.55, 0.8],
   [1, 1],
 ];
-// Down the photo while Feed's Next Workout shows (useHeroBackdrop): the sunset in full behind
-// the whole hero, down past its button, darkening below it. Measured the same way: the header
-// and the hero's title keep AA at every pixel, its smaller lines over all but the brightest
-// specks, and text in a card at every pixel, wherever a card scrolls to.
+// Down the photo while Feed's Next Workout shows (useHeroBackdrop): the sunset nearly in full
+// behind the whole hero, down past its button, darkening below it. Measured the same way: the
+// header keeps AA at every pixel, the hero's title the large-text 3:1, its smaller lines AA
+// over all but the brightest specks, and text in a card AA at every pixel, wherever a card
+// scrolls to.
 const HERO: Stops = [
-  [0, 0.1],
-  [0.35, 0.1],
+  [0, 0.14],
+  [0.35, 0.14],
   [0.5, 0.62],
   [1, 1],
 ];

@@ -182,13 +182,13 @@ describe('ScreenBackdrop behind a photo hero', () => {
     expect(topDarkness('screen-backdrop')).toBeCloseTo(0.7, 2);
   });
 
-  it('shows the sunset almost in full (10% darkening) while a hero is on the screen, and back when it goes', () => {
+  it('shows the sunset almost in full (14% darkening) while a hero is on the screen, and back when it goes', () => {
     const { rerender } = render(
       <ScreenBackdrop>
         <Hero />
       </ScreenBackdrop>,
     );
-    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.1, 2);
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.14, 2);
 
     rerender(
       <ScreenBackdrop>
