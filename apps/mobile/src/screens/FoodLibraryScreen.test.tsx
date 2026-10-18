@@ -494,7 +494,7 @@ describe('FoodLibraryScreen', () => {
     fireEvent.press(screen.getByTestId('food-item-food-apple'));
 
     expect(await screen.findByTestId('log-food-quantity')).toHaveProp('value', '1');
-    expect(screen.getByTestId('log-food-preview')).toHaveTextContent(/95 cal/);
+    expect(screen.getByTestId('log-food-calories')).toHaveTextContent(/95/);
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('log-food-submit'));
@@ -519,7 +519,7 @@ describe('FoodLibraryScreen', () => {
 
     fireEvent.changeText(screen.getByTestId('log-food-quantity'), '2');
 
-    expect(screen.getByTestId('log-food-preview')).toHaveTextContent(/190 cal/);
+    expect(screen.getByTestId('log-food-calories')).toHaveTextContent(/190/);
   });
 
   it('goes back to the list when the log step is cancelled', async () => {

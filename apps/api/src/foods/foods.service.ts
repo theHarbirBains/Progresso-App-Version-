@@ -36,6 +36,8 @@ export interface FoodRecord {
   imageUrl: string | null;
   servingSize: number;
   servingUnit: string;
+  /** The provider's wording of the serving ("3 cookies (34 g)"), or null when there is none. */
+  servingLabel: string | null;
   calories: number;
   proteinG: number | null;
   carbsG: number | null;
@@ -67,7 +69,7 @@ const OPEN_FOOD_FACTS_LIMIT_MS = 8_000;
 const MIN_ESTIMATE_MS = 5_000;
 
 const FOOD_COLUMNS =
-  'id, name, brand, image_url, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, provider, barcode';
+  'id, name, brand, image_url, serving_size, serving_unit, serving_label, calories, protein_g, carbs_g, fat_g, provider, barcode';
 
 // provider_food_id is never part of FoodRecord (toFoodRecord doesn't read
 // it) -- selected only so upsertExternalFoods can re-match a batch
@@ -83,6 +85,8 @@ function toFoodRecord(row: any): FoodRecord {
     imageUrl: row.image_url ?? null,
     servingSize: Number(row.serving_size),
     servingUnit: row.serving_unit,
+    // Empty means the provider was read and had no wording (see the serving_label migration).
+    servingLabel: row.serving_label || null,
     calories: Number(row.calories),
     proteinG: row.protein_g === null ? null : Number(row.protein_g),
     carbsG: row.carbs_g === null ? null : Number(row.carbs_g),
@@ -418,13 +422,18 @@ export class FoodsService {
    * never be returned to anyone else who scans the same code (user data
    * isolation) -- and preferring the caller's own means their entry wins on
    * the next scan.
+   *
+   * A product cached before the provider's serving wording was kept (its
+   * serving_label still null) is read from the provider once more and its row
+   * refreshed, so it gains the wording too; if that read fails, the cached row
+   * is returned as it is.
    */
   async getByBarcode(barcode: string, userId: string): Promise<FoodRecord | null> {
     const trimmed = barcode.trim();
     if (!trimmed) return null;
 
     const cached = await this.queryLocalByBarcode(trimmed, userId);
-    if (cached) return cached;
+    if (cached && !cached.servingLabelUnread) return cached.record;
 
     let food: NormalizedFood | null;
     try {
@@ -433,14 +442,21 @@ export class FoodsService {
       this.logger.warn(
         `Food provider barcode lookup failed: ${err instanceof Error ? err.message : String(err)}`,
       );
-      return null;
+      return cached?.record ?? null;
     }
-    if (!food) return null;
+    if (!food) return cached?.record ?? null;
 
-    return this.upsertExternalFood(food);
+    return (await this.upsertExternalFood(food)) ?? cached?.record ?? null;
   }
 
-  private async queryLocalByBarcode(barcode: string, userId: string): Promise<FoodRecord | null> {
+  /**
+   * The caller's own food or the shared catalog's for this barcode, and whether it's a
+   * provider product cached before its serving wording was kept (see getByBarcode).
+   */
+  private async queryLocalByBarcode(
+    barcode: string,
+    userId: string,
+  ): Promise<{ record: FoodRecord; servingLabelUnread: boolean } | null> {
     // The id comes from the verified auth token, but it is interpolated into a
     // PostgREST filter string, so it must be a plain UUID -- anything else can
     // only match the shared catalog.
@@ -460,7 +476,12 @@ export class FoodsService {
     if (error) {
       throw new InternalServerErrorException('Failed to look up food by barcode');
     }
-    return data ? toFoodRecord(data) : null;
+    if (!data) return null;
+    const record = toFoodRecord(data);
+    return {
+      record,
+      servingLabelUnread: record.provider === this.provider.name && data.serving_label == null,
+    };
   }
 
   private async fetchAndCacheExternal(query: string, pageSize: number): Promise<FoodRecord[]> {
@@ -487,6 +508,8 @@ export class FoodsService {
       image_url: food.imageUrl,
       serving_size: food.servingSize,
       serving_unit: food.servingUnit,
+      // Empty, not null, when the provider had no wording: null means "not read yet".
+      serving_label: food.servingLabel ?? '',
       calories: food.calories,
       protein_g: food.proteinG,
       carbs_g: food.carbsG,

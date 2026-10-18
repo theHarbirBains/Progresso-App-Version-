@@ -13,6 +13,8 @@ const USER_AGENT = 'Progresso/1.0 (fitness and nutrition app; contact via app su
 const SEARCH_FIELDS =
   'code,product_name,brands,serving_size,serving_quantity,nutriments,image_front_url';
 const REQUEST_TIMEOUT_MS = 8000;
+// foods.serving_label's own limit.
+const MAX_SERVING_LABEL_LENGTH = 80;
 const RETRY_DELAY_MS = 400;
 
 interface OffNutriments {
@@ -23,6 +25,7 @@ interface OffProduct {
   code?: string;
   product_name?: string;
   brands?: string;
+  serving_size?: string;
   serving_quantity?: string | number;
   nutriments?: OffNutriments;
   image_front_url?: string;
@@ -98,6 +101,11 @@ function normalizeProduct(product: OffProduct): NormalizedFood | null {
 
   const brand = product.brands?.split(',')[0]?.trim() || null;
   const imageUrl = product.image_front_url?.trim() || null;
+  // OFF's own wording of the serving ("3 cookies (34 g)"). Only alongside the structured
+  // serving it describes -- with none, the serving here is 100 g, which the wording isn't.
+  const servingLabel = hasStructuredServing
+    ? product.serving_size?.trim().slice(0, MAX_SERVING_LABEL_LENGTH) || null
+    : null;
 
   return {
     provider: 'open_food_facts',
@@ -108,6 +116,7 @@ function normalizeProduct(product: OffProduct): NormalizedFood | null {
     imageUrl,
     servingSize,
     servingUnit,
+    servingLabel,
     calories,
     proteinG: pickNutrient(product.nutriments, 'proteins', hasStructuredServing, servingSize),
     carbsG: pickNutrient(product.nutriments, 'carbohydrates', hasStructuredServing, servingSize),

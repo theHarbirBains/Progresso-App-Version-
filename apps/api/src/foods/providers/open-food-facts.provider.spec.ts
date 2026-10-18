@@ -53,12 +53,33 @@ describe('OpenFoodFactsProvider', () => {
           imageUrl: null,
           servingSize: 34,
           servingUnit: 'g',
+          servingLabel: '3 cookies (34 g)',
           calories: 160,
           proteinG: 1.6,
           carbsG: 25,
           fatG: 7,
         },
       ]);
+    });
+
+    it("keeps OFF's wording of the serving only alongside the structured serving it describes", async () => {
+      mockFetchOnce({
+        count: 1,
+        products: [
+          {
+            code: '1234567890123',
+            product_name: 'Instant Noodles',
+            // No serving_quantity: the serving becomes 100 g, which "1 package" isn't.
+            serving_size: '1 package (85 g)',
+            nutriments: { 'energy-kcal_100g': 450 },
+          },
+        ],
+      });
+
+      const result = await provider.searchFoods('noodles', 0, 20);
+
+      expect(result.foods[0]!.servingSize).toBe(100);
+      expect(result.foods[0]!.servingLabel).toBeNull();
     });
 
     it("captures the product's image_front_url when Open Food Facts provides one", async () => {

@@ -17,6 +17,8 @@ export interface NormalizedFood {
   imageUrl: string | null;
   servingSize: number;
   servingUnit: string;
+  /** The provider's own wording of that serving ("3 cookies (34 g)"), when it has one -- what the app reads a piece count from. Null when it gave none. */
+  servingLabel?: string | null;
   /** Null only when the provider genuinely has no calorie figure at all -- searchFoods() drops such products rather than returning a near-empty result (see FoodsService). */
   calories: number | null;
   proteinG: number | null;

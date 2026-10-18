@@ -97,6 +97,7 @@ const oreo = {
   brand: 'Oreo',
   servingSize: 34,
   servingUnit: 'g',
+  servingLabel: '3 cookies (34 g)',
   calories: 160,
   proteinG: 1.6,
   carbsG: 25,
@@ -215,10 +216,8 @@ describe('BarcodeScannerScreen scan -> lookup flow', () => {
     await scan('0066721016123');
 
     expect(mockGetFoodByBarcode).toHaveBeenCalledWith('token-123', '0066721016123');
-    expect(await screen.findByTestId('barcode-scanner-found-header')).toHaveTextContent(
-      /Oreo Original/,
-    );
-    expect(screen.getByTestId('barcode-scanner-calories')).toHaveTextContent(/160/);
+    expect(await screen.findByTestId('log-food-header')).toHaveTextContent(/Oreo Original/);
+    expect(screen.getByTestId('log-food-calories')).toHaveTextContent(/160/);
   });
 
   it('ignores further scans while a lookup is already in flight', async () => {
@@ -314,12 +313,12 @@ describe('BarcodeScannerScreen scan -> lookup flow', () => {
       await Promise.resolve();
     });
 
-    expect(await screen.findByTestId('barcode-scanner-found-header')).toBeTruthy();
+    expect(await screen.findByTestId('log-food-header')).toBeTruthy();
   });
 });
 
 describe('BarcodeScannerScreen logging', () => {
-  it('logs the found product via the shared LogFoodStep, then navigates to the daily log', async () => {
+  it('sets the amount on the found product itself -- in the cookies its serving names -- then logs it and opens the daily log', async () => {
     mockGetFoodByBarcode.mockResolvedValue(oreo);
     mockLogFood.mockResolvedValue({});
     render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
@@ -327,10 +326,12 @@ describe('BarcodeScannerScreen logging', () => {
     });
     await screen.findByTestId('barcode-scanner-camera');
     await scan('0066721016123');
-    await screen.findByTestId('barcode-scanner-found-header');
 
-    fireEvent.press(screen.getByTestId('barcode-scanner-log-button'));
-    expect(await screen.findByTestId('log-food-quantity')).toHaveProp('value', '1');
+    // One serving is 3 cookies, so it starts there; 2 cookies is 2/3 of a serving.
+    expect(await screen.findByTestId('log-food-quantity')).toHaveProp('value', '3');
+    fireEvent.changeText(screen.getByTestId('log-food-quantity'), '2');
+    expect(screen.getByTestId('log-food-amount')).toHaveTextContent('2 cookies · 23 g');
+    expect(screen.getByTestId('log-food-calories')).toHaveTextContent(/107/);
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('log-food-submit'));
@@ -343,12 +344,13 @@ describe('BarcodeScannerScreen logging', () => {
         name: 'Oreo Original',
         servingSize: 34,
         servingUnit: 'g',
+        servingLabel: '3 cookies (34 g)',
         calories: 160,
         proteinG: 1.6,
         carbsG: 25,
         fatG: 0,
       },
-      1,
+      0.67,
       // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
     );
@@ -364,14 +366,12 @@ describe('BarcodeScannerScreen logging', () => {
     await screen.findByTestId('barcode-scanner-camera');
     await scan('0066721016123');
 
-    expect(await screen.findByTestId('barcode-scanner-attribution')).toHaveTextContent(
-      /Open Food Facts/,
-    );
+    expect(await screen.findByTestId('log-food-attribution')).toHaveTextContent(/Open Food Facts/);
   });
 });
 
 describe('BarcodeScannerScreen -- one primary action per state', () => {
-  it('shows the found product as the shared fact widgets and one filled button', async () => {
+  it('shows the found product as the log step: three widgets and one filled button', async () => {
     mockGetFoodByBarcode.mockResolvedValue(oreo);
     render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
@@ -379,11 +379,23 @@ describe('BarcodeScannerScreen -- one primary action per state', () => {
     await screen.findByTestId('barcode-scanner-camera');
     await scan();
 
-    await screen.findByTestId('barcode-scanner-found-header');
-    expect(screen.getByTestId('barcode-scanner-serving')).toHaveTextContent('Serving: 34 g');
+    await screen.findByTestId('log-food-header');
+    expect(screen.getByTestId('log-food-serving')).toHaveTextContent('1 serving: 3 cookies (34 g)');
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(3);
     expectNoBareText();
+  });
+
+  it('goes back to scanning from the found product', async () => {
+    mockGetFoodByBarcode.mockResolvedValue(oreo);
+    render(<BarcodeScannerScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('barcode-scanner-camera');
+    await scan();
+
+    fireEvent.press(await screen.findByLabelText('Back'));
+    expect(await screen.findByTestId('barcode-scanner-camera')).toBeTruthy();
   });
 
   it('on not-found, makes Enter Manually the one filled button, with Scan Again and Search Food outlined', async () => {

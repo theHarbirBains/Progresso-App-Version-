@@ -1,4 +1,4 @@
-import { fromServings, gramsPerServing, toServings } from './logQuantity';
+import { fromServings, gramsPerServing, servingPieces, toServings } from './logQuantity';
 
 describe('gramsPerServing', () => {
   it('weighs a serving given in grams, kilograms or ounces', () => {
@@ -53,5 +53,52 @@ describe('fromServings', () => {
   it('comes back to the same servings after a round trip', () => {
     const grams = Number(fromServings(1, 'oz', 182));
     expect(toServings(grams, 'oz', 182)).toBe(1);
+  });
+});
+
+describe('servingPieces', () => {
+  it('reads the pieces a serving is worded in, counted from the front or in brackets', () => {
+    expect(servingPieces('3 cookies (34 g)')).toEqual({
+      perServing: 3,
+      singular: 'cookie',
+      plural: 'cookies',
+    });
+    expect(servingPieces('34 g (3 Cookies)')).toEqual({
+      perServing: 3,
+      singular: 'cookie',
+      plural: 'cookies',
+    });
+    expect(servingPieces('3 cookies 34 g')).toMatchObject({ perServing: 3, plural: 'cookies' });
+  });
+
+  it('words one piece in the singular and plural: "1 package (85 g)"', () => {
+    expect(servingPieces('1 package (85 g)')).toEqual({
+      perServing: 1,
+      singular: 'package',
+      plural: 'packages',
+    });
+    expect(servingPieces('1 pouch, 40 g')).toMatchObject({ plural: 'pouches' });
+    expect(servingPieces('1 patty (113 g)')).toMatchObject({ plural: 'patties' });
+    expect(servingPieces('2 patties (226 g)')).toMatchObject({ singular: 'patty' });
+    expect(servingPieces('2 brownies (60 g)')).toMatchObject({ singular: 'brownie' });
+    expect(servingPieces('1/2 package (42.5 g)')).toMatchObject({
+      perServing: 0.5,
+      plural: 'packages',
+    });
+  });
+
+  it('finds no pieces in a plain weight or volume, a serving, or no wording at all', () => {
+    for (const label of ['30 g', '250 ml', '1 serving (30 g)', '100g', '', null, undefined]) {
+      expect(servingPieces(label)).toBeNull();
+    }
+  });
+});
+
+describe('pieces as servings', () => {
+  it('turns pieces into servings and back: 2 cookies of a 3-cookie serving', () => {
+    expect(toServings(2, 'pieces', 34, 3)).toBe(0.67);
+    expect(toServings(6, 'pieces', 34, 3)).toBe(2);
+    expect(fromServings(1, 'pieces', 34, 3)).toBe('3');
+    expect(fromServings(0.5, 'pieces', null, 1)).toBe('0.5');
   });
 });

@@ -97,6 +97,7 @@ const cachedExternalFoodRow = {
   fat_g: '7.00',
   provider: 'open_food_facts',
   barcode: '0066721016123',
+  serving_label: '3 cookies (34 g)',
   // Selected only for upsertExternalFoods' own re-ordering of a batch
   // upsert's returned rows -- must match normalizedOreo.providerFoodId
   // below for these fixtures to represent the same food.
@@ -112,6 +113,7 @@ const normalizedOreo: NormalizedFood = {
   imageUrl: 'https://images.openfoodfacts.org/oreo-front.jpg',
   servingSize: 34,
   servingUnit: 'g',
+  servingLabel: '3 cookies (34 g)',
   calories: 160,
   proteinG: 1.6,
   carbsG: 25,
@@ -381,7 +383,69 @@ describe('FoodsService.getByBarcode', () => {
       provider: 'open_food_facts',
       provider_food_id: '0066721016123',
       barcode: '0066721016123',
+      serving_label: '3 cookies (34 g)',
     });
+    expect(result).toMatchObject({ servingLabel: '3 cookies (34 g)' });
+  });
+
+  it("stores an empty serving label, not null, when the provider has no wording -- null means it hasn't been read", async () => {
+    const { supabaseService, instances } = mockSupabaseSequence([
+      { data: null, error: null },
+      { data: { ...cachedExternalFoodRow, serving_label: '' }, error: null },
+    ]);
+    const provider = mockProvider({
+      getFoodByBarcode: jest.fn().mockResolvedValue({ ...normalizedOreo, servingLabel: null }),
+    });
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+    const result = await service.getByBarcode('0066721016123', USER_ID);
+
+    const upsertArgs: unknown[] = instances[1]!.calls.upsert?.[0] ?? [];
+    expect(upsertArgs[0]).toMatchObject({ serving_label: '' });
+    expect(result).toMatchObject({ servingLabel: null });
+  });
+
+  it('reads a product cached before serving wording was kept from the provider once more, and refreshes it', async () => {
+    const { supabaseService, instances } = mockSupabaseSequence([
+      { data: { ...cachedExternalFoodRow, serving_label: null }, error: null }, // older cached row
+      { data: cachedExternalFoodRow, error: null }, // the refreshed row
+    ]);
+    const provider = mockProvider({
+      getFoodByBarcode: jest.fn().mockResolvedValue(normalizedOreo),
+    });
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+    const result = await service.getByBarcode('0066721016123', USER_ID);
+
+    expect(provider.getFoodByBarcode).toHaveBeenCalledWith('0066721016123');
+    expect(instances[1]!.calls.upsert).toHaveLength(1);
+    expect(result).toMatchObject({ id: 'food-2', servingLabel: '3 cookies (34 g)' });
+  });
+
+  it('returns the older cached product as it is when reading the provider again fails', async () => {
+    const { supabaseService } = mockSupabaseSequence([
+      { data: { ...cachedExternalFoodRow, serving_label: null }, error: null },
+    ]);
+    const provider = mockProvider({
+      getFoodByBarcode: jest.fn().mockRejectedValue(new Error('network down')),
+    });
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+    const result = await service.getByBarcode('0066721016123', USER_ID);
+
+    expect(result).toMatchObject({ id: 'food-2', name: 'Oreo Original', servingLabel: null });
+  });
+
+  it("never re-reads the provider for the user's own food or a seeded one, which have no provider wording", async () => {
+    const { supabaseService } = mockSupabaseSequence([
+      { data: { ...localFoodRow, barcode: '123', serving_label: null }, error: null },
+    ]);
+    const provider = mockProvider();
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+    await service.getByBarcode('123', USER_ID);
+
+    expect(provider.getFoodByBarcode).not.toHaveBeenCalled();
   });
 
   it('returns null (never throws) when the product genuinely is not found anywhere', async () => {

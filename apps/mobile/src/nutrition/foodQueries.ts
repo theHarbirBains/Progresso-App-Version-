@@ -20,6 +20,8 @@ export interface FoodRow {
   imageUrl: string | null;
   servingSize: number;
   servingUnit: string;
+  /** A provider product's own wording of its serving ("3 cookies (34 g)"); null for the user's own foods and seeded ones. */
+  servingLabel?: string | null;
   calories: number;
   proteinG: number;
   carbsG: number;
@@ -55,6 +57,7 @@ interface FoodDbRow {
   image_url: string | null;
   serving_size: string | number;
   serving_unit: string;
+  serving_label: string | null;
   calories: string | number;
   protein_g: string | number;
   carbs_g: string | number;
@@ -117,6 +120,8 @@ function toFoodRow(row: FoodDbRow): FoodRow {
     imageUrl: row.image_url,
     servingSize: Number(row.serving_size),
     servingUnit: row.serving_unit,
+    // Empty means the provider had no wording (see the serving_label migration).
+    servingLabel: row.serving_label || null,
     calories: Number(row.calories),
     proteinG: Number(row.protein_g),
     carbsG: Number(row.carbs_g),
@@ -126,7 +131,7 @@ function toFoodRow(row: FoodDbRow): FoodRow {
   };
 }
 
-const FOOD_COLUMNS = `id, name, brand, barcode, image_url, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_active, ${PROVENANCE_COLUMNS}`;
+const FOOD_COLUMNS = `id, name, brand, barcode, image_url, serving_size, serving_unit, serving_label, calories, protein_g, carbs_g, fat_g, is_active, ${PROVENANCE_COLUMNS}`;
 
 export interface FetchFoodsParams {
   userId: string;

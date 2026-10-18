@@ -13,7 +13,6 @@ import { Screen } from '../design/Screen';
 import { getFoodByBarcode, type FoodSearchResult } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { goToSection } from '../navigation/sectionNavigation';
-import { FoodFacts } from '../nutrition/FoodFacts';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { barcodeScannerStyles as styles } from './barcodeScannerStyles';
@@ -28,7 +27,6 @@ type ScanState =
   | { status: 'scanning' }
   | { status: 'looking-up'; barcode: string }
   | { status: 'found'; product: FoodSearchResult }
-  | { status: 'logging'; product: FoodSearchResult }
   | { status: 'not-found'; barcode: string }
   | { status: 'error'; barcode: string; message: string };
 
@@ -41,8 +39,10 @@ type ScanState =
 // external-provider-orchestration reasoning as food search.
 //
 // States: live camera (full-bleed, header floating over it), camera-permission
-// prompt, the found product (shared FoodFacts widgets + one filled Log Food),
-// not found and lookup error. Every state but the live camera is a stack of
+// prompt, the found product -- straight into the shared LogFoodStep, so the
+// amount (in servings, the pieces its serving names, or grams) is set on the
+// same screen, every figure following it, before Log Food -- not found and
+// lookup error. Every state but the live camera is a stack of
 // widgets. Not found tells the user which code it was and makes **Enter
 // Manually** the one filled button: it opens the custom-food form already
 // carrying the scanned barcode, then goes straight on to logging it (see
@@ -152,68 +152,31 @@ export function BarcodeScannerScreen({ navigation }: Props) {
     );
   }
 
-  if (state.status === 'logging') {
-    return (
-      <LogFoodStep
-        food={{
-          id: state.product.id,
-          name: state.product.name,
-          servingSize: state.product.servingSize,
-          servingUnit: state.product.servingUnit,
-          calories: state.product.calories,
-          proteinG: state.product.proteinG ?? 0,
-          carbsG: state.product.carbsG ?? 0,
-          fatG: state.product.fatG ?? 0,
-          imageUrl: state.product.imageUrl,
-        }}
-        accentColor={theme.accent}
-        onAccentColor={theme.onAccent}
-        onDone={() => goToSection(navigation, 'Nutrition')}
-        onCancel={() => setState({ status: 'found', product: state.product })}
-      />
-    );
-  }
-
   if (state.status === 'found') {
     const product = state.product;
     return (
-      <Screen
-        header={
-          <AppHeader
-            title={product.name}
-            subtitle={product.brand ?? undefined}
-            onBack={resetToScanning}
-            testID="barcode-scanner-found-header"
-          />
-        }
-      >
-        <FoodFacts
-          name={product.name}
-          imageUrl={product.imageUrl}
-          servingSize={product.servingSize}
-          servingUnit={product.servingUnit}
-          calories={product.calories}
-          proteinG={product.proteinG}
-          carbsG={product.carbsG}
-          fatG={product.fatG}
-          showAttribution={product.provider === 'open_food_facts'}
-          accentColor={theme.accent}
-          testIDs={{
-            serving: 'barcode-scanner-serving',
-            calories: 'barcode-scanner-calories',
-            attribution: 'barcode-scanner-attribution',
-          }}
-        />
-        <View style={styles.foundButtonWrap}>
-          <PrimaryButton
-            testID="barcode-scanner-log-button"
-            label="Log Food"
-            onPress={() => setState({ status: 'logging', product })}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
-          />
-        </View>
-      </Screen>
+      <LogFoodStep
+        food={{
+          id: product.id,
+          name: product.name,
+          servingSize: product.servingSize,
+          servingUnit: product.servingUnit,
+          servingLabel: product.servingLabel,
+          calories: product.calories,
+          // food_logs' macro columns are NOT NULL, so one the provider didn't report is
+          // logged as 0 -- the same honest default Search Food uses at this step.
+          proteinG: product.proteinG ?? 0,
+          carbsG: product.carbsG ?? 0,
+          fatG: product.fatG ?? 0,
+          imageUrl: product.imageUrl,
+        }}
+        subtitle={product.brand ?? undefined}
+        showAttribution={product.provider === 'open_food_facts'}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+        onDone={() => goToSection(navigation, 'Nutrition')}
+        onCancel={resetToScanning}
+      />
     );
   }
 

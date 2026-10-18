@@ -38,8 +38,44 @@ function formatMacro(value: number | null): string {
   return value === null ? '—' : String(value);
 }
 
-// One food's nutrition at a glance, shared by every "found a food" view
-// (Search Food's detail, Scan Barcode's found product): two widgets `widgetGap`
+interface FoodMacrosProps {
+  /** null = not reported (or, on the log step, no amount yet) -- shown as "—", never a fabricated 0. */
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  testIDs?: Pick<FoodFactsTestIDs, 'protein' | 'carbs' | 'fat'>;
+  testID?: string;
+}
+
+/** Protein / carbs / fat as three raised blocks in one widget -- FoodFacts' and the log step's. */
+export function FoodMacros({ proteinG, carbsG, fatG, testIDs = {}, testID }: FoodMacrosProps) {
+  const macros = [
+    { label: 'Protein', value: proteinG, testID: testIDs.protein },
+    { label: 'Carbs', value: carbsG, testID: testIDs.carbs },
+    { label: 'Fat', value: fatG, testID: testIDs.fat },
+  ];
+  return (
+    <AppCard testID={testID}>
+      <View style={styles.macroRow}>
+        {macros.map((macro) => (
+          <View key={macro.label} style={styles.macro}>
+            <Text style={styles.macroLabel}>{macro.label}</Text>
+            <StatValue
+              testID={macro.testID}
+              size="medium"
+              value={formatMacro(macro.value)}
+              unit={macro.value === null ? undefined : 'g'}
+              color={colors.textPrimary}
+            />
+          </View>
+        ))}
+      </View>
+    </AppCard>
+  );
+}
+
+// One food's nutrition at a glance -- Search Food's detail (a scanned product
+// opens straight on LogFoodStep, which shares FoodMacros): two widgets `widgetGap`
 // apart. The hero holds the food's picture (its photo, or a category glyph),
 // the serving as a muted line and the calories as the one large accent
 // readout; the second holds protein / carbs / fat as three raised blocks. The
@@ -57,11 +93,6 @@ export function FoodFacts({
   accentColor,
   testIDs = {},
 }: Props) {
-  const macros = [
-    { label: 'Protein', value: proteinG, testID: testIDs.protein },
-    { label: 'Carbs', value: carbsG, testID: testIDs.carbs },
-    { label: 'Fat', value: fatG, testID: testIDs.fat },
-  ];
   return (
     <View style={styles.stack}>
       <AppCard hero testID={testIDs.summary}>
@@ -81,22 +112,7 @@ export function FoodFacts({
         </View>
       </AppCard>
 
-      <AppCard>
-        <View style={styles.macroRow}>
-          {macros.map((macro) => (
-            <View key={macro.label} style={styles.macro}>
-              <Text style={styles.macroLabel}>{macro.label}</Text>
-              <StatValue
-                testID={macro.testID}
-                size="medium"
-                value={formatMacro(macro.value)}
-                unit={macro.value === null ? undefined : 'g'}
-                color={colors.textPrimary}
-              />
-            </View>
-          ))}
-        </View>
-      </AppCard>
+      <FoodMacros proteinG={proteinG} carbsG={carbsG} fatG={fatG} testIDs={testIDs} />
 
       {showAttribution ? (
         <Text testID={testIDs.attribution} style={styles.attribution}>

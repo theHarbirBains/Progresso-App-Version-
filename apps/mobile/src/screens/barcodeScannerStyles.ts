@@ -73,8 +73,4 @@ export const barcodeScannerStyles = StyleSheet.create({
   actions: {
     gap: spacing.md,
   },
-
-  foundButtonWrap: {
-    marginTop: spacing.xxl,
-  },
 });

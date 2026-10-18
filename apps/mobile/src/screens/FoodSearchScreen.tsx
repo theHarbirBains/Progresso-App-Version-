@@ -96,6 +96,7 @@ export function FoodSearchScreen({ navigation }: Props) {
           name: selected.name,
           servingSize: selected.servingSize,
           servingUnit: selected.servingUnit,
+          servingLabel: selected.servingLabel,
           calories: selected.calories,
           // A macro the provider genuinely didn't report becomes 0 only
           // here, at the point of logging -- food_logs' own columns are

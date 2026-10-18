@@ -20,6 +20,8 @@ export interface FoodSearchResult {
   imageUrl: string | null;
   servingSize: number;
   servingUnit: string;
+  /** The serving as the provider words it ("3 cookies (34 g)"); null when it has no wording. */
+  servingLabel?: string | null;
   calories: number;
   /** Null when the provider genuinely didn't report this macro -- never a fabricated 0. */
   proteinG: number | null;
