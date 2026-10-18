@@ -3551,6 +3551,139 @@ async function main() {
     /not in this trainer/,
   );
 
+  console.log('\nRunning blocking and reporting tests...\n');
+  {
+    const [blocker, blocked, bystander] = [randomUUID(), randomUUID(), randomUUID()];
+    await admin.query('insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6)', [
+      blocker,
+      'blocker@test.local',
+      blocked,
+      'blocked@test.local',
+      bystander,
+      'bystander@test.local',
+    ]);
+    // Following each other, a pending trainer link request, and a group invite.
+    await admin.query(
+      "insert into public.follows (follower_id, followee_id, status) values ($1, $2, 'accepted'), ($2, $1, 'pending'), ($1, $3, 'accepted')",
+      [blocker, blocked, bystander],
+    );
+    await admin.query(
+      "insert into public.trainer_clients (trainer_id, client_id, status, source) values ($1, $2, 'pending', 'linked')",
+      [blocked, blocker],
+    );
+    const group = (
+      await admin.query(
+        "insert into public.workout_groups (host_id, name) values ($1, 'Blocked group') returning id",
+        [blocked],
+      )
+    ).rows[0].id;
+    await admin.query(
+      "insert into public.workout_group_members (group_id, user_id, role, status, added_by) values ($1, $2, 'host', 'joined', $2), ($1, $3, 'member', 'invited', $2)",
+      [group, blocked, blocker],
+    );
+
+    await admin.query('select public.block_user($1, $2)', [blocker, blocked]);
+    // Twice is fine.
+    await admin.query('select public.block_user($1, $2)', [blocker, blocked]);
+
+    const count = async (sql, params) => (await admin.query(sql, params)).rows[0].n;
+    record(
+      'Blocking someone removes following each other, either way',
+      (await count(
+        'select count(*)::int as n from public.follows where (follower_id = $1 and followee_id = $2) or (follower_id = $2 and followee_id = $1)',
+        [blocker, blocked],
+      )) === 0,
+    );
+    record(
+      'Blocking someone leaves your other follows alone',
+      (await count(
+        'select count(*)::int as n from public.follows where follower_id = $1 and followee_id = $2',
+        [blocker, bystander],
+      )) === 1,
+    );
+    record(
+      'Blocking someone removes their group invite and trainer link request',
+      (await count(
+        "select count(*)::int as n from public.workout_group_members where user_id = $1 and status = 'invited'",
+        [blocker],
+      )) === 0 &&
+        (await count(
+          'select count(*)::int as n from public.trainer_clients where trainer_id = $1 and client_id = $2',
+          [blocked, blocker],
+        )) === 0,
+    );
+    await expectThrows(
+      admin.query(
+        "insert into public.follows (follower_id, followee_id, status) values ($1, $2, 'pending')",
+        [blocked, blocker],
+      ),
+      'A blocked person cannot follow the person who blocked them',
+      /blocked/,
+    );
+    await expectThrows(
+      admin.query(
+        "insert into public.follows (follower_id, followee_id, status) values ($1, $2, 'pending')",
+        [blocker, blocked],
+      ),
+      'Nor can the blocker follow them while the block stands',
+      /blocked/,
+    );
+    const blockedBetween = (
+      await admin.query(
+        'select public.is_blocked_between($1, $2) as a, public.is_blocked_between($2, $1) as b, public.is_blocked_between($1, $3) as c',
+        [blocker, blocked, bystander],
+      )
+    ).rows[0];
+    record(
+      'A block counts in both directions, and only between those two',
+      blockedBetween.a === true && blockedBetween.b === true && blockedBetween.c === false,
+    );
+    await expectThrows(
+      admin.query('select public.block_user($1, $1)', [blocker]),
+      'You cannot block yourself',
+      /yourself/,
+    );
+
+    // Each person reads only their own block list, and nobody writes it directly.
+    const ownList = await asUser(blocker, (c) =>
+      c.query('select blocked_id from public.user_blocks'),
+    );
+    const theirView = await asUser(blocked, (c) =>
+      c.query('select blocked_id from public.user_blocks'),
+    );
+    record(
+      'You see your own block list, and the blocked person sees nothing of it',
+      ownList.rowCount === 1 && theirView.rowCount === 0,
+    );
+    await expectThrows(
+      asUser(blocked, (c) =>
+        c.query('delete from public.user_blocks where blocked_id = $1 returning id', [blocked]),
+      ).then((res) => {
+        if (res.rowCount === 0) throw new Error('permission denied: no rows');
+      }),
+      'A blocked person cannot remove the block',
+      /permission denied/,
+    );
+
+    await admin.query(
+      "insert into public.user_reports (reporter_id, reported_user_id, reason, details) values ($1, $2, 'harassment', 'Sent abusive messages')",
+      [blocker, blocked],
+    );
+    await expectThrows(
+      asUser(blocker, (c) => c.query('select id from public.user_reports')),
+      'Reports are not readable from the app, not even your own',
+      /permission denied/,
+    );
+    await expectThrows(
+      admin.query(
+        "insert into public.user_reports (reporter_id, reported_user_id, reason) values ($1, $2, 'rude')",
+        [blocker, blocked],
+      ),
+      'A report needs one of the listed reasons',
+      /check constraint/,
+    );
+  }
+
   await admin.end();
 }
 
