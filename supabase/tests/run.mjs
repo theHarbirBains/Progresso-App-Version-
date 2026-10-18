@@ -928,8 +928,10 @@ async function main() {
   // second exercise onto fixtureA's existing workout rather than creating a
   // new one, since a user can only have one active (incomplete) workout at
   // a time (workouts_one_active_per_user) and fixtureA's is already active.
-  const pullUp = (await admin.query("select id from public.exercises where name = 'Pull-Up'"))
-    .rows[0].id;
+  // A weighted exercise: these checks are about weighted PRs (Pull-Up itself is reps-only).
+  const pullUp = (
+    await admin.query("select id from public.exercises where name = 'Weighted Pull-Up'")
+  ).rows[0].id;
 
   const setCompletionFixture = await asUserCommitted(userA, async (client) => {
     const we = (
@@ -1899,6 +1901,240 @@ async function main() {
   } finally {
     await admin.query('reset role').catch(() => {});
     await admin.query('rollback').catch(() => {});
+  }
+
+  console.log('\nRunning bodyweight and timed exercise tests...\n');
+
+  {
+    const builtin = async (name) =>
+      (
+        await admin.query(
+          'select id, measurement_type from public.exercises where created_by is null and name = $1',
+          [name],
+        )
+      ).rows[0];
+    const pushUp = await builtin('Push-Up');
+    const pullUp = await builtin('Pull-Up');
+    const abWheel = await builtin('Ab Wheel Rollout');
+    const plank = await builtin('Plank');
+    const deadHang = await builtin('Dead Hang');
+    const weightedPullUp = await builtin('Weighted Pull-Up');
+    const backSquat = await builtin('Barbell Back Squat');
+    const gluteBridge = await builtin('Glute Bridge');
+    record(
+      'Push-Up, Pull-Up and the other bodyweight built-ins measure reps only',
+      pushUp?.measurement_type === 'bodyweight' &&
+        pullUp?.measurement_type === 'bodyweight' &&
+        abWheel?.measurement_type === 'bodyweight',
+    );
+    record(
+      'Plank and Dead Hang are timed, and Weighted Pull-Up is its own weight-and-reps exercise',
+      plank?.measurement_type === 'timed' &&
+        deadHang?.measurement_type === 'timed' &&
+        weightedPullUp?.measurement_type === 'weight_reps',
+    );
+    record(
+      'Every other built-in still measures weight and reps',
+      backSquat?.measurement_type === 'weight_reps' &&
+        gluteBridge?.measurement_type === 'weight_reps',
+    );
+
+    const bwUser = randomUUID();
+    await admin.query('insert into auth.users (id, email) values ($1, $2)', [
+      bwUser,
+      'bodyweight@test.local',
+    ]);
+
+    await admin.query('begin');
+    try {
+      const w = (
+        await admin.query(
+          "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'Calisthenics', '2026-10-10T09:00:00Z', '2026-10-10T10:00:00Z') returning id",
+          [bwUser],
+        )
+      ).rows[0].id;
+      let order = 0;
+      const logExercise = async (exerciseId, claimedType = null) => {
+        order += 1;
+        return (
+          await admin.query(
+            "insert into public.workout_exercises (workout_id, exercise_id, order_index, measurement_type) values ($1, $2, $3, coalesce($4::public.measurement_type, 'weight_reps')) returning id, measurement_type",
+            [w, exerciseId, order, claimedType],
+          )
+        ).rows[0];
+      };
+      const addSet = async (
+        workoutExerciseId,
+        index,
+        { weight = null, reps = null, duration = null, done = true } = {},
+      ) =>
+        (
+          await admin.query(
+            'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, duration_seconds, completed_at) values ($1, $2, $3, $4, $5, $6) returning id',
+            [
+              workoutExerciseId,
+              index,
+              weight,
+              reps,
+              duration,
+              done ? '2026-10-10T09:30:00Z' : null,
+            ],
+          )
+        ).rows[0].id;
+      const repRecord = async (exerciseId) =>
+        (
+          await admin.query(
+            'select reps from public.rep_records where user_id = $1 and exercise_id = $2',
+            [bwUser, exerciseId],
+          )
+        ).rows[0]?.reps;
+      const durationRecord = async (exerciseId) =>
+        (
+          await admin.query(
+            'select duration_seconds from public.duration_records where user_id = $1 and exercise_id = $2',
+            [bwUser, exerciseId],
+          )
+        ).rows[0]?.duration_seconds;
+
+      // A logged exercise takes its exercise's type, whatever the writer says.
+      const pushUpRow = await logExercise(pushUp.id, 'timed');
+      record(
+        "A logged exercise always takes its exercise's type, never one the writer chooses",
+        pushUpRow.measurement_type === 'bodyweight',
+        pushUpRow.measurement_type,
+      );
+
+      await addSet(pushUpRow.id, 1, { reps: 12 });
+      const fifteen = await addSet(pushUpRow.id, 2, { reps: 15 });
+      record(
+        'A bodyweight set logs with reps only, and the most reps is the record',
+        (await repRecord(pushUp.id)) === 15,
+      );
+
+      await admin.query('update public.sets set completed_at = null where id = $1', [fifteen]);
+      record(
+        'Un-ticking the record set recomputes the record from the sets still completed',
+        (await repRecord(pushUp.id)) === 12,
+      );
+
+      // An app build from before this change still sends a weight with a bodyweight set.
+      await addSet(pushUpRow.id, 3, { weight: 80, reps: 20 });
+      record(
+        "A bodyweight set from an older app (with a weight) still logs; its reps count, its weight doesn't",
+        (await repRecord(pushUp.id)) === 20,
+      );
+      expectRowCount(
+        await admin.query('select 1 from public.rep_prs where user_id = $1 and exercise_id = $2', [
+          bwUser,
+          pushUp.id,
+        ]),
+        0,
+        'A bodyweight session never produces a weighted PR',
+      );
+
+      await expectThrowsInTransaction(
+        admin,
+        () => addSet(pushUpRow.id, 4, { reps: 10, duration: 30 }),
+        'Only a timed exercise’s set may hold a duration',
+        /only a timed exercise/,
+      );
+      await expectThrowsInTransaction(
+        admin,
+        () => addSet(pushUpRow.id, 4, { weight: 20 }),
+        'A completed bodyweight set needs reps',
+        /needs reps/,
+      );
+
+      const plankRow = await logExercise(plank.id);
+      record('A Plank logged today is timed', plankRow.measurement_type === 'timed');
+      await addSet(plankRow.id, 1, { duration: 60 });
+      await addSet(plankRow.id, 2, { duration: 95 });
+      record(
+        'A timed set logs a duration, and the longest is the record',
+        (await durationRecord(plank.id)) === 95,
+      );
+      // An older app logs a plank with weight and reps and no duration: allowed, sets no record.
+      await addSet(plankRow.id, 3, { weight: 1, reps: 1 });
+      record(
+        'A timed set from an older app (no duration) still logs and sets no record',
+        (await durationRecord(plank.id)) === 95,
+      );
+
+      const weightedRow = await logExercise(weightedPullUp.id);
+      await expectThrowsInTransaction(
+        admin,
+        () => addSet(weightedRow.id, 1, { reps: 8 }),
+        'A completed weighted set needs a weight',
+        /needs a weight and reps/,
+      );
+      await addSet(weightedRow.id, 1, { weight: 20, reps: 8 });
+      record(
+        'A weighted pull-up keeps ordinary rep PRs, the weight being the load added',
+        (
+          await admin.query(
+            'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 8',
+            [bwUser, weightedPullUp.id],
+          )
+        ).rows[0]?.best_weight_kg === '20.00',
+      );
+
+      // Re-classifying an exercise changes new sessions only.
+      const custom = (
+        await admin.query(
+          "insert into public.exercises (created_by, name, muscle_group, measurement_type) values ($1, 'Ring Dip', 'triceps', 'bodyweight') returning id",
+          [bwUser],
+        )
+      ).rows[0].id;
+      const dipRow = await logExercise(custom);
+      await addSet(dipRow.id, 1, { reps: 9 });
+      await admin.query(
+        "update public.exercises set measurement_type = 'weight_reps' where id = $1",
+        [custom],
+      );
+      await admin.query('update public.workout_exercises set order_index = 99 where id = $1', [
+        dipRow.id,
+      ]);
+      const dipType = (
+        await admin.query('select measurement_type from public.workout_exercises where id = $1', [
+          dipRow.id,
+        ])
+      ).rows[0].measurement_type;
+      record(
+        'Changing what an exercise measures leaves sessions already logged as they were',
+        dipType === 'bodyweight' && (await repRecord(custom)) === 9,
+        dipType,
+      );
+
+      await admin.query('update public.workouts set deleted_at = now() where id = $1', [w]);
+      record(
+        'Deleting the workout removes its bodyweight and timed records',
+        (await repRecord(pushUp.id)) === undefined &&
+          (await durationRecord(plank.id)) === undefined,
+      );
+      await admin.query('update public.workouts set deleted_at = null where id = $1', [w]);
+      record(
+        'Restoring it brings them back',
+        (await repRecord(pushUp.id)) === 20 && (await durationRecord(plank.id)) === 95,
+      );
+
+      await asClaims(admin, bwUser);
+      const ownRecords = await admin.query('select reps from public.rep_records');
+      await admin.query('reset role');
+      await asClaims(admin, userA);
+      const othersRecords = await admin.query(
+        'select reps from public.rep_records where user_id = $1',
+        [bwUser],
+      );
+      await admin.query('reset role');
+      record(
+        'A user reads their own records, and nobody else’s',
+        ownRecords.rows.length >= 1 && othersRecords.rows.length === 0,
+        `own=${ownRecords.rows.length}, other=${othersRecords.rows.length}`,
+      );
+    } finally {
+      await admin.query('reset role').catch(() => {});
+      await admin.query('rollback').catch(() => {});
+    }
   }
 
   console.log('\nRunning nutrition tests (Phase 6)...\n');
