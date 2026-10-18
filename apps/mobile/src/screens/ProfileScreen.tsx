@@ -138,6 +138,7 @@ export function ProfileScreen({ navigation }: Props) {
     allSetHistory,
     repPRs,
     oneRepMaxes,
+    exerciseRecords,
     statsLoading,
     statsError,
     prsLoading,
@@ -630,6 +631,7 @@ export function ProfileScreen({ navigation }: Props) {
             <PRsSection
               repPRs={repPRs}
               oneRepMaxes={oneRepMaxes}
+              exerciseRecords={exerciseRecords}
               weightUnit={weightUnit}
               accentColor={theme.accent}
               navigation={navigation}

@@ -74,6 +74,7 @@ jest.mock('../workouts/allExerciseHistoryQueries', () => ({
 }));
 
 jest.mock('../workouts/prSummaryQueries', () => ({
+  fetchAllExerciseRecords: jest.fn().mockResolvedValue([]),
   fetchAllRepPRs: jest.fn(),
   fetchAllOneRepMaxes: jest.fn(),
 }));
@@ -281,6 +282,7 @@ describe('EditWorkoutScreen -- saving changes', () => {
       expect(mockUpdateSet).toHaveBeenCalledWith('s1', {
         weightKg: 100,
         reps: 5,
+        durationSeconds: null,
         completedAt: baseWorkout.performedAt,
       }),
     );
@@ -303,7 +305,11 @@ describe('EditWorkoutScreen -- saving changes', () => {
         completedAt: baseWorkout.performedAt,
       }),
     );
-    expect(mockUpdateSet).toHaveBeenCalledWith('s1', { weightKg: 105, reps: 5 });
+    expect(mockUpdateSet).toHaveBeenCalledWith('s1', {
+      weightKg: 105,
+      reps: 5,
+      durationSeconds: null,
+    });
     expect(mockCreateSet).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' }),
@@ -373,6 +379,7 @@ describe('EditWorkoutScreen -- saving changes', () => {
     expect(mockUpdateSet).toHaveBeenCalledWith('set-2-none', {
       weightKg: 110,
       reps: 3,
+      durationSeconds: null,
       completedAt: expect.any(String),
     });
     // The pre-existing set was never touched.

@@ -1,6 +1,6 @@
 import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
-import type { LoggingStyle, MovementType } from './movementTypes';
+import type { LoggingStyle, MeasurementType, MovementType } from './movementTypes';
 import type { MuscleGroup } from './muscleGroups';
 
 // Reads go directly to Supabase (anon key + RLS), never through the
@@ -15,6 +15,8 @@ export interface ExerciseRow {
   muscleGroup: MuscleGroup;
   movementType: MovementType;
   loggingStyle: LoggingStyle | null;
+  /** What a set of this exercise records: weight and reps, reps only, or a time. */
+  measurementType: MeasurementType;
   /** An optional photo of the machine/equipment, shown as a small thumbnail in the library -- null for most exercises (built-ins never have one, a custom exercise only if its owner added one). */
   photoUrl: string | null;
   isActive: boolean;
@@ -45,6 +47,7 @@ interface ExerciseDbRow {
   muscle_group: MuscleGroup;
   movement_type: MovementType;
   logging_style: LoggingStyle | null;
+  measurement_type: MeasurementType | null;
   photo_url: string | null;
   is_active: boolean;
   created_by: string | null;
@@ -57,6 +60,7 @@ function toExerciseRow(row: ExerciseDbRow): ExerciseRow {
     muscleGroup: row.muscle_group,
     movementType: row.movement_type,
     loggingStyle: row.logging_style,
+    measurementType: row.measurement_type ?? 'weight_reps',
     photoUrl: row.photo_url,
     isActive: row.is_active,
     createdBy: row.created_by,
@@ -76,7 +80,7 @@ function buildExerciseQuery(params: {
   let query = supabase
     .from('exercises')
     .select(
-      'id, name, muscle_group, movement_type, logging_style, photo_url, is_active, created_by',
+      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, is_active, created_by',
       count ? { count } : undefined,
     )
     .eq('is_active', true)
@@ -148,7 +152,7 @@ async function fetchFullExerciseList(userId: string): Promise<ExerciseRow[]> {
   const { data, error } = await supabase
     .from('exercises')
     .select(
-      'id, name, muscle_group, movement_type, logging_style, photo_url, is_active, created_by',
+      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, is_active, created_by',
     )
     .eq('is_active', true)
     .order('name', { ascending: true });

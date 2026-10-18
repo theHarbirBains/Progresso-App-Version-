@@ -1,3 +1,4 @@
+import { measurementTypeOf } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import {
@@ -52,6 +53,8 @@ export async function fetchRecentWorkoutInfo(userId: string): Promise<RecentWork
   let topExerciseName: string | null = null;
   let topSet: CompletedSetRecord | null = null;
   for (const exercise of detail.exercises) {
+    // The heaviest set is a weighted exercise's: a bodyweight or timed one has no weight.
+    if (measurementTypeOf(exercise) !== 'weight_reps') continue;
     const candidate = heaviestSet(completedSetsOnly(exercise.sets));
     if (candidate && (!topSet || candidate.weightKg > topSet.weightKg)) {
       topSet = candidate;

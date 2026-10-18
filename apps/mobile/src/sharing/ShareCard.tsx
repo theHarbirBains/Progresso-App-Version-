@@ -7,8 +7,9 @@ import { BACKGROUND_ASPECT, BACKGROUND_IMAGE } from '../design/AppBackgroundLaye
 import { Avatar } from '../design/Avatar';
 import { Text } from '../design/Text';
 import { colors } from '../design/theme';
-import { formatWeightKg, fromKg, roundWeight } from '../lib/units';
+import { fromKg, roundWeight } from '../lib/units';
 import { mixHex, withAlpha } from '../theme/accentColor';
+import { formatSetValues } from '../workouts/setValues';
 import type { ShareCardData, ShareTopSet } from './shareCardData';
 import { shareCardBodyStyles as card, shareCardStyles as styles } from './shareCardStyles';
 import { CARD_WIDTH, STORY_CANVAS, STORY_SAFE_AREA, cardPt } from './storyLayout';
@@ -96,7 +97,7 @@ function formatVolume(kg: number, unit: 'kg' | 'lb'): string {
 }
 
 function setValue(set: ShareTopSet, unit: 'kg' | 'lb'): string {
-  return `${formatWeightKg(set.weightKg, unit)} ${unit} × ${set.reps}`;
+  return formatSetValues(set, unit);
 }
 
 function Stat({

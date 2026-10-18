@@ -5,9 +5,13 @@ import { Feather } from '@expo/vector-icons';
 import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import type { ExerciseHistoryGroup } from '../workouts/allExerciseHistoryQueries';
-import type { OneRepMaxWithExercise, RepPRWithExercise } from '../workouts/prSummaryQueries';
+import type {
+  ExerciseRecordWithExercise,
+  OneRepMaxWithExercise,
+  RepPRWithExercise,
+} from '../workouts/prSummaryQueries';
 import type { LifetimeStats } from './lifetimeStats';
-import { mergeAndSortPRs } from './prFeed';
+import { mergeAndSortPRs, recordValueText } from './prFeed';
 import { PRRow } from './PRRow';
 import { ProgressEmptyState } from './ProgressEmptyState';
 import { progressStyles as styles } from './progressStyles';
@@ -15,6 +19,8 @@ import { progressStyles as styles } from './progressStyles';
 type Navigation = RootStackScreenProps<'ProgressOverview'>['navigation'];
 
 const RECENT_MILESTONES_LIMIT = 3;
+// Stable, so the milestones aren't rebuilt on every render when a caller passes none.
+const EMPTY_RECORDS: ExerciseRecordWithExercise[] = [];
 
 interface Props {
   groups: ExerciseHistoryGroup[];
@@ -23,6 +29,8 @@ interface Props {
   totalPRs: number;
   repPRs: RepPRWithExercise[];
   oneRepMaxes: OneRepMaxWithExercise[];
+  /** A bodyweight or timed exercise's most reps / longest time. */
+  exerciseRecords?: ExerciseRecordWithExercise[];
   weightUnit: 'kg' | 'lb';
   accentColor: string;
   navigation: Navigation;
@@ -70,6 +78,7 @@ export function OverviewSection({
   totalPRs,
   repPRs,
   oneRepMaxes,
+  exerciseRecords = EMPTY_RECORDS,
   weightUnit,
   accentColor,
   navigation,
@@ -77,8 +86,8 @@ export function OverviewSection({
   onViewAllMilestones,
 }: Props) {
   const recentMilestones = useMemo(
-    () => mergeAndSortPRs(repPRs, oneRepMaxes).slice(0, RECENT_MILESTONES_LIMIT),
-    [repPRs, oneRepMaxes],
+    () => mergeAndSortPRs(repPRs, oneRepMaxes, exerciseRecords).slice(0, RECENT_MILESTONES_LIMIT),
+    [repPRs, oneRepMaxes, exerciseRecords],
   );
 
   if (groups.length === 0) {
@@ -164,18 +173,23 @@ export function OverviewSection({
               key={item.key}
               testID={`progress-overview-milestone-${item.key}`}
               exerciseName={item.exerciseName}
-              weightDisplay={roundWeight(fromKg(item.weightKg, weightUnit))}
+              weightDisplay={roundWeight(fromKg(item.weightKg ?? 0, weightUnit))}
               reps={item.reps}
               unit={weightUnit}
+              value={recordValueText(item, weightUnit)}
               achievedAt={item.achievedAt}
               recordType={item.recordType}
               accentColor={accentColor}
               showDivider={index > 0}
-              onPress={() =>
-                navigation.navigate('ProgressExerciseDetail', {
-                  exerciseId: item.exerciseId,
-                  exerciseName: item.exerciseName,
-                })
+              // Exercise progress charts weights; a most-reps / longest record has none to open.
+              onPress={
+                item.measurementType === 'weight_reps'
+                  ? () =>
+                      navigation.navigate('ProgressExerciseDetail', {
+                        exerciseId: item.exerciseId,
+                        exerciseName: item.exerciseName,
+                      })
+                  : undefined
               }
             />
           ))}

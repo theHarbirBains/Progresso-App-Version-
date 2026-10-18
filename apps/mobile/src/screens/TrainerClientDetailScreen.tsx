@@ -49,11 +49,14 @@ import {
 } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import {
+  fetchAllExerciseRecords,
   fetchAllOneRepMaxes,
   fetchAllRepPRs,
+  type ExerciseRecordWithExercise,
   type OneRepMaxWithExercise,
   type RepPRWithExercise,
 } from '../workouts/prSummaryQueries';
+import { formatSetValues } from '../workouts/setValues';
 import type { EnrichedWorkoutSummary } from '../workouts/workoutHistoryEnrichment';
 import type { WorkoutSummary } from '../workouts/workoutQueries';
 
@@ -73,6 +76,8 @@ interface ClientData {
   allSetHistory: HistoricalSetWithExercise[];
   repPRs: RepPRWithExercise[];
   oneRepMaxes: OneRepMaxWithExercise[];
+  /** The client's most reps / longest time on bodyweight and timed exercises. */
+  exerciseRecords: ExerciseRecordWithExercise[];
 }
 
 /** "5 ft 11 in" for a height stored in cm. */
@@ -126,6 +131,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
           allSetHistory: [],
           repPRs: [],
           oneRepMaxes: [],
+          exerciseRecords: [],
         });
         return;
       }
@@ -134,14 +140,16 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
       // this client -- the trainer RLS policies (trainer_mode migration)
       // are what actually allow this, same as fetchClientPersonalRecords
       // already does for rep_prs.
-      const [feed, records, allWorkouts, allSetHistory, repPRs, oneRepMaxes] = await Promise.all([
-        fetchClientWorkoutFeed(clientId, 0),
-        fetchClientPersonalRecords(clientId),
-        fetchAllCompletedWorkouts(clientId),
-        fetchAllExerciseHistory(clientId),
-        fetchAllRepPRs(clientId),
-        fetchAllOneRepMaxes(clientId),
-      ]);
+      const [feed, records, allWorkouts, allSetHistory, repPRs, oneRepMaxes, exerciseRecords] =
+        await Promise.all([
+          fetchClientWorkoutFeed(clientId, 0),
+          fetchClientPersonalRecords(clientId),
+          fetchAllCompletedWorkouts(clientId),
+          fetchAllExerciseHistory(clientId),
+          fetchAllRepPRs(clientId),
+          fetchAllOneRepMaxes(clientId),
+          fetchAllExerciseRecords(clientId),
+        ]);
       setLiveSession(await fetchOpenLiveSession(clientId, user?.id ?? ''));
       setPage(0);
       setData({
@@ -153,6 +161,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
         allSetHistory,
         repPRs,
         oneRepMaxes,
+        exerciseRecords,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this client');
@@ -265,7 +274,10 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
     () => computeLifetimeStats(data?.allWorkouts ?? []),
     [data?.allWorkouts],
   );
-  const totalPRs = (data?.repPRs.length ?? 0) + (data?.oneRepMaxes.length ?? 0);
+  const totalPRs =
+    (data?.repPRs.length ?? 0) +
+    (data?.oneRepMaxes.length ?? 0) +
+    (data?.exerciseRecords.length ?? 0);
   // The four Progress section components type their own `navigation` prop as
   // RootStackScreenProps<'ProgressOverview'>['navigation'] -- cosmetic, since
   // all they ever call on it is `.navigate()`, which accepts any route in the
@@ -432,7 +444,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
           {tab === 'records' ? (
             <AppCard testID="trainer-client-records">
               <SectionHeader label="Personal Records" />
-              {data?.records.length === 0 ? (
+              {data?.records.length === 0 && data.exerciseRecords.length === 0 ? (
                 <ListRow title="No personal records yet" testID="trainer-client-no-records" />
               ) : null}
               {data?.records.map((record, index) => (
@@ -443,6 +455,24 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                   subtitle={`${record.reps} ${record.reps === 1 ? 'rep' : 'reps'}`}
                   value={`${formatWeightKg(record.bestWeightKg, CLIENT_WEIGHT_UNIT)} ${CLIENT_WEIGHT_UNIT}`}
                   divider={index > 0}
+                />
+              ))}
+              {/* Bodyweight and timed exercises: the most reps, the longest time. */}
+              {data?.exerciseRecords.map((record, index) => (
+                <ListRow
+                  key={`${record.measurementType}-${record.exerciseId}`}
+                  testID={`trainer-client-exercise-record-${record.exerciseId}`}
+                  title={record.exerciseName}
+                  subtitle={record.measurementType === 'timed' ? 'Longest' : 'Most Reps'}
+                  value={formatSetValues(
+                    {
+                      measurementType: record.measurementType,
+                      reps: record.value,
+                      durationSeconds: record.value,
+                    },
+                    CLIENT_WEIGHT_UNIT,
+                  )}
+                  divider={index > 0 || (data?.records.length ?? 0) > 0}
                 />
               ))}
             </AppCard>
@@ -469,6 +499,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                     totalPRs={totalPRs}
                     repPRs={data?.repPRs ?? []}
                     oneRepMaxes={data?.oneRepMaxes ?? []}
+                    exerciseRecords={data?.exerciseRecords}
                     weightUnit={CLIENT_WEIGHT_UNIT}
                     accentColor={theme.accent}
                     navigation={progressNavigation}

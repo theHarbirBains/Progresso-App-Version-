@@ -1,5 +1,9 @@
-import { mergeAndSortPRs } from './prFeed';
-import type { OneRepMaxWithExercise, RepPRWithExercise } from '../workouts/prSummaryQueries';
+import { mergeAndSortPRs, recordValueText } from './prFeed';
+import type {
+  ExerciseRecordWithExercise,
+  OneRepMaxWithExercise,
+  RepPRWithExercise,
+} from '../workouts/prSummaryQueries';
 
 function repPR(overrides: Partial<RepPRWithExercise> = {}): RepPRWithExercise {
   return {
@@ -57,5 +61,62 @@ describe('mergeAndSortPRs', () => {
 
     expect(rows.find((r) => r.recordType === '6-Rep PR')?.reps).toBe(6);
     expect(rows.find((r) => r.recordType === '1RM')?.reps).toBeNull();
+  });
+});
+
+function exerciseRecord(
+  overrides: Partial<ExerciseRecordWithExercise> = {},
+): ExerciseRecordWithExercise {
+  return {
+    measurementType: 'bodyweight',
+    value: 25,
+    exerciseId: 'ex-pushup',
+    exerciseName: 'Push-Up',
+    achievedAt: '2026-03-01T00:00:00Z',
+    sourceSetId: 'set-3',
+    ...overrides,
+  };
+}
+
+describe('mergeAndSortPRs with bodyweight and timed records', () => {
+  it('adds most reps and longest time, in date order with the weighted records', () => {
+    const rows = mergeAndSortPRs(
+      [repPR({ achievedAt: '2026-01-01T00:00:00Z' })],
+      [],
+      [
+        exerciseRecord({ achievedAt: '2026-03-01T00:00:00Z' }),
+        exerciseRecord({
+          measurementType: 'timed',
+          value: 90,
+          exerciseId: 'ex-plank',
+          exerciseName: 'Plank',
+          achievedAt: '2026-02-01T00:00:00Z',
+        }),
+      ],
+    );
+
+    expect(rows.map((r) => r.recordType)).toEqual(['Most Reps', 'Longest', '8-Rep PR']);
+    expect(rows[0]).toMatchObject({ reps: 25, weightKg: null, durationSeconds: null });
+    expect(rows[1]).toMatchObject({ reps: null, weightKg: null, durationSeconds: 90 });
+  });
+
+  it('shows a record by what it measures, and leaves a weight to PRRow', () => {
+    const [bodyweight, timed, weighted] = mergeAndSortPRs(
+      [repPR({ achievedAt: '2026-01-01T00:00:00Z' })],
+      [],
+      [
+        exerciseRecord({ achievedAt: '2026-03-01T00:00:00Z' }),
+        exerciseRecord({
+          measurementType: 'timed',
+          value: 90,
+          exerciseId: 'ex-plank',
+          achievedAt: '2026-02-01T00:00:00Z',
+        }),
+      ],
+    );
+
+    expect(recordValueText(bodyweight, 'lb')).toBe('25 reps');
+    expect(recordValueText(timed, 'lb')).toBe('1:30');
+    expect(recordValueText(weighted, 'lb')).toBeUndefined();
   });
 });

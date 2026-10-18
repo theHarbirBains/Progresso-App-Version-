@@ -1,7 +1,7 @@
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import { fetchAllRows } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
-import type { OneRepMax, RepPR } from './prQueries';
+import type { ExerciseRecord, OneRepMax, RepPR } from './prQueries';
 
 // Cross-exercise variants of prQueries.ts's fetchRepPRs/fetchOneRepMax --
 // same read-only tables (rep_prs/one_rep_maxes have no write RLS policy for
@@ -92,4 +92,78 @@ export async function fetchAllOneRepMaxes(userId: string): Promise<OneRepMaxWith
     exerciseName: row.exercises?.name ?? 'Exercise',
     exercisePhotoUrl: row.exercises?.photo_url ?? null,
   }));
+}
+
+/**
+ * A bodyweight exercise's most reps, or a timed one's longest time -- prQueries.ts's
+ * ExerciseRecord, across every exercise.
+ */
+export interface ExerciseRecordWithExercise extends ExerciseRecord {
+  /** 'bodyweight': `value` is reps. 'timed': `value` is seconds. */
+  measurementType: 'bodyweight' | 'timed';
+  exerciseId: string;
+  exerciseName: string;
+  /** The exercise's machine photo (exercises.photo_url), when it has one. */
+  exercisePhotoUrl?: string | null;
+}
+
+interface RecordRow {
+  source_set_id: string;
+  achieved_at: string;
+  exercise_id: string;
+  exercises: { name: string; photo_url: string | null } | null;
+}
+
+function toExerciseRecord(
+  row: RecordRow,
+  measurementType: 'bodyweight' | 'timed',
+  value: number,
+): ExerciseRecordWithExercise {
+  return {
+    measurementType,
+    value,
+    sourceSetId: row.source_set_id,
+    achievedAt: row.achieved_at,
+    exerciseId: row.exercise_id,
+    exerciseName: row.exercises?.name ?? 'Exercise',
+    exercisePhotoUrl: row.exercises?.photo_url ?? null,
+  };
+}
+
+/**
+ * Every bodyweight (most reps) and timed (longest time) record across every exercise for this
+ * user, most recently achieved first. Kept by the database like rep PRs.
+ */
+export async function fetchAllExerciseRecords(
+  userId: string,
+): Promise<ExerciseRecordWithExercise[]> {
+  const [repRows, durationRows] = await Promise.all([
+    fetchAllRows<RecordRow & { reps: number }>((from, to) =>
+      supabase
+        .from('rep_records')
+        .select('reps, source_set_id, achieved_at, exercise_id, exercises(name, photo_url)', {
+          count: 'exact',
+        })
+        .eq('user_id', userId)
+        .order('achieved_at', { ascending: false })
+        .order('id')
+        .range(from, to),
+    ),
+    fetchAllRows<RecordRow & { duration_seconds: number }>((from, to) =>
+      supabase
+        .from('duration_records')
+        .select(
+          'duration_seconds, source_set_id, achieved_at, exercise_id, exercises(name, photo_url)',
+          { count: 'exact' },
+        )
+        .eq('user_id', userId)
+        .order('achieved_at', { ascending: false })
+        .order('id')
+        .range(from, to),
+    ),
+  ]);
+  return [
+    ...repRows.map((row) => toExerciseRecord(row, 'bodyweight', row.reps)),
+    ...durationRows.map((row) => toExerciseRecord(row, 'timed', row.duration_seconds)),
+  ].sort((a, b) => new Date(b.achievedAt).getTime() - new Date(a.achievedAt).getTime());
 }

@@ -1,16 +1,35 @@
-import { formatWeightKg, isValidWeightIncrement } from '../lib/units';
+import type { MeasurementType } from '../exercises/movementTypes';
+import { formatDuration, parseDuration } from '../lib/duration';
+import { formatWeightKg, isValidWeightIncrement, roundWeight, toKg } from '../lib/units';
 import { formatShortDate } from './workoutFormat';
-import type { PreviousSessionDisplay, UnilateralExerciseCardSet } from './ExerciseCard';
+import type {
+  ExerciseCardSet,
+  PreviousSessionDisplay,
+  UnilateralExerciseCardSet,
+} from './ExerciseCard';
 import type { SetRecord, SetSide } from './workoutQueries';
 
 // The set-entry rules every live workout shares: what counts as a valid draft, what a new
 // set starts with, how a unilateral exercise groups its two sides, and how last session is
 // shown. The regular Active Workout and the group workout both read from here so they cannot
 // drift apart.
+//
+// Each rule follows what the exercise measures: a weight and reps, reps only (bodyweight), or
+// a duration (timed), typed as seconds or minutes:seconds. The type defaults to weight and
+// reps, as every exercise was before measurement types.
 
 export interface SetInputDraft {
   weight: string;
   reps: string;
+  /** A timed set's duration as typed ("45", "1:30"). Absent for every other set. */
+  duration?: string;
+}
+
+/** What a draft saves as, for updateSet: only the values the type records, the rest null. */
+export interface SetDraftValues {
+  weightKg: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
 }
 
 /** Every set from the user's last completed session with this exercise, in
@@ -18,35 +37,130 @@ export interface SetInputDraft {
 export function buildPreviousSessionDisplay(
   previous: { performedAt: string; sets: SetRecord[] } | undefined,
   unit: 'kg' | 'lb',
+  type: MeasurementType = 'weight_reps',
 ): PreviousSessionDisplay | null {
   if (!previous || previous.sets.length === 0) return null;
   return {
     dateDisplay: formatShortDate(previous.performedAt),
     sets: previous.sets.map((s, i) => ({
       setNumber: i + 1,
-      weightDisplay: formatWeightKg(s.weightKg ?? 0, unit),
+      weightDisplay: type === 'weight_reps' ? formatWeightKg(s.weightKg ?? 0, unit) : '',
       unit,
-      reps: s.reps ?? 0,
+      reps: type === 'timed' ? 0 : (s.reps ?? 0),
+      durationDisplay:
+        type === 'timed' && s.durationSeconds != null ? formatDuration(s.durationSeconds) : null,
       side: s.side,
     })),
   };
 }
 
-export function isValidDraft(draft: SetInputDraft | undefined): boolean {
-  if (!draft) return false;
-  const weightNum = Number(draft.weight);
-  const repsNum = Number(draft.reps);
-  return (
-    Number.isFinite(weightNum) &&
-    weightNum > 0 &&
-    isValidWeightIncrement(weightNum) &&
-    Number.isInteger(repsNum) &&
-    repsNum > 0
-  );
+function isValidReps(text: string): boolean {
+  const reps = Number(text);
+  return text.trim() !== '' && Number.isInteger(reps) && reps > 0;
 }
 
-function hasInput(draft: SetInputDraft | undefined): draft is SetInputDraft {
-  return draft !== undefined && (draft.weight !== '' || draft.reps !== '');
+export function isValidDraft(
+  draft: SetInputDraft | undefined,
+  type: MeasurementType = 'weight_reps',
+): boolean {
+  if (!draft) return false;
+  switch (type) {
+    case 'bodyweight':
+      return isValidReps(draft.reps);
+    case 'timed':
+      return parseDuration(draft.duration ?? '') !== null;
+    default: {
+      const weightNum = Number(draft.weight);
+      return (
+        draft.weight.trim() !== '' &&
+        Number.isFinite(weightNum) &&
+        weightNum > 0 &&
+        isValidWeightIncrement(weightNum) &&
+        isValidReps(draft.reps)
+      );
+    }
+  }
+}
+
+/** What to say when a set can't be completed yet, by what it measures. */
+export function invalidDraftMessage(type: MeasurementType, bothSides = false): string {
+  const sides = bothSides ? ' for both sides' : '';
+  switch (type) {
+    case 'bodyweight':
+      return `Enter a rep count${sides}`;
+    case 'timed':
+      return `Enter a time${sides}, like 45 or 1:30`;
+    default:
+      return `Enter a valid weight (in steps of 0.25) and rep count${sides}`;
+  }
+}
+
+/** A bilateral exercise's sets as ExerciseCard shows them: what's typed, and whether each can be completed. */
+export function computeCardSets(
+  sets: SetRecord[],
+  setInputs: Record<string, SetInputDraft>,
+  type: MeasurementType = 'weight_reps',
+): ExerciseCardSet[] {
+  return sets.map((set) => ({
+    id: set.id,
+    setIndex: set.setIndex,
+    weight: setInputs[set.id]?.weight ?? '',
+    reps: setInputs[set.id]?.reps ?? '',
+    duration: setInputs[set.id]?.duration ?? '',
+    completed: set.completedAt !== null,
+    canComplete: isValidDraft(setInputs[set.id], type),
+  }));
+}
+
+/** The values a valid draft saves as. Call only after isValidDraft. */
+export function draftValues(
+  draft: SetInputDraft,
+  type: MeasurementType,
+  unit: 'kg' | 'lb',
+): SetDraftValues {
+  switch (type) {
+    case 'bodyweight':
+      return { weightKg: null, reps: Math.trunc(Number(draft.reps)), durationSeconds: null };
+    case 'timed':
+      return { weightKg: null, reps: null, durationSeconds: parseDuration(draft.duration ?? '') };
+    default:
+      return {
+        weightKg: roundWeight(toKg(Number(draft.weight), unit)),
+        reps: Math.trunc(Number(draft.reps)),
+        durationSeconds: null,
+      };
+  }
+}
+
+/** What a saved set shows in its fields. */
+export function draftFromSet(
+  set: Pick<SetRecord, 'weightKg' | 'reps' | 'durationSeconds'>,
+  type: MeasurementType,
+  unit: 'kg' | 'lb',
+): SetInputDraft {
+  switch (type) {
+    case 'bodyweight':
+      return { weight: '', reps: set.reps !== null ? String(set.reps) : '' };
+    case 'timed':
+      return {
+        weight: '',
+        reps: '',
+        duration: set.durationSeconds != null ? formatDuration(set.durationSeconds) : '',
+      };
+    default:
+      return {
+        weight: set.weightKg !== null ? formatWeightKg(set.weightKg, unit) : '',
+        reps: set.reps !== null ? String(set.reps) : '',
+      };
+  }
+}
+
+/** Whether anything is typed into a draft. */
+export function hasDraftInput(draft: SetInputDraft | undefined): draft is SetInputDraft {
+  return (
+    draft !== undefined &&
+    (draft.weight !== '' || draft.reps !== '' || (draft.duration ?? '') !== '')
+  );
 }
 
 /**
@@ -61,11 +175,12 @@ export function withPrefilledSets(
   setsBefore: SetRecord[],
   lastSession: SetRecord[] | undefined,
   unit: 'kg' | 'lb',
+  type: MeasurementType = 'weight_reps',
 ): Record<string, SetInputDraft> {
   const next = { ...setInputs };
   for (const set of newSets) {
-    if (hasInput(setInputs[set.id])) continue;
-    next[set.id] = prefillFor(set.side, setsBefore, setInputs, lastSession, unit);
+    if (hasDraftInput(setInputs[set.id])) continue;
+    next[set.id] = prefillFor(set.side, setsBefore, setInputs, lastSession, unit, type);
   }
   return next;
 }
@@ -76,6 +191,7 @@ function prefillFor(
   setInputs: Record<string, SetInputDraft>,
   lastSession: SetRecord[] | undefined,
   unit: 'kg' | 'lb',
+  type: MeasurementType,
 ): SetInputDraft {
   const onSide = (set: SetRecord) => side === null || set.side === side;
   const before = setsBefore
@@ -85,7 +201,7 @@ function prefillFor(
       undefined,
     );
   const beforeInput = before ? setInputs[before.id] : undefined;
-  if (hasInput(beforeInput)) return { ...beforeInput };
+  if (hasDraftInput(beforeInput)) return { ...beforeInput };
 
   // Set numbers count a left/right pair as one set, in the order the sets were logged.
   const setNumber = new Set(setsBefore.map((set) => set.setIndex)).size + 1;
@@ -95,11 +211,10 @@ function prefillFor(
   const match = lastSession?.find(
     (set) => set.setIndex === lastIndexes[setNumber - 1] && onSide(set),
   );
-  return {
-    weight: match?.weightKg != null ? formatWeightKg(match.weightKg, unit) : '',
-    reps: match?.reps != null ? String(match.reps) : '',
-  };
+  return match ? draftFromSet(match, type, unit) : draftFromSet(EMPTY_SET, type, unit);
 }
+
+const EMPTY_SET = { weightKg: null, reps: null, durationSeconds: null };
 
 /** Groups a unilateral exercise's flat sets array into one row per LOGICAL
  * set (left + right sharing a setIndex), for ExerciseCard's unilateralSets
@@ -109,6 +224,7 @@ function prefillFor(
 export function computeUnilateralSets(
   sets: SetRecord[],
   setInputs: Record<string, SetInputDraft>,
+  type: MeasurementType = 'weight_reps',
 ): UnilateralExerciseCardSet[] {
   const bySetIndex = new Map<number, { left?: SetRecord; right?: SetRecord }>();
   for (const set of sets) {
@@ -118,26 +234,19 @@ export function computeUnilateralSets(
     bySetIndex.set(set.setIndex, entry);
   }
 
+  const side = (set: SetRecord) => ({
+    id: set.id,
+    weight: setInputs[set.id]?.weight ?? '',
+    reps: setInputs[set.id]?.reps ?? '',
+    duration: setInputs[set.id]?.duration ?? '',
+    completed: set.completedAt !== null,
+    canComplete: isValidDraft(setInputs[set.id], type),
+  });
+
   const rows: UnilateralExerciseCardSet[] = [];
   for (const [setIndex, { left, right }] of bySetIndex) {
     if (!left || !right) continue;
-    rows.push({
-      setIndex,
-      left: {
-        id: left.id,
-        weight: setInputs[left.id]?.weight ?? '',
-        reps: setInputs[left.id]?.reps ?? '',
-        completed: left.completedAt !== null,
-        canComplete: isValidDraft(setInputs[left.id]),
-      },
-      right: {
-        id: right.id,
-        weight: setInputs[right.id]?.weight ?? '',
-        reps: setInputs[right.id]?.reps ?? '',
-        completed: right.completedAt !== null,
-        canComplete: isValidDraft(setInputs[right.id]),
-      },
-    });
+    rows.push({ setIndex, left: side(left), right: side(right) });
   }
   return rows.sort((a, b) => a.setIndex - b.setIndex);
 }

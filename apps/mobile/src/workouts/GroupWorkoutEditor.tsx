@@ -6,7 +6,7 @@ import { Text } from '../design/Text';
 import { UnderlineTabs } from '../design/UnderlineTabs';
 import { colors, spacing, typeScale } from '../design/theme';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
-import { formatWeightKg, roundWeight, toKg } from '../lib/units';
+import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import { computeTotalSets } from './workoutSummary';
 import { WorkoutStats } from './WorkoutStats';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -23,7 +23,11 @@ import { ExerciseCard, type PreviousSessionDisplay } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
 import {
   buildPreviousSessionDisplay,
+  computeCardSets,
   computeUnilateralSets,
+  draftFromSet,
+  draftValues,
+  invalidDraftMessage,
   isValidDraft,
   withPrefilledSets,
   type SetInputDraft,
@@ -83,7 +87,7 @@ export function GroupWorkoutEditor({
   const { weightUnit } = useProgressTheme();
   const [details, setDetails] = useState<Record<string, WorkoutDetail>>({});
   const [selectedId, setSelectedId] = useState(userId);
-  const { setInputs, setSetInputs, changeWeight, changeReps } = useSetInputDrafts();
+  const { setInputs, setSetInputs, changeWeight, changeReps, changeDuration } = useSetInputDrafts();
   const [previous, setPrevious] = useState<
     Record<string, { performedAt: string; sets: SetRecord[] }>
   >({});
@@ -109,10 +113,7 @@ export function GroupWorkoutEditor({
       const saved: Record<string, SetInputDraft> = {};
       for (const exercise of detail.exercises) {
         for (const set of exercise.sets) {
-          saved[set.id] = {
-            weight: set.weightKg !== null ? formatWeightKg(set.weightKg, weightUnit) : '',
-            reps: set.reps !== null ? String(set.reps) : '',
-          };
+          saved[set.id] = draftFromSet(set, measurementTypeOf(exercise), weightUnit);
         }
       }
       const merged = mergeLiveWorkoutDrafts(saved, drafts, openSetIds);
@@ -150,7 +151,7 @@ export function GroupWorkoutEditor({
         const have = new Set(loaded[i].exercises.map((ex) => ex.exerciseId));
         for (const [exerciseId, shape] of byExercise) {
           if (have.has(exerciseId)) continue;
-          await addToWorkout(members[i], exerciseId, shape.movementType);
+          await addToWorkout(members[i], exerciseId, shape);
           added = true;
         }
       }
@@ -175,8 +176,12 @@ export function GroupWorkoutEditor({
   async function addToWorkout(
     member: GroupWorkoutMember,
     exerciseId: string,
-    movementType: WorkoutExerciseWithSets['movementType'],
+    shape: {
+      movementType: WorkoutExerciseWithSets['movementType'];
+      measurementType?: MeasurementType;
+    },
   ) {
+    const { movementType } = shape;
     // Loads alongside the writes below; it only fills in the set, so a failure is ignored.
     const lastSessionLoad = fetchPreviousPerformance(
       member.userId,
@@ -193,7 +198,9 @@ export function GroupWorkoutEditor({
           ]
         : [await createSet(workoutExerciseId, 1)];
     const lastSession = await lastSessionLoad;
-    setSetInputs((prev) => withPrefilledSets(prev, created, [], lastSession?.sets, weightUnit));
+    setSetInputs((prev) =>
+      withPrefilledSets(prev, created, [], lastSession?.sets, weightUnit, measurementTypeOf(shape)),
+    );
   }
 
   /** Runs one change, then reloads so each row shows what is saved. */
@@ -292,7 +299,7 @@ export function GroupWorkoutEditor({
         const detail = details[member.userId];
         if (!detail) continue;
         const exerciseId = resolveExerciseId ? await resolveExerciseId(exercise.id) : exercise.id;
-        await addToWorkout(member, exerciseId, exercise.movementType);
+        await addToWorkout(member, exerciseId, exercise);
       }
     });
   }
@@ -319,26 +326,33 @@ export function GroupWorkoutEditor({
             ]
           : [await createSet(exercise.id, nextIndex)];
       setSetInputs((prev) =>
-        withPrefilledSets(prev, created, exercise.sets, lastSession, weightUnit),
+        withPrefilledSets(
+          prev,
+          created,
+          exercise.sets,
+          lastSession,
+          weightUnit,
+          measurementTypeOf(exercise),
+        ),
       );
     });
   }
 
   /** Completes or reopens one set of the selected person. */
-  async function toggleSet(set: SetRecord) {
+  async function toggleSet(exercise: WorkoutExerciseWithSets, set: SetRecord) {
     if (set.completedAt) {
       await change(() => updateSet(set.id, { completedAt: null }));
       return;
     }
+    const type = measurementTypeOf(exercise);
     const draft = setInputs[set.id];
-    if (!isValidDraft(draft)) {
-      setError('Enter a valid weight (in steps of 0.25) and rep count');
+    if (!isValidDraft(draft, type)) {
+      setError(invalidDraftMessage(type));
       return;
     }
     await change(() =>
       updateSet(set.id, {
-        weightKg: roundWeight(toKg(Number(draft.weight), weightUnit)),
-        reps: Math.trunc(Number(draft.reps)),
+        ...draftValues(draft, type, weightUnit),
         completedAt: new Date().toISOString(),
       }),
     );
@@ -350,8 +364,12 @@ export function GroupWorkoutEditor({
     const right = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'right');
     if (!left || !right) return;
     const reopening = left.completedAt !== null || right.completedAt !== null;
-    if (!reopening && (!isValidDraft(setInputs[left.id]) || !isValidDraft(setInputs[right.id]))) {
-      setError('Enter a valid weight (in steps of 0.25) and rep count for both sides');
+    const type = measurementTypeOf(exercise);
+    if (
+      !reopening &&
+      (!isValidDraft(setInputs[left.id], type) || !isValidDraft(setInputs[right.id], type))
+    ) {
+      setError(invalidDraftMessage(type, true));
       return;
     }
     await change(async () => {
@@ -359,10 +377,8 @@ export function GroupWorkoutEditor({
         if (reopening) {
           await updateSet(set.id, { completedAt: null });
         } else {
-          const draft = setInputs[set.id];
           await updateSet(set.id, {
-            weightKg: roundWeight(toKg(Number(draft.weight), weightUnit)),
-            reps: Math.trunc(Number(draft.reps)),
+            ...draftValues(setInputs[set.id], type, weightUnit),
             completedAt: new Date().toISOString(),
           });
         }
@@ -428,9 +444,11 @@ export function GroupWorkoutEditor({
         const row = rowFor(shape.exerciseId);
         if (!row) return null;
         const prior = selected ? previous[`${selected.userId}:${row.exerciseId}`] : undefined;
+        const type = measurementTypeOf(row);
         const previousSession: PreviousSessionDisplay | null = buildPreviousSessionDisplay(
           prior,
           weightUnit,
+          type,
         );
         return (
           <ExerciseCard
@@ -439,29 +457,24 @@ export function GroupWorkoutEditor({
             exerciseName={row.exerciseName}
             muscleGroup={row.muscleGroup}
             movementType={row.movementType}
+            measurementType={type}
             previousSession={previousSession}
             sets={
-              row.movementType === 'unilateral'
-                ? []
-                : row.sets.map((set) => ({
-                    id: set.id,
-                    setIndex: set.setIndex,
-                    weight: setInputs[set.id]?.weight ?? '',
-                    reps: setInputs[set.id]?.reps ?? '',
-                    completed: set.completedAt !== null,
-                    canComplete: isValidDraft(setInputs[set.id]),
-                  }))
+              row.movementType === 'unilateral' ? [] : computeCardSets(row.sets, setInputs, type)
             }
             unilateralSets={
-              row.movementType === 'unilateral' ? computeUnilateralSets(row.sets, setInputs) : []
+              row.movementType === 'unilateral'
+                ? computeUnilateralSets(row.sets, setInputs, type)
+                : []
             }
             onChangeWeight={changeWeight}
             onChangeReps={changeReps}
+            onChangeDuration={changeDuration}
             onToggleComplete={(setId) => {
               const set = row.sets.find((s) => s.id === setId);
               if (!set) return;
               if (row.movementType === 'unilateral') void toggleUnilateral(row, set.setIndex);
-              else void toggleSet(set);
+              else void toggleSet(row, set);
             }}
             onAddSet={() => void addSet(row)}
             onRemoveExercise={() => confirmRemove(row)}

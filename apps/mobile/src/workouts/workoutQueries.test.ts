@@ -326,6 +326,7 @@ describe('fetchWorkoutDetail', () => {
           muscleGroup: 'chest',
           movementType: 'bilateral',
           loggingStyle: null,
+          measurementType: 'weight_reps',
           orderIndex: 1,
           sets: [
             {
@@ -334,9 +335,18 @@ describe('fetchWorkoutDetail', () => {
               side: null,
               weightKg: 100,
               reps: 5,
+              durationSeconds: null,
               completedAt: '2026-01-01T00:05:00Z',
             },
-            { id: 's2', setIndex: 2, side: null, weightKg: null, reps: null, completedAt: null },
+            {
+              id: 's2',
+              setIndex: 2,
+              side: null,
+              weightKg: null,
+              reps: null,
+              durationSeconds: null,
+              completedAt: null,
+            },
           ],
         },
       ],
@@ -713,6 +723,7 @@ describe('createSet/updateSet/deleteSet', () => {
       setIndex: 1,
       weightKg: null,
       reps: null,
+      durationSeconds: null,
       completedAt: null,
     });
     expect(sets.builder.insert).toHaveBeenCalledWith({ workout_exercise_id: 'we1', set_index: 1 });
@@ -741,6 +752,7 @@ describe('createSet/updateSet/deleteSet', () => {
       side: 'left',
       weightKg: null,
       reps: null,
+      durationSeconds: null,
       completedAt: null,
     });
     expect(sets.builder.insert).toHaveBeenCalledWith({
@@ -847,6 +859,7 @@ describe('fetchPreviousPerformance', () => {
           side: null,
           weightKg: 135,
           reps: 10,
+          durationSeconds: null,
           completedAt: '2026-01-10T00:05:00Z',
         },
       ],
@@ -901,6 +914,7 @@ describe('fetchPreviousPerformance', () => {
         side: 'left',
         weightKg: 42.5,
         reps: 10,
+        durationSeconds: null,
         completedAt: '2026-01-05T00:05:00Z',
       },
       {
@@ -909,6 +923,7 @@ describe('fetchPreviousPerformance', () => {
         side: 'right',
         weightKg: 40,
         reps: 10,
+        durationSeconds: null,
         completedAt: '2026-01-05T00:06:00Z',
       },
     ]);

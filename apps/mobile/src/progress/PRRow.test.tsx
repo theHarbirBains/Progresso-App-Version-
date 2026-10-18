@@ -103,3 +103,25 @@ describe('PRRow', () => {
     expect(screen.queryByTestId('row-photo')).toBeNull();
   });
 });
+
+describe('PRRow for a bodyweight or timed record', () => {
+  it('shows the given value in place of a weight', () => {
+    render(
+      <PRRow
+        exerciseName="Plank"
+        weightDisplay={0}
+        reps={null}
+        unit="lb"
+        value="1:30"
+        achievedAt="2026-10-03T00:00:00Z"
+        recordType="Longest"
+        accentColor="#D99A50"
+        testID="row"
+      />,
+    );
+
+    expect(screen.getByTestId('row')).toHaveTextContent(/Longest/);
+    expect(screen.getByTestId('row')).toHaveTextContent(/1:30/);
+    expect(screen.getByTestId('row')).not.toHaveTextContent(/lb/);
+  });
+});

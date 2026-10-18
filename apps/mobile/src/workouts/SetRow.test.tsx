@@ -100,3 +100,38 @@ describe('SetRow render behaviour', () => {
     expect(onChangeWeight).toHaveBeenCalledWith('set-9', '42');
   });
 });
+
+describe('SetRow by what the exercise measures', () => {
+  it('shows BW in place of a weight field for a bodyweight exercise', () => {
+    render(<SetRow {...baseProps} measurementType="bodyweight" />);
+
+    expect(screen.getByTestId('set-row-bodyweight')).toHaveTextContent('BW');
+    expect(screen.queryByTestId('set-row-weight')).toBeNull();
+    expect(screen.getByTestId('set-row-reps')).toBeTruthy();
+  });
+
+  it('shows one time field for a timed exercise, and reports what is typed', () => {
+    const onChangeDuration = jest.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        measurementType="timed"
+        duration=""
+        onChangeDuration={onChangeDuration}
+      />,
+    );
+
+    expect(screen.queryByTestId('set-row-weight')).toBeNull();
+    expect(screen.queryByTestId('set-row-reps')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('set-row-time'), '1:30');
+
+    expect(onChangeDuration).toHaveBeenCalledWith('set-1', '1:30');
+    expect(screen.getByLabelText('Set 1 time, in seconds or minutes and seconds')).toBeTruthy();
+  });
+
+  it("locks a completed timed set's field", () => {
+    render(<SetRow {...baseProps} measurementType="timed" duration="1:30" completed />);
+
+    expect(screen.getByTestId('set-row-time').props.editable).toBe(false);
+  });
+});

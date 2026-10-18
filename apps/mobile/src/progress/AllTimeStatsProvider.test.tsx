@@ -1,7 +1,11 @@
 import { act, render, renderHook, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
-import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
+import {
+  fetchAllExerciseRecords,
+  fetchAllOneRepMaxes,
+  fetchAllRepPRs,
+} from '../workouts/prSummaryQueries';
 import { fetchAllCompletedWorkouts } from './progressStatsQueries';
 import { AllTimeStatsProvider, useAllTimeStats } from './AllTimeStatsProvider';
 
@@ -18,6 +22,7 @@ jest.mock('../workouts/allExerciseHistoryQueries', () => ({
 }));
 
 jest.mock('../workouts/prSummaryQueries', () => ({
+  fetchAllExerciseRecords: jest.fn(),
   fetchAllRepPRs: jest.fn(),
   fetchAllOneRepMaxes: jest.fn(),
 }));
@@ -27,11 +32,13 @@ const mockFetchAllCompletedWorkouts = fetchAllCompletedWorkouts as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
 const mockFetchAllRepPRs = fetchAllRepPRs as jest.Mock;
 const mockFetchAllOneRepMaxes = fetchAllOneRepMaxes as jest.Mock;
+const mockFetchAllExerciseRecords = fetchAllExerciseRecords as jest.Mock;
 
 const sampleWorkout = { id: 'w1', name: 'Push', performedAt: '2026-01-01T00:00:00Z' };
 const sampleSet = { id: 's1', exerciseId: 'e1' };
 const sampleRepPR = { id: 'pr1', exerciseId: 'e1' };
 const sampleOneRepMax = { id: 'orm1', exerciseId: 'e1' };
+const sampleExerciseRecord = { measurementType: 'timed', value: 90, exerciseId: 'e2' };
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
@@ -39,6 +46,7 @@ beforeEach(() => {
   mockFetchAllExerciseHistory.mockReset().mockResolvedValue([sampleSet]);
   mockFetchAllRepPRs.mockReset().mockResolvedValue([sampleRepPR]);
   mockFetchAllOneRepMaxes.mockReset().mockResolvedValue([sampleOneRepMax]);
+  mockFetchAllExerciseRecords.mockReset().mockResolvedValue([sampleExerciseRecord]);
 });
 
 describe('AllTimeStatsProvider', () => {
@@ -54,6 +62,9 @@ describe('AllTimeStatsProvider', () => {
     expect(result.current.allSetHistory).toEqual([sampleSet]);
     expect(result.current.repPRs).toEqual([sampleRepPR]);
     expect(result.current.oneRepMaxes).toEqual([sampleOneRepMax]);
+    // A bodyweight or timed exercise's most reps / longest time, alongside the PRs.
+    expect(result.current.exerciseRecords).toEqual([sampleExerciseRecord]);
+    expect(mockFetchAllExerciseRecords).toHaveBeenCalledWith('user-1');
     expect(mockFetchAllCompletedWorkouts).toHaveBeenCalledWith('user-1');
   });
 

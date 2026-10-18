@@ -8,6 +8,7 @@ function exercise(name: string, id = name): ExerciseRow {
     muscleGroup: 'chest',
     movementType: 'bilateral',
     loggingStyle: null,
+    measurementType: 'weight_reps',
     photoUrl: null,
     isActive: true,
     createdBy: null,

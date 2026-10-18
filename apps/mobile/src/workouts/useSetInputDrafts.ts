@@ -13,6 +13,8 @@ export interface UseSetInputDraftsResult {
    * handler it's given never changes identity. */
   changeWeight: (setId: string, text: string) => void;
   changeReps: (setId: string, text: string) => void;
+  /** A timed set's duration, as typed. */
+  changeDuration: (setId: string, text: string) => void;
 }
 
 /**
@@ -29,22 +31,26 @@ export interface UseSetInputDraftsResult {
 export function useSetInputDrafts(): UseSetInputDraftsResult {
   const [setInputs, setSetInputs] = useState<Record<string, SetInputDraft>>({});
 
-  const changeWeight = useCallback(
-    (setId: string, text: string) =>
+  const changeField = useCallback(
+    (field: 'weight' | 'reps' | 'duration', setId: string, text: string) =>
       setSetInputs((prev) => ({
         ...prev,
-        [setId]: { weight: text, reps: prev[setId]?.reps ?? '' },
+        [setId]: { ...(prev[setId] ?? { weight: '', reps: '' }), [field]: text },
       })),
     [],
+  );
+  const changeWeight = useCallback(
+    (setId: string, text: string) => changeField('weight', setId, text),
+    [changeField],
   );
   const changeReps = useCallback(
-    (setId: string, text: string) =>
-      setSetInputs((prev) => ({
-        ...prev,
-        [setId]: { weight: prev[setId]?.weight ?? '', reps: text },
-      })),
-    [],
+    (setId: string, text: string) => changeField('reps', setId, text),
+    [changeField],
+  );
+  const changeDuration = useCallback(
+    (setId: string, text: string) => changeField('duration', setId, text),
+    [changeField],
   );
 
-  return { setInputs, setSetInputs, changeWeight, changeReps };
+  return { setInputs, setSetInputs, changeWeight, changeReps, changeDuration };
 }

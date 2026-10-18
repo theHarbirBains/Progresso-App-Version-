@@ -236,6 +236,22 @@ export const liveWorkoutStyles = StyleSheet.create({
     ...typeScale.statMedium,
     textAlign: 'center',
   },
+  // A timed set's one time field, across both columns.
+  setInputWide: {
+    flex: 2,
+  },
+  // A bodyweight set's weight column: "BW", no field -- the exercise records reps only.
+  setBodyweightCell: {
+    flex: 1,
+    marginHorizontal: spacing.xs,
+    height: minTouchTarget + spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setBodyweightText: {
+    ...typeScale.label,
+    color: colors.textMuted,
+  },
   setInputCompleted: {
     borderColor: colors.borderHero,
     backgroundColor: colors.surfaceHero,

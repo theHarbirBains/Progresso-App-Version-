@@ -5,8 +5,12 @@ import { Feather } from '@expo/vector-icons';
 import { colors, typeScale } from '../design/theme';
 import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackParamList } from '../navigation/types';
-import type { OneRepMaxWithExercise, RepPRWithExercise } from '../workouts/prSummaryQueries';
-import { mergeAndSortPRs, type PRFeedRow } from './prFeed';
+import type {
+  ExerciseRecordWithExercise,
+  OneRepMaxWithExercise,
+  RepPRWithExercise,
+} from '../workouts/prSummaryQueries';
+import { mergeAndSortPRs, recordValueText, type PRFeedRow } from './prFeed';
 import { PRRow } from './PRRow';
 import { ProgressEmptyState } from './ProgressEmptyState';
 import { fetchWorkoutIdForSet } from './progressStatsQueries';
@@ -18,6 +22,9 @@ import { progressStyles as styles } from './progressStyles';
 // regardless of its own route name, without the generic-variance issues
 // NativeStackNavigationProp<RootStackParamList> (no pinned route) runs
 // into for methods like setParams that this component never calls.
+// Stable, so the merged list isn't rebuilt on every render when a caller passes none.
+const EMPTY_RECORDS: ExerciseRecordWithExercise[] = [];
+
 type Navigation = {
   navigate<RouteName extends 'ShareWorkout' | 'ProgressExerciseDetail'>(
     screen: RouteName,
@@ -28,6 +35,8 @@ type Navigation = {
 interface Props {
   repPRs: RepPRWithExercise[];
   oneRepMaxes: OneRepMaxWithExercise[];
+  /** A bodyweight or timed exercise's most reps / longest time. */
+  exerciseRecords?: ExerciseRecordWithExercise[];
   weightUnit: 'kg' | 'lb';
   accentColor: string;
   navigation: Navigation;
@@ -41,8 +50,9 @@ interface Props {
   scrollable?: boolean;
 }
 
-// Every personal record Progresso currently tracks: rep-count PRs and true
-// 1RMs (both database-maintained, see prSummaryQueries.ts), merged into one
+// Every personal record Progresso currently tracks: rep-count PRs, true
+// 1RMs and most-reps / longest records (all database-maintained, see
+// prSummaryQueries.ts), merged into one
 // feed sorted by when they were achieved (mergeAndSortPRs, shared with
 // OverviewSection's "Recent Milestones"). The record-type distinction shown
 // per row is exactly what the data supports -- nothing invented. Section 12
@@ -52,6 +62,7 @@ interface Props {
 export function PRsSection({
   repPRs,
   oneRepMaxes,
+  exerciseRecords = EMPTY_RECORDS,
   weightUnit,
   accentColor,
   navigation,
@@ -61,8 +72,8 @@ export function PRsSection({
   const [sharing, setSharing] = useState(false);
 
   const rows = useMemo<PRFeedRow[]>(
-    () => mergeAndSortPRs(repPRs, oneRepMaxes),
-    [repPRs, oneRepMaxes],
+    () => mergeAndSortPRs(repPRs, oneRepMaxes, exerciseRecords),
+    [repPRs, oneRepMaxes, exerciseRecords],
   );
 
   const mostRecent = rows[0] ?? null;
@@ -92,18 +103,23 @@ export function PRsSection({
         testID={`progress-pr-row-${item.key}`}
         exerciseName={item.exerciseName}
         photoUrl={item.photoUrl}
-        weightDisplay={roundWeight(fromKg(item.weightKg, weightUnit))}
+        weightDisplay={roundWeight(fromKg(item.weightKg ?? 0, weightUnit))}
         reps={item.reps}
         unit={weightUnit}
+        value={recordValueText(item, weightUnit)}
         achievedAt={item.achievedAt}
         recordType={item.recordType}
         accentColor={accentColor}
         showDivider={index > 0}
-        onPress={() =>
-          navigation.navigate('ProgressExerciseDetail', {
-            exerciseId: item.exerciseId,
-            exerciseName: item.exerciseName,
-          })
+        // Exercise progress charts weights; a most-reps / longest record has none to open.
+        onPress={
+          item.measurementType === 'weight_reps'
+            ? () =>
+                navigation.navigate('ProgressExerciseDetail', {
+                  exerciseId: item.exerciseId,
+                  exerciseName: item.exerciseName,
+                })
+            : undefined
         }
       />
     );

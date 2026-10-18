@@ -6,8 +6,10 @@ import {
   type HistoricalSetWithExercise,
 } from '../workouts/allExerciseHistoryQueries';
 import {
+  fetchAllExerciseRecords,
   fetchAllOneRepMaxes,
   fetchAllRepPRs,
+  type ExerciseRecordWithExercise,
   type OneRepMaxWithExercise,
   type RepPRWithExercise,
 } from '../workouts/prSummaryQueries';
@@ -22,6 +24,8 @@ export interface AllTimeStatsContextValue {
 
   repPRs: RepPRWithExercise[];
   oneRepMaxes: OneRepMaxWithExercise[];
+  /** A bodyweight or timed exercise's most reps / longest time. */
+  exerciseRecords: ExerciseRecordWithExercise[];
   prsLoading: boolean;
   prsError: string | null;
 
@@ -38,10 +42,11 @@ interface StatsGroup {
 interface PrsGroup {
   repPRs: RepPRWithExercise[];
   oneRepMaxes: OneRepMaxWithExercise[];
+  exerciseRecords: ExerciseRecordWithExercise[];
 }
 
 const EMPTY_STATS: StatsGroup = { allWorkouts: [], allSetHistory: [] };
-const EMPTY_PRS: PrsGroup = { repPRs: [], oneRepMaxes: [] };
+const EMPTY_PRS: PrsGroup = { repPRs: [], oneRepMaxes: [], exerciseRecords: [] };
 
 async function fetchStatsGroup(userId: string): Promise<StatsGroup> {
   const [allWorkouts, allSetHistory] = await Promise.all([
@@ -52,11 +57,12 @@ async function fetchStatsGroup(userId: string): Promise<StatsGroup> {
 }
 
 async function fetchPrsGroup(userId: string): Promise<PrsGroup> {
-  const [repPRs, oneRepMaxes] = await Promise.all([
+  const [repPRs, oneRepMaxes, exerciseRecords] = await Promise.all([
     fetchAllRepPRs(userId),
     fetchAllOneRepMaxes(userId),
+    fetchAllExerciseRecords(userId),
   ]);
-  return { repPRs, oneRepMaxes };
+  return { repPRs, oneRepMaxes, exerciseRecords };
 }
 
 // The user's entire completed-workout/set/PR history -- unbounded, and
@@ -76,7 +82,7 @@ async function fetchPrsGroup(userId: string): Promise<PrsGroup> {
 // visited.
 //
 // Kept as two independent groups (stats: workouts+set history, prs: rep
-// PRs+1RMs), matching the two screens' own existing error granularity --
+// PRs+1RMs+most-reps/longest records), matching the two screens' own existing error granularity --
 // ProfileScreen shows each on a different tab (Stats vs PRs), so a failure
 // in one must not block the other.
 export function AllTimeStatsProvider({ children }: PropsWithChildren) {
@@ -114,6 +120,7 @@ export function AllTimeStatsProvider({ children }: PropsWithChildren) {
       statsError,
       repPRs: prs.repPRs,
       oneRepMaxes: prs.oneRepMaxes,
+      exerciseRecords: prs.exerciseRecords,
       prsLoading,
       prsError,
       refetch,

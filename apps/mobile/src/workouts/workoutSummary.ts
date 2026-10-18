@@ -1,3 +1,4 @@
+import { measurementTypeOf } from '../exercises/movementTypes';
 import { fromKg, snapToWeightStep } from '../lib/units';
 import { completedSetsOnly } from './setCompletion';
 import type { WorkoutExerciseWithSets } from './workoutQueries';
@@ -42,8 +43,10 @@ export function formatVolume(value: number): string {
   return snapToWeightStep(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+/** Weight x reps across a workout's weighted exercises -- a bodyweight or timed exercise has no volume. */
 export function computeTotalVolumeKg(exercises: WorkoutExerciseWithSets[]): number {
   return exercises.reduce((sum, exercise) => {
+    if (measurementTypeOf(exercise) !== 'weight_reps') return sum;
     const logged = completedSetsOnly(exercise.sets);
     return sum + logged.reduce((setSum, set) => setSum + setVolumeKg(set), 0);
   }, 0);

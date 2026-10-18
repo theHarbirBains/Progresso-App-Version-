@@ -51,6 +51,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
     allWorkouts: completedWorkouts,
     repPRs,
     oneRepMaxes,
+    exerciseRecords,
     statsLoading,
     statsError,
     prsLoading,
@@ -63,7 +64,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
 
   const groups = useMemo(() => groupByExercise(history), [history]);
   const lifetimeStats = useMemo(() => computeLifetimeStats(completedWorkouts), [completedWorkouts]);
-  const totalPRs = repPRs.length + oneRepMaxes.length;
+  const totalPRs = repPRs.length + oneRepMaxes.length + exerciseRecords.length;
 
   if (loading || themeLoading) {
     return <LoadingState testID="progress-overview-loading" />;
@@ -118,6 +119,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 totalPRs={totalPRs}
                 repPRs={repPRs}
                 oneRepMaxes={oneRepMaxes}
+                exerciseRecords={exerciseRecords}
                 weightUnit={weightUnit}
                 accentColor={theme.accent}
                 navigation={navigation}

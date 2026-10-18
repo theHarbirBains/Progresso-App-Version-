@@ -37,8 +37,22 @@ describe('computeWorkoutTopSets', () => {
     ]);
 
     expect(topSets).toEqual([
-      { exerciseId: 'bench', exerciseName: 'Bench Press', weightKg: 225, reps: 8 },
-      { exerciseId: 'pulldown', exerciseName: 'Lat Pulldown', weightKg: 160, reps: 10 },
+      {
+        exerciseId: 'bench',
+        exerciseName: 'Bench Press',
+        measurementType: 'weight_reps',
+        weightKg: 225,
+        reps: 8,
+        durationSeconds: null,
+      },
+      {
+        exerciseId: 'pulldown',
+        exerciseName: 'Lat Pulldown',
+        measurementType: 'weight_reps',
+        weightKg: 160,
+        reps: 10,
+        durationSeconds: null,
+      },
     ]);
   });
 
@@ -48,7 +62,14 @@ describe('computeWorkoutTopSets', () => {
     ]);
 
     expect(topSets).toEqual([
-      { exerciseId: 'bench', exerciseName: 'Bench Press', weightKg: 100, reps: 5 },
+      {
+        exerciseId: 'bench',
+        exerciseName: 'Bench Press',
+        measurementType: 'weight_reps',
+        weightKg: 100,
+        reps: 5,
+        durationSeconds: null,
+      },
     ]);
   });
 

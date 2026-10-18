@@ -1,15 +1,19 @@
 import { memo } from 'react';
-import { TextInput, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../design/theme';
+import type { MeasurementType } from '../exercises/movementTypes';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { SetValueFields } from './SetValueFields';
 
 export interface UnilateralSideInput {
   /** The set row id of this side. Handlers receive it, so they need no lookup. */
   id: string;
   weight: string;
   reps: string;
+  /** A timed set's duration as typed. */
+  duration?: string;
 }
 
 interface Props {
@@ -28,6 +32,9 @@ interface Props {
    */
   onChangeWeight: (setId: string, text: string) => void;
   onChangeReps: (setId: string, text: string) => void;
+  onChangeDuration?: (setId: string, text: string) => void;
+  /** What the exercise measures -- decides which fields show. Defaults to weight and reps. */
+  measurementType?: MeasurementType;
   /** Completes or un-completes the whole logical set. Receives the left side's id. */
   onToggleComplete: (setId: string) => void;
   /** Removes both sides together -- a unilateral logical set is one unit, same as completion.
@@ -62,6 +69,8 @@ function UnilateralSetRowComponent({
   canComplete,
   onChangeWeight,
   onChangeReps,
+  onChangeDuration,
+  measurementType = 'weight_reps',
   onToggleComplete,
   onRemove,
   accentColor,
@@ -79,27 +88,18 @@ function UnilateralSetRowComponent({
         {SIDES.map(({ key, tag, name }) => (
           <View key={key} style={styles.unilateralSideRow}>
             <Text style={styles.unilateralSideLabel}>{tag}</Text>
-            <TextInput
-              testID={testID ? `${testID}-${key}-weight` : undefined}
-              style={[styles.setInput, completed && styles.setInputCompleted]}
-              accessibilityLabel={`Set ${setIndex} ${name} weight`}
-              keyboardType="decimal-pad"
-              value={values[key].weight}
-              onChangeText={(text) => onChangeWeight(values[key].id, text)}
-              editable={!completed}
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-            />
-            <TextInput
-              testID={testID ? `${testID}-${key}-reps` : undefined}
-              style={[styles.setInput, completed && styles.setInputCompleted]}
-              accessibilityLabel={`Set ${setIndex} ${name} reps`}
-              keyboardType="number-pad"
-              value={values[key].reps}
-              onChangeText={(text) => onChangeReps(values[key].id, text)}
-              editable={!completed}
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
+            <SetValueFields
+              setId={values[key].id}
+              label={`Set ${setIndex} ${name}`}
+              measurementType={measurementType}
+              weight={values[key].weight}
+              reps={values[key].reps}
+              duration={values[key].duration ?? ''}
+              completed={completed}
+              onChangeWeight={onChangeWeight}
+              onChangeReps={onChangeReps}
+              onChangeDuration={onChangeDuration}
+              testID={testID ? `${testID}-${key}` : undefined}
             />
           </View>
         ))}

@@ -16,9 +16,14 @@ export { groupByExercise } from './exerciseHistoryGrouping';
  * so a user with many different logged exercises doesn't trigger an N+1
  * query pattern. Both reads are paged and the set ids chunked (lib/fetchAllRows.ts),
  * so a long history is read in full rather than cut off at Supabase's row cap.
+ *
+ * Weighted sessions only by default: everything built on this (strength, Top Sets, volume,
+ * milestones) is weight x reps, and a bodyweight or timed session has no weight. `allTypes`
+ * includes those too, for what only needs when a muscle was trained.
  */
 export async function fetchAllExerciseHistory(
   userId: string,
+  { allTypes = false }: { allTypes?: boolean } = {},
 ): Promise<HistoricalSetWithExercise[]> {
   type Candidate = {
     id: string;
@@ -30,18 +35,18 @@ export async function fetchAllExerciseHistory(
       deleted_at: string | null;
     } | null;
   };
-  const workoutExercises = await fetchAllRows<Candidate>((from, to) =>
-    supabase
+  const workoutExercises = await fetchAllRows<Candidate>((from, to) => {
+    let query = supabase
       .from('workout_exercises')
       .select(
         'id, exercise_id, exercises(name, muscle_group, movement_type), workouts(performed_at, completed_at, deleted_at)',
         { count: 'exact' },
       )
       .eq('user_id', userId)
-      .is('deleted_at', null)
-      .order('id')
-      .range(from, to),
-  );
+      .is('deleted_at', null);
+    if (!allTypes) query = query.eq('measurement_type', 'weight_reps');
+    return query.order('id').range(from, to);
+  });
   const qualifying = workoutExercises.filter(
     (c) => c.workouts && c.workouts.deleted_at === null && c.workouts.completed_at !== null,
   );

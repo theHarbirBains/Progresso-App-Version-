@@ -54,11 +54,13 @@ export interface TrainerActivity {
   clientName: string | null;
 }
 
+/** A logged set holds what its exercise measures: weight and reps, reps only, or a duration. */
 export interface LoggedSetInput {
   setIndex: number;
   side: 'none' | 'left' | 'right';
-  weightKg: number;
-  reps: number;
+  weightKg: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
 }
 
 export interface LogWorkoutForClientInput {

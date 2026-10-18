@@ -17,8 +17,13 @@ import { RiseInStack } from '../design/RiseIn';
 import { SectionHeader } from '../design/SectionHeader';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
-import type { MovementType } from '../exercises/movementTypes';
-import { formatWeightKg, isValidWeightIncrement, roundWeight, toKg } from '../lib/units';
+import {
+  measurementTypeOf,
+  type MeasurementType,
+  type MovementType,
+} from '../exercises/movementTypes';
+import { draftFromSet, draftValues, isValidDraft } from '../workouts/setInputDrafts';
+import { PER_SIDE_NOTE, SetColumnHeader } from '../workouts/SetColumnHeader';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -59,6 +64,8 @@ interface DraftSet {
   side: 'left' | 'right' | null;
   weight: string;
   reps: string;
+  /** A timed set's duration as typed. */
+  duration: string;
 }
 
 interface DraftExercise {
@@ -69,19 +76,13 @@ interface DraftExercise {
   exerciseName: string;
   muscleGroup: MuscleGroup;
   movementType: MovementType;
+  /** What the exercise is logged as: weight and reps, reps only, or a time. */
+  measurementType: MeasurementType;
   sets: DraftSet[];
 }
 
-function isValidSet(set: DraftSet): boolean {
-  const weightNum = Number(set.weight);
-  const repsNum = Number(set.reps);
-  return (
-    Number.isFinite(weightNum) &&
-    weightNum > 0 &&
-    isValidWeightIncrement(weightNum) &&
-    Number.isInteger(repsNum) &&
-    repsNum > 0
-  );
+function isValidSet(set: DraftSet, type: MeasurementType): boolean {
+  return isValidDraft(set, type);
 }
 
 /** Pairs a unilateral exercise's flat sets into one row per logical set (left
@@ -192,13 +193,14 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
             exerciseName: ex.exerciseName,
             muscleGroup: ex.muscleGroup,
             movementType: ex.movementType,
+            measurementType: measurementTypeOf(ex),
             sets: ex.sets.map((s) => ({
               localId: newLocalId(),
               id: s.id,
               setIndex: s.setIndex,
               side: s.side,
-              weight: s.weightKg !== null ? formatWeightKg(s.weightKg, weightUnit) : '',
-              reps: s.reps !== null ? String(s.reps) : '',
+              duration: '',
+              ...draftFromSet(s, measurementTypeOf(ex), weightUnit),
             })),
           })),
         );
@@ -221,11 +223,29 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
   function blankSets(movementType: MovementType, setIndex: number): DraftSet[] {
     if (movementType === 'unilateral') {
       return [
-        { localId: newLocalId(), id: null, setIndex, side: 'left', weight: '', reps: '' },
-        { localId: newLocalId(), id: null, setIndex, side: 'right', weight: '', reps: '' },
+        {
+          localId: newLocalId(),
+          id: null,
+          setIndex,
+          side: 'left',
+          weight: '',
+          reps: '',
+          duration: '',
+        },
+        {
+          localId: newLocalId(),
+          id: null,
+          setIndex,
+          side: 'right',
+          weight: '',
+          reps: '',
+          duration: '',
+        },
       ];
     }
-    return [{ localId: newLocalId(), id: null, setIndex, side: null, weight: '', reps: '' }];
+    return [
+      { localId: newLocalId(), id: null, setIndex, side: null, weight: '', reps: '', duration: '' },
+    ];
   }
 
   function handleSelectExercise(exercise: ExerciseRow) {
@@ -240,6 +260,7 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
         exerciseName: exercise.name,
         muscleGroup: exercise.muscleGroup,
         movementType: exercise.movementType,
+        measurementType: measurementTypeOf(exercise),
         sets: blankSets(exercise.movementType, 1),
       },
     ]);
@@ -278,7 +299,7 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
   function handleChangeSetField(
     exerciseLocalId: string,
     setLocalId: string,
-    field: 'weight' | 'reps',
+    field: 'weight' | 'reps' | 'duration',
     text: string,
   ) {
     setExercises((prev) =>
@@ -399,13 +420,12 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
       let nextOrderIndex = await fetchNextExerciseOrderIndex(workoutId);
 
       for (const exercise of exercises) {
+        const type = exercise.measurementType;
+        const valid = exercise.sets.filter((set) => isValidSet(set, type));
         const validSets =
           exercise.movementType === 'unilateral'
-            ? groupUnilateralSets(exercise.sets.filter(isValidSet)).flatMap((p) => [
-                p.left,
-                p.right,
-              ])
-            : exercise.sets.filter(isValidSet);
+            ? groupUnilateralSets(valid).flatMap((p) => [p.left, p.right])
+            : valid;
         if (validSets.length === 0) {
           if (exercise.id !== null) await removeExerciseFromWorkout(exercise.id);
           continue;
@@ -433,11 +453,10 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
         }
 
         for (const set of validSets) {
-          const weightKg = roundWeight(toKg(Number(set.weight), weightUnit));
-          const reps = Math.trunc(Number(set.reps));
+          const values = draftValues(set, type, weightUnit);
           if (set.id === null) {
             const created = await createSet(workoutExerciseId, set.setIndex, set.side ?? undefined);
-            await updateSet(created.id, { weightKg, reps, completedAt: performedAtIso });
+            await updateSet(created.id, { ...values, completedAt: performedAtIso });
             continue;
           }
           const originalSet = originalSetsById.get(set.id);
@@ -448,14 +467,15 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
           if (
             originalSet &&
             wasCompleted &&
-            originalSet.weightKg === weightKg &&
-            originalSet.reps === reps
+            originalSet.weightKg === values.weightKg &&
+            originalSet.reps === values.reps &&
+            (originalSet.durationSeconds ?? null) === values.durationSeconds
           ) {
             continue;
           }
           await updateSet(
             set.id,
-            wasCompleted ? { weightKg, reps } : { weightKg, reps, completedAt: performedAtIso },
+            wasCompleted ? values : { ...values, completedAt: performedAtIso },
           );
         }
       }
@@ -584,7 +604,9 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
                         {MUSCLE_GROUP_LABELS[exercise.muscleGroup]}
                       </Text>
                       {isUnilateral ? (
-                        <Text style={liveWorkoutStyles.perSideNote}>Weight is per side</Text>
+                        <Text style={liveWorkoutStyles.perSideNote}>
+                          {PER_SIDE_NOTE[exercise.measurementType]}
+                        </Text>
                       ) : null}
                     </View>
                     <View style={liveWorkoutStyles.exerciseActions}>
@@ -600,14 +622,7 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
                     </View>
                   </View>
 
-                  {hasRows ? (
-                    <View style={liveWorkoutStyles.setHeaderRow}>
-                      <Text style={liveWorkoutStyles.setHeaderIndex}>Set</Text>
-                      <Text style={liveWorkoutStyles.setHeaderInput}>Weight</Text>
-                      <Text style={liveWorkoutStyles.setHeaderInput}>Reps</Text>
-                      <View style={liveWorkoutStyles.setHeaderComplete} />
-                    </View>
-                  ) : null}
+                  {hasRows ? <SetColumnHeader measurementType={exercise.measurementType} /> : null}
 
                   {isUnilateral
                     ? unilateralRows.map((row) => (
@@ -633,6 +648,15 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
                               text,
                             )
                           }
+                          onChangeDuration={(side, text) =>
+                            handleChangeSetField(
+                              exercise.localId,
+                              side === 'left' ? row.left.localId : row.right.localId,
+                              'duration',
+                              text,
+                            )
+                          }
+                          measurementType={exercise.measurementType}
                           onRemove={() => handleRemoveUnilateralSet(exercise.localId, row.setIndex)}
                         />
                       ))
@@ -643,6 +667,11 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
                           setIndex={set.setIndex}
                           weight={set.weight}
                           reps={set.reps}
+                          duration={set.duration}
+                          measurementType={exercise.measurementType}
+                          onChangeDuration={(text) =>
+                            handleChangeSetField(exercise.localId, set.localId, 'duration', text)
+                          }
                           onChangeWeight={(text) =>
                             handleChangeSetField(exercise.localId, set.localId, 'weight', text)
                           }

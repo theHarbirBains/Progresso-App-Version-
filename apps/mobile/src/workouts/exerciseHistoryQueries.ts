@@ -45,6 +45,8 @@ export async function fetchExerciseSetHistory(
       .select('id, workouts(performed_at, completed_at, deleted_at)', { count: 'exact' })
       .eq('exercise_id', exerciseId)
       .eq('user_id', userId)
+      // Weight x reps charts: weighted sessions only (a bodyweight or timed one has no weight).
+      .eq('measurement_type', 'weight_reps')
       .is('deleted_at', null)
       .order('id')
       .range(from, to),

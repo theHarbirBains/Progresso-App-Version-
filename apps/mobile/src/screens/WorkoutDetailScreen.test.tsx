@@ -7,7 +7,12 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
-import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
+import {
+  fetchDurationRecord,
+  fetchOneRepMax,
+  fetchRepPRs,
+  fetchRepRecord,
+} from '../workouts/prQueries';
 import { deleteWorkout, fetchWorkoutDetail } from '../workouts/workoutQueries';
 import { WorkoutDetailScreen } from './WorkoutDetailScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
@@ -30,6 +35,8 @@ jest.mock('../workouts/workoutQueries', () => ({
 jest.mock('../workouts/prQueries', () => ({
   fetchRepPRs: jest.fn(),
   fetchOneRepMax: jest.fn(),
+  fetchRepRecord: jest.fn(),
+  fetchDurationRecord: jest.fn(),
 }));
 
 jest.mock('../progress/AllTimeStatsProvider', () => ({
@@ -43,6 +50,8 @@ const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
 const mockFetchRepPRs = fetchRepPRs as jest.Mock;
 const mockFetchOneRepMax = fetchOneRepMax as jest.Mock;
+const mockFetchRepRecord = fetchRepRecord as jest.Mock;
+const mockFetchDurationRecord = fetchDurationRecord as jest.Mock;
 const mockDeleteWorkout = deleteWorkout as jest.Mock;
 
 const mockGoBack = jest.fn();
@@ -87,6 +96,8 @@ beforeEach(() => {
   mockFetchWorkoutDetail.mockReset().mockResolvedValue(workout);
   mockFetchRepPRs.mockReset().mockResolvedValue([]);
   mockFetchOneRepMax.mockReset().mockResolvedValue(null);
+  mockFetchRepRecord.mockReset().mockResolvedValue(null);
+  mockFetchDurationRecord.mockReset().mockResolvedValue(null);
   mockDeleteWorkout.mockClear().mockResolvedValue(undefined);
   mockRefetchAllTimeStats.mockReset().mockResolvedValue(true);
   mockUseAllTimeStats.mockReturnValue({ refetch: mockRefetchAllTimeStats });
@@ -150,6 +161,67 @@ describe('WorkoutDetailScreen', () => {
     await screen.findByText('Push Day');
     expect(screen.getByTestId('workout-detail-stat-volume')).toHaveTextContent(/^3,150 lb/);
     expect(screen.getByTestId('workout-detail-stat-volume')).not.toHaveTextContent(/\d\.\d/);
+  });
+
+  it('shows a bodyweight exercise by reps and a timed one by time, with records and no volume', async () => {
+    const done = '2026-01-01T12:05:00Z';
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...workout,
+      exercises: [
+        {
+          id: 'we-pushup',
+          exerciseId: 'ex-pushup',
+          exerciseName: 'Push-Up',
+          muscleGroup: 'chest' as const,
+          orderIndex: 1,
+          measurementType: 'bodyweight' as const,
+          sets: [
+            // An older app could have sent a weight with push-ups: it isn't shown or weighed.
+            { id: 'p1', setIndex: 1, weightKg: 80, reps: 20, completedAt: done },
+            { id: 'p2', setIndex: 2, weightKg: null, reps: 25, completedAt: done },
+          ],
+        },
+        {
+          id: 'we-plank',
+          exerciseId: 'ex-plank',
+          exerciseName: 'Plank',
+          muscleGroup: 'abs' as const,
+          orderIndex: 2,
+          measurementType: 'timed' as const,
+          sets: [
+            {
+              id: 't1',
+              setIndex: 1,
+              weightKg: null,
+              reps: null,
+              durationSeconds: 90,
+              completedAt: done,
+            },
+          ],
+        },
+      ],
+    });
+    mockFetchRepRecord.mockResolvedValue({ value: 25, sourceSetId: 'p2', achievedAt: done });
+    mockFetchDurationRecord.mockResolvedValue({ value: 90, sourceSetId: 't1', achievedAt: done });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('top-set-we-pushup')).toHaveTextContent('Best set: 25 reps');
+    expect(screen.getByTestId('top-set-we-plank')).toHaveTextContent('Longest: 1:30');
+    expect(screen.getByTestId('exercise-card-we-pushup')).toHaveTextContent(/20 reps/);
+    expect(screen.getByTestId('exercise-card-we-pushup')).not.toHaveTextContent(/kg/);
+    expect(screen.getByTestId('workout-detail-stat-sets')).toHaveTextContent(/^3/);
+    expect(screen.getByTestId('workout-detail-stat-volume')).toHaveTextContent(/^0/);
+    // Reps PR and longest-time record, from the database's records, never a weighted PR lookup.
+    expect(await screen.findByTestId('pr-tag-p2')).toBeTruthy();
+    expect(screen.getByTestId('pr-tag-t1')).toBeTruthy();
+    expect(screen.queryByTestId('pr-tag-p1')).toBeNull();
+    expect(mockFetchRepPRs).not.toHaveBeenCalled();
+    // PR history is weighted only: the title opens nothing here.
+    expect(screen.getByTestId('exercise-title-we-plank').props.accessibilityState).toMatchObject({
+      disabled: true,
+    });
   });
 
   it('shows the computed top set', async () => {

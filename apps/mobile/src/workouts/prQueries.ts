@@ -57,3 +57,50 @@ export async function fetchOneRepMax(
     achievedAt: data.achieved_at,
   };
 }
+
+/**
+ * A bodyweight exercise's record (its most reps) or a timed one's (its longest time, in
+ * seconds) -- kept by the database like the PRs above
+ * (20261019100000_bodyweight_and_timed_exercises.sql). Null until one is logged.
+ */
+export interface ExerciseRecord {
+  value: number;
+  sourceSetId: string;
+  achievedAt: string;
+}
+
+/** The most reps this user has done in one set of this bodyweight exercise. */
+export async function fetchRepRecord(
+  userId: string,
+  exerciseId: string,
+): Promise<ExerciseRecord | null> {
+  const { data, error } = await supabase
+    .from('rep_records')
+    .select('reps, source_set_id, achieved_at')
+    .eq('user_id', userId)
+    .eq('exercise_id', exerciseId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return { value: data.reps, sourceSetId: data.source_set_id, achievedAt: data.achieved_at };
+}
+
+/** The longest this user has held one set of this timed exercise, in seconds. */
+export async function fetchDurationRecord(
+  userId: string,
+  exerciseId: string,
+): Promise<ExerciseRecord | null> {
+  const { data, error } = await supabase
+    .from('duration_records')
+    .select('duration_seconds, source_set_id, achieved_at')
+    .eq('user_id', userId)
+    .eq('exercise_id', exerciseId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return {
+    value: data.duration_seconds,
+    sourceSetId: data.source_set_id,
+    achievedAt: data.achieved_at,
+  };
+}

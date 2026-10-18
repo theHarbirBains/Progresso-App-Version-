@@ -87,6 +87,36 @@ describe('PRsSection', () => {
     });
   });
 
+  it('lists most reps and longest time with the PRs, counted, without opening weight charts', () => {
+    render(
+      <PRsSection
+        repPRs={[repPR]}
+        oneRepMaxes={[]}
+        exerciseRecords={[
+          {
+            measurementType: 'timed',
+            value: 90,
+            sourceSetId: 'set-plank',
+            achievedAt: '2026-02-20T12:00:00Z',
+            exerciseId: 'ex-plank',
+            exerciseName: 'Plank',
+          },
+        ]}
+        weightUnit="kg"
+        accentColor="#2F80FF"
+        navigation={navigation}
+      />,
+    );
+
+    expect(screen.getByTestId('progress-prs-count')).toHaveTextContent('2 PRs');
+    const row = screen.getByTestId('progress-pr-row-record-ex-plank');
+    expect(row).toHaveTextContent(/Longest/);
+    expect(row).toHaveTextContent(/1:30/);
+    expect(row.props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.press(row);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   it('shares the most recent PR by resolving it back to its source workout', async () => {
     mockFetchWorkoutIdForSet.mockResolvedValue('workout-42');
     render(

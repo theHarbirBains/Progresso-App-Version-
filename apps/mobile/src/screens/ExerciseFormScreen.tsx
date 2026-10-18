@@ -8,13 +8,19 @@ import { DestructiveButton, PrimaryButton, SecondaryButton, TextButton } from '.
 import { PhotoLightbox } from '../design/PhotoLightbox';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
+import { SegmentedControl } from '../design/SegmentedControl';
 import { TextInput } from '../design/TextInput';
 import { Toggle } from '../design/Toggle';
 import { colors, radii, spacing, typeScale } from '../design/theme';
 import { invalidateExerciseCache, type ExerciseRow } from '../exercises/exerciseQueries';
 import { MuscleGroupSelect } from '../exercises/MuscleGroupSelect';
 import type { MuscleGroup } from '../exercises/muscleGroups';
-import type { MovementType } from '../exercises/movementTypes';
+import {
+  MEASUREMENT_TYPE_LABELS,
+  MEASUREMENT_TYPES,
+  type MeasurementType,
+  type MovementType,
+} from '../exercises/movementTypes';
 import { createExercise, updateExercise } from '../lib/api';
 import { uploadEquipmentPhoto } from '../lib/equipmentPhotoUpload';
 
@@ -32,7 +38,9 @@ type Props = {
 // first place).
 //
 // Deliberately minimal: a name, a muscle group (a real dropdown -- tap the
-// field, pick from a sheet, rather than a filter-style chip row), whether
+// field, pick from a sheet, rather than a filter-style chip row), what a set
+// records (weight and reps, reps only, or a time -- a weighted version of a
+// bodyweight exercise is its own exercise), whether
 // it's unilateral (one plain yes/no toggle -- logging_style, which only
 // distinguishes HOW a unilateral exercise's sets are entered and never
 // changes any actual behavior, is set to 'single_side' automatically rather
@@ -53,6 +61,9 @@ export function ExerciseFormScreen(props: Props) {
   );
   const [isUnilateral, setIsUnilateral] = useState(
     props.mode === 'edit' ? props.exercise.movementType === 'unilateral' : false,
+  );
+  const [measurementType, setMeasurementType] = useState<MeasurementType>(
+    props.mode === 'edit' ? props.exercise.measurementType : 'weight_reps',
   );
   const [isActive] = useState(props.mode === 'edit' ? props.exercise.isActive : true);
   const [saving, setSaving] = useState(false);
@@ -134,6 +145,7 @@ export function ExerciseFormScreen(props: Props) {
           name: name.trim(),
           muscleGroup,
           movementType,
+          measurementType,
           // Only meaningful for a unilateral exercise -- see the file
           // comment. Always 'single_side' since this form never asks.
           ...(isUnilateral ? { loggingStyle: 'single_side' as const } : {}),
@@ -144,6 +156,7 @@ export function ExerciseFormScreen(props: Props) {
           name: name.trim(),
           muscleGroup,
           movementType,
+          measurementType,
           ...(isUnilateral ? { loggingStyle: 'single_side' as const } : {}),
           isActive,
           ...(photoUrl !== undefined ? { photoUrl } : {}),
@@ -228,6 +241,25 @@ export function ExerciseFormScreen(props: Props) {
           onChange={setMuscleGroup}
           accentColor={accentColor}
         />
+
+        <View style={styles.measuredBy}>
+          <Text style={styles.fieldLabel}>Measured By</Text>
+          <SegmentedControl
+            testID="exercise-form-measurement"
+            options={MEASUREMENT_TYPES.map((type) => ({
+              value: type,
+              label: MEASUREMENT_TYPE_LABELS[type].label,
+              accessibilityLabel: MEASUREMENT_TYPE_LABELS[type].spoken,
+            }))}
+            value={measurementType}
+            onChange={setMeasurementType}
+            accentColor={accentColor}
+            onAccentColor={onAccentColor}
+          />
+          <Text testID="exercise-form-measurement-hint" style={styles.helperText}>
+            {MEASUREMENT_TYPE_LABELS[measurementType].hint}
+          </Text>
+        </View>
 
         <View style={styles.unilateralRow}>
           <View style={styles.unilateralText}>
@@ -347,6 +379,9 @@ const styles = StyleSheet.create({
   helperText: {
     ...typeScale.caption,
     color: colors.textMuted,
+  },
+  measuredBy: {
+    gap: spacing.sm,
   },
   unilateralRow: {
     flexDirection: 'row',

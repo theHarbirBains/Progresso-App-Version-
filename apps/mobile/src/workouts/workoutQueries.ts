@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { LoggingStyle, MovementType } from '../exercises/movementTypes';
+import type { LoggingStyle, MeasurementType, MovementType } from '../exercises/movementTypes';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 
 /** Mirrors the database's public.set_side enum ('none' | 'left' | 'right') -- see setCompletion.ts / the unilateral-exercises migrations for why 'none' rather than a nullable column. Exposed to the app as `null` for a bilateral set, matching every other "not applicable" field in this file. */
@@ -7,6 +7,29 @@ export type SetSide = 'left' | 'right' | null;
 
 function fromDbSide(dbSide: 'none' | 'left' | 'right'): SetSide {
   return dbSide === 'none' ? null : dbSide;
+}
+
+/** A set row's columns, as every read here selects them. */
+const SET_COLUMNS = 'id, set_index, side, weight_kg, reps, duration_seconds, completed_at';
+
+function toSetRecord(row: {
+  id: string;
+  set_index: number;
+  side: 'none' | 'left' | 'right';
+  weight_kg: string | number | null;
+  reps: number | null;
+  duration_seconds?: number | null;
+  completed_at: string | null;
+}): SetRecord {
+  return {
+    id: row.id,
+    setIndex: row.set_index,
+    side: fromDbSide(row.side),
+    weightKg: row.weight_kg === null ? null : Number(row.weight_kg),
+    reps: row.reps,
+    durationSeconds: row.duration_seconds ?? null,
+    completedAt: row.completed_at,
+  };
 }
 
 // Direct-to-Supabase reads and writes for workout logging, per the approved
@@ -32,6 +55,8 @@ export interface SetRecord {
    * afterward. */
   weightKg: number | null;
   reps: number | null;
+  /** A timed exercise's set: how long it lasted, in seconds. Null (or absent) for every other set. */
+  durationSeconds?: number | null;
   /** Null means "planned but not yet performed" -- the same nullable-
    * timestamp convention workouts.completed_at already uses. */
   completedAt: string | null;
@@ -57,6 +82,9 @@ export interface WorkoutExerciseWithSets {
   muscleGroup: MuscleGroup;
   movementType: MovementType;
   loggingStyle: LoggingStyle | null;
+  /** What this exercise was logged as -- its snapshot, fixed when it was added to the
+   * workout. Absent means weight and reps (see measurementTypeOf). */
+  measurementType?: MeasurementType;
   orderIndex: number;
   sets: SetRecord[];
 }
@@ -195,7 +223,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
   const { data: workoutExercises, error: weError } = await supabase
     .from('workout_exercises')
     .select(
-      'id, exercise_id, order_index, exercises(name, muscle_group, movement_type, logging_style, photo_url)',
+      'id, exercise_id, order_index, measurement_type, exercises(name, muscle_group, movement_type, logging_style, photo_url)',
     )
     .eq('workout_id', workoutId)
     .is('deleted_at', null)
@@ -207,7 +235,9 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
   if (workoutExerciseIds.length > 0) {
     const { data: sets, error: setsError } = await supabase
       .from('sets')
-      .select('id, workout_exercise_id, set_index, side, weight_kg, reps, completed_at')
+      .select(
+        'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at',
+      )
       .in('workout_exercise_id', workoutExerciseIds)
       .is('deleted_at', null)
       .order('set_index', { ascending: true });
@@ -216,14 +246,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
     setsByWorkoutExercise = new Map();
     for (const s of sets ?? []) {
       const list = setsByWorkoutExercise.get(s.workout_exercise_id) ?? [];
-      list.push({
-        id: s.id,
-        setIndex: s.set_index,
-        side: fromDbSide(s.side),
-        weightKg: s.weight_kg === null ? null : Number(s.weight_kg),
-        reps: s.reps,
-        completedAt: s.completed_at,
-      });
+      list.push(toSetRecord(s));
       setsByWorkoutExercise.set(s.workout_exercise_id, list);
     }
   }
@@ -246,6 +269,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
       muscleGroup: embedded?.muscle_group ?? 'other',
       movementType: embedded?.movement_type ?? 'bilateral',
       loggingStyle: embedded?.logging_style ?? null,
+      measurementType: (we.measurement_type as MeasurementType | null) ?? 'weight_reps',
       orderIndex: we.order_index,
       sets: setsByWorkoutExercise.get(we.id) ?? [],
     };
@@ -501,43 +525,39 @@ export async function createSet(
       set_index: setIndex,
       ...(side ? { side } : {}),
     })
-    .select('id, set_index, side, weight_kg, reps, completed_at')
+    .select(SET_COLUMNS)
     .single();
   if (error) throw new Error(error.message);
-  return {
-    id: data.id,
-    setIndex: data.set_index,
-    side: fromDbSide(data.side),
-    weightKg: data.weight_kg === null ? null : Number(data.weight_kg),
-    reps: data.reps,
-    completedAt: data.completed_at,
-  };
+  return toSetRecord(data);
 }
 
+/**
+ * What a set holds, by what its exercise measures: weight and reps, reps only (weight
+ * null), or a duration (weight and reps null). Omitted fields are left as they are.
+ */
 export async function updateSet(
   setId: string,
-  updates: { weightKg?: number; reps?: number; completedAt?: string | null },
+  updates: {
+    weightKg?: number | null;
+    reps?: number | null;
+    durationSeconds?: number | null;
+    completedAt?: string | null;
+  },
 ): Promise<SetRecord> {
   const payload: Record<string, unknown> = {};
   if (updates.weightKg !== undefined) payload.weight_kg = updates.weightKg;
   if (updates.reps !== undefined) payload.reps = updates.reps;
+  if (updates.durationSeconds !== undefined) payload.duration_seconds = updates.durationSeconds;
   if (updates.completedAt !== undefined) payload.completed_at = updates.completedAt;
 
   const { data, error } = await supabase
     .from('sets')
     .update(payload)
     .eq('id', setId)
-    .select('id, set_index, side, weight_kg, reps, completed_at')
+    .select(SET_COLUMNS)
     .single();
   if (error) throw new Error(error.message);
-  return {
-    id: data.id,
-    setIndex: data.set_index,
-    side: fromDbSide(data.side),
-    weightKg: data.weight_kg === null ? null : Number(data.weight_kg),
-    reps: data.reps,
-    completedAt: data.completed_at,
-  };
+  return toSetRecord(data);
 }
 
 export async function deleteSet(setId: string): Promise<void> {
@@ -590,7 +610,7 @@ export async function fetchPreviousPerformance(
   // The candidates' sets in one read (at most 50 ids, so one short request).
   const { data: sets, error: setsError } = await supabase
     .from('sets')
-    .select('id, workout_exercise_id, set_index, side, weight_kg, reps, completed_at')
+    .select(`workout_exercise_id, ${SET_COLUMNS}`)
     .in(
       'workout_exercise_id',
       qualifying.map((c) => c.id),
@@ -615,13 +635,6 @@ export async function fetchPreviousPerformance(
 
   return {
     performedAt: mostRecent.workouts!.performed_at,
-    sets: setsByWorkoutExercise.get(mostRecent.id)!.map((s) => ({
-      id: s.id,
-      setIndex: s.set_index,
-      side: fromDbSide(s.side),
-      weightKg: s.weight_kg === null ? null : Number(s.weight_kg),
-      reps: s.reps,
-      completedAt: s.completed_at,
-    })),
+    sets: setsByWorkoutExercise.get(mostRecent.id)!.map(toSetRecord),
   };
 }

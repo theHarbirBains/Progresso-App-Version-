@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { fetchAllOneRepMaxes, fetchAllRepPRs } from './prSummaryQueries';
+import { fetchAllExerciseRecords, fetchAllOneRepMaxes, fetchAllRepPRs } from './prSummaryQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
 
@@ -139,5 +139,68 @@ describe('fetchAllOneRepMaxes', () => {
     mockTable({ data: null, error: { message: 'boom' } });
 
     await expect(fetchAllOneRepMaxes('user-1')).rejects.toThrow('boom');
+  });
+});
+
+describe('fetchAllExerciseRecords', () => {
+  it('merges most-reps and longest-time records, most recent first', async () => {
+    const tables: Record<string, ReturnType<typeof createQueryBuilder>> = {
+      rep_records: createQueryBuilder({
+        data: [
+          {
+            reps: 25,
+            source_set_id: 'set-pushup',
+            achieved_at: '2026-01-05T00:00:00Z',
+            exercise_id: 'ex-pushup',
+            exercises: { name: 'Push-Up', photo_url: null },
+          },
+        ],
+        error: null,
+      }),
+      duration_records: createQueryBuilder({
+        data: [
+          {
+            duration_seconds: 90,
+            source_set_id: 'set-plank',
+            achieved_at: '2026-02-01T00:00:00Z',
+            exercise_id: 'ex-plank',
+            exercises: null,
+          },
+        ],
+        error: null,
+      }),
+    };
+    mockFrom.mockImplementation((table: string) => tables[table]);
+
+    const result = await fetchAllExerciseRecords('user-1');
+
+    expect(result).toEqual([
+      {
+        measurementType: 'timed',
+        value: 90,
+        sourceSetId: 'set-plank',
+        achievedAt: '2026-02-01T00:00:00Z',
+        exerciseId: 'ex-plank',
+        exerciseName: 'Exercise',
+        exercisePhotoUrl: null,
+      },
+      {
+        measurementType: 'bodyweight',
+        value: 25,
+        sourceSetId: 'set-pushup',
+        achievedAt: '2026-01-05T00:00:00Z',
+        exerciseId: 'ex-pushup',
+        exerciseName: 'Push-Up',
+        exercisePhotoUrl: null,
+      },
+    ]);
+    expect(tables.rep_records.eq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(tables.duration_records.eq).toHaveBeenCalledWith('user_id', 'user-1');
+  });
+
+  it('throws on a query error', async () => {
+    mockTable({ data: null, error: { message: 'boom' } });
+
+    await expect(fetchAllExerciseRecords('user-1')).rejects.toThrow('boom');
   });
 });

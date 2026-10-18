@@ -29,6 +29,7 @@ jest.mock('../workouts/allExerciseHistoryQueries', () => ({
 }));
 
 jest.mock('../workouts/prSummaryQueries', () => ({
+  fetchAllExerciseRecords: jest.fn().mockResolvedValue([]),
   fetchAllRepPRs: jest.fn(),
   fetchAllOneRepMaxes: jest.fn(),
 }));

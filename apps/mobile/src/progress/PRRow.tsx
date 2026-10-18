@@ -15,8 +15,10 @@ interface Props {
   /** null for a true-1RM record (a 1RM isn't described by a rep count the way a rep-count PR is). */
   reps: number | null;
   unit: 'kg' | 'lb';
+  /** A bodyweight or timed record's value ("25 reps", "1:30"), shown in place of the weight. */
+  value?: string;
   achievedAt: string;
-  /** "1RM" or "N-Rep PR" -- the record-type distinction the spec asks for, exactly as the data supports it. */
+  /** "1RM", "N-Rep PR", "Most Reps" or "Longest" -- the record-type distinction the spec asks for, exactly as the data supports it. */
   recordType: string;
   accentColor: string;
   onPress?: () => void;
@@ -24,13 +26,14 @@ interface Props {
   testID?: string;
 }
 
-/** One row on the PRs page -- a rep-count PR or a true 1RM, both real database-maintained records. */
+/** One row on the PRs page -- a rep-count PR, a true 1RM, or a most-reps / longest record, all real database-maintained records. */
 export function PRRow({
   exerciseName,
   photoUrl,
   weightDisplay,
   reps,
   unit,
+  value,
   achievedAt,
   recordType,
   accentColor,
@@ -72,9 +75,13 @@ export function PRRow({
         </Text>
       </View>
       <Text style={[styles.recordRowValue, { color: accentColor }]}>
-        {formatWeight(weightDisplay)}
-        {unit}
-        {reps !== null ? ` × ${reps}` : ''}
+        {value ?? (
+          <>
+            {formatWeight(weightDisplay)}
+            {unit}
+            {reps !== null ? ` × ${reps}` : ''}
+          </>
+        )}
       </Text>
     </TouchableOpacity>
   );

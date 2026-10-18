@@ -1,3 +1,4 @@
+import type { MeasurementType } from '../exercises/movementTypes';
 import type { FollowUser } from './followsApi';
 import { request } from './apiClient';
 
@@ -22,12 +23,16 @@ export type FriendsFeedItem = {
     completedSetCount: number;
     totalVolumeKg: number;
     completedExerciseCount: number;
+    /** Each exercise's best set: the heaviest, the most reps, or the longest, by what it measures. */
     topSets: {
       exerciseId: string;
       exerciseName: string;
       photoUrl: string | null;
-      weightKg: number;
-      reps: number;
+      /** Absent from an API before measurement types: weight and reps. */
+      measurementType?: MeasurementType;
+      weightKg: number | null;
+      reps: number | null;
+      durationSeconds?: number | null;
     }[];
   };
 };

@@ -1,15 +1,21 @@
 import { memo } from 'react';
-import { TextInput, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../design/theme';
+import type { MeasurementType } from '../exercises/movementTypes';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { SetValueFields } from './SetValueFields';
 
 interface Props {
   setId: string;
   setIndex: number;
   weight: string;
   reps: string;
+  /** A timed set's duration as typed. */
+  duration?: string;
+  /** What the exercise measures -- decides which fields show. Defaults to weight and reps. */
+  measurementType?: MeasurementType;
   completed: boolean;
   /** Whether weight+reps currently hold valid values -- gates turning
    * completed on (turning it back off is always allowed). */
@@ -21,6 +27,7 @@ interface Props {
    */
   onChangeWeight: (setId: string, text: string) => void;
   onChangeReps: (setId: string, text: string) => void;
+  onChangeDuration?: (setId: string, text: string) => void;
   onToggleComplete: (setId: string) => void;
   /** Omitted where removing a set mid-workout isn't offered (see each caller). */
   onRemove?: (setId: string) => void;
@@ -42,10 +49,13 @@ function SetRowComponent({
   setIndex,
   weight,
   reps,
+  duration = '',
+  measurementType = 'weight_reps',
   completed,
   canComplete,
   onChangeWeight,
   onChangeReps,
+  onChangeDuration,
   onToggleComplete,
   onRemove,
   accentColor,
@@ -57,27 +67,18 @@ function SetRowComponent({
   return (
     <View testID={testID} style={styles.setRow}>
       <Text style={styles.setIndex}>{setIndex}</Text>
-      <TextInput
-        testID={testID ? `${testID}-weight` : undefined}
-        style={[styles.setInput, completed && styles.setInputCompleted]}
-        accessibilityLabel={`Set ${setIndex} weight`}
-        keyboardType="decimal-pad"
-        value={weight}
-        onChangeText={(text) => onChangeWeight(setId, text)}
-        editable={!completed}
-        placeholder="0"
-        placeholderTextColor={colors.textMuted}
-      />
-      <TextInput
-        testID={testID ? `${testID}-reps` : undefined}
-        style={[styles.setInput, completed && styles.setInputCompleted]}
-        accessibilityLabel={`Set ${setIndex} reps`}
-        keyboardType="number-pad"
-        value={reps}
-        onChangeText={(text) => onChangeReps(setId, text)}
-        editable={!completed}
-        placeholder="0"
-        placeholderTextColor={colors.textMuted}
+      <SetValueFields
+        setId={setId}
+        label={`Set ${setIndex}`}
+        measurementType={measurementType}
+        weight={weight}
+        reps={reps}
+        duration={duration}
+        completed={completed}
+        onChangeWeight={onChangeWeight}
+        onChangeReps={onChangeReps}
+        onChangeDuration={onChangeDuration}
+        testID={testID}
       />
       <TouchableOpacity
         testID={testID ? `${testID}-complete` : undefined}

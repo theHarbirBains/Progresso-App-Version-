@@ -11,8 +11,8 @@ import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { useScreenFocused } from '../navigation/useScreenFocused';
-import { formatWeightKg } from '../lib/units';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
+import { formatSetValues } from '../workouts/setValues';
 
 const AUTO_ADVANCE_MS = 3500;
 const PHOTO_SIZE = 56;
@@ -110,9 +110,7 @@ export function RecentWorkoutTopSets({ topSets, weightUnit, testID }: Props) {
               <Text style={styles.exerciseName} numberOfLines={1}>
                 {topSet.exerciseName}
               </Text>
-              <Text style={styles.topSetValue}>
-                {`${formatWeightKg(topSet.weightKg, weightUnit)} ${weightUnit} × ${topSet.reps}`}
-              </Text>
+              <Text style={styles.topSetValue}>{formatSetValues(topSet, weightUnit)}</Text>
             </View>
           </View>
         ))}

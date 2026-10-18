@@ -149,10 +149,20 @@ describe('enrichWorkoutSummaries', () => {
             exerciseId: 'bench',
             exerciseName: 'Bench Press',
             photoUrl: 'https://example.com/bench.jpg',
+            measurementType: 'weight_reps',
             weightKg: 100,
             reps: 5,
+            durationSeconds: null,
           },
-          { exerciseId: 'curl', exerciseName: 'Curl', photoUrl: null, weightKg: 60, reps: 10 },
+          {
+            exerciseId: 'curl',
+            exerciseName: 'Curl',
+            photoUrl: null,
+            measurementType: 'weight_reps',
+            weightKg: 60,
+            reps: 10,
+            durationSeconds: null,
+          },
         ],
       },
     ]);
@@ -200,11 +210,90 @@ describe('enrichWorkoutSummaries', () => {
 
     await enrichWorkoutSummaries([workout({})]);
 
-    expect(tables.sets.calls.not).toEqual([
-      ['completed_at', 'is', null],
-      ['weight_kg', 'is', null],
-      ['reps', 'is', null],
+    expect(tables.sets.calls.not).toEqual([['completed_at', 'is', null]]);
+  });
+
+  it('counts a completed set only when it holds what its exercise records, and weighs only weighted ones', async () => {
+    mockTables({
+      workout_exercises: {
+        data: [
+          { id: 'we-bench', workout_id: 'w1', measurement_type: 'weight_reps' },
+          { id: 'we-pushup', workout_id: 'w1', measurement_type: 'bodyweight' },
+          { id: 'we-plank', workout_id: 'w1', measurement_type: 'timed' },
+        ],
+        error: null,
+      },
+      sets: {
+        data: [
+          {
+            id: 's1',
+            workout_exercise_id: 'we-bench',
+            set_index: 1,
+            side: 'none',
+            weight_kg: '100',
+            reps: 5,
+            duration_seconds: null,
+            completed_at: 'x',
+          },
+          // A weighted set with no weight isn't a logged set.
+          {
+            id: 's2',
+            workout_exercise_id: 'we-bench',
+            set_index: 2,
+            side: 'none',
+            weight_kg: null,
+            reps: 5,
+            duration_seconds: null,
+            completed_at: 'x',
+          },
+          // Push-ups: reps only, and no volume even if an older app sent a weight.
+          {
+            id: 's3',
+            workout_exercise_id: 'we-pushup',
+            set_index: 1,
+            side: 'none',
+            weight_kg: '80',
+            reps: 20,
+            duration_seconds: null,
+            completed_at: 'x',
+          },
+          {
+            id: 's4',
+            workout_exercise_id: 'we-plank',
+            set_index: 1,
+            side: 'none',
+            weight_kg: null,
+            reps: null,
+            duration_seconds: 90,
+            completed_at: 'x',
+          },
+          // A timed set with no time isn't a logged set.
+          {
+            id: 's5',
+            workout_exercise_id: 'we-plank',
+            set_index: 2,
+            side: 'none',
+            weight_kg: null,
+            reps: null,
+            duration_seconds: null,
+            completed_at: 'x',
+          },
+        ],
+        error: null,
+      },
+    });
+
+    const [result] = await enrichWorkoutSummaries([workout({})]);
+
+    expect(result.completedSetCount).toBe(3);
+    expect(result.totalVolumeKg).toBe(500);
+    expect(result.topSets.map((top) => top.measurementType)).toEqual([
+      'weight_reps',
+      'bodyweight',
+      'timed',
     ]);
+    expect(result.topSets[1]).toMatchObject({ reps: 20, weightKg: null });
+    expect(result.topSets[2]).toMatchObject({ durationSeconds: 90, reps: null });
   });
 
   it('excludes incomplete/blank sets from totalVolumeKg the same way it does for completedSetCount', async () => {
@@ -216,11 +305,7 @@ describe('enrichWorkoutSummaries', () => {
     const result = await enrichWorkoutSummaries([workout({})]);
 
     expect(result[0].totalVolumeKg).toBe(0);
-    expect(tables.sets.calls.not).toEqual([
-      ['completed_at', 'is', null],
-      ['weight_kg', 'is', null],
-      ['reps', 'is', null],
-    ]);
+    expect(tables.sets.calls.not).toEqual([['completed_at', 'is', null]]);
   });
 
   it('computes duration as completedAt minus performedAt in whole minutes', async () => {

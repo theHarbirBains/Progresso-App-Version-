@@ -1,4 +1,4 @@
-import type { LoggingStyle, MovementType } from '../exercises/movementTypes';
+import type { LoggingStyle, MeasurementType, MovementType } from '../exercises/movementTypes';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import { request } from './apiClient';
 
@@ -12,6 +12,7 @@ export interface ExerciseResponse {
   muscleGroup: MuscleGroup;
   movementType: MovementType;
   loggingStyle: LoggingStyle | null;
+  measurementType: MeasurementType;
   photoUrl: string | null;
   isActive: boolean;
   createdBy: string | null;
@@ -25,6 +26,8 @@ export interface CreateExerciseInput {
   movementType: MovementType;
   /** Required when movementType is 'unilateral', omitted otherwise -- see ExerciseFormScreen. */
   loggingStyle?: LoggingStyle;
+  /** What a set records; the API defaults to weight and reps. */
+  measurementType?: MeasurementType;
   photoUrl?: string;
 }
 
@@ -33,6 +36,8 @@ export interface UpdateExerciseInput {
   muscleGroup?: MuscleGroup;
   movementType?: MovementType;
   loggingStyle?: LoggingStyle;
+  /** Workouts already logged keep what they were logged as. */
+  measurementType?: MeasurementType;
   isActive?: boolean;
   /** Omit to leave the stored photo alone; null clears it, a string sets/replaces it -- editable any time, not just at create. */
   photoUrl?: string | null;

@@ -1,4 +1,6 @@
+import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import { supabase } from '../lib/supabase';
+import { holdsMeasurement } from './setValues';
 import {
   computeWorkoutTopSets,
   countCompletedExercises,
@@ -11,9 +13,9 @@ export interface EnrichedWorkoutSummary extends WorkoutSummary {
   /** From the workout's tagged split day -- never inferred from its exercises. Null for a workout with no split day tagged. */
   splitDayName: string | null;
   muscleGroups: SplitMuscleGroup[];
-  /** Only sets that were actually logged (weight + reps entered and marked complete) -- the same completed-set definition used everywhere else in the app, never a raw count of every set row. */
+  /** Only sets that were actually logged (marked complete, holding what their exercise records: weight and reps, reps, or a time) -- never a raw count of every set row. */
   completedSetCount: number;
-  /** Same weight x reps definition as workoutSummary.ts's computeTotalVolumeKg, over the same completed-sets-only rows already fetched for completedSetCount -- no second query. */
+  /** Same weight x reps definition as workoutSummary.ts's computeTotalVolumeKg -- weighted exercises only, over the same rows already fetched for completedSetCount, no second query. */
   totalVolumeKg: number;
   /** Null if somehow still incomplete (shouldn't happen for a completed-workout query, but avoids a NaN if it ever does). */
   durationMinutes: number | null;
@@ -74,7 +76,9 @@ export async function enrichWorkoutSummaries(
   const workoutIds = workouts.map((w) => w.id);
   const { data: workoutExercises, error: weError } = await supabase
     .from('workout_exercises')
-    .select('id, workout_id, exercise_id, order_index, exercises(name, photo_url)')
+    .select(
+      'id, workout_id, exercise_id, order_index, measurement_type, exercises(name, photo_url)',
+    )
     .in('workout_id', workoutIds)
     .is('deleted_at', null);
   if (weError) throw new Error(weError.message);
@@ -83,7 +87,13 @@ export async function enrichWorkoutSummaries(
   const exerciseCountByWorkoutId = new Map<string, number>();
   const exerciseInfoById = new Map<
     string,
-    { exerciseId: string; exerciseName: string; photoUrl: string | null; orderIndex: number }
+    {
+      exerciseId: string;
+      exerciseName: string;
+      photoUrl: string | null;
+      orderIndex: number;
+      measurementType: MeasurementType;
+    }
   >();
   for (const we of workoutExercises ?? []) {
     workoutIdByExerciseId.set(we.id, we.workout_id);
@@ -93,6 +103,9 @@ export async function enrichWorkoutSummaries(
       exerciseName: embedded?.name ?? '',
       photoUrl: embedded?.photo_url ?? null,
       orderIndex: we.order_index,
+      measurementType: measurementTypeOf({
+        measurementType: we.measurement_type as MeasurementType | null,
+      }),
     });
     exerciseCountByWorkoutId.set(
       we.workout_id,
@@ -107,37 +120,43 @@ export async function enrichWorkoutSummaries(
   if (workoutExerciseIds.length > 0) {
     const { data: sets, error: setsError } = await supabase
       .from('sets')
-      .select('id, workout_exercise_id, set_index, side, weight_kg, reps, completed_at')
+      .select(
+        'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at',
+      )
       .in('workout_exercise_id', workoutExerciseIds)
       .is('deleted_at', null)
-      .not('completed_at', 'is', null)
-      .not('weight_kg', 'is', null)
-      .not('reps', 'is', null);
+      .not('completed_at', 'is', null);
     if (setsError) throw new Error(setsError.message);
     for (const set of sets ?? []) {
-      const bucket = setsByWorkoutExerciseId.get(set.workout_exercise_id) ?? [];
-      bucket.push({
+      const type = exerciseInfoById.get(set.workout_exercise_id)?.measurementType ?? 'weight_reps';
+      const record: SetRecord = {
         id: set.id,
         setIndex: set.set_index,
         side: set.side === 'none' ? null : set.side,
-        weightKg: Number(set.weight_kg),
-        reps: Number(set.reps),
+        weightKg: set.weight_kg === null ? null : Number(set.weight_kg),
+        reps: set.reps === null ? null : Number(set.reps),
+        durationSeconds: set.duration_seconds ?? null,
         completedAt: set.completed_at,
-      });
+      };
+      // Only a set holding what its exercise records counts as logged.
+      if (!holdsMeasurement(record, type)) continue;
+      const bucket = setsByWorkoutExerciseId.get(set.workout_exercise_id) ?? [];
+      bucket.push(record);
       setsByWorkoutExerciseId.set(set.workout_exercise_id, bucket);
-    }
 
-    for (const set of sets ?? []) {
       const workoutId = workoutIdByExerciseId.get(set.workout_exercise_id);
       if (!workoutId) continue;
       completedSetCountByWorkoutId.set(
         workoutId,
         (completedSetCountByWorkoutId.get(workoutId) ?? 0) + 1,
       );
-      totalVolumeKgByWorkoutId.set(
-        workoutId,
-        (totalVolumeKgByWorkoutId.get(workoutId) ?? 0) + Number(set.weight_kg) * Number(set.reps),
-      );
+      // Volume is weight x reps: weighted exercises only.
+      if (type === 'weight_reps') {
+        totalVolumeKgByWorkoutId.set(
+          workoutId,
+          (totalVolumeKgByWorkoutId.get(workoutId) ?? 0) + record.weightKg! * record.reps!,
+        );
+      }
     }
   }
 
@@ -149,6 +168,7 @@ export async function enrichWorkoutSummaries(
       photoUrl: string | null;
       sets: SetRecord[];
       orderIndex: number;
+      measurementType: MeasurementType;
     }[]
   >();
   for (const [weId, workoutId] of workoutIdByExerciseId) {

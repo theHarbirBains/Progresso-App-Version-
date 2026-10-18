@@ -9,6 +9,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface SetDraft {
   weight: string;
   reps: string;
+  /** A timed set's duration as typed. */
+  duration?: string;
+}
+
+function isEmpty(draft: SetDraft): boolean {
+  return draft.weight === '' && draft.reps === '' && (draft.duration ?? '') === '';
 }
 
 const keyFor = (workoutId: string) => `@progresso/liveWorkoutDraft/${workoutId}`;
@@ -59,7 +65,7 @@ export function mergeLiveWorkoutDrafts(
   const merged = { ...saved };
   for (const [setId, draft] of Object.entries(drafts)) {
     if (!openSetIds.has(setId)) continue;
-    if (draft.weight === '' && draft.reps === '') continue;
+    if (isEmpty(draft)) continue;
     merged[setId] = draft;
   }
   return merged;
@@ -73,7 +79,7 @@ export function pendingDraftsFor(
   const pending: Record<string, SetDraft> = {};
   for (const [setId, input] of Object.entries(inputs)) {
     if (!openSetIds.has(setId)) continue;
-    if (input.weight === '' && input.reps === '') continue;
+    if (isEmpty(input)) continue;
     pending[setId] = input;
   }
   return pending;

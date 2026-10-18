@@ -180,6 +180,8 @@ describe('fetchExercises', () => {
         id: 'ex-1',
         name: 'Barbell Curl',
         muscleGroup: 'biceps',
+        // A row from before measurement types says nothing: it measures weight and reps.
+        measurementType: 'weight_reps',
         isActive: true,
         createdBy: 'user-1',
       },

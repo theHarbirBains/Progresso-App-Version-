@@ -73,6 +73,7 @@ jest.mock('../workouts/allExerciseHistoryQueries', () => ({
 }));
 
 jest.mock('../workouts/prSummaryQueries', () => ({
+  fetchAllExerciseRecords: jest.fn().mockResolvedValue([]),
   fetchAllRepPRs: jest.fn(),
   fetchAllOneRepMaxes: jest.fn(),
 }));
@@ -317,6 +318,7 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
     expect(mockUpdateSet).toHaveBeenCalledWith('set-1-none', {
       weightKg: 100,
       reps: 5,
+      durationSeconds: null,
       completedAt: expect.any(String),
     });
     await waitFor(() =>

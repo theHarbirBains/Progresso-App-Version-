@@ -4,9 +4,10 @@ import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { SecondaryButton } from '../design/Button';
 import { colors } from '../design/theme';
-import type { MovementType } from '../exercises/movementTypes';
+import type { MeasurementType, MovementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { PER_SIDE_NOTE, SetColumnHeader } from './SetColumnHeader';
 import { SetRow } from './SetRow';
 import { UnilateralSetRow, type UnilateralSideInput } from './UnilateralSetRow';
 
@@ -18,6 +19,8 @@ export interface PreviousSessionSet {
   weightDisplay: string;
   unit: 'kg' | 'lb';
   reps: number;
+  /** A timed exercise's set, as shown ("1:30"); null for every other set. */
+  durationDisplay?: string | null;
   /** Only present for a unilateral exercise's set -- shown as a small "L"/"R" tag so two same-numbered-look rows aren't ambiguous. */
   side: 'left' | 'right' | null;
 }
@@ -32,6 +35,8 @@ export interface ExerciseCardSet {
   setIndex: number;
   weight: string;
   reps: string;
+  /** A timed set's duration as typed. */
+  duration?: string;
   completed: boolean;
   canComplete: boolean;
 }
@@ -49,6 +54,8 @@ interface Props {
   exerciseName: string;
   muscleGroup: MuscleGroup;
   movementType: MovementType;
+  /** What the exercise is logged as: weight and reps, reps only, or a time. Defaults to weight and reps. */
+  measurementType?: MeasurementType;
   /** Every set from the user's last completed session with this exercise
    * (never today's own in-progress sets) -- null/omitted when there's no
    * prior session yet, in which case the section is omitted entirely. */
@@ -62,6 +69,7 @@ interface Props {
   unilateralSets: UnilateralExerciseCardSet[];
   onChangeWeight: (setId: string, text: string) => void;
   onChangeReps: (setId: string, text: string) => void;
+  onChangeDuration?: (setId: string, text: string) => void;
   onToggleComplete: (setId: string) => void;
   /** Only used for a unilateral exercise -- completes/uncompletes both sides of one logical set together, since a unilateral set is one unit, not two independent ones. */
   onAddSet: () => void;
@@ -87,12 +95,14 @@ function ExerciseCardComponent({
   exerciseName,
   muscleGroup,
   movementType,
+  measurementType = 'weight_reps',
   previousSession = null,
   onViewHistory,
   sets,
   unilateralSets,
   onChangeWeight,
   onChangeReps,
+  onChangeDuration,
   onToggleComplete,
   onAddSet,
   onRemoveSet,
@@ -122,7 +132,7 @@ function ExerciseCardComponent({
               testID={testID ? `${testID}-per-side-note` : undefined}
               style={styles.perSideNote}
             >
-              Weight is per side
+              {PER_SIDE_NOTE[measurementType]}
             </Text>
           ) : null}
         </View>
@@ -201,12 +211,7 @@ function ExerciseCardComponent({
           </View>
           <Text style={styles.previousDate}>{previousSession.dateDisplay}</Text>
 
-          <View style={styles.previousColumnHeader}>
-            <Text style={styles.previousColumnIndex}>Set</Text>
-            <Text style={styles.previousColumnInput}>Weight</Text>
-            <Text style={styles.previousColumnInput}>Reps</Text>
-            <View style={styles.setHeaderComplete} />
-          </View>
+          <SetColumnHeader measurementType={measurementType} previous />
           <View style={styles.previousSets}>
             {previousSession.sets.map((set) => (
               <View
@@ -214,14 +219,23 @@ function ExerciseCardComponent({
                 testID={testID ? `${testID}-previous-set-${set.setNumber}` : undefined}
                 style={styles.previousSet}
                 accessible
-                accessibilityLabel={`Set ${set.setNumber}${set.side ? ` ${set.side}` : ''}: ${set.weightDisplay} ${set.unit} for ${set.reps} reps`}
+                accessibilityLabel={`Set ${set.setNumber}${set.side ? ` ${set.side}` : ''}: ${previousSetDescription(set, measurementType)}`}
               >
                 <Text style={styles.previousSetNumber}>{set.setNumber}</Text>
-                <Text style={styles.previousSetWeight}>
-                  {set.side ? `${set.side === 'left' ? 'L' : 'R'} ` : ''}
-                  {set.weightDisplay} {set.unit}
-                </Text>
-                <Text style={styles.previousSetReps}>{set.reps}</Text>
+                {measurementType === 'timed' ? (
+                  <Text style={[styles.previousSetReps, styles.setInputWide]}>
+                    {set.side ? `${set.side === 'left' ? 'L' : 'R'} ` : ''}
+                    {set.durationDisplay ?? '—'}
+                  </Text>
+                ) : (
+                  <>
+                    <Text style={styles.previousSetWeight}>
+                      {set.side ? `${set.side === 'left' ? 'L' : 'R'} ` : ''}
+                      {measurementType === 'bodyweight' ? 'BW' : `${set.weightDisplay} ${set.unit}`}
+                    </Text>
+                    <Text style={styles.previousSetReps}>{set.reps}</Text>
+                  </>
+                )}
                 <View style={styles.setHeaderComplete} />
               </View>
             ))}
@@ -229,14 +243,7 @@ function ExerciseCardComponent({
         </View>
       ) : null}
 
-      {hasRows ? (
-        <View style={styles.setHeaderRow}>
-          <Text style={styles.setHeaderIndex}>Set</Text>
-          <Text style={styles.setHeaderInput}>Weight</Text>
-          <Text style={styles.setHeaderInput}>Reps</Text>
-          <View style={styles.setHeaderComplete} />
-        </View>
-      ) : null}
+      {hasRows ? <SetColumnHeader measurementType={measurementType} /> : null}
 
       {isUnilateral
         ? unilateralSets.map((set) => (
@@ -248,8 +255,10 @@ function ExerciseCardComponent({
               right={set.right}
               completed={set.left.completed && set.right.completed}
               canComplete={set.left.canComplete && set.right.canComplete}
+              measurementType={measurementType}
               onChangeWeight={onChangeWeight}
               onChangeReps={onChangeReps}
+              onChangeDuration={onChangeDuration}
               onToggleComplete={onToggleComplete}
               onRemove={onRemoveSet}
               accentColor={accentColor}
@@ -263,11 +272,14 @@ function ExerciseCardComponent({
               setIndex={set.setIndex}
               weight={set.weight}
               reps={set.reps}
+              duration={set.duration ?? ''}
+              measurementType={measurementType}
               completed={set.completed}
               canComplete={set.canComplete}
               setId={set.id}
               onChangeWeight={onChangeWeight}
               onChangeReps={onChangeReps}
+              onChangeDuration={onChangeDuration}
               onToggleComplete={onToggleComplete}
               onRemove={onRemoveSet}
               accentColor={accentColor}
@@ -288,6 +300,12 @@ function ExerciseCardComponent({
   );
 }
 
+function previousSetDescription(set: PreviousSessionSet, type: MeasurementType): string {
+  if (type === 'timed') return set.durationDisplay ?? 'no time';
+  if (type === 'bodyweight') return `${set.reps} reps at bodyweight`;
+  return `${set.weightDisplay} ${set.unit} for ${set.reps} reps`;
+}
+
 function arraysEqual<T>(a: T[], b: T[], elementEqual: (x: T, y: T) => boolean): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
@@ -303,6 +321,7 @@ function setsEqual(a: ExerciseCardSet[], b: ExerciseCardSet[]): boolean {
       set.setIndex === other.setIndex &&
       set.weight === other.weight &&
       set.reps === other.reps &&
+      set.duration === other.duration &&
       set.completed === other.completed &&
       set.canComplete === other.canComplete,
   );
@@ -315,6 +334,7 @@ function unilateralSideEqual(
   return (
     a.weight === b.weight &&
     a.reps === b.reps &&
+    a.duration === b.duration &&
     a.completed === b.completed &&
     a.canComplete === b.canComplete
   );
@@ -349,6 +369,7 @@ function previousSessionEqual(
       set.weightDisplay === other.weightDisplay &&
       set.unit === other.unit &&
       set.reps === other.reps &&
+      set.durationDisplay === other.durationDisplay &&
       set.side === other.side,
   );
 }
@@ -376,6 +397,7 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     prev.exerciseName === next.exerciseName &&
     prev.muscleGroup === next.muscleGroup &&
     prev.movementType === next.movementType &&
+    prev.measurementType === next.measurementType &&
     prev.divider === next.divider &&
     prev.accentColor === next.accentColor &&
     prev.onAccentColor === next.onAccentColor &&

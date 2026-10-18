@@ -15,13 +15,23 @@ import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
+import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
+import {
+  fetchDurationRecord,
+  fetchOneRepMax,
+  fetchRepPRs,
+  fetchRepRecord,
+  type ExerciseRecord,
+  type OneRepMax,
+  type RepPR,
+} from '../workouts/prQueries';
+import { bestLoggedSet, formatSetValues, loggedSets, setValuesOf } from '../workouts/setValues';
 import { computeDurationMinutes } from '../workouts/topSetSummary';
 import {
   completedSetsOnly,
   deleteWorkout,
   fetchWorkoutDetail,
-  type CompletedSetRecord,
+  type SetRecord,
   type WorkoutDetail,
 } from '../workouts/workoutQueries';
 import { formatCardDuration } from '../workouts/workoutFormat';
@@ -92,6 +102,8 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [repPRs, setRepPRs] = useState<Record<string, RepPR[]>>({});
   const [oneRepMaxes, setOneRepMaxes] = useState<Record<string, OneRepMax | null>>({});
+  // A bodyweight or timed exercise's record (most reps, longest time), by logged exercise.
+  const [otherRecords, setOtherRecords] = useState<Record<string, ExerciseRecord | null>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,16 +123,25 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         // against the database's current, authoritative state.
         const prEntries = await Promise.all(
           detail.exercises.map(async (exercise) => {
+            const type = measurementTypeOf(exercise);
+            if (type !== 'weight_reps') {
+              const record =
+                type === 'timed'
+                  ? await fetchDurationRecord(userId, exercise.exerciseId)
+                  : await fetchRepRecord(userId, exercise.exerciseId);
+              return [exercise.id, [] as RepPR[], null, record] as const;
+            }
             const [prs, orm] = await Promise.all([
               fetchRepPRs(userId, exercise.exerciseId),
               fetchOneRepMax(userId, exercise.exerciseId),
             ]);
-            return [exercise.id, prs, orm] as const;
+            return [exercise.id, prs, orm, null] as const;
           }),
         );
         if (!cancelled) {
           setRepPRs(Object.fromEntries(prEntries.map(([id, prs]) => [id, prs])));
           setOneRepMaxes(Object.fromEntries(prEntries.map(([id, , orm]) => [id, orm])));
+          setOtherRecords(Object.fromEntries(prEntries.map(([id, , , record]) => [id, record])));
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load workout');
@@ -166,20 +187,28 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  // The workout as a whole, from the sets that were actually logged.
-  const loggedByExercise = workout.exercises.map((exercise) => ({
-    exercise,
-    sets: completedSetsOnly(exercise.sets),
-  }));
-  const allLogged = loggedByExercise.flatMap((entry) => entry.sets);
-  const totalVolume = volumeInUnit(allLogged, weightUnit);
+  // The workout as a whole, from the sets that were actually logged -- each holding what its
+  // exercise records (weight and reps; reps; a time).
+  const loggedByExercise = workout.exercises.map((exercise) => {
+    const type = measurementTypeOf(exercise);
+    return { exercise, type, sets: loggedSets(exercise.sets, type) };
+  });
+  // Volume is weight x reps: weighted exercises only.
+  const weightedLogged = loggedByExercise
+    .filter((entry) => entry.type === 'weight_reps')
+    .flatMap((entry) => completedSetsOnly(entry.sets));
+  const totalVolume = volumeInUnit(weightedLogged, weightUnit);
+  const loggedSetCount = loggedByExercise.reduce((sum, entry) => sum + entry.sets.length, 0);
   const durationMinutes = computeDurationMinutes(workout.performedAt, workout.completedAt);
-  const isRecord = (exerciseId: string, set: CompletedSetRecord, reps: number) =>
-    Boolean(repPRs[exerciseId]?.some((pr) => pr.reps === reps && pr.sourceSetId === set.id)) ||
-    oneRepMaxes[exerciseId]?.sourceSetId === set.id;
+  const isRecord = (exerciseId: string, type: MeasurementType, set: SetRecord) =>
+    type === 'weight_reps'
+      ? Boolean(
+          repPRs[exerciseId]?.some((pr) => pr.reps === set.reps && pr.sourceSetId === set.id),
+        ) || oneRepMaxes[exerciseId]?.sourceSetId === set.id
+      : otherRecords[exerciseId]?.sourceSetId === set.id;
   const recordCount = loggedByExercise.reduce(
-    (sum, { exercise, sets }) =>
-      sum + sets.filter((set) => isRecord(exercise.id, set, set.reps)).length,
+    (sum, { exercise, type, sets }) =>
+      sum + sets.filter((set) => isRecord(exercise.id, type, set)).length,
     0,
   );
   const muscles = Array.from(
@@ -229,7 +258,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
             />
             <StatBlock
               testID="workout-detail-stat-sets"
-              value={String(allLogged.length)}
+              value={String(loggedSetCount)}
               label="Sets"
             />
           </View>
@@ -249,16 +278,15 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         </View>
       </AppCard>
 
-      {loggedByExercise.map(({ exercise, sets: loggedSets }) => {
+      {loggedByExercise.map(({ exercise, type, sets: exerciseSets }) => {
         // A workout's history view only ever shows sets that were actually
         // logged -- a blank/incomplete set left over from a live session
         // that was completed anyway is not real performance data.
-        const topSet = loggedSets.reduce<CompletedSetRecord | null>(
-          (max, s) => (!max || s.weightKg > max.weightKg ? s : max),
-          null,
-        );
+        const topSet = bestLoggedSet(exerciseSets, type);
         return (
           <AppCard key={exercise.id} testID={`exercise-card-${exercise.id}`}>
+            {/* PR history is weighted rep PRs and 1RMs: a bodyweight or timed exercise's
+                title opens nothing, and its record shows on its set instead. */}
             <TouchableOpacity
               testID={`exercise-title-${exercise.id}`}
               style={styles.exerciseTitleRow}
@@ -268,8 +296,11 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                   exerciseName: exercise.exerciseName,
                 })
               }
-              accessibilityRole="button"
-              accessibilityLabel={`${exercise.exerciseName}, view PR history`}
+              disabled={type !== 'weight_reps'}
+              accessibilityRole={type === 'weight_reps' ? 'button' : undefined}
+              accessibilityLabel={
+                type === 'weight_reps' ? `${exercise.exerciseName}, view PR history` : undefined
+              }
             >
               <View style={styles.exerciseTitleBody}>
                 <Text style={styles.exerciseTitle}>{exercise.exerciseName}</Text>
@@ -277,7 +308,9 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                   {MUSCLE_GROUP_LABELS[exercise.muscleGroup]}
                 </Text>
               </View>
-              <Feather name="chevron-right" size={18} color={colors.textMuted} />
+              {type === 'weight_reps' ? (
+                <Feather name="chevron-right" size={18} color={colors.textMuted} />
+              ) : null}
             </TouchableOpacity>
             {topSet ? (
               <View style={styles.topSetBlock}>
@@ -285,23 +318,34 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                   testID={`top-set-${exercise.id}`}
                   style={[styles.topSet, { color: theme.accent }]}
                 >
-                  Top set: {formatWeightKg(topSet.weightKg, weightUnit)}
-                  {weightUnit}
-                  {'×'}
-                  {topSet.reps}
+                  {type === 'weight_reps' ? (
+                    <>
+                      Top set: {formatWeightKg(topSet.weightKg ?? 0, weightUnit)}
+                      {weightUnit}
+                      {'×'}
+                      {topSet.reps}
+                    </>
+                  ) : (
+                    `${type === 'timed' ? 'Longest' : 'Best set'}: ${formatSetValues(
+                      setValuesOf(topSet, type),
+                      weightUnit,
+                    )}`
+                  )}
                 </Text>
               </View>
             ) : null}
             <View style={styles.sets}>
-              {loggedSets.map((set) => {
-                const oneRepMax = oneRepMaxes[exercise.id]?.sourceSetId === set.id;
-                const record = isRecord(exercise.id, set, set.reps);
+              {exerciseSets.map((set) => {
+                const oneRepMax =
+                  type === 'weight_reps' && oneRepMaxes[exercise.id]?.sourceSetId === set.id;
+                const record = isRecord(exercise.id, type, set);
                 return (
                   <View key={set.id} style={styles.setRow}>
                     <Text style={styles.setLabel}>Set {set.setIndex}</Text>
                     <Text style={styles.setValue}>
-                      {formatWeightKg(set.weightKg, weightUnit)}
-                      {weightUnit} × {set.reps}
+                      {type === 'weight_reps'
+                        ? `${formatWeightKg(set.weightKg ?? 0, weightUnit)}${weightUnit} × ${set.reps}`
+                        : formatSetValues(setValuesOf(set, type), weightUnit)}
                     </Text>
                     {record ? (
                       <Badge

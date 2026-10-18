@@ -535,3 +535,75 @@ describe('ExerciseCard.arePropsEqual', () => {
     expect(arePropsEqual(prev, { ...baseProps, onMoveUp })).toBe(true);
   });
 });
+
+describe('ExerciseCard by what the exercise measures', () => {
+  it('heads a timed exercise with one Time column, and its last session with times', () => {
+    render(
+      <ExerciseCard
+        {...baseProps}
+        exerciseName="Plank"
+        measurementType="timed"
+        sets={[
+          {
+            id: 's1',
+            setIndex: 1,
+            weight: '',
+            reps: '',
+            duration: '',
+            completed: false,
+            canComplete: false,
+          },
+        ]}
+        previousSession={{
+          dateDisplay: 'Oct 1, 2026',
+          sets: [
+            {
+              setNumber: 1,
+              weightDisplay: '',
+              unit: 'kg',
+              reps: 0,
+              durationDisplay: '1:15',
+              side: null,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText('Time').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Weight')).toBeNull();
+    expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(/1:15/);
+    expect(screen.getByLabelText('Set 1: 1:15')).toBeTruthy();
+  });
+
+  it("shows a bodyweight exercise's last session as BW and reps", () => {
+    render(
+      <ExerciseCard
+        {...baseProps}
+        exerciseName="Push-Up"
+        measurementType="bodyweight"
+        previousSession={{
+          dateDisplay: 'Oct 1, 2026',
+          sets: [{ setNumber: 1, weightDisplay: '', unit: 'kg', reps: 20, side: null }],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(/BW.*20/);
+    expect(screen.queryByText('Weight')).toBeNull();
+  });
+
+  it('says reps are per side for a unilateral bodyweight exercise', () => {
+    render(
+      <ExerciseCard
+        {...baseProps}
+        movementType="unilateral"
+        measurementType="bodyweight"
+        sets={[]}
+        unilateralSets={oneUnilateralSet}
+      />,
+    );
+
+    expect(screen.getByText('Reps are per side')).toBeTruthy();
+  });
+});

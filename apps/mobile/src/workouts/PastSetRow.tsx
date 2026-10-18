@@ -1,16 +1,23 @@
 import { memo } from 'react';
-import { TextInput, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../design/theme';
+import type { MeasurementType } from '../exercises/movementTypes';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { SetValueFields } from './SetValueFields';
 
 interface Props {
   setIndex: number;
   weight: string;
   reps: string;
+  /** A timed set's duration as typed. */
+  duration?: string;
+  /** What the exercise measures -- decides which fields show. Defaults to weight and reps. */
+  measurementType?: MeasurementType;
   onChangeWeight: (text: string) => void;
   onChangeReps: (text: string) => void;
+  onChangeDuration?: (text: string) => void;
   onRemove: () => void;
   testID?: string;
 }
@@ -27,33 +34,29 @@ function PastSetRowComponent({
   setIndex,
   weight,
   reps,
+  duration = '',
+  measurementType = 'weight_reps',
   onChangeWeight,
   onChangeReps,
+  onChangeDuration,
   onRemove,
   testID,
 }: Props) {
   return (
     <View testID={testID} style={styles.setRow}>
       <Text style={styles.setIndex}>{setIndex}</Text>
-      <TextInput
-        testID={testID ? `${testID}-weight` : undefined}
-        style={styles.setInput}
-        accessibilityLabel={`Set ${setIndex} weight`}
-        keyboardType="decimal-pad"
-        value={weight}
-        onChangeText={onChangeWeight}
-        placeholder="0"
-        placeholderTextColor={colors.textMuted}
-      />
-      <TextInput
-        testID={testID ? `${testID}-reps` : undefined}
-        style={styles.setInput}
-        accessibilityLabel={`Set ${setIndex} reps`}
-        keyboardType="number-pad"
-        value={reps}
-        onChangeText={onChangeReps}
-        placeholder="0"
-        placeholderTextColor={colors.textMuted}
+      <SetValueFields
+        setId=""
+        label={`Set ${setIndex}`}
+        measurementType={measurementType}
+        weight={weight}
+        reps={reps}
+        duration={duration}
+        completed={false}
+        onChangeWeight={(_, text) => onChangeWeight(text)}
+        onChangeReps={(_, text) => onChangeReps(text)}
+        onChangeDuration={(_, text) => onChangeDuration?.(text)}
+        testID={testID}
       />
       <TouchableOpacity
         testID={testID ? `${testID}-remove` : undefined}
@@ -82,6 +85,8 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     prev.setIndex === next.setIndex &&
     prev.weight === next.weight &&
     prev.reps === next.reps &&
+    prev.duration === next.duration &&
+    prev.measurementType === next.measurementType &&
     prev.testID === next.testID
   );
 }

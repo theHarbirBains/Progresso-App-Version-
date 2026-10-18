@@ -82,7 +82,8 @@ export function NotificationsScreen({ navigation }: Props) {
     setInsightsError(null);
     try {
       const [history, goals] = await Promise.all([
-        fetchAllExerciseHistory(userId),
+        // Every session counts toward when a muscle was trained, bodyweight and timed too.
+        fetchAllExerciseHistory(userId, { allTypes: true }),
         fetchNutritionGoals(userId),
       ]);
       setStaleGroups(computeStaleMuscleGroups(history));

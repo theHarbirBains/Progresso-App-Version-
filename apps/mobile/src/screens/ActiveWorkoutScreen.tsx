@@ -10,7 +10,7 @@ import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
-import { roundWeight, toKg, formatWeightKg } from '../lib/units';
+import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -20,7 +20,11 @@ import { ExerciseCard } from '../workouts/ExerciseCard';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
 import {
   buildPreviousSessionDisplay,
+  computeCardSets,
   computeUnilateralSets,
+  draftFromSet,
+  draftValues,
+  invalidDraftMessage,
   isValidDraft,
   withPrefilledSets,
   type SetInputDraft,
@@ -110,6 +114,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     setSetInputs,
     changeWeight: changeSetWeight,
     changeReps: changeSetReps,
+    changeDuration: changeSetDuration,
   } = useSetInputDrafts();
   // Mirrors what is typed into open sets to the device, so an app close or reset mid-set doesn't
   // lose it. Debounced so typing never waits on storage. Completed sets are saved on the server
@@ -177,10 +182,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         const openSetIds = new Set<string>();
         for (const exercise of detail.exercises) {
           for (const set of exercise.sets) {
-            savedInputs[set.id] = {
-              weight: set.weightKg !== null ? formatWeightKg(set.weightKg, weightUnit) : '',
-              reps: set.reps !== null ? String(set.reps) : '',
-            };
+            savedInputs[set.id] = draftFromSet(set, measurementTypeOf(exercise), weightUnit);
             if (set.completedAt === null) openSetIds.add(set.id);
           }
         }
@@ -246,6 +248,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   async function handleAddSet(exercise: WorkoutExerciseWithSets) {
     setError(null);
     const lastSession = previousPerformance[exercise.exerciseId]?.sets;
+    const type = measurementTypeOf(exercise);
     try {
       const nextIndex = exercise.sets.reduce((max, s) => Math.max(max, s.setIndex), 0) + 1;
       if (exercise.movementType === 'unilateral') {
@@ -258,14 +261,14 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         ]);
         updateExerciseSets(exercise.id, (ex) => ({ ...ex, sets: [...ex.sets, left, right] }));
         setSetInputs((prev) =>
-          withPrefilledSets(prev, [left, right], exercise.sets, lastSession, weightUnit),
+          withPrefilledSets(prev, [left, right], exercise.sets, lastSession, weightUnit, type),
         );
         return;
       }
       const created = await createSet(exercise.id, nextIndex);
       updateExerciseSets(exercise.id, (ex) => ({ ...ex, sets: [...ex.sets, created] }));
       setSetInputs((prev) =>
-        withPrefilledSets(prev, [created], exercise.sets, lastSession, weightUnit),
+        withPrefilledSets(prev, [created], exercise.sets, lastSession, weightUnit, type),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add set');
@@ -279,6 +282,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   async function completeOrUncompleteSet(
     exerciseId: string,
     set: SetRecord,
+    type: MeasurementType,
   ): Promise<{ ok: true } | { ok: false; error: string }> {
     if (set.completedAt) {
       const updated = await updateSet(set.id, { completedAt: null });
@@ -290,14 +294,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     }
 
     const draft = setInputs[set.id];
-    if (!isValidDraft(draft)) {
-      return { ok: false, error: 'Enter a valid weight (in steps of 0.25) and rep count' };
+    if (!isValidDraft(draft, type)) {
+      return { ok: false, error: invalidDraftMessage(type) };
     }
-    const weightKg = roundWeight(toKg(Number(draft.weight), weightUnit));
-    const reps = Math.trunc(Number(draft.reps));
     const updated = await updateSet(set.id, {
-      weightKg,
-      reps,
+      ...draftValues(draft, type, weightUnit),
       completedAt: new Date().toISOString(),
     });
     updateExerciseSets(exerciseId, (ex) => ({
@@ -313,7 +314,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   ) {
     setError(null);
     try {
-      const result = await completeOrUncompleteSet(exercise.id, set);
+      const result = await completeOrUncompleteSet(exercise.id, set, measurementTypeOf(exercise));
       if (!result.ok) setError(result.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update set');
@@ -332,19 +333,20 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     if (!left || !right) return;
 
     setError(null);
+    const type = measurementTypeOf(exercise);
     if (!left.completedAt || !right.completedAt) {
       const leftDraft = setInputs[left.id];
       const rightDraft = setInputs[right.id];
-      if (!isValidDraft(leftDraft) || !isValidDraft(rightDraft)) {
-        setError('Enter a valid weight (in steps of 0.25) and rep count for both sides');
+      if (!isValidDraft(leftDraft, type) || !isValidDraft(rightDraft, type)) {
+        setError(invalidDraftMessage(type, true));
         return;
       }
     }
 
     try {
       const [leftResult, rightResult] = await Promise.all([
-        completeOrUncompleteSet(exercise.id, left),
-        completeOrUncompleteSet(exercise.id, right),
+        completeOrUncompleteSet(exercise.id, left, type),
+        completeOrUncompleteSet(exercise.id, right, type),
       ]);
       if (!leftResult.ok) setError(leftResult.error);
       else if (!rightResult.ok) setError(rightResult.error);
@@ -536,6 +538,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                   muscleGroup: exercise.muscleGroup,
                   movementType: exercise.movementType,
                   loggingStyle: exercise.loggingStyle,
+                  measurementType: exercise.measurementType,
                   orderIndex: nextOrderIndex,
                   sets: createdSets,
                 },
@@ -546,7 +549,14 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       const lastSession = await lastSessionLoad;
       // Anything typed into the new set while last session loaded is kept.
       setSetInputs((prev) =>
-        withPrefilledSets(prev, createdSets, [], lastSession?.sets, weightUnit),
+        withPrefilledSets(
+          prev,
+          createdSets,
+          [],
+          lastSession?.sets,
+          weightUnit,
+          exercise.measurementType,
+        ),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add exercise');
@@ -700,12 +710,16 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               exerciseName={exercise.exerciseName}
               muscleGroup={exercise.muscleGroup}
               movementType={exercise.movementType}
+              measurementType={measurementTypeOf(exercise)}
               previousSession={buildPreviousSessionDisplay(
                 previousPerformance[exercise.exerciseId],
                 weightUnit,
+                measurementTypeOf(exercise),
               )}
+              // Exercise progress charts weights; a bodyweight or timed exercise has none to show.
               onViewHistory={
-                previousPerformance[exercise.exerciseId]
+                previousPerformance[exercise.exerciseId] &&
+                measurementTypeOf(exercise) === 'weight_reps'
                   ? () =>
                       navigation.navigate('ProgressExerciseDetail', {
                         exerciseId: exercise.exerciseId,
@@ -716,22 +730,16 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               sets={
                 exercise.movementType === 'unilateral'
                   ? []
-                  : exercise.sets.map((set) => ({
-                      id: set.id,
-                      setIndex: set.setIndex,
-                      weight: setInputs[set.id]?.weight ?? '',
-                      reps: setInputs[set.id]?.reps ?? '',
-                      completed: set.completedAt !== null,
-                      canComplete: isValidDraft(setInputs[set.id]),
-                    }))
+                  : computeCardSets(exercise.sets, setInputs, measurementTypeOf(exercise))
               }
               unilateralSets={
                 exercise.movementType === 'unilateral'
-                  ? computeUnilateralSets(exercise.sets, setInputs)
+                  ? computeUnilateralSets(exercise.sets, setInputs, measurementTypeOf(exercise))
                   : []
               }
               onChangeWeight={changeSetWeight}
               onChangeReps={changeSetReps}
+              onChangeDuration={changeSetDuration}
               onToggleComplete={toggleSetComplete}
               onAddSet={() => handleAddSet(exercise)}
               onRemoveSet={removeSet}

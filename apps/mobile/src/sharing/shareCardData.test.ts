@@ -112,7 +112,15 @@ describe('fetchShareCardData', () => {
     const result = await fetchShareCardData('w1', 'user-1');
 
     expect(result.topSets).toEqual([
-      { exerciseName: 'Bench Press', photoUrl: null, weightKg: 110, reps: 8, prLabel: null },
+      {
+        exerciseName: 'Bench Press',
+        photoUrl: null,
+        measurementType: 'weight_reps',
+        weightKg: 110,
+        reps: 8,
+        durationSeconds: null,
+        prLabel: null,
+      },
     ]);
   });
 
@@ -221,8 +229,10 @@ describe('fetchShareCardData', () => {
     expect(result.topSets[0]).toEqual({
       exerciseName: 'Bench Press',
       photoUrl: null,
+      measurementType: 'weight_reps',
       weightKg: 500.5,
       reps: 50,
+      durationSeconds: null,
       prLabel: null,
     });
   });

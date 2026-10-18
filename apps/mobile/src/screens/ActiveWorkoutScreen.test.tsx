@@ -88,6 +88,7 @@ jest.mock('../workouts/allExerciseHistoryQueries', () => ({
 }));
 
 jest.mock('../workouts/prSummaryQueries', () => ({
+  fetchAllExerciseRecords: jest.fn().mockResolvedValue([]),
   fetchAllRepPRs: jest.fn(),
   fetchAllOneRepMaxes: jest.fn(),
 }));
@@ -268,6 +269,77 @@ describe('ActiveWorkoutScreen', () => {
       expect(mockUpdateSet).toHaveBeenCalledWith(
         's2',
         expect.objectContaining({ weightKg: 120, reps: 6, completedAt: expect.any(String) }),
+      ),
+    );
+  });
+
+  it('completes a bodyweight set on reps alone, and saves no weight', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [
+        {
+          ...baseWorkout.exercises[0],
+          exerciseName: 'Push-Up',
+          measurementType: 'bodyweight' as const,
+          sets: [{ id: 's2', setIndex: 1, weightKg: null, reps: null, completedAt: null }],
+        },
+      ],
+    });
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    expect(screen.queryByTestId('exercise-card-we1-set-s2-weight')).toBeNull();
+    expect(screen.getByTestId('exercise-card-we1-set-s2-bodyweight')).toHaveTextContent('BW');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '20');
+    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
+
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        's2',
+        expect.objectContaining({
+          weightKg: null,
+          reps: 20,
+          durationSeconds: null,
+          completedAt: expect.any(String),
+        }),
+      ),
+    );
+  });
+
+  it('completes a timed set on a time typed as minutes and seconds', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [
+        {
+          ...baseWorkout.exercises[0],
+          exerciseName: 'Plank',
+          muscleGroup: 'abs' as const,
+          measurementType: 'timed' as const,
+          sets: [{ id: 's2', setIndex: 1, weightKg: null, reps: null, completedAt: null }],
+        },
+      ],
+    });
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    const complete = screen.getByTestId('exercise-card-we1-set-s2-complete');
+    expect(complete.props.accessibilityState.disabled).toBe(true);
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-time'), '1:30');
+    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
+
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        's2',
+        expect.objectContaining({
+          weightKg: null,
+          reps: null,
+          durationSeconds: 90,
+          completedAt: expect.any(String),
+        }),
       ),
     );
   });
@@ -1171,6 +1243,48 @@ describe('Last Workout', () => {
       exerciseId: 'ex1',
       exerciseName: 'Barbell Bench Press',
     });
+  });
+
+  it("shows a timed exercise's last session without View History, which charts weights", async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [
+        {
+          ...baseWorkout.exercises[0],
+          exerciseName: 'Plank',
+          measurementType: 'timed' as const,
+          sets: [{ id: 's2', setIndex: 1, weightKg: null, reps: null, completedAt: null }],
+        },
+      ],
+    });
+    mockFetchPreviousPerformance.mockResolvedValue({
+      performedAt: '2026-01-05T00:00:00Z',
+      sets: [
+        {
+          id: 'prev-1',
+          setIndex: 1,
+          weightKg: null,
+          reps: null,
+          durationSeconds: 75,
+          completedAt: '...',
+          side: null,
+        },
+      ],
+    });
+
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+
+    expect(await screen.findByTestId('exercise-card-we1-previous-session')).toHaveTextContent(
+      /1:15/,
+    );
+    expect(screen.queryByTestId('exercise-card-we1-view-history')).toBeNull();
+
+    // A new set starts from the time typed in the set before it.
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-time'), '1:20');
+    fireEvent.press(screen.getByTestId('exercise-card-we1-add-set'));
+    expect((await screen.findByTestId('exercise-card-we1-set-s3-time')).props.value).toBe('1:20');
   });
 });
 

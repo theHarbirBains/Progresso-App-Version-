@@ -42,6 +42,7 @@ const ownedExercise = {
   muscleGroup: 'biceps' as const,
   movementType: 'bilateral' as const,
   loggingStyle: null,
+  measurementType: 'weight_reps' as const,
   photoUrl: null,
   isActive: true,
   createdBy: 'user-1',
@@ -93,6 +94,7 @@ describe('ExerciseFormScreen (create mode)', () => {
         name: 'Cable Preacher Curl',
         muscleGroup: 'biceps',
         movementType: 'bilateral',
+        measurementType: 'weight_reps',
       }),
     );
     expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');
@@ -114,9 +116,61 @@ describe('ExerciseFormScreen (create mode)', () => {
         name: 'Single-Arm Lat Pulldown',
         muscleGroup: 'back',
         movementType: 'unilateral',
+        measurementType: 'weight_reps',
         loggingStyle: 'single_side',
       }),
     );
+  });
+
+  it('starts on weight and reps, and creates a bodyweight or timed exercise when picked', async () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    expect(
+      screen.getByTestId('exercise-form-measurement-weight_reps').props.accessibilityState.selected,
+    ).toBe(true);
+    expect(screen.getByTestId('exercise-form-measurement-hint')).toHaveTextContent(
+      'A weight and reps for each set.',
+    );
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Ring Dip');
+    selectMuscleGroup('exercise-form-muscle-group', 'chest');
+    fireEvent.press(screen.getByTestId('exercise-form-measurement-bodyweight'));
+    expect(screen.getByTestId('exercise-form-measurement-hint')).toHaveTextContent(
+      'For added weight, make a weighted version.',
+      { exact: false },
+    );
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith(
+        'token-123',
+        expect.objectContaining({ name: 'Ring Dip', measurementType: 'bodyweight' }),
+      ),
+    );
+  });
+
+  it('creates a timed exercise', async () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Wall Sit');
+    selectMuscleGroup('exercise-form-muscle-group', 'quadriceps');
+    fireEvent.press(screen.getByTestId('exercise-form-measurement-timed'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith(
+        'token-123',
+        expect.objectContaining({ name: 'Wall Sit', measurementType: 'timed' }),
+      ),
+    );
+  });
+
+  it('reads each choice out in full', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    expect(screen.getByLabelText('Weight and reps')).toBeTruthy();
+    expect(screen.getByLabelText('Reps only')).toBeTruthy();
+    expect(screen.getByLabelText('Time')).toBeTruthy();
   });
 
   it('flipping Unilateral back off before saving creates a plain bilateral exercise', async () => {
@@ -229,6 +283,32 @@ describe('ExerciseFormScreen (edit mode)', () => {
     expect(screen.getByTestId('exercise-form-unilateral').props.value).toBe(true);
   });
 
+  it('prefills what an existing exercise is measured by, and saves a change to it', async () => {
+    render(
+      <ExerciseFormScreen
+        mode="edit"
+        exercise={{ ...ownedExercise, measurementType: 'timed' }}
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId('exercise-form-measurement-timed').props.accessibilityState.selected,
+    ).toBe(true);
+
+    fireEvent.press(screen.getByTestId('exercise-form-measurement-bodyweight'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockUpdateExercise).toHaveBeenCalledWith(
+        'token-123',
+        'ex-mine',
+        expect.objectContaining({ measurementType: 'bodyweight' }),
+      ),
+    );
+  });
+
   it('saves edited fields via updateExercise', async () => {
     const onDone = jest.fn();
     render(
@@ -248,6 +328,7 @@ describe('ExerciseFormScreen (edit mode)', () => {
         name: 'Renamed Curl',
         muscleGroup: 'biceps',
         movementType: 'bilateral',
+        measurementType: 'weight_reps',
         isActive: true,
       }),
     );
