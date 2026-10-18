@@ -1939,6 +1939,34 @@ async function main() {
         gluteBridge?.measurement_type === 'weight_reps',
     );
 
+    const libraryNames = [
+      'Push-Up',
+      'Pull-Up',
+      'Sit-Up',
+      'Hanging Leg Raise',
+      'Nordic Hamstring Curl',
+      'Ab Wheel Rollout',
+      'Plank',
+      'Dead Hang',
+      'Weighted Pull-Up',
+    ];
+    const activeInLibrary = (
+      await admin.query(
+        'select name from public.exercises where created_by is null and is_active and name = any($1)',
+        [libraryNames],
+      )
+    ).rows.map((row) => row.name);
+    record(
+      'Every bodyweight and timed built-in, Weighted Pull-Up and Dead Hang are in the library',
+      libraryNames.every((name) => activeInLibrary.includes(name)),
+    );
+    const hiddenMachines = (
+      await admin.query(
+        "select count(*)::int as n from public.exercises where created_by is null and is_active and name in ('Leg Press', 'Cable Fly', 'Lat Pulldown')",
+      )
+    ).rows[0].n;
+    record('Machine and cable built-ins stay out of the library', hiddenMachines === 0);
+
     const bwUser = randomUUID();
     await admin.query('insert into auth.users (id, email) values ($1, $2)', [
       bwUser,
