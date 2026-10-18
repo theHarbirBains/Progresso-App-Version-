@@ -262,6 +262,30 @@ describe('EditWorkoutScreen -- saving changes', () => {
     expect(mockUpdateSet).not.toHaveBeenCalled();
   });
 
+  it('completes a set that was left un-ticked in the live workout when it is saved here', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [
+        {
+          ...baseWorkout.exercises[0],
+          sets: [{ id: 's1', setIndex: 1, weightKg: 100, reps: 5, completedAt: null }],
+        },
+      ],
+    });
+    renderScreen();
+    await screen.findByTestId(EX);
+
+    fireEvent.press(screen.getByTestId('edit-workout-save'));
+
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith('s1', {
+        weightKg: 100,
+        reps: 5,
+        completedAt: baseWorkout.performedAt,
+      }),
+    );
+  });
+
   it('renames the workout and saves a changed existing set by its real id', async () => {
     renderScreen();
     await screen.findByTestId(EX);

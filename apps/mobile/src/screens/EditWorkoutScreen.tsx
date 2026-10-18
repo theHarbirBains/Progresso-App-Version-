@@ -441,10 +441,22 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
             continue;
           }
           const originalSet = originalSetsById.get(set.id);
-          if (originalSet && originalSet.weightKg === weightKg && originalSet.reps === reps) {
+          // A set left blank or un-ticked in the live workout is part of the workout once
+          // it's saved here, so it's completed too -- otherwise it would stay out of the
+          // workout's history and PRs while showing on this screen.
+          const wasCompleted = originalSet?.completedAt != null;
+          if (
+            originalSet &&
+            wasCompleted &&
+            originalSet.weightKg === weightKg &&
+            originalSet.reps === reps
+          ) {
             continue;
           }
-          await updateSet(set.id, { weightKg, reps });
+          await updateSet(
+            set.id,
+            wasCompleted ? { weightKg, reps } : { weightKg, reps, completedAt: performedAtIso },
+          );
         }
       }
 

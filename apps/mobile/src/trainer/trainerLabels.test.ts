@@ -107,6 +107,21 @@ describe('describeTrainerActivity', () => {
     );
   });
 
+  it("describes a trainer's direct edits to a client's workouts from both sides", () => {
+    expect(describeTrainerActivity(activity('set.edited'), TRAINER)).toBe(
+      'Edited a set of Purnima’s',
+    );
+    expect(describeTrainerActivity(activity('set.edited'), CLIENT)).toBe(
+      'Coach Jo edited one of your sets',
+    );
+    expect(describeTrainerActivity(activity('workout.deleted'), CLIENT)).toBe(
+      'Coach Jo deleted one of your workouts',
+    );
+    expect(describeTrainerActivity(activity('exercise.added'), TRAINER)).toBe(
+      'Added an exercise to Purnima’s workout',
+    );
+  });
+
   it('shows an unknown action by its raw name rather than guessing', () => {
     expect(describeTrainerActivity(activity('workout.exported'), TRAINER)).toBe('workout.exported');
   });

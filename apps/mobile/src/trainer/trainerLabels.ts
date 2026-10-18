@@ -57,6 +57,39 @@ export function describeTrainerActivity(activity: TrainerActivity, userId: strin
       return asTrainer ? `${who} declined the link` : `You declined ${by}’s link`;
     case 'link.ended':
       return asTrainer ? `Link with ${who} ended` : `Link with ${by} ended`;
+    // A trainer's direct edits to a client's workouts (recorded by the database).
+    case 'workout.created':
+      return asTrainer ? `Started a workout for ${who}` : `${by} started a workout for you`;
+    case 'workout.edited':
+      return asTrainer ? `Edited ${who}’s workout` : `${by} edited one of your workouts`;
+    case 'workout.deleted':
+      return asTrainer ? `Deleted ${who}’s workout` : `${by} deleted one of your workouts`;
+    case 'workout.restored':
+      return asTrainer ? `Restored ${who}’s workout` : `${by} restored one of your workouts`;
+    case 'exercise.added':
+      return asTrainer
+        ? `Added an exercise to ${who}’s workout`
+        : `${by} added an exercise to your workout`;
+    case 'exercise.edited':
+      return asTrainer
+        ? `Changed an exercise in ${who}’s workout`
+        : `${by} changed an exercise in your workout`;
+    case 'exercise.removed':
+      return asTrainer
+        ? `Removed an exercise from ${who}’s workout`
+        : `${by} removed an exercise from your workout`;
+    case 'exercise.restored':
+      return asTrainer
+        ? `Restored an exercise in ${who}’s workout`
+        : `${by} restored an exercise in your workout`;
+    case 'set.added':
+      return asTrainer ? `Added a set for ${who}` : `${by} added a set to your workout`;
+    case 'set.edited':
+      return asTrainer ? `Edited a set of ${who}’s` : `${by} edited one of your sets`;
+    case 'set.removed':
+      return asTrainer ? `Removed a set of ${who}’s` : `${by} removed one of your sets`;
+    case 'set.restored':
+      return asTrainer ? `Restored a set of ${who}’s` : `${by} restored one of your sets`;
     default:
       return activity.action;
   }

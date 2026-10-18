@@ -1326,12 +1326,12 @@ async function main() {
     ).rows[0];
 
     await admin.query(
-      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 100, 5)',
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 100, 5, now())',
       [we.id],
     );
     const set110 = (
       await admin.query(
-        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 2, 110, 5) returning id',
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 2, 110, 5, now()) returning id',
         [we.id],
       )
     ).rows[0];
@@ -1347,7 +1347,7 @@ async function main() {
     );
 
     await admin.query(
-      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 3, 140, 1)',
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 3, 140, 1, now())',
       [we.id],
     );
 
@@ -1413,6 +1413,70 @@ async function main() {
       `got ${pr.rows[0]?.best_weight_kg}`,
     );
 
+    // A set counts toward PRs only while it's ticked. Un-ticking in the live
+    // workout clears completed_at but keeps the weight and reps it was logged
+    // with, so the PR must come from the completion, not from the values.
+    await admin.query('update public.sets set completed_at = null where id = $1', [set110.id]);
+    pr = await admin.query(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 5',
+      [userA, squat],
+    );
+    record(
+      'Un-ticking the PR set (weight and reps kept) recomputes down to the completed set (100kg)',
+      pr.rows[0]?.best_weight_kg === '100.00',
+      `got ${pr.rows[0]?.best_weight_kg}`,
+    );
+
+    await admin.query('update public.sets set completed_at = now() where id = $1', [set110.id]);
+    pr = await admin.query(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 5',
+      [userA, squat],
+    );
+    record(
+      'Ticking it again restores the PR (110kg)',
+      pr.rows[0]?.best_weight_kg === '110.00',
+      `got ${pr.rows[0]?.best_weight_kg}`,
+    );
+
+    await admin.query(
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 4, 200, 3)',
+      [we.id],
+    );
+    expectRowCount(
+      await admin.query(
+        'select 1 from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 3',
+        [userA, squat],
+      ),
+      0,
+      'A set with a weight and reps that was never ticked creates no PR',
+    );
+
+    await admin.query(
+      'update public.sets set completed_at = null where workout_exercise_id = $1 and reps = 1',
+      [we.id],
+    );
+    expectRowCount(
+      await admin.query(
+        'select 1 from public.one_rep_maxes where user_id = $1 and exercise_id = $2',
+        [userA, squat],
+      ),
+      0,
+      'Un-ticking the only single-rep set removes the true 1RM',
+    );
+    await admin.query(
+      'update public.sets set completed_at = now() where workout_exercise_id = $1 and reps = 1',
+      [we.id],
+    );
+    orm = await admin.query(
+      'select weight_kg from public.one_rep_maxes where user_id = $1 and exercise_id = $2',
+      [userA, squat],
+    );
+    record(
+      'Ticking the single-rep set again restores the true 1RM (140kg)',
+      orm.rows[0]?.weight_kg === '140.00',
+      `got ${orm.rows[0]?.weight_kg}`,
+    );
+
     // completed_at set at creation, same reasoning as the "PR Test Workout"
     // above -- avoids colliding with the one-active-workout-per-user index.
     const wD = (
@@ -1430,7 +1494,7 @@ async function main() {
 
     const set8a = (
       await admin.query(
-        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 150, 8) returning id',
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 150, 8, now()) returning id',
         [weD.id],
       )
     ).rows[0];
@@ -1446,7 +1510,7 @@ async function main() {
     );
 
     await admin.query(
-      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 2, 140, 8)',
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 2, 140, 8, now())',
       [weD.id],
     );
     pr8 = await admin.query(
@@ -1460,7 +1524,7 @@ async function main() {
     );
 
     await admin.query(
-      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 3, 160, 6)',
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 3, 160, 6, now())',
       [weD.id],
     );
     const pr6 = await admin.query(
@@ -1533,7 +1597,7 @@ async function main() {
     ).rows[0];
     const setEarly = (
       await admin.query(
-        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 100, 5) returning id',
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 100, 5, now()) returning id',
         [weEarly.id],
       )
     ).rows[0];
@@ -1552,7 +1616,7 @@ async function main() {
     ).rows[0];
     const setLate = (
       await admin.query(
-        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 100, 5) returning id',
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 100, 5, now()) returning id',
         [weLate.id],
       )
     ).rows[0];
@@ -1746,13 +1810,13 @@ async function main() {
 
     const leftSet = (
       await admin.query(
-        "insert into public.sets (workout_exercise_id, set_index, side, weight_kg, reps) values ($1, 1, 'left', 42.5, 10) returning id",
+        "insert into public.sets (workout_exercise_id, set_index, side, weight_kg, reps, completed_at) values ($1, 1, 'left', 42.5, 10, now()) returning id",
         [we.id],
       )
     ).rows[0];
     const rightSet = (
       await admin.query(
-        "insert into public.sets (workout_exercise_id, set_index, side, weight_kg, reps) values ($1, 1, 'right', 40, 10) returning id",
+        "insert into public.sets (workout_exercise_id, set_index, side, weight_kg, reps, completed_at) values ($1, 1, 'right', 40, 10, now()) returning id",
         [we.id],
       )
     ).rows[0];
@@ -1773,7 +1837,7 @@ async function main() {
       admin,
       () =>
         admin.query(
-          "insert into public.sets (workout_exercise_id, set_index, side, weight_kg, reps) values ($1, 1, 'left', 50, 8)",
+          "insert into public.sets (workout_exercise_id, set_index, side, weight_kg, reps, completed_at) values ($1, 1, 'left', 50, 8, now())",
           [we.id],
         ),
       'A second left row at the same set_index still violates uniqueness',
@@ -1792,7 +1856,7 @@ async function main() {
       )
     ).rows[0];
     await admin.query(
-      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 100, 5)',
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 100, 5, now())',
       [weBilateral.id],
     );
     await admin.query(
@@ -1802,7 +1866,7 @@ async function main() {
       admin,
       () =>
         admin.query(
-          'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps) values ($1, 1, 105, 5)',
+          'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 105, 5, now())',
           [weBilateral.id],
         ),
       "A second bilateral set at the same set_index still violates uniqueness ('none' is a real value, not null)",
@@ -2573,6 +2637,132 @@ async function main() {
   record(
     'Another user cannot see a link between a trainer and a client',
     otherSeesLink.rows.length === 0,
+  );
+
+  // Every trainer write to a client's workouts is recorded in trainer_actions
+  // (20261018120000_record_trainer_writes.sql). A workout the client logged
+  // themselves, so the edits below are a trainer changing the client's own data.
+  const clientOwnWorkout = (
+    await admin.query(
+      "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'Client own session', '2026-10-02T09:00:00Z', '2026-10-02T10:00:00Z') returning id",
+      [C],
+    )
+  ).rows[0].id;
+  const clientOwnExercise = (
+    await admin.query(
+      'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+      [clientOwnWorkout, squat],
+    )
+  ).rows[0].id;
+  const clientOwnSet = (
+    await admin.query(
+      "insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 80, 8, '2026-10-02T09:30:00Z') returning id",
+      [clientOwnExercise],
+    )
+  ).rows[0].id;
+  const actionsFor = (client, targetId) =>
+    client.query(
+      'select trainer_id, client_id, action, target_table, details from public.trainer_actions where target_id = $1 order by created_at',
+      [targetId],
+    );
+
+  const trainerEdit = await asUser(T, async (client) => {
+    await client.query('update public.sets set weight_kg = 85 where id = $1', [clientOwnSet]);
+    return actionsFor(client, clientOwnSet);
+  });
+  const editRow = trainerEdit.rows[0];
+  record(
+    "A trainer editing a client's own set is recorded, with the field's before and after",
+    trainerEdit.rows.length === 1 &&
+      editRow.action === 'set.edited' &&
+      editRow.trainer_id === T &&
+      editRow.client_id === C &&
+      editRow.details.workout_id === clientOwnWorkout &&
+      Number(editRow.details.changes.weight_kg.from) === 80 &&
+      Number(editRow.details.changes.weight_kg.to) === 85 &&
+      !('reps' in editRow.details.changes),
+    JSON.stringify(trainerEdit.rows),
+  );
+
+  const trainerAdds = await asUser(T, async (client) => {
+    const added = await client.query(
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 2, 80, 8, now()) returning id',
+      [clientOwnExercise],
+    );
+    return actionsFor(client, added.rows[0].id);
+  });
+  record(
+    "A trainer adding a set to a client's workout is recorded with its values",
+    trainerAdds.rows.length === 1 &&
+      trainerAdds.rows[0].action === 'set.added' &&
+      Number(trainerAdds.rows[0].details.values.weight_kg) === 80,
+    JSON.stringify(trainerAdds.rows),
+  );
+
+  const trainerDeletes = await asUser(T, async (client) => {
+    await client.query('update public.workouts set deleted_at = now() where id = $1', [
+      clientOwnWorkout,
+    ]);
+    return actionsFor(client, clientOwnWorkout);
+  });
+  record(
+    "A trainer deleting a client's workout is recorded as workout.deleted",
+    trainerDeletes.rows.length === 1 && trainerDeletes.rows[0].action === 'workout.deleted',
+    JSON.stringify(trainerDeletes.rows),
+  );
+
+  const trainerNoOp = await asUser(T, async (client) => {
+    await client.query('update public.sets set weight_kg = weight_kg where id = $1', [
+      clientOwnSet,
+    ]);
+    return actionsFor(client, clientOwnSet);
+  });
+  record(
+    'A trainer write that changes nothing a person would see records nothing',
+    trainerNoOp.rows.length === 0,
+    JSON.stringify(trainerNoOp.rows),
+  );
+
+  const clientOwnEdit = await asUser(C, async (client) => {
+    await client.query('update public.sets set reps = 9 where id = $1', [clientOwnSet]);
+    return client.query('select id from public.trainer_actions where target_id = $1', [
+      clientOwnSet,
+    ]);
+  });
+  record(
+    "A client's edit of their own set records no trainer action",
+    clientOwnEdit.rows.length === 0,
+    JSON.stringify(clientOwnEdit.rows),
+  );
+
+  const serviceRoleEdit = await (async () => {
+    await admin.query('begin');
+    try {
+      await admin.query('update public.sets set reps = 10 where id = $1', [clientOwnSet]);
+      return await admin.query('select id from public.trainer_actions where target_id = $1', [
+        clientOwnSet,
+      ]);
+    } finally {
+      await admin.query('rollback');
+    }
+  })();
+  record(
+    'A write that does not come from a signed-in trainer (the API, an admin) records nothing',
+    serviceRoleEdit.rows.length === 0,
+    JSON.stringify(serviceRoleEdit.rows),
+  );
+
+  // The record is the client's to read: a committed trainer edit shows up for them.
+  await asUserCommitted(T, (client) =>
+    client.query('update public.sets set reps = 7 where id = $1', [clientOwnSet]),
+  );
+  const clientSeesAudit = await asUser(C, (client) => actionsFor(client, clientOwnSet));
+  record(
+    "The client can read the record of their trainer's edit",
+    clientSeesAudit.rows.length === 1 &&
+      clientSeesAudit.rows[0].action === 'set.edited' &&
+      clientSeesAudit.rows[0].trainer_id === T,
+    JSON.stringify(clientSeesAudit.rows),
   );
 
   // Lapsed entitlement stops access, and restoring it brings access back.
