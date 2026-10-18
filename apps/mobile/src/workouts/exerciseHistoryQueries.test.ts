@@ -12,7 +12,7 @@ interface Result {
 
 // Same chainable-and-thenable mock builder pattern as workoutQueries.test.ts.
 function createQueryBuilder(result: Result) {
-  const methods = ['select', 'eq', 'is', 'in', 'not'] as const;
+  const methods = ['select', 'eq', 'is', 'in', 'not', 'order', 'range'] as const;
   const builder: Record<string, unknown> = {};
   for (const m of methods) {
     builder[m] = jest.fn(() => builder);

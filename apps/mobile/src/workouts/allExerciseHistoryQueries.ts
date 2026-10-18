@@ -1,3 +1,4 @@
+import { fetchAllRows, fetchAllRowsForIds } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
 import type { MovementType } from '../exercises/movementTypes';
 import type { MuscleGroup } from '../exercises/muscleGroups';
@@ -13,20 +14,12 @@ export { groupByExercise } from './exerciseHistoryGrouping';
  * feature's cross-exercise views (Exercises page, Overview's "Exercises
  * Improving", Muscle Group Progress). One request instead of one-per-exercise,
  * so a user with many different logged exercises doesn't trigger an N+1
- * query pattern.
+ * query pattern. Both reads are paged and the set ids chunked (lib/fetchAllRows.ts),
+ * so a long history is read in full rather than cut off at Supabase's row cap.
  */
 export async function fetchAllExerciseHistory(
   userId: string,
 ): Promise<HistoricalSetWithExercise[]> {
-  const { data: workoutExercises, error: weError } = await supabase
-    .from('workout_exercises')
-    .select(
-      'id, exercise_id, exercises(name, muscle_group, movement_type), workouts(performed_at, completed_at, deleted_at)',
-    )
-    .eq('user_id', userId)
-    .is('deleted_at', null);
-  if (weError) throw new Error(weError.message);
-
   type Candidate = {
     id: string;
     exercise_id: string;
@@ -37,7 +30,19 @@ export async function fetchAllExerciseHistory(
       deleted_at: string | null;
     } | null;
   };
-  const qualifying = ((workoutExercises ?? []) as unknown as Candidate[]).filter(
+  const workoutExercises = await fetchAllRows<Candidate>((from, to) =>
+    supabase
+      .from('workout_exercises')
+      .select(
+        'id, exercise_id, exercises(name, muscle_group, movement_type), workouts(performed_at, completed_at, deleted_at)',
+        { count: 'exact' },
+      )
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .order('id')
+      .range(from, to),
+  );
+  const qualifying = workoutExercises.filter(
     (c) => c.workouts && c.workouts.deleted_at === null && c.workouts.completed_at !== null,
   );
   if (qualifying.length === 0) return [];
@@ -60,15 +65,22 @@ export async function fetchAllExerciseHistory(
   // (weight_kg/reps/completed_at all null -- a "planned but not yet
   // performed" row, see 20260907100001_set_completion_state.sql) even if the
   // workout it belongs to was otherwise completed.
-  const { data: sets, error: setsError } = await supabase
-    .from('sets')
-    .select('workout_exercise_id, weight_kg, reps')
-    .in('workout_exercise_id', workoutExerciseIds)
-    .is('deleted_at', null)
-    .not('completed_at', 'is', null);
-  if (setsError) throw new Error(setsError.message);
+  const sets = await fetchAllRowsForIds<{
+    workout_exercise_id: string;
+    weight_kg: string | number | null;
+    reps: number;
+  }>(workoutExerciseIds, (ids, from, to) =>
+    supabase
+      .from('sets')
+      .select('workout_exercise_id, weight_kg, reps', { count: 'exact' })
+      .in('workout_exercise_id', ids)
+      .is('deleted_at', null)
+      .not('completed_at', 'is', null)
+      .order('id')
+      .range(from, to),
+  );
 
-  return (sets ?? [])
+  return sets
     .map((s) => {
       const info = infoByWorkoutExercise.get(s.workout_exercise_id)!;
       return {

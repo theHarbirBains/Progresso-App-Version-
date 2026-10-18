@@ -1,3 +1,4 @@
+import { fetchAllRows, fetchAllRowsForIds } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
 
 // Raw historical data for one (user, exercise) pair -- the authoritative
@@ -29,14 +30,6 @@ export async function fetchExerciseSetHistory(
   userId: string,
   exerciseId: string,
 ): Promise<HistoricalSet[]> {
-  const { data: workoutExercises, error: weError } = await supabase
-    .from('workout_exercises')
-    .select('id, workouts(performed_at, completed_at, deleted_at)')
-    .eq('exercise_id', exerciseId)
-    .eq('user_id', userId)
-    .is('deleted_at', null);
-  if (weError) throw new Error(weError.message);
-
   type Candidate = {
     id: string;
     workouts: {
@@ -45,7 +38,18 @@ export async function fetchExerciseSetHistory(
       deleted_at: string | null;
     } | null;
   };
-  const qualifying = ((workoutExercises ?? []) as unknown as Candidate[]).filter(
+  // Paged and chunked (lib/fetchAllRows.ts), so years of one lift are read in full.
+  const workoutExercises = await fetchAllRows<Candidate>((from, to) =>
+    supabase
+      .from('workout_exercises')
+      .select('id, workouts(performed_at, completed_at, deleted_at)', { count: 'exact' })
+      .eq('exercise_id', exerciseId)
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .order('id')
+      .range(from, to),
+  );
+  const qualifying = workoutExercises.filter(
     (c) => c.workouts && c.workouts.deleted_at === null && c.workouts.completed_at !== null,
   );
   if (qualifying.length === 0) return [];
@@ -55,15 +59,22 @@ export async function fetchExerciseSetHistory(
   );
   const workoutExerciseIds = qualifying.map((c) => c.id);
 
-  const { data: sets, error: setsError } = await supabase
-    .from('sets')
-    .select('workout_exercise_id, weight_kg, reps')
-    .in('workout_exercise_id', workoutExerciseIds)
-    .is('deleted_at', null)
-    .not('completed_at', 'is', null);
-  if (setsError) throw new Error(setsError.message);
+  const sets = await fetchAllRowsForIds<{
+    workout_exercise_id: string;
+    weight_kg: string | number | null;
+    reps: number;
+  }>(workoutExerciseIds, (ids, from, to) =>
+    supabase
+      .from('sets')
+      .select('workout_exercise_id, weight_kg, reps', { count: 'exact' })
+      .in('workout_exercise_id', ids)
+      .is('deleted_at', null)
+      .not('completed_at', 'is', null)
+      .order('id')
+      .range(from, to),
+  );
 
-  return (sets ?? [])
+  return sets
     .map((s) => ({
       weightKg: Number(s.weight_kg),
       reps: s.reps,

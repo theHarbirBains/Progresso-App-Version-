@@ -11,7 +11,7 @@ interface Result {
 }
 
 function createQueryBuilder(result: Result) {
-  const methods = ['select', 'eq', 'order'] as const;
+  const methods = ['select', 'eq', 'order', 'range'] as const;
   const builder: Record<string, unknown> = {};
   for (const m of methods) {
     builder[m] = jest.fn(() => builder);

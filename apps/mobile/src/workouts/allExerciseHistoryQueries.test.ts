@@ -15,7 +15,7 @@ interface Result {
 }
 
 function createQueryBuilder(result: Result) {
-  const methods = ['select', 'eq', 'is', 'in', 'not'] as const;
+  const methods = ['select', 'eq', 'is', 'in', 'not', 'order', 'range'] as const;
   const builder: Record<string, unknown> = {};
   for (const m of methods) {
     builder[m] = jest.fn(() => builder);
@@ -182,6 +182,31 @@ describe('fetchAllExerciseHistory', () => {
     const result = await fetchAllExerciseHistory('user-1');
 
     expect(result).toEqual([]);
+  });
+
+  it('reads the sets of a long history in chunks of at most 100 logged exercises, paged', async () => {
+    const workoutExercises = Array.from({ length: 250 }, (_, i) => ({
+      id: `we${i}`,
+      exercise_id: 'ex-bench',
+      exercises: { name: 'Bench Press', muscle_group: 'chest', movement_type: 'bilateral' },
+      workouts: {
+        performed_at: '2026-02-01T00:00:00Z',
+        completed_at: '2026-02-01T01:00:00Z',
+        deleted_at: null,
+      },
+    }));
+    const builders = mockTables({
+      workout_exercises: { data: workoutExercises, error: null },
+      sets: { data: [], error: null },
+    });
+
+    await fetchAllExerciseHistory('user-1');
+
+    const inCalls = (builders.sets.in as jest.Mock).mock.calls;
+    expect(inCalls).toHaveLength(3);
+    expect(inCalls.map(([, ids]) => (ids as string[]).length)).toEqual([100, 100, 50]);
+    expect(builders.workout_exercises.range).toHaveBeenCalledWith(0, 999);
+    expect(builders.sets.order).toHaveBeenCalledWith('id');
   });
 
   it('returns an empty array without querying sets when there are no qualifying workout_exercises', async () => {

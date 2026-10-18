@@ -1,3 +1,4 @@
+import { fetchAllRows } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
 import { toWorkoutSummary, type WorkoutSummary } from '../workouts/workoutQueries';
 
@@ -12,16 +13,19 @@ import { toWorkoutSummary, type WorkoutSummary } from '../workouts/workoutQuerie
  * result.
  */
 export async function fetchAllCompletedWorkouts(userId: string): Promise<WorkoutSummary[]> {
-  const { data, error } = await supabase
-    .from('workouts')
-    .select('id, name, performed_at, completed_at, workout_split_day_id')
-    .eq('user_id', userId)
-    .not('completed_at', 'is', null)
-    .is('deleted_at', null)
-    .order('performed_at', { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(toWorkoutSummary);
+  // Paged (lib/fetchAllRows.ts); id breaks ties so no workout falls between two pages.
+  const rows = await fetchAllRows<Parameters<typeof toWorkoutSummary>[0]>((from, to) =>
+    supabase
+      .from('workouts')
+      .select('id, name, performed_at, completed_at, workout_split_day_id', { count: 'exact' })
+      .eq('user_id', userId)
+      .not('completed_at', 'is', null)
+      .is('deleted_at', null)
+      .order('performed_at', { ascending: true })
+      .order('id')
+      .range(from, to),
+  );
+  return rows.map(toWorkoutSummary);
 }
 
 /**

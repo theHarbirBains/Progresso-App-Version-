@@ -1,4 +1,5 @@
 import type { MuscleGroup } from '../exercises/muscleGroups';
+import { fetchAllRows } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
 import type { OneRepMax, RepPR } from './prQueries';
 
@@ -37,15 +38,20 @@ interface RepPRRow {
 
 /** Every rep-count PR across every exercise for this user, most recently achieved first. */
 export async function fetchAllRepPRs(userId: string): Promise<RepPRWithExercise[]> {
-  const { data, error } = await supabase
-    .from('rep_prs')
-    .select(
-      'reps, best_weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, muscle_group, photo_url)',
-    )
-    .eq('user_id', userId)
-    .order('achieved_at', { ascending: false });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as RepPRRow[]).map((row) => ({
+  // One row per exercise and rep count, so a long history can pass the row cap: paged.
+  const rows = await fetchAllRows<RepPRRow>((from, to) =>
+    supabase
+      .from('rep_prs')
+      .select(
+        'reps, best_weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, muscle_group, photo_url)',
+        { count: 'exact' },
+      )
+      .eq('user_id', userId)
+      .order('achieved_at', { ascending: false })
+      .order('id')
+      .range(from, to),
+  );
+  return rows.map((row) => ({
     reps: row.reps,
     bestWeightKg: Number(row.best_weight_kg),
     sourceSetId: row.source_set_id,
@@ -67,13 +73,18 @@ interface OneRepMaxRow {
 
 /** Every true 1RM across every exercise for this user, most recently achieved first. */
 export async function fetchAllOneRepMaxes(userId: string): Promise<OneRepMaxWithExercise[]> {
-  const { data, error } = await supabase
-    .from('one_rep_maxes')
-    .select('weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, photo_url)')
-    .eq('user_id', userId)
-    .order('achieved_at', { ascending: false });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as OneRepMaxRow[]).map((row) => ({
+  const rows = await fetchAllRows<OneRepMaxRow>((from, to) =>
+    supabase
+      .from('one_rep_maxes')
+      .select('weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, photo_url)', {
+        count: 'exact',
+      })
+      .eq('user_id', userId)
+      .order('achieved_at', { ascending: false })
+      .order('id')
+      .range(from, to),
+  );
+  return rows.map((row) => ({
     weightKg: Number(row.weight_kg),
     sourceSetId: row.source_set_id,
     achievedAt: row.achieved_at,
