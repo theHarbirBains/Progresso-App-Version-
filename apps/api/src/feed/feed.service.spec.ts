@@ -210,6 +210,113 @@ describe('FeedService', () => {
       });
     });
 
+    it('gives a bodyweight exercise its most reps and a timed one its longest, with volume from weighted sets only', async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
+      client.queue('workouts', {
+        data: [
+          {
+            id: 'w1',
+            user_id: 'user-2',
+            name: 'Mixed',
+            performed_at: '2026-09-20T10:00:00.000Z',
+            completed_at: '2026-09-20T11:00:00.000Z',
+            workout_split_day_id: null,
+          },
+        ],
+        error: null,
+      });
+      client.queue('workout_exercises', {
+        data: [
+          {
+            id: 'we-bench',
+            workout_id: 'w1',
+            exercise_id: 'bench',
+            order_index: 1,
+            measurement_type: 'weight_reps',
+            exercises: { name: 'Bench Press', photo_url: null },
+          },
+          {
+            id: 'we-pushup',
+            workout_id: 'w1',
+            exercise_id: 'pushup',
+            order_index: 2,
+            measurement_type: 'bodyweight',
+            exercises: { name: 'Push-Up', photo_url: null },
+          },
+          {
+            id: 'we-plank',
+            workout_id: 'w1',
+            exercise_id: 'plank',
+            order_index: 3,
+            measurement_type: 'timed',
+            exercises: { name: 'Plank', photo_url: null },
+          },
+        ],
+        error: null,
+      });
+      const set = (id: string, we: string, index: number, values: object) => ({
+        id,
+        workout_exercise_id: we,
+        set_index: index,
+        weight_kg: null,
+        reps: null,
+        duration_seconds: null,
+        ...values,
+      });
+      client.queue('sets', {
+        data: [
+          set('s1', 'we-bench', 1, { weight_kg: 100, reps: 5 }),
+          // A weighted set with no weight isn't a logged set.
+          set('s2', 'we-bench', 2, { reps: 5 }),
+          // An older app may have sent a weight with push-ups: reps only, and no volume.
+          set('s3', 'we-pushup', 1, { weight_kg: 80, reps: 20 }),
+          set('s4', 'we-pushup', 2, { reps: 25 }),
+          set('s5', 'we-plank', 1, { duration_seconds: 60 }),
+          set('s6', 'we-plank', 2, { duration_seconds: 90 }),
+          // A timed set with no time isn't a logged set.
+          set('s7', 'we-plank', 3, {}),
+        ],
+        error: null,
+      });
+      client.queue('users', {
+        data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const result = await service.getFriendsFeed('user-1', 0);
+
+      expect(result.items[0]?.workout).toMatchObject({
+        completedSetCount: 5,
+        totalVolumeKg: 500,
+        completedExerciseCount: 3,
+        topSets: [
+          {
+            exerciseId: 'bench',
+            measurementType: 'weight_reps',
+            weightKg: 100,
+            reps: 5,
+            durationSeconds: null,
+          },
+          {
+            exerciseId: 'pushup',
+            measurementType: 'bodyweight',
+            weightKg: null,
+            reps: 25,
+            durationSeconds: null,
+          },
+          {
+            exerciseId: 'plank',
+            measurementType: 'timed',
+            weightKg: null,
+            reps: null,
+            durationSeconds: 90,
+          },
+        ],
+      });
+    });
+
     it('leaves workouts a trainer logged for a client out of the friends feed', async () => {
       const client = createMockClient();
       client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });

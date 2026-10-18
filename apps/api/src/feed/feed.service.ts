@@ -1,8 +1,46 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import type { MeasurementType } from '../exercises/movement-type';
 import { FollowsService, type FollowUserSummary } from '../follows/follows.service';
 import { SupabaseService } from '../supabase/supabase.service';
 
 const WORKOUT_PAGE_SIZE = 20;
+
+/**
+ * One exercise's best set in a workout, for what it measures: the heaviest (the Top Set) for
+ * weight and reps, the most reps at bodyweight, the longest when timed.
+ */
+export interface FeedTopSet {
+  exerciseId: string;
+  exerciseName: string;
+  photoUrl: string | null;
+  measurementType: MeasurementType;
+  /** Weight and reps only. */
+  weightKg: number | null;
+  /** Null for a timed exercise. */
+  reps: number | null;
+  /** A timed exercise's time, in seconds. */
+  durationSeconds: number | null;
+}
+
+interface FeedSet {
+  setIndex: number;
+  weightKg: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
+}
+
+/** Whether a set holds what its exercise records -- the mobile app's holdsMeasurement. */
+function holdsMeasurement(set: FeedSet, type: MeasurementType): boolean {
+  if (type === 'bodyweight') return set.reps !== null;
+  if (type === 'timed') return set.durationSeconds !== null;
+  return set.weightKg !== null && set.reps !== null;
+}
+
+function score(set: FeedSet, type: MeasurementType): number {
+  if (type === 'bodyweight') return set.reps ?? 0;
+  if (type === 'timed') return set.durationSeconds ?? 0;
+  return set.weightKg ?? 0;
+}
 
 export type FeedItem = {
   kind: 'workout';
@@ -19,13 +57,7 @@ export type FeedItem = {
     completedSetCount: number;
     totalVolumeKg: number;
     completedExerciseCount: number;
-    topSets: {
-      exerciseId: string;
-      exerciseName: string;
-      photoUrl: string | null;
-      weightKg: number;
-      reps: number;
-    }[];
+    topSets: FeedTopSet[];
   };
 };
 
@@ -157,7 +189,9 @@ export class FeedService {
       splitDaysQuery,
       client
         .from('workout_exercises')
-        .select('id, workout_id, exercise_id, order_index, exercises(name, photo_url)')
+        .select(
+          'id, workout_id, exercise_id, order_index, measurement_type, exercises(name, photo_url)',
+        )
         .in('workout_id', workoutIds)
         .is('deleted_at', null),
     ]);
@@ -181,7 +215,13 @@ export class FeedService {
     const exerciseCountByWorkoutId = new Map<string, number>();
     const exerciseInfoById = new Map<
       string,
-      { exerciseId: string; exerciseName: string; photoUrl: string | null; orderIndex: number }
+      {
+        exerciseId: string;
+        exerciseName: string;
+        photoUrl: string | null;
+        orderIndex: number;
+        measurementType: MeasurementType;
+      }
     >();
     for (const we of workoutExercises ?? []) {
       workoutIdByExerciseId.set(we.id as string, we.workout_id as string);
@@ -191,6 +231,8 @@ export class FeedService {
         exerciseName: embedded?.name ?? '',
         photoUrl: embedded?.photo_url ?? null,
         orderIndex: we.order_index as number,
+        // What the exercise was logged as (snapshotted per logged exercise).
+        measurementType: (we.measurement_type as MeasurementType | null) ?? 'weight_reps',
       });
       exerciseCountByWorkoutId.set(
         we.workout_id as string,
@@ -200,41 +242,47 @@ export class FeedService {
 
     const completedSetCountByWorkoutId = new Map<string, number>();
     const totalVolumeKgByWorkoutId = new Map<string, number>();
-    const setsByExerciseRowId = new Map<
-      string,
-      { setIndex: number; weightKg: number; reps: number }[]
-    >();
+    const setsByExerciseRowId = new Map<string, FeedSet[]>();
     const workoutExerciseIds = Array.from(workoutIdByExerciseId.keys());
     if (workoutExerciseIds.length > 0) {
       const { data: sets, error: setsError } = await client
         .from('sets')
-        .select('id, workout_exercise_id, set_index, weight_kg, reps')
+        .select('id, workout_exercise_id, set_index, weight_kg, reps, duration_seconds')
         .in('workout_exercise_id', workoutExerciseIds)
         .is('deleted_at', null)
-        .not('completed_at', 'is', null)
-        .not('weight_kg', 'is', null)
-        .not('reps', 'is', null);
+        .not('completed_at', 'is', null);
       if (setsError) throw new InternalServerErrorException('Failed to load friends feed');
 
       for (const set of sets ?? []) {
-        const workoutId = workoutIdByExerciseId.get(set.workout_exercise_id as string);
-        if (!workoutId) continue;
         const exerciseRowId = set.workout_exercise_id as string;
-        const bucket = setsByExerciseRowId.get(exerciseRowId) ?? [];
-        bucket.push({
+        const workoutId = workoutIdByExerciseId.get(exerciseRowId);
+        if (!workoutId) continue;
+        const type = exerciseInfoById.get(exerciseRowId)?.measurementType ?? 'weight_reps';
+        const feedSet: FeedSet = {
           setIndex: set.set_index as number,
-          weightKg: Number(set.weight_kg),
-          reps: Number(set.reps),
-        });
+          weightKg: set.weight_kg === null ? null : Number(set.weight_kg),
+          reps: set.reps === null ? null : Number(set.reps),
+          durationSeconds:
+            set.duration_seconds === null || set.duration_seconds === undefined
+              ? null
+              : Number(set.duration_seconds),
+        };
+        // Only a set holding what its exercise records counts as logged.
+        if (!holdsMeasurement(feedSet, type)) continue;
+        const bucket = setsByExerciseRowId.get(exerciseRowId) ?? [];
+        bucket.push(feedSet);
         setsByExerciseRowId.set(exerciseRowId, bucket);
         completedSetCountByWorkoutId.set(
           workoutId,
           (completedSetCountByWorkoutId.get(workoutId) ?? 0) + 1,
         );
-        totalVolumeKgByWorkoutId.set(
-          workoutId,
-          (totalVolumeKgByWorkoutId.get(workoutId) ?? 0) + Number(set.weight_kg) * Number(set.reps),
-        );
+        // Volume is weight x reps: weighted exercises only.
+        if (type === 'weight_reps') {
+          totalVolumeKgByWorkoutId.set(
+            workoutId,
+            (totalVolumeKgByWorkoutId.get(workoutId) ?? 0) + feedSet.weightKg! * feedSet.reps!,
+          );
+        }
       }
     }
 
@@ -249,30 +297,27 @@ export class FeedService {
       const exerciseRows = (exerciseRowIdsByWorkoutId.get(workout.id) ?? [])
         .map((id) => ({ id, info: exerciseInfoById.get(id)! }))
         .sort((a, b) => a.info.orderIndex - b.info.orderIndex);
-      const topSets: {
-        exerciseId: string;
-        exerciseName: string;
-        photoUrl: string | null;
-        weightKg: number;
-        reps: number;
-      }[] = [];
+      const topSets: FeedTopSet[] = [];
       let completedExerciseCount = 0;
       for (const row of exerciseRows) {
         const completed = setsByExerciseRowId.get(row.id) ?? [];
         if (completed.length === 0) continue;
         completedExerciseCount += 1;
-        // Same rule as the mobile heaviestSet: sets in set order, first heaviest wins.
+        const type = row.info.measurementType;
+        // Same rule as the mobile bestLoggedSet: sets in set order, the first best wins.
         const ordered = [...completed].sort((x, y) => x.setIndex - y.setIndex);
         let top = ordered[0]!;
         for (const set of ordered) {
-          if (set.weightKg > top.weightKg) top = set;
+          if (score(set, type) > score(top, type)) top = set;
         }
         topSets.push({
           exerciseId: row.info.exerciseId,
           exerciseName: row.info.exerciseName,
           photoUrl: row.info.photoUrl,
-          weightKg: top.weightKg,
-          reps: top.reps,
+          measurementType: type,
+          weightKg: type === 'weight_reps' ? top.weightKg : null,
+          reps: type === 'timed' ? null : top.reps,
+          durationSeconds: type === 'timed' ? top.durationSeconds : null,
         });
       }
 

@@ -458,8 +458,9 @@ export class TrainerService {
         sets: exercise.sets.map((set) => ({
           setIndex: set.setIndex,
           side: set.side ?? 'none',
-          weightKg: set.weightKg,
-          reps: set.reps,
+          weightKg: set.weightKg ?? null,
+          reps: set.reps ?? null,
+          durationSeconds: set.durationSeconds ?? null,
         })),
       })),
     };
@@ -1055,7 +1056,8 @@ export class TrainerService {
     if (/not an active client|entitlement is not active|not in this trainer/.test(message)) {
       return new ForbiddenException(message);
     }
-    if (/is not available/.test(message)) {
+    // A set that doesn't hold what its exercise measures (see the measurement-type check).
+    if (/is not available|needs a weight and reps|needs reps|only a timed exercise/.test(message)) {
       return new BadRequestException(message);
     }
     return new InternalServerErrorException('Failed to log workout');

@@ -82,6 +82,7 @@ describe('ExercisesService', () => {
         created_by: 'user-1',
         movement_type: 'bilateral',
         logging_style: null,
+        measurement_type: 'weight_reps',
         photo_url: null,
       });
       expect(result).toEqual({
@@ -90,6 +91,7 @@ describe('ExercisesService', () => {
         muscleGroup: 'biceps',
         movementType: 'bilateral',
         loggingStyle: null,
+        measurementType: 'weight_reps',
         photoUrl: null,
         isActive: true,
         createdBy: 'user-1',
@@ -121,10 +123,30 @@ describe('ExercisesService', () => {
         created_by: 'user-1',
         movement_type: 'unilateral',
         logging_style: 'single_side',
+        measurement_type: 'weight_reps',
         photo_url: null,
       });
       expect(result.movementType).toBe('unilateral');
       expect(result.loggingStyle).toBe('single_side');
+    });
+
+    it('creates a timed custom exercise', async () => {
+      const client = createMockClient({
+        insertData: { ...ownCustomRow, name: 'Wall Sit', measurement_type: 'timed' },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.createCustom('user-1', {
+        name: 'Wall Sit',
+        muscleGroup: 'quadriceps',
+        movementType: 'bilateral',
+        measurementType: 'timed',
+      });
+
+      expect(client.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ measurement_type: 'timed' }),
+      );
+      expect(result.measurementType).toBe('timed');
     });
 
     it('creates a custom exercise with a photo', async () => {

@@ -27,16 +27,28 @@ export class LoggedSetDto {
   @IsIn(['none', 'left', 'right'])
   side?: 'none' | 'left' | 'right';
 
+  // What a set holds depends on what its exercise measures: a weight and reps, reps only
+  // (bodyweight) or a duration (timed). The database checks the combination against
+  // the exercise (20261019100000_bodyweight_and_timed_exercises.sql).
+
   // Canonical kg, per the CLAUDE.md weight rule. The mobile app converts.
+  @IsOptional()
   @IsNumber()
   @IsPositive()
   @Max(1000)
-  weightKg!: number;
+  weightKg?: number;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(1000)
-  reps!: number;
+  reps?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(86_400)
+  durationSeconds?: number;
 }
 
 export class LoggedExerciseDto {

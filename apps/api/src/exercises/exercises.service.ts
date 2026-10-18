@@ -9,7 +9,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import type { CreateExerciseDto } from './dto/create-exercise.dto';
 import type { UpdateExerciseDto } from './dto/update-exercise.dto';
 import type { MuscleGroup } from './muscle-group';
-import type { LoggingStyle, MovementType } from './movement-type';
+import type { LoggingStyle, MeasurementType, MovementType } from './movement-type';
 
 export interface ExerciseRecord {
   id: string;
@@ -17,6 +17,7 @@ export interface ExerciseRecord {
   muscleGroup: MuscleGroup;
   movementType: MovementType;
   loggingStyle: LoggingStyle | null;
+  measurementType: MeasurementType;
   photoUrl: string | null;
   isActive: boolean;
   createdBy: string | null;
@@ -33,6 +34,7 @@ function toExerciseRecord(row: Record<string, unknown>): ExerciseRecord {
     muscleGroup: row.muscle_group as MuscleGroup,
     movementType: row.movement_type as MovementType,
     loggingStyle: (row.logging_style as LoggingStyle | null) ?? null,
+    measurementType: (row.measurement_type as MeasurementType | undefined) ?? 'weight_reps',
     photoUrl: (row.photo_url as string | null) ?? null,
     isActive: row.is_active as boolean,
     createdBy: (row.created_by as string | null) ?? null,
@@ -62,6 +64,7 @@ export class ExercisesService {
         // movementType is 'unilateral', so this is never silently null for
         // a unilateral exercise.
         logging_style: dto.movementType === 'unilateral' ? dto.loggingStyle : null,
+        measurement_type: dto.measurementType ?? 'weight_reps',
         photo_url: dto.photoUrl ?? null,
       })
       .select('*')
@@ -100,6 +103,7 @@ export class ExercisesService {
       updatePayload.logging_style = dto.loggingStyle;
     }
     if (dto.photoUrl !== undefined) updatePayload.photo_url = dto.photoUrl;
+    if (dto.measurementType !== undefined) updatePayload.measurement_type = dto.measurementType;
 
     if (Object.keys(updatePayload).length === 0) {
       return existing;

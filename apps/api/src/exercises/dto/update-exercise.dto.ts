@@ -11,8 +11,10 @@ import {
 import { MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
 import {
   LOGGING_STYLES,
+  MEASUREMENT_TYPES,
   MOVEMENT_TYPES,
   type LoggingStyle,
+  type MeasurementType,
   type MovementType,
 } from '../movement-type';
 
@@ -39,6 +41,11 @@ export class UpdateExerciseDto {
   @ValidateIf((dto: UpdateExerciseDto) => dto.movementType === 'unilateral')
   @IsIn(LOGGING_STYLES)
   loggingStyle?: LoggingStyle;
+
+  // Changes new sessions only: each logged exercise keeps the type it was logged as.
+  @IsOptional()
+  @IsIn(MEASUREMENT_TYPES)
+  measurementType?: MeasurementType;
 
   @IsOptional()
   @IsBoolean()

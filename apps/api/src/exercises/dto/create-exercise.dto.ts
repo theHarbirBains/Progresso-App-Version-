@@ -3,8 +3,10 @@ import { IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'cl
 import { MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
 import {
   LOGGING_STYLES,
+  MEASUREMENT_TYPES,
   MOVEMENT_TYPES,
   type LoggingStyle,
+  type MeasurementType,
   type MovementType,
 } from '../movement-type';
 
@@ -30,6 +32,11 @@ export class CreateExerciseDto {
   @ValidateIf((dto: CreateExerciseDto) => dto.movementType === 'unilateral')
   @IsIn(LOGGING_STYLES)
   loggingStyle?: LoggingStyle;
+
+  // What a set records. Omitted means weight and reps, as every exercise was before.
+  @IsOptional()
+  @IsIn(MEASUREMENT_TYPES)
+  measurementType?: MeasurementType;
 
   // Optional at create, and editable any time after -- see
   // UpdateExerciseDto. Reuses the same equipment-photos bucket

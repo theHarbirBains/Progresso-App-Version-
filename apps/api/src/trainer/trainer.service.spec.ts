@@ -541,6 +541,48 @@ describe('TrainerService', () => {
       );
     });
 
+    it('sends a timed set as a duration, with no weight or reps', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queue('trainer_clients', ok({ id: 'l1', status: 'active', source: 'managed' }));
+      mock.queueRpc('trainer_log_workout', ok('workout-1'));
+      mock.queue('trainer_actions', ok());
+
+      await service.logWorkout(
+        TRAINER,
+        CLIENT,
+        logDto({ exercises: [{ exerciseId, sets: [{ setIndex: 1, durationSeconds: 90 }] }] }),
+      );
+
+      const rpc = mock.calls.find((c) => c.target === 'rpc:trainer_log_workout');
+      expect(rpc?.args[0]).toMatchObject({
+        p_payload: {
+          exercises: [
+            {
+              exerciseId,
+              sets: [{ setIndex: 1, weightKg: null, reps: null, durationSeconds: 90 }],
+            },
+          ],
+        },
+      });
+    });
+
+    it("turns a set that doesn't match its exercise into a 400", async () => {
+      for (const message of [
+        "only a timed exercise's set has a duration",
+        'a completed weighted set needs a weight and reps',
+        'a completed bodyweight set needs reps',
+      ]) {
+        const { mock, service } = setup();
+        mock.queue('subscriptions', activeTrainer());
+        mock.queue('trainer_clients', ok({ id: 'l1', status: 'active', source: 'managed' }));
+        mock.queueRpc('trainer_log_workout', fail(message));
+        await expect(service.logWorkout(TRAINER, CLIENT, logDto())).rejects.toThrow(
+          BadRequestException,
+        );
+      }
+    });
+
     it('hides unexpected database errors behind a generic 500', async () => {
       const { mock, service } = setup();
       mock.queue('subscriptions', activeTrainer());

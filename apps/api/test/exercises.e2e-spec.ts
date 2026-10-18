@@ -111,12 +111,49 @@ describe('Exercises (e2e)', () => {
         muscleGroup: 'biceps',
         movementType: 'bilateral',
         loggingStyle: null,
+        measurementType: 'weight_reps',
         photoUrl: null,
         isActive: true,
         createdBy: 'user-1',
         createdAt: '2026-01-02T00:00:00.000Z',
         updatedAt: '2026-01-02T00:00:00.000Z',
       });
+    });
+
+    it('creates a bodyweight or timed exercise, and rejects any other measurementType', async () => {
+      const { insert } = mockInsertChain({
+        data: { ...customExerciseRow, measurement_type: 'bodyweight' },
+      });
+
+      const created = await app.inject({
+        method: 'POST',
+        url: '/api/v1/exercises',
+        headers: { authorization: 'Bearer good-token' },
+        payload: {
+          name: 'Ring Dip',
+          muscleGroup: 'chest',
+          movementType: 'bilateral',
+          measurementType: 'bodyweight',
+        },
+      });
+      const invalid = await app.inject({
+        method: 'POST',
+        url: '/api/v1/exercises',
+        headers: { authorization: 'Bearer good-token' },
+        payload: {
+          name: 'X',
+          muscleGroup: 'chest',
+          movementType: 'bilateral',
+          measurementType: 'distance',
+        },
+      });
+
+      expect(created.statusCode).toBe(201);
+      expect(insert).toHaveBeenCalledWith(
+        expect.objectContaining({ measurement_type: 'bodyweight' }),
+      );
+      expect(JSON.parse(created.payload)).toMatchObject({ measurementType: 'bodyweight' });
+      expect(invalid.statusCode).toBe(400);
     });
 
     it('rejects an empty name', async () => {
@@ -257,6 +294,23 @@ describe('Exercises (e2e)', () => {
 
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.payload)).toMatchObject({ isActive: false });
+    });
+
+    it('changes what an owned custom exercise is measured by', async () => {
+      mockSelectThenUpdateChain(
+        { data: customExerciseRow },
+        { data: { ...customExerciseRow, measurement_type: 'timed' } },
+      );
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: '/api/v1/exercises/11111111-1111-1111-1111-111111111111',
+        headers: { authorization: 'Bearer good-token' },
+        payload: { measurementType: 'timed' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.payload)).toMatchObject({ measurementType: 'timed' });
     });
 
     it('returns 403 when the exercise is a built-in', async () => {
