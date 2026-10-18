@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -14,10 +14,13 @@ import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import { getTrainerStatus, listTrainerClients, type TrainerClient } from '../lib/api';
+import { AppMenuContext } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { clientName } from '../trainer/clientPicker';
 import { trainerClientStatusLabel } from '../trainer/trainerLabels';
+import { useWorkspace } from '../workspace/WorkspaceContext';
+import { WorkspaceSwitcher } from '../workspace/WorkspaceSwitcher';
 
 type Props = RootStackScreenProps<'TrainerClients'>;
 
@@ -65,6 +68,9 @@ export function TrainerClientsScreen({ navigation }: Props) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   const { theme } = useProgressTheme();
+  // The side menu and the workspace switcher (both absent outside the app shell, e.g. in a test).
+  const menu = useContext(AppMenuContext);
+  const workspace = useWorkspace();
   const [state, setState] = useState<State>({ status: 'loading' });
 
   const load = useCallback(async () => {
@@ -103,7 +109,17 @@ export function TrainerClientsScreen({ navigation }: Props) {
         <AppHeader
           title="Clients"
           subtitle="Track workouts for the people you train"
-          onBack={() => navigation.goBack()}
+          titleContent={workspace?.isTrainer ? <WorkspaceSwitcher /> : undefined}
+          {...(menu
+            ? {
+                leftAction: {
+                  icon: 'menu' as const,
+                  onPress: () => menu.openMenu(),
+                  accessibilityLabel: 'Open menu',
+                  testID: 'trainer-clients-open-menu',
+                },
+              }
+            : { onBack: () => navigation.goBack() })}
           rightAction={
             isTrainer
               ? {

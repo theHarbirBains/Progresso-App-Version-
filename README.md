@@ -56,7 +56,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Trainer mode**
 
-- Trainers manage clients, log workouts for them and run live sessions, behind a "trainer" entitlement; there's no in-app purchase for it yet, so it's switched on by hand during internal testing (`supabase/dev/trainer-access.sql`)
+- Trainers switch between My Workspace and a Trainer Workspace (a switcher at the top of Feed) where they manage clients, log workouts for them and run live sessions, behind a "trainer" entitlement; there's no in-app purchase for it yet, so it's switched on by hand during internal testing (`supabase/dev/trainer-access.sql`)
 
 **Settings**
 

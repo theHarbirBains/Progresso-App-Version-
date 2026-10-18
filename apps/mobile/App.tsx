@@ -20,7 +20,11 @@ import { BottomNavBar } from './src/design/BottomNavBar';
 import { colors } from './src/design/theme';
 import { wrapApp } from './src/lib/sentry';
 import { AppMenuContext } from './src/navigation/AppMenuContext';
-import { appMenuSectionsFor, type AppMenuRoute } from './src/navigation/appMenuSections';
+import {
+  appMenuSectionsFor,
+  TRAINER_MENU_SECTIONS,
+  type AppMenuRoute,
+} from './src/navigation/appMenuSections';
 import { routeToBottomNavTab } from './src/navigation/bottomNavRouting';
 import { useAppLinking } from './src/navigation/linking';
 import {
@@ -31,6 +35,7 @@ import {
 import { goToSection } from './src/navigation/sectionNavigation';
 import { PageArrival } from './src/navigation/useAfterTransition';
 import { forgetShown } from './src/lib/lastShown';
+import { WorkspaceContext, type Workspace } from './src/workspace/WorkspaceContext';
 import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
 import { FoodLogProvider } from './src/nutrition/FoodLogProvider';
@@ -220,6 +225,29 @@ function Root() {
     : isNutritionRoute(currentRouteName)
       ? 'nutrition'
       : 'workout';
+  // Which side of the app a trainer is using (workspace/WorkspaceContext.tsx).
+  // Everyone else is always in their personal workspace.
+  const [workspaceChoice, setWorkspaceChoice] = useState<Workspace>('personal');
+  const workspace: Workspace = isTrainer ? workspaceChoice : 'personal';
+  const switchWorkspace = useCallback(
+    (next: Workspace) => {
+      setWorkspaceChoice(next);
+      openSection(next === 'trainer' ? 'TrainerClients' : 'Feed');
+    },
+    [openSection],
+  );
+  const workspaceValue = useMemo(
+    () => ({ workspace, isTrainer, switchTo: switchWorkspace }),
+    [workspace, isTrainer, switchWorkspace],
+  );
+  // A bottom tab is always your own app, so it brings you back to My Workspace.
+  const openTab = useCallback(
+    (route: keyof RootStackParamList) => {
+      setWorkspaceChoice('personal');
+      openSection(route);
+    },
+    [openSection],
+  );
   // What pages last showed (lib/lastShown.ts) never outlives the session.
   useEffect(() => {
     if (status !== 'signedIn') forgetShown();
@@ -296,134 +324,142 @@ function Root() {
 
     return (
       <AppMenuContext.Provider value={appMenu}>
-        <View style={styles.navigatorShell}>
-          <View style={styles.navigatorContent}>
-            <NavigationContainer
-              ref={navigationRef}
-              linking={linking}
-              onReady={() => setCurrentRouteName(navigationRef.current?.getCurrentRoute()?.name)}
-              onStateChange={() =>
-                setCurrentRouteName(navigationRef.current?.getCurrentRoute()?.name)
-              }
-            >
-              <Stack.Navigator
-                initialRouteName="Feed"
-                screenOptions={screenOptions}
-                screenLayout={renderScreenLayout}
-              >
-                <Stack.Screen name="Feed" component={FeedScreen} />
-                <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
-                <Stack.Screen name="SettingsPersonalInfo" component={SettingsPersonalInfoScreen} />
-                <Stack.Screen
-                  name="SettingsWorkoutPreferences"
-                  component={SettingsWorkoutPreferencesScreen}
-                />
-                <Stack.Screen name="SettingsNutrition" component={SettingsNutritionScreen} />
-                <Stack.Screen
-                  name="SettingsNotifications"
-                  component={SettingsNotificationsScreen}
-                />
-                <Stack.Screen
-                  name="SettingsAccountSecurity"
-                  component={SettingsAccountSecurityScreen}
-                />
-                <Stack.Screen
-                  name="SettingsChangePassword"
-                  component={SettingsChangePasswordScreen}
-                />
-                <Stack.Screen name="SettingsSupport" component={SettingsSupportScreen} />
-                <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
-                <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
-                <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
-                <Stack.Screen name="EditWorkout" component={EditWorkoutScreen} />
-                <Stack.Screen name="ShareWorkout" component={ShareWorkoutScreen} />
-                <Stack.Screen name="NewWorkout" component={NewWorkoutScreen} />
-                <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
-                <Stack.Screen name="LogPastWorkout" component={LogPastWorkoutScreen} />
-                <Stack.Screen name="TrainerLogWorkout" component={LogPastWorkoutScreen} />
-                <Stack.Screen name="PRHistory" component={PRHistoryScreen} />
-                <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
-                <Stack.Screen name="Nutrition" component={NutritionTodayScreen} />
-                <Stack.Screen name="FoodLibrary" component={FoodLibraryScreen} />
-                <Stack.Screen name="FoodSearch" component={FoodSearchScreen} />
-                <Stack.Screen name="AiFoodSearch" component={AiFoodSearchScreen} />
-                <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
-                <Stack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
-                <Stack.Screen name="NutritionHistory" component={NutritionHistoryScreen} />
-                <Stack.Screen name="CalorieEstimation" component={CalorieEstimationScreen} />
-                <Stack.Screen name="ProgressOverview" component={ProgressOverviewScreen} />
-                <Stack.Screen
-                  name="ProgressExerciseDetail"
-                  component={ProgressExerciseDetailScreen}
-                />
-                <Stack.Screen name="WorkoutSplits" component={WorkoutSplitsScreen} />
-                <Stack.Screen name="WorkoutSplitView" component={WorkoutSplitViewScreen} />
-                <Stack.Screen name="WorkoutSplitForm" component={WorkoutSplitFormScreen} />
-                <Stack.Screen name="ChooseWorkoutSplit" component={ChooseWorkoutSplitScreen} />
-                <Stack.Screen name="Profile" component={ProfileScreen} />
-                <Stack.Screen name="TrainerAccess" component={TrainerAccessScreen} />
-                <Stack.Screen name="TrainerClaim" component={TrainerClaimScreen} />
-                <Stack.Screen name="Groups" component={GroupsScreen} />
-                <Stack.Screen name="GroupSession" component={GroupSessionScreen} />
-                <Stack.Screen name="GroupStart" component={GroupStartScreen} />
-                <Stack.Screen name="TrainerLiveWorkout" component={TrainerLiveWorkoutScreen} />
-                <Stack.Screen name="TrainerClaimCode" component={TrainerClaimCodeScreen} />
-                <Stack.Screen name="TrainerClients" component={TrainerClientsScreen} />
-                <Stack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
-                <Stack.Screen name="TrainerEditClient" component={TrainerClientFormScreen} />
-                <Stack.Screen name="TrainerClientDetail" component={TrainerClientDetailScreen} />
-                <Stack.Screen name="FindPeople" component={FindPeopleScreen} />
-                <Stack.Screen name="Notifications" component={NotificationsScreen} />
-              </Stack.Navigator>
-            </NavigationContainer>
-          </View>
-
-          {showGlobalBottomNav ? (
-            // The strip behind the bar is opaque flat theme colour -- every
-            // screen paints its own opaque backdrop now, so nothing behind
-            // the bar is ever a photograph.
-            <View style={{ backgroundColor: colors.background }}>
-              <BottomNavBar
-                testID="app-bottom-nav"
-                active={routeToBottomNavTab(currentRouteName)}
-                workoutAccentColor={menuTheme.accent}
-                nutritionAccentColor={nutritionMenuTheme.accent}
-                neutralAccentColor={
-                  backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
+        <WorkspaceContext.Provider value={workspaceValue}>
+          <View style={styles.navigatorShell}>
+            <View style={styles.navigatorContent}>
+              <NavigationContainer
+                ref={navigationRef}
+                linking={linking}
+                onReady={() => setCurrentRouteName(navigationRef.current?.getCurrentRoute()?.name)}
+                onStateChange={() =>
+                  setCurrentRouteName(navigationRef.current?.getCurrentRoute()?.name)
                 }
-                paddingBottom={Math.max(insets.bottom, 8)}
-                onNavigateFeed={() => openSection('Feed')}
-                onNavigateTrain={() => openSection('WorkoutHistory')}
-                onNavigateNutrition={() => openSection('Nutrition')}
-                onNavigateProgress={() => openSection('ProgressOverview')}
-                onNavigateYou={() => openSection('Profile')}
-              />
+              >
+                <Stack.Navigator
+                  initialRouteName="Feed"
+                  screenOptions={screenOptions}
+                  screenLayout={renderScreenLayout}
+                >
+                  <Stack.Screen name="Feed" component={FeedScreen} />
+                  <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+                  <Stack.Screen
+                    name="SettingsPersonalInfo"
+                    component={SettingsPersonalInfoScreen}
+                  />
+                  <Stack.Screen
+                    name="SettingsWorkoutPreferences"
+                    component={SettingsWorkoutPreferencesScreen}
+                  />
+                  <Stack.Screen name="SettingsNutrition" component={SettingsNutritionScreen} />
+                  <Stack.Screen
+                    name="SettingsNotifications"
+                    component={SettingsNotificationsScreen}
+                  />
+                  <Stack.Screen
+                    name="SettingsAccountSecurity"
+                    component={SettingsAccountSecurityScreen}
+                  />
+                  <Stack.Screen
+                    name="SettingsChangePassword"
+                    component={SettingsChangePasswordScreen}
+                  />
+                  <Stack.Screen name="SettingsSupport" component={SettingsSupportScreen} />
+                  <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
+                  <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
+                  <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
+                  <Stack.Screen name="EditWorkout" component={EditWorkoutScreen} />
+                  <Stack.Screen name="ShareWorkout" component={ShareWorkoutScreen} />
+                  <Stack.Screen name="NewWorkout" component={NewWorkoutScreen} />
+                  <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
+                  <Stack.Screen name="LogPastWorkout" component={LogPastWorkoutScreen} />
+                  <Stack.Screen name="TrainerLogWorkout" component={LogPastWorkoutScreen} />
+                  <Stack.Screen name="PRHistory" component={PRHistoryScreen} />
+                  <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
+                  <Stack.Screen name="Nutrition" component={NutritionTodayScreen} />
+                  <Stack.Screen name="FoodLibrary" component={FoodLibraryScreen} />
+                  <Stack.Screen name="FoodSearch" component={FoodSearchScreen} />
+                  <Stack.Screen name="AiFoodSearch" component={AiFoodSearchScreen} />
+                  <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
+                  <Stack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
+                  <Stack.Screen name="NutritionHistory" component={NutritionHistoryScreen} />
+                  <Stack.Screen name="CalorieEstimation" component={CalorieEstimationScreen} />
+                  <Stack.Screen name="ProgressOverview" component={ProgressOverviewScreen} />
+                  <Stack.Screen
+                    name="ProgressExerciseDetail"
+                    component={ProgressExerciseDetailScreen}
+                  />
+                  <Stack.Screen name="WorkoutSplits" component={WorkoutSplitsScreen} />
+                  <Stack.Screen name="WorkoutSplitView" component={WorkoutSplitViewScreen} />
+                  <Stack.Screen name="WorkoutSplitForm" component={WorkoutSplitFormScreen} />
+                  <Stack.Screen name="ChooseWorkoutSplit" component={ChooseWorkoutSplitScreen} />
+                  <Stack.Screen name="Profile" component={ProfileScreen} />
+                  <Stack.Screen name="TrainerAccess" component={TrainerAccessScreen} />
+                  <Stack.Screen name="TrainerClaim" component={TrainerClaimScreen} />
+                  <Stack.Screen name="Groups" component={GroupsScreen} />
+                  <Stack.Screen name="GroupSession" component={GroupSessionScreen} />
+                  <Stack.Screen name="GroupStart" component={GroupStartScreen} />
+                  <Stack.Screen name="TrainerLiveWorkout" component={TrainerLiveWorkoutScreen} />
+                  <Stack.Screen name="TrainerClaimCode" component={TrainerClaimCodeScreen} />
+                  <Stack.Screen name="TrainerClients" component={TrainerClientsScreen} />
+                  <Stack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
+                  <Stack.Screen name="TrainerEditClient" component={TrainerClientFormScreen} />
+                  <Stack.Screen name="TrainerClientDetail" component={TrainerClientDetailScreen} />
+                  <Stack.Screen name="FindPeople" component={FindPeopleScreen} />
+                  <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                </Stack.Navigator>
+              </NavigationContainer>
             </View>
-          ) : null}
 
-          <AppSideMenu
-            visible={menuOpen}
-            sections={appMenuSectionsFor(isTrainer)}
-            activeRoute={
-              (navigationRef.current?.getCurrentRoute()?.name as AppMenuRoute | undefined) ?? 'Feed'
-            }
-            onNavigate={(route) => {
-              setMenuOpen(false);
-              if (screenTransitionFor(route) === 'section') {
-                openSection(route);
-                return;
+            {showGlobalBottomNav ? (
+              // The strip behind the bar is opaque flat theme colour -- every
+              // screen paints its own opaque backdrop now, so nothing behind
+              // the bar is ever a photograph.
+              <View style={{ backgroundColor: colors.background }}>
+                <BottomNavBar
+                  testID="app-bottom-nav"
+                  active={routeToBottomNavTab(currentRouteName)}
+                  workoutAccentColor={menuTheme.accent}
+                  nutritionAccentColor={nutritionMenuTheme.accent}
+                  neutralAccentColor={
+                    backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
+                  }
+                  paddingBottom={Math.max(insets.bottom, 8)}
+                  onNavigateFeed={() => openTab('Feed')}
+                  onNavigateTrain={() => openTab('WorkoutHistory')}
+                  onNavigateNutrition={() => openTab('Nutrition')}
+                  onNavigateProgress={() => openTab('ProgressOverview')}
+                  onNavigateYou={() => openTab('Profile')}
+                />
+              </View>
+            ) : null}
+
+            <AppSideMenu
+              visible={menuOpen}
+              sections={
+                workspace === 'trainer' ? TRAINER_MENU_SECTIONS : appMenuSectionsFor(isTrainer)
               }
-              // Menu routes take no params, which the navigator's typed overloads cannot accept as one union.
-              const navigateByName = navigationRef.current?.navigate as
-                ((name: AppMenuRoute) => void) | undefined;
-              navigateByName?.call(navigationRef.current, route);
-            }}
-            onClose={() => setMenuOpen(false)}
-            accentColor={
-              backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
-            }
-          />
-        </View>
+              activeRoute={
+                (navigationRef.current?.getCurrentRoute()?.name as AppMenuRoute | undefined) ??
+                'Feed'
+              }
+              onNavigate={(route) => {
+                setMenuOpen(false);
+                if (screenTransitionFor(route) === 'section') {
+                  openSection(route);
+                  return;
+                }
+                // Menu routes take no params, which the navigator's typed overloads cannot accept as one union.
+                const navigateByName = navigationRef.current?.navigate as
+                  ((name: AppMenuRoute) => void) | undefined;
+                navigateByName?.call(navigationRef.current, route);
+              }}
+              onClose={() => setMenuOpen(false)}
+              accentColor={
+                backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
+              }
+            />
+          </View>
+        </WorkspaceContext.Provider>
       </AppMenuContext.Provider>
     );
   }

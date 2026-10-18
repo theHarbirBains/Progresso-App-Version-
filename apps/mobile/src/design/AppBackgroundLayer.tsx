@@ -14,18 +14,19 @@ import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { withAlpha } from '../theme/accentColor';
 import { colors } from './theme';
 
-// The sunset gym photo behind every screen (Warm Minimal -- see DESIGN.md §3a): the bright
-// window of the original workout photo, warm-graded and sharp, with the sun's glow bloomed;
-// upscaled 1.5x with light sharpening so a phone stretches it less. Text over it stays readable
+// The golden gym photo behind every screen (Warm Minimal -- see DESIGN.md §3a): the original
+// workout photo cropped to the gym itself -- the window with the sun on the mountain line, the
+// plates on the right, the bench in front -- graded golden and high-contrast like the reference,
+// sharp, with the sun's glow bloomed to a hot core; upscaled 1.5x with light sharpening so a
+// phone stretches it less. Text over it stays readable
 // through the darkening layers below, not blur. Exported for the one other place it appears:
 // the top of the workout share card.
 export const BACKGROUND_IMAGE = require('../../assets/background-gym-sunset.jpg');
 // The photo's own width / height, so it keeps its proportions.
 export const BACKGROUND_ASPECT = 852 / 1300;
-// Shown a little larger than the screen and pinned to the top-left, so the sun sits at the
-// right edge, beside the left-aligned text -- the way the bright window sits beside the text in
-// the Warm Minimal reference.
-const PHOTO_ZOOM = 1.25;
+// Shown at the screen's full width, pinned to the top: the whole gym in view, the plates down
+// the right edge and the sun near the top right, as in the reference.
+const PHOTO_ZOOM = 1;
 
 // Every darkening layer below paints colors.background at some opacity. They were chosen by
 // measurement over the photo on a phone-sized screen; don't lighten any of them without
@@ -41,8 +42,8 @@ const SIDE_SCRIM: Stops = [
 // Behind the header (points from the top of the screen).
 const HEADER_BAND_HEIGHT = 140;
 const HEADER_BAND: Stops = [
-  [0, 0.5],
-  [110 / HEADER_BAND_HEIGHT, 0.25],
+  [0, 0.3],
+  [110 / HEADER_BAND_HEIGHT, 0.15],
   [1, 0],
 ];
 // Down the photo, every day: dark enough that textPrimary keeps WCAG AA (4.5:1) even over the
@@ -60,8 +61,8 @@ const EVERYDAY: Stops = [
 // over all but the brightest specks, and text in a card AA at every pixel, wherever a card
 // scrolls to.
 const HERO: Stops = [
-  [0, 0.14],
-  [0.35, 0.14],
+  [0, 0.1],
+  [0.35, 0.1],
   [0.5, 0.62],
   [1, 1],
 ];

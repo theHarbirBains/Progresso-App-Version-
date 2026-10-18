@@ -24,6 +24,8 @@ import {
   type GroupSummary,
 } from '../lib/api';
 import { fetchMyOpenLiveSessions, type TrainerOpenSession } from '../trainer/clientQueries';
+import { useWorkspace } from '../workspace/WorkspaceContext';
+import { WorkspaceSwitcher } from '../workspace/WorkspaceSwitcher';
 import { isStale } from '../lib/focusFreshness';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -129,6 +131,7 @@ export function FeedScreen({ navigation }: Props) {
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
+  const workspace = useWorkspace();
   const { weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId } = useProgressTheme();
 
   // What Feed showed last time (lib/lastShown.ts): a reopened Feed starts from
@@ -470,6 +473,7 @@ export function FeedScreen({ navigation }: Props) {
           <AppHeader
             testID="feed-header"
             title="Progresso"
+            titleContent={workspace?.isTrainer ? <WorkspaceSwitcher /> : undefined}
             leftAction={{
               icon: 'menu',
               onPress: () => openMenu(),

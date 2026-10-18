@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { Feather } from '@expo/vector-icons';
@@ -31,6 +32,8 @@ interface Props {
   loading?: boolean;
   /** Default true: pads for the device's top safe area, matching ScreenContainer's own inset handling. */
   safeArea?: boolean;
+  /** Something other than text in the title's place (e.g. Feed's workspace switcher); replaces title/subtitle when given. */
+  titleContent?: ReactNode;
   testID?: string;
 }
 
@@ -50,6 +53,7 @@ export function AppHeader({
   rightAction2,
   loading,
   safeArea = true,
+  titleContent,
   testID,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -103,8 +107,12 @@ export function AppHeader({
       ) : null}
 
       <View style={styles.titleColumn}>
-        {title ? <Text style={styles.title}>{title}</Text> : null}
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        {titleContent ?? (
+          <>
+            {title ? <Text style={styles.title}>{title}</Text> : null}
+            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          </>
+        )}
       </View>
 
       {loading ? (

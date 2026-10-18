@@ -27,13 +27,13 @@ describe('AppBackgroundLayer', () => {
     expect(screen.getByTestId('app-background-layer').props.pointerEvents).toBe('none');
   });
 
-  it('puts the sunset photo across the top, a little zoomed and pinned left, before sign-in too', () => {
+  it('puts the golden gym photo across the top at full width, before sign-in too', () => {
     render(<AppBackgroundLayer showAtmosphere={false} />);
 
     const photo = StyleSheet.flatten(screen.getByTestId('app-background-photo').props.style);
-    expect(photo).toMatchObject({ position: 'absolute', top: 0, left: 0, width: '125%' });
+    expect(photo).toMatchObject({ position: 'absolute', top: 0, left: 0, width: '100%' });
     expect(photo.aspectRatio).toBeGreaterThan(0);
-    // The zoomed photo runs past the right edge, so the layer clips it.
+    // The layer never lets the photo draw outside the screen.
     expect(
       StyleSheet.flatten(screen.getByTestId('app-background-layer').props.style).overflow,
     ).toBe('hidden');
@@ -57,7 +57,7 @@ describe('AppBackgroundLayer', () => {
     expect(alphaOf(side.props.colors[0])).toBeGreaterThan(0.5);
     expect(alphaOf(side.props.colors[side.props.colors.length - 1])).toBe(0);
     const band = screen.getByTestId('app-background-header-band');
-    expect(alphaOf(band.props.colors[0])).toBe(0.5);
+    expect(alphaOf(band.props.colors[0])).toBe(0.3);
     expect(alphaOf(band.props.colors[band.props.colors.length - 1])).toBe(0);
   });
 });
@@ -182,13 +182,13 @@ describe('ScreenBackdrop behind a photo hero', () => {
     expect(topDarkness('screen-backdrop')).toBeCloseTo(0.7, 2);
   });
 
-  it('shows the sunset almost in full (14% darkening) while a hero is on the screen, and back when it goes', () => {
+  it('shows the photo almost in full (10% darkening) while a hero is on the screen, and back when it goes', () => {
     const { rerender } = render(
       <ScreenBackdrop>
         <Hero />
       </ScreenBackdrop>,
     );
-    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.14, 2);
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.1, 2);
 
     rerender(
       <ScreenBackdrop>

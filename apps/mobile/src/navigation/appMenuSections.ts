@@ -10,8 +10,8 @@ type NoParamRoute = {
   [K in keyof RootStackParamList]: undefined extends RootStackParamList[K] ? K : never;
 }[keyof RootStackParamList];
 
-/** The add/edit form is opened from a client's page or from Clients, never from the side menu directly. */
-type FormOnlyRoute = 'TrainerClientForm' | 'TrainerClaim';
+/** Opened from a page, never from the side menu directly. */
+type FormOnlyRoute = 'TrainerClaim';
 
 export type AppMenuRoute = Exclude<NoParamRoute, FormOnlyRoute>;
 
@@ -99,3 +99,19 @@ export const APP_MENU_FOOTER_ITEM: AppMenuItem = {
   label: 'Settings',
   icon: 'settings',
 };
+
+/**
+ * The side menu while a trainer is in their Trainer Workspace (see
+ * workspace/WorkspaceContext.tsx): their clients, and adding one. Their own
+ * workouts, nutrition and the rest are back in My Workspace -- the switcher, or
+ * any bottom tab, takes them there.
+ */
+export const TRAINER_MENU_SECTIONS: AppMenuSection[] = [
+  {
+    title: 'TRAINER',
+    items: [
+      { route: 'TrainerClients', label: 'Clients', icon: 'users' },
+      { route: 'TrainerClientForm', label: 'Add Client', icon: 'user-plus' },
+    ],
+  },
+];

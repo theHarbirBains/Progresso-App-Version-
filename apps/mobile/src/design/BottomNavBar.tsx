@@ -17,7 +17,8 @@ interface NavItem {
 }
 
 interface Props {
-  active: BottomNavDestination;
+  /** The tab of the page you're on, or null on a page that belongs to none (the Trainer Workspace). */
+  active: BottomNavDestination | null;
   onNavigateFeed: () => void;
   onNavigateTrain: () => void;
   onNavigateNutrition: () => void;

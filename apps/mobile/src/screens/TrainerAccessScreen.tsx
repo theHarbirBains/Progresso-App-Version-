@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -14,44 +14,39 @@ import { Text } from '../design/Text';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import {
   endTrainerLink,
-  getTrainerStatus,
   listMyTrainers,
-  listTrainerClients,
   listTrainerRequests,
   respondToTrainerRequest,
-  type TrainerClient,
   type TrainerRequest,
 } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { clientName } from '../trainer/clientPicker';
-import { trainerClientStatusLabel } from '../trainer/trainerLabels';
 import { formatCardDate } from '../workouts/workoutFormat';
+import { useWorkspace } from '../workspace/WorkspaceContext';
 
 type Props = RootStackScreenProps<'TrainerAccess'>;
 
 interface AccessData {
-  isTrainer: boolean;
   requests: TrainerRequest[];
   trainers: TrainerRequest[];
-  clients: TrainerClient[];
 }
 
 /**
- * Trainer access, as widgets: an overview of who can log for you (and, for a trainer,
- * their clients); requests waiting on you (Accept is the one primary action); your
- * trainers, each with End; the Clients widget, with Add Client for a trainer; how trainer
- * access works; and linking history a trainer tracked before you joined. A side-menu page,
- * so the menu button sits at the top left.
+ * Trainer access -- the side of it everyone has -- as widgets: an overview of who can log
+ * for you; requests waiting on you (Accept is the one primary action); your trainers, each
+ * with End; for a trainer, a way into their Trainer Workspace (their clients live there,
+ * not here); how trainer access works; and linking history a trainer tracked before you
+ * joined. A side-menu page, so the menu button sits at the top left.
  */
 export function TrainerAccessScreen({ navigation }: Props) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   const { theme } = useProgressTheme();
 
-  // The side menu, for the menu button (absent outside the app shell, e.g. in a test).
+  // The side menu, for the menu button, and the workspace (both absent outside the app shell, e.g. in a test).
   const menu = useContext(AppMenuContext);
+  const workspace = useWorkspace();
   const [data, setData] = useState<AccessData | null>(null);
   const [loading, setLoading] = useState(true);
   // Only the first load shows placeholders; coming back refreshes in place.
@@ -64,13 +59,11 @@ export function TrainerAccessScreen({ navigation }: Props) {
     if (!hasLoaded.current) setLoading(true);
     setError(null);
     try {
-      const [status, requests, trainers] = await Promise.all([
-        getTrainerStatus(accessToken),
+      const [requests, trainers] = await Promise.all([
         listTrainerRequests(accessToken),
         listMyTrainers(accessToken),
       ]);
-      const clients = status.isTrainer ? await listTrainerClients(accessToken) : [];
-      setData({ isTrainer: status.isTrainer, requests, trainers, clients });
+      setData({ requests, trainers });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load trainer access');
     } finally {
@@ -88,14 +81,6 @@ export function TrainerAccessScreen({ navigation }: Props) {
     const unsubscribe = navigation.addListener('focus', () => void load());
     return unsubscribe;
   }, [navigation, load]);
-
-  const sortedClients = useMemo(
-    () =>
-      [...(data?.clients ?? [])].sort((a, b) =>
-        clientName(a).localeCompare(clientName(b), undefined, { sensitivity: 'base' }),
-      ),
-    [data],
-  );
 
   async function respond(trainerId: string, action: 'accept' | 'decline') {
     if (!accessToken || busyTrainerId) return;
@@ -192,13 +177,6 @@ export function TrainerAccessScreen({ navigation }: Props) {
                 label={data.requests.length === 1 ? 'Request' : 'Requests'}
                 valueColor={data.requests.length > 0 ? theme.accent : undefined}
               />
-              {data.isTrainer ? (
-                <StatBlock
-                  testID="trainer-access-stat-clients"
-                  value={String(data.clients.length)}
-                  label={data.clients.length === 1 ? 'Client' : 'Clients'}
-                />
-              ) : null}
             </View>
           </AppCard>
 
@@ -268,54 +246,18 @@ export function TrainerAccessScreen({ navigation }: Props) {
             )}
           </AppCard>
 
-          <AppCard testID="trainer-access-clients">
-            <SectionHeader label="Clients" />
-            {!data.isTrainer ? (
-              <Text style={styles.empty}>Clients need a Trainer subscription.</Text>
-            ) : sortedClients.length === 0 ? (
-              <Text style={styles.empty} testID="trainer-access-no-clients">
-                No clients yet. Add someone, even if they do not use Progresso yet.
-              </Text>
-            ) : (
-              sortedClients.map((client, index) => {
-                const openable = client.clientId !== null;
-                return (
-                  <ListRow
-                    key={client.clientId ?? client.inviteId ?? `client-${index}`}
-                    testID={
-                      openable
-                        ? `trainer-access-client-${client.clientId}`
-                        : `trainer-access-invite-${client.inviteId}`
-                    }
-                    title={clientName(client)}
-                    subtitle={trainerClientStatusLabel(client)}
-                    chevron={openable}
-                    divider={index > 0}
-                    onPress={
-                      openable
-                        ? () =>
-                            navigation.navigate('TrainerClientDetail', {
-                              clientId: client.clientId as string,
-                              clientName: client.displayName ?? undefined,
-                            })
-                        : undefined
-                    }
-                  />
-                );
-              })
-            )}
-            {data.isTrainer ? (
-              <View style={styles.cardAction}>
-                <PrimaryButton
-                  testID="trainer-access-add-client"
-                  label="Add Client"
-                  onPress={() => navigation.navigate('TrainerClientForm')}
-                  accentColor={theme.accent}
-                  onAccentColor={theme.onAccent}
-                />
-              </View>
-            ) : null}
-          </AppCard>
+          {workspace?.isTrainer ? (
+            <AppCard testID="trainer-access-coaching">
+              <SectionHeader label="Coaching" />
+              <ListRow
+                testID="trainer-access-open-workspace"
+                icon="users"
+                title="Open Trainer Workspace"
+                subtitle="Your clients, adding a client, and logging their workouts."
+                onPress={() => workspace.switchTo('trainer')}
+              />
+            </AppCard>
+          ) : null}
 
           <AppCard testID="trainer-access-how">
             <SectionHeader label="How it works" />

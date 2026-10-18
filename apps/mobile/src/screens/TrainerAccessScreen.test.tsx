@@ -10,6 +10,7 @@ import {
   respondToTrainerRequest,
 } from '../lib/api';
 import { TrainerAccessScreen } from './TrainerAccessScreen';
+import { WorkspaceContext } from '../workspace/WorkspaceContext';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -51,21 +52,6 @@ const request = {
   trainerId: TRAINER_ID,
   trainerDisplayName: 'Coach Jo',
   requestedAt: '2026-10-01T00:00:00.000Z',
-};
-
-const sam = {
-  clientId: 'client-sam',
-  inviteId: null,
-  email: null,
-  status: 'active',
-  awaitingClaim: false,
-  source: 'managed',
-  displayName: 'Sam',
-  birthday: null,
-  heightValue: null,
-  heightUnit: 'cm',
-  weightValue: null,
-  weightUnit: 'kg',
 };
 
 function renderScreen() {
@@ -113,35 +99,31 @@ describe('TrainerAccessScreen', () => {
     );
   });
 
-  it('lets a trainer see their clients in the Clients widget, and open one', async () => {
-    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
-    mockListTrainerClients.mockResolvedValue([sam]);
-    renderScreen();
+  it('gives a trainer a way into their Trainer Workspace -- their clients live there, not here', async () => {
+    const switchTo = jest.fn();
+    render(
+      <WorkspaceContext.Provider value={{ workspace: 'personal', isTrainer: true, switchTo }}>
+        <TrainerAccessScreen navigation={navigation} route={{} as never} />
+      </WorkspaceContext.Provider>,
+    );
 
-    expect(await screen.findByTestId('trainer-access-clients')).toHaveTextContent(/Sam/);
-    expect(screen.getByTestId('trainer-access-add-client')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('trainer-access-client-client-sam'));
-    expect(mockNavigate).toHaveBeenCalledWith('TrainerClientDetail', {
-      clientId: 'client-sam',
-      clientName: 'Sam',
-    });
+    fireEvent.press(await screen.findByTestId('trainer-access-open-workspace'));
+    expect(switchTo).toHaveBeenCalledWith('trainer');
+    expect(screen.queryByTestId('trainer-access-clients')).toBeNull();
   });
 
-  it('says clients need a Trainer subscription for everyone else, and still offers tracked history', async () => {
+  it('offers tracked history to everyone, and no Coaching widget to someone who is not a trainer', async () => {
     renderScreen();
 
-    const widget = await screen.findByTestId('trainer-access-clients');
-    expect(widget).toHaveTextContent(/Clients need a Trainer subscription/);
-    fireEvent.press(screen.getByTestId('trainer-access-open-claim'));
+    fireEvent.press(await screen.findByTestId('trainer-access-open-claim'));
     expect(mockNavigate).toHaveBeenCalledWith('TrainerClaim');
+    expect(screen.queryByTestId('trainer-access-coaching')).toBeNull();
   });
 
   it('has no activity widget', async () => {
-    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
-    mockListTrainerClients.mockResolvedValue([sam]);
     renderScreen();
 
-    await screen.findByTestId('trainer-access-clients');
+    await screen.findByTestId('trainer-access-trainers');
     expect(screen.queryByText('Activity')).toBeNull();
   });
 
@@ -171,16 +153,10 @@ describe('TrainerAccessScreen', () => {
     alert.mockRestore();
   });
 
-  it('has no back arrow, and lists every client a trainer has', async () => {
-    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
-    mockListTrainerClients.mockResolvedValue([
-      sam,
-      { ...sam, clientId: 'client-ana', displayName: 'Ana' },
-    ]);
+  it('has no back arrow', async () => {
     renderScreen();
 
-    expect(await screen.findByTestId('trainer-access-client-client-sam')).toBeTruthy();
-    expect(screen.getByTestId('trainer-access-client-client-ana')).toBeTruthy();
+    await screen.findByTestId('trainer-access-trainers');
     expect(screen.queryByLabelText('Back')).toBeNull();
   });
 
@@ -196,9 +172,7 @@ describe('TrainerAccessScreen', () => {
     expect(openMenu).toHaveBeenCalled();
   });
 
-  it("opens with an overview: who can log for you, requests, and a trainer's clients", async () => {
-    mockGetTrainerStatus.mockResolvedValue({ isTrainer: true });
-    mockListTrainerClients.mockResolvedValue([sam]);
+  it('opens with an overview: who can log for you, and requests waiting', async () => {
     mockListMyTrainers.mockResolvedValue([
       {
         trainerId: TRAINER_ID,
@@ -213,7 +187,7 @@ describe('TrainerAccessScreen', () => {
     );
     expect(screen.getByTestId('trainer-access-stat-trainers')).toHaveTextContent(/1/);
     expect(screen.getByTestId('trainer-access-stat-requests')).toHaveTextContent(/0/);
-    expect(screen.getByTestId('trainer-access-stat-clients')).toHaveTextContent(/1/);
+    expect(screen.queryByTestId('trainer-access-stat-clients')).toBeNull();
   });
 
   it('shows no clients count to someone who is not a trainer', async () => {

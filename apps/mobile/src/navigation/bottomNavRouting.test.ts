@@ -34,3 +34,16 @@ describe('routeToBottomNavTab', () => {
     expect(routeToBottomNavTab('SomeFutureScreen')).toBe('feed');
   });
 });
+
+describe('routeToBottomNavTab -- the Trainer Workspace', () => {
+  it('highlights no tab on a trainer page -- they belong to none of the five', () => {
+    for (const route of [
+      'TrainerClients',
+      'TrainerClientDetail',
+      'TrainerClientForm',
+      'TrainerLiveWorkout',
+    ]) {
+      expect(routeToBottomNavTab(route)).toBeNull();
+    }
+  });
+});

@@ -1,4 +1,4 @@
-import { APP_MENU_FOOTER_ITEM, APP_MENU_SECTIONS } from './appMenuSections';
+import { TRAINER_MENU_SECTIONS, APP_MENU_FOOTER_ITEM, APP_MENU_SECTIONS } from './appMenuSections';
 
 // Three sections -- Training, Nutrition, and (since Social v1) Social --
 // the app's real domains, rather than the finer PROGRESSO/TRAINING·TOOLS/
@@ -80,5 +80,15 @@ describe('APP_MENU_SECTIONS', () => {
 describe('APP_MENU_FOOTER_ITEM', () => {
   it('keeps Settings available via the existing app-level AccountSettings route', () => {
     expect(APP_MENU_FOOTER_ITEM).toMatchObject({ route: 'AccountSettings', label: 'Settings' });
+  });
+});
+
+describe('TRAINER_MENU_SECTIONS', () => {
+  it("is the side menu in the Trainer Workspace: the trainer's clients, and adding one", () => {
+    const items = TRAINER_MENU_SECTIONS.flatMap((section) => section.items);
+    expect(items.map((item) => ('route' in item ? item.route : null))).toEqual([
+      'TrainerClients',
+      'TrainerClientForm',
+    ]);
   });
 });

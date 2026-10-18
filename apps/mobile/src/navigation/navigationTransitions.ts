@@ -51,6 +51,8 @@ const SECTION_ROUTES: ReadonlySet<RouteName> = new Set<RouteName>([
   'CalorieEstimation',
   'LogPastWorkout',
   'TrainerAccess',
+  // The Trainer Workspace's home.
+  'TrainerClients',
 ]);
 
 const TASK_ROUTES: ReadonlySet<RouteName> = new Set<RouteName>([

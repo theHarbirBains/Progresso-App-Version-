@@ -9,7 +9,7 @@ import type { RootStackParamList } from './types';
  * Onboarding is deliberately absent: it never shows the bottom nav at all
  * (see App.tsx).
  */
-const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination>> = {
+const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination | null>> = {
   Feed: 'feed',
   ExerciseLibrary: 'train',
   WorkoutHistory: 'train',
@@ -41,11 +41,19 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination>
   SettingsChangePassword: 'you',
   SettingsSupport: 'you',
   Profile: 'you',
+  // The Trainer Workspace's pages belong to none of the five tabs.
+  TrainerClients: null,
+  TrainerClientDetail: null,
+  TrainerClientForm: null,
+  TrainerEditClient: null,
+  TrainerLogWorkout: null,
+  TrainerLiveWorkout: null,
+  TrainerClaimCode: null,
 };
 
-export function routeToBottomNavTab(routeName: string | undefined): BottomNavDestination {
+export function routeToBottomNavTab(routeName: string | undefined): BottomNavDestination | null {
   if (routeName && routeName in ROUTE_TABS) {
-    return ROUTE_TABS[routeName as keyof RootStackParamList]!;
+    return ROUTE_TABS[routeName as keyof RootStackParamList] ?? null;
   }
   return 'feed';
 }
