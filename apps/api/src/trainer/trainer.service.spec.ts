@@ -43,6 +43,8 @@ function createMockClient() {
 
   const take = (queue: Result[] | undefined, name: string): Promise<Result> => {
     const next = queue?.shift();
+    // No blocks unless a test queues some.
+    if (!next && name === 'user_blocks') return Promise.resolve({ data: [], error: null });
     if (!next) return Promise.reject(new Error(`No queued result for "${name}"`));
     return Promise.resolve(next);
   };
@@ -190,6 +192,17 @@ describe('TrainerService', () => {
       await expect(
         service.addClient(TRAINER, { username: 'me_coach' } as AddClientDto),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it("can't reach someone who blocked them: the username reads as unknown", async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queue('users', ok({ id: CLIENT }));
+      mock.queue('user_blocks', ok([{ blocker_id: CLIENT, blocked_id: TRAINER }]));
+      await expect(
+        service.addClient(TRAINER, { username: 'sam_lifts' } as AddClientDto),
+      ).rejects.toThrow('No Progresso user has that username');
+      expect(mock.calls.some((c) => c.method === 'insert')).toBe(false);
     });
 
     it('sends the account a pending request, looking the username up in lower case', async () => {

@@ -29,6 +29,8 @@ function createMockClient() {
 
   const take = (queue: Result[] | undefined, name: string): Promise<Result> => {
     const next = queue?.shift();
+    // No blocks unless a test queues some.
+    if (!next && name === 'user_blocks') return Promise.resolve({ data: [], error: null });
     if (!next) return Promise.reject(new Error(`No queued result for "${name}"`));
     return Promise.resolve(next);
   };
@@ -164,6 +166,19 @@ describe('GroupsService', () => {
       await expect(service.inviteMember(HOST, GROUP, 'stranger_one')).rejects.toThrow(
         ForbiddenException,
       );
+    });
+
+    it('refuses a friend who blocked you, exactly as it refuses a stranger', async () => {
+      const { mock, service } = setup();
+      mock.queue('workout_groups', ok({ status: 'live' }));
+      mock.queue('workout_group_members', joined(HOST, 'host'));
+      mock.queue('users', ok({ id: TARGET }));
+      mock.queue('user_blocks', ok([{ blocker_id: TARGET, blocked_id: HOST }]));
+
+      await expect(service.inviteMember(HOST, GROUP, 'friend_one')).rejects.toThrow(
+        'You can invite your friends and your clients',
+      );
+      expect(mock.calls.some((c) => c.method === 'insert')).toBe(false);
     });
 
     it('invites a friend, who then has to accept', async () => {

@@ -9,6 +9,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { isBlockedEitherWay, loadBlocks } from '../safety/blocks';
 import { SupabaseService } from '../supabase/supabase.service';
 import type { AddClientDto } from './dto/add-client.dto';
 import type { TrackClientDto } from './dto/track-client.dto';
@@ -243,6 +244,11 @@ export class TrainerService {
     }
     if (clientId === trainerId) {
       throw new BadRequestException('You cannot add yourself as a client');
+    }
+    // A block in either direction reads like the username isn't there.
+    const blocks = await loadBlocks(this.supabaseService.getClient(), trainerId);
+    if (isBlockedEitherWay(blocks, clientId)) {
+      throw new NotFoundException('No Progresso user has that username');
     }
     const status = await this.requestLink(trainerId, clientId);
     return { kind: 'request', status, clientId };

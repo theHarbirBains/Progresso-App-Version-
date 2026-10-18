@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { isBlockedEitherWay, loadBlocks } from '../safety/blocks';
 import { SupabaseService } from '../supabase/supabase.service';
 
 export type FollowStatus = 'none' | 'pending' | 'accepted';
@@ -73,6 +74,16 @@ export class FollowsService {
     }
     if (!followee) {
       throw new NotFoundException('User not found');
+    }
+
+    // Someone who blocked you looks like no one at all; someone you blocked needs unblocking
+    // first. The database refuses either follow too (follows_not_blocked).
+    const blocks = await loadBlocks(client, followerId);
+    if (blocks.blockedBy.has(followeeId)) {
+      throw new NotFoundException('User not found');
+    }
+    if (blocks.blocked.has(followeeId)) {
+      throw new BadRequestException("You've blocked this person. Unblock them to follow them.");
     }
 
     const { data: existing, error: existingError } = await client
@@ -286,7 +297,7 @@ export class FollowsService {
     // Two separate ilike queries rather than a single .or(...) filter string
     // -- a display name can contain commas/parentheses, which would corrupt
     // PostgREST's .or() filter syntax if interpolated into it directly.
-    const [byUsername, byDisplayName] = await Promise.all([
+    const [byUsername, byDisplayName, blocks] = await Promise.all([
       client
         .from('users')
         .select('id, username, display_name, avatar_url')
@@ -299,6 +310,7 @@ export class FollowsService {
         .ilike('display_name', pattern)
         .neq('id', userId)
         .limit(SEARCH_RESULT_LIMIT),
+      loadBlocks(client, userId),
     ]);
     if (byUsername.error || byDisplayName.error) {
       throw new InternalServerErrorException('Failed to search users');
@@ -306,6 +318,8 @@ export class FollowsService {
 
     const dedup = new Map<string, Record<string, unknown>>();
     for (const row of [...(byUsername.data ?? []), ...(byDisplayName.data ?? [])]) {
+      // Nobody you blocked, or who blocked you, turns up.
+      if (isBlockedEitherWay(blocks, row.id as string)) continue;
       dedup.set(row.id as string, row);
     }
     const results = Array.from(dedup.values()).slice(0, SEARCH_RESULT_LIMIT);
@@ -342,12 +356,17 @@ export class FollowsService {
   async listSuggested(userId: string): Promise<FollowSearchResult[]> {
     const client = this.supabaseService.getClient();
 
-    const { data: existingRows, error: existingError } = await client
-      .from('follows')
-      .select('followee_id')
-      .eq('follower_id', userId);
+    const [{ data: existingRows, error: existingError }, blocks] = await Promise.all([
+      client.from('follows').select('followee_id').eq('follower_id', userId),
+      loadBlocks(client, userId),
+    ]);
     if (existingError) throw new InternalServerErrorException('Failed to load suggested users');
-    const excluded = new Set((existingRows ?? []).map((r) => r.followee_id as string));
+    // Nobody already followed or requested, and nobody blocked either way.
+    const excluded = new Set([
+      ...(existingRows ?? []).map((r) => r.followee_id as string),
+      ...blocks.blocked,
+      ...blocks.blockedBy,
+    ]);
 
     // Overfetch by the excluded count and filter in-memory rather than a
     // PostgREST .not('id', 'in', ...) filter -- simpler and avoids that

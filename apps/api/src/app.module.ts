@@ -14,6 +14,7 @@ import { FollowsModule } from './follows/follows.module';
 import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RevenueCatModule } from './revenuecat/revenuecat.module';
+import { SafetyModule } from './safety/safety.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { TrainerModule } from './trainer/trainer.module';
 import { GroupsModule } from './groups/groups.module';
@@ -40,6 +41,7 @@ import { UsersModule } from './users/users.module';
     AdminModule,
     RevenueCatModule,
     NotificationsModule,
+    SafetyModule,
   ],
   providers: [
     {

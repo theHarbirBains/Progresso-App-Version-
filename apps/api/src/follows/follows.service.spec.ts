@@ -19,6 +19,7 @@ const CHAIN_METHODS = [
   'ilike',
   'neq',
   'gte',
+  'or',
   'order',
   'limit',
   'insert',
@@ -51,6 +52,8 @@ function createMockClient() {
   function nextResult(table: string): QueuedResult {
     const list = queues.get(table);
     const result = list?.shift();
+    // No blocks unless a test queues some.
+    if (!result && table === 'user_blocks') return { data: [], error: null };
     if (!result) throw new Error(`No queued result for table "${table}"`);
     return result;
   }
@@ -119,6 +122,36 @@ describe('FollowsService', () => {
         followee_id: 'user-2',
         status: 'pending',
       });
+    });
+
+    it('treats someone who blocked you as no one at all, and never writes a request', async () => {
+      const client = createMockClient();
+      client.queue('users', { data: { id: 'user-2' }, error: null });
+      client.queue('user_blocks', {
+        data: [{ blocker_id: 'user-2', blocked_id: 'user-1' }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      await expect(service.sendRequest('user-1', 'user-2')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(client.calls.some((c) => c.method === 'insert')).toBe(false);
+    });
+
+    it('asks you to unblock someone before following them', async () => {
+      const client = createMockClient();
+      client.queue('users', { data: { id: 'user-2' }, error: null });
+      client.queue('user_blocks', {
+        data: [{ blocker_id: 'user-1', blocked_id: 'user-2' }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      await expect(service.sendRequest('user-1', 'user-2')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(client.calls.some((c) => c.method === 'insert')).toBe(false);
     });
 
     it('is idempotent -- reports the existing status instead of erroring on a duplicate request', async () => {
@@ -234,6 +267,34 @@ describe('FollowsService', () => {
       ]);
     });
 
+    it('leaves out anyone you blocked or who blocked you', async () => {
+      const client = createMockClient();
+      client.queue('users', {
+        data: [
+          { id: 'user-2', username: 'blocked_one', display_name: null, avatar_url: null },
+          { id: 'user-3', username: 'blocker_one', display_name: null, avatar_url: null },
+          { id: 'user-4', username: 'fine_one', display_name: null, avatar_url: null },
+        ],
+        error: null,
+      });
+      client.queue('users', { data: [], error: null });
+      client.queue('user_blocks', {
+        data: [
+          { blocker_id: 'user-1', blocked_id: 'user-2' },
+          { blocker_id: 'user-3', blocked_id: 'user-1' },
+        ],
+        error: null,
+      });
+      client.queue('follows', { data: [], error: null });
+      const service = serviceWith(client);
+
+      const results = await service.search('user-1', 'one');
+
+      expect(results.map((r) => r.user.id)).toEqual(['user-4']);
+      const blockFilter = client.calls.find((c) => c.table === 'user_blocks' && c.method === 'or');
+      expect(blockFilter?.args[0]).toBe('blocker_id.eq.user-1,blocked_id.eq.user-1');
+    });
+
     it('returns an empty list without querying follow status when no user matches', async () => {
       const client = createMockClient();
       client.queue('users', { data: [], error: null });
@@ -345,6 +406,27 @@ describe('FollowsService', () => {
 
       const limitCall = client.calls.find((c) => c.table === 'users' && c.method === 'limit');
       expect(limitCall?.args[0]).toBe(22); // SUGGESTED_LIMIT (20) + 2 excluded
+    });
+
+    it('suggests no one blocked either way', async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [], error: null });
+      client.queue('user_blocks', {
+        data: [{ blocker_id: 'user-9', blocked_id: 'user-1' }],
+        error: null,
+      });
+      client.queue('users', {
+        data: [
+          { id: 'user-9', username: 'blocker', display_name: null, avatar_url: null },
+          { id: 'user-3', username: 'new', display_name: null, avatar_url: null },
+        ],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const results = await service.listSuggested('user-1');
+
+      expect(results.map((r) => r.user.id)).toEqual(['user-3']);
     });
 
     it('returns an empty list when there is nothing left to suggest', async () => {

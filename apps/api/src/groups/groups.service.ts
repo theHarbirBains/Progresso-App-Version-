@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { isBlockedEitherWay, loadBlocks } from '../safety/blocks';
 import { SupabaseService } from '../supabase/supabase.service';
 import type { AddGuestDto, CreateGroupDto } from './dto/groups.dto';
 
@@ -313,7 +314,9 @@ export class GroupsService {
     if (!targetId) throw new NotFoundException('No Progresso user has that username');
     if (targetId === userId) throw new BadRequestException('You are already in this group');
 
-    if (!(await this.areConnected(userId, targetId))) {
+    // A block in either direction reads exactly like not being connected.
+    const blocks = await loadBlocks(client, userId);
+    if (isBlockedEitherWay(blocks, targetId) || !(await this.areConnected(userId, targetId))) {
       throw new ForbiddenException('You can invite your friends and your clients');
     }
 
