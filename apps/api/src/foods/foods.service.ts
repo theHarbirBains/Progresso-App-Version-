@@ -56,6 +56,23 @@ const AMOUNT_QUESTION = /\b(how much|how many|what amount|quantity|serving size)
 /** A leading amount and unit the parser didn't keep ("100 g potato" -> "potato" after this). */
 const LEADING_AMOUNT = /^\s*\d+(?:\.\d+)?\s*[a-zA-Z]{0,12}\s+/;
 
+// How long a scan of an older cached product waits for its serving wording to be read
+// again before answering with the cached row (see getByBarcode).
+export const BARCODE_REFRESH_BUDGET_MS = 1_000;
+
+/** The work's result if it settles within `ms`, otherwise null; the work itself carries on. */
+async function withinBudget<T>(work: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  try {
+    return await Promise.race([work, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // The app waits 45 s for an AI Food Search request (see the mobile foodsApi). The server stops
@@ -425,28 +442,39 @@ export class FoodsService {
    *
    * A product cached before the provider's serving wording was kept (its
    * serving_label still null) is read from the provider once more and its row
-   * refreshed, so it gains the wording too; if that read fails, the cached row
-   * is returned as it is.
+   * refreshed, so it gains the wording too. The scan waits at most
+   * BARCODE_REFRESH_BUDGET_MS for that: past it, or if the read fails, the
+   * cached row is returned as it is, and the refresh carries on in the
+   * background so the next scan has the wording.
    */
   async getByBarcode(barcode: string, userId: string): Promise<FoodRecord | null> {
     const trimmed = barcode.trim();
     if (!trimmed) return null;
 
     const cached = await this.queryLocalByBarcode(trimmed, userId);
-    if (cached && !cached.servingLabelUnread) return cached.record;
+    if (!cached) return this.lookUpAndCacheBarcode(trimmed);
+    if (!cached.servingLabelUnread) return cached.record;
 
+    const refreshed = await withinBudget(
+      this.lookUpAndCacheBarcode(trimmed),
+      BARCODE_REFRESH_BUDGET_MS,
+    );
+    return refreshed ?? cached.record;
+  }
+
+  /** The provider's product for this barcode, cached; null when it has none or the read fails. Never rejects. */
+  private async lookUpAndCacheBarcode(barcode: string): Promise<FoodRecord | null> {
     let food: NormalizedFood | null;
     try {
-      food = await this.provider.getFoodByBarcode(trimmed);
+      food = await this.provider.getFoodByBarcode(barcode);
     } catch (err) {
       this.logger.warn(
         `Food provider barcode lookup failed: ${err instanceof Error ? err.message : String(err)}`,
       );
-      return cached?.record ?? null;
+      return null;
     }
-    if (!food) return cached?.record ?? null;
-
-    return (await this.upsertExternalFood(food)) ?? cached?.record ?? null;
+    if (!food) return null;
+    return this.upsertExternalFood(food);
   }
 
   /**

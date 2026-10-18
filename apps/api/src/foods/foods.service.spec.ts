@@ -1,7 +1,7 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import type { SupabaseService } from '../supabase/supabase.service';
 import type { FoodProvider, NormalizedFood } from './food-provider.interface';
-import { FoodsService } from './foods.service';
+import { BARCODE_REFRESH_BUDGET_MS, FoodsService } from './foods.service';
 import type { AnthropicNutritionProvider } from './providers/anthropic-nutrition.provider';
 import type { InterpretFoodResponse } from './interpretation';
 
@@ -434,6 +434,35 @@ describe('FoodsService.getByBarcode', () => {
     const result = await service.getByBarcode('0066721016123', USER_ID);
 
     expect(result).toMatchObject({ id: 'food-2', name: 'Oreo Original', servingLabel: null });
+  });
+
+  it('answers within the refresh budget with the cached product when the provider hangs, and keeps refreshing', async () => {
+    jest.useFakeTimers();
+    try {
+      let answer: (food: NormalizedFood) => void = () => {};
+      const { supabaseService, instances } = mockSupabaseSequence([
+        { data: { ...cachedExternalFoodRow, serving_label: null }, error: null },
+        { data: cachedExternalFoodRow, error: null }, // the refresh's upsert, once it lands
+      ]);
+      const provider = mockProvider({
+        getFoodByBarcode: jest.fn(
+          () => new Promise<NormalizedFood>((resolve) => (answer = resolve)),
+        ),
+      });
+      const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+      const scan = service.getByBarcode('0066721016123', USER_ID);
+      await jest.advanceTimersByTimeAsync(BARCODE_REFRESH_BUDGET_MS);
+
+      expect(await scan).toMatchObject({ id: 'food-2', servingLabel: null });
+
+      // The provider answers later: the row is still refreshed for the next scan.
+      answer(normalizedOreo);
+      await jest.runAllTimersAsync();
+      expect(instances[1]!.calls.upsert).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("never re-reads the provider for the user's own food or a seeded one, which have no provider wording", async () => {
