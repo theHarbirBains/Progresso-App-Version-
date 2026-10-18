@@ -54,18 +54,18 @@ describe('isValidWeightIncrement', () => {
     expect(isValidWeightIncrement(100)).toBe(true);
   });
 
-  it('accepts .5 increments', () => {
+  it('accepts steps of 0.25 -- 61.25 kg with 1.25 kg plates, fractional plates', () => {
     expect(isValidWeightIncrement(1.5)).toBe(true);
     expect(isValidWeightIncrement(2.5)).toBe(true);
     expect(isValidWeightIncrement(100.5)).toBe(true);
+    expect(isValidWeightIncrement(61.25)).toBe(true);
+    expect(isValidWeightIncrement(100.75)).toBe(true);
   });
 
   it('rejects arbitrary decimal precision', () => {
     expect(isValidWeightIncrement(1.1)).toBe(false);
-    expect(isValidWeightIncrement(1.25)).toBe(false);
-    expect(isValidWeightIncrement(1.75)).toBe(false);
-    expect(isValidWeightIncrement(100.25)).toBe(false);
-    expect(isValidWeightIncrement(100.75)).toBe(false);
+    expect(isValidWeightIncrement(100.3)).toBe(false);
+    expect(isValidWeightIncrement(100.125)).toBe(false);
   });
 
   it('rejects non-finite values', () => {
@@ -81,10 +81,21 @@ describe('isValidWeightIncrement', () => {
 });
 
 describe('formatWeight / formatWeightKg', () => {
-  it('shows a whole number as-is and anything else with one decimal', () => {
+  it('shows a weight as entered, in steps of 0.25, with no trailing zero', () => {
     expect(formatWeight(100)).toBe('100');
     expect(formatWeight(102.5)).toBe('102.5');
-    expect(formatWeight(102.25)).toBe('102.3');
+    expect(formatWeight(102.25)).toBe('102.25');
+    expect(formatWeight(61.25)).toBe('61.25');
+  });
+
+  it('shows a converted measurement, which is no entry step, with one decimal', () => {
+    // An 80 kg body weight is 176.37 lb.
+    expect(formatWeightKg(80, 'lb')).toBe('176.4');
+  });
+
+  it('shows a quarter-step lb weight exactly after the kg round trip', () => {
+    // 52.25 lb is stored as 23.70 kg, which reads back as 52.2498 lb.
+    expect(formatWeightKg(23.7, 'lb')).toBe('52.25');
   });
 
   it('never shows a trailing .0 -- a value that rounds to a whole number is a whole number', () => {

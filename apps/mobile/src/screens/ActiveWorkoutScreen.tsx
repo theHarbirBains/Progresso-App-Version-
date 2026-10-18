@@ -291,7 +291,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
 
     const draft = setInputs[set.id];
     if (!isValidDraft(draft)) {
-      return { ok: false, error: 'Enter a valid weight (whole number or .5) and rep count' };
+      return { ok: false, error: 'Enter a valid weight (in steps of 0.25) and rep count' };
     }
     const weightKg = roundWeight(toKg(Number(draft.weight), weightUnit));
     const reps = Math.trunc(Number(draft.reps));
@@ -336,7 +336,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       const leftDraft = setInputs[left.id];
       const rightDraft = setInputs[right.id];
       if (!isValidDraft(leftDraft) || !isValidDraft(rightDraft)) {
-        setError('Enter a valid weight (whole number or .5) and rep count for both sides');
+        setError('Enter a valid weight (in steps of 0.25) and rep count for both sides');
         return;
       }
     }

@@ -286,13 +286,28 @@ describe('ActiveWorkoutScreen', () => {
     ).toBe(false);
   });
 
-  it('rejects arbitrary decimal precision -- only whole numbers or .5 increments are a valid weight', async () => {
+  it('accepts weights in steps of 0.25, such as 61.25 with 1.25 kg plates', async () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
     });
     await screen.findByTestId('exercise-card-we1');
 
-    for (const invalid of ['100.1', '100.25', '100.75']) {
+    for (const valid of ['61.25', '100.75']) {
+      fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), valid);
+      fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '6');
+      expect(
+        screen.getByTestId('exercise-card-we1-set-s2-complete').props.accessibilityState.disabled,
+      ).toBe(false);
+    }
+  });
+
+  it('rejects arbitrary decimal precision -- only steps of 0.25 are a valid weight', async () => {
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    for (const invalid of ['100.1', '100.3', '100.125']) {
       fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), invalid);
       fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '6');
       expect(

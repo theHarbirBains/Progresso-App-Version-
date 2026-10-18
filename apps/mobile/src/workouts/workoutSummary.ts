@@ -1,4 +1,4 @@
-import { fromKg } from '../lib/units';
+import { fromKg, snapToWeightStep } from '../lib/units';
 import { completedSetsOnly } from './setCompletion';
 import type { WorkoutExerciseWithSets } from './workoutQueries';
 
@@ -22,34 +22,24 @@ export function setVolumeKg(set: { weightKg: number; reps: number }): number {
 }
 
 /**
- * Every weight a user can enter is a whole number or a .5 in its own unit
- * (isValidWeightIncrement). Storage rounds kg to 2dp, which moves a pound
- * weight by at most ~0.01 lb -- far less than the 0.25 lb it takes to reach
- * the next half -- so snapping to the nearest .5 recovers exactly what was
- * entered.
- */
-export function snapToHalf(value: number): number {
-  return Math.round(value * 2) / 2;
-}
-
-/**
  * Volume in the user's display unit: each set's weight snapped to its entry
- * increment, times reps, summed. For real entries the result is always a
- * whole number or a .5, never a storage rounding artifact like 3149.9 lb.
+ * step (snapToWeightStep), times reps, summed. For real entries the result is
+ * always a multiple of the step, never a storage rounding artifact like
+ * 3149.9 lb.
  */
 export function volumeInUnit(
   sets: { weightKg: number; reps: number }[],
   unit: 'kg' | 'lb',
 ): number {
-  return sets.reduce((sum, set) => sum + snapToHalf(fromKg(set.weightKg, unit)) * set.reps, 0);
+  return sets.reduce(
+    (sum, set) => sum + snapToWeightStep(fromKg(set.weightKg, unit)) * set.reps,
+    0,
+  );
 }
 
-/** A volume that is a whole number or .5: "3,150" or "3,150.5". */
+/** A volume as a multiple of the entry step: "3,150", "3,150.5" or "3,150.25". */
 export function formatVolume(value: number): string {
-  const snapped = snapToHalf(value);
-  return Number.isInteger(snapped)
-    ? snapped.toLocaleString()
-    : snapped.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return snapToWeightStep(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 export function computeTotalVolumeKg(exercises: WorkoutExerciseWithSets[]): number {

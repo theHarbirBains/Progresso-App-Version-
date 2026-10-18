@@ -129,9 +129,9 @@ describe('volumeInUnit / formatVolume', () => {
   const KG_PER_LB = 0.45359237;
   const storeLb = (lb: number) => Math.round(lb * KG_PER_LB * 100) / 100;
 
-  it('recovers the exact pound volume for every valid entry (whole or .5) at every rep count', () => {
-    for (let half = 1; half <= 1000; half++) {
-      const lb = half / 2;
+  it('recovers the exact pound volume for every valid entry (steps of 0.25) at every rep count', () => {
+    for (let quarter = 1; quarter <= 2000; quarter++) {
+      const lb = quarter / 4;
       for (const reps of [1, 5, 8, 10, 12, 20]) {
         const exact = lb * reps;
         const got = volumeInUnit([{ weightKg: storeLb(lb), reps }], 'lb');
@@ -163,6 +163,11 @@ describe('volumeInUnit / formatVolume', () => {
     ];
     const sets = entries.map(([lb, reps]) => ({ weightKg: storeLb(lb), reps }));
     expect(volumeInUnit(sets, 'lb')).toBe(24300);
+  });
+
+  it('shows a quarter-step total exactly', () => {
+    expect(formatVolume(1507.25)).toBe('1,507.25');
+    expect(formatVolume(1507.75)).toBe('1,507.75');
   });
 
   it('keeps a .5 total as .5', () => {

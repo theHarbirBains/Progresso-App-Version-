@@ -3,7 +3,7 @@ import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
-import { fromKg, roundWeight } from '../lib/units';
+import { formatWeightKg, fromKg } from '../lib/units';
 import { withAlpha } from '../theme/accentColor';
 import type { RootStackScreenProps } from '../navigation/types';
 import type {
@@ -41,8 +41,7 @@ interface Props {
 }
 
 function formatWeight(kg: number, unit: 'kg' | 'lb'): string {
-  const value = roundWeight(fromKg(kg, unit));
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return formatWeightKg(kg, unit);
 }
 
 function formatVolume(kg: number, unit: 'kg' | 'lb'): string {

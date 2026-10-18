@@ -332,7 +332,7 @@ export function GroupWorkoutEditor({
     }
     const draft = setInputs[set.id];
     if (!isValidDraft(draft)) {
-      setError('Enter a valid weight (whole number or .5) and rep count');
+      setError('Enter a valid weight (in steps of 0.25) and rep count');
       return;
     }
     await change(() =>
@@ -351,7 +351,7 @@ export function GroupWorkoutEditor({
     if (!left || !right) return;
     const reopening = left.completedAt !== null || right.completedAt !== null;
     if (!reopening && (!isValidDraft(setInputs[left.id]) || !isValidDraft(setInputs[right.id]))) {
-      setError('Enter a valid weight (whole number or .5) and rep count for both sides');
+      setError('Enter a valid weight (in steps of 0.25) and rep count for both sides');
       return;
     }
     await change(async () => {
