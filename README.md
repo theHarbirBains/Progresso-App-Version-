@@ -11,6 +11,7 @@ Most workout-logging apps either bury progress data in raw tables or estimate it
 - **Top sets** — the heaviest weight completed for an exercise within a single workout.
 - **Rep-count PRs** — the heaviest weight ever logged for an exercise at a specific rep count.
 - **True 1-Rep Max** — recorded only from an actual logged set of exactly 1 rep, never estimated from higher-rep sets.
+- **Bodyweight and timed exercises** — a bodyweight exercise (Push-Up, Pull-Up) records reps only and keeps its most reps; a timed one (Plank, Dead Hang) records a time and keeps its longest. A weighted variant (Weighted Pull-Up) is its own weighted exercise. Weight-based numbers — volume, top sets, rep PRs, 1RMs — only ever come from weighted sets.
 
 A user creates a workout split (or starts from a preset), logs sets during a live workout, and the app derives history, personal records, and strength trends from that logged data — per exercise and per muscle group. Every user's data is isolated at the database level via Postgres Row-Level Security, not just hidden in the UI.
 
@@ -31,7 +32,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Workouts**
 
 - Create, edit, view, duplicate, and delete workout splits, including a set of built-in split presets (e.g. Push/Pull/Legs) that can be copied into an editable, user-owned split
-- Live workout tracking: log exercises, sets, reps, and weight against a split in progress, with a running workout timer and each exercise's last session shown above its sets
+- Live workout tracking: log exercises, sets, reps, and weight (or reps alone for a bodyweight exercise, or a time like 45 or 1:30 for a timed one) against a split in progress, with a running workout timer and each exercise's last session shown above its sets
 - New sets start filled in from the set before them, or the same set from last session, ready to edit; a set only completes when you tap it
 - Unilateral exercises are logged per side, left and right
 - Group workouts: start a group from a workout; each person has their own tab of sets, and anyone in the group can enter them
@@ -42,7 +43,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Progress & analytics**
 
 - A Progress tab with Overview, Top Sets, Strength and All Time sections
-- Per-exercise and lifetime top sets, rep-count PRs, and true 1RM tracking (1RM is only ever recorded from an actual 1-rep set)
+- Per-exercise and lifetime top sets, rep-count PRs, and true 1RM tracking (1RM is only ever recorded from an actual 1-rep set), plus most reps and longest time for bodyweight and timed exercises
 - Strength trend charts and progress metrics per exercise
 - Muscle-group visualization based on which exercises the user has actually logged
 
@@ -161,7 +162,7 @@ Authentication is issued by Supabase Auth; the mobile app holds the session, and
 
 ## Testing
 
-- **Mobile:** 223 test files in `apps/mobile` (Jest + `jest-expo` + React Native Testing Library), covering screens, components, and business logic (query builders, PR/1RM calculations, progressive-overload logic, calendar/date logic).
+- **Mobile:** 226 test files in `apps/mobile` (Jest + `jest-expo` + React Native Testing Library), covering screens, components, and business logic (query builders, PR/1RM calculations, progressive-overload logic, calendar/date logic).
 - **Backend:** 27 unit-test (`.spec.ts`) files alongside their modules, plus 6 end-to-end suites under `apps/api/test` (auth/authorization, exercises, observability, RevenueCat webhook, user profile, and a general app smoke test) using Supertest against a mocked Supabase layer.
 - **Database:** `npm run db:test` applies every migration to a real, ephemeral, local Postgres instance (via the `embedded-postgres` package — no Docker or live Supabase project required) and runs correctness/security tests against it, including RLS isolation checks.
 - Run everything: `npm run test:api` (backend unit tests), `npm run test:e2e --workspace apps/api` (backend end-to-end tests), `npm run test --workspace apps/mobile` (mobile tests), `npm run db:test` (database tests).
