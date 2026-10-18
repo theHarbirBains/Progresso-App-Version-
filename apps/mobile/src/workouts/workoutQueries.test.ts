@@ -823,6 +823,7 @@ describe('fetchPreviousPerformance', () => {
       sets: {
         data: [
           {
+            workout_exercise_id: 'we-new',
             id: 's1',
             set_index: 1,
             side: 'none',
@@ -867,6 +868,7 @@ describe('fetchPreviousPerformance', () => {
       sets: {
         data: [
           {
+            workout_exercise_id: 'we-bss',
             id: 's-left',
             set_index: 1,
             side: 'left',
@@ -875,6 +877,7 @@ describe('fetchPreviousPerformance', () => {
             completed_at: '2026-01-05T00:05:00Z',
           },
           {
+            workout_exercise_id: 'we-bss',
             id: 's-right',
             set_index: 1,
             side: 'right',
@@ -909,6 +912,64 @@ describe('fetchPreviousPerformance', () => {
         completedAt: '2026-01-05T00:06:00Z',
       },
     ]);
+  });
+
+  it('passes over a newer session where the exercise was skipped, to the last time it was done', async () => {
+    mockTables({
+      workout_exercises: {
+        data: [
+          {
+            id: 'we-done',
+            workout_id: 'w-done',
+            workouts: { performed_at: '2026-01-01T00:00:00Z', deleted_at: null },
+          },
+          {
+            id: 'we-skipped',
+            workout_id: 'w-skipped',
+            workouts: { performed_at: '2026-01-10T00:00:00Z', deleted_at: null },
+          },
+        ],
+        error: null,
+      },
+      // Only the older session has a completed set.
+      sets: {
+        data: [
+          {
+            workout_exercise_id: 'we-done',
+            id: 's1',
+            set_index: 1,
+            side: 'none',
+            weight_kg: '100.00',
+            reps: 8,
+            completed_at: '2026-01-01T00:05:00Z',
+          },
+        ],
+        error: null,
+      },
+    });
+
+    const result = await fetchPreviousPerformance('user-1', 'ex1', 'w-current');
+
+    expect(result?.performedAt).toBe('2026-01-01T00:00:00Z');
+    expect(result?.sets.map((set) => set.id)).toEqual(['s1']);
+  });
+
+  it('returns null when no past session has a completed set', async () => {
+    mockTables({
+      workout_exercises: {
+        data: [
+          {
+            id: 'we1',
+            workout_id: 'w1',
+            workouts: { performed_at: '2026-01-01T00:00:00Z', deleted_at: null },
+          },
+        ],
+        error: null,
+      },
+      sets: { data: [], error: null },
+    });
+
+    expect(await fetchPreviousPerformance('user-1', 'ex1', 'w-current')).toBeNull();
   });
 
   it('only selects already-completed sets from the previous occurrence', async () => {

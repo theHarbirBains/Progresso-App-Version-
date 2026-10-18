@@ -549,8 +549,8 @@ export async function deleteSet(setId: string): Promise<void> {
 }
 
 /**
- * The most recent past occurrence of this exercise (excluding the workout
- * currently being logged), with its sets -- the Phase 3 foundation for
+ * The most recent past occurrence of this exercise that has any completed sets
+ * (excluding the workout currently being logged), with those sets -- the Phase 3 foundation for
  * "previous performance". Deliberately raw sets only, never rep_prs/
  * one_rep_maxes: those tables already exist and are already correctly
  * maintained, but surfacing them is explicitly deferred to the Phase 4 PR
@@ -586,12 +586,15 @@ export async function fetchPreviousPerformance(
     (a, b) =>
       new Date(b.workouts!.performed_at).getTime() - new Date(a.workouts!.performed_at).getTime(),
   );
-  const mostRecent = qualifying[0];
 
+  // The candidates' sets in one read (at most 50 ids, so one short request).
   const { data: sets, error: setsError } = await supabase
     .from('sets')
-    .select('id, set_index, side, weight_kg, reps, completed_at')
-    .eq('workout_exercise_id', mostRecent.id)
+    .select('id, workout_exercise_id, set_index, side, weight_kg, reps, completed_at')
+    .in(
+      'workout_exercise_id',
+      qualifying.map((c) => c.id),
+    )
     .is('deleted_at', null)
     // "Previous performance" only ever means real, logged history -- never
     // a set that was left blank/incomplete in that past workout.
@@ -599,9 +602,20 @@ export async function fetchPreviousPerformance(
     .order('set_index', { ascending: true });
   if (setsError) throw new Error(setsError.message);
 
+  // The newest session that has a completed set. One where the exercise was added
+  // but skipped is passed over, so "last time" reaches back to when it was done.
+  const setsByWorkoutExercise = new Map<string, NonNullable<typeof sets>>();
+  for (const set of sets ?? []) {
+    const list = setsByWorkoutExercise.get(set.workout_exercise_id) ?? [];
+    list.push(set);
+    setsByWorkoutExercise.set(set.workout_exercise_id, list);
+  }
+  const mostRecent = qualifying.find((c) => setsByWorkoutExercise.has(c.id));
+  if (!mostRecent) return null;
+
   return {
     performedAt: mostRecent.workouts!.performed_at,
-    sets: (sets ?? []).map((s) => ({
+    sets: setsByWorkoutExercise.get(mostRecent.id)!.map((s) => ({
       id: s.id,
       setIndex: s.set_index,
       side: fromDbSide(s.side),
