@@ -116,3 +116,50 @@ export async function fetchMyOpenLiveSessions(trainerId: string): Promise<Traine
     startedAt: row.performed_at,
   }));
 }
+
+/** One of a trainer's clients, as the Activity feed needs them. */
+export interface ActivityClient {
+  clientId: string;
+  name: string;
+}
+
+/** A client's finished workout, with whose it is. */
+export interface ClientActivityItem {
+  clientId: string;
+  clientName: string;
+  workout: EnrichedWorkoutSummary;
+}
+
+/** How many of each client's latest workouts are read, and how many the feed shows. */
+export const ACTIVITY_PER_CLIENT = 5;
+export const ACTIVITY_LIMIT = 30;
+
+/**
+ * The trainer's Activity feed: every client's latest finished workouts, newest first,
+ * in the same shape Feed shows its own (the same history query and enrichment). A
+ * client whose workouts can't be read (a link that just ended) is left out rather than
+ * failing the whole feed. The trainer RLS policies decide what comes back.
+ */
+export async function fetchClientsActivity(
+  clients: ActivityClient[],
+): Promise<ClientActivityItem[]> {
+  const perClient = await Promise.allSettled(
+    clients.map(async (client) => {
+      const { rows } = await fetchWorkoutHistory(client.clientId, 0, ACTIVITY_PER_CLIENT);
+      return rows.map((row) => ({ client, row }));
+    }),
+  );
+  const latest = perClient
+    .flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
+    .filter(({ row }) => row.completedAt !== null)
+    .sort((a, b) => new Date(b.row.performedAt).getTime() - new Date(a.row.performedAt).getTime())
+    .slice(0, ACTIVITY_LIMIT);
+  if (latest.length === 0) return [];
+
+  const enriched = await enrichWorkoutSummaries(latest.map(({ row }) => row));
+  const byId = new Map(enriched.map((workout) => [workout.id, workout]));
+  return latest.flatMap(({ client, row }) => {
+    const workout = byId.get(row.id);
+    return workout ? [{ clientId: client.clientId, clientName: client.name, workout }] : [];
+  });
+}

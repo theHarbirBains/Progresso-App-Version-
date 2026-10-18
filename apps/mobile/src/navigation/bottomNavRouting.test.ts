@@ -36,14 +36,15 @@ describe('routeToBottomNavTab', () => {
 });
 
 describe('routeToBottomNavTab -- the Trainer Workspace', () => {
-  it('highlights no tab on a trainer page -- they belong to none of the five', () => {
-    for (const route of [
-      'TrainerClients',
-      'TrainerClientDetail',
-      'TrainerClientForm',
-      'TrainerLiveWorkout',
-    ]) {
-      expect(routeToBottomNavTab(route)).toBeNull();
-    }
+  it("files a trainer page under the Trainer Workspace's own tabs", () => {
+    expect(routeToBottomNavTab('TrainerClients')).toBe('clients');
+    expect(routeToBottomNavTab('TrainerClientDetail')).toBe('clients');
+    expect(routeToBottomNavTab('TrainerClientForm')).toBe('clients');
+    expect(routeToBottomNavTab('TrainerEditClient')).toBe('clients');
+    expect(routeToBottomNavTab('TrainerClaimCode')).toBe('clients');
+    expect(routeToBottomNavTab('TrainerActivity')).toBe('activity');
+    expect(routeToBottomNavTab('TrainerSessions')).toBe('sessions');
+    expect(routeToBottomNavTab('TrainerLogWorkout')).toBe('sessions');
+    expect(routeToBottomNavTab('TrainerLiveWorkout')).toBe('sessions');
   });
 });

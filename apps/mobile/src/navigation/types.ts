@@ -35,6 +35,10 @@ export type RootStackParamList = {
   /** The same form as TrainerClientForm, editing one managed client's details. */
   TrainerEditClient: { clientId: string };
   TrainerClientDetail: { clientId: string; clientName?: string };
+  /** The Trainer Workspace's Activity tab: every client's latest finished workouts, newest first. */
+  TrainerActivity: undefined;
+  /** The Trainer Workspace's Sessions tab: live sessions to resume, and Start / Log for each client. */
+  TrainerSessions: undefined;
   TrainerAccess: undefined;
   /** Group workouts: start one, and see the live ones you are in. */
   Groups: undefined;

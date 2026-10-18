@@ -4,7 +4,23 @@ import { GlassBackground } from './GlassBackground';
 import { Text } from './Text';
 import { colors, minTouchTarget, spacing, typeScale } from './theme';
 
-export type BottomNavDestination = 'feed' | 'train' | 'nutrition' | 'progress' | 'you';
+export type BottomNavDestination =
+  | 'feed'
+  | 'train'
+  | 'nutrition'
+  | 'progress'
+  | 'you'
+  // The Trainer Workspace's tabs.
+  | 'clients'
+  | 'activity'
+  | 'sessions';
+
+/** The Trainer Workspace's tabs. Given, the bar shows these three in place of the five personal ones. */
+export interface TrainerTabs {
+  onNavigateClients: () => void;
+  onNavigateActivity: () => void;
+  onNavigateSessions: () => void;
+}
 
 interface NavItem {
   destination: BottomNavDestination;
@@ -17,8 +33,10 @@ interface NavItem {
 }
 
 interface Props {
-  /** The tab of the page you're on, or null on a page that belongs to none (the Trainer Workspace). */
+  /** The tab of the page you're on, or null on a page that belongs to none. */
   active: BottomNavDestination | null;
+  /** The Trainer Workspace: its three tabs replace the five, and the bar's top edge turns amber. */
+  trainerTabs?: TrainerTabs;
   onNavigateFeed: () => void;
   onNavigateTrain: () => void;
   onNavigateNutrition: () => void;
@@ -31,6 +49,33 @@ interface Props {
   paddingBottom: number;
   onLayout?: (event: LayoutChangeEvent) => void;
   testID?: string;
+}
+
+/** The Trainer Workspace's three tabs: a group for Clients, a pulse for Activity, a clock for Sessions. */
+function trainerItems(tabs: TrainerTabs): NavItem[] {
+  return [
+    {
+      destination: 'clients',
+      testID: 'bottom-nav-clients',
+      label: 'Clients',
+      icon: 'users',
+      onPress: tabs.onNavigateClients,
+    },
+    {
+      destination: 'activity',
+      testID: 'bottom-nav-activity',
+      label: 'Activity',
+      icon: 'activity',
+      onPress: tabs.onNavigateActivity,
+    },
+    {
+      destination: 'sessions',
+      testID: 'bottom-nav-sessions',
+      label: 'Sessions',
+      icon: 'clock',
+      onPress: tabs.onNavigateSessions,
+    },
+  ];
 }
 
 /**
@@ -51,11 +96,17 @@ interface Props {
  * mode-agnostic tabs (Feed/Progress/You) use `neutralAccentColor` --
  * whichever of the two you were most recently in.
  *
+ * In a trainer's Trainer Workspace (`trainerTabs`) the five become that
+ * workspace's three -- Clients, Activity, Sessions -- in the same places and
+ * style, and the bar's top edge is a thin line of the accent, so a glance at
+ * the bottom of the screen says which workspace you're in.
+ *
  * Navigation UI only: it calls back, it does not navigate. It is not a second
  * navigation system on top of the single stack navigator.
  */
 export function BottomNavBar({
   active,
+  trainerTabs,
   onNavigateFeed,
   onNavigateTrain,
   onNavigateNutrition,
@@ -68,7 +119,7 @@ export function BottomNavBar({
   onLayout,
   testID,
 }: Props) {
-  const items: NavItem[] = [
+  const personal: NavItem[] = [
     {
       destination: 'feed',
       testID: 'bottom-nav-feed',
@@ -107,11 +158,16 @@ export function BottomNavBar({
       onPress: onNavigateYou,
     },
   ];
+  const items = trainerTabs ? trainerItems(trainerTabs) : personal;
 
   return (
     <View
       testID={testID ?? 'bottom-nav-bar'}
-      style={[styles.bar, { paddingBottom }]}
+      style={[
+        styles.bar,
+        { paddingBottom },
+        trainerTabs ? { borderTopColor: neutralAccentColor } : null,
+      ]}
       onLayout={onLayout}
       accessibilityRole="tablist"
     >

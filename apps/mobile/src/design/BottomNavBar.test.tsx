@@ -139,3 +139,55 @@ describe('BottomNavBar accessibility and touch targets', () => {
     expect(StyleSheet.flatten(label.props.style).color).toBe('#10B981');
   });
 });
+
+describe('BottomNavBar in the Trainer Workspace', () => {
+  const trainerTabs = {
+    onNavigateClients: jest.fn(),
+    onNavigateActivity: jest.fn(),
+    onNavigateSessions: jest.fn(),
+  };
+
+  it("shows the workspace's three tabs -- Clients, Activity, Sessions -- in place of the five", () => {
+    render(<BottomNavBar {...baseProps} active="clients" trainerTabs={trainerTabs} />);
+
+    expect(screen.getByTestId('bottom-nav-clients')).toHaveTextContent(/Clients/);
+    expect(screen.getByTestId('bottom-nav-activity')).toHaveTextContent(/Activity/);
+    expect(screen.getByTestId('bottom-nav-sessions')).toHaveTextContent(/Sessions/);
+    for (const id of [
+      'bottom-nav-feed',
+      'bottom-nav-train',
+      'bottom-nav-nutrition',
+      'bottom-nav-progress',
+      'bottom-nav-you',
+    ]) {
+      expect(screen.queryByTestId(id)).toBeNull();
+    }
+  });
+
+  it('opens each tab, and marks the current one in the accent', () => {
+    render(<BottomNavBar {...baseProps} active="sessions" trainerTabs={trainerTabs} />);
+
+    expect(screen.getByTestId('bottom-nav-sessions').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('bottom-nav-clients').props.accessibilityState.selected).toBe(false);
+    const label = within(screen.getByTestId('bottom-nav-sessions')).getByText('Sessions');
+    expect(StyleSheet.flatten(label.props.style).color).toBe('#2F80FF');
+
+    fireEvent.press(screen.getByTestId('bottom-nav-clients'));
+    expect(trainerTabs.onNavigateClients).toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('bottom-nav-activity'));
+    expect(trainerTabs.onNavigateActivity).toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('bottom-nav-sessions'));
+    expect(trainerTabs.onNavigateSessions).toHaveBeenCalled();
+  });
+
+  it("draws the bar's top edge in the accent -- only in the Trainer Workspace", () => {
+    const { rerender } = render(
+      <BottomNavBar {...baseProps} active="clients" trainerTabs={trainerTabs} />,
+    );
+    const edge = () => StyleSheet.flatten(screen.getByTestId('bottom-nav-bar').props.style);
+    expect(edge().borderTopColor).toBe('#2F80FF');
+
+    rerender(<BottomNavBar {...baseProps} active="feed" />);
+    expect(edge().borderTopColor).not.toBe('#2F80FF');
+  });
+});

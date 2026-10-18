@@ -102,15 +102,17 @@ export const APP_MENU_FOOTER_ITEM: AppMenuItem = {
 
 /**
  * The side menu while a trainer is in their Trainer Workspace (see
- * workspace/WorkspaceContext.tsx): their clients, and adding one. Their own
- * workouts, nutrition and the rest are back in My Workspace -- the switcher, or
- * any bottom tab, takes them there.
+ * workspace/WorkspaceContext.tsx): its three tabs' pages, and adding a client.
+ * Their own workouts, nutrition and the rest are back in My Workspace -- the
+ * switcher at the top of each page takes them there.
  */
 export const TRAINER_MENU_SECTIONS: AppMenuSection[] = [
   {
     title: 'TRAINER',
     items: [
       { route: 'TrainerClients', label: 'Clients', icon: 'users' },
+      { route: 'TrainerActivity', label: 'Activity', icon: 'activity' },
+      { route: 'TrainerSessions', label: 'Sessions', icon: 'clock' },
       { route: 'TrainerClientForm', label: 'Add Client', icon: 'user-plus' },
     ],
   },

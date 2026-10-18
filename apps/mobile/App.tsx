@@ -64,7 +64,9 @@ import { TrainerLiveWorkoutScreen } from './src/screens/TrainerLiveWorkoutScreen
 import { TrainerClaimCodeScreen } from './src/screens/TrainerClaimCodeScreen';
 import { TrainerClientDetailScreen } from './src/screens/TrainerClientDetailScreen';
 import { TrainerClientFormScreen } from './src/screens/TrainerClientFormScreen';
+import { TrainerActivityScreen } from './src/screens/TrainerActivityScreen';
 import { TrainerClientsScreen } from './src/screens/TrainerClientsScreen';
+import { TrainerSessionsScreen } from './src/screens/TrainerSessionsScreen';
 import { useTrainerStatus } from './src/trainer/useTrainerStatus';
 import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
@@ -240,12 +242,21 @@ function Root() {
     () => ({ workspace, isTrainer, switchTo: switchWorkspace }),
     [workspace, isTrainer, switchWorkspace],
   );
-  // A bottom tab is always your own app, so it brings you back to My Workspace.
+  // A personal bottom tab is always your own app, so it brings you back to My Workspace.
+  // (In the Trainer Workspace the bar shows that workspace's own tabs instead -- below.)
   const openTab = useCallback(
     (route: keyof RootStackParamList) => {
       setWorkspaceChoice('personal');
       openSection(route);
     },
+    [openSection],
+  );
+  const trainerTabs = useMemo(
+    () => ({
+      onNavigateClients: () => openSection('TrainerClients'),
+      onNavigateActivity: () => openSection('TrainerActivity'),
+      onNavigateSessions: () => openSection('TrainerSessions'),
+    }),
     [openSection],
   );
   // What pages last showed (lib/lastShown.ts) never outlives the session.
@@ -404,6 +415,8 @@ function Root() {
                   <Stack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
                   <Stack.Screen name="TrainerEditClient" component={TrainerClientFormScreen} />
                   <Stack.Screen name="TrainerClientDetail" component={TrainerClientDetailScreen} />
+                  <Stack.Screen name="TrainerActivity" component={TrainerActivityScreen} />
+                  <Stack.Screen name="TrainerSessions" component={TrainerSessionsScreen} />
                   <Stack.Screen name="FindPeople" component={FindPeopleScreen} />
                   <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 </Stack.Navigator>
@@ -429,6 +442,7 @@ function Root() {
                   onNavigateNutrition={() => openTab('Nutrition')}
                   onNavigateProgress={() => openTab('ProgressOverview')}
                   onNavigateYou={() => openTab('Profile')}
+                  trainerTabs={workspace === 'trainer' ? trainerTabs : undefined}
                 />
               </View>
             ) : null}

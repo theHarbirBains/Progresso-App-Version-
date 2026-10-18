@@ -84,10 +84,12 @@ describe('APP_MENU_FOOTER_ITEM', () => {
 });
 
 describe('TRAINER_MENU_SECTIONS', () => {
-  it("is the side menu in the Trainer Workspace: the trainer's clients, and adding one", () => {
+  it("is the side menu in the Trainer Workspace: its three tabs' pages, and adding a client", () => {
     const items = TRAINER_MENU_SECTIONS.flatMap((section) => section.items);
     expect(items.map((item) => ('route' in item ? item.route : null))).toEqual([
       'TrainerClients',
+      'TrainerActivity',
+      'TrainerSessions',
       'TrainerClientForm',
     ]);
   });
