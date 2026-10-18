@@ -1,11 +1,9 @@
 import { StyleSheet } from 'react-native';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 
-const INDEX_RAIL_WIDTH = 20;
-
 // FoodLibraryScreen. Token-only. The frame (safe area, fixed header, transparent
 // root) is the shared `Screen` and each food is a `ListRow`, so this holds only
-// the controls block above the list and the row/rail geometry.
+// the controls block above the list and the row geometry.
 export const foodLibraryStyles = StyleSheet.create({
   flex: {
     flex: 1,
@@ -44,8 +42,9 @@ export const foodLibraryStyles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
 
-  listContent: {
-    paddingRight: INDEX_RAIL_WIDTH,
+  // A letter heading after the first: room above it, so the groups read apart.
+  laterSection: {
+    paddingTop: spacing.lg,
   },
   // A food row: the ListRow (logs it) beside its edit button; consecutive
   // rows in a section are separated by a hairline across both.
@@ -56,13 +55,5 @@ export const foodLibraryStyles = StyleSheet.create({
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.divider,
-  },
-
-  indexRailWrap: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
 });

@@ -204,21 +204,23 @@ describe('FoodLibraryScreen', () => {
     expect(mockFetchAllFoods).toHaveBeenCalledWith(expect.objectContaining({ ascending: false }));
   });
 
-  it("jumps to a letter's section when its index-rail entry is pressed", async () => {
+  it('has no A-Z rail -- a heading only for each letter that has foods', async () => {
     renderScreen();
     await screen.findByTestId('food-item-food-apple');
 
-    // Only asserts the rail is wired up and doesn't throw -- SectionList's
-    // own scrollToLocation isn't meaningfully observable in this test
-    // environment (no real layout/scroll measurements).
-    expect(() => fireEvent.press(screen.getByTestId('food-library-index-B'))).not.toThrow();
+    expect(screen.queryByTestId('food-library-index')).toBeNull();
+    expect(
+      screen.getAllByTestId(/^food-library-section-/).map((node) => node.props.testID),
+    ).toEqual(['food-library-section-A', 'food-library-section-B']);
+    expect(screen.queryByTestId('food-library-section-Z')).toBeNull();
   });
 
-  it('does not call onSelect for a letter with no foods', async () => {
+  it('scrolls the letter headings with their foods, rather than pinning them', async () => {
     renderScreen();
     await screen.findByTestId('food-item-food-apple');
 
-    expect(screen.getByTestId('food-library-index-Z').props.accessibilityState.disabled).toBe(true);
+    // No heading is one the list pins in place (iOS pins them all by default).
+    expect(screen.getByTestId('food-library-list').props.stickyHeaderIndices ?? []).toEqual([]);
   });
 
   it('opens the app-level side menu from the hamburger button, not a back arrow', async () => {
