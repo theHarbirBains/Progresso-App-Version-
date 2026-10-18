@@ -64,6 +64,15 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
         />
       </Section>
 
+      <Section title="Privacy">
+        <ListRow
+          testID="account-blocked-people"
+          icon="slash"
+          title="Blocked People"
+          onPress={() => navigation.navigate('SettingsBlockedPeople')}
+        />
+      </Section>
+
       <Section title="Legal">
         <ComingSoonRow testID="privacy-terms" icon="file-text" title="Terms of Service" />
         <ComingSoonRow testID="privacy-policy" icon="shield" title="Privacy Policy" showDivider />

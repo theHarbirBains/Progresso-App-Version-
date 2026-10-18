@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { fetchActiveWorkout } from '../workouts/workoutQueries';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import * as backdrop from '../design/AppBackgroundLayer';
@@ -7,6 +7,7 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchFeedItems } from '../feed/feedQueries';
 import { fetchFriendsFeed, listFollowNotifications } from '../lib/api';
+import { blockUser } from '../lib/safetyApi';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
@@ -21,6 +22,11 @@ import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
+}));
+
+jest.mock('../lib/safetyApi', () => ({
+  blockUser: jest.fn(),
+  reportUser: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
@@ -616,6 +622,35 @@ describe('FeedScreen -- merged Friends activity', () => {
 
     const card = within(await screen.findByTestId('feed-item-workout-fw1'));
     expect(await card.findByText('Jane Doe')).toBeTruthy();
+  });
+
+  it("offers report and block on a friend's workout, and not on your own", async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
+    renderScreen();
+    await screen.findByTestId('feed-item-workout-fw1');
+
+    expect(screen.queryByTestId('feed-item-workout-w1-more')).toBeNull();
+    fireEvent.press(screen.getByTestId('feed-item-workout-fw1-more'));
+
+    expect(screen.getByTestId('person-actions-report')).toHaveTextContent(/Report Workout/);
+    expect(screen.getByLabelText("More options for Jane Doe's workout")).toBeTruthy();
+  });
+
+  it("takes a blocked friend's workouts off Feed straight away", async () => {
+    (blockUser as jest.Mock).mockResolvedValue({ success: true });
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === 'Block')?.onPress?.();
+    });
+    mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
+    renderScreen();
+    await screen.findByTestId('feed-item-workout-fw1');
+
+    fireEvent.press(screen.getByTestId('feed-item-workout-fw1-more'));
+    fireEvent.press(screen.getByTestId('person-actions-block'));
+
+    await waitFor(() => expect(blockUser).toHaveBeenCalledWith(expect.any(String), 'user-2'));
+    await waitFor(() => expect(screen.queryByTestId('feed-item-workout-fw1')).toBeNull());
   });
 
   it("does not navigate on tap -- a friend's workout isn't the signed-in user's to open", async () => {

@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Avatar } from '../design/Avatar';
 import { Card } from '../design/Card';
 import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
-import { colors } from '../design/theme';
+import { colors, minTouchTarget } from '../design/theme';
 import type { EnrichedWorkoutSummary } from '../workouts/workoutHistoryEnrichment';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
@@ -34,6 +34,8 @@ interface Props {
   timestamp: string;
   weightUnit: 'kg' | 'lb';
   onPress?: () => void;
+  /** Shows a "more" glyph in the byline -- a friend's workout, to report it or block them. */
+  onMore?: () => void;
   /** Extra actions shown under the card, e.g. a trainer's Edit and Delete. Feed passes none. */
   actions?: ReactNode;
 }
@@ -51,6 +53,7 @@ export function WorkoutFeedCard({
   timestamp,
   weightUnit,
   onPress,
+  onMore,
   actions,
 }: Props) {
   return (
@@ -75,6 +78,17 @@ export function WorkoutFeedCard({
             <Text style={styles.metaTimestamp}>{formatCardDate(timestamp)}</Text>
           </View>
         </View>
+        {onMore ? (
+          <TouchableOpacity
+            testID={`${idPrefix}-${workout.id}-more`}
+            onPress={onMore}
+            style={moreStyle}
+            accessibilityRole="button"
+            accessibilityLabel={`More options for ${authorName}'s workout`}
+          >
+            <Feather name="more-horizontal" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <Text style={styles.itemTitle} numberOfLines={1}>
@@ -112,3 +126,13 @@ export function WorkoutFeedCard({
     </Card>
   );
 }
+
+// A bare glyph with a full 44pt target, like the live workout's reorder/remove glyphs. Pulled
+// toward the card's edge so the glyph lines up with its content.
+const moreStyle = {
+  width: minTouchTarget,
+  height: minTouchTarget,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: -12,
+} as const;

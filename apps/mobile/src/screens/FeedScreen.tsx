@@ -20,6 +20,7 @@ import {
   fetchFriendsFeed,
   listFollowNotifications,
   listGroups,
+  type FollowUser,
   type FriendsFeedItem,
   type GroupSummary,
 } from '../lib/api';
@@ -34,6 +35,7 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import { fetchActiveWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
 import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
+import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { LiveNowCard } from '../feed/LiveNowCard';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
@@ -64,6 +66,8 @@ interface DisplayItem {
   authorName: string;
   avatarUrl: string | null;
   onPress?: () => void;
+  /** A friend's workout: report it, or block them. */
+  onMore?: () => void;
   workout: {
     id: string;
     name: string;
@@ -152,6 +156,20 @@ export function FeedScreen({ navigation }: Props) {
   const [friendsItems, setFriendsItems] = useState<FriendsFeedItem[]>(shown.friends?.items ?? []);
   const [friendsPage, setFriendsPage] = useState(0);
   const [friendsHasMore, setFriendsHasMore] = useState(shown.friends?.hasMore ?? false);
+  // A friend's workout whose report/block sheet is open.
+  const [actionsFor, setActionsFor] = useState<{ person: FollowUser; workoutId: string } | null>(
+    null,
+  );
+
+  // Blocking a friend ends following each other, so their workouts leave Feed now, and from
+  // what a reopened Feed starts with.
+  function handleBlocked(blockedId: string) {
+    setFriendsItems((prev) => {
+      const next = prev.filter((item) => item.author.id !== blockedId);
+      rememberShown(userId, 'feed.friends', { items: next, hasMore: friendsHasMore });
+      return next;
+    });
+  }
   const [friendsLoading, setFriendsLoading] = useState(!shown.friends);
   const [friendsLoadingMore, setFriendsLoadingMore] = useState(false);
   const [friendsError, setFriendsError] = useState<string | null>(null);
@@ -415,6 +433,7 @@ export function FeedScreen({ navigation }: Props) {
     authorName:
       item.author.displayName ?? (item.author.username ? `@${item.author.username}` : 'Someone'),
     avatarUrl: item.author.avatarUrl,
+    onMore: () => setActionsFor({ person: item.author, workoutId: item.workout.id }),
     workout: {
       id: item.workout.id,
       name: item.workout.splitDayName ?? item.workout.name,
@@ -674,6 +693,7 @@ export function FeedScreen({ navigation }: Props) {
                   timestamp={item.timestamp}
                   weightUnit={weightUnit}
                   onPress={item.onPress}
+                  onMore={item.onMore}
                 />
               </RiseIn>
             ))}
@@ -688,6 +708,12 @@ export function FeedScreen({ navigation }: Props) {
             ) : null}
           </>
         )}
+        <PersonActionsSheet
+          person={actionsFor?.person ?? null}
+          workoutId={actionsFor?.workoutId}
+          onClose={() => setActionsFor(null)}
+          onBlocked={handleBlocked}
+        />
       </Screen>
     </RiseInGroup>
   );

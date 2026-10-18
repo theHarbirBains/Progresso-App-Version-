@@ -14,3 +14,4 @@ export * from './followsApi';
 export * from './feedApi';
 export * from './trainerApi';
 export * from './groupsApi';
+export * from './safetyApi';

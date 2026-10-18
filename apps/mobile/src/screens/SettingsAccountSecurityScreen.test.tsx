@@ -55,6 +55,14 @@ describe('SettingsAccountSecurityScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('SettingsChangePassword');
   });
 
+  it('opens the people you have blocked', () => {
+    renderScreen();
+
+    fireEvent.press(screen.getByTestId('account-blocked-people'));
+
+    expect(navigation.navigate).toHaveBeenCalledWith('SettingsBlockedPeople');
+  });
+
   it('calls signOut when the sign-out row is pressed', () => {
     const signOut = jest.fn();
     mockUseAuth.mockReturnValue({ user: { id: 'user-1', email: 'athlete@example.com' }, signOut });

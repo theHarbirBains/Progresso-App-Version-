@@ -16,6 +16,7 @@ export type RootStackParamList = {
   SettingsNotifications: undefined;
   SettingsAccountSecurity: undefined;
   SettingsChangePassword: undefined;
+  SettingsBlockedPeople: undefined;
   SettingsSupport: undefined;
   ExerciseLibrary: undefined;
   WorkoutHistory: undefined;

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Share } from 'react-native';
+import { Alert, Share } from 'react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import {
@@ -10,10 +10,16 @@ import {
   sendFollowRequest,
   unfollowUser,
 } from '../lib/api';
+import { blockUser } from '../lib/safetyApi';
 import { FindPeopleScreen } from './FindPeopleScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
+}));
+
+jest.mock('../lib/safetyApi', () => ({
+  blockUser: jest.fn(),
+  reportUser: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
@@ -331,5 +337,45 @@ describe('FindPeopleScreen -- misc', () => {
     fireEvent.press(screen.getByTestId('find-people-tab-requests'));
     await screen.findByTestId('find-people-request-follow-1');
     expectNoBareText();
+  });
+});
+
+describe('FindPeopleScreen -- report and block', () => {
+  it('opens report and block for a person when their row is tapped', async () => {
+    mockListSuggestedUsers.mockResolvedValue([bobResult]);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('find-people-suggested-user-3'));
+
+    expect(screen.getByTestId('person-actions-report')).toHaveTextContent(/Report Bob Smith/);
+    expect(screen.getByTestId('person-actions-block')).toHaveTextContent(/Block Bob Smith/);
+  });
+
+  it('drops a blocked person from the list straight away', async () => {
+    (blockUser as jest.Mock).mockResolvedValue({ success: true });
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === 'Block')?.onPress?.();
+    });
+    mockListSuggestedUsers.mockResolvedValue([bobResult]);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('find-people-suggested-user-3'));
+    fireEvent.press(screen.getByTestId('person-actions-block'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByTestId('find-people-suggested-user-3')).toBeNull();
+    expect(blockUser).toHaveBeenCalledWith('token-123', 'user-3');
+  });
+
+  it('lets you block someone straight from their follow request', async () => {
+    mockListFollowRequests.mockResolvedValue([janeRequest]);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('find-people-tab-requests'));
+    fireEvent.press(await screen.findByTestId('find-people-request-follow-1'));
+
+    expect(screen.getByTestId('person-actions-block')).toHaveTextContent(/Block Jane Doe/);
   });
 });

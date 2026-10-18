@@ -34,6 +34,7 @@ import {
   type FollowUser,
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { findPeopleStyles as styles } from './findPeopleStyles';
 
 type Props = RootStackScreenProps<'FindPeople'>;
@@ -70,6 +71,9 @@ function rowLabel(user: FollowUser): { title: string; subtitle: string | undefin
  * notifications bell (NotificationsScreen) surfaces the same pending
  * requests too, alongside recent acceptances -- that's the quick/recent
  * view; this is the full list, same underlying data.
+ *
+ * Tapping a person opens PersonActionsSheet: report or block them. Blocking
+ * drops them from every list here.
  */
 export function FindPeopleScreen({ navigation }: Props) {
   const { session } = useAuth();
@@ -96,6 +100,15 @@ export function FindPeopleScreen({ navigation }: Props) {
   // disables just the one row's button(s) while its action is in flight,
   // rather than freezing the whole screen.
   const [pending, setPending] = useState<Record<string, boolean>>({});
+
+  // The person whose report/block sheet is open.
+  const [actionsFor, setActionsFor] = useState<FollowUser | null>(null);
+
+  function handleBlocked(userId: string) {
+    setResults((prev) => prev.filter((r) => r.user.id !== userId));
+    setSuggested((prev) => prev.filter((r) => r.user.id !== userId));
+    setRequests((prev) => prev.filter((r) => r.user.id !== userId));
+  }
 
   const loadRequests = useCallback(async () => {
     if (!accessToken) return;
@@ -282,6 +295,8 @@ export function FindPeopleScreen({ navigation }: Props) {
         key={result.user.id}
         testID={`${testIDPrefix}-${result.user.id}`}
         divider={index > 0}
+        onPress={() => setActionsFor(result.user)}
+        accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ''}, report or block`}
         leading={
           <Avatar
             uri={result.user.avatarUrl}
@@ -368,6 +383,8 @@ export function FindPeopleScreen({ navigation }: Props) {
                   key={request.followId}
                   testID={`find-people-request-${request.followId}`}
                   divider={index > 0}
+                  onPress={() => setActionsFor(request.user)}
+                  accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ''}, report or block`}
                   leading={
                     <Avatar
                       uri={request.user.avatarUrl}
@@ -520,6 +537,11 @@ export function FindPeopleScreen({ navigation }: Props) {
           </View>
         </>
       )}
+      <PersonActionsSheet
+        person={actionsFor}
+        onClose={() => setActionsFor(null)}
+        onBlocked={handleBlocked}
+      />
     </Screen>
   );
 }
