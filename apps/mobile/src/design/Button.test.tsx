@@ -191,3 +191,32 @@ describe('TextButton -- destructive', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('Button icon', () => {
+  it('draws an optional glyph before the label, in the label colour, and is still named by the label', () => {
+    render(
+      <PrimaryButton
+        testID="log"
+        label="Log Food"
+        icon="plus"
+        onPress={jest.fn()}
+        accentColor="#E8A657"
+        onAccentColor="#111111"
+      />,
+    );
+
+    const button = screen.getByTestId('log');
+    expect(button.props.accessibilityLabel).toBe('Log Food');
+    expect(within(button).getByText('Log Food')).toBeTruthy();
+    const glyph = within(button).UNSAFE_getByProps({ name: 'plus' });
+    expect(glyph.props.color).toBe('#111111');
+  });
+
+  it('draws no glyph without one', () => {
+    render(<SecondaryButton testID="plain" label="Search Food" onPress={jest.fn()} />);
+
+    expect(within(screen.getByTestId('plain')).UNSAFE_queryAllByProps({ name: 'plus' })).toEqual(
+      [],
+    );
+  });
+});

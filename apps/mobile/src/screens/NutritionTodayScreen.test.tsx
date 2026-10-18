@@ -169,7 +169,42 @@ describe('NutritionTodayScreen', () => {
     ).toHaveTextContent('330');
     expect(screen.getByTestId('nutrition-today-calorie-ring')).toHaveTextContent(/of 2000 cal/);
     expect(screen.getByTestId('calories-remaining')).toHaveTextContent('1670 cal remaining');
-    expect(screen.getByTestId('protein-remaining')).toHaveTextContent('118g remaining');
+    // Each macro: what's been eaten against the target, and a bar of the way there.
+    expect(screen.getByTestId('protein-consumed')).toHaveTextContent('62g');
+    expect(screen.getByTestId('protein-goal')).toHaveTextContent('/ 180g');
+    expect(StyleSheet.flatten(screen.getByTestId('protein-bar').props.style).width).toBe(
+      `${(62 / 180) * 100}%`,
+    );
+    expect(screen.getByTestId('protein-row').props.accessibilityLabel).toBe(
+      'Protein, 62 of 180 grams',
+    );
+    // Daily Targets.
+    expect(screen.getByTestId('target-calories')).toHaveTextContent(/2000/);
+    expect(screen.getByTestId('target-protein')).toHaveTextContent(/180g/);
+  });
+
+  it('fills a macro bar no further than full when the target is passed', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: 2000,
+      proteinG: 50,
+      carbsG: 200,
+      fatG: 60,
+    });
+    renderScreen();
+
+    const bar = await screen.findByTestId('protein-bar');
+    expect(StyleSheet.flatten(bar.props.style).width).toBe('100%');
+  });
+
+  it('shows no target, bar or remaining for a macro with no target, and "—" under Daily Targets', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    renderScreen();
+
+    expect(await screen.findByTestId('protein-consumed')).toHaveTextContent('62g');
+    expect(screen.queryByTestId('protein-goal')).toBeNull();
+    expect(screen.queryByTestId('protein-bar')).toBeNull();
+    expect(screen.getByTestId('target-calories')).toHaveTextContent(/—/);
   });
 
   it('lists each logged food with its snapshot values', async () => {
@@ -231,12 +266,30 @@ describe('NutritionTodayScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
   });
 
-  it('does not show Nutrition Goals or AI Food Search as buttons -- Goals lives in the side menu only, AI Food Search inside Food Library', async () => {
+  it('does not show AI Food Search as a button -- it lives inside Food Library', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
 
-    expect(screen.queryByTestId('nutrition-goals-link')).toBeNull();
     expect(screen.queryByTestId('ai-food-search-button')).toBeNull();
+  });
+
+  it('opens Nutrition History from View All, and Nutrition Goals from Edit Targets', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    fireEvent.press(screen.getByTestId('nutrition-today-view-all'));
+    expect(mockNavigate).toHaveBeenCalledWith('NutritionHistory');
+    fireEvent.press(screen.getByTestId('nutrition-today-edit-targets'));
+    expect(mockNavigate).toHaveBeenCalledWith('NutritionGoals');
+  });
+
+  it('offers to log the first meal when nothing is logged yet -- with no caption under it', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('food-log-empty')).toHaveTextContent('No foods logged today');
+    expect(screen.queryByText(/Start by logging/)).toBeNull();
+    fireEvent.press(screen.getByTestId('food-log-empty-log'));
+    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
   });
 
   it('navigates to the barcode scanner when Scan Barcode is pressed', async () => {
@@ -322,13 +375,19 @@ describe('NutritionTodayScreen background refresh from the shared cache', () => 
 });
 
 describe('NutritionTodayScreen -- widgets, one primary action', () => {
-  it("is three widgets: the macros, the actions and today's foods", async () => {
+  it("is four widgets: today's intake (the hero), the actions, today's foods and the daily targets", async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     renderScreen();
     await screen.findByTestId('food-log-row-log-1');
 
     const cards = screen.UNSAFE_queryAllByType(AppCard);
-    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false]);
+    expect(cards.map((c) => c.props.testID)).toEqual([
+      'nutrition-today-macros',
+      'nutrition-today-actions',
+      'nutrition-today-foods',
+      'nutrition-today-targets',
+    ]);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false]);
     expect(
       within(screen.getByTestId('nutrition-today-foods')).getByTestId('food-log-row-log-1'),
     ).toBeTruthy();

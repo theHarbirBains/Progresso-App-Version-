@@ -1,4 +1,11 @@
-import { ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  ActivityIndicator,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  type TextStyle,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { Text } from './Text';
 import { colors, fonts, minTouchTarget, radii, spacing } from './theme';
 
@@ -14,6 +21,8 @@ interface ButtonProps {
   size?: ButtonSize;
   /** Defaults to the label. Only override when the visible label alone would be ambiguous out of context. */
   accessibilityLabel?: string;
+  /** An optional Feather glyph before the label, in the label's colour. */
+  icon?: keyof typeof Feather.glyphMap;
   testID?: string;
 }
 
@@ -39,6 +48,7 @@ const SIZE_STYLE = {
 const SM_HIT_SLOP = { top: 4, bottom: 4, left: 0, right: 0 } as const;
 
 const LABEL_SIZE = { lg: 16, md: 15, sm: 14 } as const;
+const ICON_SIZE = { lg: 18, md: 17, sm: 16 } as const;
 
 function Frame({
   size = 'lg',
@@ -50,10 +60,11 @@ function Frame({
   disabled,
   loading,
   accessibilityLabel,
+  icon,
   testID,
 }: ButtonProps & {
   variantStyle: object | object[];
-  labelStyle: object;
+  labelStyle: TextStyle;
   spinnerColor: string;
 }) {
   const blocked = Boolean(disabled || loading);
@@ -71,6 +82,11 @@ function Frame({
     >
       {loading ? (
         <ActivityIndicator size="small" color={spinnerColor} />
+      ) : icon ? (
+        <View style={styles.iconRow}>
+          <Feather name={icon} size={ICON_SIZE[size]} color={labelStyle.color as string} />
+          <Text style={[{ fontSize: LABEL_SIZE[size] }, labelStyle]}>{label}</Text>
+        </View>
       ) : (
         <Text style={[{ fontSize: LABEL_SIZE[size] }, labelStyle]}>{label}</Text>
       )}
@@ -167,6 +183,11 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   secondary: {
     borderWidth: 1,

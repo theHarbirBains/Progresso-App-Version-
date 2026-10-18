@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
+import { EmptyState } from '../design/EmptyState';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
+import { SkeletonCards } from '../design/Skeleton';
+import { StatBlock } from '../design/StatBlock';
 import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -22,20 +26,38 @@ type Props = RootStackScreenProps<'Nutrition'>;
 
 const EMPTY_GOALS: NutritionGoals = { calories: null, proteinG: null, carbsG: null, fatG: null };
 
+type MacroKey = 'protein' | 'carbs' | 'fat';
+
+// Each macro's glyph -- the same food-category glyph set as a food's picture
+// (nutrition/foodGlyph.ts), in its quiet raised tile.
+const MACRO_GLYPHS: Record<MacroKey, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  protein: 'food-drumstick-outline',
+  carbs: 'barley',
+  fat: 'water-outline',
+};
+
+function grams(value: number): string {
+  return `${Math.round(value)}g`;
+}
+
 // The Nutrition tab's own root screen (see App.tsx's bottom nav) -- today's
 // intake against the user's targets, with the day's logged foods.
 //
-// Layout: the shared Screen with a hamburger menu, then three widgets `widgetGap` apart:
-// the four macros (what was consumed, against the target when one is set, and
-// what remains); the one filled action -- Log Food -- with Scan Barcode and
-// Search Food as outlined secondaries (two more ways into the same
-// LogFoodStep-backed logging flow); and Today's Foods as rows (the food's
-// picture, its name, the values snapshotted when it was logged, an editable
-// quantity and a quiet Delete). AI Food Search lives inside Food Library
-// itself (Log Food's destination), next to that screen's own "add a food"
-// action, rather than as a fourth peer button here. Nutrition Goals is only
-// in the app-level side menu now (see appMenuSections.ts) -- not duplicated
-// as a button on every screen that touches nutrition.
+// Layout: the shared Screen with a hamburger menu, then four widgets
+// `widgetGap` apart, rising in like every other page's:
+// - **Today** (the hero): the calorie ring and what's left on the left; on the
+//   right, protein / carbs / fat, each with its glyph, what's been eaten against
+//   the target and a thin bar of the way there.
+// - **Actions**: Log Food, the one filled button, with Scan Barcode and Search
+//   Food outlined side by side under it (two more ways into the same
+//   LogFoodStep-backed logging flow). AI Food Search lives inside Food Library
+//   (Log Food's destination) rather than as a fourth button here.
+// - **Today's Foods**, with View All (Nutrition History): each food as a row --
+//   its picture, its name, the values snapshotted when it was logged, an
+//   editable quantity and a quiet Delete -- or, with none yet, a quiet empty
+//   state offering to log the first.
+// - **Daily Targets**, with Edit Targets (Nutrition Goals): the four targets as
+//   stat blocks, "—" for one not set.
 export function NutritionTodayScreen({ navigation }: Props) {
   const { nutritionTheme } = useProgressTheme();
   const { openMenu } = useAppMenu();
@@ -71,6 +93,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
   const consumed = useMemo(() => sumDailyTotals(logs), [logs]);
   const remaining = useMemo(() => calculateRemaining(consumed, goals), [consumed, goals]);
   const displayError = error ?? goalsError ?? logsError;
+  const accent = nutritionTheme.accent;
 
   async function handleUpdateQuantity(log: FoodLogRow) {
     const raw = quantityInputs[log.id];
@@ -97,7 +120,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
   const header = (
     <AppHeader
       testID="nutrition-today-header"
-      title="Nutrition Today"
+      title="Today"
       leftAction={{
         icon: 'menu',
         onPress: () => openMenu(),
@@ -109,44 +132,23 @@ export function NutritionTodayScreen({ navigation }: Props) {
 
   if (goalsLoading || logsLoading) {
     return (
-      <Screen scroll={false} header={header}>
-        <View style={styles.loading}>
-          <ActivityIndicator
-            testID="nutrition-today-loading"
-            size="large"
-            color={colors.textPrimary}
-          />
-        </View>
+      <Screen header={header} contentContainerStyle={styles.content}>
+        <SkeletonCards testID="nutrition-today-loading" heights={[216, 132, 176]} />
       </Screen>
     );
   }
 
-  // Calories gets the ring (see below); Protein/Carbs/Fat stay plain rows.
-  const macros = [
-    {
-      key: 'protein',
-      label: 'Protein',
-      unit: 'g',
-      consumed: consumed.proteinG,
-      goal: goals.proteinG,
-      remaining: remaining.proteinG,
-    },
-    {
-      key: 'carbs',
-      label: 'Carbs',
-      unit: 'g',
-      consumed: consumed.carbsG,
-      goal: goals.carbsG,
-      remaining: remaining.carbsG,
-    },
-    {
-      key: 'fat',
-      label: 'Fat',
-      unit: 'g',
-      consumed: consumed.fatG,
-      goal: goals.fatG,
-      remaining: remaining.fatG,
-    },
+  const macros: { key: MacroKey; label: string; consumed: number; goal: number | null }[] = [
+    { key: 'protein', label: 'Protein', consumed: consumed.proteinG, goal: goals.proteinG },
+    { key: 'carbs', label: 'Carbs', consumed: consumed.carbsG, goal: goals.carbsG },
+    { key: 'fat', label: 'Fat', consumed: consumed.fatG, goal: goals.fatG },
+  ];
+
+  const targets = [
+    { key: 'calories', label: 'Calories', value: goals.calories, unit: '' },
+    { key: 'protein', label: 'Protein', value: goals.proteinG, unit: 'g' },
+    { key: 'carbs', label: 'Carbs', value: goals.carbsG, unit: 'g' },
+    { key: 'fat', label: 'Fat', value: goals.fatG, unit: 'g' },
   ];
 
   return (
@@ -157,69 +159,141 @@ export function NutritionTodayScreen({ navigation }: Props) {
         </Text>
       ) : null}
 
-      <AppCard hero topAccent={nutritionTheme.accent} testID="nutrition-today-macros">
-        <View style={styles.ringWrap}>
-          <CalorieRing
-            testID="nutrition-today-calorie-ring"
-            consumed={consumed.calories}
-            goal={goals.calories}
-            accentColor={nutritionTheme.accent}
-          />
-          {remaining.calories !== null ? (
-            <Text testID="calories-remaining" style={styles.macroRemaining}>
-              {remaining.calories} cal remaining
-            </Text>
-          ) : null}
-        </View>
-        {macros.map((macro) => (
-          <View key={macro.key} style={[styles.macro, styles.macroDivider]}>
-            <Text testID={`${macro.key}-consumed`} style={styles.macroLine}>
-              {macro.label}: {macro.consumed}
-              {macro.unit}
-              {macro.goal !== null ? ` / ${macro.goal}${macro.unit}` : ''}
-            </Text>
-            {macro.remaining !== null ? (
-              <Text testID={`${macro.key}-remaining`} style={styles.macroRemaining}>
-                {macro.remaining}
-                {macro.unit} remaining
+      <AppCard hero testID="nutrition-today-macros">
+        <View style={styles.summary}>
+          <View style={styles.ringColumn}>
+            <CalorieRing
+              testID="nutrition-today-calorie-ring"
+              consumed={consumed.calories}
+              goal={goals.calories}
+              accentColor={accent}
+              size={RING_SIZE}
+              strokeWidth={12}
+            />
+            {remaining.calories !== null ? (
+              <Text testID="calories-remaining" style={styles.ringRemaining}>
+                {remaining.calories} cal remaining
               </Text>
             ) : null}
           </View>
-        ))}
+
+          <View style={styles.macroColumn}>
+            {macros.map((macro, index) => {
+              const fraction =
+                macro.goal !== null && macro.goal > 0
+                  ? Math.min(macro.consumed / macro.goal, 1)
+                  : 0;
+              return (
+                <View
+                  key={macro.key}
+                  testID={`${macro.key}-row`}
+                  style={[styles.macroRow, index > 0 && styles.divider]}
+                  accessible
+                  accessibilityLabel={
+                    macro.goal !== null
+                      ? `${macro.label}, ${Math.round(macro.consumed)} of ${macro.goal} grams`
+                      : `${macro.label}, ${Math.round(macro.consumed)} grams`
+                  }
+                >
+                  <View style={styles.macroGlyph}>
+                    <MaterialCommunityIcons
+                      name={MACRO_GLYPHS[macro.key]}
+                      size={18}
+                      color={accent}
+                    />
+                  </View>
+                  <View style={styles.macroBody}>
+                    <Text style={styles.macroLabel}>{macro.label}</Text>
+                    <View style={styles.macroFigures}>
+                      <Text testID={`${macro.key}-consumed`} style={styles.macroValue}>
+                        {grams(macro.consumed)}
+                      </Text>
+                      {macro.goal !== null ? (
+                        <Text testID={`${macro.key}-goal`} style={styles.macroGoal}>
+                          / {grams(macro.goal)}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {macro.goal !== null ? (
+                      <View style={styles.barTrack}>
+                        <View
+                          testID={`${macro.key}-bar`}
+                          style={[
+                            styles.barFill,
+                            { width: `${fraction * 100}%`, backgroundColor: accent },
+                          ]}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
       </AppCard>
 
       <AppCard testID="nutrition-today-actions" style={styles.actions}>
         <PrimaryButton
           testID="log-food-button"
           label="Log Food"
+          icon="plus"
           onPress={() => navigation.navigate('FoodLibrary')}
-          accentColor={nutritionTheme.accent}
+          accentColor={accent}
           onAccentColor={nutritionTheme.onAccent}
         />
-        <SecondaryButton
-          testID="scan-barcode-button"
-          label="Scan Barcode"
-          onPress={() => navigation.navigate('BarcodeScanner')}
-        />
-        <SecondaryButton
-          testID="search-food-button"
-          label="Search Food"
-          onPress={() => navigation.navigate('FoodSearch')}
-        />
+        <View style={styles.secondaryActions}>
+          <View style={styles.secondaryAction}>
+            <SecondaryButton
+              testID="scan-barcode-button"
+              label="Scan Barcode"
+              icon="maximize"
+              size="md"
+              onPress={() => navigation.navigate('BarcodeScanner')}
+            />
+          </View>
+          <View style={styles.secondaryAction}>
+            <SecondaryButton
+              testID="search-food-button"
+              label="Search Food"
+              icon="search"
+              size="md"
+              onPress={() => navigation.navigate('FoodSearch')}
+            />
+          </View>
+        </View>
       </AppCard>
 
       <AppCard testID="nutrition-today-foods">
-        <Section title="Today's Foods">
+        <Section
+          title="Today's Foods"
+          action={{
+            label: 'View All',
+            onPress: () => navigation.navigate('NutritionHistory'),
+            testID: 'nutrition-today-view-all',
+          }}
+        >
           {logs.length === 0 ? (
-            <Text testID="food-log-empty" style={styles.emptyText}>
-              No foods logged today
-            </Text>
+            <EmptyState
+              testID="food-log-empty"
+              icon={
+                <View style={styles.emptyGlyph}>
+                  <Feather name="coffee" size={22} color={colors.textSecondary} />
+                </View>
+              }
+              title="No foods logged today"
+              action={{
+                label: 'Log Your First Meal',
+                onPress: () => navigation.navigate('FoodLibrary'),
+                testID: 'food-log-empty-log',
+              }}
+            />
           ) : (
             logs.map((log, index) => (
               <View
                 key={log.id}
                 testID={`food-log-row-${log.id}`}
-                style={[styles.logRow, index > 0 && styles.macroDivider]}
+                style={[styles.logRow, index > 0 && styles.divider]}
               >
                 <FoodImage uri={log.imageUrl} name={log.foodNameSnapshot} size={44} />
                 <View style={styles.logInfo}>
@@ -252,52 +326,134 @@ export function NutritionTodayScreen({ navigation }: Props) {
           )}
         </Section>
       </AppCard>
+
+      <AppCard testID="nutrition-today-targets">
+        <Section
+          title="Daily Targets"
+          action={{
+            label: 'Edit Targets',
+            onPress: () => navigation.navigate('NutritionGoals'),
+            testID: 'nutrition-today-edit-targets',
+          }}
+          actionColor={accent}
+        >
+          <View style={styles.targets}>
+            {targets.map((target) => (
+              <StatBlock
+                key={target.key}
+                testID={`target-${target.key}`}
+                value={target.value !== null ? `${target.value}${target.unit}` : '—'}
+                label={target.label}
+              />
+            ))}
+          </View>
+        </Section>
+      </AppCard>
     </Screen>
   );
 }
+
+const RING_SIZE = 128;
 
 const styles = StyleSheet.create({
   content: {
     gap: widgetGap,
     paddingBottom: spacing.xxl,
   },
-  loading: {
-    paddingVertical: spacing.xxl,
-  },
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,
   },
 
-  ringWrap: {
+  // The hero: the ring on the left, the three macros on the right.
+  summary: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingBottom: spacing.lg,
+    gap: spacing.lg,
   },
-  macro: {
-    paddingVertical: spacing.md,
+  ringColumn: {
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  macroDivider: {
+  ringRemaining: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    maxWidth: RING_SIZE,
+  },
+  macroColumn: {
+    flex: 1,
+  },
+  macroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  divider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.divider,
   },
-  macroLine: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
+  macroGlyph: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceLift,
   },
-  macroRemaining: {
+  macroBody: {
+    flex: 1,
+  },
+  macroLabel: {
     ...typeScale.secondary,
     color: colors.textSecondary,
-    marginTop: 2,
+  },
+  macroFigures: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  macroValue: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+  },
+  macroGoal: {
+    ...typeScale.secondary,
+    color: colors.textMuted,
+  },
+  barTrack: {
+    height: 4,
+    borderRadius: 2,
+    marginTop: spacing.xs,
+    backgroundColor: colors.surfaceRaised,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 2,
   },
 
   actions: {
     gap: spacing.sm,
   },
+  secondaryActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  secondaryAction: {
+    flex: 1,
+  },
 
-  emptyText: {
-    ...typeScale.callout,
-    color: colors.textMuted,
+  emptyGlyph: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.xs,
   },
   logRow: {
     flexDirection: 'row',
@@ -327,5 +483,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     ...typeScale.statSmall,
     textAlign: 'center',
+  },
+
+  targets: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
 });
