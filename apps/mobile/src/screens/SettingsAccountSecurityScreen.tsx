@@ -7,6 +7,7 @@ import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { useAuth } from '../auth/AuthProvider';
 import { deleteMyAccount } from '../lib/api';
+import { openLegalPage } from '../lib/legalLinks';
 import { supabase } from '../lib/supabase';
 import type { RootStackScreenProps } from '../navigation/types';
 import { ComingSoonRow } from '../settings/ComingSoonRow';
@@ -18,7 +19,8 @@ type Props = RootStackScreenProps<'SettingsAccountSecurity'>;
  * Account & Security: credentials, blocked people, sign-out, account deletion,
  * and the two legal links -- grouped together per their shared "account
  * access/privacy action" purpose, rather than split across Account/Privacy the
- * way the old in-screen tabs had them. Change Email is visible but not yet
+ * way the old in-screen tabs had them. Terms of Service and Privacy Policy
+ * open the pages the API serves. Change Email is visible but not yet
  * backed by real functionality (same "Coming Soon" precedent used throughout
  * Settings); Change Password and Blocked People open their own subpages; Sign
  * Out reuses the existing signOut() exactly as before.
@@ -111,8 +113,19 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
       </Section>
 
       <Section title="Legal">
-        <ComingSoonRow testID="privacy-terms" icon="file-text" title="Terms of Service" />
-        <ComingSoonRow testID="privacy-policy" icon="shield" title="Privacy Policy" showDivider />
+        <ListRow
+          testID="privacy-terms"
+          icon="file-text"
+          title="Terms of Service"
+          onPress={() => void openLegalPage('terms')}
+        />
+        <ListRow
+          testID="privacy-policy"
+          icon="shield"
+          title="Privacy Policy"
+          divider
+          onPress={() => void openLegalPage('privacy')}
+        />
       </Section>
 
       <Section title="Account Actions">

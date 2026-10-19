@@ -4,6 +4,7 @@ import { colors } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { deleteMyAccount } from '../lib/api';
+import { openLegalPage } from '../lib/legalLinks';
 import { supabase } from '../lib/supabase';
 import { SettingsAccountSecurityScreen } from './SettingsAccountSecurityScreen';
 
@@ -13,6 +14,10 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../lib/api', () => ({
   deleteMyAccount: jest.fn(),
+}));
+
+jest.mock('../lib/legalLinks', () => ({
+  openLegalPage: jest.fn(),
 }));
 
 jest.mock('../lib/supabase', () => ({
@@ -149,12 +154,14 @@ describe('SettingsAccountSecurityScreen', () => {
     expect(StyleSheet.flatten(title.props.style).color).toBe(colors.destructive);
   });
 
-  it('shows Terms of Service and Privacy Policy as real coming-soon rows, no invented content', () => {
+  it('opens the Terms of Service and the Privacy Policy', () => {
     renderScreen();
 
-    for (const testID of ['privacy-terms', 'privacy-policy']) {
-      expect(screen.getByTestId(testID)).toHaveTextContent(/Coming Soon/);
-    }
+    fireEvent.press(screen.getByTestId('privacy-terms'));
+    fireEvent.press(screen.getByTestId('privacy-policy'));
+
+    expect((openLegalPage as jest.Mock).mock.calls).toEqual([['terms'], ['privacy']]);
+    expect(screen.getByTestId('privacy-policy')).not.toHaveTextContent(/Coming Soon/);
   });
 
   it('renders no bare text outside <Text>', () => {
