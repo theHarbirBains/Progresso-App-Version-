@@ -239,7 +239,7 @@ Some areas are intentionally incomplete rather than hidden:
 - **Notifications**: opt-in preferences are real and saved, and devices register for push. The API's daily reminder job sends through Expo's push service, but nothing triggers it yet (there's no scheduler, and its trigger secret is unset), and iOS delivery also needs an APNs key in EAS. There is no email delivery.
 - **Account actions**: Change Email is visible in Settings but marked "Coming Soon." Delete Account works.
 - **Backups**: a nightly, encrypted database backup runs in GitHub Actions once its two secrets are set ([docs/BACKUPS.md](docs/BACKUPS.md)).
-- **Legal pages**: the Privacy Policy and Terms of Service are first drafts with three details still to fill in (`apps/api/src/legal/legal-details.ts`), and need review before external testers.
+- **Legal pages**: the Privacy Policy and Terms of Service (`/legal/privacy`, `/legal/terms`; operator and contact in `apps/api/src/legal/legal-details.ts`) are first drafts that need review before external testers.
 - **Apple Health**: not offered; there is no HealthKit integration.
 - **Admin**: role-based authorization is implemented and tested end to end, but the admin surface itself is a minimal placeholder route, not a full admin dashboard.
 - **Subscriptions**: RevenueCat webhook handling exists, but there is no in-app purchase or paywall yet.

@@ -51,6 +51,18 @@ describe('Legal pages (e2e)', () => {
     expect(response.payload).toContain('30 days');
   });
 
+  it('names who runs Progresso and how to reach them, with no prompt left unfilled', async () => {
+    const [privacy, terms] = await Promise.all(
+      ['/legal/privacy', '/legal/terms'].map((url) => app.inject({ method: 'GET', url })),
+    );
+    for (const page of [privacy!, terms!]) {
+      expect(page.payload).toContain(`operated by ${LEGAL_DETAILS.operator}`);
+      expect(page.payload).toContain(LEGAL_DETAILS.contactEmail);
+      expect(page.payload).not.toMatch(/\[[^\]]*\]/);
+    }
+    expect(terms!.payload).toContain('Province of Ontario');
+  });
+
   it('loads nothing from anywhere else', async () => {
     const pages = await Promise.all(
       ['/legal/privacy', '/legal/terms'].map((url) => app.inject({ method: 'GET', url })),
