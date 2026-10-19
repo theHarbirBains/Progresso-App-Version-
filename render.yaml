@@ -9,7 +9,9 @@ services:
   - type: web
     name: progresso-api
     runtime: node
-    plan: free
+    # Starter ($7/month, 0.5 CPU, 512 MB), as on the dashboard: it never sleeps. Free would
+    # sleep after 15 idle minutes and make the next request wait up to a minute.
+    plan: starter
     autoDeployTrigger: commit
     # `--include=dev` is required: Render passes NODE_ENV=production to the
     # build, which would otherwise make `npm ci` skip devDependencies
