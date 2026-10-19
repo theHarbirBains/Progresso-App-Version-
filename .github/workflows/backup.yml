@@ -1,0 +1,69 @@
+name: Nightly database backup
+
+# A nightly, encrypted copy of the production database, kept 30 days as a workflow artifact.
+# This repository is public, so the dump is encrypted with a passphrase only you hold before it
+# is uploaded: without the passphrase the artifact is unreadable. See docs/BACKUPS.md for the
+# two secrets this needs, how to run it by hand, and how to restore.
+
+on:
+  schedule:
+    # 07:17 UTC every day (around 3 am in Toronto).
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Dump, encrypt and keep
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check the secrets are set
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::Add the SUPABASE_DB_URL and BACKUP_PASSPHRASE repository secrets first (docs/BACKUPS.md)."
+            exit 1
+          fi
+
+      - name: Set up the Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      # Supabase's documented backup: roles, schema and data as three SQL files, restorable
+      # into a new project with psql. Photos in Storage are not part of the database.
+      - name: Dump the database
+        run: |
+          set -euo pipefail
+          mkdir backup
+          supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f backup/roles.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" --data-only --use-copy -f backup/data.sql
+          ls -l backup
+
+      - name: Encrypt
+        run: |
+          set -euo pipefail
+          name="progresso-$(date -u +%Y-%m-%dT%H%MZ).tar.gz.gpg"
+          tar -czf - -C backup . \
+            | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 \
+                --symmetric --cipher-algo AES256 --output "$name" 3<<<"$BACKUP_PASSPHRASE"
+          rm -rf backup
+          echo "BACKUP_FILE=$name" >> "$GITHUB_ENV"
+
+      - name: Keep for 30 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-backup-${{ github.run_id }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30
+          if-no-files-found: error
