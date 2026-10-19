@@ -94,3 +94,11 @@ export function updateMyProfile(
     body: JSON.stringify(updates),
   });
 }
+
+/**
+ * Deletes the signed-in account and everything it owns, for good -- see the API's
+ * AccountDeletionService. The server only ever deletes the account the token belongs to.
+ */
+export function deleteMyAccount(accessToken: string): Promise<{ success: true }> {
+  return request<{ success: true }>('/api/v1/users/me', accessToken, { method: 'DELETE' });
+}
