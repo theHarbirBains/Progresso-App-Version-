@@ -64,7 +64,8 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - A root list of six categories, each its own page: Profile & Personal Information, Workout Preferences, Nutrition & Goals, Notifications, Account & Security, Support & About
 - One fixed Warm Minimal look: the warm gym photo behind the top of every screen and one amber accent. There are no background themes or colour pickers, so the app always looks as designed
 - Notification preferences: push and email opt-in toggles are real and saved; more granular categories (workout reminders, PR alerts, weekly summaries) are shown as explicit "Coming Soon" rows rather than toggles that wouldn't do anything
-- Change Email, Delete Account and the help and contact rows are visible but not yet implemented ("Coming Soon")
+- Account & Security: Blocked People (each with Unblock), Terms of Service and Privacy Policy (the pages the API serves at `/legal/terms` and `/legal/privacy`), and Delete Account, which asks twice and then deletes the account and everything it owns
+- Change Email and the help and contact rows are visible but not yet implemented ("Coming Soon")
 - There is no Apple Health (HealthKit) integration, and onboarding doesn't offer one
 
 **Social**
@@ -72,6 +73,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - A one-directional, accept-gated follow graph (Instagram-style follow requests) — send/accept/reject a request, unfollow, search for people by name/username
 - A Friends tab on Feed showing accepted followees' own completed workouts and logged foods, reverse-chronological, reusing the same activity-card visual language as your own feed
 - A Notifications screen with follow requests and recent follows, plus suggestions from your own data
+- Report or block someone: tap a person in Find People, or the "…" on a friend's workout in Feed. A block ends following each other, and keeps them from finding, following or inviting you; reports are kept for review in the Supabase dashboard (`user_reports`)
 - No likes, comments, or leaderboards yet
 
 **Backend (NestJS API)**
@@ -162,8 +164,8 @@ Authentication is issued by Supabase Auth; the mobile app holds the session, and
 
 ## Testing
 
-- **Mobile:** 226 test files in `apps/mobile` (Jest + `jest-expo` + React Native Testing Library), covering screens, components, and business logic (query builders, PR/1RM calculations, progressive-overload logic, calendar/date logic).
-- **Backend:** 27 unit-test (`.spec.ts`) files alongside their modules, plus 6 end-to-end suites under `apps/api/test` (auth/authorization, exercises, observability, RevenueCat webhook, user profile, and a general app smoke test) using Supertest against a mocked Supabase layer.
+- **Mobile:** 229 test files in `apps/mobile` (Jest + `jest-expo` + React Native Testing Library), covering screens, components, and business logic (query builders, PR/1RM calculations, progressive-overload logic, calendar/date logic).
+- **Backend:** 29 unit-test (`.spec.ts`) files alongside their modules, plus 8 end-to-end suites under `apps/api/test` (auth/authorization, exercises, observability, RevenueCat webhook, user profile and account deletion, blocking and reporting, the legal pages, and a general app smoke test) using Supertest against a mocked Supabase layer.
 - **Database:** `npm run db:test` applies every migration to a real, ephemeral, local Postgres instance (via the `embedded-postgres` package — no Docker or live Supabase project required) and runs correctness/security tests against it, including RLS isolation checks.
 - Run everything: `npm run test:api` (backend unit tests), `npm run test:e2e --workspace apps/api` (backend end-to-end tests), `npm run test --workspace apps/mobile` (mobile tests), `npm run db:test` (database tests).
 - CI (GitHub Actions) runs lint, typecheck, the format check, all of the above and an iOS bundle export on every push and pull request to `main`.
@@ -235,7 +237,9 @@ Progresso is **actively under development**. The core loop — accounts, onboard
 Some areas are intentionally incomplete rather than hidden:
 
 - **Notifications**: opt-in preferences are real and saved, and devices register for push. The API's daily reminder job sends through Expo's push service, but nothing triggers it yet (there's no scheduler, and its trigger secret is unset), and iOS delivery also needs an APNs key in EAS. There is no email delivery.
-- **Account actions**: Change Email and Delete Account are visible in Settings but marked "Coming Soon."
+- **Account actions**: Change Email is visible in Settings but marked "Coming Soon." Delete Account works.
+- **Backups**: a nightly, encrypted database backup runs in GitHub Actions once its two secrets are set ([docs/BACKUPS.md](docs/BACKUPS.md)).
+- **Legal pages**: the Privacy Policy and Terms of Service are first drafts with three details still to fill in (`apps/api/src/legal/legal-details.ts`), and need review before external testers.
 - **Apple Health**: not offered; there is no HealthKit integration.
 - **Admin**: role-based authorization is implemented and tested end to end, but the admin surface itself is a minimal placeholder route, not a full admin dashboard.
 - **Subscriptions**: RevenueCat webhook handling exists, but there is no in-app purchase or paywall yet.
