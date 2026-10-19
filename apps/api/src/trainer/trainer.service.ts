@@ -720,7 +720,8 @@ export class TrainerService {
       .maybeSingle();
     if (error) throw new InternalServerErrorException('Failed to check the code');
     const placeholder = row as {
-      trainer_id: string;
+      // Null once the trainer's own account is deleted: the history stays claimable for 30 days.
+      trainer_id: string | null;
       placeholder_user_id: string;
       code_expires_at: string;
     } | null;
@@ -747,6 +748,8 @@ export class TrainerService {
     await client.auth.admin.deleteUser(placeholder.placeholder_user_id);
 
     const workouts = Number(moved ?? 0);
+    // There's no trainer to record it against once their account is gone.
+    if (!placeholder.trainer_id) return { workouts };
     await this.audit(
       placeholder.trainer_id,
       userId,

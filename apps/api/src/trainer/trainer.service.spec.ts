@@ -776,6 +776,18 @@ describe('TrainerService: clients without an account', () => {
       expect(lookup?.args[0]).toBe('code_hash');
     });
 
+    it("still claims after the trainer's account is gone, with no trainer to record it against", async () => {
+      const { mock, service } = setup();
+      mock.queue(
+        'trainer_placeholder_clients',
+        ok({ trainer_id: null, placeholder_user_id: PLACEHOLDER, code_expires_at: future() }),
+      );
+      mock.queueRpc('claim_placeholder_history', ok(2));
+
+      await expect(service.claimHistory(CLIENT, 'abcd-2345')).resolves.toEqual({ workouts: 2 });
+      expect(mock.calls.some((c) => c.target === 'trainer_actions')).toBe(false);
+    });
+
     it('answers a wrong code with a single message', async () => {
       const { mock, service } = setup();
       mock.queue('trainer_placeholder_clients', ok(null));

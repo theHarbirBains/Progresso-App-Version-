@@ -169,4 +169,33 @@ describe('User profile updates (e2e)', () => {
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.payload)).toEqual({ available: true });
   });
+
+  describe('DELETE /users/me', () => {
+    it('requires authentication', async () => {
+      const response = await app.inject({ method: 'DELETE', url: '/api/v1/users/me' });
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('deletes only the signed-in account, never one named in the request', async () => {
+      const list = jest.fn().mockResolvedValue({ data: [], error: null });
+      const rpc = jest.fn().mockResolvedValue({ data: ['user-1'], error: null });
+      const deleteUser = jest.fn().mockResolvedValue({ data: {}, error: null });
+      getClient.mockReturnValue({
+        storage: { from: () => ({ list, remove: jest.fn() }) },
+        rpc,
+        auth: { admin: { deleteUser } },
+      });
+
+      const response = await app.inject({
+        method: 'DELETE',
+        url: '/api/v1/users/me?userId=someone-else',
+        headers: { authorization: 'Bearer good-token' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(rpc).toHaveBeenCalledWith('delete_account', { p_user: 'user-1' });
+      expect(deleteUser).toHaveBeenCalledWith('user-1');
+      expect(deleteUser).toHaveBeenCalledTimes(1);
+    });
+  });
 });

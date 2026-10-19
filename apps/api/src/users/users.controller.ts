@@ -1,14 +1,18 @@
-import { BadRequestException, Body, Controller, Get, Patch, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Patch, Query } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/types/authenticated-request';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { AccountDeletionService } from './account-deletion.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly accountDeletionService: AccountDeletionService,
+  ) {}
 
   // Any authenticated role is allowed through; the point of listing all
   // three here is to make RolesGuard run and resolve the real role from
@@ -39,6 +43,15 @@ export class UsersController {
       role: user.role,
       ...profile,
     };
+  }
+
+  // Deletes the signed-in account and everything it owns. Like updateMe, the target is only
+  // ever the verified token's own id. The app confirms twice before calling this.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Delete('me')
+  async deleteMe(@CurrentUser() user: AuthenticatedUser) {
+    await this.accountDeletionService.deleteAccount(user.id);
+    return { success: true };
   }
 
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
