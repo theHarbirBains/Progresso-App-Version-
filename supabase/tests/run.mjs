@@ -3684,6 +3684,248 @@ async function main() {
     );
   }
 
+  console.log('\nRunning account deletion tests...\n');
+  {
+    const [doomed, friend, guest] = [randomUUID(), randomUUID(), randomUUID()];
+    await admin.query('insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6)', [
+      doomed,
+      `doomed-${doomed}@test.local`,
+      friend,
+      `friend-${friend}@test.local`,
+      guest,
+      `guest-${guest}@placeholders.invalid`,
+    ]);
+    const q = async (sql, params = []) => (await admin.query(sql, params)).rows;
+    const n = async (sql, params = []) => (await q(sql, params))[0].n;
+
+    // The person deleting their account: a custom exercise, a workout with a PR, a food and
+    // a food log, a follow, a block and a push token.
+    const doomedCurl = (
+      await q(
+        "insert into public.exercises (created_by, name, muscle_group) values ($1, 'Doomed Curl', 'biceps') returning id",
+        [doomed],
+      )
+    )[0].id;
+    const workout = async (userId, { groupId = null, done = true } = {}) =>
+      (
+        await q(
+          'insert into public.workouts (user_id, name, performed_at, completed_at, group_id) values ($1, $2, $3, $4, $5) returning id',
+          [userId, 'Arms', '2026-10-12T09:00:00Z', done ? '2026-10-12T10:00:00Z' : null, groupId],
+        )
+      )[0].id;
+    const logged = async (workoutId, exerciseId, weight) => {
+      const we = (
+        await q(
+          'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+          [workoutId, exerciseId],
+        )
+      )[0].id;
+      await q(
+        "insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, $2, 8, '2026-10-12T09:30:00Z')",
+        [we, weight],
+      );
+      return we;
+    };
+    await logged(await workout(doomed), doomedCurl, 30);
+    const food = (
+      await q(
+        "insert into public.foods (created_by, name, calories, protein_g, carbs_g, fat_g) values ($1, 'Doomed Oats', 300, 10, 50, 5) returning id",
+        [doomed],
+      )
+    )[0].id;
+    await q(
+      "insert into public.food_logs (user_id, food_id, food_name_snapshot, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g) values ($1, $2, 'Doomed Oats', 1, 'serving', 300, 10, 50, 5), ($3, $2, 'Doomed Oats', 1, 'serving', 300, 10, 50, 5)",
+      [doomed, food, friend],
+    );
+    await q(
+      "insert into public.follows (follower_id, followee_id, status) values ($1, $2, 'accepted')",
+      [friend, doomed],
+    );
+    await q(
+      "insert into public.device_push_tokens (user_id, expo_push_token, platform) values ($1, 'ExponentPushToken[x]', 'ios')",
+      [doomed],
+    );
+
+    // A live group they host: the friend has a workout in it using their custom exercise,
+    // and a guest they added has one too.
+    const group = (
+      await q(
+        "insert into public.workout_groups (host_id, name) values ($1, 'Arm day') returning id",
+        [doomed],
+      )
+    )[0].id;
+    await q(
+      "insert into public.workout_group_members (group_id, user_id, role, status, is_guest, added_by) values ($1, $2, 'host', 'joined', false, $2), ($1, $3, 'member', 'joined', false, $2), ($1, $4, 'member', 'joined', true, $2)",
+      [group, doomed, friend, guest],
+    );
+    await workout(doomed, { groupId: group, done: false });
+    const friendGroupWorkout = await workout(friend, { groupId: group, done: false });
+    const friendLogged = await logged(friendGroupWorkout, doomedCurl, 40);
+    await logged(await workout(guest, { groupId: group, done: false }), doomedCurl, 20);
+
+    // A copy of one of their exercises in the friend's library, still showing their photo.
+    const copiedWithPhoto = (
+      await q(
+        'insert into public.exercises (created_by, name, muscle_group, photo_url) values ($1, $2, $3, $4) returning id',
+        [
+          friend,
+          'Copied Row',
+          'back',
+          `https://example.supabase.co/storage/v1/object/public/equipment-photos/${doomed}/row.jpg`,
+        ],
+      )
+    )[0].id;
+
+    const accounts = (await q('select public.delete_account($1) as ids', [doomed]))[0].ids;
+    record(
+      'Deleting an account returns it and the guests it added, for the API to remove',
+      accounts.length === 2 && accounts[0] === doomed && accounts[1] === guest,
+    );
+    await q('delete from auth.users where id = any($1::uuid[])', [accounts]);
+
+    const leftovers = await n(
+      `select (
+         (select count(*) from public.workouts where user_id = any($1::uuid[])) +
+         (select count(*) from public.workout_exercises where user_id = any($1::uuid[])) +
+         (select count(*) from public.sets where user_id = any($1::uuid[])) +
+         (select count(*) from public.rep_prs where user_id = any($1::uuid[])) +
+         (select count(*) from public.exercises where created_by = any($1::uuid[])) +
+         (select count(*) from public.foods where created_by = any($1::uuid[])) +
+         (select count(*) from public.food_logs where user_id = any($1::uuid[])) +
+         (select count(*) from public.follows where follower_id = any($1::uuid[]) or followee_id = any($1::uuid[])) +
+         (select count(*) from public.device_push_tokens where user_id = any($1::uuid[])) +
+         (select count(*) from public.users where id = any($1::uuid[])) +
+         (select count(*) from public.workout_groups where host_id = any($1::uuid[]))
+       )::int as n`,
+      [accounts],
+    );
+    record('Nothing the deleted account or its guests owned is left', leftovers === 0);
+
+    const moved = (
+      await q(
+        'select e.created_by, e.name, e.is_active, we.exercise_id from public.workout_exercises we join public.exercises e on e.id = we.exercise_id where we.id = $1',
+        [friendLogged],
+      )
+    )[0];
+    record(
+      "A friend's workout that used the deleted person's custom exercise now uses their own copy",
+      moved.created_by === friend && moved.name === 'Doomed Curl' && moved.is_active === true,
+    );
+    const friendPr = await q(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2',
+      [friend, moved.exercise_id],
+    );
+    record(
+      "The friend's PR on that exercise is rebuilt on their copy",
+      friendPr.length === 1 && Number(friendPr[0].best_weight_kg) === 40,
+    );
+    const friendWorkouts = await q(
+      'select id, group_id, completed_at from public.workouts where user_id = $1 order by created_at',
+      [friend],
+    );
+    const groupOne = friendWorkouts.find((w) => w.id === friendGroupWorkout);
+    record(
+      "The friend's workout in the deleted host's live group is finished and kept as their own",
+      groupOne?.group_id === null && groupOne?.completed_at !== null,
+    );
+    record(
+      "A copy in someone else's library stops showing the deleted person's photo",
+      (await q('select photo_url from public.exercises where id = $1', [copiedWithPhoto]))[0]
+        .photo_url === null,
+    );
+    const friendLog = (
+      await q('select food_id, food_name_snapshot from public.food_logs where user_id = $1', [
+        friend,
+      ])
+    )[0];
+    record(
+      "The friend's food log of the deleted person's food keeps what was logged",
+      friendLog.food_id === null && friendLog.food_name_snapshot === 'Doomed Oats',
+    );
+
+    // A trainer who tracked a client without an account deletes theirs.
+    const [coach, tracked, recentlyOrphaned] = [randomUUID(), randomUUID(), randomUUID()];
+    await q('insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6)', [
+      coach,
+      `coach-${coach}@test.local`,
+      tracked,
+      `placeholder-${tracked}@placeholders.invalid`,
+      recentlyOrphaned,
+      `placeholder-${recentlyOrphaned}@placeholders.invalid`,
+    ]);
+    await q(
+      "insert into public.trainer_placeholder_clients (trainer_id, placeholder_user_id, code_hash, code_expires_at) values ($1, $2, 'del-code-1', now() - interval '1 day'), ($1, $3, 'del-code-2', now() + interval '2 days')",
+      [coach, tracked, recentlyOrphaned],
+    );
+    const trackedWorkout = await workout(tracked);
+    await logged(trackedWorkout, benchPress, 60);
+
+    const coachAccounts = (await q('select public.delete_account($1) as ids', [coach]))[0].ids;
+    await q('delete from auth.users where id = any($1::uuid[])', [coachAccounts]);
+
+    const claim = (
+      await q(
+        "select trainer_id, trainer_deleted_at, code_expires_at > now() + interval '29 days' as long_enough from public.trainer_placeholder_clients where placeholder_user_id = $1",
+        [tracked],
+      )
+    )[0];
+    record(
+      "A trainer's tracked client stays claimable for 30 days after the trainer's account goes",
+      claim?.trainer_id === null &&
+        claim?.trainer_deleted_at !== null &&
+        claim?.long_enough === true,
+    );
+    record(
+      "and the tracked client's history is still there meanwhile",
+      (await n('select count(*)::int as n from public.workouts where id = $1', [
+        trackedWorkout,
+      ])) === 1,
+    );
+
+    // 31 days on, nobody claimed it.
+    await q(
+      "update public.trainer_placeholder_clients set trainer_deleted_at = now() - interval '31 days' where placeholder_user_id = $1",
+      [tracked],
+    );
+    const purged = (await q('select public.purge_unclaimed_tracked_clients() as n'))[0].n;
+    record(
+      'After 30 unclaimed days the tracked history and placeholder account are deleted',
+      purged === 1 &&
+        (await n('select count(*)::int as n from auth.users where id = $1', [tracked])) === 0 &&
+        (await n('select count(*)::int as n from public.workouts where id = $1', [
+          trackedWorkout,
+        ])) === 0 &&
+        (await n(
+          'select count(*)::int as n from public.trainer_placeholder_clients where placeholder_user_id = $1',
+          [tracked],
+        )) === 0,
+    );
+    const claimant = randomUUID();
+    await q('insert into auth.users (id, email) values ($1, $2)', [
+      claimant,
+      `claimant-${claimant}@test.local`,
+    ]);
+    await q('select public.claim_placeholder_history($1, $2)', [recentlyOrphaned, claimant]);
+    record(
+      'A tracked client can still claim their history after their trainer’s account is gone',
+      (await n(
+        'select count(*)::int as n from public.trainer_placeholder_clients where placeholder_user_id = $1 and claimed_by = $2',
+        [recentlyOrphaned, claimant],
+      )) === 1,
+    );
+    record(
+      'A tracked client still inside its 30 days is kept',
+      (await n('select count(*)::int as n from auth.users where id = $1', [recentlyOrphaned])) ===
+        1,
+    );
+
+    await expectThrows(
+      asUser(friend, (c) => c.query('select public.delete_account($1)', [friend])),
+      'Nobody can call account deletion from the app, even on their own account',
+      /permission denied/,
+    );
+  }
+
   await admin.end();
 }
 
