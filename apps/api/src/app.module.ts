@@ -12,6 +12,7 @@ import { FeedModule } from './feed/feed.module';
 import { FoodsModule } from './foods/foods.module';
 import { FollowsModule } from './follows/follows.module';
 import { HealthModule } from './health/health.module';
+import { LegalModule } from './legal/legal.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RevenueCatModule } from './revenuecat/revenuecat.module';
 import { SafetyModule } from './safety/safety.module';
@@ -30,6 +31,7 @@ import { UsersModule } from './users/users.module';
     SupabaseModule,
     AuthModule,
     HealthModule,
+    LegalModule,
     UsersModule,
     ExercisesModule,
     EquipmentProfilesModule,

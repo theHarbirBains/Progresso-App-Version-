@@ -37,7 +37,8 @@ async function bootstrap(): Promise<void> {
     configService.get('NODE_ENV', { infer: true }),
   );
 
-  app.setGlobalPrefix('api', { exclude: ['health'] });
+  // /health and the legal pages live at the root, outside /api.
+  app.setGlobalPrefix('api', { exclude: ['health', 'legal/privacy', 'legal/terms'] });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
   const corsOrigin = configService.get('CORS_ORIGIN', { infer: true });
