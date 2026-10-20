@@ -11,7 +11,7 @@ import type { FoodProvider, FoodSearchResult, NormalizedFood } from '../food-pro
 const BASE_URL = 'https://ca.openfoodfacts.org';
 const USER_AGENT = 'Progresso/1.0 (fitness and nutrition app; contact via app support)';
 const SEARCH_FIELDS =
-  'code,product_name,brands,serving_size,serving_quantity,nutriments,image_front_url';
+  'code,product_name,brands,serving_size,serving_quantity,serving_quantity_unit,nutriments,image_front_url';
 const REQUEST_TIMEOUT_MS = 8000;
 // foods.serving_label's own limit.
 const MAX_SERVING_LABEL_LENGTH = 80;
@@ -27,6 +27,8 @@ interface OffProduct {
   brands?: string;
   serving_size?: string;
   serving_quantity?: string | number;
+  /** What serving_quantity is in: "g", or "ml" for a drink. */
+  serving_quantity_unit?: string;
   nutriments?: OffNutriments;
   image_front_url?: string;
 }
@@ -89,7 +91,12 @@ function normalizeProduct(product: OffProduct): NormalizedFood | null {
   const structuredServing = toFiniteNumber(product.serving_quantity);
   const hasStructuredServing = structuredServing !== null && structuredServing > 0;
   const servingSize = hasStructuredServing ? (structuredServing as number) : 100;
-  const servingUnit = 'g';
+  // A drink's serving is in millilitres; everything else, and a product without a structured
+  // serving (its figures are per 100 g), in grams.
+  const servingUnit =
+    hasStructuredServing && product.serving_quantity_unit?.trim().toLowerCase() === 'ml'
+      ? 'ml'
+      : 'g';
 
   const calories = pickNutrient(
     product.nutriments,

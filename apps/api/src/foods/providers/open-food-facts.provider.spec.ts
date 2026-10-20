@@ -138,6 +138,31 @@ describe('OpenFoodFactsProvider', () => {
       expect(result.foods[0]!.calories).toBe(130);
     });
 
+    it('keeps a drink in millilitres, as Open Food Facts measures its serving', async () => {
+      mockFetchOnce({
+        count: 1,
+        products: [
+          {
+            code: '5449000000996',
+            product_name: 'Cola',
+            serving_size: '330 ml',
+            serving_quantity: 330,
+            serving_quantity_unit: 'mL',
+            nutriments: {
+              'energy-kcal_serving': 139,
+              proteins_serving: 0,
+              carbohydrates_serving: 35,
+              fat_serving: 0,
+            },
+          },
+        ],
+      });
+
+      const result = await provider.searchFoods('cola', 0, 20);
+
+      expect(result.foods[0]).toMatchObject({ servingSize: 330, servingUnit: 'ml', calories: 139 });
+    });
+
     it('scales missing per-serving fields from the 100g figure using the real serving_quantity, rather than inventing a value', async () => {
       mockFetchOnce({
         count: 1,
