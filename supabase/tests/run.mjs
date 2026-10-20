@@ -3978,6 +3978,168 @@ async function main() {
     );
   }
 
+  console.log('\nRunning nutrition shortcut tests...\n');
+  {
+    const [cook, other] = [randomUUID(), randomUUID()];
+    await admin.query('insert into auth.users (id, email) values ($1, $2), ($3, $4)', [
+      cook,
+      `cook-${cook}@test.local`,
+      other,
+      `other-${other}@test.local`,
+    ]);
+    const food = async (owner, name, extra = {}) =>
+      (
+        await admin.query(
+          'insert into public.foods (created_by, name, calories, protein_g, carbs_g, fat_g, recipe_servings) values ($1, $2, 100, 10, 10, 2, $3) returning id',
+          [owner, name, extra.recipeServings ?? null],
+        )
+      ).rows[0].id;
+    const oats = await food(cook, 'Oats');
+    const catalogMilk = await food(null, 'Milk');
+    const othersFood = await food(other, 'Their Shake');
+
+    // The amount as typed.
+    await admin.query(
+      "insert into public.food_logs (user_id, food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, entered_amount, entered_unit, serving_label) values ($1, $2, 'Oats', 1, 'serving', 0.67, 67, 7, 7, 1, 2, 'pieces', '3 cookies (34 g)')",
+      [cook, oats],
+    );
+    record('A log keeps the amount and unit as typed', true);
+    await expectThrows(
+      admin.query(
+        "insert into public.food_logs (user_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, entered_amount) values ($1, 'Oats', 1, 'serving', 1, 100, 10, 10, 2, 2)",
+        [cook],
+      ),
+      'An amount needs its unit',
+      /food_logs_entered_together/,
+    );
+    await expectThrows(
+      admin.query(
+        "insert into public.food_logs (user_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, entered_amount, entered_unit) values ($1, 'Oats', 1, 'serving', 1, 100, 10, 10, 2, 2, 'cups')",
+        [cook],
+      ),
+      'A unit is one the app logs in',
+      /check constraint/,
+    );
+
+    // Saved meals.
+    const meal = await asUserCommitted(cook, async (c) => {
+      const id = (
+        await c.query(
+          "insert into public.saved_meals (user_id, name) values ($1, 'Breakfast') returning id",
+          [cook],
+        )
+      ).rows[0].id;
+      await c.query(
+        'insert into public.saved_meal_items (saved_meal_id, user_id, food_id, quantity) values ($1, $2, $3, 1), ($1, $2, $4, 2)',
+        [id, cook, oats, catalogMilk],
+      );
+      return id;
+    });
+    record(
+      'A saved meal holds your own foods and catalog foods, each item owned by the meal owner',
+      (
+        await admin.query(
+          'select count(*)::int as n from public.saved_meal_items where saved_meal_id = $1 and user_id = $2',
+          [meal, cook],
+        )
+      ).rows[0].n === 2,
+    );
+    const theirView = await asUser(other, (c) =>
+      c.query(
+        'select (select count(*) from public.saved_meals)::int as meals, (select count(*) from public.saved_meal_items)::int as items',
+      ),
+    );
+    record(
+      "Nobody else sees your saved meals or what's in them",
+      theirView.rows[0].meals === 0 && theirView.rows[0].items === 0,
+    );
+    await expectThrows(
+      asUser(other, (c) =>
+        c.query(
+          'insert into public.saved_meal_items (saved_meal_id, user_id, food_id, quantity) values ($1, $2, $3, 1)',
+          [meal, other, catalogMilk],
+        ),
+      ),
+      "Nobody can add to someone else's saved meal",
+      /row-level security|policy/,
+    );
+    await expectThrows(
+      asUser(cook, (c) =>
+        c.query(
+          'insert into public.saved_meal_items (saved_meal_id, user_id, food_id, quantity) values ($1, $2, $3, 1)',
+          [meal, cook, othersFood],
+        ),
+      ),
+      "A saved meal can't use someone else's food",
+      /food not available/,
+    );
+
+    // Recipes.
+    const shake = await food(cook, 'Protein Shake', { recipeServings: 2 });
+    await asUserCommitted(cook, (c) =>
+      c.query(
+        'insert into public.recipe_ingredients (recipe_id, user_id, food_id, quantity) values ($1, $2, $3, 1), ($1, $2, $4, 2)',
+        [shake, cook, oats, catalogMilk],
+      ),
+    );
+    record(
+      'A recipe is your own food with its ingredients',
+      (
+        await admin.query(
+          'select count(*)::int as n from public.recipe_ingredients where recipe_id = $1 and user_id = $2',
+          [shake, cook],
+        )
+      ).rows[0].n === 2,
+    );
+    await expectThrows(
+      asUser(cook, (c) =>
+        c.query(
+          'insert into public.recipe_ingredients (recipe_id, user_id, food_id, quantity) values ($1, $2, $1, 1)',
+          [shake, cook],
+        ),
+      ),
+      "A recipe can't contain itself",
+      /check constraint/,
+    );
+    await expectThrows(
+      asUser(cook, (c) =>
+        c.query(
+          'insert into public.recipe_ingredients (recipe_id, user_id, food_id, quantity) values ($1, $2, $3, 1)',
+          [oats, cook, catalogMilk],
+        ),
+      ),
+      'Ingredients only go on a recipe, not on any food',
+      /recipe not found/,
+    );
+    await expectThrows(
+      asUser(cook, (c) =>
+        c.query(
+          'insert into public.recipe_ingredients (recipe_id, user_id, food_id, quantity) values ($1, $2, $3, 1)',
+          [shake, cook, othersFood],
+        ),
+      ),
+      "A recipe can't use someone else's food",
+      /food not available/,
+    );
+    const ingredientsSeen = await asUser(other, (c) =>
+      c.query('select count(*)::int as n from public.recipe_ingredients'),
+    );
+    record("Nobody else sees what's in your recipes", ingredientsSeen.rows[0].n === 0);
+
+    // Deleting the account takes them too.
+    const ids = (await admin.query('select public.delete_account($1) as ids', [cook])).rows[0].ids;
+    await admin.query('delete from auth.users where id = any($1::uuid[])', [ids]);
+    record(
+      'Deleting an account removes its saved meals and recipes',
+      (
+        await admin.query(
+          'select ((select count(*) from public.saved_meals where user_id = $1) + (select count(*) from public.saved_meal_items where user_id = $1) + (select count(*) from public.recipe_ingredients where user_id = $1))::int as n',
+          [cook],
+        )
+      ).rows[0].n === 0,
+    );
+  }
+
   await admin.end();
 }
 
