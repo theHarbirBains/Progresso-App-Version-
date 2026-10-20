@@ -44,6 +44,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Progress & analytics**
 
 - A Progress tab with Overview, Top Sets, Strength and All Time sections
+- A Weekly Summary at the top of Overview, for this week or last: workout days against your weekly goal, average calories and protein and the days on target, sets per muscle group against the 4 weeks before, and your main lifts' top sets against their best in the 4 weeks before
 - Per-exercise and lifetime top sets, rep-count PRs, and true 1RM tracking (1RM is only ever recorded from an actual 1-rep set), plus most reps and longest time for bodyweight and timed exercises
 - Strength trend charts and progress metrics per exercise
 - Muscle-group visualization based on which exercises the user has actually logged
@@ -51,6 +52,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Nutrition**
 
 - Today's calories and macros against your goals, with goal estimates calculated from your body data, and a history calendar
+- A weekly calorie budget (7 times your daily target, Monday to Sunday) on Today, so eating less one day leaves more for another
 - Log Food opens your Food Library: your saved meals, your usual foods (the ones you log on the most days) and your most recently logged foods first, ready to re-log at last time's amount, then your own foods (with photos) and recipes
 - Saved meals: foods you eat together, logged in one go, each as its own entry; build one in the Food Library or save today's foods as one
 - Recipes: a drink or a meal always made the same way -- its ingredients and how many servings it makes -- logged as a single food, with its figures per serving worked out from the ingredients

@@ -56,7 +56,8 @@ The landing screen is a personal activity feed, which replaced the original Dash
 - **Your activity:** your own completed workouts and logged foods as activity cards, newest first, with a Friends tab for the people you follow (Section 7).
 - **Next workout:** the next day in your active split; a workout in progress gets its own card.
 - **Workout cards:** duration, exercises and sets, then a Top Sets strip — the top set of each exercise in that workout (e.g., Bench Press 165 lb × 6). Top sets are **not** automatically labeled PRs — a PR is a separate distinction.
-- Today's calories and macros are on Nutrition Today and the You tab.
+- Today's calories and macros are on Nutrition Today and the You tab, with the week's calorie budget (7 times the daily target, Monday to Sunday) under them on Today.
+- **Weekly Summary:** at the top of Progress → Overview, this week or last in plain numbers -- workout days against the weekly goal, average calories and protein and the days on target (only days with food logged count), sets per muscle group against the 4 weeks before, and the main lifts' top sets against their best in the 4 weeks before. Deterministic and descriptive: it says what happened, never why.
 
 ## 7. Social/Athlete Experience
 
@@ -143,7 +144,7 @@ Users should eventually be able to export their data and delete their account/da
 | 4     | Progressive Overload Engine        | Done — top sets, rep-count PRs, true 1RM, PR correctness across edit/delete/restore                                                                                                               |
 | 5     | Strength Analytics                 | Done — tabbed Progress section (Overview/Top Sets/Strength/All Time), charts, muscle visualization, PRs and true 1RMs                                                                             |
 | 6     | Nutrition Logging                  | Done — custom foods, food search, barcode scanning, AI food search, usual and recent foods, saved meals, recipes, Copy Yesterday, logging by servings, pieces, weight or volume, daily goals      |
-| 7     | Nutrition Analytics                | Not started — daily totals and a day-by-day history calendar only; no trend analytics                                                                                                             |
+| 7     | Nutrition Analytics                | Started — daily totals, a history calendar, the weekly calorie budget and the Weekly Summary; no body-weight tracking or longer trends yet                                                        |
 | 8     | Subscriptions                      | Paused by decision — RevenueCat webhook handling (signature verification, event projection) is implemented; no in-app purchase or paywall until approved                                          |
 | 9     | Admin Dashboard                    | Not started — role-based authorization is implemented and tested end to end; the admin surface itself is a single placeholder route, not a dashboard                                              |
 | 10    | Privacy Tooling                    | Not started — no account export or account deletion yet (Delete Account is a visible "Coming Soon" placeholder)                                                                                   |
