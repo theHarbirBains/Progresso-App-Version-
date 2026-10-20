@@ -18,6 +18,7 @@ import { CalorieRing } from '../nutrition/CalorieRing';
 import { FoodImage } from '../nutrition/FoodImage';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import type { FoodLogRow } from '../nutrition/foodLogQueries';
+import { servingMeasures, servingsFor, unitWord } from '../nutrition/logQuantity';
 import { calculateRemaining, sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
@@ -82,7 +83,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
       let changed = false;
       for (const log of logs) {
         if (!(log.id in next)) {
-          next[log.id] = String(log.quantity);
+          next[log.id] = String(log.enteredAmount ?? log.quantity);
           changed = true;
         }
       }
@@ -95,14 +96,27 @@ export function NutritionTodayScreen({ navigation }: Props) {
   const displayError = error ?? goalsError ?? logsError;
   const accent = nutritionTheme.accent;
 
+  // A log's amount is edited the way it was typed -- "2" cookies, "150" g -- and turned into
+  // servings from the log's own serving snapshot. A log from before amounts were kept is in
+  // servings.
   async function handleUpdateQuantity(log: FoodLogRow) {
-    const raw = quantityInputs[log.id];
-    const newQuantity = Number(raw);
-    if (!Number.isFinite(newQuantity) || newQuantity <= 0 || newQuantity === log.quantity) return;
+    const amount = Number(quantityInputs[log.id]);
+    const unit = log.enteredUnit ?? 'servings';
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    if (amount === (log.enteredAmount ?? log.quantity)) return;
+    const servings = servingsFor(amount, unit, servingMeasures(log));
+    if (!(servings > 0)) return;
     setError(null);
     try {
-      const updated = await updateQuantity(log, newQuantity);
-      setQuantityInputs((prev) => ({ ...prev, [log.id]: String(updated.quantity) }));
+      const updated = await updateQuantity(
+        log,
+        servings,
+        log.enteredUnit ? { amount, unit: log.enteredUnit } : undefined,
+      );
+      setQuantityInputs((prev) => ({
+        ...prev,
+        [log.id]: String(updated.enteredAmount ?? updated.quantity),
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update quantity');
     }
@@ -303,17 +317,30 @@ export function NutritionTodayScreen({ navigation }: Props) {
                     fat
                   </Text>
                 </View>
-                <TextInput
-                  testID={`food-log-quantity-${log.id}`}
-                  style={styles.quantityInput}
-                  accessibilityLabel={`Quantity of ${log.foodNameSnapshot}`}
-                  keyboardType="decimal-pad"
-                  value={quantityInputs[log.id] ?? ''}
-                  onChangeText={(text) =>
-                    setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))
-                  }
-                  onEndEditing={() => handleUpdateQuantity(log)}
-                />
+                <View style={styles.quantityColumn}>
+                  <TextInput
+                    testID={`food-log-quantity-${log.id}`}
+                    style={styles.quantityInput}
+                    accessibilityLabel={`Amount of ${log.foodNameSnapshot}, in ${unitWord(
+                      2,
+                      log.enteredUnit ?? 'servings',
+                      servingMeasures(log).pieces,
+                    )}`}
+                    keyboardType="decimal-pad"
+                    value={quantityInputs[log.id] ?? ''}
+                    onChangeText={(text) =>
+                      setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))
+                    }
+                    onEndEditing={() => handleUpdateQuantity(log)}
+                  />
+                  <Text testID={`food-log-unit-${log.id}`} style={styles.quantityUnit}>
+                    {unitWord(
+                      log.enteredAmount ?? log.quantity,
+                      log.enteredUnit ?? 'servings',
+                      servingMeasures(log).pieces,
+                    )}
+                  </Text>
+                </View>
                 <TextButton
                   testID={`food-log-delete-${log.id}`}
                   label="Delete"
@@ -472,6 +499,15 @@ const styles = StyleSheet.create({
     ...typeScale.secondary,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  quantityColumn: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  quantityUnit: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+    maxWidth: 72,
   },
   quantityInput: {
     width: 64,

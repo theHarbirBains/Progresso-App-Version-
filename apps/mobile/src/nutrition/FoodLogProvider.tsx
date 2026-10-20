@@ -12,8 +12,10 @@ import { useSignedInResource } from '../lib/useSignedInResource';
 import {
   deleteFoodLog,
   fetchTodaysFoodLogs,
+  copyFoodLogs,
   logFood,
   updateFoodLogQuantity,
+  type EnteredAmount,
   type FoodLogRow,
 } from './foodLogQueries';
 import type { MealType } from './mealTypes';
@@ -24,8 +26,24 @@ export interface FoodLogContextValue {
   loading: boolean;
   error: string | null;
   refetch: () => Promise<boolean>;
-  logFoodEntry: (food: LoggableFood, quantity: number, mealType: MealType) => Promise<FoodLogRow>;
-  updateQuantity: (log: FoodLogRow, newQuantity: number) => Promise<FoodLogRow>;
+  logFoodEntry: (
+    food: LoggableFood,
+    quantity: number,
+    mealType: MealType,
+    entered?: EnteredAmount | null,
+  ) => Promise<FoodLogRow>;
+  /** Logs several foods now, one entry each, in order -- a saved meal. */
+  logFoodEntries: (
+    entries: { food: LoggableFood; quantity: number; entered?: EnteredAmount | null }[],
+    mealType: MealType,
+  ) => Promise<FoodLogRow[]>;
+  /** Logs past logs again, now, exactly as they were logged -- Copy Yesterday. */
+  copyLogs: (logIds: string[]) => Promise<FoodLogRow[]>;
+  updateQuantity: (
+    log: FoodLogRow,
+    newQuantity: number,
+    entered?: EnteredAmount | null,
+  ) => Promise<FoodLogRow>;
   removeLog: (logId: string) => Promise<void>;
 }
 
@@ -101,9 +119,9 @@ export function FoodLogProvider({ children }: PropsWithChildren) {
       loading,
       error,
       refetch,
-      logFoodEntry: async (food, quantity, mealType) => {
+      logFoodEntry: async (food, quantity, mealType, entered) => {
         if (!userId) throw new Error('Not signed in');
-        const created = await logFood(userId, food, quantity, mealType);
+        const created = await logFood(userId, food, quantity, mealType, entered);
         // logFood's own return never carries a photo (only the dedicated
         // today's-list select embeds one) -- carried over here from the food
         // that was just logged, same as the merge NutritionTodayScreen's own
@@ -112,8 +130,28 @@ export function FoodLogProvider({ children }: PropsWithChildren) {
         setLogs((prev) => [...prev, withImage]);
         return withImage;
       },
-      updateQuantity: async (log, newQuantity) => {
-        const updated = await updateFoodLogQuantity(log, newQuantity);
+      logFoodEntries: async (entries, mealType) => {
+        if (!userId) throw new Error('Not signed in');
+        const created: FoodLogRow[] = [];
+        // One at a time, so a failure part way leaves the ones logged so far in Today.
+        try {
+          for (const entry of entries) {
+            const row = await logFood(userId, entry.food, entry.quantity, mealType, entry.entered);
+            created.push({ ...row, imageUrl: entry.food.imageUrl ?? null });
+          }
+        } finally {
+          if (created.length > 0) setLogs((prev) => [...prev, ...created]);
+        }
+        return created;
+      },
+      copyLogs: async (logIds) => {
+        if (!userId) throw new Error('Not signed in');
+        const copies = await copyFoodLogs(userId, logIds);
+        setLogs((prev) => [...prev, ...copies]);
+        return copies;
+      },
+      updateQuantity: async (log, newQuantity, entered) => {
+        const updated = await updateFoodLogQuantity(log, newQuantity, entered);
         const withImage: FoodLogRow = { ...updated, imageUrl: log.imageUrl };
         setLogs((prev) => prev.map((l) => (l.id === log.id ? withImage : l)));
         return withImage;

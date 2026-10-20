@@ -7,6 +7,8 @@ import {
   logFood,
   updateFoodLogQuantity,
   type FoodLogRow,
+  copyFoodLogs,
+  fetchFoodLogsForDay,
 } from './foodLogQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
@@ -20,7 +22,17 @@ interface Result {
 
 function createQueryBuilder(result: Result) {
   const calls: Record<string, unknown[][]> = {};
-  const methods = ['select', 'eq', 'gte', 'lt', 'order', 'insert', 'update', 'delete'] as const;
+  const methods = [
+    'select',
+    'eq',
+    'in',
+    'gte',
+    'lt',
+    'order',
+    'insert',
+    'update',
+    'delete',
+  ] as const;
   const builder: Record<string, unknown> = {};
   for (const m of methods) {
     calls[m] = [];
@@ -130,6 +142,9 @@ describe('fetchTodaysFoodLogs', () => {
         carbsG: 0,
         fatG: 3.6,
         loggedAt: '2026-01-01T12:00:00Z',
+        enteredAmount: null,
+        enteredUnit: null,
+        servingLabel: null,
       },
     ]);
     expect(calls.eq).toEqual([['user_id', 'user-1']]);
@@ -184,6 +199,9 @@ describe('fetchFoodLogsForMonth', () => {
         carbsG: 0,
         fatG: 3.6,
         loggedAt: '2026-01-01T12:00:00Z',
+        enteredAmount: null,
+        enteredUnit: null,
+        servingLabel: null,
       },
     ]);
     expect(calls.eq).toEqual([['user_id', 'user-1']]);
@@ -239,6 +257,10 @@ describe('logFood', () => {
       carbs_g: 0,
       fat_g: 3.6,
       meal_type: 'lunch',
+      // Logged without an amount as typed, from a food with no serving wording.
+      entered_amount: null,
+      entered_unit: null,
+      serving_label: null,
       // No provenance on this food, so the log records none either.
       nutrition_confidence: null,
       nutrition_source_kind: null,
@@ -313,5 +335,131 @@ describe('deleteFoodLog', () => {
     mockTable({ data: null, error: { message: 'boom' } });
 
     await expect(deleteFoodLog('log-1')).rejects.toThrow('boom');
+  });
+});
+
+describe('the amount as typed', () => {
+  it('logs the amount and unit typed, and the serving wording, beside the servings', async () => {
+    const { builder } = mockTable({ data: dbRow, error: null });
+
+    await logFood(
+      'user-1',
+      {
+        id: 'food-oreo',
+        name: 'Oreo',
+        servingSize: 34,
+        servingUnit: 'g',
+        servingLabel: '3 cookies (34 g)',
+        calories: 160,
+        proteinG: 1.6,
+        carbsG: 25,
+        fatG: 7,
+      },
+      0.67,
+      'snack',
+      { amount: 2, unit: 'pieces' },
+    );
+
+    expect(builder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quantity: 0.67,
+        entered_amount: 2,
+        entered_unit: 'pieces',
+        serving_label: '3 cookies (34 g)',
+      }),
+    );
+  });
+
+  it('reads the amount as typed back', async () => {
+    mockTable({
+      data: [{ ...dbRow, entered_amount: '150.00', entered_unit: 'g', serving_label: null }],
+      error: null,
+    });
+
+    const [log] = await fetchTodaysFoodLogs('user-1');
+
+    expect(log).toMatchObject({ enteredAmount: 150, enteredUnit: 'g', servingLabel: null });
+  });
+
+  it('saves a new amount as typed with the new servings', async () => {
+    const { builder } = mockTable({ data: dbRow, error: null });
+
+    await updateFoodLogQuantity(domainRow, 3, { amount: 300, unit: 'g' });
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ quantity: 3, entered_amount: 300, entered_unit: 'g' }),
+    );
+  });
+});
+
+describe('fetchFoodLogsForDay', () => {
+  it('reads one local calendar day', async () => {
+    const { calls } = mockTable({ data: [dbRow], error: null });
+    const day = new Date(2026, 9, 19, 15, 0);
+
+    await fetchFoodLogsForDay('user-1', day);
+
+    const { start, end } = getLocalDayRange(day);
+    expect(calls.gte).toEqual([['logged_at', start.toISOString()]]);
+    expect(calls.lt).toEqual([['logged_at', end.toISOString()]]);
+  });
+});
+
+describe('copyFoodLogs', () => {
+  it('logs exactly what was logged before, now, in the order given', async () => {
+    const source = (id: string, name: string) => ({
+      id,
+      food_id: `food-${id}`,
+      food_name_snapshot: name,
+      serving_size: '1.00',
+      serving_unit: 'serving',
+      quantity: '2.00',
+      calories: '300.00',
+      protein_g: '20.00',
+      carbs_g: '30.00',
+      fat_g: '10.00',
+      meal_type: 'breakfast',
+      entered_amount: '2.00',
+      entered_unit: 'servings',
+      serving_label: null,
+      nutrition_confidence: 'verified',
+    });
+    const read = createQueryBuilder({
+      data: [source('b', 'Toast'), source('a', 'Eggs')],
+      error: null,
+    });
+    const write = createQueryBuilder({
+      data: [
+        { ...dbRow, id: 'new-1', logged_at: '2026-10-20T08:00:00.000Z' },
+        { ...dbRow, id: 'new-2', logged_at: '2026-10-20T08:00:00.001Z' },
+      ],
+      error: null,
+    });
+    mockFrom.mockImplementationOnce(() => read.builder).mockImplementationOnce(() => write.builder);
+
+    const copies = await copyFoodLogs('user-1', ['a', 'b']);
+
+    expect(read.calls.eq).toEqual([['user_id', 'user-1']]);
+    expect(read.calls.in).toEqual([['id', ['a', 'b']]]);
+    const inserted = write.calls.insert[0]![0] as Record<string, unknown>[];
+    expect(inserted.map((row) => row.food_name_snapshot)).toEqual(['Eggs', 'Toast']);
+    expect(inserted[0]).toMatchObject({
+      user_id: 'user-1',
+      quantity: '2.00',
+      calories: '300.00',
+      entered_unit: 'servings',
+      nutrition_confidence: 'verified',
+    });
+    expect(inserted[0]).not.toHaveProperty('id');
+    // Now, a millisecond apart, so they keep their order.
+    expect(Date.parse(inserted[1]!.logged_at as string)).toBe(
+      Date.parse(inserted[0]!.logged_at as string) + 1,
+    );
+    expect(copies.map((log) => log.id)).toEqual(['new-1', 'new-2']);
+  });
+
+  it('does nothing for no logs', async () => {
+    await expect(copyFoodLogs('user-1', [])).resolves.toEqual([]);
+    expect(mockFrom).not.toHaveBeenCalled();
   });
 });

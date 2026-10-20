@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
@@ -11,14 +11,9 @@ import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import { FoodImage } from './FoodImage';
 import { FoodMacros } from './FoodFacts';
+import { loggedJustNow } from './duplicateLog';
 import { useFoodLog } from './FoodLogProvider';
-import {
-  fromServings,
-  gramsPerServing,
-  servingPieces,
-  toServings,
-  type QuantityUnit,
-} from './logQuantity';
+import { amountFor, servingMeasures, servingsFor, type QuantityUnit } from './logQuantity';
 import { defaultMealTypeForTime } from './mealTypes';
 import { calculateLogTotals } from './nutritionCalculations';
 import type { FoodRow } from './foodQueries';
@@ -37,6 +32,8 @@ interface LogFoodStepProps {
   food: LoggableFood;
   /** The quantity the field starts at, in servings -- last time's, when re-logging from Recent. */
   initialQuantity?: number;
+  /** The amount as typed last time ("150" g), when re-logging -- used when the food can still be measured that way. */
+  initialEntry?: { amount: number; unit: QuantityUnit } | null;
   /** Under the food's name in the header -- a scanned product's brand. */
   subtitle?: string;
   /** Open Food Facts' ODbL license asks integrations to credit the source. */
@@ -76,6 +73,7 @@ function servingsText(servings: number): string {
 export function LogFoodStep({
   food,
   initialQuantity = 1,
+  initialEntry = null,
   subtitle,
   showAttribution = false,
   accentColor,
@@ -83,19 +81,33 @@ export function LogFoodStep({
   onDone,
   onCancel,
 }: LogFoodStepProps) {
-  const { logFoodEntry } = useFoodLog();
-  const servingGrams = gramsPerServing(food);
-  const pieces = servingPieces(food.servingLabel);
-  const piecesPerServing = pieces?.perServing ?? null;
-  const [unit, setUnit] = useState<QuantityUnit>(pieces ? 'pieces' : 'servings');
+  const { logs, logFoodEntry } = useFoodLog();
+  const measures = servingMeasures(food);
+  const { servingGrams, servingMl, pieces } = measures;
+  const available = (candidate: QuantityUnit): boolean =>
+    candidate === 'servings' ||
+    (candidate === 'pieces' && pieces !== null) ||
+    ((candidate === 'g' || candidate === 'oz') && servingGrams !== null) ||
+    (candidate === 'ml' && servingMl !== null);
+  // Last time's amount as it was typed, when it can still be measured that way; otherwise the
+  // serving's pieces when it names them, or servings.
+  const startUnit: QuantityUnit =
+    initialEntry && available(initialEntry.unit)
+      ? initialEntry.unit
+      : pieces
+        ? 'pieces'
+        : 'servings';
+  const [unit, setUnit] = useState<QuantityUnit>(startUnit);
   const [quantity, setQuantity] = useState(() =>
-    fromServings(initialQuantity, pieces ? 'pieces' : 'servings', servingGrams, piecesPerServing),
+    initialEntry && initialEntry.unit === startUnit
+      ? String(initialEntry.amount)
+      : amountFor(initialQuantity, startUnit, measures),
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const amount = Number(quantity);
-  const servings = toServings(amount, unit, servingGrams, piecesPerServing);
+  const servings = servingsFor(amount, unit, measures);
   const validAmount = Number.isFinite(servings) && servings > 0;
   const canLog = validAmount && !saving;
   const totals = validAmount ? calculateLogTotals(food, servings) : null;
@@ -109,12 +121,16 @@ export function LogFoodStep({
           { label: 'oz', value: 'oz' as const, accessibilityLabel: 'Ounces' },
         ]
       : []),
+    ...(servingMl !== null
+      ? [{ label: 'ml', value: 'ml' as const, accessibilityLabel: 'Millilitres' }]
+      : []),
   ];
   const fieldLabel: Record<QuantityUnit, string> = {
     servings: 'Quantity',
     pieces: capitalize(pieces?.plural ?? 'pieces'),
     g: 'Grams',
     oz: 'Ounces',
+    ml: 'Millilitres',
   };
 
   // What's being logged, in the unit typed and the one it comes to: "2 cookies · 23 g".
@@ -129,6 +145,8 @@ export function LogFoodStep({
         return `${amount} g · ${servingsText(servings)}`;
       case 'oz':
         return `${amount} oz · ${servingsText(servings)}`;
+      case 'ml':
+        return `${amount} ml · ${servingsText(servings)}`;
       default:
         return withGrams(servingsText(servings));
     }
@@ -136,19 +154,32 @@ export function LogFoodStep({
 
   function changeUnit(next: QuantityUnit) {
     // The amount carries over: 1 serving of a 100 g food becomes 100 g.
-    setQuantity(validAmount ? fromServings(servings, next, servingGrams, piecesPerServing) : '');
+    setQuantity(validAmount ? amountFor(servings, next, measures) : '');
     setUnit(next);
   }
 
-  async function handleLog() {
+  function handleLog() {
     if (!canLog) return;
+    // A second tap seconds after the first is almost always a mistake: ask first.
+    if (loggedJustNow(logs, food.id)) {
+      Alert.alert('Log it again?', `You logged ${food.name} a few seconds ago.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Again', onPress: () => void log() },
+      ]);
+      return;
+    }
+    void log();
+  }
+
+  async function log() {
     setError(null);
     setSaving(true);
     try {
       // Through the shared cache's own write path -- NutritionTodayScreen and
       // ProfileScreen, wherever they're mounted, see this the instant it
       // resolves, with no re-fetch of their own.
-      await logFoodEntry(food, servings, defaultMealTypeForTime());
+      // Kept as typed too, so Today shows "2 cookies" rather than 0.67 servings.
+      await logFoodEntry(food, servings, defaultMealTypeForTime(), { amount, unit });
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to log food');

@@ -216,6 +216,61 @@ describe('NutritionTodayScreen', () => {
     expect(screen.getByTestId('food-log-row-log-1')).toHaveTextContent(/330 cal/);
   });
 
+  it('shows a log in the amount it was typed in, and edits it there', async () => {
+    const cookies = {
+      ...sampleLog,
+      foodNameSnapshot: 'Oreo',
+      servingSize: 34,
+      servingUnit: 'g',
+      servingLabel: '3 cookies (34 g)',
+      quantity: 0.67,
+      calories: 107,
+      enteredAmount: 2,
+      enteredUnit: 'pieces' as const,
+    };
+    mockFetchTodaysFoodLogs.mockResolvedValue([cookies]);
+    mockUpdateFoodLogQuantity.mockResolvedValue({
+      ...cookies,
+      quantity: 1,
+      calories: 160,
+      enteredAmount: 3,
+    });
+
+    renderScreen();
+    await screen.findByTestId('food-log-row-log-1');
+    expect(screen.getByTestId('food-log-quantity-log-1')).toHaveProp('value', '2');
+    expect(screen.getByTestId('food-log-unit-log-1')).toHaveTextContent('cookies');
+
+    fireEvent.changeText(screen.getByTestId('food-log-quantity-log-1'), '3');
+    await act(async () => {
+      fireEvent(screen.getByTestId('food-log-quantity-log-1'), 'endEditing');
+    });
+
+    // 3 cookies of a 3-cookie serving is 1 serving, and stays 3 cookies.
+    expect(mockUpdateFoodLogQuantity).toHaveBeenCalledWith(cookies, 1, {
+      amount: 3,
+      unit: 'pieces',
+    });
+    expect(screen.getByTestId('food-log-quantity-log-1')).toHaveProp('value', '3');
+  });
+
+  it('edits grams as grams', async () => {
+    const grams = { ...sampleLog, enteredAmount: 200, enteredUnit: 'g' as const };
+    mockFetchTodaysFoodLogs.mockResolvedValue([grams]);
+    mockUpdateFoodLogQuantity.mockResolvedValue({ ...grams, quantity: 1.5, enteredAmount: 150 });
+
+    renderScreen();
+    await screen.findByTestId('food-log-row-log-1');
+    expect(screen.getByTestId('food-log-unit-log-1')).toHaveTextContent('g');
+
+    fireEvent.changeText(screen.getByTestId('food-log-quantity-log-1'), '150');
+    await act(async () => {
+      fireEvent(screen.getByTestId('food-log-quantity-log-1'), 'endEditing');
+    });
+
+    expect(mockUpdateFoodLogQuantity).toHaveBeenCalledWith(grams, 1.5, { amount: 150, unit: 'g' });
+  });
+
   it('updates a quantity and re-sums totals from the returned log', async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     mockUpdateFoodLogQuantity.mockResolvedValue({
@@ -233,7 +288,7 @@ describe('NutritionTodayScreen', () => {
       fireEvent(screen.getByTestId('food-log-quantity-log-1'), 'endEditing');
     });
 
-    expect(mockUpdateFoodLogQuantity).toHaveBeenCalledWith(sampleLog, 3);
+    expect(mockUpdateFoodLogQuantity).toHaveBeenCalledWith(sampleLog, 3, undefined);
     await waitFor(() =>
       expect(
         screen.getByTestId('nutrition-today-calorie-ring-value', includeHidden),
@@ -436,7 +491,7 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
     expect(row).toBeTruthy();
     expect(
       screen.getByTestId(`food-log-quantity-${sampleLog.id}`).props.accessibilityLabel,
-    ).toMatch(/^Quantity of /);
+    ).toMatch(/^Amount of Chicken Breast, in servings/);
     const del = screen.getByTestId(`food-log-delete-${sampleLog.id}`);
     expect(del.props.accessibilityLabel).toMatch(/^Delete /);
     expect(StyleSheet.flatten(del.props.style).borderWidth).toBeUndefined();

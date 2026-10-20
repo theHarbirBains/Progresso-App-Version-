@@ -1,11 +1,13 @@
 // The amount typed on the log step, and the servings it comes to -- what a log stores. A food
 // whose serving is a weight (g, kg, oz) can also be logged by weight: 250 g of a food whose
-// serving is 100 g is 2.5 servings. A food whose serving names its pieces ("3 cookies (34 g)",
-// the provider's own wording) can also be logged in those pieces: 2 cookies is 2/3 of a serving.
-// Every other serving unit is logged in servings only.
+// serving is 100 g is 2.5 servings. A drink whose serving is a volume (ml, l) can be logged in
+// millilitres. A food whose serving names its pieces ("3 cookies (34 g)", the provider's own
+// wording) can also be logged in those pieces: 2 cookies is 2/3 of a serving. Every other
+// serving unit is logged in servings only. A log keeps the amount as typed too
+// (food_logs.entered_amount/entered_unit), so it's shown and edited that way afterwards.
 
 /** What the log step's amount is typed in. */
-export type QuantityUnit = 'servings' | 'pieces' | 'g' | 'oz';
+export type QuantityUnit = 'servings' | 'pieces' | 'g' | 'oz' | 'ml';
 
 const GRAMS_PER_OUNCE = 28.349523125;
 
@@ -19,6 +21,15 @@ const GRAMS_PER_SERVING_UNIT: Record<string, number> = {
 /** What one serving weighs in grams, or null when the serving is not a weight (a cup, a slice). */
 export function gramsPerServing(food: { servingSize: number; servingUnit: string }): number | null {
   const perUnit = GRAMS_PER_SERVING_UNIT[food.servingUnit.trim().toLowerCase()];
+  return perUnit === undefined ? null : food.servingSize * perUnit;
+}
+
+// The serving units that are volumes, in millilitres per unit.
+const ML_PER_SERVING_UNIT: Record<string, number> = { ml: 1, l: 1000 };
+
+/** One serving's volume in millilitres, or null when the serving is not a volume. */
+export function mlPerServing(food: { servingSize: number; servingUnit: string }): number | null {
+  const perUnit = ML_PER_SERVING_UNIT[food.servingUnit.trim().toLowerCase()];
   return perUnit === undefined ? null : food.servingSize * perUnit;
 }
 
@@ -132,8 +143,10 @@ export function toServings(
   unit: QuantityUnit,
   servingGrams: number | null,
   piecesPerServing: number | null = null,
+  servingMl: number | null = null,
 ): number {
   if (unit === 'pieces') return round2(piecesPerServing ? amount / piecesPerServing : amount);
+  if (unit === 'ml') return round2(servingMl ? amount / servingMl : amount);
   if (unit === 'servings' || servingGrams === null) return round2(amount);
   const grams = unit === 'g' ? amount : amount * GRAMS_PER_OUNCE;
   return round2(grams / servingGrams);
@@ -145,9 +158,74 @@ export function fromServings(
   unit: QuantityUnit,
   servingGrams: number | null,
   piecesPerServing: number | null = null,
+  servingMl: number | null = null,
 ): string {
   if (unit === 'pieces') return String(round2(servings * (piecesPerServing ?? 1)));
+  if (unit === 'ml') return String(round2(servings * (servingMl ?? 1)));
   if (unit === 'servings' || servingGrams === null) return String(round2(servings));
   const grams = servings * servingGrams;
   return String(round2(unit === 'g' ? grams : grams / GRAMS_PER_OUNCE));
+}
+
+/** Everything a serving can be counted in: its weight, its volume, its pieces. */
+export interface ServingMeasures {
+  servingGrams: number | null;
+  servingMl: number | null;
+  pieces: ServingPieces | null;
+}
+
+/** A food's -- or a log's own snapshot of it -- serving measures. */
+export function servingMeasures(food: {
+  servingSize: number;
+  servingUnit: string;
+  servingLabel?: string | null;
+}): ServingMeasures {
+  return {
+    servingGrams: gramsPerServing(food),
+    servingMl: mlPerServing(food),
+    pieces: servingPieces(food.servingLabel),
+  };
+}
+
+/** The servings an amount in `unit` comes to, given a serving's measures. */
+export function servingsFor(amount: number, unit: QuantityUnit, measures: ServingMeasures): number {
+  return toServings(
+    amount,
+    unit,
+    measures.servingGrams,
+    measures.pieces?.perServing ?? null,
+    measures.servingMl,
+  );
+}
+
+/** The amount, in `unit`, that a number of servings is, given a serving's measures. */
+export function amountFor(servings: number, unit: QuantityUnit, measures: ServingMeasures): string {
+  return fromServings(
+    servings,
+    unit,
+    measures.servingGrams,
+    measures.pieces?.perServing ?? null,
+    measures.servingMl,
+  );
+}
+
+/** The unit word for an amount: "g", "ml", "cookies" / "cookie", "servings" / "serving". */
+export function unitWord(amount: number, unit: QuantityUnit, pieces: ServingPieces | null): string {
+  switch (unit) {
+    case 'pieces':
+      return amount === 1 ? (pieces?.singular ?? 'piece') : (pieces?.plural ?? 'pieces');
+    case 'servings':
+      return amount === 1 ? 'serving' : 'servings';
+    default:
+      return unit;
+  }
+}
+
+/** An amount as typed: "2 cookies", "150 g", "330 ml", "1.5 servings". */
+export function amountText(
+  amount: number,
+  unit: QuantityUnit,
+  pieces: ServingPieces | null,
+): string {
+  return `${amount} ${unitWord(amount, unit, pieces)}`;
 }

@@ -284,6 +284,7 @@ describe('FoodSearchScreen', () => {
       1,
       // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
+      { amount: 1, unit: 'servings' },
     );
     expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
     expect(mockNavigate).not.toHaveBeenCalledWith('Nutrition');
@@ -308,6 +309,7 @@ describe('FoodSearchScreen', () => {
       expect.objectContaining({ fatG: 0 }),
       1,
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
+      { amount: 1, unit: 'servings' },
     );
   });
 

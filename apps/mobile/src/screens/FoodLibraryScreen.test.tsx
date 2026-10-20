@@ -319,6 +319,7 @@ describe('FoodLibraryScreen', () => {
       expect.objectContaining({ id: 'food-scanned' }),
       1,
       expect.anything(),
+      { amount: 1, unit: 'servings' },
     );
     // Done returns to Nutrition, not back to the scanner's not-found screen.
     expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
@@ -506,6 +507,7 @@ describe('FoodLibraryScreen', () => {
       1,
       // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
+      { amount: 1, unit: 'servings' },
     );
     expect(mockGoBack).toHaveBeenCalled();
   });
@@ -585,6 +587,7 @@ describe('FoodLibraryScreen -- Recent', () => {
       yogurt,
       2,
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
+      { amount: 2, unit: 'servings' },
     );
     expect(mockGoBack).toHaveBeenCalled();
   });
@@ -613,7 +616,10 @@ describe('FoodLibraryScreen -- Recent', () => {
       fireEvent.press(screen.getByTestId('log-food-submit'));
     });
 
-    expect(mockLogFood).toHaveBeenCalledWith('user-1', edited, 1, expect.any(String));
+    expect(mockLogFood).toHaveBeenCalledWith('user-1', edited, 1, expect.any(String), {
+      amount: 1,
+      unit: 'servings',
+    });
   });
 
   it('hides Recent while searching', async () => {

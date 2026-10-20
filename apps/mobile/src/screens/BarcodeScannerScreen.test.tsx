@@ -353,6 +353,7 @@ describe('BarcodeScannerScreen logging', () => {
       0.67,
       // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
+      { amount: 2, unit: 'pieces' },
     );
     expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
     expect(mockNavigate).not.toHaveBeenCalledWith('Nutrition');

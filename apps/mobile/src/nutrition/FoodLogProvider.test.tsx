@@ -140,7 +140,7 @@ describe('FoodLogProvider', () => {
       await result.current.logFoodEntry(sampleFood, 1, 'lunch');
     });
 
-    expect(mockLogFood).toHaveBeenCalledWith('user-1', sampleFood, 1, 'lunch');
+    expect(mockLogFood).toHaveBeenCalledWith('user-1', sampleFood, 1, 'lunch', undefined);
     expect(result.current.logs).toHaveLength(2);
     expect(result.current.logs[1].imageUrl).toBe('https://images.example/rice.jpg');
     expect(mockFetchTodaysFoodLogs).not.toHaveBeenCalled();
@@ -163,6 +163,7 @@ describe('FoodLogProvider', () => {
     expect(mockUpdateFoodLogQuantity).toHaveBeenCalledWith(
       { ...sampleLog, imageUrl: 'https://images.example/a.jpg' },
       3,
+      undefined,
     );
     expect(result.current.logs[0].calories).toBe(495);
     expect(result.current.logs[0].imageUrl).toBe('https://images.example/a.jpg');

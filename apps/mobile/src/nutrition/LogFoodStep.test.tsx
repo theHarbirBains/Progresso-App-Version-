@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useFoodLog } from './FoodLogProvider';
@@ -25,7 +26,8 @@ const MEAL = expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/);
 
 beforeEach(() => {
   mockLogFoodEntry.mockReset().mockResolvedValue({});
-  mockUseFoodLog.mockReturnValue({ logFoodEntry: mockLogFoodEntry });
+  mockUseFoodLog.mockReturnValue({ logs: [], logFoodEntry: mockLogFoodEntry });
+  jest.restoreAllMocks();
 });
 
 function renderStep(food: LoggableFood = rice, initialQuantity?: number) {
@@ -63,7 +65,7 @@ describe('LogFoodStep', () => {
     expect(screen.getByTestId('log-food-calories')).toHaveTextContent(/260/);
     await submit();
 
-    expect(mockLogFoodEntry).toHaveBeenCalledWith(rice, 2, MEAL);
+    expect(mockLogFoodEntry).toHaveBeenCalledWith(rice, 2, MEAL, { amount: 2, unit: 'servings' });
     expect(onDone).toHaveBeenCalled();
   });
 
@@ -97,7 +99,7 @@ describe('LogFoodStep', () => {
     expect(screen.getByTestId('log-food-calories')).toHaveTextContent(/325/);
     await submit();
 
-    expect(mockLogFoodEntry).toHaveBeenCalledWith(rice, 2.5, MEAL);
+    expect(mockLogFoodEntry).toHaveBeenCalledWith(rice, 2.5, MEAL, { amount: 250, unit: 'g' });
   });
 
   it('logs ounces as servings too, and switching back keeps the amount', async () => {
@@ -112,7 +114,7 @@ describe('LogFoodStep', () => {
     expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '2');
     await submit();
 
-    expect(mockLogFoodEntry).toHaveBeenCalledWith(rice, 2, MEAL);
+    expect(mockLogFoodEntry).toHaveBeenCalledWith(rice, 2, MEAL, { amount: 2, unit: 'servings' });
   });
 
   it('will not log an amount that comes to no servings', async () => {
@@ -185,7 +187,11 @@ describe('LogFoodStep', () => {
       expect(screen.getByTestId('log-food-calories')).toHaveTextContent(/107/);
       await submit();
 
-      expect(mockLogFoodEntry).toHaveBeenCalledWith(oreo, 0.67, MEAL);
+      // Kept as typed, so Today shows 2 cookies.
+      expect(mockLogFoodEntry).toHaveBeenCalledWith(oreo, 0.67, MEAL, {
+        amount: 2,
+        unit: 'pieces',
+      });
     });
 
     it('says one cookie in the singular, and can still be switched to grams', () => {
@@ -210,5 +216,89 @@ describe('LogFoodStep', () => {
 
     fireEvent.press(screen.getByTestId('log-food-unit-g'));
     expectNoBareText();
+  });
+});
+
+describe('LogFoodStep -- drinks, last time and double taps', () => {
+  const cola: LoggableFood = {
+    id: 'food-cola',
+    name: 'Cola',
+    servingSize: 330,
+    servingUnit: 'ml',
+    calories: 139,
+    proteinG: 0,
+    carbsG: 35,
+    fatG: 0,
+  };
+
+  it('logs a drink in millilitres', async () => {
+    renderStep(cola);
+
+    expect(screen.getByTestId('log-food-unit-ml').props.accessibilityLabel).toBe('Millilitres');
+    fireEvent.press(screen.getByTestId('log-food-unit-ml'));
+    expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '330');
+    fireEvent.changeText(screen.getByTestId('log-food-quantity'), '165');
+    expect(screen.getByTestId('log-food-amount')).toHaveTextContent('165 ml · 0.5 servings');
+    await submit();
+
+    expect(mockLogFoodEntry).toHaveBeenCalledWith(cola, 0.5, MEAL, { amount: 165, unit: 'ml' });
+  });
+
+  it('starts in the amount and unit typed last time', () => {
+    render(
+      <LogFoodStep
+        food={rice}
+        initialQuantity={1.5}
+        initialEntry={{ amount: 150, unit: 'g' }}
+        accentColor="#3DDC97"
+        onAccentColor="#000000"
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('log-food-unit-g').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '150');
+  });
+
+  it("falls back to servings when last time's unit no longer fits the food", () => {
+    render(
+      <LogFoodStep
+        food={{ ...rice, servingSize: 1, servingUnit: 'cup' }}
+        initialQuantity={2}
+        initialEntry={{ amount: 150, unit: 'g' }}
+        accentColor="#3DDC97"
+        onAccentColor="#000000"
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '2');
+  });
+
+  it('asks before logging the same food again seconds later', async () => {
+    mockUseFoodLog.mockReturnValue({
+      logs: [{ foodId: 'food-rice', loggedAt: new Date(Date.now() - 2000).toISOString() }],
+      logFoodEntry: mockLogFoodEntry,
+    });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    renderStep();
+
+    await submit();
+
+    expect(alert).toHaveBeenCalledWith(
+      'Log it again?',
+      'You logged White Rice a few seconds ago.',
+      expect.any(Array),
+    );
+    expect(mockLogFoodEntry).not.toHaveBeenCalled();
+
+    // "Log Again" logs it.
+    const buttons = alert.mock.calls[0]![2]!;
+    await act(async () => {
+      buttons.find((b) => b.text === 'Log Again')!.onPress!();
+    });
+    expect(mockLogFoodEntry).toHaveBeenCalled();
   });
 });
