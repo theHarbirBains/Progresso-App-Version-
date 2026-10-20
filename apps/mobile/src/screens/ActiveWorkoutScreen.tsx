@@ -92,7 +92,7 @@ type Props = RootStackScreenProps<'ActiveWorkout'>;
 // direct-to-Supabase workoutQueries functions; nothing here talks to a new
 // endpoint.
 export function ActiveWorkoutScreen({ route, navigation }: Props) {
-  const { workoutId } = route.params;
+  const { workoutId, planned } = route.params;
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
@@ -329,7 +329,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           // A workout just started from a split day's plan: its sets were made ahead of time,
           // blank, and start from last time, as a set added with Add Set does. A set with
           // anything typed or ticked is left as it is.
-          if (route.params.planned)
+          if (planned)
             setSetInputs((prev) => {
               let next = prev;
               for (const exercise of detail.exercises) {
@@ -365,7 +365,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     };
     // setSetInputs is useSetInputDrafts' own useState setter and navigation is the screen's own
     // (both stable for the life of the screen); listed for the linter, not because they change.
-  }, [workoutId, themeLoading, weightUnit, userId, setSetInputs, navigation]);
+  }, [workoutId, planned, themeLoading, weightUnit, userId, setSetInputs, navigation]);
 
   function updateExerciseSets(
     exerciseId: string,
