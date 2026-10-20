@@ -1,8 +1,10 @@
 import type { PropsWithChildren } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { interpretFoodDescription, resolveFoodComponent } from '../lib/api';
-import { createFood, findOwnFoodByName } from '../nutrition/foodQueries';
+import { createFood, findOwnFoodByName, updateFood } from '../nutrition/foodQueries';
+import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { AiFoodSearchScreen } from './AiFoodSearchScreen';
@@ -24,6 +26,11 @@ jest.mock('../profile/profileQueries', () => ({
 jest.mock('../nutrition/foodQueries', () => ({
   createFood: jest.fn(),
   findOwnFoodByName: jest.fn(),
+  updateFood: jest.fn(),
+}));
+
+jest.mock('../nutrition/FoodLogProvider', () => ({
+  useFoodLog: jest.fn(),
 }));
 
 function TestProviders({ children }: PropsWithChildren) {
@@ -36,11 +43,20 @@ const mockInterpret = interpretFoodDescription as jest.Mock;
 const mockResolve = resolveFoodComponent as jest.Mock;
 const mockCreateFood = createFood as jest.Mock;
 const mockFindOwnFoodByName = findOwnFoodByName as jest.Mock;
+const mockUpdateFood = updateFood as jest.Mock;
+const mockUseFoodLog = useFoodLog as jest.Mock;
+const mockLogFoodEntry = jest.fn();
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
+const mockDispatch = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { goBack: mockGoBack, navigate: mockNavigate };
+const navigation: any = {
+  goBack: mockGoBack,
+  navigate: mockNavigate,
+  dispatch: mockDispatch,
+  getState: () => ({ routes: [{ name: 'Nutrition' }, { name: 'AiFoodSearch' }] }),
+};
 const route = {} as never;
 
 const POTATO_FIGURES = {
@@ -458,5 +474,118 @@ describe('AiFoodSearchScreen', () => {
     await screen.findByTestId('ai-food-search-input');
 
     expectNoBareText();
+  });
+});
+
+describe('AiFoodSearchScreen -- Review & Log', () => {
+  const savedPotato = {
+    id: 'food-potato',
+    name: 'air fried potatoes (air fried, no oil)',
+    brand: null,
+    barcode: null,
+    imageUrl: null,
+    servingSize: 100,
+    servingUnit: 'g',
+    calories: 93,
+    proteinG: 2.5,
+    carbsG: 21.2,
+    fatG: 0.1,
+    isActive: true,
+  };
+
+  beforeEach(() => {
+    mockLogFoodEntry.mockReset().mockResolvedValue({});
+    mockUseFoodLog.mockReturnValue({ logs: [], logFoodEntry: mockLogFoodEntry });
+    mockUpdateFood.mockReset();
+  });
+
+  async function openAdjust() {
+    renderScreen();
+    describeFood('100 grams of air fried potatoes with no oil');
+    await screen.findByTestId('ai-food-review');
+    fireEvent.press(screen.getByTestId('ai-food-log'));
+    return screen.findByTestId('ai-adjust-calories');
+  }
+
+  it('lets the numbers be checked and changed, then logs the food to today at the amount chosen', async () => {
+    mockCreateFood.mockImplementation(async (_user: string, input: object) => ({
+      ...savedPotato,
+      ...input,
+    }));
+    await openAdjust();
+
+    expect(screen.getByTestId('ai-adjust-serving')).toHaveTextContent(/For 100 g/);
+    expect(screen.getByTestId('ai-adjust-source')).toHaveTextContent(/verified/);
+    fireEvent.changeText(screen.getByTestId('ai-adjust-calories'), '110');
+    expect(screen.getByTestId('ai-adjust-source')).toHaveTextContent('Adjusted by you.');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('ai-adjust-continue'));
+    });
+
+    expect(mockCreateFood).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({
+        calories: 110,
+        provenance: expect.objectContaining({
+          confidence: 'user_entered',
+          assumptions: expect.arrayContaining(['Figures adjusted by you after AI Food Search.']),
+        }),
+      }),
+    );
+    // The usual log step: the amount, in servings or grams.
+    fireEvent.changeText(await screen.findByTestId('log-food-quantity'), '2');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('log-food-submit'));
+    });
+    expect(mockLogFoodEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ calories: 110 }),
+      2,
+      expect.any(String),
+      { amount: 2, unit: 'servings' },
+    );
+    expect(mockDispatch).toHaveBeenCalled();
+  });
+
+  it('logs the saved food again rather than adding a second copy with the same figures', async () => {
+    await openAdjust();
+    mockFindOwnFoodByName.mockResolvedValue(savedPotato);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('ai-adjust-continue'));
+    });
+
+    expect(await screen.findByTestId('log-food-quantity')).toBeTruthy();
+    expect(mockCreateFood).not.toHaveBeenCalled();
+    expect(mockUpdateFood).not.toHaveBeenCalled();
+  });
+
+  it('asks before using or updating a saved food of the same name with other figures', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Update Saved')?.onPress?.();
+    });
+    mockUpdateFood.mockResolvedValue({ ...savedPotato, calories: 93 });
+    await openAdjust();
+    mockFindOwnFoodByName.mockResolvedValue({ ...savedPotato, calories: 150 });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('ai-adjust-continue'));
+    });
+
+    expect(alert.mock.calls[0]![0]).toBe(
+      '"air fried potatoes (air fried, no oil)" is already in your Food Library',
+    );
+    expect(mockUpdateFood).toHaveBeenCalledWith(
+      'food-potato',
+      expect.objectContaining({ calories: 93, servingSize: 100 }),
+    );
+    expect(await screen.findByTestId('log-food-quantity')).toBeTruthy();
+    expect(mockCreateFood).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
+  it("won't continue with a figure that isn't a number", async () => {
+    await openAdjust();
+
+    fireEvent.changeText(screen.getByTestId('ai-adjust-protein'), '');
+
+    expect(screen.getByTestId('ai-adjust-continue').props.accessibilityState.disabled).toBe(true);
   });
 });

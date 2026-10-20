@@ -31,6 +31,8 @@ interface Props {
     quantity: { amount: number; unit: string } | null,
   ) => void;
   onAdd: () => void;
+  /** Goes on to check the numbers and log the food to today's diary. */
+  onLog: () => void;
   onDescribeAgain: () => void;
   accentColor: string;
   onAccentColor: string;
@@ -52,6 +54,7 @@ export function InterpretedFoodReview({
   resolvingIndex,
   onResolve,
   onAdd,
+  onLog,
   onDescribeAgain,
   accentColor,
   onAccentColor,
@@ -216,13 +219,19 @@ export function InterpretedFoodReview({
         ) : null}
 
         <PrimaryButton
+          testID="ai-food-log"
+          label="Review & Log"
+          disabled={adding || !interpretation.complete}
+          onPress={onLog}
+          accentColor={accentColor}
+          onAccentColor={onAccentColor}
+        />
+        <SecondaryButton
           testID="ai-food-add"
           label={adding ? 'Adding…' : 'Add to Food Library'}
           loading={adding}
           disabled={adding || !interpretation.complete || duplicateName !== null}
           onPress={onAdd}
-          accentColor={accentColor}
-          onAccentColor={onAccentColor}
         />
         <SecondaryButton
           testID="ai-food-describe-again"

@@ -347,11 +347,15 @@ describe('NutritionTodayScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
   });
 
-  it('does not show AI Food Search as a button -- it lives inside Food Library', async () => {
+  it('opens AI Food Search straight from the Nutrition dashboard', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
 
-    expect(screen.queryByTestId('ai-food-search-button')).toBeNull();
+    const button = screen.getByTestId('ai-food-search-button');
+    expect(button).toHaveTextContent(/Describe a Food/);
+    expect(button.props.accessibilityLabel).toBe('AI Food Search');
+    fireEvent.press(button);
+    expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch');
   });
 
   it('opens Nutrition History from View All, and Nutrition Goals from Edit Targets', async () => {

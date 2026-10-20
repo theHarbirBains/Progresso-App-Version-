@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -14,13 +14,24 @@ import {
   type ComponentRequest,
   type FoodInterpretation,
 } from '../lib/api';
-import { createFood, findOwnFoodByName } from '../nutrition/foodQueries';
+import { AiFoodAdjustStep } from '../nutrition/AiFoodAdjustStep';
+import {
+  createFood,
+  findOwnFoodByName,
+  updateFood,
+  type FoodInput,
+  type FoodRow,
+} from '../nutrition/foodQueries';
 import { InterpretedFoodReview } from '../nutrition/InterpretedFoodReview';
 import {
+  adjustedProvenance,
   libraryFoodInput,
   libraryFoodName,
+  sameFigures,
   withComponentStatus,
 } from '../nutrition/interpretedFood';
+import { LogFoodStep } from '../nutrition/LogFoodStep';
+import { goToSection } from '../navigation/sectionNavigation';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { aiFoodSearchStyles as styles } from './aiFoodSearchStyles';
@@ -30,7 +41,13 @@ type Props = RootStackScreenProps<'AiFoodSearch'>;
 // AI Food Search: the user describes what they ate in their own words. Claude only works out
 // what the words mean. Progresso's own food data and other sources supply every figure, each
 // scaled to the amount given. Parts that need an amount or a choice are resolved on the review,
-// and only the Add to Food Library tap saves anything.
+// and nothing is saved until the person says so:
+// - Review & Log: check (and change) the name and figures, then set the amount on the usual log
+//   step and log it to today. The food is kept in the Food Library for next time -- the same
+//   food again if one of that name already has these figures, never a second copy; a saved food
+//   of that name with other figures is used or updated only on the person's choice.
+// - Add to Food Library: save it for later without logging.
+type Step = { type: 'search' } | { type: 'adjust' } | { type: 'log'; food: FoodRow };
 export function AiFoodSearchScreen({ navigation }: Props) {
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
@@ -45,6 +62,9 @@ export function AiFoodSearchScreen({ navigation }: Props) {
   const [duplicateName, setDuplicateName] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [resolvingIndex, setResolvingIndex] = useState<number | null>(null);
+  const [step, setStep] = useState<Step>({ type: 'search' });
+  const [preparing, setPreparing] = useState(false);
+  const [adjustError, setAdjustError] = useState<string | null>(null);
 
   const trimmed = description.trim();
 
@@ -126,6 +146,84 @@ export function AiFoodSearchScreen({ navigation }: Props) {
     }
   }
 
+  // The food to log, kept in the library: a saved food of the same name with the same figures is
+  // used again; one with other figures is used or updated only if the person says so.
+  async function handleContinue(input: FoodInput, adjusted: boolean) {
+    if (!userId || preparing) return;
+    const food: FoodInput = adjusted
+      ? { ...input, provenance: adjustedProvenance(input.provenance) }
+      : input;
+    setAdjustError(null);
+    setPreparing(true);
+    try {
+      const existing = await findOwnFoodByName(userId, food.name);
+      if (!existing) {
+        setStep({ type: 'log', food: await createFood(userId, food) });
+        return;
+      }
+      if (sameFigures(existing, food)) {
+        setStep({ type: 'log', food: existing });
+        return;
+      }
+      Alert.alert(
+        `"${existing.name}" is already in your Food Library`,
+        `Saved: ${Math.round(existing.calories)} cal for ${existing.servingSize} ${existing.servingUnit}. This search: ${Math.round(food.calories)} cal for ${food.servingSize} ${food.servingUnit}.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Use Saved', onPress: () => setStep({ type: 'log', food: existing }) },
+          {
+            text: 'Update Saved',
+            onPress: () => {
+              void updateFood(existing.id, {
+                servingSize: food.servingSize,
+                servingUnit: food.servingUnit,
+                calories: food.calories,
+                proteinG: food.proteinG,
+                carbsG: food.carbsG,
+                fatG: food.fatG,
+                provenance: food.provenance,
+              })
+                .then((updated) => setStep({ type: 'log', food: updated }))
+                .catch((err: unknown) =>
+                  setAdjustError(err instanceof Error ? err.message : 'Failed to update the food'),
+                );
+            },
+          },
+        ],
+      );
+    } catch (err) {
+      setAdjustError(err instanceof Error ? err.message : 'Failed to prepare the food');
+    } finally {
+      setPreparing(false);
+    }
+  }
+
+  if (step.type === 'log') {
+    return (
+      <LogFoodStep
+        food={step.food}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+        onDone={() => goToSection(navigation, 'Nutrition')}
+        onCancel={() => setStep({ type: 'adjust' })}
+      />
+    );
+  }
+
+  if (step.type === 'adjust' && interpretation?.complete) {
+    return (
+      <AiFoodAdjustStep
+        input={libraryFoodInput(interpretation)}
+        busy={preparing}
+        error={adjustError}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+        onContinue={(input, adjusted) => void handleContinue(input, adjusted)}
+        onBack={() => setStep({ type: 'search' })}
+      />
+    );
+  }
+
   return (
     <Screen
       keyboardAvoiding
@@ -193,6 +291,10 @@ export function AiFoodSearchScreen({ navigation }: Props) {
           resolvingIndex={resolvingIndex}
           onResolve={handleResolve}
           onAdd={handleAdd}
+          onLog={() => {
+            setAdjustError(null);
+            setStep({ type: 'adjust' });
+          }}
           onDescribeAgain={() => {
             setInterpretation(null);
             setDuplicateName(null);

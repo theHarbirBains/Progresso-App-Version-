@@ -160,6 +160,44 @@ export function libraryFoodInput(interpretation: FoodInterpretation): FoodInput 
   };
 }
 
+/**
+ * Figures the person changed after AI Food Search are their own from then on: the food keeps
+ * what it was worked out from (its components), and says it was adjusted.
+ */
+export function adjustedProvenance(provenance: FoodProvenance | null | undefined): FoodProvenance {
+  return {
+    confidence: 'user_entered',
+    sourceKind: 'user_entered',
+    sourceId: null,
+    matchedName: provenance?.matchedName ?? null,
+    dataVersion: provenance?.dataVersion ?? null,
+    retrievedAt: provenance?.retrievedAt ?? null,
+    licence: 'none',
+    attribution: provenance?.attribution ?? null,
+    assumptions: [
+      ...(provenance?.assumptions ?? []),
+      'Figures adjusted by you after AI Food Search.',
+    ],
+    components: provenance?.components ?? null,
+  };
+}
+
+/** Whether a saved food already has these figures for this serving -- the same food, logged again. */
+export function sameFigures(
+  a: Pick<FoodInput, 'servingSize' | 'servingUnit' | 'calories' | 'proteinG' | 'carbsG' | 'fatG'>,
+  b: Pick<FoodInput, 'servingSize' | 'servingUnit' | 'calories' | 'proteinG' | 'carbsG' | 'fatG'>,
+): boolean {
+  const close = (x: number, y: number) => Math.abs(x - y) <= 0.5;
+  return (
+    close(a.servingSize, b.servingSize) &&
+    a.servingUnit.trim().toLowerCase() === b.servingUnit.trim().toLowerCase() &&
+    close(a.calories, b.calories) &&
+    close(a.proteinG, b.proteinG) &&
+    close(a.carbsG, b.carbsG) &&
+    close(a.fatG, b.fatG)
+  );
+}
+
 /** The line that says where a component's figures came from. */
 export function componentSourceLabel(status: ComponentStatus): string {
   if (status.state === 'ai_estimate') return 'AI estimate, not verified';

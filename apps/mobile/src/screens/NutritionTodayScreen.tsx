@@ -65,9 +65,9 @@ function grams(value: number): string {
 //   Sunday -- against what's been eaten so far, as a bar, with what's left and the days
 //   left to spread it over (WeeklyCalorieBudget).
 // - **Actions**: Log Food, the one filled button, with Scan Barcode and Search
-//   Food outlined side by side under it (two more ways into the same
-//   LogFoodStep-backed logging flow). AI Food Search lives inside Food Library
-//   (Log Food's destination) rather than as a fourth button here.
+//   Food outlined side by side under it, and AI Food Search ("Describe a Food")
+//   outlined under those -- every way into the same LogFoodStep-backed logging
+//   flow.
 // - **Today's Foods**, with View All (Nutrition History): each food as a row --
 //   its picture, its name, the values snapshotted when it was logged, an
 //   editable quantity and a quiet Delete -- or, with none yet, a quiet empty
@@ -353,6 +353,14 @@ export function NutritionTodayScreen({ navigation }: Props) {
             />
           </View>
         </View>
+        <SecondaryButton
+          testID="ai-food-search-button"
+          label="Describe a Food (AI)"
+          accessibilityLabel="AI Food Search"
+          icon="zap"
+          size="md"
+          onPress={() => navigation.navigate('AiFoodSearch')}
+        />
       </AppCard>
 
       <AppCard testID="nutrition-today-foods">
