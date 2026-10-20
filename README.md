@@ -43,7 +43,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Progress & analytics**
 
-- A Progress tab with Overview, Top Sets, Strength and All Time sections
+- A Progress tab with Overview (the phase going now, the Weekly Summary and 12 weeks of consistency), Top Sets, Strength, Nutrition (a week, month or three months of logged food against the targets in force each day, each day opening its foods) and All Time sections
 - A Weekly Summary at the top of Overview, for this week or last: workout days against your weekly goal, average calories and protein and the days on target, sets per muscle group against the 4 weeks before, and your main lifts' top sets against their best in the 4 weeks before
 - Per-exercise and lifetime top sets, rep-count PRs, and true 1RM tracking (1RM is only ever recorded from an actual 1-rep set), plus most reps and longest time for bodyweight and timed exercises
 - Strength trend charts and progress metrics per exercise
@@ -51,14 +51,15 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Nutrition**
 
-- Today's calories and macros against your goals, with goal estimates calculated from your body data, and a history calendar
+- Today's calories and macros against your own targets: calories, protein, fat and carbs, each optional and yours to set. Suggestions only on a tap -- calorie estimates from your body data, protein and fat from your body weight, carbs from the calories left after protein and fat (kept as you typed once you change them) -- with the calories your macros add up to and any conflict explained
+- Phases: record a cut, bulk, maintenance or your own phase from a start date (today or earlier), with optional start and target weight, its own targets (used in place of your daily ones while it's going, never overwriting them) and notes; edit, end and review past phases
 - A weekly calorie budget (7 times your daily target, Monday to Sunday) on Today, so eating less one day leaves more for another
 - Log Food opens your Food Library: your saved meals, your usual foods (the ones you log on the most days) and your most recently logged foods first, ready to re-log at last time's amount, then your own foods (with photos) and recipes
 - Saved meals: foods you eat together, logged in one go, each as its own entry; build one in the Food Library or save today's foods as one
 - Recipes: a drink or a meal always made the same way -- its ingredients and how many servings it makes -- logged as a single food, with its figures per serving worked out from the ingredients
 - Copy Yesterday logs any of yesterday's foods again, exactly as they were logged
 - Search Food covers Progresso's food catalog and Open Food Facts; Scan Barcode looks products up on Open Food Facts, with Enter Manually when one isn't found
-- AI Food Search turns a description into its parts and takes their figures from Progresso's catalog, USDA data and Open Food Facts; Claude's own estimate is used only as a labelled last resort. Each user has an hourly and a daily limit
+- AI Food Search (from the Nutrition dashboard or the Food Library) turns a description into its parts and takes their figures from Progresso's catalog, USDA data and Open Food Facts; Claude's own estimate is used only as a labelled last resort. Review & Log lets you check and change the name and figures before setting the amount and logging it, without adding a duplicate to your library. Each user has an hourly and a daily limit
 - A food can be logged in servings, in the pieces its serving names (cookies, slices), in grams or ounces when its serving is a weight, or in millilitres when it's a drink; a log keeps the amount as typed and is edited that way, and logging the same food twice within seconds asks first
 - Every log keeps the figures it was logged with, even if the food (or recipe) changes later
 
