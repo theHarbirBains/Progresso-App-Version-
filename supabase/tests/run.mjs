@@ -1827,14 +1827,8 @@ async function main() {
       Boolean(leftSet.id) && Boolean(rightSet.id),
     );
 
-    // The unique constraint is deferrable (needed for reorderExercises'
-    // real bulk-upsert use case elsewhere), so it's only checked at COMMIT
-    // by default -- and this whole test never commits (always rolled back
-    // for isolation). Force it to check immediately so the violation below
-    // actually raises within this still-open transaction.
-    await admin.query(
-      'set constraints public.sets_workout_exercise_id_set_index_side_key immediate',
-    );
+    // The live-slot unique index is checked immediately, so the violation
+    // below raises within this still-open transaction.
     await expectThrowsInTransaction(
       admin,
       () =>
@@ -1860,9 +1854,6 @@ async function main() {
     await admin.query(
       'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 100, 5, now())',
       [weBilateral.id],
-    );
-    await admin.query(
-      'set constraints public.sets_workout_exercise_id_set_index_side_key immediate',
     );
     await expectThrowsInTransaction(
       admin,
@@ -3962,8 +3953,8 @@ async function main() {
       ).rows[0].rep_range_max === 10,
     );
     await expectThrows(
-      admin.query('update public.users set rep_range_min = 10 where id = $1', [lifter]),
-      "A range's bottom must be below its top",
+      admin.query('update public.users set rep_range_min = 11 where id = $1', [lifter]),
+      "A range's bottom can't be above its top",
       /users_rep_range_check/,
     );
     await expectThrows(
@@ -4135,6 +4126,227 @@ async function main() {
         await admin.query(
           'select ((select count(*) from public.saved_meals where user_id = $1) + (select count(*) from public.saved_meal_items where user_id = $1) + (select count(*) from public.recipe_ingredients where user_id = $1))::int as n',
           [cook],
+        )
+      ).rows[0].n === 0,
+    );
+  }
+
+  console.log('\nRunning training improvement tests...\n');
+  {
+    const [lifter, stranger] = [randomUUID(), randomUUID()];
+    await admin.query('insert into auth.users (id, email) values ($1, $2), ($3, $4)', [
+      lifter,
+      `lifter-${lifter}@test.local`,
+      stranger,
+      `stranger-${stranger}@test.local`,
+    ]);
+    const builtIn = (await admin.query("select id from public.exercises where name = 'Barbell Back Squat'"))
+      .rows[0].id;
+    const strangersExercise = (
+      await admin.query(
+        "insert into public.exercises (created_by, name, muscle_group) values ($1, 'Their Curl', 'biceps') returning id",
+        [stranger],
+      )
+    ).rows[0].id;
+
+    // A removed set gives up its slot.
+    const workout = (
+      await admin.query(
+        "insert into public.workouts (user_id, name, completed_at) values ($1, 'Legs', now()) returning id",
+        [lifter],
+      )
+    ).rows[0].id;
+    const we = (
+      await admin.query(
+        'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+        [workout, builtIn],
+      )
+    ).rows[0].id;
+    await admin.query(
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 100, 5, now()), ($1, 2, 100, 5, now())',
+      [we],
+    );
+    await admin.query(
+      'update public.sets set deleted_at = now() where workout_exercise_id = $1 and set_index = 2',
+      [we],
+    );
+    await admin.query(
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 2, 105, 5, now())',
+      [we],
+    );
+    record('A set can be added again in the slot a removed set left', true);
+    await expectThrows(
+      admin.query(
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 2, 110, 5, now())',
+        [we],
+      ),
+      'Two live sets still cannot share a slot',
+      /duplicate key|unique/i,
+    );
+    const pr = await admin.query(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 5',
+      [lifter, builtIn],
+    );
+    record(
+      "A removed set's weight never stays a PR",
+      Number(pr.rows[0]?.best_weight_kg) === 105,
+      `best: ${pr.rows[0]?.best_weight_kg}`,
+    );
+
+    // A rep range may be one number.
+    await admin.query('update public.users set rep_range_min = 5, rep_range_max = 5 where id = $1', [
+      lifter,
+    ]);
+    record('A rep range can be a single number', true);
+    await expectThrows(
+      admin.query('update public.users set rep_range_min = 6, rep_range_max = 5 where id = $1', [
+        lifter,
+      ]),
+      "A rep range's bottom can't be above its top",
+      /users_rep_range_check/,
+    );
+
+    // Per-exercise progression settings.
+    await asUserCommitted(lifter, (c) =>
+      c.query(
+        'insert into public.exercise_progression_settings (user_id, exercise_id, rep_range_min, rep_range_max, weight_increment_kg) values ($1, $2, 3, 5, 2.5)',
+        [lifter, builtIn],
+      ),
+    );
+    record('Someone can set their own range and increment for an exercise', true);
+    await expectThrows(
+      asUser(lifter, (c) =>
+        c.query(
+          'insert into public.exercise_progression_settings (user_id, exercise_id, rep_range_min, rep_range_max) values ($1, $2, 8, 12)',
+          [lifter, strangersExercise],
+        ),
+      ),
+      "Settings can't be kept for someone else's custom exercise",
+      /exercise not available/,
+    );
+    await expectThrows(
+      admin.query(
+        'insert into public.exercise_progression_settings (user_id, exercise_id, rep_range_min) values ($1, $2, 8)',
+        [stranger, builtIn],
+      ),
+      'A range needs both ends',
+      /check constraint/,
+    );
+    const settingsSeen = await asUser(stranger, (c) =>
+      c.query('select count(*)::int as n from public.exercise_progression_settings'),
+    );
+    record("Nobody else sees someone's exercise settings", settingsSeen.rows[0].n === 0);
+
+    // A split day's plan.
+    const day = await asUserCommitted(lifter, async (c) => {
+      const split = (
+        await c.query(
+          "insert into public.workout_splits (user_id, name) values ($1, 'Upper/Lower') returning id",
+          [lifter],
+        )
+      ).rows[0].id;
+      return (
+        await c.query(
+          "insert into public.workout_split_days (workout_split_id, user_id, name, order_index) values ($1, $2, 'Legs', 1) returning id",
+          [split, lifter],
+        )
+      ).rows[0].id;
+    });
+    const planned = await asUserCommitted(lifter, (c) =>
+      c.query(
+        'insert into public.workout_split_day_exercises (workout_split_day_id, user_id, exercise_id, position, target_sets) values ($1, $2, $3, 0, 4) returning user_id',
+        [day, stranger, builtIn],
+      ),
+    );
+    record("A planned exercise always belongs to the day's owner", planned.rows[0].user_id === lifter);
+    await expectThrows(
+      asUser(lifter, (c) =>
+        c.query(
+          'insert into public.workout_split_day_exercises (workout_split_day_id, user_id, exercise_id) values ($1, $2, $3)',
+          [day, lifter, strangersExercise],
+        ),
+      ),
+      "A day can't plan someone else's custom exercise",
+      /exercise not available/,
+    );
+    await expectThrows(
+      admin.query(
+        'insert into public.workout_split_day_exercises (workout_split_day_id, user_id, exercise_id, target_sets) values ($1, $2, $3, 0)',
+        [day, lifter, builtIn],
+      ),
+      'A planned exercise has at least one set',
+      /check constraint/,
+    );
+    const planSeen = await asUser(stranger, (c) =>
+      c.query('select count(*)::int as n from public.workout_split_day_exercises'),
+    );
+    record("Nobody else sees someone's split plan", planSeen.rows[0].n === 0);
+
+    // Phases.
+    await asUserCommitted(lifter, (c) =>
+      c.query(
+        "insert into public.training_phases (user_id, kind, start_date, end_date, calories) values ($1, 'bulk', '2026-06-01', '2026-07-31', 3000)",
+        [lifter],
+      ),
+    );
+    await asUserCommitted(lifter, (c) =>
+      c.query(
+        "insert into public.training_phases (user_id, kind, start_date, calories, protein_g) values ($1, 'cut', '2026-09-01', 2200, 180)",
+        [lifter],
+      ),
+    );
+    record('Someone can keep past phases and one going now', true);
+    await expectThrows(
+      admin.query(
+        "insert into public.training_phases (user_id, kind, start_date) values ($1, 'maintenance', '2026-01-01')",
+        [lifter],
+      ),
+      'Only one phase can be going at a time',
+      /training_phases_one_active|duplicate key|phases cannot overlap/,
+    );
+    await expectThrows(
+      admin.query(
+        "insert into public.training_phases (user_id, kind, start_date, end_date) values ($1, 'maintenance', '2026-07-15', '2026-08-15')",
+        [lifter],
+      ),
+      'Phases cannot overlap',
+      /phases cannot overlap/,
+    );
+    await admin.query(
+      "insert into public.training_phases (user_id, kind, start_date, end_date) values ($1, 'maintenance', '2026-08-01', '2026-08-31')",
+      [lifter],
+    );
+    record('A phase can sit between two others', true);
+    await expectThrows(
+      admin.query(
+        "insert into public.training_phases (user_id, kind, start_date, end_date) values ($1, 'custom', '2025-01-01', '2025-02-01')",
+        [lifter],
+      ),
+      'A custom phase needs a name',
+      /check constraint/,
+    );
+    await expectThrows(
+      admin.query(
+        "insert into public.training_phases (user_id, kind, start_date, end_date) values ($1, 'cut', '2025-03-01', '2025-02-01')",
+        [lifter],
+      ),
+      "A phase can't end before it starts",
+      /check constraint/,
+    );
+    const phasesSeen = await asUser(stranger, (c) =>
+      c.query('select count(*)::int as n from public.training_phases'),
+    );
+    record("Nobody else sees someone's phases", phasesSeen.rows[0].n === 0);
+
+    const ids = (await admin.query('select public.delete_account($1) as ids', [lifter])).rows[0]
+      .ids;
+    await admin.query('delete from auth.users where id = any($1::uuid[])', [ids]);
+    record(
+      "Deleting an account removes its phases, plans and exercise settings",
+      (
+        await admin.query(
+          'select ((select count(*) from public.training_phases where user_id = $1) + (select count(*) from public.workout_split_day_exercises where user_id = $1) + (select count(*) from public.exercise_progression_settings where user_id = $1))::int as n',
+          [lifter],
         )
       ).rows[0].n === 0,
     );
