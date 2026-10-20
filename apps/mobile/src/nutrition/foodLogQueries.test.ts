@@ -9,6 +9,7 @@ import {
   type FoodLogRow,
   copyFoodLogs,
   fetchFoodLogsForDay,
+  fetchFoodLogsForRange,
 } from './foodLogQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
@@ -402,6 +403,22 @@ describe('fetchFoodLogsForDay', () => {
     const { start, end } = getLocalDayRange(day);
     expect(calls.gte).toEqual([['logged_at', start.toISOString()]]);
     expect(calls.lt).toEqual([['logged_at', end.toISOString()]]);
+  });
+});
+
+describe('fetchFoodLogsForRange', () => {
+  it("reads the user's logs from the start up to the end, oldest first", async () => {
+    const { calls } = mockTable({ data: [dbRow], error: null });
+    const start = new Date(2026, 9, 19);
+    const end = new Date(2026, 9, 21);
+
+    const logs = await fetchFoodLogsForRange('user-1', start, end);
+
+    expect(calls.eq).toEqual([['user_id', 'user-1']]);
+    expect(calls.gte).toEqual([['logged_at', start.toISOString()]]);
+    expect(calls.lt).toEqual([['logged_at', end.toISOString()]]);
+    expect(calls.order).toEqual([['logged_at', { ascending: true }]]);
+    expect(logs).toHaveLength(1);
   });
 });
 

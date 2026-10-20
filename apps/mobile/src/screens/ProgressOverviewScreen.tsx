@@ -12,6 +12,8 @@ import { AllTimeSection } from '../progress/AllTimeSection';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { OverviewSection } from '../progress/OverviewSection';
+import { useWeeklySummaries } from '../progress/useWeeklySummaries';
+import { WeeklySummaryBlock } from '../progress/WeeklySummaryBlock';
 import { ProgressHeader } from '../progress/ProgressHeader';
 import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
 import { progressStyles as styles } from '../progress/progressStyles';
@@ -61,6 +63,8 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   const error = statsError ?? prsError;
 
   const [activeSection, setActiveSection] = useState<ProgressSection>('Overview');
+  // This week's and last week's summaries, read once as Progress opens.
+  const { summaries: weekSummaries, error: weekError } = useWeeklySummaries();
 
   const groups = useMemo(() => groupByExercise(history), [history]);
   const lifetimeStats = useMemo(() => computeLifetimeStats(completedWorkouts), [completedWorkouts]);
@@ -125,6 +129,15 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 navigation={navigation}
                 onViewDetails={() => setActiveSection('Strength')}
                 onViewAllMilestones={() => setActiveSection('Strength')}
+                top={
+                  <WeeklySummaryBlock
+                    summaries={weekSummaries}
+                    error={weekError}
+                    weightUnit={weightUnit}
+                    accentColor={theme.accent}
+                    onAccentColor={theme.onAccent}
+                  />
+                }
               />
             ) : null}
 

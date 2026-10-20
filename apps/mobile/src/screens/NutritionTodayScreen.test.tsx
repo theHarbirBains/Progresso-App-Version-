@@ -9,6 +9,7 @@ import {
   copyFoodLogs,
   deleteFoodLog,
   fetchFoodLogsForDay,
+  fetchFoodLogsForRange,
   fetchTodaysFoodLogs,
   logFood,
   updateFoodLogQuantity,
@@ -37,6 +38,7 @@ jest.mock('../profile/profileQueries', () => ({
 jest.mock('../nutrition/foodLogQueries', () => ({
   fetchTodaysFoodLogs: jest.fn(),
   fetchFoodLogsForDay: jest.fn(),
+  fetchFoodLogsForRange: jest.fn(),
   copyFoodLogs: jest.fn(),
   updateFoodLogQuantity: jest.fn(),
   deleteFoodLog: jest.fn(),
@@ -62,6 +64,7 @@ const mockDeleteFoodLog = deleteFoodLog as jest.Mock;
 const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 const mockLogFood = logFood as jest.Mock;
 const mockFetchFoodLogsForDay = fetchFoodLogsForDay as jest.Mock;
+const mockFetchFoodLogsForRange = fetchFoodLogsForRange as jest.Mock;
 const mockCopyFoodLogs = copyFoodLogs as jest.Mock;
 const mockFetchFoodsByIds = fetchFoodsByIds as jest.Mock;
 const mockCreateSavedMeal = createSavedMeal as jest.Mock;
@@ -124,6 +127,7 @@ beforeEach(() => {
   mockDeleteFoodLog.mockReset();
   mockLogFood.mockReset();
   mockFetchFoodLogsForDay.mockReset().mockResolvedValue([]);
+  mockFetchFoodLogsForRange.mockReset().mockResolvedValue([]);
   mockCopyFoodLogs.mockReset();
   mockFetchFoodsByIds.mockReset();
   mockCreateSavedMeal.mockReset();
@@ -452,7 +456,7 @@ describe('NutritionTodayScreen background refresh from the shared cache', () => 
 });
 
 describe('NutritionTodayScreen -- widgets, one primary action', () => {
-  it("is four widgets: today's intake (the hero), the actions, today's foods and the daily targets", async () => {
+  it("is five widgets: today's intake (the hero), the week, the actions, today's foods and the daily targets", async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     renderScreen();
     await screen.findByTestId('food-log-row-log-1');
@@ -460,11 +464,12 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
     const cards = screen.UNSAFE_queryAllByType(AppCard);
     expect(cards.map((c) => c.props.testID)).toEqual([
       'nutrition-today-macros',
+      'nutrition-today-week',
       'nutrition-today-actions',
       'nutrition-today-foods',
       'nutrition-today-targets',
     ]);
-    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false]);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false, false]);
     expect(
       within(screen.getByTestId('nutrition-today-foods')).getByTestId('food-log-row-log-1'),
     ).toBeTruthy();
@@ -652,5 +657,105 @@ describe('NutritionTodayScreen -- Save as Meal', () => {
 
     expect(mockCreateSavedMeal).not.toHaveBeenCalled();
     expect(screen.getByTestId('save-meal-error')).toHaveTextContent(/any more/);
+  });
+});
+
+describe("NutritionTodayScreen -- the week's calorie budget", () => {
+  // Only the clock is faked, so the screen's own reads still resolve normally.
+  function setToday(date: Date) {
+    jest.useFakeTimers({
+      now: date,
+      doNotFake: [
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'setImmediate',
+        'clearImmediate',
+        'nextTick',
+        'queueMicrotask',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'requestIdleCallback',
+        'cancelIdleCallback',
+        'hrtime',
+        'performance',
+      ],
+    });
+  }
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const goals = { calories: 2000, proteinG: null, carbsG: null, fatG: null };
+
+  it("adds this week's earlier days to today's foods, against 7 times the daily target", async () => {
+    // A Wednesday.
+    setToday(new Date(2026, 9, 21, 12, 0));
+    mockFetchNutritionGoals.mockResolvedValue(goals);
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    mockFetchFoodLogsForRange.mockResolvedValue([
+      { ...sampleLog, id: 'mon', calories: 1800 },
+      { ...sampleLog, id: 'tue', calories: 1200 },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('weekly-budget-remaining')).toHaveTextContent(
+      '10,670 cal left · 5 days to go, today included',
+    );
+    expect(screen.getByTestId('weekly-budget-consumed')).toHaveTextContent('3,330');
+    expect(screen.getByTestId('weekly-budget-target')).toHaveTextContent('/ 14,000 cal');
+    // Monday 00:00 up to today 00:00 -- today's own come from the shared cache.
+    expect(mockFetchFoodLogsForRange).toHaveBeenCalledWith(
+      'user-1',
+      new Date(2026, 9, 19),
+      new Date(2026, 9, 21),
+    );
+  });
+
+  it('moves at once when a food is deleted today', async () => {
+    setToday(new Date(2026, 9, 21, 12, 0));
+    mockFetchNutritionGoals.mockResolvedValue(goals);
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    mockFetchFoodLogsForRange.mockResolvedValue([{ ...sampleLog, id: 'mon', calories: 1000 }]);
+    mockDeleteFoodLog.mockResolvedValue(undefined);
+    renderScreen();
+    expect(await screen.findByTestId('weekly-budget-consumed')).toHaveTextContent('1,330');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('food-log-delete-log-1'));
+    });
+
+    expect(screen.getByTestId('weekly-budget-consumed')).toHaveTextContent('1,000');
+  });
+
+  it('reads no earlier days on a Monday', async () => {
+    setToday(new Date(2026, 9, 19, 12, 0));
+    mockFetchNutritionGoals.mockResolvedValue(goals);
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    renderScreen();
+
+    expect(await screen.findByTestId('weekly-budget-remaining')).toHaveTextContent(
+      '13,670 cal left · 7 days to go, today included',
+    );
+    expect(mockFetchFoodLogsForRange).not.toHaveBeenCalled();
+  });
+
+  it('offers to set a target when there is none', async () => {
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('weekly-budget-set-target'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('NutritionGoals');
+  });
+
+  it("says when the week's earlier days couldn't be read", async () => {
+    setToday(new Date(2026, 9, 21, 12, 0));
+    mockFetchNutritionGoals.mockResolvedValue(goals);
+    mockFetchFoodLogsForRange.mockRejectedValue(new Error('network error'));
+    renderScreen();
+
+    expect(await screen.findByTestId('weekly-budget-error')).toBeTruthy();
   });
 });

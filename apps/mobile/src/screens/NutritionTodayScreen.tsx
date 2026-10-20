@@ -18,12 +18,22 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { CalorieRing } from '../nutrition/CalorieRing';
 import { FoodImage } from '../nutrition/FoodImage';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
-import { fetchFoodLogsForDay, type FoodLogRow } from '../nutrition/foodLogQueries';
+import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
+import {
+  fetchFoodLogsForDay,
+  fetchFoodLogsForRange,
+  type FoodLogRow,
+} from '../nutrition/foodLogQueries';
 import { servingMeasures, servingsFor, unitWord } from '../nutrition/logQuantity';
-import { calculateRemaining, sumDailyTotals } from '../nutrition/nutritionCalculations';
+import {
+  calculateRemaining,
+  daysLeftInWeek,
+  sumDailyTotals,
+} from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { CopyYesterdaySheet, SaveAsMealSheet } from '../nutrition/TodayShortcutSheets';
+import { WeeklyCalorieBudget } from '../nutrition/WeeklyCalorieBudget';
 
 type Props = RootStackScreenProps<'Nutrition'>;
 
@@ -46,11 +56,14 @@ function grams(value: number): string {
 // The Nutrition tab's own root screen (see App.tsx's bottom nav) -- today's
 // intake against the user's targets, with the day's logged foods.
 //
-// Layout: the shared Screen with a hamburger menu, then four widgets
+// Layout: the shared Screen with a hamburger menu, then five widgets
 // `widgetGap` apart, rising in like every other page's:
 // - **Today** (the hero): the calorie ring and what's left on the left; on the
 //   right, protein / carbs / fat, each with its glyph, what's been eaten against
 //   the target and a thin bar of the way there.
+// - **This Week**: the week's calorie budget -- 7 times the daily target, Monday to
+//   Sunday -- against what's been eaten so far, as a bar, with what's left and the days
+//   left to spread it over (WeeklyCalorieBudget).
 // - **Actions**: Log Food, the one filled button, with Scan Barcode and Search
 //   Food outlined side by side under it (two more ways into the same
 //   LogFoodStep-backed logging flow). AI Food Search lives inside Food Library
@@ -81,6 +94,10 @@ export function NutritionTodayScreen({ navigation }: Props) {
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [yesterdayLogs, setYesterdayLogs] = useState<FoodLogRow[]>([]);
+  // Calories from this week's days before today; today's own come from the shared cache, so
+  // logging a food moves the week's bar at once. Null while being read.
+  const [earlierThisWeek, setEarlierThisWeek] = useState<number | null>(null);
+  const [weekFailed, setWeekFailed] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [saveMealOpen, setSaveMealOpen] = useState(false);
 
@@ -96,6 +113,30 @@ export function NutritionTodayScreen({ navigation }: Props) {
         if (!cancelled) setYesterdayLogs(rows);
       })
       .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  // This week's days before today, for the week's calorie budget -- read each time Today opens,
+  // like yesterday's. On a Monday there are none.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    const now = new Date();
+    const { start: weekStart } = getCurrentWeekRange(now);
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (weekStart.getTime() >= todayStart.getTime()) {
+      setEarlierThisWeek(0);
+      return;
+    }
+    fetchFoodLogsForRange(userId, weekStart, todayStart)
+      .then((rows) => {
+        if (!cancelled) setEarlierThisWeek(sumDailyTotals(rows).calories);
+      })
+      .catch(() => {
+        if (!cancelled) setWeekFailed(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -273,6 +314,15 @@ export function NutritionTodayScreen({ navigation }: Props) {
           </View>
         </View>
       </AppCard>
+
+      <WeeklyCalorieBudget
+        consumed={earlierThisWeek === null ? null : earlierThisWeek + consumed.calories}
+        dailyTarget={goals.calories}
+        daysLeft={daysLeftInWeek()}
+        failed={weekFailed}
+        accentColor={accent}
+        onSetTarget={() => navigation.navigate('NutritionGoals')}
+      />
 
       <AppCard testID="nutrition-today-actions" style={styles.actions}>
         <PrimaryButton

@@ -104,6 +104,15 @@ export function computeWeeklyCalorieSummary(
 }
 
 /**
+ * The days left in the Monday-to-Sunday week, today included: 7 on a Monday, 1 on a Sunday --
+ * what's left of a weekly calorie budget can be spread over.
+ */
+export function daysLeftInWeek(now: Date = new Date()): number {
+  const day = now.getDay(); // 0 = Sunday .. 6 = Saturday
+  return day === 0 ? 1 : 8 - day;
+}
+
+/**
  * Recomputes an existing food log's totals for a new quantity using ONLY
  * the log's own already-stored snapshot -- never the live foods table.
  * This is what keeps a quantity edit from silently pulling in today's

@@ -3,6 +3,7 @@ import {
   calculateLogTotals,
   calculateRemaining,
   computeWeeklyCalorieSummary,
+  daysLeftInWeek,
   recalculateForQuantity,
   sumDailyTotals,
 } from './nutritionCalculations';
@@ -163,5 +164,15 @@ describe('recalculateForQuantity', () => {
     const result = recalculateForQuantity(existing, 1);
 
     expect(result).toEqual({ calories: 30, proteinG: 3, carbsG: 3, fatG: 3 });
+  });
+});
+
+describe('daysLeftInWeek', () => {
+  it('counts the days left to Sunday, today included', () => {
+    // 19 October 2026 is a Monday.
+    expect(daysLeftInWeek(new Date(2026, 9, 19, 8, 0))).toBe(7);
+    expect(daysLeftInWeek(new Date(2026, 9, 21, 23, 0))).toBe(5);
+    expect(daysLeftInWeek(new Date(2026, 9, 24, 12, 0))).toBe(2);
+    expect(daysLeftInWeek(new Date(2026, 9, 25, 12, 0))).toBe(1);
   });
 });

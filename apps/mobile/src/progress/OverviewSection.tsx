@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
@@ -38,6 +38,8 @@ interface Props {
   onViewDetails: () => void;
   /** Switches Progress to the PRs tab -- "Recent Milestones" card's "View All" link. */
   onViewAllMilestones: () => void;
+  /** Shown first, above everything else -- the Weekly Summary. */
+  top?: ReactNode;
 }
 
 function OverviewStat({
@@ -84,6 +86,7 @@ export function OverviewSection({
   navigation,
   onViewDetails,
   onViewAllMilestones,
+  top,
 }: Props) {
   const recentMilestones = useMemo(
     () => mergeAndSortPRs(repPRs, oneRepMaxes, exerciseRecords).slice(0, RECENT_MILESTONES_LIMIT),
@@ -91,14 +94,26 @@ export function OverviewSection({
   );
 
   if (groups.length === 0) {
-    return (
-      <View style={styles.sectionFill}>
-        <ProgressEmptyState
-          testID="progress-overview-empty"
-          title="Your progression starts here."
-          icon="trending-up"
-        />
-      </View>
+    const empty = (
+      <ProgressEmptyState
+        testID="progress-overview-empty"
+        title="Your progression starts here."
+        icon="trending-up"
+      />
+    );
+    // The week can have food logged, or bodyweight work, before any weighted lift.
+    return top ? (
+      <ScrollView
+        testID="progress-overview-scroll"
+        style={styles.sectionFill}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {top}
+        {empty}
+      </ScrollView>
+    ) : (
+      <View style={styles.sectionFill}>{empty}</View>
     );
   }
 
@@ -109,6 +124,7 @@ export function OverviewSection({
       contentContainerStyle={{ paddingBottom: 32 }}
       showsVerticalScrollIndicator={false}
     >
+      {top}
       <View style={styles.overviewCard}>
         <View style={styles.overviewCardHeader}>
           <View style={styles.overviewCardTitleColumn}>

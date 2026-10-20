@@ -245,6 +245,26 @@ export async function fetchFoodLogsForDay(userId: string, day: Date): Promise<Fo
   return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
 }
 
+/**
+ * Every food log from `start` up to (not including) `end`, oldest first -- a week's, for its
+ * calorie budget and its summary. A week's logs are a few dozen rows, well inside one read.
+ */
+export async function fetchFoodLogsForRange(
+  userId: string,
+  start: Date,
+  end: Date,
+): Promise<FoodLogRow[]> {
+  const { data, error } = await supabase
+    .from('food_logs')
+    .select(FOOD_LOG_COLUMNS)
+    .eq('user_id', userId)
+    .gte('logged_at', start.toISOString())
+    .lt('logged_at', end.toISOString())
+    .order('logged_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
+}
+
 // Everything a log snapshots, so a copy is exactly what was logged.
 const COPIED_COLUMNS = `food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, meal_type, entered_amount, entered_unit, serving_label, ${PROVENANCE_COLUMNS}`;
 

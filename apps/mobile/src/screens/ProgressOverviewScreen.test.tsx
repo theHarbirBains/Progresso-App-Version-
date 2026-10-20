@@ -3,7 +3,11 @@ import { AppCard } from '../design/AppCard';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { AppMenuContext } from '../navigation/AppMenuContext';
+import { fetchFoodLogsForRange } from '../nutrition/foodLogQueries';
+import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
+import { fetchSummaryTraining } from '../progress/weeklySummaryQueries';
 import {
   AllTimeStatsProvider,
   useAllTimeStats,
@@ -34,6 +38,18 @@ jest.mock('../workouts/prSummaryQueries', () => ({
   fetchAllOneRepMaxes: jest.fn(),
 }));
 
+jest.mock('../progress/weeklySummaryQueries', () => ({
+  fetchSummaryTraining: jest.fn(),
+}));
+
+jest.mock('../nutrition/foodLogQueries', () => ({
+  fetchFoodLogsForRange: jest.fn(),
+}));
+
+jest.mock('../nutrition/nutritionGoalQueries', () => ({
+  fetchNutritionGoals: jest.fn(),
+}));
+
 jest.mock('../progress/progressStatsQueries', () => ({
   fetchAllCompletedWorkouts: jest.fn(),
   fetchWorkoutIdForSet: jest.fn(),
@@ -45,6 +61,9 @@ const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
 const mockFetchAllRepPRs = fetchAllRepPRs as jest.Mock;
 const mockFetchAllOneRepMaxes = fetchAllOneRepMaxes as jest.Mock;
 const mockFetchAllCompletedWorkouts = fetchAllCompletedWorkouts as jest.Mock;
+const mockFetchSummaryTraining = fetchSummaryTraining as jest.Mock;
+const mockFetchFoodLogsForRange = fetchFoodLogsForRange as jest.Mock;
+const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 
 const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,11 +84,13 @@ const mockOpenMenu = jest.fn();
 function renderScreen(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
     <ProfileProvider>
-      <AllTimeStatsProvider>
-        <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
-          <ProgressOverviewScreen navigation={navigation} route={route} />
-        </AppMenuContext.Provider>
-      </AllTimeStatsProvider>
+      <NutritionGoalsProvider>
+        <AllTimeStatsProvider>
+          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
+            <ProgressOverviewScreen navigation={navigation} route={route} />
+          </AppMenuContext.Provider>
+        </AllTimeStatsProvider>
+      </NutritionGoalsProvider>
     </ProfileProvider>,
   );
 }
@@ -152,6 +173,14 @@ const meaningfulBenchHistory = [
 ];
 
 beforeEach(() => {
+  mockFetchSummaryTraining.mockReset().mockResolvedValue({ workouts: [], sets: [] });
+  mockFetchFoodLogsForRange.mockReset().mockResolvedValue([]);
+  mockFetchNutritionGoals.mockReset().mockResolvedValue({
+    calories: null,
+    proteinG: null,
+    carbsG: null,
+    fatG: null,
+  });
   mockUseAuth.mockReturnValue({
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
@@ -367,12 +396,14 @@ describe('ProgressOverviewScreen background refresh from the shared cache', () =
 
     render(
       <ProfileProvider>
-        <AllTimeStatsProvider>
-          <CaptureRefetch />
-          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
-            <ProgressOverviewScreen navigation={navigation} route={route} />
-          </AppMenuContext.Provider>
-        </AllTimeStatsProvider>
+        <NutritionGoalsProvider>
+          <AllTimeStatsProvider>
+            <CaptureRefetch />
+            <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
+              <ProgressOverviewScreen navigation={navigation} route={route} />
+            </AppMenuContext.Provider>
+          </AllTimeStatsProvider>
+        </NutritionGoalsProvider>
       </ProfileProvider>,
     );
     await screen.findByTestId('progress-overview-scroll');
@@ -415,5 +446,69 @@ describe('ProgressOverviewScreen -- one widget for the active section', () => {
       goToSection(section);
       expectNoBareText();
     }
+  });
+});
+
+describe('ProgressOverviewScreen -- Weekly Summary', () => {
+  it("opens Overview on this week's summary, read from the last few weeks' workouts and the two weeks' food", async () => {
+    mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: 2000,
+      proteinG: 150,
+      carbsG: null,
+      fatG: null,
+    });
+    const today = new Date();
+    mockFetchSummaryTraining.mockResolvedValue({
+      workouts: [{ id: 'w1', performedAt: today.toISOString() }],
+      sets: [
+        {
+          workoutId: 'w1',
+          performedAt: today.toISOString(),
+          exerciseId: 'ex-bench',
+          exerciseName: 'Bench Press',
+          muscleGroup: 'chest',
+          measurementType: 'weight_reps',
+          weightKg: 100,
+          reps: 5,
+        },
+      ],
+    });
+    mockFetchFoodLogsForRange.mockResolvedValue([
+      { id: 'l1', loggedAt: today.toISOString(), calories: 1900, proteinG: 160 },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('weekly-summary-workouts')).toHaveTextContent(/1/);
+    expect(screen.getByTestId('weekly-summary-avg-calories')).toHaveTextContent(/1,900/);
+    expect(screen.getByTestId('weekly-summary-calorie-days')).toHaveTextContent(/1 of 1/);
+    expect(screen.getByTestId('weekly-summary-lift-ex-bench')).toHaveTextContent(/100 kg × 5/);
+
+    // From four weeks before last Monday, to next Monday.
+    const [, since, until] = mockFetchSummaryTraining.mock.calls[0]!;
+    expect(Math.round(((until as Date).getTime() - (since as Date).getTime()) / 86400000)).toBe(42);
+    const [, foodSince, foodUntil] = mockFetchFoodLogsForRange.mock.calls[0]!;
+    expect(
+      Math.round(((foodUntil as Date).getTime() - (foodSince as Date).getTime()) / 86400000),
+    ).toBe(14);
+  });
+
+  it('shows the week even before any weighted lift is logged', async () => {
+    mockFetchAllExerciseHistory.mockResolvedValue([]);
+    mockFetchFoodLogsForRange.mockResolvedValue([
+      { id: 'l1', loggedAt: new Date().toISOString(), calories: 1900, proteinG: 160 },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('weekly-summary-avg-calories')).toBeTruthy();
+    expect(screen.getByTestId('progress-overview-empty')).toBeTruthy();
+  });
+
+  it('says why the week could not be shown when it fails to load', async () => {
+    mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
+    mockFetchSummaryTraining.mockRejectedValue(new Error('network error'));
+    renderScreen();
+
+    expect(await screen.findByTestId('weekly-summary-error')).toHaveTextContent('network error');
   });
 });
