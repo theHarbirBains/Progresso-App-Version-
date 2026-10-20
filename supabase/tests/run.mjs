@@ -4140,8 +4140,9 @@ async function main() {
       stranger,
       `stranger-${stranger}@test.local`,
     ]);
-    const builtIn = (await admin.query("select id from public.exercises where name = 'Barbell Back Squat'"))
-      .rows[0].id;
+    const builtIn = (
+      await admin.query("select id from public.exercises where name = 'Barbell Back Squat'")
+    ).rows[0].id;
     const strangersExercise = (
       await admin.query(
         "insert into public.exercises (created_by, name, muscle_group) values ($1, 'Their Curl', 'biceps') returning id",
@@ -4194,9 +4195,10 @@ async function main() {
     );
 
     // A rep range may be one number.
-    await admin.query('update public.users set rep_range_min = 5, rep_range_max = 5 where id = $1', [
-      lifter,
-    ]);
+    await admin.query(
+      'update public.users set rep_range_min = 5, rep_range_max = 5 where id = $1',
+      [lifter],
+    );
     record('A rep range can be a single number', true);
     await expectThrows(
       admin.query('update public.users set rep_range_min = 6, rep_range_max = 5 where id = $1', [
@@ -4258,7 +4260,10 @@ async function main() {
         [day, stranger, builtIn],
       ),
     );
-    record("A planned exercise always belongs to the day's owner", planned.rows[0].user_id === lifter);
+    record(
+      "A planned exercise always belongs to the day's owner",
+      planned.rows[0].user_id === lifter,
+    );
     await expectThrows(
       asUser(lifter, (c) =>
         c.query(
@@ -4342,7 +4347,7 @@ async function main() {
       .ids;
     await admin.query('delete from auth.users where id = any($1::uuid[])', [ids]);
     record(
-      "Deleting an account removes its phases, plans and exercise settings",
+      'Deleting an account removes its phases, plans and exercise settings',
       (
         await admin.query(
           'select ((select count(*) from public.training_phases where user_id = $1) + (select count(*) from public.workout_split_day_exercises where user_id = $1) + (select count(*) from public.exercise_progression_settings where user_id = $1))::int as n',
