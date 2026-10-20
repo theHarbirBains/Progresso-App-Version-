@@ -173,10 +173,11 @@ describe('NutritionGoalsScreen', () => {
     expect(screen.queryByTestId('nutrition-goals-option-maintenance')).toBeNull();
   });
 
-  it('prefills the custom target from the calculated maintenance value when nothing has been saved yet', async () => {
+  it('leaves the calorie target blank until an estimate is taken with Use -- nothing is filled in by itself', async () => {
     renderScreen();
     await screen.findByTestId('nutrition-goals-scroll');
 
+    expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp('value', '');
     const targets = computeCalorieTargets({
       gender: 'male',
       age: 24,
@@ -184,18 +185,31 @@ describe('NutritionGoalsScreen', () => {
       weightKg: 78,
       activityLevel: 'moderately_active',
     });
-    expect(screen.getByTestId('nutrition-goals-custom-input')).toHaveProp(
+    fireEvent.press(screen.getByTestId('nutrition-goals-option-deficit-use'));
+
+    expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp(
       'value',
-      String(targets.maintenance),
+      String(targets.deficit),
+    );
+    expect(screen.getByTestId('nutrition-goals-estimate-note')).toHaveTextContent(
+      /Mifflin-St Jeor/,
     );
   });
 
-  it('prefills the custom target from the existing saved target, never silently overwriting it', async () => {
-    mockFetchNutritionGoals.mockResolvedValue({ ...emptyGoals, calories: 2400 });
+  it('fills the fields from the saved targets', async () => {
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: 2400,
+      proteinG: 180,
+      carbsG: 200,
+      fatG: 60,
+    });
     renderScreen();
     await screen.findByTestId('nutrition-goals-scroll');
 
-    expect(screen.getByTestId('nutrition-goals-custom-input')).toHaveProp('value', '2400');
+    expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp('value', '2400');
+    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '180');
+    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '200');
+    expect(screen.getByTestId('nutrition-goals-fat')).toHaveProp('value', '60');
   });
 
   it('does not auto-save anything just from opening the screen', async () => {
@@ -205,50 +219,100 @@ describe('NutritionGoalsScreen', () => {
     expect(mockSaveNutritionGoals).not.toHaveBeenCalled();
   });
 
-  it('shows a dynamic Save button label matching the entered custom target', async () => {
+  it('suggests protein and fat from body weight, and only uses them on a tap', async () => {
     renderScreen();
     await screen.findByTestId('nutrition-goals-scroll');
 
-    fireEvent.changeText(screen.getByTestId('nutrition-goals-custom-input'), '2400');
+    // 78 kg is 172 lb: 0.7-0.8 g protein and 0.3 g fat per lb.
+    expect(screen.getByTestId('nutrition-goals-macro-suggestion')).toHaveTextContent(
+      /Protein 120–138 g · fat about 52 g/,
+    );
+    expect(screen.getByTestId('nutrition-goals-macro-suggestion')).toHaveTextContent(
+      /don't make a deficit on their own/,
+    );
+    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '');
 
-    expect(screen.getByTestId('nutrition-goals-save')).toHaveTextContent(/Save 2,400 Calories/);
+    fireEvent.press(screen.getByTestId('nutrition-goals-use-macros'));
+
+    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '129');
+    expect(screen.getByTestId('nutrition-goals-fat')).toHaveProp('value', '52');
   });
 
-  it('rejects a non-whole-number custom target and disables Save', async () => {
+  it('works carbs out from the calories left after protein and fat, and keeps carbs the person typed', async () => {
     renderScreen();
     await screen.findByTestId('nutrition-goals-scroll');
 
-    fireEvent.changeText(screen.getByTestId('nutrition-goals-custom-input'), '2400.5');
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2200');
+    expect(screen.getByTestId('nutrition-goals-carb-hint')).toHaveTextContent(
+      'Add protein and fat to get a carb suggestion.',
+    );
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-protein'), '160');
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-fat'), '60');
+    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '255');
+    expect(screen.getByTestId('nutrition-goals-total')).toHaveTextContent(
+      'Your macros come to 2,200 cal, matching your calorie target.',
+    );
+
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-carbs'), '230');
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2400');
+    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '230');
+    expect(screen.getByTestId('nutrition-goals-carb-hint')).toHaveTextContent(/room for 305 g/);
+    expect(screen.getByTestId('nutrition-goals-total')).toHaveTextContent(
+      /2,100 cal, 300 under your 2,400 cal target/,
+    );
+
+    fireEvent.press(screen.getByTestId('nutrition-goals-use-carbs'));
+    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '305');
+  });
+
+  it('explains protein and fat that pass the calorie target, rather than clamping carbs', async () => {
+    renderScreen();
+    await screen.findByTestId('nutrition-goals-scroll');
+
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '1500');
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-protein'), '200');
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-fat'), '100');
+
+    expect(screen.getByTestId('nutrition-goals-carb-hint')).toHaveTextContent(
+      /Protein and fat come to 1,700 cal, 200 more than your calorie target/,
+    );
+    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '');
+  });
+
+  it('says a carb suggestion needs a calorie target', async () => {
+    renderScreen();
+    await screen.findByTestId('nutrition-goals-scroll');
+
+    expect(screen.getByTestId('nutrition-goals-carb-hint')).toHaveTextContent(
+      'A carb suggestion needs a calorie target.',
+    );
+  });
+
+  it('rejects a non-whole calorie target and disables Save', async () => {
+    renderScreen();
+    await screen.findByTestId('nutrition-goals-scroll');
+
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2400.5');
 
     expect(screen.getByTestId('nutrition-goals-save').props.accessibilityState.disabled).toBe(true);
   });
 
-  it('saves the entered custom target as the daily target, preserving existing macro goals', async () => {
-    mockFetchNutritionGoals.mockResolvedValue({
-      calories: null,
-      proteinG: 180,
-      carbsG: 200,
-      fatG: 60,
-    });
-    mockSaveNutritionGoals.mockResolvedValue({
-      calories: 2400,
-      proteinG: 180,
-      carbsG: 200,
-      fatG: 60,
-    });
+  it('saves all four targets as typed, blank as no target', async () => {
+    mockSaveNutritionGoals.mockImplementation(async (_user: string, goals: object) => goals);
     renderScreen();
     await screen.findByTestId('nutrition-goals-scroll');
 
-    fireEvent.changeText(screen.getByTestId('nutrition-goals-custom-input'), '2400');
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2200');
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-protein'), '160');
     await act(async () => {
       fireEvent.press(screen.getByTestId('nutrition-goals-save'));
     });
 
     expect(mockSaveNutritionGoals).toHaveBeenCalledWith('user-1', {
-      calories: 2400,
-      proteinG: 180,
-      carbsG: 200,
-      fatG: 60,
+      calories: 2200,
+      proteinG: 160,
+      carbsG: null,
+      fatG: null,
     });
     expect(screen.getByTestId('nutrition-goals-saved')).toBeTruthy();
   });
@@ -274,16 +338,15 @@ describe('NutritionGoalsScreen', () => {
     expect(await screen.findByTestId('nutrition-goals-error')).toHaveTextContent('network error');
   });
 
-  it('recalculates whenever the shared profile cache updates elsewhere', async () => {
+  it('recalculates the estimates whenever the shared profile cache updates elsewhere, never the targets', async () => {
     // Simulates CalorieEstimationScreen -- a different screen, not rendered
-    // here -- saving a weight change via the same shared updateProfile. No
-    // focus event and no re-fetch of its own: the reactive cache is what
-    // keeps this screen's summary and targets current.
+    // here -- saving a weight change via the same shared updateProfile.
     let capturedUpdateProfile: ProfileContextValue['updateProfile'] | undefined;
     function CaptureUpdateProfile() {
       capturedUpdateProfile = useProfile().updateProfile;
       return null;
     }
+    mockFetchNutritionGoals.mockResolvedValue({ ...emptyGoals, calories: 2100 });
 
     render(
       <ProfileProvider>
@@ -296,8 +359,9 @@ describe('NutritionGoalsScreen', () => {
       </ProfileProvider>,
     );
     await screen.findByTestId('nutrition-goals-scroll');
-
     const initialSummary = screen.getByTestId('nutrition-goals-summary').props.children;
+    const initialMaintenance = screen.getByTestId('nutrition-goals-option-maintenance-value').props
+      .children;
 
     await act(async () => {
       await capturedUpdateProfile?.({ weightValue: 95 });
@@ -306,88 +370,12 @@ describe('NutritionGoalsScreen', () => {
     expect(screen.getByTestId('nutrition-goals-summary').props.children).not.toEqual(
       initialSummary,
     );
-  });
-
-  // Regression coverage: NutritionGoalsScreen stays mounted underneath
-  // CalorieEstimationScreen when the user taps Edit (a navigate, not a
-  // remount), so a one-shot "seed once" guard on the custom-target field
-  // would leave it stuck on the estimate computed from the OLD profile
-  // after the user corrects their weight/activity level and comes back.
-  it('reseeds the untouched custom target field itself when the shared profile cache updates elsewhere', async () => {
-    let capturedUpdateProfile: ProfileContextValue['updateProfile'] | undefined;
-    function CaptureUpdateProfile() {
-      capturedUpdateProfile = useProfile().updateProfile;
-      return null;
-    }
-
-    render(
-      <ProfileProvider>
-        <NutritionGoalsProvider>
-          <CaptureUpdateProfile />
-          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-            <NutritionGoalsScreen navigation={navigation} route={route} />
-          </AppMenuContext.Provider>
-        </NutritionGoalsProvider>
-      </ProfileProvider>,
-    );
-    await screen.findByTestId('nutrition-goals-scroll');
-
-    const initialTargets = computeCalorieTargets({
-      gender: 'male',
-      age: 24,
-      heightCm: 180,
-      weightKg: 78,
-      activityLevel: 'moderately_active',
-    });
-    expect(screen.getByTestId('nutrition-goals-custom-input')).toHaveProp(
-      'value',
-      String(initialTargets.maintenance),
-    );
-
-    await act(async () => {
-      await capturedUpdateProfile?.({ weightValue: 95 });
-    });
-
-    const updatedTargets = computeCalorieTargets({
-      gender: 'male',
-      age: 24,
-      heightCm: 180,
-      weightKg: 95,
-      activityLevel: 'moderately_active',
-    });
-    expect(updatedTargets.maintenance).not.toBe(initialTargets.maintenance);
-    expect(screen.getByTestId('nutrition-goals-custom-input')).toHaveProp(
-      'value',
-      String(updatedTargets.maintenance),
-    );
-  });
-
-  it('never overwrites a custom target the user already typed, even when the profile changes afterward', async () => {
-    let capturedUpdateProfile: ProfileContextValue['updateProfile'] | undefined;
-    function CaptureUpdateProfile() {
-      capturedUpdateProfile = useProfile().updateProfile;
-      return null;
-    }
-
-    render(
-      <ProfileProvider>
-        <NutritionGoalsProvider>
-          <CaptureUpdateProfile />
-          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-            <NutritionGoalsScreen navigation={navigation} route={route} />
-          </AppMenuContext.Provider>
-        </NutritionGoalsProvider>
-      </ProfileProvider>,
-    );
-    await screen.findByTestId('nutrition-goals-scroll');
-
-    fireEvent.changeText(screen.getByTestId('nutrition-goals-custom-input'), '1850');
-
-    await act(async () => {
-      await capturedUpdateProfile?.({ weightValue: 95 });
-    });
-
-    expect(screen.getByTestId('nutrition-goals-custom-input')).toHaveProp('value', '1850');
+    expect(
+      screen.getByTestId('nutrition-goals-option-maintenance-value').props.children,
+    ).not.toEqual(initialMaintenance);
+    // A new weight changes the suggestions, never a saved target.
+    expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp('value', '2100');
+    expect(mockSaveNutritionGoals).not.toHaveBeenCalled();
   });
 
   it('shows a concise Important Notes section', async () => {
@@ -399,13 +387,20 @@ describe('NutritionGoalsScreen', () => {
 });
 
 describe('NutritionGoalsScreen -- rows and one labelled field, one primary action', () => {
-  it('is four widgets: your information, the estimates, the custom target and the notes', async () => {
+  it('is four widgets: your information, your daily targets, the estimates and the notes', async () => {
     renderScreen();
     await screen.findByTestId('nutrition-goals-scroll');
 
     const cards = screen.UNSAFE_queryAllByType(AppCard);
     expect(cards).toHaveLength(4);
     expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false]);
+    // Today's Edit Targets opens here for the targets, so they come straight after the summary.
+    expect(cards.map((c) => c.props.testID)).toEqual([
+      'nutrition-goals-info-card',
+      'nutrition-goals-custom-card',
+      'nutrition-goals-targets',
+      'nutrition-goals-notes',
+    ]);
   });
 
   it('shows the four estimates as rows with the calories as a mono readout, separated by hairlines', async () => {
@@ -432,12 +427,15 @@ describe('NutritionGoalsScreen -- rows and one labelled field, one primary actio
     expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
   });
 
-  it('labels the custom target field and offers Edit as a plain 44pt text action', async () => {
+  it('labels the target fields and offers Edit as a plain 44pt text action', async () => {
     renderScreen();
     await screen.findByTestId('nutrition-goals-scroll');
 
-    expect(screen.getByTestId('nutrition-goals-custom-input').props.accessibilityLabel).toBe(
-      'Daily calorie target',
+    expect(screen.getByTestId('nutrition-goals-calories').props.accessibilityLabel).toBe(
+      'Calories',
+    );
+    expect(screen.getByTestId('nutrition-goals-protein').props.accessibilityLabel).toBe(
+      'Protein (g)',
     );
     const edit = screen.getByTestId('nutrition-goals-edit');
     expect(StyleSheet.flatten(edit.props.style).borderWidth).toBeUndefined();
@@ -450,7 +448,7 @@ describe('NutritionGoalsScreen -- rows and one labelled field, one primary actio
     await screen.findByTestId('nutrition-goals-scroll');
 
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    fireEvent.changeText(screen.getByTestId('nutrition-goals-custom-input'), '2400');
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2400');
     await act(async () => {
       fireEvent.press(screen.getByTestId('nutrition-goals-save'));
     });

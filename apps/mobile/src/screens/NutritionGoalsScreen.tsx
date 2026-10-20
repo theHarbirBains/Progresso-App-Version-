@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
@@ -7,7 +7,6 @@ import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
-import { TextInput } from '../design/TextInput';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { ACTIVITY_LEVELS, ageFromBirthday } from '../nutrition/calorieEstimationInput';
@@ -17,6 +16,13 @@ import {
   type CalorieTargets,
 } from '../nutrition/calorieTargets';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
+import {
+  draftFromTargets,
+  editDraft,
+  parseTargets,
+  type TargetDraft,
+} from '../nutrition/targetMath';
+import { TargetsEditor } from '../nutrition/TargetsEditor';
 import { feetAndInchesFromCm, kgToLb } from '../onboarding/weightHeightConversion';
 import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -55,97 +61,62 @@ const OPTIONS = [
   },
 ] as const;
 
-/** Whole numbers only (section 7's "whole-number input"), matching the
- * nutrition_goals.calories column's own integer type -- never a decimal. */
-function parseWholeCalories(text: string): number | null {
-  const trimmed = text.trim();
-  if (!/^\d+$/.test(trimmed)) return null;
-  const value = Number(trimmed);
-  return value > 0 ? value : null;
-}
-
 // The reference-image Nutrition Goals screen: real, profile-derived calorie
-// recommendations (Mifflin-St Jeor, see nutrition/calorieTargets.ts) plus a
-// custom target the user explicitly saves as their Daily Calorie Target
-// (nutrition_goals.calories -- the same table/column Nutrition Mode's
-// Dashboard already reads). Personal data (gender/birthday/height/weight/
-// activity level) is never edited here -- CalorieEstimationScreen is the
-// one place that happens; "Edit" just navigates there, and this screen
-// reads personal info from the shared profile cache, so an edit there is
-// reflected here the moment the user comes back -- no re-fetch needed. The
-// saved goals themselves come from the shared NutritionGoalsProvider cache
-// too, the same one NutritionTodayScreen and ProfileScreen read, so a save
-// here is reflected there immediately with no re-fetch of their own.
+// estimates (Mifflin-St Jeor, see nutrition/calorieTargets.ts) and the
+// person's own four daily targets (nutrition_goals -- the same row Nutrition
+// Today reads). Personal data (gender/birthday/height/weight/activity level)
+// is never edited here -- CalorieEstimationScreen is the one place that
+// happens; "Edit" just navigates there, and this screen reads personal info
+// from the shared profile cache, so an edit there shows here at once. The
+// saved goals come from the shared NutritionGoalsProvider cache too, so a
+// save here is reflected on Today with no re-fetch of its own.
 //
-// Layout: a plain summary line with Edit, the four estimates as rows (name,
-// how they differ from maintenance, and the calories as a mono readout), the
-// custom target as one labelled field, one filled Save, then the notes.
+// Nothing here is fixed or filled in behind the person's back: an estimate is
+// only taken with its Use button, the protein/fat/carb suggestions live in
+// TargetsEditor beside the fields, and saved targets never change unless the
+// person saves new ones -- a new weight changes the suggestions, never the
+// targets.
+//
+// Layout: a plain summary line with Edit, then Your Daily Targets right
+// under it -- what Today's Edit Targets opens for, so the fields come first:
+// the four fields with their suggestions and one filled Save -- then the four
+// estimates as rows (name, how they differ from maintenance, the calories as
+// a mono readout and a Use action that fills the calorie field), then the
+// notes.
 export function NutritionGoalsScreen({ navigation }: Props) {
   const { openMenu } = useAppMenu();
   const { nutritionTheme: theme } = useProgressTheme();
-  // Personal info (gender/birthday/height/weight/activity level) is only
-  // ever edited on CalorieEstimationScreen, never here -- reading it off
-  // the shared profile cache means an edit there is reflected here the
-  // moment this screen re-renders, with no re-fetch of its own needed.
   const { profile, loading: profileLoading, error: profileError } = useProfile();
   const { goals, loading: goalsLoading, error: goalsError, saveGoals } = useNutritionGoals();
 
-  const [customInput, setCustomInput] = useState('');
+  const [draft, setDraft] = useState<TargetDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Prefills the custom target from the saved goal, or -- when nothing has
-  // ever been saved -- a calculated maintenance estimate the user can still
-  // change before saving. Never overwrites an in-progress edit: it only
-  // (re)seeds when the field still holds exactly what this effect itself
-  // last put there (lastAutoSeedRef), so a value the user actually typed is
-  // always left alone. This still means it reseeds automatically when
-  // `profile` changes (e.g. the user edited weight/activity level on
-  // CalorieEstimationScreen and came back to an unmodified estimate) --
-  // NutritionGoalsScreen stays mounted under that navigation, so a one-shot
-  // "seed once" guard would otherwise leave the field stuck on the
-  // estimate computed from the OLD profile.
-  const lastAutoSeedRef = useRef<string | null>(null);
+  // The saved targets fill the fields once, when they first arrive. After that the fields are
+  // the person's: a goals refresh (a save from here) never resets what they're typing.
   useEffect(() => {
-    if (!profile || !goals) return;
-    if (lastAutoSeedRef.current !== null && customInput !== lastAutoSeedRef.current) return;
+    if (goals && draft === null) setDraft(draftFromTargets(goals));
+  }, [goals, draft]);
 
-    let next: string | null;
-    if (goals.calories !== null) {
-      next = String(goals.calories);
-    } else {
-      const calorieInput = buildCalorieProfileInput({
-        gender: profile.gender,
-        birthday: profile.birthday,
-        heightCm: profile.heightValue,
-        weightKg: profile.weightValue,
-        activityLevel: profile.activityLevel,
-      });
-      next = calorieInput ? String(computeCalorieTargets(calorieInput).maintenance) : null;
-    }
-    if (next !== null && next !== lastAutoSeedRef.current) {
-      lastAutoSeedRef.current = next;
-      setCustomInput(next);
-    }
-  }, [profile, goals, customInput]);
+  function change(next: TargetDraft) {
+    setSaved(false);
+    setDraft(next);
+  }
 
   async function handleSave() {
-    const calories = parseWholeCalories(customInput);
-    if (calories === null) return;
+    if (!draft) return;
+    const { values, errors } = parseTargets(draft);
+    if (Object.keys(errors).length > 0) return;
     setError(null);
     setSaved(false);
     setSaving(true);
     try {
-      await saveGoals({
-        calories,
-        proteinG: goals?.proteinG ?? null,
-        carbsG: goals?.carbsG ?? null,
-        fatG: goals?.fatG ?? null,
-      });
+      await saveGoals(values);
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save your daily target');
+      setError(err instanceof Error ? err.message : 'Failed to save your daily targets');
     } finally {
       setSaving(false);
     }
@@ -183,8 +154,8 @@ export function NutritionGoalsScreen({ navigation }: Props) {
       : null,
   ].filter((part): part is string => part !== null);
 
-  const parsedCustom = parseWholeCalories(customInput);
-  const canSave = parsedCustom !== null && !saving;
+  const parsed = draft ? parseTargets(draft) : null;
+  const canSave = parsed !== null && Object.keys(parsed.errors).length === 0 && !saving;
   const displayError = error ?? profileError ?? goalsError;
 
   return (
@@ -226,6 +197,42 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         </View>
       </AppCard>
 
+      <AppCard testID="nutrition-goals-custom-card">
+        <Section title="Your Daily Targets">
+          {draft ? (
+            <TargetsEditor
+              draft={draft}
+              onChange={change}
+              weightKg={profile?.weightValue ?? null}
+              weightUnit={profile?.weightUnit ?? 'lb'}
+              testIDPrefix="nutrition-goals"
+            />
+          ) : null}
+        </Section>
+
+        <View style={styles.actions}>
+          {displayError ? (
+            <Text testID="nutrition-goals-error" style={styles.errorText}>
+              {displayError}
+            </Text>
+          ) : null}
+          {saved ? (
+            <Text testID="nutrition-goals-saved" style={styles.savedText}>
+              Saved
+            </Text>
+          ) : null}
+          <PrimaryButton
+            testID="nutrition-goals-save"
+            label="Save Targets"
+            onPress={handleSave}
+            loading={saving}
+            disabled={!canSave && !saving}
+            accentColor={theme.accent}
+            onAccentColor={theme.onAccent}
+          />
+        </View>
+      </AppCard>
+
       {targets ? (
         <AppCard testID="nutrition-goals-targets">
           <Section title="Estimated daily targets">
@@ -252,9 +259,20 @@ export function NutritionGoalsScreen({ navigation }: Props) {
                     </Text>
                     <Text style={styles.optionUnit}>calories/day</Text>
                   </View>
+                  <TextButton
+                    testID={`${option.testID}-use`}
+                    label="Use"
+                    accessibilityLabel={`Use ${calories.toLocaleString()} calories as your daily target`}
+                    onPress={() => draft && change(editDraft(draft, 'calories', String(calories)))}
+                  />
                 </View>
               );
             })}
+            <Text testID="nutrition-goals-estimate-note" style={styles.note}>
+              Maintenance is estimated from your sex, age, height and weight (the Mifflin-St Jeor
+              formula), times your activity level. Weight loss is 300 calories below it, aggressive
+              loss 500 below, and weight gain 300 above.
+            </Text>
           </Section>
         </AppCard>
       ) : (
@@ -273,54 +291,16 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         </AppCard>
       )}
 
-      <AppCard testID="nutrition-goals-custom-card">
-        <Section title="Custom Calorie Target">
-          <TextInput
-            testID="nutrition-goals-custom-input"
-            label="Daily calorie target"
-            helperText="Set as your daily calorie target."
-            placeholder="0"
-            keyboardType="number-pad"
-            value={customInput}
-            onChangeText={setCustomInput}
-            rightAccessory={<Text style={styles.inputUnit}>calories/day</Text>}
-          />
-        </Section>
-
-        <View style={styles.actions}>
-          {displayError ? (
-            <Text testID="nutrition-goals-error" style={styles.errorText}>
-              {displayError}
-            </Text>
-          ) : null}
-          {saved ? (
-            <Text testID="nutrition-goals-saved" style={styles.savedText}>
-              Saved
-            </Text>
-          ) : null}
-          <PrimaryButton
-            testID="nutrition-goals-save"
-            label={
-              parsedCustom !== null
-                ? `Save ${parsedCustom.toLocaleString()} Calories`
-                : 'Save Calories'
-            }
-            onPress={handleSave}
-            loading={saving}
-            disabled={!canSave && !saving}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
-          />
-        </View>
-      </AppCard>
-
       <AppCard testID="nutrition-goals-notes">
         <Section title="Important Notes">
           <Text style={styles.note}>
             • These are estimates and may vary based on your activity level and body composition.
           </Text>
           <Text style={styles.note}>• Adjust based on your progress and how you feel.</Text>
-          <Text style={styles.note}>• You can always change your target later.</Text>
+          <Text style={styles.note}>
+            • Every target is yours: leave any blank, and change them any time. Nothing changes them
+            for you.
+          </Text>
         </Section>
       </AppCard>
     </Screen>
