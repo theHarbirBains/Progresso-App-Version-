@@ -8,11 +8,14 @@ import type { SetRecord } from './workoutQueries';
 // Progressive overload, worked out from sets already logged. Nothing here stores anything or
 // changes a weight: it only says what to aim for.
 //
-// Everyone trains to one rep range across all their workouts. For a weighted exercise, its
-// top set (the heaviest completed set, the first one if several tie -- the same Top Set shown
-// everywhere else) is judged against that range:
-// - reaching the top of the range, or beyond, means increase the weight next time, picking one
-//   you can lift for about the bottom of the range, then building back up week by week;
+// Everyone has their own rep range (Settings > Workout Preferences), and any exercise can have
+// its own instead (exerciseSettingsQueries.ts): an exercise's own range wins over theirs. For a
+// weighted exercise, its top set (the heaviest completed set, the first one if several tie --
+// the same Top Set shown everywhere else) is judged against that range:
+// - reaching the top of the range, or beyond, means increase the weight next time -- by the
+//   exercise's own step when it has one (5 lb dumbbells, 2.5 kg plates), otherwise 5 lb or
+//   2.5 kg -- picking one you can lift for about the bottom of the range, then building back up
+//   week by week;
 // - anything short of the top is still good: stay at that weight and work toward the top.
 // Falling short is never called a bad set, and the app never suggests going lighter.
 //
@@ -39,9 +42,21 @@ export function wantsGuidance(comfort: TrainingComfort | null): boolean {
   return comfort === 'still_learning' || comfort === 'knows_basics';
 }
 
-/** "8–12". */
+/** "8–12", or "5" for a range of one number. */
 export function formatRepRange(range: RepRange): string {
-  return `${range.min}–${range.max}`;
+  return range.min === range.max ? String(range.min) : `${range.min}–${range.max}`;
+}
+
+const KG_PER_LB = 0.45359237;
+
+/** The step to go heavier by when an exercise has none of its own: 5 lb, or 2.5 kg. */
+export function defaultIncrementKg(unit: 'kg' | 'lb'): number {
+  return unit === 'lb' ? 5 * KG_PER_LB : 2.5;
+}
+
+/** The range an exercise is judged against: its own when it has one, otherwise the person's. */
+export function effectiveRepRange(personal: RepRange, exerciseRange: RepRange | null): RepRange {
+  return exerciseRange ?? personal;
 }
 
 /** A suggestion for the next time an exercise is done. */
@@ -123,6 +138,8 @@ interface CueInput {
   range: RepRange;
   unit: 'kg' | 'lb';
   guided: boolean;
+  /** How much heavier to suggest, in kg -- the exercise's own step or the default. */
+  incrementKg?: number;
   /** The weighted version of this exercise in the person's library ("Weighted Pull-Up"), if any. */
   weightedVariant?: string | null;
 }
@@ -132,6 +149,7 @@ export function nextSessionCue(
   input: CueInput & { lastSessionSets: SetRecord[] },
 ): ProgressionCue | null {
   const { measurementType, movementType, range, unit, guided, weightedVariant } = input;
+  const incrementKg = input.incrementKg ?? defaultIncrementKg(unit);
   const top = topSetOf(input.lastSessionSets, measurementType, movementType);
   if (!top) return null;
   const bothSides = movementType === 'unilateral' ? ' on both sides' : '';
@@ -175,8 +193,9 @@ export function nextSessionCue(
   if (top.weightKg == null) return null;
   const weight = weightText(top.weightKg, unit);
   if (top.reps >= range.max) {
+    const heavier = weightText(top.weightKg + incrementKg, unit);
     return {
-      headline: `Your top set hit ${top.reps}${bothSides} at ${weight}. Increase the weight today.`,
+      headline: `Your top set hit ${top.reps}${bothSides} at ${weight}. Increase the weight today: try ${heavier}.`,
       options: [],
       detail: guided
         ? `Pick a weight you can lift for about ${range.min} reps, then build back up to ${range.max}.`
@@ -273,6 +292,12 @@ export function findWeightedVariant(
   return match?.name ?? null;
 }
 
+/** An exercise's own range and step, when the person set them. */
+export interface ExerciseOverride {
+  range: RepRange | null;
+  incrementKg: number | null;
+}
+
 /** The person's progression settings, from their profile. */
 export interface ProgressionSettings {
   range: RepRange;
@@ -303,6 +328,8 @@ export function progressionForExercise(input: {
   records: { exerciseId: string; measurementType: MeasurementType; value: number }[];
   /** The person's exercise library, to find a weighted version. */
   library: { name: string; measurementType: MeasurementType; isActive: boolean }[];
+  /** This exercise's own range and step, when it has them. */
+  override?: ExerciseOverride | null;
 }): {
   bestLine: string | null;
   progressionCue: ProgressionCue | null;
@@ -314,16 +341,17 @@ export function progressionForExercise(input: {
     measurementType === 'weight_reps'
       ? null
       : findWeightedVariant(exercise.exerciseName, input.library);
+  const range = effectiveRepRange(settings.range, input.override?.range ?? null);
   const shared = {
     measurementType,
     movementType: exercise.movementType,
-    range: settings.range,
+    range,
     weightedVariant,
   };
   return {
     bestLine: bestLine({
       measurementType,
-      range: settings.range,
+      range,
       unit: settings.unit,
       repPRs: input.repPRs.filter((pr) => pr.exerciseId === exercise.exerciseId),
       recordValue:
@@ -338,6 +366,7 @@ export function progressionForExercise(input: {
             ...shared,
             unit: settings.unit,
             guided: settings.guided,
+            incrementKg: input.override?.incrementKg ?? undefined,
             lastSessionSets,
           })
         : null,

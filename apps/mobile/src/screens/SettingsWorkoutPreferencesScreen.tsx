@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../auth/AuthProvider';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '../design/Text';
 import { AppHeader } from '../design/AppHeader';
 import { BottomSheet } from '../design/BottomSheet';
-import { PrimaryButton } from '../design/Button';
+import { PrimaryButton, TextButton } from '../design/Button';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
@@ -20,11 +21,18 @@ import {
 import { TrainingComfortSelector } from '../onboarding/TrainingComfortSelector';
 import { useProfile } from '../profile/ProfileProvider';
 import { settingsStyles as styles } from '../settings/settingsStyles';
+import {
+  clearExerciseSetting,
+  fetchExerciseSettings,
+  type ExerciseProgressionSetting,
+} from '../workouts/exerciseSettingsQueries';
 import { formatRepRange, type RepRange } from '../workouts/progression';
+import { formatWeightKg } from '../lib/units';
 
-// Any range from 1 rep up to 50, as the database allows: the bottom always below the top.
-const RANGE_BOTTOMS = Array.from({ length: 49 }, (_, i) => String(i + 1));
-const RANGE_TOPS = Array.from({ length: 49 }, (_, i) => String(i + 2));
+// Any range from 1 rep up to 50, as the database allows: the bottom never above the top. A
+// range of one number (5-5) is a fixed target.
+const RANGE_BOTTOMS = Array.from({ length: 50 }, (_, i) => String(i + 1));
+const RANGE_TOPS = RANGE_BOTTOMS;
 
 type Props = RootStackScreenProps<'SettingsWorkoutPreferences'>;
 
@@ -41,6 +49,40 @@ type Props = RootStackScreenProps<'SettingsWorkoutPreferences'>;
  */
 export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
   const { profile, loading, updateProfile } = useProfile();
+  const { user } = useAuth();
+  const userId = user?.id;
+  // Exercises with their own range or weight step, set from the exercise in a workout. Listed
+  // here so any can go back to the person's own range.
+  const [exerciseSettings, setExerciseSettings] = useState<ExerciseProgressionSetting[]>([]);
+  const [exerciseSheetOpen, setExerciseSheetOpen] = useState(false);
+  const [exerciseError, setExerciseError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    fetchExerciseSettings(userId)
+      .then((settings) => {
+        if (!cancelled) {
+          setExerciseSettings(
+            [...settings.values()].sort((a, b) => a.exerciseName.localeCompare(b.exerciseName)),
+          );
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  async function handleResetExercise(exerciseId: string) {
+    if (!userId) return;
+    setExerciseError(null);
+    try {
+      await clearExerciseSetting(userId, exerciseId);
+      setExerciseSettings((prev) => prev.filter((setting) => setting.exerciseId !== exerciseId));
+    } catch (err) {
+      setExerciseError(err instanceof Error ? err.message : 'Failed to reset the exercise');
+    }
+  }
   const [sheetOpen, setSheetOpen] = useState(false);
   const [comfortSheetOpen, setComfortSheetOpen] = useState(false);
   const [rangeDraft, setRangeDraft] = useState<RepRange | null>(null);
@@ -54,7 +96,7 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
     (option) => option.value === profile?.trainingComfort,
   );
   const range: RepRange = { min: profile?.repRangeMin ?? 8, max: profile?.repRangeMax ?? 12 };
-  const rangeDraftValid = rangeDraft !== null && rangeDraft.min < rangeDraft.max;
+  const rangeDraftValid = rangeDraft !== null && rangeDraft.min <= rangeDraft.max;
 
   async function save(updates: UpdateProfileInput) {
     setSaveError(null);
@@ -126,10 +168,19 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
           testID="open-rep-range"
           icon="repeat"
           title="Rep Range"
-          subtitle="For every exercise"
+          subtitle="Unless an exercise has its own"
           value={formatRepRange(range)}
           onPress={() => setRangeDraft(range)}
           disabled={saving}
+          divider
+        />
+        <ListRow
+          testID="open-exercise-ranges"
+          icon="sliders"
+          title="Exercise Ranges"
+          subtitle="Set from an exercise in your workout"
+          value={String(exerciseSettings.length)}
+          onPress={() => setExerciseSheetOpen(true)}
           divider
         />
         <ListRow
@@ -155,6 +206,53 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
           {saveError}
         </Text>
       ) : null}
+
+      <BottomSheet
+        visible={exerciseSheetOpen}
+        onClose={() => setExerciseSheetOpen(false)}
+        testID="exercise-ranges-sheet"
+      >
+        <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>Exercise Ranges</Text>
+        <Text style={localStyles.sheetHelp}>
+          An exercise with its own range is judged against it instead of yours. Change one from the
+          exercise in a workout.
+        </Text>
+        {exerciseSettings.length === 0 ? (
+          <Text testID="exercise-ranges-empty" style={localStyles.sheetHelp}>
+            No exercise has its own range or weight step.
+          </Text>
+        ) : (
+          exerciseSettings.map((setting, index) => (
+            <ListRow
+              key={setting.exerciseId}
+              testID={`exercise-range-row-${setting.exerciseId}`}
+              title={setting.exerciseName}
+              subtitle={[
+                setting.range ? `Range ${formatRepRange(setting.range)}` : null,
+                setting.incrementKg !== null
+                  ? `Step ${formatWeightKg(setting.incrementKg, profile?.weightUnit ?? 'lb')} ${profile?.weightUnit ?? 'lb'}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+              divider={index > 0}
+              trailing={
+                <TextButton
+                  testID={`exercise-range-reset-${setting.exerciseId}`}
+                  label="Use Mine"
+                  accessibilityLabel={`Use your own range for ${setting.exerciseName}`}
+                  onPress={() => void handleResetExercise(setting.exerciseId)}
+                />
+              }
+            />
+          ))
+        )}
+        {exerciseError ? (
+          <Text testID="exercise-ranges-error" style={styles.errorText}>
+            {exerciseError}
+          </Text>
+        ) : null}
+      </BottomSheet>
 
       <BottomSheet
         visible={sheetOpen}
@@ -234,7 +332,7 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
         ) : null}
         {rangeDraft && !rangeDraftValid ? (
           <Text testID="rep-range-error" style={styles.errorText}>
-            The bottom of the range has to be below the top.
+            The bottom of the range can&apos;t be above the top.
           </Text>
         ) : null}
         <PrimaryButton

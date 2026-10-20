@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { fetchExerciseSettings, saveExerciseSetting } from '../workouts/exerciseSettingsQueries';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
@@ -63,6 +64,11 @@ jest.mock('../exercises/exerciseQueries', () => ({
   fetchAllExercises: jest.fn(),
   invalidateExerciseCache: jest.fn(),
   fetchExerciseSourceCounts: jest.fn().mockResolvedValue({ all: 0, builtin: 0, mine: 0 }),
+}));
+
+jest.mock('../workouts/exerciseSettingsQueries', () => ({
+  fetchExerciseSettings: jest.fn(),
+  saveExerciseSetting: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
@@ -147,6 +153,8 @@ const baseWorkout = {
 };
 
 beforeEach(() => {
+  (fetchExerciseSettings as jest.Mock).mockReset().mockResolvedValue(new Map());
+  (saveExerciseSetting as jest.Mock).mockReset();
   mockUseAuth.mockReturnValue({
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
@@ -432,6 +440,52 @@ describe('ActiveWorkoutScreen', () => {
     await waitFor(() => expect(mockDeleteSet).toHaveBeenCalledWith('s2'));
     expect(screen.queryByTestId('exercise-card-we1-set-s2')).toBeNull();
     expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('1');
+  });
+
+  it('asks before removing a set that has been logged, and keeps it on Cancel', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1-set-s1');
+
+    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s1-remove'));
+
+    expect(alert).toHaveBeenCalledWith(
+      'Remove set 1?',
+      'What you entered for it is removed from this workout.',
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'Cancel' }),
+        expect.objectContaining({ text: 'Remove Set', style: 'destructive' }),
+      ]),
+    );
+    expect(mockDeleteSet).not.toHaveBeenCalled();
+
+    const buttons = alert.mock.calls[0]![2] as { text: string; onPress?: () => void }[];
+    await act(async () => {
+      buttons.find((button) => button.text === 'Remove Set')!.onPress!();
+    });
+    expect(mockDeleteSet).toHaveBeenCalledWith('s1');
+    alert.mockRestore();
+  });
+
+  it('numbers the sets left after a removal 1, 2, ... with no gap', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Remove Set')?.onPress?.();
+    });
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1-set-s2');
+    expect(within(screen.getByTestId('exercise-card-we1-set-s2')).getByText('2')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('exercise-card-we1-set-s1-remove'));
+    });
+
+    await waitFor(() => expect(screen.queryByTestId('exercise-card-we1-set-s1')).toBeNull());
+    expect(within(screen.getByTestId('exercise-card-we1-set-s2')).getByText('1')).toBeTruthy();
+    (Alert.alert as jest.Mock).mockRestore();
   });
 
   it('adds an exercise mid-workout, which starts with exactly one blank set', async () => {
@@ -1336,7 +1390,9 @@ describe('Progressive overload', () => {
     renderScreen();
 
     const cue = await screen.findByTestId('exercise-card-we1-cue');
-    expect(cue).toHaveTextContent(/Your top set hit 12 at 100 kg\. Increase the weight today\./);
+    expect(cue).toHaveTextContent(
+      /Your top set hit 12 at 100 kg\. Increase the weight today: try 102\.5 kg\./,
+    );
     // They asked for guidance, so they're told how to pick the new weight.
     expect(cue).toHaveTextContent(/about 8 reps, then build back up to 12/);
   });
@@ -1361,7 +1417,9 @@ describe('Progressive overload', () => {
     renderScreen();
 
     const cue = await screen.findByTestId('exercise-card-we1-cue');
-    expect(cue).toHaveTextContent(/Your top set hit 10 at 140 kg\. Increase the weight today\./);
+    expect(cue).toHaveTextContent(
+      /Your top set hit 10 at 140 kg\. Increase the weight today: try 142\.5 kg\./,
+    );
     // No how-to for someone who follows their own method.
     expect(cue).not.toHaveTextContent(/build back up/);
   });
@@ -1630,5 +1688,67 @@ describe('ActiveWorkoutScreen renders no bare text outside <Text>', () => {
     await screen.findByTestId('exercise-card-we1-previous-session');
 
     expectNoBareText();
+  });
+});
+
+describe("ActiveWorkoutScreen -- an exercise's own rep range", () => {
+  it('shows the range each exercise is judged against, and saves one of its own', async () => {
+    (saveExerciseSetting as jest.Mock).mockResolvedValue({
+      exerciseId: 'ex1',
+      exerciseName: 'Bench Press',
+      range: { min: 10, max: 14 },
+      incrementKg: null,
+    });
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+
+    const link = await screen.findByTestId('exercise-card-we1-range');
+    expect(link).toHaveTextContent('Range 8–12');
+
+    fireEvent.press(link);
+    fireEvent.press(screen.getByTestId('exercise-progression-source-own'));
+    // The wheels start on the person's 8-12, and show the values from there on.
+    fireEvent.press(screen.getByTestId('exercise-range-min-item-10'));
+    fireEvent.press(screen.getByTestId('exercise-range-max-item-14'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('exercise-progression-save'));
+    });
+
+    expect(saveExerciseSetting).toHaveBeenCalledWith('user-1', 'ex1', {
+      range: { min: 10, max: 14 },
+      incrementKg: null,
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('exercise-card-we1-range')).toHaveTextContent(
+        'Range 10–14 · this exercise',
+      ),
+    );
+  });
+
+  it('reads the ranges already set when the workout opens', async () => {
+    (fetchExerciseSettings as jest.Mock).mockResolvedValue(
+      new Map([
+        [
+          'ex1',
+          {
+            exerciseId: 'ex1',
+            exerciseName: 'Bench Press',
+            range: { min: 5, max: 5 },
+            incrementKg: 1,
+          },
+        ],
+      ]),
+    );
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('exercise-card-we1-range')).toHaveTextContent(
+        'Range 5 · this exercise',
+      ),
+    );
+    expect(fetchExerciseSettings).toHaveBeenCalledWith('user-1');
   });
 });

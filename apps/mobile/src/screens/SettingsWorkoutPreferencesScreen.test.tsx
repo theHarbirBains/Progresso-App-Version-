@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { clearExerciseSetting, fetchExerciseSettings } from '../workouts/exerciseSettingsQueries';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { updateMyProfile } from '../lib/api';
@@ -8,6 +9,11 @@ import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
+}));
+
+jest.mock('../workouts/exerciseSettingsQueries', () => ({
+  fetchExerciseSettings: jest.fn().mockResolvedValue(new Map()),
+  clearExerciseSetting: jest.fn(),
 }));
 
 jest.mock('../lib/api', () => ({
@@ -153,13 +159,24 @@ describe('SettingsWorkoutPreferencesScreen', () => {
     expect(await screen.findByTestId('open-rep-range')).toHaveTextContent(/10–15/);
   });
 
-  it("won't save a range whose bottom isn't below its top", async () => {
+  it('saves a range of one number, such as 12', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, repRangeMin: 12, repRangeMax: 12 });
     renderScreen();
     fireEvent.press(await screen.findByTestId('open-rep-range'));
 
     fireEvent.press(screen.getByTestId('rep-range-min-item-12'));
 
-    expect(screen.getByTestId('rep-range-error')).toHaveTextContent(/has to be below the top/);
+    expect(screen.queryByTestId('rep-range-error')).toBeNull();
+    expect(screen.getByTestId('rep-range-save')).toHaveTextContent('Save 12');
+  });
+
+  it("won't save a range whose bottom is above its top", async () => {
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('open-rep-range'));
+
+    fireEvent.press(screen.getByTestId('rep-range-min-item-13'));
+
+    expect(screen.getByTestId('rep-range-error')).toHaveTextContent(/can't be above the top/);
     expect(screen.getByTestId('rep-range-save').props.accessibilityState.disabled).toBe(true);
     expect(mockUpdateMyProfile).not.toHaveBeenCalled();
   });
@@ -180,5 +197,42 @@ describe('SettingsWorkoutPreferencesScreen', () => {
     renderScreen();
     await screen.findByTestId('open-weekly-workout-goal');
     expectNoBareText();
+  });
+});
+
+describe('SettingsWorkoutPreferencesScreen -- exercise ranges', () => {
+  beforeEach(() => {
+    (fetchExerciseSettings as jest.Mock)
+      .mockReset()
+      .mockResolvedValue(
+        new Map([
+          [
+            'ex-1',
+            {
+              exerciseId: 'ex-1',
+              exerciseName: 'Deadlift',
+              range: { min: 3, max: 5 },
+              incrementKg: null,
+            },
+          ],
+        ]),
+      );
+    (clearExerciseSetting as jest.Mock).mockReset().mockResolvedValue(undefined);
+  });
+
+  it("lists the exercises with their own range, and takes one back to the person's", async () => {
+    renderScreen();
+
+    await waitFor(() => expect(screen.getByTestId('open-exercise-ranges')).toHaveTextContent(/1/));
+    fireEvent.press(screen.getByTestId('open-exercise-ranges'));
+    expect(screen.getByTestId('exercise-range-row-ex-1')).toHaveTextContent(/Deadlift/);
+    expect(screen.getByTestId('exercise-range-row-ex-1')).toHaveTextContent(/Range 3–5/);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('exercise-range-reset-ex-1'));
+    });
+
+    expect(clearExerciseSetting).toHaveBeenCalledWith('user-1', 'ex-1');
+    expect(screen.getByTestId('exercise-ranges-empty')).toBeTruthy();
   });
 });

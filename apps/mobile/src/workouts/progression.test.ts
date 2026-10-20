@@ -2,6 +2,7 @@ import {
   bestLine,
   cuesEqual,
   defaultRepRange,
+  effectiveRepRange,
   findWeightedVariant,
   formatRepRange,
   nextSessionCue,
@@ -89,7 +90,7 @@ describe('next time, for a weighted exercise', () => {
       lastSessionSets: lifts([50, 12], [50, 10]),
     });
     expect(cue).toEqual({
-      headline: 'Your top set hit 12 at 50 lb. Increase the weight today.',
+      headline: 'Your top set hit 12 at 50 lb. Increase the weight today: try 55 lb.',
       options: [],
       detail: null,
     });
@@ -97,7 +98,9 @@ describe('next time, for a weighted exercise', () => {
 
   it('counts going past the top too', () => {
     const cue = nextSessionCue({ ...weighted, guided: false, lastSessionSets: lifts([50, 14]) });
-    expect(cue?.headline).toBe('Your top set hit 14 at 50 lb. Increase the weight today.');
+    expect(cue?.headline).toBe(
+      'Your top set hit 14 at 50 lb. Increase the weight today: try 55 lb.',
+    );
   });
 
   it('tells someone who wants guidance how to pick the new weight', () => {
@@ -138,7 +141,9 @@ describe('next time, for a weighted exercise', () => {
       guided: true,
       lastSessionSets: lifts([100, 10]),
     });
-    expect(cue?.headline).toBe('Your top set hit 10 at 100 lb. Increase the weight today.');
+    expect(cue?.headline).toBe(
+      'Your top set hit 10 at 100 lb. Increase the weight today: try 105 lb.',
+    );
     expect(cue?.detail).toBe(
       'Pick a weight you can lift for about 5 reps, then build back up to 10.',
     );
@@ -155,7 +160,7 @@ describe('next time, for a weighted exercise', () => {
       ],
     });
     expect(both?.headline).toBe(
-      'Your top set hit 12 on both sides at 25 lb. Increase the weight today.',
+      'Your top set hit 12 on both sides at 25 lb. Increase the weight today: try 30 lb.',
     );
     const oneSide = nextSessionCue({
       ...weighted,
@@ -176,7 +181,9 @@ describe('next time, for a weighted exercise', () => {
       guided: false,
       lastSessionSets: [set({ weightKg: 60, reps: 12 })],
     });
-    expect(cue?.headline).toBe('Your top set hit 12 at 60 kg. Increase the weight today.');
+    expect(cue?.headline).toBe(
+      'Your top set hit 12 at 60 kg. Increase the weight today: try 62.5 kg.',
+    );
   });
 
   it('says nothing without a logged set', () => {
@@ -383,7 +390,7 @@ describe('progressionForExercise', () => {
     expect(progressionForExercise(base)).toEqual({
       bestLine: 'Best at 8–12: 55 lb × 10',
       progressionCue: {
-        headline: 'Your top set hit 12 at 50 lb. Increase the weight today.',
+        headline: 'Your top set hit 12 at 50 lb. Increase the weight today: try 55 lb.',
         options: [],
         detail: null,
       },
@@ -405,5 +412,67 @@ describe('progressionForExercise', () => {
     expect(
       progressionForExercise({ ...base, lastSessionSets: undefined }).progressionCue,
     ).toBeNull();
+  });
+});
+
+describe('exercise-specific ranges and steps', () => {
+  it('shows a range of one number as that number', () => {
+    expect(formatRepRange({ min: 5, max: 5 })).toBe('5');
+    expect(formatRepRange({ min: 8, max: 12 })).toBe('8–12');
+  });
+
+  it("uses an exercise's own range over the person's", () => {
+    expect(effectiveRepRange({ min: 8, max: 12 }, { min: 3, max: 5 })).toEqual({ min: 3, max: 5 });
+    expect(effectiveRepRange({ min: 8, max: 12 }, null)).toEqual({ min: 8, max: 12 });
+  });
+
+  it("goes heavier by the exercise's own step when it has one", () => {
+    const cue = nextSessionCue({
+      ...weighted,
+      guided: false,
+      incrementKg: 1.25,
+      unit: 'kg',
+      lastSessionSets: [
+        {
+          id: 's1',
+          setIndex: 1,
+          weightKg: 60,
+          reps: 12,
+          completedAt: '2026-01-01T00:00:00Z',
+        } as SetRecord,
+      ],
+    });
+    expect(cue?.headline).toBe(
+      'Your top set hit 12 at 60 kg. Increase the weight today: try 61.25 kg.',
+    );
+  });
+
+  it("judges against the exercise's own range, top included, in the live workout", () => {
+    const result = progressionForExercise({
+      exercise: {
+        exerciseId: 'ex-1',
+        exerciseName: 'Deadlift',
+        movementType: 'bilateral',
+        measurementType: 'weight_reps',
+        sets: [],
+      },
+      lastSessionSets: [
+        {
+          id: 's1',
+          setIndex: 1,
+          weightKg: 140,
+          reps: 5,
+          completedAt: '2026-01-01T00:00:00Z',
+        } as SetRecord,
+      ],
+      settings: { range: { min: 8, max: 12 }, enabled: true, guided: false, unit: 'kg' },
+      repPRs: [],
+      records: [],
+      library: [],
+      override: { range: { min: 3, max: 5 }, incrementKg: 5 },
+    });
+    expect(result.progressionCue?.headline).toBe(
+      'Your top set hit 5 at 140 kg. Increase the weight today: try 145 kg.',
+    );
   });
 });

@@ -19,13 +19,26 @@ import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
 import { ExerciseCard } from '../workouts/ExerciseCard';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
-import { progressionForExercise, wantsGuidance } from '../workouts/progression';
+import {
+  effectiveRepRange,
+  formatRepRange,
+  progressionForExercise,
+  wantsGuidance,
+  type RepRange,
+} from '../workouts/progression';
+import { ExerciseProgressionSheet } from '../workouts/ExerciseProgressionSheet';
+import {
+  fetchExerciseSettings,
+  saveExerciseSetting,
+  type ExerciseProgressionSetting,
+} from '../workouts/exerciseSettingsQueries';
 import {
   buildPreviousSessionDisplay,
   computeCardSets,
   computeUnilateralSets,
   draftFromSet,
   draftValues,
+  hasDraftInput,
   invalidDraftMessage,
   isValidDraft,
   withPrefilledSets,
@@ -112,6 +125,71 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       cancelled = true;
     };
   }, [userId]);
+
+  // Exercises with their own rep range or weight step (exerciseSettingsQueries.ts). An
+  // exercise's own range wins over the person's; nothing breaks without them.
+  const [exerciseSettings, setExerciseSettings] = useState<Map<string, ExerciseProgressionSetting>>(
+    new Map(),
+  );
+  const [editingRangeFor, setEditingRangeFor] = useState<{
+    exerciseId: string;
+    exerciseName: string;
+    measurementType: MeasurementType;
+  } | null>(null);
+  const [rangeSaving, setRangeSaving] = useState(false);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    fetchExerciseSettings(userId)
+      .then((settings) => {
+        if (!cancelled) setExerciseSettings(settings);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  async function handleSaveExerciseRange(setting: {
+    range: RepRange | null;
+    incrementKg: number | null;
+  }) {
+    if (!userId || !editingRangeFor) return;
+    setRangeError(null);
+    setRangeSaving(true);
+    try {
+      const saved = await saveExerciseSetting(userId, editingRangeFor.exerciseId, setting);
+      setExerciseSettings((prev) => {
+        const next = new Map(prev);
+        if (saved) next.set(editingRangeFor.exerciseId, saved);
+        else next.delete(editingRangeFor.exerciseId);
+        return next;
+      });
+      setEditingRangeFor(null);
+    } catch (err) {
+      setRangeError(err instanceof Error ? err.message : 'Failed to save the range');
+    } finally {
+      setRangeSaving(false);
+    }
+  }
+
+  // One stable handler per exercise, so opening the range sheet never re-renders every card.
+  const rangeHandlersRef = useRef(new Map<string, () => void>());
+  function getRangeHandler(exercise: {
+    exerciseId: string;
+    exerciseName: string;
+    measurementType: MeasurementType;
+  }): () => void {
+    const cached = rangeHandlersRef.current.get(exercise.exerciseId);
+    if (cached) return cached;
+    const handler = () => {
+      setRangeError(null);
+      setEditingRangeFor(exercise);
+    };
+    rangeHandlersRef.current.set(exercise.exerciseId, handler);
+    return handler;
+  }
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -506,18 +584,47 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   removeSetRef.current = handleRemoveSet;
   const removeUnilateralSetRef = useRef(handleRemoveUnilateralSet);
   removeUnilateralSetRef.current = handleRemoveUnilateralSet;
+  const setInputsRef = useRef(setInputs);
+  setInputsRef.current = setInputs;
   const removeSet = useCallback((setId: string) => {
     const current = workoutRef.current;
     if (!current) return;
     for (const exercise of current.exercises) {
       const set = exercise.sets.find((candidate) => candidate.id === setId);
       if (set) {
+        const unilateral = exercise.movementType === 'unilateral';
         // A unilateral set is removed as one unit, same as completion above.
-        if (exercise.movementType === 'unilateral') {
-          void removeUnilateralSetRef.current(exercise, set.setIndex);
-        } else {
-          void removeSetRef.current(exercise.id, set);
+        const rows = unilateral
+          ? exercise.sets.filter((candidate) => candidate.setIndex === set.setIndex)
+          : [set];
+        const remove = () => {
+          if (unilateral) void removeUnilateralSetRef.current(exercise, set.setIndex);
+          else void removeSetRef.current(exercise.id, set);
+        };
+        // A set with nothing in it goes straight away; one with numbers in it, or ticked, is
+        // asked about first, so a stray tap never loses a logged set.
+        const hasData = rows.some(
+          (row) => row.completedAt !== null || hasDraftInput(setInputsRef.current[row.id]),
+        );
+        if (!hasData) {
+          remove();
+          return;
         }
+        const indexes = Array.from(new Set(exercise.sets.map((row) => row.setIndex))).sort(
+          (a, b) => a - b,
+        );
+        const number = indexes.indexOf(set.setIndex) + 1;
+        const lastOne = indexes.length === 1;
+        Alert.alert(
+          `Remove set ${number}?`,
+          lastOne
+            ? `It's the only set of ${exercise.exerciseName}. The exercise stays in your workout, so you can add a set again.`
+            : `What you entered for it is removed from this workout.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Remove Set', style: 'destructive', onPress: remove },
+          ],
+        );
         return;
       }
     }
@@ -742,7 +849,29 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 repPRs: allRepPRs,
                 records: allExerciseRecords,
                 library,
+                override: exerciseSettings.get(exercise.exerciseId) ?? null,
               })}
+              rangeText={
+                measurementTypeOf(exercise) === 'timed'
+                  ? null
+                  : exerciseSettings.get(exercise.exerciseId)?.range
+                    ? `Range ${formatRepRange(
+                        effectiveRepRange(
+                          progressionSettings.range,
+                          exerciseSettings.get(exercise.exerciseId)?.range ?? null,
+                        ),
+                      )} · this exercise`
+                    : `Range ${formatRepRange(progressionSettings.range)}`
+              }
+              onEditProgression={
+                measurementTypeOf(exercise) === 'timed'
+                  ? undefined
+                  : getRangeHandler({
+                      exerciseId: exercise.exerciseId,
+                      exerciseName: exercise.exerciseName,
+                      measurementType: measurementTypeOf(exercise),
+                    })
+              }
               key={exercise.id}
               testID={`exercise-card-${exercise.id}`}
               exerciseName={exercise.exerciseName}
@@ -839,6 +968,23 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           setPickerOpen(false);
           setCustomExerciseOpen(true);
         }}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+      />
+
+      <ExerciseProgressionSheet
+        visible={editingRangeFor !== null}
+        exerciseName={editingRangeFor?.exerciseName ?? ''}
+        measurementType={editingRangeFor?.measurementType ?? 'weight_reps'}
+        personalRange={progressionSettings.range}
+        current={
+          editingRangeFor ? (exerciseSettings.get(editingRangeFor.exerciseId) ?? null) : null
+        }
+        unit={weightUnit}
+        saving={rangeSaving}
+        error={rangeError}
+        onSave={(setting) => void handleSaveExerciseRange(setting)}
+        onClose={() => setEditingRangeFor(null)}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
       />

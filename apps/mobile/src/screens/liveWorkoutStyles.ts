@@ -99,6 +99,11 @@ export const liveWorkoutStyles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
+  // The exercise's rep range, a quiet link to change it for this exercise.
+  rangeLink: {
+    ...typeScale.caption,
+    marginTop: 2,
+  },
   exerciseActions: {
     flexDirection: 'row',
     alignItems: 'center',

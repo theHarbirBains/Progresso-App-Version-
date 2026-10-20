@@ -70,6 +70,10 @@ interface Props {
   progressionCue?: ProgressionCue | null;
   /** Said once today's own top set reaches the top of the range, under today's sets. */
   sessionCue?: string | null;
+  /** The rep range this exercise is judged against ("Range 8–12", "Range 3–5 · this exercise"). */
+  rangeText?: string | null;
+  /** Opens this exercise's own range and weight step. Must be stable (see arePropsEqual). */
+  onEditProgression?: () => void;
   /** Used when movementType is 'bilateral' -- one row per set, unchanged from before unilateral support existed. */
   sets: ExerciseCardSet[];
   /** Used when movementType is 'unilateral' -- one row per LOGICAL set (both sides), never a separate exercise per side. */
@@ -108,6 +112,8 @@ function ExerciseCardComponent({
   bestLine = null,
   progressionCue = null,
   sessionCue = null,
+  rangeText = null,
+  onEditProgression,
   sets,
   unilateralSets,
   onChangeWeight,
@@ -144,6 +150,17 @@ function ExerciseCardComponent({
             >
               {PER_SIDE_NOTE[measurementType]}
             </Text>
+          ) : null}
+          {rangeText && onEditProgression ? (
+            <TouchableOpacity
+              testID={testID ? `${testID}-range` : undefined}
+              onPress={onEditProgression}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={`${rangeText}. Change the rep range for ${exerciseName}`}
+            >
+              <Text style={[styles.rangeLink, { color: accentColor }]}>{rangeText}</Text>
+            </TouchableOpacity>
           ) : null}
         </View>
         <View style={styles.exerciseActions}>
@@ -289,11 +306,12 @@ function ExerciseCardComponent({
       {hasRows ? <SetColumnHeader measurementType={measurementType} /> : null}
 
       {isUnilateral
-        ? unilateralSets.map((set) => (
+        ? unilateralSets.map((set, position) => (
             <UnilateralSetRow
               key={set.setIndex}
               testID={testID ? `${testID}-set-${set.setIndex}` : undefined}
-              setIndex={set.setIndex}
+              // Numbered by position, so removing a set never leaves a gap (1, 3).
+              setIndex={position + 1}
               left={set.left}
               right={set.right}
               completed={set.left.completed && set.right.completed}
@@ -308,11 +326,11 @@ function ExerciseCardComponent({
               onAccentColor={onAccentColor}
             />
           ))
-        : sets.map((set) => (
+        : sets.map((set, position) => (
             <SetRow
               key={set.id}
               testID={testID ? `${testID}-set-${set.id}` : undefined}
-              setIndex={set.setIndex}
+              setIndex={position + 1}
               weight={set.weight}
               reps={set.reps}
               duration={set.duration ?? ''}
@@ -461,6 +479,8 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     prev.onMoveDown === next.onMoveDown &&
     (prev.bestLine ?? null) === (next.bestLine ?? null) &&
     (prev.sessionCue ?? null) === (next.sessionCue ?? null) &&
+    (prev.rangeText ?? null) === (next.rangeText ?? null) &&
+    prev.onEditProgression === next.onEditProgression &&
     cuesEqual(prev.progressionCue ?? null, next.progressionCue ?? null) &&
     previousSessionEqual(prev.previousSession, next.previousSession) &&
     setsEqual(prev.sets, next.sets) &&
