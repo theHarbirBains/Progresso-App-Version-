@@ -20,7 +20,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Accounts & onboarding**
 
 - Email/password sign-up and sign-in (Supabase Auth), password reset, and Google sign-in; an Apple button uses the same web sign-in flow
-- A guided onboarding that ends in creating the account: where you heard about Progresso, country, gender, birthday, weight and height, fitness goal, training experience, weekly frequency, workout length, training style, a starting split, and email and push preferences — then a first name (shown as the display name), a username, email and password, or Google
+- A guided onboarding that ends in creating the account: where you heard about Progresso, country, gender, birthday, weight and height, fitness goal, how comfortable you are planning and progressing your workouts (which sets your starting rep range: 8–12, or 5–10 for experienced lifters), weekly frequency, workout length, a starting split, and email and push preferences — then a first name (shown as the display name), a username, email and password, or Google
 - Allowing notifications during onboarding asks iOS for permission and registers the device for push
 - Change Password in Settings, for accounts that sign in with email
 
@@ -33,6 +33,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 - Create, edit, view, duplicate, and delete workout splits, including a set of built-in split presets (e.g. Push/Pull/Legs) that can be copied into an editable, user-owned split
 - Live workout tracking: log exercises, sets, reps, and weight (or reps alone for a bodyweight exercise, or a time like 45 or 1:30 for a timed one) against a split in progress, with a running workout timer and each exercise's last session shown above its sets
+- Progressive overload: one rep range for all your workouts (Settings › Workout Preferences). When an exercise's top set reaches the top of the range, the live workout says to increase the weight next time (a weight you can lift for about the bottom of the range, then build back up); until then, to keep the weight and work toward the top. Bodyweight exercises at the top get more reps or the weighted version, and timed ones a new time to aim for. Each card also shows your best within the range. Suggestions only, never automatic, and they can be turned off
 - New sets start filled in from the set before them, or the same set from last session, ready to edit; a set only completes when you tap it
 - Unilateral exercises are logged per side, left and right
 - Group workouts: start a group from a workout; each person has their own tab of sets, and anyone in the group can enter them
@@ -164,7 +165,7 @@ Authentication is issued by Supabase Auth; the mobile app holds the session, and
 
 ## Testing
 
-- **Mobile:** 229 test files in `apps/mobile` (Jest + `jest-expo` + React Native Testing Library), covering screens, components, and business logic (query builders, PR/1RM calculations, progressive-overload logic, calendar/date logic).
+- **Mobile:** 230 test files in `apps/mobile` (Jest + `jest-expo` + React Native Testing Library), covering screens, components, and business logic (query builders, PR/1RM calculations, progressive-overload logic, calendar/date logic).
 - **Backend:** 29 unit-test (`.spec.ts`) files alongside their modules, plus 8 end-to-end suites under `apps/api/test` (auth/authorization, exercises, observability, RevenueCat webhook, user profile and account deletion, blocking and reporting, the legal pages, and a general app smoke test) using Supertest against a mocked Supabase layer.
 - **Database:** `npm run db:test` applies every migration to a real, ephemeral, local Postgres instance (via the `embedded-postgres` package — no Docker or live Supabase project required) and runs correctness/security tests against it, including RLS isolation checks.
 - Run everything: `npm run test:api` (backend unit tests), `npm run test:e2e --workspace apps/api` (backend end-to-end tests), `npm run test --workspace apps/mobile` (mobile tests), `npm run db:test` (database tests).

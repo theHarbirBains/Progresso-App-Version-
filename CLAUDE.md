@@ -68,6 +68,7 @@ No caching library is used or needed — every rule below is built on plain Reac
 - **Top set:** heaviest weight completed for an exercise within one specific workout.
 - **Rep-count PR:** heaviest weight ever logged for an exercise at a specific rep count.
 - **True 1RM:** only ever comes from a logged set of exactly 1 rep. Never estimated from higher-rep sets. Lives in a dedicated "Maxes" section.
+- **Progression cue:** a suggestion, never a record. Each person has one rep range (`users.rep_range_min`/`rep_range_max`). When an exercise's top set reaches the top of it, the live workout suggests increasing the weight next time; short of the top (even below the bottom) it says keep the weight and work toward the top -- never "bad" or "go lighter". Worked out in the app from logged sets (`workouts/progression.ts`); it never changes a weight, a PR or a Top Set.
 - **Measurement type:** what an exercise's sets record -- `weight_reps`, `bodyweight` (reps only) or `timed` (a duration). A weighted variant (Weighted Pull-Up) is its own `weight_reps` exercise, never a flag on a bodyweight one. Each logged exercise snapshots its type (`workout_exercises.measurement_type`, set by trigger), so changing an exercise's type never rewrites history. Top sets, rep PRs, 1RMs, volume and strength charts are `weight_reps` only; a bodyweight exercise's record is its most reps (`rep_records`) and a timed one's its longest (`duration_records`), both trigger-maintained like PRs.
 
 Weights are stored canonically in kilograms; lb/kg is a display/input preference only.
