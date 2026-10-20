@@ -144,6 +144,28 @@ describe('User profile updates (e2e)', () => {
     expect(response.payload).not.toContain('duplicate key value violates unique constraint');
   });
 
+  it('rejects a rep range out of bounds, or a comfort answer that is not one of the four', async () => {
+    const payloads = [
+      { repRangeMin: 0 },
+      { repRangeMax: 51 },
+      { repRangeMin: 8.5 },
+      { trainingComfort: 'expert' },
+    ];
+    const responses = await Promise.all(
+      payloads.map((payload) =>
+        app.inject({
+          method: 'PATCH',
+          url: '/api/v1/users/me',
+          headers: { authorization: 'Bearer good-token' },
+          payload,
+        }),
+      ),
+    );
+
+    expect(responses.map((r) => r.statusCode)).toEqual([400, 400, 400, 400]);
+    expect(getClient).not.toHaveBeenCalled();
+  });
+
   it('requires authentication', async () => {
     const response = await app.inject({
       method: 'PATCH',

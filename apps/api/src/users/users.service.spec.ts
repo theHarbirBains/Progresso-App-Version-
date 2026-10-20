@@ -1,4 +1,9 @@
-import { ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import type { SupabaseService } from '../supabase/supabase.service';
 import { UsersService } from './users.service';
 
@@ -344,6 +349,52 @@ describe('UsersService', () => {
 
       await expect(service.updateProfile('user-1', { username: 'taken' })).rejects.toBeInstanceOf(
         ConflictException,
+      );
+    });
+
+    it('saves the comfort answer, rep range and suggestions setting, and returns them', async () => {
+      const client = createMockClient({
+        updateData: {
+          training_comfort: 'knows_basics',
+          rep_range_min: 8,
+          rep_range_max: 12,
+          progression_cues_enabled: false,
+        },
+      });
+      const service = serviceWith(client);
+
+      const profile = await service.updateProfile('user-1', {
+        trainingComfort: 'knows_basics',
+        repRangeMin: 8,
+        repRangeMax: 12,
+        progressionCuesEnabled: false,
+      });
+
+      expect(client.update).toHaveBeenCalledWith({
+        training_comfort: 'knows_basics',
+        rep_range_min: 8,
+        rep_range_max: 12,
+        progression_cues_enabled: false,
+      });
+      expect(profile).toMatchObject({
+        trainingComfort: 'knows_basics',
+        repRangeMin: 8,
+        repRangeMax: 12,
+        progressionCuesEnabled: false,
+      });
+    });
+
+    it("says so when a range's bottom isn't below its top", async () => {
+      const client = createMockClient({
+        updateError: {
+          code: '23514',
+          message: 'new row for relation "users" violates check constraint "users_rep_range_check"',
+        },
+      });
+      const service = serviceWith(client);
+
+      await expect(service.updateProfile('user-1', { repRangeMin: 12 })).rejects.toThrow(
+        new BadRequestException('The bottom of your rep range has to be below the top'),
       );
     });
 

@@ -43,6 +43,15 @@ const ACTIVITY_LEVELS = [
   'extra_active',
 ] as const;
 const TRAINING_STYLE_PREFERENCES = ['guided', 'build_your_own'] as const;
+// How comfortable someone is planning and progressing their training -- the onboarding
+// question that replaced trainingExperience and trainingStylePreference (still accepted
+// from older app builds). See the rep_ranges migration.
+const TRAINING_COMFORTS = [
+  'still_learning',
+  'knows_basics',
+  'plans_and_progresses',
+  'follows_method',
+] as const;
 const APPLE_HEALTH_PREFERENCES = ['connected', 'not_now'] as const;
 const REFERRAL_SOURCES = [
   'tiktok',
@@ -170,6 +179,29 @@ export class UpdateUserDto {
   @IsOptional()
   @IsIn(TRAINING_STYLE_PREFERENCES)
   trainingStylePreference?: (typeof TRAINING_STYLE_PREFERENCES)[number];
+
+  @IsOptional()
+  @IsIn(TRAINING_COMFORTS)
+  trainingComfort?: (typeof TRAINING_COMFORTS)[number];
+
+  // The rep range every exercise is trained to. The database also checks the bottom stays
+  // below the top, which covers changing just one end (UsersService.updateProfile).
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(49)
+  repRangeMin?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(2)
+  @Max(50)
+  repRangeMax?: number;
+
+  /** Whether the live workout suggests when to go heavier or make an exercise harder. */
+  @IsOptional()
+  @IsBoolean()
+  progressionCuesEnabled?: boolean;
 
   @IsOptional()
   @IsBoolean()

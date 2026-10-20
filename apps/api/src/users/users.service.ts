@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
@@ -34,9 +35,14 @@ export interface UserProfile {
   referralSource: string | null;
   country: string | null;
   averageWorkoutLength: string | null;
+  trainingComfort: string | null;
+  repRangeMin: number;
+  repRangeMax: number;
+  progressionCuesEnabled: boolean;
 }
 
 const USERNAME_UNIQUE_VIOLATION = '23505';
+const CHECK_VIOLATION = '23514';
 
 const PROFILE_COLUMNS =
   'weight_unit, display_name, username, workout_accent_color, nutrition_accent_color, ' +
@@ -44,7 +50,8 @@ const PROFILE_COLUMNS =
   'height_value, height_unit, fitness_goal, training_experience, workout_frequency_days, ' +
   'training_style_preference, email_opt_in, push_notifications_opt_in, ' +
   'apple_health_preference, onboarding_completed_at, activity_level, ' +
-  'referral_source, country, average_workout_length';
+  'referral_source, country, average_workout_length, training_comfort, rep_range_min, ' +
+  'rep_range_max, progression_cues_enabled';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
@@ -74,6 +81,10 @@ function toProfile(data: any): UserProfile {
     referralSource: data.referral_source,
     country: data.country,
     averageWorkoutLength: data.average_workout_length,
+    trainingComfort: data.training_comfort,
+    repRangeMin: data.rep_range_min,
+    repRangeMax: data.rep_range_max,
+    progressionCuesEnabled: data.progression_cues_enabled,
   };
 }
 
@@ -162,6 +173,12 @@ export class UsersService {
     if (dto.averageWorkoutLength !== undefined) {
       updatePayload.average_workout_length = dto.averageWorkoutLength;
     }
+    if (dto.trainingComfort !== undefined) updatePayload.training_comfort = dto.trainingComfort;
+    if (dto.repRangeMin !== undefined) updatePayload.rep_range_min = dto.repRangeMin;
+    if (dto.repRangeMax !== undefined) updatePayload.rep_range_max = dto.repRangeMax;
+    if (dto.progressionCuesEnabled !== undefined) {
+      updatePayload.progression_cues_enabled = dto.progressionCuesEnabled;
+    }
 
     if (Object.keys(updatePayload).length === 0) {
       return this.getProfile(userId);
@@ -178,6 +195,9 @@ export class UsersService {
     if (error) {
       if (error.code === USERNAME_UNIQUE_VIOLATION) {
         throw new ConflictException('That username is already taken');
+      }
+      if (error.code === CHECK_VIOLATION && error.message.includes('users_rep_range_check')) {
+        throw new BadRequestException('The bottom of your rep range has to be below the top');
       }
       throw new InternalServerErrorException('Failed to update profile');
     }
