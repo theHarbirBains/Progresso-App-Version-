@@ -68,7 +68,7 @@ UI should have social-media-app engagement and visual language: athlete profile,
 
 Tracks calories, protein, carbs, fat. No micronutrients in v1.
 
-Logging methods: custom foods entered by hand (with an optional photo), food search (Progresso's catalog and Open Food Facts), barcode scanning, and AI Food Search, which takes its figures from food data (Progresso's catalog, USDA, Open Food Facts) and uses an AI estimate only as a labelled last resort. A weight-based serving can be logged in grams or ounces, and a recently logged food can be logged again in two taps.
+Logging methods: custom foods entered by hand (with an optional photo), food search (Progresso's catalog and Open Food Facts), barcode scanning, and AI Food Search, which takes its figures from food data (Progresso's catalog, USDA, Open Food Facts) and uses an AI estimate only as a labelled last resort. A food can be logged in servings, in the pieces its serving names, in grams or ounces (a weight-based serving) or millilitres (a drink), and the log keeps the amount as typed. Shortcuts: usual and recently logged foods can be logged again in two taps; a **saved meal** (foods eaten together) is logged in one go, each food as its own entry; a **recipe** (a drink or meal always made the same way: its ingredients and how many servings it makes) is one food, whose figures per serving are worked out from its ingredients when it's saved; and Copy Yesterday logs any of yesterday's foods again. Editing a food or a recipe never changes what was already logged.
 
 Users may optionally set daily targets for calories/protein/carbs/fat.
 
@@ -103,7 +103,7 @@ Administrative actions must be auditable. **User-data isolation must be enforced
 
 **Hybrid architecture.**
 
-- Simple authenticated reads and own-row writes, properly protected by Supabase RLS, may go direct to Supabase. This includes workout and set writes — PR correctness is enforced by database triggers whichever path wrote a set, not by the API — and nutrition logging, whose snapshot values are computed at log time.
+- Simple authenticated reads and own-row writes, properly protected by Supabase RLS, may go direct to Supabase. This includes workout and set writes — PR correctness is enforced by database triggers whichever path wrote a set, not by the API — and nutrition logging, whose snapshot values are computed at log time, with the user's own foods, saved meals and recipes.
 - Operations needing server-side logic, cross-user trust or a third-party integration go through the backend API: exercise and equipment-profile writes, food search, barcode lookup and AI food search, social, trainer and group features, push tokens, administrative operations, RevenueCat webhooks, account export/deletion.
 
 Never bypass security or business logic just because direct Supabase access is technically possible.
@@ -142,7 +142,7 @@ Users should eventually be able to export their data and delete their account/da
 | 3     | Workout Logging                    | Done — splits (incl. presets), live workout tracking, history, calendar                                                                                                                           |
 | 4     | Progressive Overload Engine        | Done — top sets, rep-count PRs, true 1RM, PR correctness across edit/delete/restore                                                                                                               |
 | 5     | Strength Analytics                 | Done — tabbed Progress section (Overview/Top Sets/Strength/All Time), charts, muscle visualization, PRs and true 1RMs                                                                             |
-| 6     | Nutrition Logging                  | Done — custom foods, food search, barcode scanning, AI food search, recent foods, logging by servings or weight, daily goals                                                                      |
+| 6     | Nutrition Logging                  | Done — custom foods, food search, barcode scanning, AI food search, usual and recent foods, saved meals, recipes, Copy Yesterday, logging by servings, pieces, weight or volume, daily goals      |
 | 7     | Nutrition Analytics                | Not started — daily totals and a day-by-day history calendar only; no trend analytics                                                                                                             |
 | 8     | Subscriptions                      | Paused by decision — RevenueCat webhook handling (signature verification, event projection) is implemented; no in-app purchase or paywall until approved                                          |
 | 9     | Admin Dashboard                    | Not started — role-based authorization is implemented and tested end to end; the admin surface itself is a single placeholder route, not a dashboard                                              |
@@ -165,7 +165,7 @@ Progresso is **past the Phase 0 foundation** and has an implemented core loop, n
 - Workout tracking: live workout logging (exercises, sets, reps, weight) against a split, with each new set pre-filled from the set before it or the same set last session (never completed without the user's tap), workout history with a month calendar, workout sharing.
 - Progressive overload / PRs: top sets, rep-count PRs, and true 1RM (only from a logged 1-rep set), correct across set/workout edit, soft-delete, and restore.
 - Progress/strength analytics: a tabbed Progress section (Overview, Top Sets, Strength, All Time), strength trend charts, muscle-group visualization, and PRs and true 1RMs (also listed on the You tab).
-- Nutrition: today's calories and macros against user-set daily goals (with goal estimates from body data), a history calendar, and every logging method in Section 8 — custom foods, food search, barcode scanning, AI Food Search (with a per-user hourly and daily limit), recent foods and logging by weight.
+- Nutrition: today's calories and macros against user-set daily goals (with goal estimates from body data), a history calendar, and every logging method in Section 8 — custom foods, food search, barcode scanning, AI Food Search (with a per-user hourly and daily limit), usual and recent foods, saved meals, recipes, Copy Yesterday and logging by pieces, weight or volume.
 - Trainer mode and group workouts: a trainer manages clients, logs workouts for them and runs live sessions, behind a "trainer" entitlement with no purchase flow yet (switched on by hand during internal testing); anyone can start a group from a workout, with each person's sets in their own tab.
 - Deep links: `progresso://feed`, `progresso://nutrition`, `progresso://workouts/<id>` and `progresso://workouts/<id>/live`, opened once the user is signed in.
 - Settings: an app-wide Settings hub — a root list of Profile & Personal Information, Workout Preferences, Nutrition & Goals, Notifications, Account & Security and Support & About, each its own page. The look is fixed (Warm Minimal: the warm gym photo behind the top of every screen and one amber accent), with no background themes or colour customization.

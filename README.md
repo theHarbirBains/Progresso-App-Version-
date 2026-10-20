@@ -51,10 +51,14 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Nutrition**
 
 - Today's calories and macros against your goals, with goal estimates calculated from your body data, and a history calendar
-- Log Food opens your Food Library: your own foods (with photos), with your most recently logged foods first, ready to re-log at last time's quantity
+- Log Food opens your Food Library: your saved meals, your usual foods (the ones you log on the most days) and your most recently logged foods first, ready to re-log at last time's amount, then your own foods (with photos) and recipes
+- Saved meals: foods you eat together, logged in one go, each as its own entry; build one in the Food Library or save today's foods as one
+- Recipes: a drink or a meal always made the same way -- its ingredients and how many servings it makes -- logged as a single food, with its figures per serving worked out from the ingredients
+- Copy Yesterday logs any of yesterday's foods again, exactly as they were logged
 - Search Food covers Progresso's food catalog and Open Food Facts; Scan Barcode looks products up on Open Food Facts, with Enter Manually when one isn't found
 - AI Food Search turns a description into its parts and takes their figures from Progresso's catalog, USDA data and Open Food Facts; Claude's own estimate is used only as a labelled last resort. Each user has an hourly and a daily limit
-- A food whose serving is a weight can be logged in grams or ounces; every log keeps the figures it was logged with, even if the food changes later
+- A food can be logged in servings, in the pieces its serving names (cookies, slices), in grams or ounces when its serving is a weight, or in millilitres when it's a drink; a log keeps the amount as typed and is edited that way, and logging the same food twice within seconds asks first
+- Every log keeps the figures it was logged with, even if the food (or recipe) changes later
 
 **Trainer mode**
 
@@ -103,7 +107,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 Progresso is an npm-workspaces monorepo:
 
-- **`apps/mobile`** — the Expo/React Native client. Reads protected by RLS, workout and set writes, nutrition logs and the user's own foods go straight to Supabase (PRs are recomputed by database triggers, whichever path wrote the set); food search, social, trainer and group features, push tokens and admin operations go through the backend API.
+- **`apps/mobile`** — the Expo/React Native client. Reads protected by RLS, workout and set writes, nutrition logs and the user's own foods, saved meals and recipes go straight to Supabase (PRs are recomputed by database triggers, whichever path wrote the set); food search, social, trainer and group features, push tokens and admin operations go through the backend API.
 - **`apps/api`** — the NestJS backend. Validates the caller's Supabase-issued JWT on every request, resolves their role from `admin_users`, and owns any operation that needs server-side logic or elevated privileges.
 - **`supabase`** — version-controlled SQL migrations (the only way the schema changes), seed data, and a local database test suite.
 - **`docs`** — product and technical specification.
