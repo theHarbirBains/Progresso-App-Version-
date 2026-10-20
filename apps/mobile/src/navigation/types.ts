@@ -73,7 +73,8 @@ export type RootStackParamList = {
   AiFoodSearch: undefined;
   BarcodeScanner: undefined;
   NutritionGoals: undefined;
-  NutritionHistory: undefined;
+  /** `date` ("YYYY-MM-DD"): opens on that day, from a day in Progress. */
+  NutritionHistory: { date?: string } | undefined;
   /** Training phases: the one going now and past ones. */
   Phases: undefined;
   /** Starts a phase, or edits/reviews one (`phaseId`). */

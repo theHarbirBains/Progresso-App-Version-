@@ -15,6 +15,9 @@ import { OverviewSection } from '../progress/OverviewSection';
 import { useWeeklySummaries } from '../progress/useWeeklySummaries';
 import { WeeklySummaryBlock } from '../progress/WeeklySummaryBlock';
 import { PhaseProgressBlock } from '../progress/PhaseProgressBlock';
+import { ConsistencyBlock } from '../progress/ConsistencyBlock';
+import { NutritionProgressSection } from '../progress/NutritionProgressSection';
+import { useProfile } from '../profile/ProfileProvider';
 import { ProgressHeader } from '../progress/ProgressHeader';
 import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
 import { progressStyles as styles } from '../progress/progressStyles';
@@ -64,6 +67,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   const error = statsError ?? prsError;
 
   const [activeSection, setActiveSection] = useState<ProgressSection>('Overview');
+  const { profile } = useProfile();
   // This week's and last week's summaries, read once as Progress opens.
   const { summaries: weekSummaries, error: weekError } = useWeeklySummaries();
 
@@ -144,6 +148,12 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                       accentColor={theme.accent}
                       onAccentColor={theme.onAccent}
                     />
+                    <ConsistencyBlock
+                      workouts={completedWorkouts}
+                      weeklyGoal={profile?.workoutFrequencyDays ?? null}
+                      accentColor={theme.accent}
+                      onOpenHistory={() => navigation.navigate('WorkoutHistory')}
+                    />
                   </>
                 }
               />
@@ -167,6 +177,14 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 accentColor={theme.accent}
                 onAccentColor={theme.onAccent}
                 navigation={navigation}
+              />
+            ) : null}
+
+            {activeSection === 'Nutrition' ? (
+              <NutritionProgressSection
+                accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
+                onOpenDay={(date) => navigation.navigate('NutritionHistory', { date })}
               />
             ) : null}
 

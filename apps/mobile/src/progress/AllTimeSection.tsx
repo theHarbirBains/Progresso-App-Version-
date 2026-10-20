@@ -73,11 +73,11 @@ function AllTimeStat({
   );
 }
 
-// The fourth Progress tab: a lifetime, all-time-only view built entirely
+// The last Progress tab: a lifetime, all-time-only view built entirely
 // from data every other Progress section already fetches/derives (real
 // workout history, real PRs, real per-exercise/muscle-group aggregation) --
-// no new query, no fabricated numbers. See progress-relative-strength's own
-// comment below for why that one section deliberately shows no numbers yet.
+// no new query, no fabricated numbers, and no decorative banner or
+// placeholder for comparisons there's no data for.
 export function AllTimeSection({
   groups,
   history,
@@ -129,11 +129,6 @@ export function AllTimeSection({
       contentContainerStyle={{ paddingBottom: 32 }}
       showsVerticalScrollIndicator={false}
     >
-      <AppCard hero testID="progress-all-time-hero" style={styles.allTimeHero}>
-        <Text style={styles.allTimeHeroTitle}>All Time</Text>
-        <Text style={styles.allTimeHeroSubtitle}>A record of your work. Keep going.</Text>
-      </AppCard>
-
       <View style={styles.allTimeStatGrid}>
         <AllTimeStat
           testID="progress-all-time-stat-workouts"
@@ -334,25 +329,6 @@ export function AllTimeSection({
           ))}
         </AppCard>
       ) : null}
-
-      {/* Relative Strength: replaces the reference's motivational quote
-          card. Progresso has exactly one real account in its database today
-          -- there is no reference population to compute a same-sex
-          percentile against, for overall strength or any muscle group, so
-          this deliberately shows an honest "not available yet" state
-          instead of a number. See the session's own report for what a real
-          implementation would need (reference population size/minimum
-          sample gate, a backend aggregate endpoint, an approved
-          normalization algorithm) -- this card is the placeholder the real
-          feature would slot into once that exists. */}
-      <AppCard testID="progress-all-time-relative-strength">
-        <Text style={styles.relativeStrengthTitle}>Relative Strength</Text>
-        <Text style={styles.relativeStrengthBody}>
-          Comparing your strength with other users of the same sex needs a larger, active user base
-          to produce a statistically meaningful result. This is not available yet -- check back as
-          Progresso grows.
-        </Text>
-      </AppCard>
     </ScrollView>
   );
 }

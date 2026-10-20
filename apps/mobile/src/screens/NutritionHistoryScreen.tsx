@@ -27,16 +27,18 @@ type Props = RootStackScreenProps<'NutritionHistory'>;
 // selected, that day's logged foods. Unlike NutritionTodayScreen this is
 // read-only browsing of the past, not the live "today" cache (FoodLogProvider
 // only ever holds today's logs) -- there is no quantity edit or delete here.
-export function NutritionHistoryScreen({ navigation }: Props) {
+export function NutritionHistoryScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { nutritionTheme } = useProgressTheme();
   const { openMenu } = useAppMenu();
 
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  // Opened on a day from Progress: that day's month, with the day chosen.
+  const openedOn = route.params?.date ?? null;
+  const [year, setYear] = useState(openedOn ? Number(openedOn.slice(0, 4)) : now.getFullYear());
+  const [month, setMonth] = useState(openedOn ? Number(openedOn.slice(5, 7)) : now.getMonth() + 1);
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(openedOn);
   const todayKey = toLocalDateKey(now);
 
   const [monthLogs, setMonthLogs] = useState<FoodLogRow[]>([]);

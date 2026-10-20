@@ -636,19 +636,6 @@ export const progressStyles = StyleSheet.create({
   // reusing Strength's strengthPerfGrid/strengthListRow (visually similar,
   // but kept independent so an All Time tweak can never accidentally touch
   // the Strength tab's styling).
-  allTimeHero: {
-    marginBottom: spacing.lg,
-  },
-  allTimeHeroTitle: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  allTimeHeroSubtitle: {
-    ...typeScale.callout,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
   allTimeStatGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -758,19 +745,6 @@ export const progressStyles = StyleSheet.create({
   allTimeMilestoneDate: {
     ...typeScale.secondary,
     color: colors.textMuted,
-  },
-
-  // Relative Strength -- honest "not enough data yet" state (see section
-  // 24 of the All Time spec); no fabricated percentiles.
-  relativeStrengthTitle: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  relativeStrengthBody: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    lineHeight: 19,
   },
 
   // Shareable Progress

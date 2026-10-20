@@ -36,11 +36,11 @@ const mockOpenMenu = jest.fn();
 // NutritionHistoryScreen opens the app-level side menu (via AppMenuContext)
 // from its own header, same as every other tab-root/menu-destination screen
 // -- this stands in for that root-level provider.
-function renderScreen() {
+function renderScreen(params?: { date?: string }) {
   return render(
     <ProfileProvider>
       <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-        <NutritionHistoryScreen navigation={navigation} route={{} as never} />
+        <NutritionHistoryScreen navigation={navigation} route={{ params } as never} />
       </AppMenuContext.Provider>
     </ProfileProvider>,
   );
@@ -220,5 +220,15 @@ describe('NutritionHistoryScreen', () => {
 
     expectNoBareText();
     await settle();
+  });
+});
+
+describe('NutritionHistoryScreen -- opened on a day', () => {
+  it('opens on the day it was given, with its foods, as when a day in Progress is tapped', async () => {
+    mockFetchFoodLogsForMonth.mockResolvedValue([log()]);
+    renderScreen({ date: FIXTURE_DATE_KEY });
+
+    expect(await screen.findByTestId('nutrition-history-selected-day')).toBeTruthy();
+    expect(await screen.findByTestId('nutrition-history-log-row-log-1')).toBeTruthy();
   });
 });

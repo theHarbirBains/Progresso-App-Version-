@@ -111,10 +111,11 @@ describe('AllTimeSection', () => {
     expect(screen.getByTestId('progress-all-time-empty')).toBeTruthy();
   });
 
-  it('shows the "All Time" hero with no fabricated content', () => {
+  it('opens straight on the figures -- no decorative banner', () => {
     renderAllTime();
 
-    expect(screen.getByTestId('progress-all-time-hero')).toHaveTextContent(/All Time/);
+    expect(screen.queryByTestId('progress-all-time-hero')).toBeNull();
+    expect(screen.queryByText(/Keep going/)).toBeNull();
   });
 
   it('shows real lifetime stats -- never Total Calories', () => {
@@ -189,12 +190,10 @@ describe('AllTimeSection', () => {
     );
   });
 
-  it('shows Relative Strength with an honest unavailable state -- no fake percentiles', () => {
+  it('shows no placeholder for comparisons there is no data for -- and no fake percentiles', () => {
     renderAllTime();
 
-    const card = screen.getByTestId('progress-all-time-relative-strength');
-    expect(card).toHaveTextContent(/Relative Strength/);
-    expect(card).toHaveTextContent(/not available yet/i);
+    expect(screen.queryByTestId('progress-all-time-relative-strength')).toBeNull();
     expect(screen.queryByText(/%/)).toBeNull();
     expect(screen.queryByText(/[Tt]op \d/)).toBeNull();
   });
