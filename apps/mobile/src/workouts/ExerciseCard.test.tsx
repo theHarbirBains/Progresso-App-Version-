@@ -607,3 +607,84 @@ describe('ExerciseCard by what the exercise measures', () => {
     expect(screen.getByText('Reps are per side')).toBeTruthy();
   });
 });
+
+describe('ExerciseCard progression', () => {
+  const lastSession = {
+    dateDisplay: 'Oct 1, 2026',
+    sets: [{ setNumber: 1, weightDisplay: '50', unit: 'lb' as const, reps: 12, side: null }],
+  };
+  const cue = {
+    headline: 'Your top set hit 12 at 50 lb. Increase the weight today.',
+    options: [],
+    detail: 'Pick a weight you can lift for about 8 reps, then build back up to 12.',
+  };
+
+  it("shows the best within the range under Last Workout's date, and what to aim for under its sets", () => {
+    render(
+      <ExerciseCard
+        {...baseProps}
+        previousSession={lastSession}
+        bestLine="Best at 8–12: 60 lb × 9"
+        progressionCue={cue}
+      />,
+    );
+
+    expect(screen.getByTestId('exercise-card-best')).toHaveTextContent('Best at 8–12: 60 lb × 9');
+    expect(screen.getByTestId('exercise-card-cue')).toHaveTextContent(/Increase the weight today/);
+    expect(screen.getByTestId('exercise-card-cue')).toHaveTextContent(/about 8 reps/);
+    expect(
+      screen.getByLabelText(
+        'Your top set hit 12 at 50 lb. Increase the weight today. Pick a weight you can lift for about 8 reps, then build back up to 12.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('lists ways to make a bodyweight exercise harder', () => {
+    render(
+      <ExerciseCard
+        {...baseProps}
+        measurementType="bodyweight"
+        previousSession={lastSession}
+        progressionCue={{
+          headline: 'Your best set hit 12 reps, the top of your range. Make it harder today:',
+          options: ['Add reps: go for 13 or more', 'Add weight: try Weighted Pull-Up'],
+          detail: null,
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Add reps: go for 13 or more')).toBeTruthy();
+    expect(screen.getByText('Add weight: try Weighted Pull-Up')).toBeTruthy();
+  });
+
+  it("says when today's top set reaches the top of the range", () => {
+    render(
+      <ExerciseCard
+        {...baseProps}
+        sessionCue="Top of your range. Increase the weight next time."
+      />,
+    );
+
+    expect(screen.getByTestId('exercise-card-session-cue')).toHaveTextContent(
+      /Top of your range\. Increase the weight next time\./,
+    );
+  });
+
+  it('shows none of it when there is nothing to say', () => {
+    render(<ExerciseCard {...baseProps} previousSession={lastSession} />);
+
+    expect(screen.queryByTestId('exercise-card-best')).toBeNull();
+    expect(screen.queryByTestId('exercise-card-cue')).toBeNull();
+    expect(screen.queryByTestId('exercise-card-session-cue')).toBeNull();
+  });
+
+  it('re-renders when the cue, the best line or the session cue changes, and not otherwise', () => {
+    const props = { ...baseProps, previousSession: lastSession, progressionCue: cue };
+    expect(arePropsEqual(props, { ...props, progressionCue: { ...cue, options: [] } })).toBe(true);
+    expect(
+      arePropsEqual(props, { ...props, progressionCue: { ...cue, headline: 'Last time: 11' } }),
+    ).toBe(false);
+    expect(arePropsEqual(props, { ...props, bestLine: 'Best at 8–12: 60 lb × 9' })).toBe(false);
+    expect(arePropsEqual(props, { ...props, sessionCue: 'Top of your range.' })).toBe(false);
+  });
+});

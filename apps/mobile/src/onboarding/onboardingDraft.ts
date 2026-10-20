@@ -7,14 +7,14 @@ import {
   type HeightUnit,
   type ProfileResponse,
   type ReferralSource,
-  type TrainingExperience,
-  type TrainingStylePreference,
+  type TrainingComfort,
   type UpdateProfileInput,
 } from '../lib/api';
 import { requestPushToken } from '../lib/pushNotifications';
 import { toDateStringUTC } from './dateWheelValues';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { WORKOUT_SPLIT_PRESETS } from '../workouts/workoutSplitPresets';
+import { defaultRepRange } from '../workouts/progression';
 
 /**
  * Everything onboarding collects, held entirely in local/draft state --
@@ -35,10 +35,10 @@ export interface OnboardingDraft {
   heightValue: number | null;
   heightUnit: HeightUnit;
   fitnessGoal: FitnessGoal | null;
-  trainingExperience: TrainingExperience | null;
+  /** Also sets the starting rep range: see defaultRepRange. */
+  trainingComfort: TrainingComfort | null;
   workoutFrequencyDays: number | null;
   averageWorkoutLength: AverageWorkoutLength | null;
-  trainingStylePreference: TrainingStylePreference | null;
   /** A WORKOUT_SPLIT_PRESETS id -- not yet materialized into a real,
    * user-owned split row (that needs a real user id, so it only happens
    * inside submitOnboardingDraft, after the account exists). */
@@ -82,10 +82,9 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   heightValue: 170,
   heightUnit: 'cm',
   fitnessGoal: null,
-  trainingExperience: null,
+  trainingComfort: null,
   workoutFrequencyDays: null,
   averageWorkoutLength: null,
-  trainingStylePreference: null,
   selectedSplitPresetId: null,
   wantsCustomSplit: false,
   emailOptIn: null,
@@ -108,10 +107,9 @@ export const STEP_ORDER = [
   'weight',
   'height',
   'fitnessGoal',
-  'trainingExperience',
+  'trainingComfort',
   'workoutFrequency',
   'averageWorkoutLength',
-  'trainingStyle',
   'workoutSplit',
   'emailPreference',
   'pushNotifications',
@@ -139,14 +137,12 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
       return draft.heightValue != null;
     case 'fitnessGoal':
       return draft.fitnessGoal != null;
-    case 'trainingExperience':
-      return draft.trainingExperience != null;
+    case 'trainingComfort':
+      return draft.trainingComfort != null;
     case 'workoutFrequency':
       return draft.workoutFrequencyDays != null;
     case 'averageWorkoutLength':
       return draft.averageWorkoutLength != null;
-    case 'trainingStyle':
-      return draft.trainingStylePreference != null;
     case 'workoutSplit':
       return draft.selectedSplitPresetId != null || draft.wantsCustomSplit;
     case 'emailPreference':
@@ -177,12 +173,14 @@ function draftToProfileInput(draft: OnboardingDraft): UpdateProfileInput {
   if (draft.heightValue != null) input.heightValue = draft.heightValue;
   input.heightUnit = draft.heightUnit;
   if (draft.fitnessGoal != null) input.fitnessGoal = draft.fitnessGoal;
-  if (draft.trainingExperience != null) input.trainingExperience = draft.trainingExperience;
+  if (draft.trainingComfort != null) {
+    input.trainingComfort = draft.trainingComfort;
+    const range = defaultRepRange(draft.trainingComfort);
+    input.repRangeMin = range.min;
+    input.repRangeMax = range.max;
+  }
   if (draft.workoutFrequencyDays != null) input.workoutFrequencyDays = draft.workoutFrequencyDays;
   if (draft.averageWorkoutLength != null) input.averageWorkoutLength = draft.averageWorkoutLength;
-  if (draft.trainingStylePreference != null) {
-    input.trainingStylePreference = draft.trainingStylePreference;
-  }
   if (draft.emailOptIn != null) input.emailOptIn = draft.emailOptIn;
   if (draft.pushNotificationsOptIn != null) {
     input.pushNotificationsOptIn = draft.pushNotificationsOptIn;

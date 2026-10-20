@@ -166,8 +166,11 @@ describe('OnboardingScreen', () => {
     fireEvent.press(screen.getByTestId('onboarding-step-fitness-goal-build_muscle'));
     fireEvent.press(screen.getByTestId('onboarding-continue'));
 
-    await screen.findByTestId('onboarding-step-training-experience');
-    fireEvent.press(screen.getByTestId('onboarding-experience-intermediate'));
+    await screen.findByTestId('onboarding-step-training-comfort');
+    expect(
+      screen.getByText('How comfortable are you with planning and progressing your workouts?'),
+    ).toBeTruthy();
+    fireEvent.press(screen.getByTestId('onboarding-step-training-comfort-knows_basics'));
     fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-workout-frequency');
@@ -176,10 +179,6 @@ describe('OnboardingScreen', () => {
 
     await screen.findByTestId('onboarding-step-average-workout-length');
     fireEvent.press(screen.getByTestId('onboarding-workout-length-45_60'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-
-    await screen.findByTestId('onboarding-step-training-style');
-    fireEvent.press(screen.getByTestId('onboarding-step-training-style-guided'));
     fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-workout-split');
@@ -222,10 +221,11 @@ describe('OnboardingScreen', () => {
           country: 'CA',
           gender: 'male',
           fitnessGoal: 'build_muscle',
-          trainingExperience: 'intermediate',
+          trainingComfort: 'knows_basics',
+          repRangeMin: 8,
+          repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
-          trainingStylePreference: 'guided',
           activeWorkoutSplitId: 'split-new',
           emailOptIn: true,
           pushNotificationsOptIn: false,
@@ -254,10 +254,11 @@ describe('OnboardingScreen', () => {
           heightValue: 180,
           heightUnit: 'cm',
           fitnessGoal: 'build_muscle',
-          trainingExperience: 'intermediate',
+          trainingComfort: 'knows_basics',
+          repRangeMin: 8,
+          repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
-          trainingStylePreference: 'guided',
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
           pushNotificationsOptIn: false,
@@ -298,10 +299,11 @@ describe('OnboardingScreen', () => {
           heightValue: 180,
           heightUnit: 'cm',
           fitnessGoal: 'build_muscle',
-          trainingExperience: 'intermediate',
+          trainingComfort: 'knows_basics',
+          repRangeMin: 8,
+          repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
-          trainingStylePreference: 'guided',
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
           pushNotificationsOptIn: false,
@@ -361,10 +363,11 @@ describe('OnboardingScreen', () => {
           heightValue: 180,
           heightUnit: 'cm',
           fitnessGoal: 'build_muscle',
-          trainingExperience: 'intermediate',
+          trainingComfort: 'knows_basics',
+          repRangeMin: 8,
+          repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
-          trainingStylePreference: 'guided',
         },
       }),
     );
@@ -435,10 +438,11 @@ describe('OnboardingScreen', () => {
           heightValue: 180,
           heightUnit: 'cm',
           fitnessGoal: 'build_muscle',
-          trainingExperience: 'intermediate',
+          trainingComfort: 'knows_basics',
+          repRangeMin: 8,
+          repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
-          trainingStylePreference: 'guided',
           selectedSplitPresetId: 'ppl',
           emailOptIn: true,
           pushNotificationsOptIn: false,
@@ -482,10 +486,9 @@ describe('OnboardingScreen', () => {
     heightValue: 180,
     heightUnit: 'cm',
     fitnessGoal: 'build_muscle',
-    trainingExperience: 'intermediate',
+    trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
     averageWorkoutLength: '45_60',
-    trainingStylePreference: 'guided',
     selectedSplitPresetId: 'ppl',
     emailOptIn: true,
     pushNotificationsOptIn: false,
@@ -538,10 +541,9 @@ describe('OnboardingScreen -- notifications step', () => {
     country: 'CA',
     gender: 'male',
     fitnessGoal: 'build_muscle',
-    trainingExperience: 'intermediate',
+    trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
     averageWorkoutLength: '45_60',
-    trainingStylePreference: 'guided',
     selectedSplitPresetId: 'ppl',
     emailOptIn: true,
   };

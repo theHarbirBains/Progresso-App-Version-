@@ -3,8 +3,7 @@ import type {
   FitnessGoal,
   Gender,
   ReferralSource,
-  TrainingExperience,
-  TrainingStylePreference,
+  TrainingComfort,
 } from '../lib/api';
 
 export const GENDER_OPTIONS: { value: Gender; label: string }[] = [
@@ -25,10 +24,40 @@ export const FITNESS_GOAL_OPTIONS: { value: FitnessGoal; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export const TRAINING_EXPERIENCE_OPTIONS: { value: TrainingExperience; label: string }[] = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'advanced', label: 'Advanced' },
+// "How comfortable are you with planning and progressing your workouts?" -- replaced the old
+// experience (Beginner/Intermediate/Advanced) and training-style (Guided/Build My Own)
+// questions, whose answers nothing used. It sets the starting rep range and whether
+// progression suggestions come with a one-line why (workouts/progression.ts). Never locks a
+// feature or labels anyone; it can be changed in Settings > Workout Preferences.
+export const TRAINING_COMFORT_OPTIONS: {
+  value: TrainingComfort;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: 'still_learning',
+    label: "I'm still learning",
+    description:
+      "I usually choose exercises based on what feels right, and I'm not sure how to track progress.",
+  },
+  {
+    value: 'knows_basics',
+    label: 'I know the basics, but need guidance',
+    description:
+      "I understand sets and reps, but I'm not always sure when to increase weight or change my approach.",
+  },
+  {
+    value: 'plans_and_progresses',
+    label: 'I can plan and progress my training',
+    description:
+      'I follow a structured routine, track my performance, and know when and how to progress.',
+  },
+  {
+    value: 'follows_method',
+    label: 'I follow a specific training method',
+    description:
+      'I use planned progression, RPE/RIR, percentages, periodization, or programming from a coach.',
+  },
 ];
 
 export const WORKOUT_FREQUENCY_OPTIONS: { value: number; label: string }[] = [
@@ -38,23 +67,6 @@ export const WORKOUT_FREQUENCY_OPTIONS: { value: number; label: string }[] = [
   { value: 5, label: '5 days' },
   { value: 6, label: '6 days' },
   { value: 7, label: '7 days' },
-];
-
-export const TRAINING_STYLE_OPTIONS: {
-  value: TrainingStylePreference;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: 'guided',
-    label: 'Guided',
-    description: 'Let Progresso help guide your workouts and training structure.',
-  },
-  {
-    value: 'build_your_own',
-    label: 'Build My Own',
-    description: 'I want complete control over my workouts and exercises.',
-  },
 ];
 
 export const REFERRAL_SOURCE_OPTIONS: { value: ReferralSource; label: string }[] = [

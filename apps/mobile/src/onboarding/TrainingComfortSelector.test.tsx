@@ -1,21 +1,28 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { WorkoutPreferenceSelector } from './WorkoutPreferenceSelector';
+import { TrainingComfortSelector } from './TrainingComfortSelector';
 
-describe('WorkoutPreferenceSelector', () => {
-  it('renders both training-style options with their descriptions', () => {
-    render(<WorkoutPreferenceSelector testID="style" value={null} onChange={jest.fn()} />);
+describe('TrainingComfortSelector', () => {
+  it('shows all four answers with their descriptions', () => {
+    render(<TrainingComfortSelector testID="comfort" value={null} onChange={jest.fn()} />);
 
-    expect(screen.getByTestId('style-guided')).toBeTruthy();
-    expect(screen.getByTestId('style-build_your_own')).toBeTruthy();
-    expect(screen.getByText(/complete control/i)).toBeTruthy();
+    for (const value of [
+      'still_learning',
+      'knows_basics',
+      'plans_and_progresses',
+      'follows_method',
+    ]) {
+      expect(screen.getByTestId(`comfort-${value}`)).toBeTruthy();
+    }
+    expect(screen.getByText(/not sure how to track progress/i)).toBeTruthy();
+    expect(screen.getByText(/programming from a coach/i)).toBeTruthy();
   });
 
-  it('calls onChange with the pressed style', () => {
+  it('reports the answer pressed', () => {
     const onChange = jest.fn();
-    render(<WorkoutPreferenceSelector testID="style" value={null} onChange={onChange} />);
+    render(<TrainingComfortSelector testID="comfort" value={null} onChange={onChange} />);
 
-    fireEvent.press(screen.getByTestId('style-build_your_own'));
+    fireEvent.press(screen.getByTestId('comfort-knows_basics'));
 
-    expect(onChange).toHaveBeenCalledWith('build_your_own');
+    expect(onChange).toHaveBeenCalledWith('knows_basics');
   });
 });

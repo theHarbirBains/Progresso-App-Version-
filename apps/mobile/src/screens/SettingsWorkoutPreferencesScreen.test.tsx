@@ -30,6 +30,10 @@ const baseProfile = {
   username: 'athlete1',
   weightUnit: 'kg' as const,
   workoutFrequencyDays: null as number | null,
+  trainingComfort: null as string | null,
+  repRangeMin: 8,
+  repRangeMax: 12,
+  progressionCuesEnabled: true,
 };
 
 const mockGoBack = jest.fn();
@@ -99,6 +103,77 @@ describe('SettingsWorkoutPreferencesScreen', () => {
     expect(await screen.findByTestId('settings-workout-preferences-error')).toHaveTextContent(
       'network down',
     );
+  });
+
+  it('shows the comfort answer, the rep range and the suggestions switch', async () => {
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, trainingComfort: 'knows_basics' });
+    renderScreen();
+
+    expect(await screen.findByTestId('open-training-comfort')).toHaveTextContent(
+      /I know the basics, but need guidance/,
+    );
+    expect(screen.getByTestId('open-rep-range')).toHaveTextContent(/8–12/);
+    expect(screen.getByTestId('progression-tips-toggle').props.value).toBe(true);
+  });
+
+  it('says the comfort answer is not set for an account made before the question', async () => {
+    renderScreen();
+    expect(await screen.findByTestId('open-training-comfort')).toHaveTextContent(/Not set/);
+  });
+
+  it('saves a new comfort answer without touching the range', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, trainingComfort: 'follows_method' });
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('open-training-comfort'));
+
+    fireEvent.press(screen.getByTestId('training-comfort-follows_method'));
+
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
+      trainingComfort: 'follows_method',
+    });
+    expect(await screen.findByTestId('open-training-comfort')).toHaveTextContent(
+      /I follow a specific training method/,
+    );
+  });
+
+  it('saves any rep range whose bottom is below its top', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, repRangeMin: 10, repRangeMax: 15 });
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('open-rep-range'));
+
+    fireEvent.press(screen.getByTestId('rep-range-min-item-10'));
+    fireEvent.press(screen.getByTestId('rep-range-max-item-15'));
+    expect(screen.getByTestId('rep-range-save')).toHaveTextContent('Save 10–15');
+    fireEvent.press(screen.getByTestId('rep-range-save'));
+
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
+      repRangeMin: 10,
+      repRangeMax: 15,
+    });
+    expect(await screen.findByTestId('open-rep-range')).toHaveTextContent(/10–15/);
+  });
+
+  it("won't save a range whose bottom isn't below its top", async () => {
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('open-rep-range'));
+
+    fireEvent.press(screen.getByTestId('rep-range-min-item-12'));
+
+    expect(screen.getByTestId('rep-range-error')).toHaveTextContent(/has to be below the top/);
+    expect(screen.getByTestId('rep-range-save').props.accessibilityState.disabled).toBe(true);
+    expect(mockUpdateMyProfile).not.toHaveBeenCalled();
+  });
+
+  it('turns the suggestions off', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, progressionCuesEnabled: false });
+    renderScreen();
+    await screen.findByTestId('progression-tips-toggle');
+
+    fireEvent(screen.getByTestId('progression-tips-toggle'), 'valueChange', false);
+
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
+      progressionCuesEnabled: false,
+    });
   });
 
   it('renders no bare text outside <Text>', async () => {

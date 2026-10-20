@@ -8,16 +8,18 @@ import { createGroup } from '../lib/api';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
-import type { ExerciseRow } from '../exercises/exerciseQueries';
+import { fetchAllExercises, type ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
+import { useProfile } from '../profile/ProfileProvider';
 import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
 import { ExerciseCard } from '../workouts/ExerciseCard';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
+import { progressionForExercise, wantsGuidance } from '../workouts/progression';
 import {
   buildPreviousSessionDisplay,
   computeCardSets,
@@ -81,7 +83,35 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
-  const { refetch: refetchAllTimeStats } = useAllTimeStats();
+  const {
+    refetch: refetchAllTimeStats,
+    repPRs: allRepPRs,
+    exerciseRecords: allExerciseRecords,
+  } = useAllTimeStats();
+  const { profile } = useProfile();
+  // Progressive overload (workouts/progression.ts): the person's one rep range, and whether to
+  // suggest anything. Read off the shared profile, so a change in Settings shows straight away.
+  const progressionSettings = {
+    range: { min: profile?.repRangeMin ?? 8, max: profile?.repRangeMax ?? 12 },
+    enabled: profile?.progressionCuesEnabled ?? true,
+    guided: wantsGuidance(profile?.trainingComfort ?? null),
+    unit: weightUnit,
+  };
+  // The person's exercise library (already cached for the picker), to suggest the weighted
+  // version of a bodyweight or timed exercise. Nothing breaks without it.
+  const [library, setLibrary] = useState<ExerciseRow[]>([]);
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    fetchAllExercises({ userId, search: '', muscleGroup: null, source: 'all' })
+      .then((rows) => {
+        if (!cancelled) setLibrary(rows);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -705,6 +735,14 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
 
           {workout.exercises.map((exercise, index) => (
             <ExerciseCard
+              {...progressionForExercise({
+                exercise,
+                lastSessionSets: previousPerformance[exercise.exerciseId]?.sets,
+                settings: progressionSettings,
+                repPRs: allRepPRs,
+                records: allExerciseRecords,
+                library,
+              })}
               key={exercise.id}
               testID={`exercise-card-${exercise.id}`}
               exerciseName={exercise.exerciseName}

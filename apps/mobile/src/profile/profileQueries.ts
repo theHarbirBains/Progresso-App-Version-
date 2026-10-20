@@ -8,7 +8,8 @@ const PROFILE_COLUMNS =
   'height_value, height_unit, fitness_goal, training_experience, workout_frequency_days, ' +
   'training_style_preference, email_opt_in, push_notifications_opt_in, ' +
   'apple_health_preference, onboarding_completed_at, activity_level, ' +
-  'referral_source, country, average_workout_length';
+  'referral_source, country, average_workout_length, training_comfort, rep_range_min, ' +
+  'rep_range_max, progression_cues_enabled';
 
 interface ProfileRow {
   weight_unit: ProfileResponse['weightUnit'];
@@ -36,6 +37,10 @@ interface ProfileRow {
   referral_source: ProfileResponse['referralSource'];
   country: string | null;
   average_workout_length: ProfileResponse['averageWorkoutLength'];
+  training_comfort: ProfileResponse['trainingComfort'];
+  rep_range_min: number;
+  rep_range_max: number;
+  progression_cues_enabled: boolean;
 }
 
 function toProfile(userId: string, row: ProfileRow): ProfileResponse {
@@ -66,6 +71,10 @@ function toProfile(userId: string, row: ProfileRow): ProfileResponse {
     referralSource: row.referral_source,
     country: row.country,
     averageWorkoutLength: row.average_workout_length,
+    trainingComfort: row.training_comfort,
+    repRangeMin: row.rep_range_min,
+    repRangeMax: row.rep_range_max,
+    progressionCuesEnabled: row.progression_cues_enabled,
   };
 }
 

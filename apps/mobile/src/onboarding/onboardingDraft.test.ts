@@ -44,10 +44,9 @@ const FULL_DRAFT: OnboardingDraft = {
   weightValue: 80,
   heightValue: 180,
   fitnessGoal: 'build_muscle',
-  trainingExperience: 'intermediate',
+  trainingComfort: 'knows_basics',
   workoutFrequencyDays: 4,
   averageWorkoutLength: '45_60',
-  trainingStylePreference: 'guided',
   selectedSplitPresetId: 'ppl',
   emailOptIn: true,
   pushNotificationsOptIn: false,
@@ -116,10 +115,11 @@ describe('submitOnboardingDraft', () => {
         weightValue: 80,
         heightValue: 180,
         fitnessGoal: 'build_muscle',
-        trainingExperience: 'intermediate',
+        trainingComfort: 'knows_basics',
+        repRangeMin: 8,
+        repRangeMax: 12,
         workoutFrequencyDays: 4,
         averageWorkoutLength: '45_60',
-        trainingStylePreference: 'guided',
         activeWorkoutSplitId: 'split-new',
         emailOptIn: true,
         pushNotificationsOptIn: false,
@@ -130,6 +130,25 @@ describe('submitOnboardingDraft', () => {
     );
     // Onboarding no longer asks about Apple Health; there is no HealthKit integration.
     expect(mockUpdateMyProfile.mock.calls[0][1]).not.toHaveProperty('appleHealthPreference');
+    // Nor the two questions the comfort question replaced.
+    expect(mockUpdateMyProfile.mock.calls[0][1]).not.toHaveProperty('trainingExperience');
+    expect(mockUpdateMyProfile.mock.calls[0][1]).not.toHaveProperty('trainingStylePreference');
+  });
+
+  it('starts an experienced lifter on a 5-10 rep range', async () => {
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...FULL_DRAFT,
+      trainingComfort: 'follows_method',
+    });
+
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith(
+      'token-123',
+      expect.objectContaining({
+        trainingComfort: 'follows_method',
+        repRangeMin: 5,
+        repRangeMax: 10,
+      }),
+    );
   });
 
   it('skips materializing a split entirely when none was chosen', async () => {

@@ -20,7 +20,6 @@ import {
   AVERAGE_WORKOUT_LENGTH_OPTIONS,
   GENDER_OPTIONS,
   REFERRAL_SOURCE_OPTIONS,
-  TRAINING_EXPERIENCE_OPTIONS,
   WORKOUT_FREQUENCY_OPTIONS,
 } from '../onboarding/onboardingOptions';
 import {
@@ -41,7 +40,7 @@ import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
 import { OnboardingProgress } from '../onboarding/OnboardingProgress';
 import { PermissionStep } from '../onboarding/PermissionStep';
 import { WeightWheelPicker } from '../onboarding/WeightWheelPicker';
-import { WorkoutPreferenceSelector } from '../onboarding/WorkoutPreferenceSelector';
+import { TrainingComfortSelector } from '../onboarding/TrainingComfortSelector';
 import { requestNotificationPermission } from '../lib/pushNotifications';
 import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { WorkoutSplitPresetPicker } from '../workouts/WorkoutSplitPresetPicker';
@@ -63,10 +62,9 @@ const GENERIC_CONTINUE_STEPS = new Set<OnboardingStep>([
   'weight',
   'height',
   'fitnessGoal',
-  'trainingExperience',
+  'trainingComfort',
   'workoutFrequency',
   'averageWorkoutLength',
-  'trainingStyle',
   'emailPreference',
 ]);
 
@@ -388,20 +386,16 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
           </>
         ) : null}
 
-        {step === 'trainingExperience' ? (
+        {step === 'trainingComfort' ? (
           <>
-            <Text style={styles.stepTitle}>What&apos;s your experience with training?</Text>
-            <View testID="onboarding-step-training-experience">
-              {TRAINING_EXPERIENCE_OPTIONS.map((option) => (
-                <OnboardingOptionCard
-                  key={option.value}
-                  testID={`onboarding-experience-${option.value}`}
-                  label={option.label}
-                  selected={draft.trainingExperience === option.value}
-                  onPress={() => updateDraft({ trainingExperience: option.value })}
-                />
-              ))}
-            </View>
+            <Text style={styles.stepTitle}>
+              How comfortable are you with planning and progressing your workouts?
+            </Text>
+            <TrainingComfortSelector
+              testID="onboarding-step-training-comfort"
+              value={draft.trainingComfort}
+              onChange={(trainingComfort) => updateDraft({ trainingComfort })}
+            />
           </>
         ) : null}
 
@@ -436,17 +430,6 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 />
               ))}
             </View>
-          </>
-        ) : null}
-
-        {step === 'trainingStyle' ? (
-          <>
-            <Text style={styles.stepTitle}>How would you like to train?</Text>
-            <WorkoutPreferenceSelector
-              testID="onboarding-step-training-style"
-              value={draft.trainingStylePreference}
-              onChange={(trainingStylePreference) => updateDraft({ trainingStylePreference })}
-            />
           </>
         ) : null}
 

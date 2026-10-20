@@ -1288,6 +1288,199 @@ describe('Last Workout', () => {
   });
 });
 
+describe('Progressive overload', () => {
+  const profile = {
+    id: 'user-1',
+    email: 'a@example.com',
+    role: 'user',
+    displayName: null,
+    username: null,
+    weightUnit: 'kg',
+    workoutAccentColor: null,
+    nutritionAccentColor: null,
+    activeWorkoutSplitId: null,
+    trainingComfort: 'knows_basics',
+    repRangeMin: 8,
+    repRangeMax: 12,
+    progressionCuesEnabled: true,
+  };
+  const lastSession = (sets: { weightKg: number | null; reps: number }[]) => ({
+    performedAt: '2026-01-05T00:00:00Z',
+    sets: sets.map((set, i) => ({
+      id: `prev-${i + 1}`,
+      setIndex: i + 1,
+      weightKg: set.weightKg,
+      reps: set.reps,
+      completedAt: '2026-01-05T00:10:00Z',
+      side: null,
+    })),
+  });
+
+  function renderScreen() {
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+  }
+
+  beforeEach(() => {
+    mockFetchMyProfile.mockResolvedValue(profile);
+  });
+
+  it("says to increase the weight once last time's top set reached the top of the range", async () => {
+    mockFetchPreviousPerformance.mockResolvedValue(
+      lastSession([
+        { weightKg: 100, reps: 12 },
+        { weightKg: 100, reps: 10 },
+      ]),
+    );
+    renderScreen();
+
+    const cue = await screen.findByTestId('exercise-card-we1-cue');
+    expect(cue).toHaveTextContent(/Your top set hit 12 at 100 kg\. Increase the weight today\./);
+    // They asked for guidance, so they're told how to pick the new weight.
+    expect(cue).toHaveTextContent(/about 8 reps, then build back up to 12/);
+  });
+
+  it('says to keep the weight and work toward the top before then', async () => {
+    mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: 100, reps: 7 }]));
+    renderScreen();
+
+    expect(await screen.findByTestId('exercise-card-we1-cue')).toHaveTextContent(
+      /Last time: 7 at 100 kg\. Keep 100 kg and work toward 12\./,
+    );
+  });
+
+  it("follows the person's own range", async () => {
+    mockFetchMyProfile.mockResolvedValue({
+      ...profile,
+      trainingComfort: 'follows_method',
+      repRangeMin: 5,
+      repRangeMax: 10,
+    });
+    mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: 140, reps: 10 }]));
+    renderScreen();
+
+    const cue = await screen.findByTestId('exercise-card-we1-cue');
+    expect(cue).toHaveTextContent(/Your top set hit 10 at 140 kg\. Increase the weight today\./);
+    // No how-to for someone who follows their own method.
+    expect(cue).not.toHaveTextContent(/build back up/);
+  });
+
+  it('says nothing when Progression Tips is off', async () => {
+    mockFetchMyProfile.mockResolvedValue({ ...profile, progressionCuesEnabled: false });
+    mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: 100, reps: 12 }]));
+    renderScreen();
+
+    await screen.findByTestId('exercise-card-we1-previous-session');
+    expect(screen.queryByTestId('exercise-card-we1-cue')).toBeNull();
+  });
+
+  it('shows the best within the range from the PRs already kept', async () => {
+    mockFetchAllRepPRs.mockResolvedValue([
+      {
+        exerciseId: 'ex1',
+        exerciseName: 'Barbell Bench Press',
+        muscleGroup: 'chest',
+        reps: 9,
+        bestWeightKg: 105,
+        sourceSetId: 'pr-set',
+        achievedAt: '2026-01-01T00:00:00Z',
+      },
+    ]);
+    mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: 100, reps: 10 }]));
+    renderScreen();
+
+    expect(await screen.findByTestId('exercise-card-we1-best')).toHaveTextContent(
+      'Best at 8–12: 105 kg × 9',
+    );
+  });
+
+  it("says so in the workout once today's top set reaches the top", async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-card-we1');
+    expect(screen.queryByTestId('exercise-card-we1-session-cue')).toBeNull();
+
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '110');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '12');
+    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
+
+    expect(await screen.findByTestId('exercise-card-we1-session-cue')).toHaveTextContent(
+      /Top of your range\. Increase the weight next time\./,
+    );
+  });
+
+  it('offers more reps and the weighted version for a bodyweight exercise at the top', async () => {
+    mockFetchExercises.mockResolvedValue([
+      {
+        id: 'ex-weighted',
+        name: 'Weighted Pull-Up',
+        muscleGroup: 'back',
+        movementType: 'bilateral',
+        loggingStyle: null,
+        measurementType: 'weight_reps',
+        photoUrl: null,
+        isActive: true,
+        createdBy: null,
+      },
+    ]);
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [
+        {
+          ...baseWorkout.exercises[0],
+          exerciseName: 'Pull-Up',
+          measurementType: 'bodyweight' as const,
+          sets: [{ id: 's2', setIndex: 1, weightKg: null, reps: null, completedAt: null }],
+        },
+      ],
+    });
+    mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: null, reps: 12 }]));
+    renderScreen();
+
+    const cue = await screen.findByTestId('exercise-card-we1-cue');
+    expect(cue).toHaveTextContent(/Your best set hit 12 reps, the top of your range/);
+    expect(cue).toHaveTextContent(/Add reps: go for 13 or more/);
+    await waitFor(() =>
+      expect(screen.getByTestId('exercise-card-we1-cue')).toHaveTextContent(
+        /Add weight: try Weighted Pull-Up/,
+      ),
+    );
+  });
+
+  it('asks for a new time on a timed exercise', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [
+        {
+          ...baseWorkout.exercises[0],
+          exerciseName: 'Plank',
+          measurementType: 'timed' as const,
+          sets: [{ id: 's2', setIndex: 1, weightKg: null, reps: null, completedAt: null }],
+        },
+      ],
+    });
+    mockFetchPreviousPerformance.mockResolvedValue({
+      performedAt: '2026-01-05T00:00:00Z',
+      sets: [
+        {
+          id: 'prev-1',
+          setIndex: 1,
+          weightKg: null,
+          reps: null,
+          durationSeconds: 75,
+          completedAt: '2026-01-05T00:10:00Z',
+          side: null,
+        },
+      ],
+    });
+    renderScreen();
+
+    const cue = await screen.findByTestId('exercise-card-we1-cue');
+    expect(cue).toHaveTextContent(/Last time: 1:15\. Go for a new time today\./);
+    expect(cue).toHaveTextContent(/Aim for 1:25 or more/);
+  });
+});
+
 describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
   const twoExercises = {
     ...baseWorkout,

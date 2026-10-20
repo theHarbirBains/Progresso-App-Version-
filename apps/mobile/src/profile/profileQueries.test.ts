@@ -41,6 +41,10 @@ const row = {
   referral_source: 'friend',
   country: 'CA',
   average_workout_length: '45_60',
+  training_comfort: 'knows_basics',
+  rep_range_min: 8,
+  rep_range_max: 12,
+  progression_cues_enabled: true,
 };
 
 beforeEach(() => {
@@ -83,6 +87,10 @@ describe('fetchMyProfile', () => {
       referralSource: 'friend',
       country: 'CA',
       averageWorkoutLength: '45_60',
+      trainingComfort: 'knows_basics',
+      repRangeMin: 8,
+      repRangeMax: 12,
+      progressionCuesEnabled: true,
     });
   });
 

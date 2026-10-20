@@ -16,6 +16,9 @@ export type FitnessGoal =
   | 'other';
 export type TrainingExperience = 'beginner' | 'intermediate' | 'advanced';
 export type TrainingStylePreference = 'guided' | 'build_your_own';
+/** How comfortable someone is planning and progressing their workouts -- see onboardingOptions' TRAINING_COMFORT_OPTIONS. */
+export type TrainingComfort =
+  'still_learning' | 'knows_basics' | 'plans_and_progresses' | 'follows_method';
 export type AppleHealthPreference = 'connected' | 'not_now';
 /** The 5 Mifflin-St Jeor activity-multiplier tiers -- see
  * nutrition/calorieEstimationInput.ts's ACTIVITY_LEVELS for the labeled/
@@ -54,6 +57,13 @@ export interface ProfileResponse {
   /** ISO 3166-1 alpha-2, e.g. "CA" -- purely informational, nothing else reads it. */
   country: string | null;
   averageWorkoutLength: AverageWorkoutLength | null;
+  /** Null until answered (onboarding, or Settings for accounts made before the question). */
+  trainingComfort: TrainingComfort | null;
+  /** The rep range every exercise is trained to -- see workouts/progression.ts. */
+  repRangeMin: number;
+  repRangeMax: number;
+  /** Whether the live workout suggests when to go heavier or make an exercise harder. */
+  progressionCuesEnabled: boolean;
 }
 
 export interface UpdateProfileInput {
@@ -83,6 +93,10 @@ export interface UpdateProfileInput {
   referralSource?: ReferralSource;
   country?: string;
   averageWorkoutLength?: AverageWorkoutLength;
+  trainingComfort?: TrainingComfort;
+  repRangeMin?: number;
+  repRangeMax?: number;
+  progressionCuesEnabled?: boolean;
 }
 
 export function updateMyProfile(

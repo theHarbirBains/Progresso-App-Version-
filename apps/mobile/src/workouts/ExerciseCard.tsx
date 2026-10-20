@@ -7,6 +7,7 @@ import { colors } from '../design/theme';
 import type { MeasurementType, MovementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { cuesEqual, type ProgressionCue } from './progression';
 import { PER_SIDE_NOTE, SetColumnHeader } from './SetColumnHeader';
 import { SetRow } from './SetRow';
 import { UnilateralSetRow, type UnilateralSideInput } from './UnilateralSetRow';
@@ -63,6 +64,12 @@ interface Props {
   /** Opens this exercise's full history (Progress > Exercise Detail). Only
    * rendered when a previous session exists to link out from. */
   onViewHistory?: () => void;
+  /** The best within the person's rep range ("Best at 8–12: 60 lb × 9"), under Last Workout's date. */
+  bestLine?: string | null;
+  /** What to aim for today, from the last session (workouts/progression.ts), under its sets. */
+  progressionCue?: ProgressionCue | null;
+  /** Said once today's own top set reaches the top of the range, under today's sets. */
+  sessionCue?: string | null;
   /** Used when movementType is 'bilateral' -- one row per set, unchanged from before unilateral support existed. */
   sets: ExerciseCardSet[];
   /** Used when movementType is 'unilateral' -- one row per LOGICAL set (both sides), never a separate exercise per side. */
@@ -98,6 +105,9 @@ function ExerciseCardComponent({
   measurementType = 'weight_reps',
   previousSession = null,
   onViewHistory,
+  bestLine = null,
+  progressionCue = null,
+  sessionCue = null,
   sets,
   unilateralSets,
   onChangeWeight,
@@ -210,6 +220,11 @@ function ExerciseCardComponent({
             ) : null}
           </View>
           <Text style={styles.previousDate}>{previousSession.dateDisplay}</Text>
+          {bestLine ? (
+            <Text testID={testID ? `${testID}-best` : undefined} style={styles.bestLine}>
+              {bestLine}
+            </Text>
+          ) : null}
 
           <SetColumnHeader measurementType={measurementType} previous />
           <View style={styles.previousSets}>
@@ -240,6 +255,34 @@ function ExerciseCardComponent({
               </View>
             ))}
           </View>
+
+          {progressionCue ? (
+            <View
+              testID={testID ? `${testID}-cue` : undefined}
+              style={styles.cue}
+              accessible
+              accessibilityLabel={[
+                progressionCue.headline,
+                ...progressionCue.options,
+                progressionCue.detail,
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <Feather name="trending-up" size={16} color={accentColor} style={styles.cueIcon} />
+              <View style={styles.cueBody}>
+                <Text style={styles.cueHeadline}>{progressionCue.headline}</Text>
+                {progressionCue.options.map((option) => (
+                  <Text key={option} style={styles.cueOption}>
+                    {option}
+                  </Text>
+                ))}
+                {progressionCue.detail ? (
+                  <Text style={styles.cueDetail}>{progressionCue.detail}</Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -286,6 +329,18 @@ function ExerciseCardComponent({
               onAccentColor={onAccentColor}
             />
           ))}
+
+      {sessionCue ? (
+        <View
+          testID={testID ? `${testID}-session-cue` : undefined}
+          style={styles.sessionCue}
+          accessible
+          accessibilityLabel={sessionCue}
+        >
+          <Feather name="check-circle" size={16} color={accentColor} />
+          <Text style={styles.sessionCueText}>{sessionCue}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.addSet}>
         <SecondaryButton
@@ -404,6 +459,9 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     prev.testID === next.testID &&
     prev.onMoveUp === next.onMoveUp &&
     prev.onMoveDown === next.onMoveDown &&
+    (prev.bestLine ?? null) === (next.bestLine ?? null) &&
+    (prev.sessionCue ?? null) === (next.sessionCue ?? null) &&
+    cuesEqual(prev.progressionCue ?? null, next.progressionCue ?? null) &&
     previousSessionEqual(prev.previousSession, next.previousSession) &&
     setsEqual(prev.sets, next.sets) &&
     unilateralSetsEqual(prev.unilateralSets, next.unilateralSets)

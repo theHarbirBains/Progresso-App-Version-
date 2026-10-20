@@ -302,6 +302,50 @@ export const liveWorkoutStyles = StyleSheet.create({
     marginTop: spacing.sm,
   },
 
+  // ---- Progression (workouts/progression.ts) ---------------------------------
+  // Quiet text, never a card or a badge: the one accent is the small glyph.
+  bestLine: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  cue: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  cueIcon: {
+    marginTop: 2,
+  },
+  cueBody: {
+    flex: 1,
+    gap: 2,
+  },
+  cueHeadline: {
+    ...typeScale.callout,
+    color: colors.textPrimary,
+  },
+  cueOption: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
+  },
+  cueDetail: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+  },
+  sessionCue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  sessionCueText: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+
   // ---- Add Exercise picker ---------------------------------------------------
   pickerBody: {
     flex: 1,
