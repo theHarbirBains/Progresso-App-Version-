@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAuth } from '../auth/AuthProvider';
 import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
@@ -17,11 +18,12 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { CalorieRing } from '../nutrition/CalorieRing';
 import { FoodImage } from '../nutrition/FoodImage';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
-import type { FoodLogRow } from '../nutrition/foodLogQueries';
+import { fetchFoodLogsForDay, type FoodLogRow } from '../nutrition/foodLogQueries';
 import { servingMeasures, servingsFor, unitWord } from '../nutrition/logQuantity';
 import { calculateRemaining, sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
+import { CopyYesterdaySheet, SaveAsMealSheet } from '../nutrition/TodayShortcutSheets';
 
 type Props = RootStackScreenProps<'Nutrition'>;
 
@@ -56,10 +58,15 @@ function grams(value: number): string {
 // - **Today's Foods**, with View All (Nutrition History): each food as a row --
 //   its picture, its name, the values snapshotted when it was logged, an
 //   editable quantity and a quiet Delete -- or, with none yet, a quiet empty
-//   state offering to log the first.
+//   state offering to log the first. Under them, two quiet actions: Copy
+//   Yesterday (when yesterday has foods -- a sheet of them, all ticked, logged
+//   again now) and Save as Meal (when today has some -- a sheet to name them
+//   and keep them as a saved meal in the Food Library).
 // - **Daily Targets**, with Edit Targets (Nutrition Goals): the four targets as
 //   stat blocks, "—" for one not set.
 export function NutritionTodayScreen({ navigation }: Props) {
+  const { user } = useAuth();
+  const userId = user?.id;
   const { nutritionTheme } = useProgressTheme();
   const { openMenu } = useAppMenu();
   // Goals rarely change and are shared with ProfileScreen/NutritionGoalsScreen
@@ -73,6 +80,26 @@ export function NutritionTodayScreen({ navigation }: Props) {
 
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [yesterdayLogs, setYesterdayLogs] = useState<FoodLogRow[]>([]);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [saveMealOpen, setSaveMealOpen] = useState(false);
+
+  // Yesterday's foods, for Copy Yesterday. Read each time Today opens -- it's opened fresh on
+  // every visit -- and only a shortcut, so a failure just leaves it out.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    fetchFoodLogsForDay(userId, yesterday)
+      .then((rows) => {
+        if (!cancelled) setYesterdayLogs(rows);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   // Seeds a draft input for any log not already tracked (a fresh load, or a
   // food logged elsewhere while this screen is mounted) without touching an
@@ -351,8 +378,41 @@ export function NutritionTodayScreen({ navigation }: Props) {
               </View>
             ))
           )}
+          {yesterdayLogs.length > 0 || logs.some((log) => log.foodId !== null) ? (
+            <View style={styles.foodShortcuts}>
+              {yesterdayLogs.length > 0 ? (
+                <TextButton
+                  testID="nutrition-today-copy-yesterday"
+                  label="Copy Yesterday"
+                  onPress={() => setCopyOpen(true)}
+                />
+              ) : null}
+              {logs.some((log) => log.foodId !== null) ? (
+                <TextButton
+                  testID="nutrition-today-save-meal"
+                  label="Save as Meal"
+                  onPress={() => setSaveMealOpen(true)}
+                />
+              ) : null}
+            </View>
+          ) : null}
         </Section>
       </AppCard>
+
+      <CopyYesterdaySheet
+        visible={copyOpen}
+        onClose={() => setCopyOpen(false)}
+        logs={yesterdayLogs}
+        accentColor={accent}
+        onAccentColor={nutritionTheme.onAccent}
+      />
+      <SaveAsMealSheet
+        visible={saveMealOpen}
+        onClose={() => setSaveMealOpen(false)}
+        logs={logs}
+        accentColor={accent}
+        onAccentColor={nutritionTheme.onAccent}
+      />
 
       <AppCard testID="nutrition-today-targets">
         <Section
@@ -390,6 +450,12 @@ const styles = StyleSheet.create({
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,
+  },
+  // Copy Yesterday and Save as Meal, under the day's foods.
+  foodShortcuts: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
   },
 
   // The hero: the ring on the left, the three macros on the right.

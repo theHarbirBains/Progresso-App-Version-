@@ -6,11 +6,15 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import {
+  copyFoodLogs,
   deleteFoodLog,
+  fetchFoodLogsForDay,
   fetchTodaysFoodLogs,
   logFood,
   updateFoodLogQuantity,
 } from '../nutrition/foodLogQueries';
+import { fetchFoodsByIds } from '../nutrition/foodQueries';
+import { createSavedMeal } from '../nutrition/savedMealQueries';
 import {
   FoodLogProvider,
   useFoodLog,
@@ -32,9 +36,19 @@ jest.mock('../profile/profileQueries', () => ({
 
 jest.mock('../nutrition/foodLogQueries', () => ({
   fetchTodaysFoodLogs: jest.fn(),
+  fetchFoodLogsForDay: jest.fn(),
+  copyFoodLogs: jest.fn(),
   updateFoodLogQuantity: jest.fn(),
   deleteFoodLog: jest.fn(),
   logFood: jest.fn(),
+}));
+
+jest.mock('../nutrition/foodQueries', () => ({
+  fetchFoodsByIds: jest.fn(),
+}));
+
+jest.mock('../nutrition/savedMealQueries', () => ({
+  createSavedMeal: jest.fn(),
 }));
 
 jest.mock('../nutrition/nutritionGoalQueries', () => ({
@@ -47,6 +61,10 @@ const mockUpdateFoodLogQuantity = updateFoodLogQuantity as jest.Mock;
 const mockDeleteFoodLog = deleteFoodLog as jest.Mock;
 const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 const mockLogFood = logFood as jest.Mock;
+const mockFetchFoodLogsForDay = fetchFoodLogsForDay as jest.Mock;
+const mockCopyFoodLogs = copyFoodLogs as jest.Mock;
+const mockFetchFoodsByIds = fetchFoodsByIds as jest.Mock;
+const mockCreateSavedMeal = createSavedMeal as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
@@ -105,6 +123,10 @@ beforeEach(() => {
   mockUpdateFoodLogQuantity.mockReset();
   mockDeleteFoodLog.mockReset();
   mockLogFood.mockReset();
+  mockFetchFoodLogsForDay.mockReset().mockResolvedValue([]);
+  mockCopyFoodLogs.mockReset();
+  mockFetchFoodsByIds.mockReset();
+  mockCreateSavedMeal.mockReset();
   mockGoBack.mockClear();
   mockNavigate.mockClear();
 });
@@ -504,5 +526,131 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
     await screen.findByTestId(`food-log-row-${sampleLog.id}`);
 
     expectNoBareText();
+  });
+});
+
+describe('NutritionTodayScreen -- Copy Yesterday', () => {
+  const toast = { ...sampleLog, id: 'y-1', foodId: 'food-toast', foodNameSnapshot: 'Toast' };
+  const eggs = {
+    ...sampleLog,
+    id: 'y-2',
+    foodId: 'food-eggs',
+    foodNameSnapshot: 'Eggs',
+    quantity: 1,
+    calories: 140,
+    enteredAmount: 2,
+    enteredUnit: 'servings',
+  };
+
+  it("reads yesterday's foods, and offers nothing to copy when there are none", async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    const [, day] = mockFetchFoodLogsForDay.mock.calls[0]!;
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    expect((day as Date).toDateString()).toBe(yesterday.toDateString());
+    expect(screen.queryByTestId('nutrition-today-copy-yesterday')).toBeNull();
+    expect(screen.queryByTestId('nutrition-today-save-meal')).toBeNull();
+  });
+
+  it("logs yesterday's foods again, all ticked, leaving out any unticked", async () => {
+    mockFetchFoodLogsForDay.mockResolvedValue([toast, eggs]);
+    mockCopyFoodLogs.mockResolvedValue([
+      { ...eggs, id: 'new-1', loggedAt: new Date().toISOString() },
+    ]);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('nutrition-today-copy-yesterday'));
+    expect(screen.getByTestId('copy-yesterday-item-y-2')).toHaveTextContent(/2 servings · 140 cal/);
+    expect(screen.getByTestId('copy-yesterday-submit')).toHaveTextContent('Log 2 Foods');
+
+    fireEvent.press(screen.getByTestId('copy-yesterday-item-y-1'));
+    expect(screen.getByTestId('copy-yesterday-item-y-1').props.accessibilityLabel).toMatch(
+      /not selected/,
+    );
+    expect(screen.getByTestId('copy-yesterday-submit')).toHaveTextContent('Log 1 Food');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('copy-yesterday-submit'));
+    });
+
+    expect(mockCopyFoodLogs).toHaveBeenCalledWith('user-1', ['y-2']);
+    // The copy is in Today's Foods straight away.
+    expect(await screen.findByTestId('food-log-row-new-1')).toBeTruthy();
+  });
+
+  it('can be used before anything is logged today', async () => {
+    mockFetchFoodLogsForDay.mockResolvedValue([toast]);
+    renderScreen();
+
+    expect(await screen.findByTestId('food-log-empty')).toBeTruthy();
+    expect(await screen.findByTestId('nutrition-today-copy-yesterday')).toBeTruthy();
+  });
+
+  it('shows why nothing was copied when it fails', async () => {
+    mockFetchFoodLogsForDay.mockResolvedValue([toast]);
+    mockCopyFoodLogs.mockRejectedValue(new Error('network error'));
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('nutrition-today-copy-yesterday'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('copy-yesterday-submit'));
+    });
+
+    expect(screen.getByTestId('copy-yesterday-error')).toHaveTextContent('network error');
+  });
+});
+
+describe('NutritionTodayScreen -- Save as Meal', () => {
+  const chicken = {
+    id: 'food-1',
+    name: 'Chicken Breast',
+    brand: null,
+    barcode: null,
+    imageUrl: null,
+    servingSize: 100,
+    servingUnit: 'g',
+    calories: 165,
+    proteinG: 31,
+    carbsG: 0,
+    fatG: 3.6,
+    isActive: true,
+  };
+
+  it("names today's foods and keeps them as a saved meal, at today's amounts", async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([
+      { ...sampleLog, enteredAmount: 200, enteredUnit: 'g' },
+    ]);
+    mockFetchFoodsByIds.mockResolvedValue([chicken]);
+    mockCreateSavedMeal.mockResolvedValue({});
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('nutrition-today-save-meal'));
+    expect(screen.getByTestId('save-meal-submit').props.accessibilityState.disabled).toBe(true);
+    fireEvent.changeText(screen.getByTestId('save-meal-name'), ' Lunch ');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('save-meal-submit'));
+    });
+
+    expect(mockFetchFoodsByIds).toHaveBeenCalledWith(['food-1']);
+    expect(mockCreateSavedMeal).toHaveBeenCalledWith('user-1', 'Lunch', [
+      { food: chicken, quantity: 2, entered: { amount: 200, unit: 'g' } },
+    ]);
+    expect(screen.getByTestId('save-meal-done')).toHaveTextContent('Lunch saved');
+  });
+
+  it("won't save a meal of foods no longer in the library", async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    mockFetchFoodsByIds.mockResolvedValue([{ ...chicken, isActive: false }]);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('nutrition-today-save-meal'));
+    fireEvent.changeText(screen.getByTestId('save-meal-name'), 'Lunch');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('save-meal-submit'));
+    });
+
+    expect(mockCreateSavedMeal).not.toHaveBeenCalled();
+    expect(screen.getByTestId('save-meal-error')).toHaveTextContent(/any more/);
   });
 });

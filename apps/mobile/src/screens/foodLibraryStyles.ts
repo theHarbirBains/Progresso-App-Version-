@@ -56,4 +56,27 @@ export const foodLibraryStyles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.divider,
   },
+
+  // A saved meal's sheet: its name, how many foods and calories, the foods, then Log Meal
+  // and Edit Meal.
+  sheetContent: {
+    gap: spacing.sm,
+    padding: spacing.lg,
+  },
+  sheetTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+  },
+  sheetSummary: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+  },
+  sheetList: {
+    maxHeight: 320,
+    marginVertical: spacing.sm,
+  },
+  sheetError: {
+    ...typeScale.callout,
+    color: colors.destructive,
+  },
 });

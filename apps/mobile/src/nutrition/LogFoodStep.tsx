@@ -15,6 +15,7 @@ import { loggedJustNow } from './duplicateLog';
 import { useFoodLog } from './FoodLogProvider';
 import { amountFor, servingMeasures, servingsFor, type QuantityUnit } from './logQuantity';
 import { defaultMealTypeForTime } from './mealTypes';
+import type { EnteredAmount } from './foodLogQueries';
 import { calculateLogTotals } from './nutritionCalculations';
 import type { FoodRow } from './foodQueries';
 
@@ -26,6 +27,8 @@ export type LoggableFood = Pick<
   imageUrl?: string | null;
   /** The serving as its provider words it ("3 cookies (34 g)") -- what pieces can be counted in. */
   servingLabel?: string | null;
+  /** Set for a recipe: how many servings it makes. */
+  recipeServings?: number | null;
 };
 
 interface LogFoodStepProps {
@@ -40,8 +43,15 @@ interface LogFoodStepProps {
   showAttribution?: boolean;
   accentColor: string;
   onAccentColor: string;
-  onDone: () => void;
+  /** After logging. */
+  onDone?: () => void;
   onCancel: () => void;
+  /**
+   * Instead of logging, hands back the amount chosen -- adding a food to a saved meal or a
+   * recipe. The button then reads `chooseLabel`.
+   */
+  onChoose?: (choice: { quantity: number; entered: EnteredAmount }) => void;
+  chooseLabel?: string;
 }
 
 function capitalize(text: string): string {
@@ -80,6 +90,8 @@ export function LogFoodStep({
   onAccentColor,
   onDone,
   onCancel,
+  onChoose,
+  chooseLabel = 'Add',
 }: LogFoodStepProps) {
   const { logs, logFoodEntry } = useFoodLog();
   const measures = servingMeasures(food);
@@ -160,6 +172,10 @@ export function LogFoodStep({
 
   function handleLog() {
     if (!canLog) return;
+    if (onChoose) {
+      onChoose({ quantity: servings, entered: { amount, unit } });
+      return;
+    }
     // A second tap seconds after the first is almost always a mistake: ask first.
     if (loggedJustNow(logs, food.id)) {
       Alert.alert('Log it again?', `You logged ${food.name} a few seconds ago.`, [
@@ -180,7 +196,7 @@ export function LogFoodStep({
       // resolves, with no re-fetch of their own.
       // Kept as typed too, so Today shows "2 cookies" rather than 0.67 servings.
       await logFoodEntry(food, servings, defaultMealTypeForTime(), { amount, unit });
-      onDone();
+      onDone?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to log food');
       setSaving(false);
@@ -240,7 +256,9 @@ export function LogFoodStep({
         />
 
         <Text testID="log-food-serving" style={styles.serving}>
-          1 serving: {food.servingLabel?.trim() || `${food.servingSize} ${food.servingUnit}`}
+          {food.recipeServings
+            ? `Recipe · makes ${food.recipeServings} ${food.recipeServings === 1 ? 'serving' : 'servings'}`
+            : `1 serving: ${food.servingLabel?.trim() || `${food.servingSize} ${food.servingUnit}`}`}
         </Text>
       </AppCard>
 
@@ -266,7 +284,7 @@ export function LogFoodStep({
 
       <PrimaryButton
         testID="log-food-submit"
-        label="Log Food"
+        label={onChoose ? chooseLabel : 'Log Food'}
         onPress={handleLog}
         loading={saving}
         disabled={!canLog && !saving}

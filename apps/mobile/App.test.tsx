@@ -72,6 +72,7 @@ jest.mock('./src/nutrition/foodLogQueries', () => ({
   fetchTodaysFoodLogs: jest.fn().mockResolvedValue([]),
   fetchWeeklyFoodLogs: jest.fn().mockResolvedValue([]),
   fetchFoodLogsForMonth: jest.fn().mockResolvedValue([]),
+  fetchFoodLogsForDay: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('./src/nutrition/nutritionGoalQueries', () => ({
   fetchNutritionGoals: jest.fn().mockResolvedValue({

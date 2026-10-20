@@ -1,5 +1,7 @@
+import { fetchAllRows } from '../lib/fetchAllRows';
 import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
+import type { QuantityUnit } from './logQuantity';
 
 // fetchFoods/fetchAllFoods/createFood/updateFood are the user's own custom
 // foods (created_by = the querying user) -- direct-to-Supabase, same as
@@ -29,6 +31,8 @@ export interface FoodRow {
   isActive: boolean;
   /** Where this food's nutrition came from. Null for foods that predate provenance, or without it. */
   provenance?: FoodProvenance | null;
+  /** Set when the food is one of the user's recipes: how many servings the recipe makes. */
+  recipeServings?: number | null;
 }
 
 /**
@@ -73,6 +77,7 @@ interface FoodDbRow {
   nutrition_attribution: string | null;
   nutrition_assumptions: string[] | null;
   nutrition_components: unknown[] | null;
+  recipe_servings?: string | number | null;
 }
 
 /** The provenance columns, shared by foods and food logs. */
@@ -128,10 +133,19 @@ function toFoodRow(row: FoodDbRow): FoodRow {
     fatG: Number(row.fat_g),
     isActive: row.is_active,
     provenance: provenanceFromRow(row),
+    recipeServings:
+      row.recipe_servings === null || row.recipe_servings === undefined
+        ? null
+        : Number(row.recipe_servings),
   };
 }
 
-const FOOD_COLUMNS = `id, name, brand, barcode, image_url, serving_size, serving_unit, serving_label, calories, protein_g, carbs_g, fat_g, is_active, ${PROVENANCE_COLUMNS}`;
+export const FOOD_COLUMNS = `id, name, brand, barcode, image_url, serving_size, serving_unit, serving_label, calories, protein_g, carbs_g, fat_g, is_active, recipe_servings, ${PROVENANCE_COLUMNS}`;
+
+/** A food read through a log, a meal item or an ingredient -- as a FoodRow. */
+export function foodFromRow(row: unknown): FoodRow {
+  return toFoodRow(row as FoodDbRow);
+}
 
 export interface FetchFoodsParams {
   userId: string;
@@ -209,6 +223,15 @@ export interface RecentFood {
   food: FoodRow;
   /** The quantity logged last time, in servings. */
   quantity: number;
+  /** The amount as typed last time ("150" g), when it was kept. */
+  entered?: { amount: number; unit: QuantityUnit } | null;
+}
+
+function enteredFrom(
+  amount: string | number | null | undefined,
+  unit: QuantityUnit | null | undefined,
+): RecentFood['entered'] {
+  return amount === null || amount === undefined || !unit ? null : { amount: Number(amount), unit };
 }
 
 // How many of the user's latest logs Recent looks through for its foods.
@@ -223,7 +246,7 @@ const RECENT_LOGS_SCANNED = 50;
 export async function fetchRecentFoods(userId: string, limit = 8): Promise<RecentFood[]> {
   const { data, error } = await supabase
     .from('food_logs')
-    .select(`food_id, quantity, foods(${FOOD_COLUMNS})`)
+    .select(`food_id, quantity, entered_amount, entered_unit, foods(${FOOD_COLUMNS})`)
     .eq('user_id', userId)
     .not('food_id', 'is', null)
     .order('logged_at', { ascending: false })
@@ -233,6 +256,8 @@ export async function fetchRecentFoods(userId: string, limit = 8): Promise<Recen
   type RecentLogRow = {
     food_id: string;
     quantity: string | number;
+    entered_amount?: string | number | null;
+    entered_unit?: QuantityUnit | null;
     // A to-one embed comes back as an object; the client's inferred type says array, so both are read.
     foods: FoodDbRow | FoodDbRow[] | null;
   };
@@ -244,9 +269,101 @@ export async function fetchRecentFoods(userId: string, limit = 8): Promise<Recen
     seen.add(row.food_id);
     const food = Array.isArray(row.foods) ? row.foods[0] : row.foods;
     if (!food || !food.is_active) continue;
-    recent.push({ food: toFoodRow(food), quantity: Number(row.quantity) });
+    recent.push({
+      food: toFoodRow(food),
+      quantity: Number(row.quantity),
+      entered: enteredFrom(row.entered_amount, row.entered_unit),
+    });
   }
   return recent;
+}
+
+/** How far back Usual looks, in days. */
+export const USUAL_WINDOW_DAYS = 60;
+/** A food is usual once it's been logged on at least this many different days. */
+const USUAL_MIN_DAYS = 2;
+
+/**
+ * The foods the user logs most often -- on the most different days in the last 60, at least
+ * two -- each with last time's amount: the Food Library's Usual list. Days, not logs, so three
+ * eggs logged as three entries one morning count once. Ties go to the one logged most recently.
+ * A food that is gone or deactivated is left out, like Recent.
+ */
+export async function fetchUsualFoods(
+  userId: string,
+  limit = 6,
+  now: Date = new Date(),
+): Promise<RecentFood[]> {
+  const since = new Date(now.getTime() - USUAL_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  type UsualLogRow = {
+    food_id: string;
+    logged_at: string;
+    quantity: string | number;
+    entered_amount: string | number | null;
+    entered_unit: QuantityUnit | null;
+  };
+  const logs = await fetchAllRows<UsualLogRow>((from, to) =>
+    supabase
+      .from('food_logs')
+      .select('food_id, logged_at, quantity, entered_amount, entered_unit', { count: 'exact' })
+      .eq('user_id', userId)
+      .not('food_id', 'is', null)
+      .gte('logged_at', since.toISOString())
+      .order('logged_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
+
+  // Newest first, so each food's first row is its latest log.
+  const byFood = new Map<string, { days: Set<string>; latest: UsualLogRow }>();
+  for (const log of logs) {
+    const at = new Date(log.logged_at);
+    const day = `${at.getFullYear()}-${at.getMonth()}-${at.getDate()}`;
+    const entry = byFood.get(log.food_id);
+    if (entry) entry.days.add(day);
+    else byFood.set(log.food_id, { days: new Set([day]), latest: log });
+  }
+  const ranked = [...byFood.values()]
+    .filter((entry) => entry.days.size >= USUAL_MIN_DAYS)
+    .sort(
+      (a, b) =>
+        b.days.size - a.days.size ||
+        Date.parse(b.latest.logged_at) - Date.parse(a.latest.logged_at),
+    );
+  if (ranked.length === 0) return [];
+
+  // A few spare, in case some are no longer active.
+  const candidates = ranked.slice(0, limit * 2);
+  const { data, error } = await supabase
+    .from('foods')
+    .select(FOOD_COLUMNS)
+    .in(
+      'id',
+      candidates.map((entry) => entry.latest.food_id),
+    );
+  if (error) throw new Error(error.message);
+  const foods = new Map(((data ?? []) as FoodDbRow[]).map((row) => [row.id, row]));
+
+  const usual: RecentFood[] = [];
+  for (const { latest } of candidates) {
+    if (usual.length === limit) break;
+    const food = foods.get(latest.food_id);
+    if (!food || !food.is_active) continue;
+    usual.push({
+      food: toFoodRow(food),
+      quantity: Number(latest.quantity),
+      entered: enteredFrom(latest.entered_amount, latest.entered_unit),
+    });
+  }
+  return usual;
+}
+
+/** These foods as they are now, in no particular order -- one missing (or unseen) is left out. */
+export async function fetchFoodsByIds(ids: string[]): Promise<FoodRow[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase.from('foods').select(FOOD_COLUMNS).in('id', ids);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as FoodDbRow[]).map(toFoodRow);
 }
 
 /**
@@ -287,6 +404,8 @@ export interface FoodInput {
   imageUrl?: string | null;
   /** Where the figures came from. Omit for a food the user entered by hand. */
   provenance?: FoodProvenance | null;
+  /** For a recipe: how many servings it makes. */
+  recipeServings?: number | null;
 }
 
 /** A food the user typed in: its figures are the user's own, not from any data source. */
@@ -318,6 +437,7 @@ export async function createFood(userId: string, input: FoodInput): Promise<Food
       carbs_g: input.carbsG,
       fat_g: input.fatG,
       ...(input.imageUrl !== undefined ? { image_url: input.imageUrl } : {}),
+      ...(input.recipeServings !== undefined ? { recipe_servings: input.recipeServings } : {}),
       ...provenanceToColumns(input.provenance === undefined ? USER_ENTERED : input.provenance),
     })
     .select(FOOD_COLUMNS)
@@ -342,6 +462,9 @@ export async function updateFood(foodId: string, input: UpdateFoodInput): Promis
   if (input.fatG !== undefined) payload.fat_g = input.fatG;
   if (input.imageUrl !== undefined) payload.image_url = input.imageUrl;
   if (input.isActive !== undefined) payload.is_active = input.isActive;
+  if (input.recipeServings !== undefined) payload.recipe_servings = input.recipeServings;
+  // A recipe's figures are worked out again whenever it's saved, and so is where they came from.
+  if (input.provenance !== undefined) Object.assign(payload, provenanceToColumns(input.provenance));
 
   const { data, error } = await supabase
     .from('foods')

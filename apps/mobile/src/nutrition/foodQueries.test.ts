@@ -3,7 +3,9 @@ import {
   createFood,
   fetchAllFoods,
   fetchFoods,
+  fetchFoodsByIds,
   fetchRecentFoods,
+  fetchUsualFoods,
   findOwnFoodByName,
   updateFood,
 } from './foodQueries';
@@ -24,8 +26,10 @@ function createQueryBuilder(result: Result) {
   const methods = [
     'select',
     'eq',
+    'in',
     'is',
     'not',
+    'gte',
     'ilike',
     'order',
     'range',
@@ -92,6 +96,7 @@ describe('fetchFoods', () => {
         fatG: 3.6,
         isActive: true,
         provenance: null,
+        recipeServings: null,
       },
     ]);
     expect(result.hasMore).toBe(false);
@@ -157,6 +162,7 @@ describe('fetchAllFoods', () => {
         fatG: 3.6,
         isActive: true,
         provenance: null,
+        recipeServings: null,
       },
     ]);
     expect(calls.eq).toEqual([
@@ -213,7 +219,11 @@ describe('fetchRecentFoods', () => {
     const result = await fetchRecentFoods('user-1');
 
     expect(result).toEqual([
-      { food: expect.objectContaining({ id: 'food-1', name: 'Chicken Breast' }), quantity: 2 },
+      {
+        food: expect.objectContaining({ id: 'food-1', name: 'Chicken Breast' }),
+        quantity: 2,
+        entered: null,
+      },
     ]);
     expect(mockFrom).toHaveBeenCalledWith('food_logs');
     expect(calls.eq).toEqual([['user_id', 'user-1']]);
@@ -269,6 +279,205 @@ describe('fetchRecentFoods', () => {
     mockTable({ data: null, error: { message: 'boom' } });
 
     await expect(fetchRecentFoods('user-1')).rejects.toThrow('boom');
+  });
+});
+
+describe('the amount as typed, re-logging', () => {
+  it("brings back last time's amount as typed with each recent food", async () => {
+    mockTable({
+      data: [
+        {
+          food_id: 'food-1',
+          quantity: '1.50',
+          entered_amount: '150.00',
+          entered_unit: 'g',
+          foods: dbRow,
+        },
+      ],
+      error: null,
+    });
+
+    const [recent] = await fetchRecentFoods('user-1');
+
+    expect(recent).toMatchObject({ quantity: 1.5, entered: { amount: 150, unit: 'g' } });
+  });
+});
+
+describe('recipes', () => {
+  it('reads how many servings a recipe makes, and null for any other food', async () => {
+    mockTable({
+      data: [
+        { ...dbRow, id: 'recipe-1', recipe_servings: '4.00' },
+        { ...dbRow, recipe_servings: null },
+      ],
+      error: null,
+    });
+
+    const foods = await fetchAllFoods({ userId: 'user-1', search: '', ascending: true });
+
+    expect(foods.map((food) => food.recipeServings)).toEqual([4, null]);
+  });
+
+  it('saves the servings a recipe makes, and its worked-out provenance, when given', async () => {
+    const { builder } = mockTable({ data: dbRow, error: null });
+
+    await updateFood('recipe-1', {
+      calories: 200,
+      recipeServings: 2,
+      provenance: {
+        confidence: 'calculated',
+        sourceKind: 'user_entered',
+        sourceId: null,
+        matchedName: null,
+        dataVersion: null,
+        retrievedAt: null,
+        licence: 'none',
+        attribution: null,
+        assumptions: [],
+        components: [{ name: 'Oats' }],
+      },
+    });
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        calories: 200,
+        recipe_servings: 2,
+        nutrition_confidence: 'calculated',
+        nutrition_components: [{ name: 'Oats' }],
+      }),
+    );
+  });
+
+  it('leaves the provenance alone when a food is edited by hand', async () => {
+    const { builder } = mockTable({ data: dbRow, error: null });
+
+    await updateFood('food-1', { calories: 100 });
+
+    expect(builder.update).toHaveBeenCalledWith({ calories: 100 });
+  });
+});
+
+describe('fetchFoodsByIds', () => {
+  it('reads those foods', async () => {
+    const { calls } = mockTable({ data: [dbRow], error: null });
+
+    const foods = await fetchFoodsByIds(['food-1']);
+
+    expect(calls.in).toEqual([['id', ['food-1']]]);
+    expect(foods.map((food) => food.id)).toEqual(['food-1']);
+  });
+
+  it('reads nothing for no ids', async () => {
+    await expect(fetchFoodsByIds([])).resolves.toEqual([]);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchUsualFoods', () => {
+  const now = new Date(2026, 9, 20, 12, 0);
+  // A log `daysAgo` days before now, at `hour` o'clock.
+  function log(foodId: string, daysAgo: number, hour = 9, extra: Record<string, unknown> = {}) {
+    const at = new Date(2026, 9, 20 - daysAgo, hour, 0);
+    return {
+      food_id: foodId,
+      logged_at: at.toISOString(),
+      quantity: '1.00',
+      entered_amount: null,
+      entered_unit: null,
+      ...extra,
+    };
+  }
+  function food(id: string, extra: Record<string, unknown> = {}) {
+    return { ...dbRow, id, name: id, ...extra };
+  }
+
+  // The logs, newest first as the query orders them, then the foods.
+  function mockReads(logs: unknown[], foods: unknown[]) {
+    const logRead = createQueryBuilder({ data: logs, error: null });
+    const foodRead = createQueryBuilder({ data: foods, error: null });
+    mockFrom
+      .mockImplementationOnce(() => logRead.builder)
+      .mockImplementationOnce(() => foodRead.builder);
+    return { logRead, foodRead };
+  }
+
+  it("reads the last 60 days of the user's own logs", async () => {
+    const { logRead } = mockReads([], []);
+
+    await fetchUsualFoods('user-1', 6, now);
+
+    expect(logRead.calls.eq).toEqual([['user_id', 'user-1']]);
+    expect(logRead.calls.not).toEqual([['food_id', 'is', null]]);
+    expect(logRead.calls.gte).toEqual([
+      ['logged_at', new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString()],
+    ]);
+    // Nothing usual, so no foods to read.
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+  });
+
+  it('ranks foods by the different days they were logged on, at least two', async () => {
+    const { foodRead } = mockReads(
+      [
+        log('eggs', 0),
+        log('oats', 0),
+        log('eggs', 1),
+        log('oats', 1),
+        log('eggs', 2),
+        // Three times in one day is still one day.
+        log('cake', 3, 8),
+        log('cake', 3, 9),
+        log('cake', 3, 10),
+      ],
+      [food('oats'), food('eggs')],
+    );
+
+    const usual = await fetchUsualFoods('user-1', 6, now);
+
+    expect(usual.map((entry) => entry.food.id)).toEqual(['eggs', 'oats']);
+    expect(foodRead.calls.in).toEqual([['id', ['eggs', 'oats']]]);
+  });
+
+  it('breaks a tie with the food logged most recently', async () => {
+    mockReads(
+      [log('tea', 0), log('milk', 1), log('tea', 2), log('milk', 3)],
+      [food('milk'), food('tea')],
+    );
+
+    const usual = await fetchUsualFoods('user-1', 6, now);
+
+    expect(usual.map((entry) => entry.food.id)).toEqual(['tea', 'milk']);
+  });
+
+  it("brings last time's amount, as typed, with each", async () => {
+    mockReads(
+      [
+        log('rice', 0, 12, { quantity: '1.50', entered_amount: '150.00', entered_unit: 'g' }),
+        log('rice', 1, 12, { quantity: '2.00' }),
+      ],
+      [food('rice')],
+    );
+
+    const [rice] = await fetchUsualFoods('user-1', 6, now);
+
+    expect(rice).toMatchObject({ quantity: 1.5, entered: { amount: 150, unit: 'g' } });
+  });
+
+  it('leaves out a food that is gone or deactivated, and stops at the limit', async () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    mockReads(
+      ids.flatMap((id) => [log(id, 0), log(id, 1)]),
+      [food('a', { is_active: false }), food('c'), food('d')],
+    );
+
+    const usual = await fetchUsualFoods('user-1', 2, now);
+
+    expect(usual.map((entry) => entry.food.id)).toEqual(['c', 'd']);
+  });
+
+  it('throws on a query error', async () => {
+    mockTable({ data: null, error: { message: 'boom' } });
+
+    await expect(fetchUsualFoods('user-1', 6, now)).rejects.toThrow('boom');
   });
 });
 

@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, SectionList, View, type SectionListData } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  SectionList,
+  View,
+  type SectionListData,
+} from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { TextButton } from '../design/Button';
+import { BottomSheet } from '../design/BottomSheet';
+import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
+import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { IconButton } from '../design/IconButton';
@@ -18,19 +26,28 @@ import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { goToSection } from '../navigation/sectionNavigation';
 import { FoodImage } from '../nutrition/FoodImage';
+import { groupTotals, itemAmountText } from '../nutrition/foodGroups';
 import { groupFoodsByLetter } from '../nutrition/foodLibraryGrouping';
+import type { EnteredAmount } from '../nutrition/foodLogQueries';
+import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
+import { defaultMealTypeForTime } from '../nutrition/mealTypes';
 import {
   fetchAllFoods,
   fetchRecentFoods,
+  fetchUsualFoods,
   type FoodRow,
   type RecentFood,
 } from '../nutrition/foodQueries';
+import { fetchSavedMeals, type SavedMeal } from '../nutrition/savedMealQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { foodLibraryStyles as styles } from './foodLibraryStyles';
 import { FoodFormScreen } from './FoodFormScreen';
+import { FoodGroupFormScreen } from './FoodGroupFormScreen';
 
 const SEARCH_DEBOUNCE_MS = 300;
+const RECENT_LIMIT = 8;
+const USUAL_LIMIT = 6;
 
 type Props = RootStackScreenProps<'FoodLibrary'>;
 
@@ -38,12 +55,35 @@ type Mode =
   | { type: 'list' }
   | { type: 'create'; initialBarcode?: string }
   | { type: 'edit'; food: FoodRow }
-  | { type: 'log'; food: FoodRow; fromScan?: boolean; quantity?: number };
+  | {
+      type: 'log';
+      food: FoodRow;
+      fromScan?: boolean;
+      quantity?: number;
+      entered?: EnteredAmount | null;
+    }
+  | { type: 'meal-form'; meal?: SavedMeal }
+  | { type: 'recipe-form'; recipe?: FoodRow };
 
-/** A heading's foods: Recent, or one letter of the library. */
+/** A row: a saved meal, or a food -- with last time's amount when it's in Usual or Recent. */
+type LibraryItem =
+  | { kind: 'meal'; id: string; meal: SavedMeal }
+  | { kind: 'food'; id: string; food: FoodRow; last?: RecentFood };
+
+/** A heading's rows: Saved Meals, Usual, Recent, or one letter of the library. */
 interface LibrarySection {
   title: string;
-  recent: boolean;
+  key: 'meals' | 'usual' | 'recent' | 'letter';
+}
+
+/** The shortcuts above the letters: each is only a shortcut, so a failure only leaves it out. */
+interface Shortcuts {
+  usual: RecentFood[];
+  recent: RecentFood[];
+}
+
+function foodSubtitle(food: FoodRow): string {
+  return food.recipeServings ? 'Recipe · 1 serving' : `${food.servingSize}${food.servingUnit}`;
 }
 
 // The "Food" bottom-tab destination in Nutrition mode -- the user's own
@@ -52,16 +92,20 @@ interface LibrarySection {
 // editing, and logging a food are unchanged from before, just restyled.
 //
 // Layout: the shared header (menu left, "+" and a lightning bolt right --
-// add a food by hand, or describe it and let AI Food Search estimate it --
-// see AiFoodSearchScreen), then two widgets `widgetGap` apart: search with a
+// "+" opens a small menu to add a food by hand, a recipe or a saved meal; the
+// bolt describes a food and lets AI Food Search estimate it -- see
+// AiFoodSearchScreen), then two widgets `widgetGap` apart: search with a
 // count and a quiet sort action, and the foods -- each with its picture (or
 // category glyph), name, serving and calories as a mono value -- under
 // a small letter heading for each letter that has any (no A-Z rail -- a
 // letter with no foods has no heading at all). Tapping a row logs it;
-// the pencil edits it. Above the letters, while nothing is searched for, Recent
-// lists the foods logged most recently -- from the user's own logs, so it also
-// has foods logged from Search or a scan -- and tapping one opens the log step
-// at last time's quantity, so re-logging takes two taps.
+// the pencil edits it (a recipe opens its recipe form). Above the letters:
+// Saved Meals (tap one to see its foods and log them all, or edit it); then,
+// while nothing is searched for, Usual -- the foods logged on the most
+// different days lately -- and Recent, the foods logged most recently that
+// aren't already in Usual -- both from the user's own logs, so they also have
+// foods logged from Search or a scan -- and tapping one opens the log step
+// at last time's amount, so re-logging takes two taps.
 //
 // Reached from the barcode scanner's "Enter Manually", it opens straight into
 // the create form (barcode prefilled) and, once saved, on into logging that
@@ -71,6 +115,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { openMenu } = useAppMenu();
+  const { logFoodEntries } = useFoodLog();
 
   const { nutritionTheme: theme } = useProgressTheme();
   // Opens straight into "create a custom food" when reached from the Scan
@@ -86,10 +131,15 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
   const [search, setSearch] = useState('');
   const [ascending, setAscending] = useState(true);
   const [rows, setRows] = useState<FoodRow[]>([]);
+  const [meals, setMeals] = useState<SavedMeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Null until the first read finishes, so the list doesn't shift when Recent arrives.
-  const [recentFoods, setRecentFoods] = useState<RecentFood[] | null>(null);
+  // Null until the first read finishes, so the list doesn't shift when Usual and Recent arrive.
+  const [shortcuts, setShortcuts] = useState<Shortcuts | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [openMeal, setOpenMeal] = useState<SavedMeal | null>(null);
+  const [loggingMeal, setLoggingMeal] = useState(false);
+  const [mealError, setMealError] = useState<string | null>(null);
 
   // Debounce free-text input before it drives a query, so every keystroke
   // doesn't fire its own request -- same pattern as FoodSearchScreen.
@@ -103,8 +153,13 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchAllFoods({ userId, search, ascending });
-      setRows(result);
+      // Saved meals are the user's own, like their foods -- not a shortcut that can quietly go.
+      const [foods, savedMeals] = await Promise.all([
+        fetchAllFoods({ userId, search, ascending }),
+        fetchSavedMeals(userId),
+      ]);
+      setRows(foods);
+      setMeals(savedMeals);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load foods');
     } finally {
@@ -116,15 +171,23 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
     void load();
   }, [load]);
 
-  // Recent is a shortcut, so a failure only leaves it out.
-  const loadRecent = useCallback(async () => {
+  const loadShortcuts = useCallback(async () => {
     if (!userId) return;
-    setRecentFoods(await fetchRecentFoods(userId).catch(() => []));
+    const [usual, recent] = await Promise.all([
+      fetchUsualFoods(userId, USUAL_LIMIT).catch(() => []),
+      // Enough that Recent still has its eight once Usual's foods are taken out.
+      fetchRecentFoods(userId, RECENT_LIMIT + USUAL_LIMIT).catch(() => []),
+    ]);
+    const inUsual = new Set(usual.map((entry) => entry.food.id));
+    setShortcuts({
+      usual,
+      recent: recent.filter((entry) => !inUsual.has(entry.food.id)).slice(0, RECENT_LIMIT),
+    });
   }, [userId]);
 
   useEffect(() => {
-    void loadRecent();
-  }, [loadRecent]);
+    void loadShortcuts();
+  }, [loadShortcuts]);
 
   function handleDone(saved?: FoodRow) {
     // A food entered by hand for a scanned barcode goes straight on to logging.
@@ -134,8 +197,29 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
       setMode({ type: 'list' });
     }
     void load();
-    // An edited or deactivated food must not be logged from Recent's older copy.
-    void loadRecent();
+    // An edited or deactivated food must not be logged from Usual's or Recent's older copy.
+    void loadShortcuts();
+  }
+
+  // Each of the meal's foods as its own entry, at the food's figures now. A food that has
+  // left the library since is skipped.
+  async function handleLogMeal(meal: SavedMeal) {
+    const items = meal.items.filter((item) => item.food.isActive);
+    if (items.length === 0) return;
+    setMealError(null);
+    setLoggingMeal(true);
+    try {
+      await logFoodEntries(
+        items.map((item) => ({ food: item.food, quantity: item.quantity, entered: item.entered })),
+        defaultMealTypeForTime(),
+      );
+      setOpenMeal(null);
+      goToSection(navigation, 'Nutrition');
+    } catch (err) {
+      setMealError(err instanceof Error ? err.message : 'Failed to log meal');
+    } finally {
+      setLoggingMeal(false);
+    }
   }
 
   // Only letters that have foods -- groupFoodsByLetter makes no empty sections.
@@ -143,26 +227,52 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
   const listSections = useMemo(() => {
     const letters = sections.map((section) => ({
       title: section.letter,
-      recent: false,
-      data: section.data,
+      key: 'letter' as const,
+      data: section.data.map((food): LibraryItem => ({ kind: 'food', id: food.id, food })),
     }));
-    if (search || !recentFoods || recentFoods.length === 0) return letters;
+    const query = search.trim().toLowerCase();
+    const shownMeals = query
+      ? meals.filter((meal) => meal.name.toLowerCase().includes(query))
+      : meals;
+    const mealSection =
+      shownMeals.length > 0
+        ? [
+            {
+              title: 'Saved Meals',
+              key: 'meals' as const,
+              data: shownMeals.map((meal): LibraryItem => ({ kind: 'meal', id: meal.id, meal })),
+            },
+          ]
+        : [];
+    if (search || !shortcuts) return [...mealSection, ...letters];
+    const shortcut = (title: string, key: 'usual' | 'recent', entries: RecentFood[]) =>
+      entries.length > 0
+        ? [
+            {
+              title,
+              key,
+              data: entries.map((entry): LibraryItem => ({
+                kind: 'food',
+                id: entry.food.id,
+                food: entry.food,
+                last: entry,
+              })),
+            },
+          ]
+        : [];
     return [
-      { title: 'Recent', recent: true, data: recentFoods.map((entry) => entry.food) },
+      ...mealSection,
+      ...shortcut('Usual', 'usual', shortcuts.usual),
+      ...shortcut('Recent', 'recent', shortcuts.recent),
       ...letters,
     ];
-  }, [sections, search, recentFoods]);
-
-  const recentQuantities = useMemo(
-    () => new Map((recentFoods ?? []).map((entry) => [entry.food.id, entry.quantity])),
-    [recentFoods],
-  );
+  }, [sections, search, shortcuts, meals]);
 
   // A small heading over each group; every one after the first has room above it, so
   // the groups read apart.
   const firstTitle = listSections[0]?.title;
   const renderSectionHeader = useCallback(
-    ({ section }: { section: SectionListData<FoodRow, LibrarySection> }) => (
+    ({ section }: { section: SectionListData<LibraryItem, LibrarySection> }) => (
       <View
         testID={`food-library-section-${section.title}`}
         style={section.title === firstTitle ? undefined : styles.laterSection}
@@ -179,42 +289,92 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
       index,
       section,
     }: {
-      item: FoodRow;
+      item: LibraryItem;
       index: number;
-      section: SectionListData<FoodRow, LibrarySection>;
-    }) => (
-      <View style={[styles.row, index > 0 && styles.rowDivider]}>
-        <View style={styles.flex}>
-          <ListRow
-            testID={section.recent ? `food-recent-${item.id}` : `food-item-${item.id}`}
-            leading={<FoodImage uri={item.imageUrl} name={item.name} size={44} />}
-            title={item.name}
-            subtitle={`${item.servingSize}${item.servingUnit}`}
-            value={`${item.calories} cal`}
-            chevron={false}
-            onPress={() =>
-              setMode({
-                type: 'log',
-                food: item,
-                quantity: section.recent ? recentQuantities.get(item.id) : undefined,
-              })
-            }
-          />
+      section: SectionListData<LibraryItem, LibrarySection>;
+    }) => {
+      if (item.kind === 'meal') {
+        const { meal } = item;
+        const count = meal.items.length;
+        const calories = Math.round(
+          groupTotals(meal.items.filter((entry) => entry.food.isActive)).calories,
+        );
+        return (
+          <View style={[styles.row, index > 0 && styles.rowDivider]}>
+            <View style={styles.flex}>
+              <ListRow
+                testID={`food-meal-${meal.id}`}
+                leading={<FoodImage uri={null} name={meal.name} size={44} />}
+                title={meal.name}
+                subtitle={`${count} ${count === 1 ? 'food' : 'foods'}`}
+                value={`${calories} cal`}
+                chevron={false}
+                onPress={() => {
+                  setMealError(null);
+                  setOpenMeal(meal);
+                }}
+              />
+            </View>
+          </View>
+        );
+      }
+      const { food, last } = item;
+      const shortcut = section.key === 'usual' || section.key === 'recent';
+      return (
+        <View style={[styles.row, index > 0 && styles.rowDivider]}>
+          <View style={styles.flex}>
+            <ListRow
+              testID={shortcut ? `food-${section.key}-${food.id}` : `food-item-${food.id}`}
+              leading={<FoodImage uri={food.imageUrl} name={food.name} size={44} />}
+              title={food.name}
+              subtitle={foodSubtitle(food)}
+              value={`${Math.round(food.calories)} cal`}
+              chevron={false}
+              onPress={() =>
+                setMode({
+                  type: 'log',
+                  food,
+                  quantity: last?.quantity,
+                  entered: last?.entered ?? null,
+                })
+              }
+            />
+          </View>
+          {/* A usual or recent food can come from Search, which isn't the user's to edit. */}
+          {shortcut ? null : (
+            <IconButton
+              testID={`food-edit-${food.id}`}
+              icon="edit-2"
+              onPress={() =>
+                setMode(
+                  food.recipeServings
+                    ? { type: 'recipe-form', recipe: food }
+                    : { type: 'edit', food },
+                )
+              }
+              accessibilityLabel={`Edit ${food.name}`}
+              color={colors.textSecondary}
+            />
+          )}
         </View>
-        {/* A recent food can come from Search, which isn't the user's to edit. */}
-        {section.recent ? null : (
-          <IconButton
-            testID={`food-edit-${item.id}`}
-            icon="edit-2"
-            onPress={() => setMode({ type: 'edit', food: item })}
-            accessibilityLabel={`Edit ${item.name}`}
-            color={colors.textSecondary}
-          />
-        )}
-      </View>
-    ),
-    [recentQuantities],
+      );
+    },
+    [],
   );
+
+  if (mode.type === 'meal-form' || mode.type === 'recipe-form') {
+    const shared = {
+      accentColor: theme.accent,
+      onAccentColor: theme.onAccent,
+      onDone: () => handleDone(),
+      onCancel: () => setMode({ type: 'list' }),
+    };
+    return mode.type === 'meal-form' ? (
+      <FoodGroupFormScreen kind="meal" meal={mode.meal} {...shared} />
+    ) : (
+      <FoodGroupFormScreen kind="recipe" recipe={mode.recipe} {...shared} />
+    );
+  }
 
   if (mode.type === 'create') {
     return (
@@ -247,6 +407,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
       <LogFoodStep
         food={mode.food}
         initialQuantity={mode.quantity}
+        initialEntry={mode.entered}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
         onDone={() => (mode.fromScan ? goToSection(navigation, 'Nutrition') : navigation.goBack())}
@@ -272,8 +433,8 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
           }}
           rightAction={{
             icon: 'plus',
-            onPress: () => setMode({ type: 'create' }),
-            accessibilityLabel: 'Add a new food',
+            onPress: () => setAddMenuOpen(true),
+            accessibilityLabel: 'Add a food, recipe or meal',
             testID: 'food-create-button',
           }}
           rightAction2={{
@@ -285,6 +446,101 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         />
       }
     >
+      <BubbleMenu
+        testID="food-library-add-menu"
+        visible={addMenuOpen}
+        onClose={() => setAddMenuOpen(false)}
+      >
+        <BubbleMenuRow
+          testID="food-library-add-food"
+          icon="plus-circle"
+          label="New Food"
+          onPress={() => {
+            setAddMenuOpen(false);
+            setMode({ type: 'create' });
+          }}
+        />
+        <BubbleMenuRow
+          testID="food-library-add-recipe"
+          icon="book-open"
+          label="New Recipe"
+          onPress={() => {
+            setAddMenuOpen(false);
+            setMode({ type: 'recipe-form' });
+          }}
+        />
+        <BubbleMenuRow
+          testID="food-library-add-meal"
+          icon="layers"
+          label="New Meal"
+          onPress={() => {
+            setAddMenuOpen(false);
+            setMode({ type: 'meal-form' });
+          }}
+        />
+      </BubbleMenu>
+
+      <BottomSheet
+        testID="food-meal-sheet"
+        visible={openMeal !== null}
+        onClose={() => setOpenMeal(null)}
+      >
+        {openMeal ? (
+          <View style={styles.sheetContent}>
+            <Text testID="food-meal-sheet-title" style={styles.sheetTitle}>
+              {openMeal.name}
+            </Text>
+            <Text testID="food-meal-sheet-summary" style={styles.sheetSummary}>
+              {(() => {
+                const active = openMeal.items.filter((entry) => entry.food.isActive);
+                const calories = Math.round(groupTotals(active).calories);
+                return `${active.length} ${active.length === 1 ? 'food' : 'foods'} · ${calories} cal`;
+              })()}
+            </Text>
+            <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
+              {openMeal.items.map((entry, i) => (
+                <ListRow
+                  key={`${entry.food.id}-${i}`}
+                  testID={`food-meal-sheet-item-${i}`}
+                  leading={<FoodImage uri={entry.food.imageUrl} name={entry.food.name} size={44} />}
+                  title={entry.food.name}
+                  subtitle={
+                    entry.food.isActive
+                      ? itemAmountText(entry)
+                      : "No longer in your library, so it isn't logged"
+                  }
+                  divider={i > 0}
+                />
+              ))}
+            </ScrollView>
+            {mealError ? (
+              <Text testID="food-meal-sheet-error" style={styles.sheetError}>
+                {mealError}
+              </Text>
+            ) : null}
+            <PrimaryButton
+              testID="food-meal-log"
+              label="Log Meal"
+              onPress={() => void handleLogMeal(openMeal)}
+              loading={loggingMeal}
+              disabled={!openMeal.items.some((entry) => entry.food.isActive) && !loggingMeal}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+            />
+            <SecondaryButton
+              testID="food-meal-edit"
+              label="Edit Meal"
+              disabled={loggingMeal}
+              onPress={() => {
+                const meal = openMeal;
+                setOpenMeal(null);
+                setMode({ type: 'meal-form', meal });
+              }}
+            />
+          </View>
+        ) : null}
+      </BottomSheet>
+
       <View style={styles.page}>
         <AppCard testID="food-library-controls">
           <View style={styles.block}>
@@ -322,7 +578,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
                 }}
               />
             </View>
-          ) : loading || recentFoods === null ? (
+          ) : loading || shortcuts === null ? (
             <View style={styles.loading}>
               <ActivityIndicator
                 testID="food-library-loading"
@@ -351,7 +607,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
               <SectionList
                 testID="food-library-list"
                 sections={listSections}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => `${item.kind}-${item.id}`}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
                 renderSectionHeader={renderSectionHeader}

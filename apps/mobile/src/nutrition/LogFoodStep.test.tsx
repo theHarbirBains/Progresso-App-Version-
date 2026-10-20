@@ -302,3 +302,65 @@ describe('LogFoodStep -- drinks, last time and double taps', () => {
     expect(mockLogFoodEntry).toHaveBeenCalled();
   });
 });
+
+describe('LogFoodStep -- choosing an amount for a meal or a recipe', () => {
+  it('hands back the amount instead of logging, under the label it is given', async () => {
+    const onChoose = jest.fn();
+    render(
+      <LogFoodStep
+        food={rice}
+        accentColor="#3DDC97"
+        onAccentColor="#000000"
+        onCancel={jest.fn()}
+        onChoose={onChoose}
+        chooseLabel="Add to Recipe"
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('log-food-unit-g'));
+    fireEvent.changeText(screen.getByTestId('log-food-quantity'), '150');
+    expect(screen.getByTestId('log-food-submit')).toHaveTextContent('Add to Recipe');
+    await submit();
+
+    expect(onChoose).toHaveBeenCalledWith({ quantity: 1.5, entered: { amount: 150, unit: 'g' } });
+    expect(mockLogFoodEntry).not.toHaveBeenCalled();
+  });
+
+  it("doesn't ask about a double log, since nothing is logged", async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    mockUseFoodLog.mockReturnValue({
+      logs: [{ foodId: rice.id, loggedAt: new Date().toISOString() }],
+      logFoodEntry: mockLogFoodEntry,
+    });
+    const onChoose = jest.fn();
+    render(
+      <LogFoodStep
+        food={rice}
+        accentColor="#3DDC97"
+        onAccentColor="#000000"
+        onCancel={jest.fn()}
+        onChoose={onChoose}
+      />,
+    );
+
+    await submit();
+
+    expect(alert).not.toHaveBeenCalled();
+    expect(onChoose).toHaveBeenCalled();
+  });
+});
+
+describe('LogFoodStep -- a recipe', () => {
+  it('says how many servings the recipe makes, in place of the serving size', () => {
+    renderStep({
+      ...rice,
+      name: 'Smoothie',
+      servingSize: 1,
+      servingUnit: 'serving',
+      recipeServings: 4,
+    });
+
+    expect(screen.getByTestId('log-food-serving')).toHaveTextContent('Recipe · makes 4 servings');
+    expect(screen.queryByTestId('log-food-unit')).toBeNull();
+  });
+});
