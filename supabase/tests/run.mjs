@@ -3926,6 +3926,58 @@ async function main() {
     );
   }
 
+  console.log('\nRunning rep range tests...\n');
+  {
+    const lifter = randomUUID();
+    await admin.query('insert into auth.users (id, email) values ($1, $2)', [
+      lifter,
+      `lifter-${lifter}@test.local`,
+    ]);
+    const profile = (
+      await admin.query(
+        'select rep_range_min, rep_range_max, progression_cues_enabled, training_comfort from public.users where id = $1',
+        [lifter],
+      )
+    ).rows[0];
+    record(
+      'A new account starts at 8-12 with suggestions on and no comfort answer yet',
+      profile.rep_range_min === 8 &&
+        profile.rep_range_max === 12 &&
+        profile.progression_cues_enabled === true &&
+        profile.training_comfort === null,
+    );
+
+    await asUserCommitted(lifter, (c) =>
+      c.query(
+        "update public.users set rep_range_min = 5, rep_range_max = 10, training_comfort = 'follows_method' where id = $1",
+        [lifter],
+      ),
+    );
+    record(
+      'You can set your own range and comfort answer',
+      (
+        await admin.query('select rep_range_min, rep_range_max from public.users where id = $1', [
+          lifter,
+        ])
+      ).rows[0].rep_range_max === 10,
+    );
+    await expectThrows(
+      admin.query('update public.users set rep_range_min = 10 where id = $1', [lifter]),
+      "A range's bottom must be below its top",
+      /users_rep_range_check/,
+    );
+    await expectThrows(
+      admin.query('update public.users set rep_range_min = 0 where id = $1', [lifter]),
+      'A range starts at 1 rep or more',
+      /users_rep_range_check/,
+    );
+    await expectThrows(
+      admin.query("update public.users set training_comfort = 'expert' where id = $1", [lifter]),
+      'The comfort answer is one of the four',
+      /users_training_comfort_check/,
+    );
+  }
+
   await admin.end();
 }
 
