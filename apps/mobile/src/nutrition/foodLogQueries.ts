@@ -1,3 +1,4 @@
+import { fetchAllRows } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
 import { calculateLogTotals, recalculateForQuantity } from './nutritionCalculations';
 import type { QuantityUnit } from './logQuantity';
@@ -263,6 +264,37 @@ export async function fetchFoodLogsForRange(
     .order('logged_at', { ascending: true });
   if (error) throw new Error(error.message);
   return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
+}
+
+/**
+ * Each food log's time and calories from `start` up to (not including) `end` -- a phase's,
+ * which can run for months -- read a page at a time, so a long phase is read in full.
+ */
+export async function fetchIntakeForRange(
+  userId: string,
+  start: Date,
+  end: Date,
+): Promise<{ loggedAt: string; calories: number; proteinG: number }[]> {
+  const rows = await fetchAllRows<{
+    logged_at: string;
+    calories: string | number;
+    protein_g: string | number;
+  }>((from, to) =>
+    supabase
+      .from('food_logs')
+      .select('logged_at, calories, protein_g', { count: 'exact' })
+      .eq('user_id', userId)
+      .gte('logged_at', start.toISOString())
+      .lt('logged_at', end.toISOString())
+      .order('logged_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
+  return rows.map((row) => ({
+    loggedAt: row.logged_at,
+    calories: Number(row.calories),
+    proteinG: Number(row.protein_g),
+  }));
 }
 
 // Everything a log snapshots, so a copy is exactly what was logged.

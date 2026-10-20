@@ -70,6 +70,10 @@ export type RootStackParamList = {
   BarcodeScanner: undefined;
   NutritionGoals: undefined;
   NutritionHistory: undefined;
+  /** Training phases: the one going now and past ones. */
+  Phases: undefined;
+  /** Starts a phase, or edits/reviews one (`phaseId`). */
+  PhaseForm: { phaseId?: string } | undefined;
   CalorieEstimation: undefined;
   ProgressOverview: undefined;
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };

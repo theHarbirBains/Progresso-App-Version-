@@ -77,6 +77,9 @@ import { LogPastWorkoutScreen } from './src/screens/LogPastWorkoutScreen';
 import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { NutritionGoalsScreen } from './src/screens/NutritionGoalsScreen';
+import { PhasesScreen } from './src/screens/PhasesScreen';
+import { PhaseFormScreen } from './src/screens/PhaseFormScreen';
+import { PhaseProvider } from './src/phases/PhaseProvider';
 import { NutritionHistoryScreen } from './src/screens/NutritionHistoryScreen';
 import { NutritionTodayScreen } from './src/screens/NutritionTodayScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
@@ -398,6 +401,8 @@ function Root() {
                   <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
                   <Stack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
                   <Stack.Screen name="NutritionHistory" component={NutritionHistoryScreen} />
+                  <Stack.Screen name="Phases" component={PhasesScreen} />
+                  <Stack.Screen name="PhaseForm" component={PhaseFormScreen} />
                   <Stack.Screen name="CalorieEstimation" component={CalorieEstimationScreen} />
                   <Stack.Screen name="ProgressOverview" component={ProgressOverviewScreen} />
                   <Stack.Screen
@@ -540,12 +545,14 @@ function App() {
       <AuthProvider>
         <ProfileProvider>
           <NutritionGoalsProvider>
-            <FoodLogProvider>
-              <AllTimeStatsProvider>
-                <AppShell fontsLoaded={fontsLoaded} />
-                <StatusBar style="light" />
-              </AllTimeStatsProvider>
-            </FoodLogProvider>
+            <PhaseProvider>
+              <FoodLogProvider>
+                <AllTimeStatsProvider>
+                  <AppShell fontsLoaded={fontsLoaded} />
+                  <StatusBar style="light" />
+                </AllTimeStatsProvider>
+              </FoodLogProvider>
+            </PhaseProvider>
           </NutritionGoalsProvider>
         </ProfileProvider>
       </AuthProvider>

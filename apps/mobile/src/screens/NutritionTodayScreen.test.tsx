@@ -23,8 +23,14 @@ import {
 } from '../nutrition/FoodLogProvider';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
+import { PhaseProvider } from '../phases/PhaseProvider';
+import { fetchPhases } from '../phases/phaseQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { NutritionTodayScreen } from './NutritionTodayScreen';
+
+jest.mock('../phases/phaseQueries', () => ({
+  fetchPhases: jest.fn().mockResolvedValue([]),
+}));
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -90,11 +96,13 @@ function renderScreen() {
   return render(
     <ProfileProvider>
       <NutritionGoalsProvider>
-        <FoodLogProvider>
-          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-            <NutritionTodayScreen navigation={navigation} route={route} />
-          </AppMenuContext.Provider>
-        </FoodLogProvider>
+        <PhaseProvider>
+          <FoodLogProvider>
+            <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+              <NutritionTodayScreen navigation={navigation} route={route} />
+            </AppMenuContext.Provider>
+          </FoodLogProvider>
+        </PhaseProvider>
       </NutritionGoalsProvider>
     </ProfileProvider>,
   );
@@ -425,12 +433,14 @@ describe('NutritionTodayScreen background refresh from the shared cache', () => 
     render(
       <ProfileProvider>
         <NutritionGoalsProvider>
-          <FoodLogProvider>
-            <CaptureLogFoodEntry />
-            <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-              <NutritionTodayScreen navigation={navigation} route={route} />
-            </AppMenuContext.Provider>
-          </FoodLogProvider>
+          <PhaseProvider>
+            <FoodLogProvider>
+              <CaptureLogFoodEntry />
+              <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+                <NutritionTodayScreen navigation={navigation} route={route} />
+              </AppMenuContext.Provider>
+            </FoodLogProvider>
+          </PhaseProvider>
         </NutritionGoalsProvider>
       </ProfileProvider>,
     );
@@ -761,5 +771,39 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     renderScreen();
 
     expect(await screen.findByTestId('weekly-budget-error')).toBeTruthy();
+  });
+});
+
+describe('NutritionTodayScreen -- a phase with its own targets', () => {
+  afterEach(() => {
+    (fetchPhases as jest.Mock).mockResolvedValue([]);
+  });
+
+  it("measures the day against the phase's own targets, and the daily ones where it has none", async () => {
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: 2200,
+      proteinG: 160,
+      carbsG: null,
+      fatG: null,
+    });
+    (fetchPhases as jest.Mock).mockResolvedValue([
+      {
+        id: 'phase-1',
+        kind: 'cut',
+        name: null,
+        startDate: '2026-10-01',
+        endDate: null,
+        startWeightKg: 90,
+        targetWeightKg: 85,
+        targets: { calories: 1800, proteinG: null, carbsG: null, fatG: null },
+        notes: null,
+      },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByText('Cut Targets')).toBeTruthy();
+    expect(screen.getByTestId('target-calories')).toHaveTextContent(/1800/);
+    // The phase leaves protein blank: the daily target applies.
+    expect(screen.getByTestId('target-protein')).toHaveTextContent(/160g/);
   });
 });

@@ -16,6 +16,7 @@ import {
   type CalorieTargets,
 } from '../nutrition/calorieTargets';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
+import { useDailyTargets } from '../phases/PhaseProvider';
 import {
   draftFromTargets,
   editDraft,
@@ -88,6 +89,8 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   const { nutritionTheme: theme } = useProgressTheme();
   const { profile, loading: profileLoading, error: profileError } = useProfile();
   const { goals, loading: goalsLoading, error: goalsError, saveGoals } = useNutritionGoals();
+  // An active phase with targets of its own is used in place of these while it's going.
+  const { phaseName } = useDailyTargets();
 
   const [draft, setDraft] = useState<TargetDraft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -199,6 +202,19 @@ export function NutritionGoalsScreen({ navigation }: Props) {
 
       <AppCard testID="nutrition-goals-custom-card">
         <Section title="Your Daily Targets">
+          {phaseName ? (
+            <View testID="nutrition-goals-phase-note" style={styles.phaseNote}>
+              <Text style={styles.note}>
+                Your {phaseName} has targets of its own, used in place of these while it&apos;s
+                going. These stay as they are and apply again when it ends.
+              </Text>
+              <TextButton
+                testID="nutrition-goals-view-phase"
+                label="View Phase"
+                onPress={() => navigation.navigate('Phases')}
+              />
+            </View>
+          ) : null}
           {draft ? (
             <TargetsEditor
               draft={draft}

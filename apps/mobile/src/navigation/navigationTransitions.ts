@@ -48,6 +48,7 @@ const SECTION_ROUTES: ReadonlySet<RouteName> = new Set<RouteName>([
   'FoodLibrary',
   'NutritionGoals',
   'NutritionHistory',
+  'Phases',
   'CalorieEstimation',
   'LogPastWorkout',
   'TrainerAccess',

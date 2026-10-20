@@ -15,6 +15,8 @@ const NUTRITION_ROUTE_NAMES = new Set([
   'BarcodeScanner',
   'NutritionGoals',
   'NutritionHistory',
+  'Phases',
+  'PhaseForm',
   'CalorieEstimation',
 ]);
 

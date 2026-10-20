@@ -74,6 +74,10 @@ jest.mock('./src/nutrition/foodLogQueries', () => ({
   fetchFoodLogsForMonth: jest.fn().mockResolvedValue([]),
   fetchFoodLogsForDay: jest.fn().mockResolvedValue([]),
   fetchFoodLogsForRange: jest.fn().mockResolvedValue([]),
+  fetchIntakeForRange: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('./src/phases/phaseQueries', () => ({
+  fetchPhases: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('./src/nutrition/nutritionGoalQueries', () => ({
   fetchNutritionGoals: jest.fn().mockResolvedValue({
@@ -625,7 +629,7 @@ describe('Universal side menu', () => {
     expect(screen.getByTestId('app-menu-item-NutritionHistory')).toHaveTextContent(
       /Nutrition History/,
     );
-    expect(screen.getByTestId('app-menu-item-Recipes')).toHaveTextContent(/Coming Soon/);
+    expect(screen.getByTestId('app-menu-item-Phases')).toHaveTextContent(/Phases/);
     expect(screen.getByTestId('app-menu-item-AccountSettings')).toHaveTextContent(/Settings/);
     // The Workout destinations are still there too -- one universal list.
     expect(screen.getByTestId('app-menu-item-WorkoutHistory')).toBeTruthy();
@@ -657,17 +661,15 @@ describe('Universal side menu', () => {
     expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
   });
 
-  it('does not navigate anywhere when a coming-soon Nutrition menu row is pressed', async () => {
+  it('opens Phases from the Nutrition menu', async () => {
     await signIn();
     fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
     await screen.findByTestId('nutrition-today-open-menu');
     fireEvent.press(screen.getByTestId('nutrition-today-open-menu'));
 
-    fireEvent.press(screen.getByTestId('app-menu-item-Recipes'));
+    fireEvent.press(screen.getByTestId('app-menu-item-Phases'));
 
-    // Still on Nutrition, menu still open -- nothing happened.
-    expect(screen.getByTestId('nutrition-today-open-menu')).toBeTruthy();
-    expect(screen.getByTestId('app-menu-backdrop')).toBeTruthy();
+    expect(await screen.findByTestId('phases-header')).toBeTruthy();
   });
 });
 

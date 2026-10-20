@@ -27,7 +27,7 @@ describe('APP_MENU_SECTIONS', () => {
         'Food Library',
         'Nutrition Goals',
         'Nutrition History',
-        'Recipes',
+        'Phases',
         'Find People',
       ]),
     );
@@ -72,8 +72,9 @@ describe('APP_MENU_SECTIONS', () => {
     });
   });
 
-  it('marks Recipes as a coming-soon placeholder, not a route to a nonexistent screen', () => {
-    expect(findItem('Recipes')).toEqual({ label: 'Recipes', icon: 'book-open', comingSoon: true });
+  it('opens Phases from the Nutrition section; Recipes live in the Food Library now', () => {
+    expect(findItem('Phases')).toEqual({ route: 'Phases', label: 'Phases', icon: 'flag' });
+    expect(findItem('Recipes')).toBeUndefined();
   });
 });
 

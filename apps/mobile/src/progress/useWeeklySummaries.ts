@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchFoodLogsForRange } from '../nutrition/foodLogQueries';
-import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
+import { useDailyTargets } from '../phases/PhaseProvider';
 import { useProfile } from '../profile/ProfileProvider';
 import {
   COMPARISON_WEEKS,
@@ -37,7 +37,9 @@ export function useWeeklySummaries(now: Date = new Date()): {
 } {
   const { user } = useAuth();
   const userId = user?.id;
-  const { goals } = useNutritionGoals();
+  // The targets that apply now: an active phase's own where it has them, the daily ones
+  // everywhere else.
+  const { targets: goals } = useDailyTargets();
   const { profile } = useProfile();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);

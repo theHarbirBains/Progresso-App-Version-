@@ -14,6 +14,7 @@ import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { OverviewSection } from '../progress/OverviewSection';
 import { useWeeklySummaries } from '../progress/useWeeklySummaries';
 import { WeeklySummaryBlock } from '../progress/WeeklySummaryBlock';
+import { PhaseProgressBlock } from '../progress/PhaseProgressBlock';
 import { ProgressHeader } from '../progress/ProgressHeader';
 import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
 import { progressStyles as styles } from '../progress/progressStyles';
@@ -130,13 +131,20 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 onViewDetails={() => setActiveSection('Strength')}
                 onViewAllMilestones={() => setActiveSection('Strength')}
                 top={
-                  <WeeklySummaryBlock
-                    summaries={weekSummaries}
-                    error={weekError}
-                    weightUnit={weightUnit}
-                    accentColor={theme.accent}
-                    onAccentColor={theme.onAccent}
-                  />
+                  <>
+                    <PhaseProgressBlock
+                      weightUnit={weightUnit}
+                      accentColor={theme.accent}
+                      onOpenPhases={() => navigation.navigate('Phases')}
+                    />
+                    <WeeklySummaryBlock
+                      summaries={weekSummaries}
+                      error={weekError}
+                      weightUnit={weightUnit}
+                      accentColor={theme.accent}
+                      onAccentColor={theme.onAccent}
+                    />
+                  </>
                 }
               />
             ) : null}
