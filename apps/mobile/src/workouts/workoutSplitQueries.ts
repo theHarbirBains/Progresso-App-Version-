@@ -1,3 +1,4 @@
+import { copyDayPlan } from './splitPlanQueries';
 import { supabase } from '../lib/supabase';
 import type { SplitMuscleGroup } from './splitMuscleGroups';
 import type { WorkoutSplitPreset } from './workoutSplitPresets';
@@ -107,6 +108,8 @@ export async function duplicateWorkoutSplit(
     if (day.muscleGroups.length > 0) {
       await setWorkoutSplitDayMuscleGroups(newDay.id, day.muscleGroups);
     }
+    // The copy gets each day's planned exercises too.
+    await copyDayPlan(day.id, newDay.id);
   }
   return newSplit;
 }

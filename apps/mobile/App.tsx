@@ -103,6 +103,7 @@ import { WorkoutHistoryScreen } from './src/screens/WorkoutHistoryScreen';
 import { WorkoutSplitFormScreen } from './src/screens/WorkoutSplitFormScreen';
 import { WorkoutSplitsScreen } from './src/screens/WorkoutSplitsScreen';
 import { WorkoutSplitViewScreen } from './src/screens/WorkoutSplitViewScreen';
+import { SplitDayPlanScreen } from './src/screens/SplitDayPlanScreen';
 
 type AuthMode = 'signIn' | 'signUp' | 'forgotPassword';
 
@@ -411,6 +412,7 @@ function Root() {
                   />
                   <Stack.Screen name="WorkoutSplits" component={WorkoutSplitsScreen} />
                   <Stack.Screen name="WorkoutSplitView" component={WorkoutSplitViewScreen} />
+                  <Stack.Screen name="SplitDayPlan" component={SplitDayPlanScreen} />
                   <Stack.Screen name="WorkoutSplitForm" component={WorkoutSplitFormScreen} />
                   <Stack.Screen name="ChooseWorkoutSplit" component={ChooseWorkoutSplitScreen} />
                   <Stack.Screen name="Profile" component={ProfileScreen} />

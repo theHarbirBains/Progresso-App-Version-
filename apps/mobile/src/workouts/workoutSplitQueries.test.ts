@@ -243,8 +243,9 @@ describe('fetchLastWorkoutSplitDayId', () => {
 });
 
 describe('duplicateWorkoutSplit', () => {
-  it('creates a copy with the same days and muscle groups', async () => {
+  it('creates a copy with the same days, muscle groups and planned exercises', async () => {
     let createSplitCallCount = 0;
+    const planBuilders: Record<string, unknown>[] = [];
     mockFrom.mockImplementation((table: string) => {
       if (table === 'workout_splits') {
         const builder = createQueryBuilder({ data: { id: 's1', name: 'PPL' }, error: null });
@@ -285,12 +286,40 @@ describe('duplicateWorkoutSplit', () => {
         const builder = createQueryBuilder({ data: null, error: null });
         return builder;
       }
+      if (table === 'workout_split_day_exercises') {
+        // Day d1's plan: read, then copied onto d2.
+        const builder = createQueryBuilder({
+          data: [
+            {
+              id: 'p1',
+              workout_split_day_id: 'd1',
+              exercise_id: 'bench',
+              position: 0,
+              target_sets: 4,
+              exercises: {
+                name: 'Bench',
+                muscle_group: 'chest',
+                movement_type: 'bilateral',
+                measurement_type: 'weight_reps',
+              },
+            },
+          ],
+          error: null,
+        });
+        planBuilders.push(builder);
+        return builder;
+      }
       throw new Error(`unexpected table ${table}`);
     });
 
     const result = await duplicateWorkoutSplit('user-1', 's1');
 
     expect(result).toEqual({ id: 's2', name: 'PPL Copy' });
+    // The copy gets each day's planned exercises too.
+    const inserted = planBuilders.flatMap((builder) => (builder.insert as jest.Mock).mock.calls);
+    expect(inserted).toEqual([
+      [[{ workout_split_day_id: 'd2', exercise_id: 'bench', position: 0, target_sets: 4 }]],
+    ]);
   });
 });
 

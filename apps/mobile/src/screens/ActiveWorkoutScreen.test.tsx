@@ -989,6 +989,54 @@ describe('Pre-filled sets', () => {
     expect(mockUpdateSet).not.toHaveBeenCalledWith('s3', expect.anything());
   });
 
+  it("starts a planned day's blank sets from last session; a resumed workout's are left blank", async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [
+        {
+          ...baseWorkout.exercises[0],
+          sets: [
+            { id: 'pl1', setIndex: 1, side: null, weightKg: null, reps: null, completedAt: null },
+            { id: 'pl2', setIndex: 2, side: null, weightKg: null, reps: null, completedAt: null },
+          ],
+        },
+      ],
+    });
+    mockFetchPreviousPerformance.mockResolvedValue(lastBench);
+    render(
+      <ActiveWorkoutScreen
+        navigation={navigation}
+        route={{ params: { workoutId: 'w1', planned: true } } as never}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('exercise-card-we1-set-pl1-weight').props.value).toBe('100'),
+    );
+    expect(screen.getByTestId('exercise-card-we1-set-pl1-reps').props.value).toBe('10');
+    // Set 2 starts from set 1, as a set added with Add Set does.
+    expect(screen.getByTestId('exercise-card-we1-set-pl2-weight').props.value).toBe('100');
+  });
+
+  it('shows why part of a planned day is missing, when starting it said so', async () => {
+    render(
+      <ActiveWorkoutScreen
+        navigation={navigation}
+        route={
+          {
+            params: { workoutId: 'w1', planError: "Not all of this day's plan could be added." },
+          } as never
+        }
+      />,
+      { wrapper: TestProviders },
+    );
+
+    expect(await screen.findByTestId('active-workout-error')).toHaveTextContent(
+      "Not all of this day's plan could be added.",
+    );
+  });
+
   it('uses the same set number from last session when the set before it is empty', async () => {
     mockFetchPreviousPerformance.mockResolvedValue(lastBench);
     renderScreen();

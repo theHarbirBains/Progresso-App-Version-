@@ -202,21 +202,19 @@ describe('SettingsWorkoutPreferencesScreen', () => {
 
 describe('SettingsWorkoutPreferencesScreen -- exercise ranges', () => {
   beforeEach(() => {
-    (fetchExerciseSettings as jest.Mock)
-      .mockReset()
-      .mockResolvedValue(
-        new Map([
-          [
-            'ex-1',
-            {
-              exerciseId: 'ex-1',
-              exerciseName: 'Deadlift',
-              range: { min: 3, max: 5 },
-              incrementKg: null,
-            },
-          ],
-        ]),
-      );
+    (fetchExerciseSettings as jest.Mock).mockReset().mockResolvedValue(
+      new Map([
+        [
+          'ex-1',
+          {
+            exerciseId: 'ex-1',
+            exerciseName: 'Deadlift',
+            range: { min: 3, max: 5 },
+            incrementKg: null,
+          },
+        ],
+      ]),
+    );
     (clearExerciseSetting as jest.Mock).mockReset().mockResolvedValue(undefined);
   });
 

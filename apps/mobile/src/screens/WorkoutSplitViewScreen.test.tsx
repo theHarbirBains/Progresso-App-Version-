@@ -3,7 +3,11 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react-n
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { ProfileProvider } from '../profile/ProfileProvider';
-import { fetchWorkoutSplitDetail } from '../workouts/workoutSplitQueries';
+import {
+  fetchLastWorkoutSplitDayId,
+  fetchWorkoutSplitDetail,
+} from '../workouts/workoutSplitQueries';
+import { fetchPlansForDays } from '../workouts/splitPlanQueries';
 import { WorkoutSplitViewScreen } from './WorkoutSplitViewScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -17,6 +21,11 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../workouts/workoutSplitQueries', () => ({
   fetchWorkoutSplitDetail: jest.fn(),
+  fetchLastWorkoutSplitDayId: jest.fn(),
+}));
+
+jest.mock('../workouts/splitPlanQueries', () => ({
+  fetchPlansForDays: jest.fn(),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
@@ -61,6 +70,8 @@ beforeEach(() => {
     nutritionAccentColor: null,
   });
   mockFetchWorkoutSplitDetail.mockReset().mockResolvedValue(detail);
+  (fetchPlansForDays as jest.Mock).mockReset().mockResolvedValue(new Map());
+  (fetchLastWorkoutSplitDayId as jest.Mock).mockReset().mockResolvedValue(null);
   mockNavigate.mockClear();
   mockGoBack.mockClear();
 });
@@ -232,5 +243,61 @@ describe('WorkoutSplitViewScreen -- a widget per day, plain muscle text, no chip
     expect(screen.getByTestId('workout-split-view-edit').props.accessibilityLabel).toBe(
       'Edit split',
     );
+  });
+});
+
+describe('WorkoutSplitViewScreen -- day plans and the next day', () => {
+  it("shows each day's planned exercises and opens the plan", async () => {
+    (fetchPlansForDays as jest.Mock).mockResolvedValue(
+      new Map([
+        [
+          'day-1',
+          [
+            { id: 'p1', exerciseId: 'bench', exerciseName: 'Bench', targetSets: 4, position: 0 },
+            { id: 'p2', exerciseId: 'ohp', exerciseName: 'OHP', targetSets: 3, position: 1 },
+          ],
+        ],
+        ['day-2', []],
+      ]),
+    );
+    render(<WorkoutSplitViewScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('workout-split-view-day-day-1-plan')).toHaveTextContent(
+      /2 exercises · 7 sets/,
+    );
+    expect(screen.getByTestId('workout-split-view-day-day-2-plan')).toHaveTextContent(
+      /No exercises planned/,
+    );
+    fireEvent.press(screen.getByTestId('workout-split-view-day-day-1-plan'));
+    expect(mockNavigate).toHaveBeenCalledWith('SplitDayPlan', { dayId: 'day-1', dayName: 'Push' });
+  });
+
+  it('marks the next day on the active split: the one after the last done', async () => {
+    mockFetchMyProfile.mockResolvedValue({
+      id: 'user-1',
+      weightUnit: 'kg',
+      activeWorkoutSplitId: 'split-1',
+    });
+    (fetchLastWorkoutSplitDayId as jest.Mock).mockResolvedValue('day-1');
+    render(<WorkoutSplitViewScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('workout-split-view-day-day-2-next')).toHaveTextContent(
+      'Next',
+    );
+    expect(screen.queryByTestId('workout-split-view-day-day-1-next')).toBeNull();
+  });
+
+  it('marks no day on a split that is not active', async () => {
+    render(<WorkoutSplitViewScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    await screen.findByTestId('workout-split-view-day-day-1-plan');
+
+    expect(screen.queryByTestId(/-next$/)).toBeNull();
+    expect(fetchLastWorkoutSplitDayId).not.toHaveBeenCalled();
   });
 });

@@ -194,6 +194,9 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Starting a planned day says here if not all of its plan made it into the workout. Kept apart
+  // from `error`, which loading clears.
+  const planError = route.params.planError ?? null;
   const [completing, setCompleting] = useState(false);
   const [startingGroup, setStartingGroup] = useState(false);
 
@@ -323,6 +326,31 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               nextPreviousPerformance[exerciseId] = previous;
           }
           setPreviousPerformance(nextPreviousPerformance);
+          // A workout just started from a split day's plan: its sets were made ahead of time,
+          // blank, and start from last time, as a set added with Add Set does. A set with
+          // anything typed or ticked is left as it is.
+          if (route.params.planned)
+            setSetInputs((prev) => {
+              let next = prev;
+              for (const exercise of detail.exercises) {
+                const indexes = Array.from(new Set(exercise.sets.map((set) => set.setIndex))).sort(
+                  (a, b) => a - b,
+                );
+                for (const index of indexes) {
+                  const rows = exercise.sets.filter((set) => set.setIndex === index);
+                  if (rows.some((row) => row.completedAt !== null)) continue;
+                  next = withPrefilledSets(
+                    next,
+                    rows,
+                    exercise.sets.filter((set) => set.setIndex < index),
+                    nextPreviousPerformance[exercise.exerciseId]?.sets,
+                    weightUnit,
+                    measurementTypeOf(exercise),
+                  );
+                }
+              }
+              return next;
+            });
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load workout');
@@ -825,9 +853,9 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {error ? (
+          {(error ?? planError) ? (
             <Text testID="active-workout-error" style={styles.errorText}>
-              {error}
+              {error ?? planError}
             </Text>
           ) : null}
 

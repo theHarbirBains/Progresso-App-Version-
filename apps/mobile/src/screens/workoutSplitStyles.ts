@@ -78,6 +78,30 @@ export const workoutSplitStyles = StyleSheet.create({
     ...typeScale.cardTitle,
     color: colors.textPrimary,
   },
+  dayHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  // The day Start Workout will suggest next, on the active split.
+  nextMark: {
+    ...typeScale.label,
+  },
+  // A day's planned exercises, and the way into its plan.
+  planLink: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+  },
+  planText: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+  },
+  planAction: {
+    ...typeScale.secondary,
+  },
   // A day's muscle groups as plain text in a wrapping line -- no chips or
   // badges: they are read-only information, not controls.
   muscleLine: {

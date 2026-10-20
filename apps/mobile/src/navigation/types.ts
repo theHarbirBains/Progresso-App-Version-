@@ -26,7 +26,11 @@ export type RootStackParamList = {
   EditWorkout: { workoutId: string; clientId?: string; clientName?: string };
   ShareWorkout: { workoutId: string };
   NewWorkout: undefined;
-  ActiveWorkout: { workoutId: string };
+  /**
+   * `planned`: just started from a split day's plan, so its blank sets start from last time.
+   * `planError`: not all of the plan could be added; said on arrival.
+   */
+  ActiveWorkout: { workoutId: string; planned?: boolean; planError?: string };
   LogPastWorkout: undefined;
   /** The same screen as LogPastWorkout, for a trainer logging a workout for one client. Saves through the trainer API, never the trainer's own data. */
   TrainerLogWorkout: { clientId: string; clientName?: string };
@@ -79,6 +83,8 @@ export type RootStackParamList = {
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
   WorkoutSplits: undefined;
   WorkoutSplitView: { splitId: string };
+  /** One split day's planned exercises. */
+  SplitDayPlan: { dayId: string; dayName: string };
   WorkoutSplitForm: { splitId?: string; activateOnCreate?: boolean };
   ChooseWorkoutSplit: undefined;
   Profile: undefined;

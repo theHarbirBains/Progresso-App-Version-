@@ -18,6 +18,7 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { createWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
+import { applyPlanToWorkout, fetchDayPlan } from '../workouts/splitPlanQueries';
 import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
@@ -123,13 +124,27 @@ export function NewWorkoutScreen({ navigation }: Props) {
       setConflict(null);
       setBusyKey(key);
       try {
+        // A planned day's exercises go into the workout as it starts (splitPlanQueries.ts).
+        const plan = dayId ? await fetchDayPlan(dayId) : [];
         const result = await createWorkout(userId, name, dayId);
         if (result.type === 'conflict') {
           setConflict(result.existingWorkout);
           return;
         }
         setCustomSheetOpen(false);
-        navigation.replace('ActiveWorkout', { workoutId: result.workout.id });
+        let planError: string | undefined;
+        try {
+          await applyPlanToWorkout(result.workout.id, plan);
+        } catch (err) {
+          // The workout has started; what was added stays, and the live workout says the rest
+          // didn't make it, so it can be added by hand.
+          planError = `Not all of this day's plan could be added (${err instanceof Error ? err.message : 'unknown error'}). Add the rest with Add Exercise.`;
+        }
+        navigation.replace('ActiveWorkout', {
+          workoutId: result.workout.id,
+          ...(plan.length > 0 ? { planned: true } : {}),
+          ...(planError ? { planError } : {}),
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to start workout');
       } finally {

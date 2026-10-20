@@ -1,6 +1,7 @@
 import { ActivityIndicator, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { applyPlanToWorkout, fetchDayPlan } from '../workouts/splitPlanQueries';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { ProfileProvider } from '../profile/ProfileProvider';
@@ -22,6 +23,11 @@ jest.mock('../lib/api', () => ({
 
 jest.mock('../profile/profileQueries', () => ({
   fetchMyProfile: jest.fn(),
+}));
+
+jest.mock('../workouts/splitPlanQueries', () => ({
+  fetchDayPlan: jest.fn().mockResolvedValue([]),
+  applyPlanToWorkout: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
@@ -161,6 +167,39 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
 
     fireEvent.press(await screen.findByTestId('start-workout-group'));
     expect(mockNavigate).toHaveBeenCalledWith('GroupStart');
+  });
+
+  it("puts the day's planned exercises into the workout it starts", async () => {
+    const plan = [{ id: 'p1', exerciseId: 'bench', targetSets: 3, movementType: 'bilateral' }];
+    (fetchDayPlan as jest.Mock).mockResolvedValueOnce(plan);
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    fireEvent.press(await screen.findByTestId('start-workout-next'));
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('ActiveWorkout', { workoutId: 'w1', planned: true }),
+    );
+    expect(applyPlanToWorkout).toHaveBeenCalledWith('w1', plan);
+  });
+
+  it('still starts the workout when part of the plan could not be added, and says so', async () => {
+    (fetchDayPlan as jest.Mock).mockResolvedValueOnce([{ id: 'p1', exerciseId: 'bench' }]);
+    (applyPlanToWorkout as jest.Mock).mockRejectedValueOnce(new Error('network down'));
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    fireEvent.press(await screen.findByTestId('start-workout-next'));
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('ActiveWorkout', {
+        workoutId: 'w1',
+        planned: true,
+        planError: expect.stringContaining('network down'),
+      }),
+    );
   });
 
   it('Do a Different Workout opens a naming sheet; confirming starts an untagged workout with the given name', async () => {
