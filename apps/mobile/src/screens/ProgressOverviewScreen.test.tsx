@@ -233,7 +233,7 @@ describe('ProgressOverviewScreen shell', () => {
     renderScreen();
     await screen.findByTestId('progress-overview-scroll');
 
-    goToSection('Strength');
+    goToSection('AllTime');
     expect(screen.queryByText('PROGRESS')).toBeNull();
     expect(screen.queryByText('Track Your Growth')).toBeNull();
     expect(screen.queryByTestId('progress-header-subtitle')).toBeNull();
@@ -268,21 +268,21 @@ describe('ProgressOverviewScreen shell', () => {
     await screen.findByTestId('progress-overview-scroll');
 
     expect(screen.queryByTestId('progress-nutrition-coming-soon')).toBeNull();
-    for (const section of ['Overview', 'TopSets', 'Strength', 'AllTime']) {
+    for (const section of ['Overview', 'TopSets', 'Nutrition', 'AllTime']) {
       expect(screen.getByTestId(`progress-tabs-${section}`)).toBeTruthy();
     }
   });
 
-  it('lists exactly four sections (Overview, Top Sets, Strength, All Time), defaulting to Overview', async () => {
+  it('lists exactly four sections (Overview, Top Sets, Nutrition, All Time), defaulting to Overview', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     renderScreen();
     await screen.findByTestId('progress-tabs');
 
-    for (const section of ['Overview', 'TopSets', 'Strength', 'AllTime']) {
+    for (const section of ['Overview', 'TopSets', 'Nutrition', 'AllTime']) {
       expect(screen.getByTestId(`progress-tabs-${section}`)).toBeTruthy();
     }
     expect(screen.getByText('All Time')).toBeTruthy();
-    for (const removed of ['PRs', 'Exercises', 'OneRepMax']) {
+    for (const removed of ['Strength', 'PRs', 'Exercises', 'OneRepMax']) {
       expect(screen.queryByTestId(`progress-tabs-${removed}`)).toBeNull();
     }
     expect(await screen.findByTestId('progress-overview-scroll')).toBeTruthy();
@@ -304,7 +304,7 @@ describe('ProgressOverviewScreen shell', () => {
     await screen.findByTestId('progress-overview-scroll');
     const callsAfterMount = mockFetchAllExerciseHistory.mock.calls.length;
 
-    goToSection('Strength');
+    goToSection('TopSets');
     expect(screen.getByTestId('progress-tabs')).toBeTruthy();
     expect(screen.queryByTestId('progress-overview-scroll')).toBeNull();
 
@@ -330,9 +330,6 @@ describe('ProgressOverviewScreen shell', () => {
     renderScreen();
     await screen.findByTestId('progress-overview-scroll');
 
-    goToSection('Strength');
-    expect(await screen.findByTestId('progress-strength-scroll')).toBeTruthy();
-
     goToSection('TopSets');
     expect(await screen.findByTestId('progress-topsets-search')).toBeTruthy();
   });
@@ -349,20 +346,17 @@ describe('ProgressOverviewScreen shell', () => {
     expect(screen.getByTestId('progress-overview-stat-sets')).toHaveTextContent(/2/);
   });
 
-  it('switches to the Strength tab when "View Details" is pressed on the Overview card', async () => {
+  it('draws no line graph anywhere on Overview', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     renderScreen();
     await screen.findByTestId('progress-overview-scroll');
 
-    fireEvent.press(screen.getByTestId('progress-overview-view-details'));
-
-    // benchHistory's own dates fall outside the default 4-week range, so
-    // this only needs to confirm the tab switch itself, not the featured
-    // card's data state -- the section title renders either way.
-    expect(await screen.findByText('Strength Progress')).toBeTruthy();
+    expect(screen.queryByTestId('progress-overview-view-details')).toBeNull();
+    expect(screen.queryByTestId('progress-consistency-chart')).toBeNull();
+    expect(screen.getByTestId('progress-consistency-this-week')).toBeTruthy();
   });
 
-  it('switches to the Strength tab when "View All" is pressed on the Recent Milestones card', async () => {
+  it('switches to All Time when "View All" is pressed on the Recent Milestones card', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     mockFetchAllRepPRs.mockResolvedValue([
       {
@@ -380,7 +374,7 @@ describe('ProgressOverviewScreen shell', () => {
 
     fireEvent.press(screen.getByTestId('progress-overview-view-all-milestones'));
 
-    expect(await screen.findByText('Strength Progress')).toBeTruthy();
+    expect(await screen.findByTestId('progress-all-time-scroll')).toBeTruthy();
   });
 });
 
@@ -437,7 +431,7 @@ describe('ProgressOverviewScreen -- one widget for the active section', () => {
 
   it('puts the active section in its own widget, on every tab', async () => {
     await ready();
-    for (const section of ['Overview', 'Strength', 'TopSets', 'AllTime']) {
+    for (const section of ['Overview', 'TopSets', 'Nutrition', 'AllTime']) {
       goToSection(section);
       expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(1);
       expect(screen.getByTestId('progress-section-card')).toBeTruthy();
@@ -453,7 +447,7 @@ describe('ProgressOverviewScreen -- one widget for the active section', () => {
 
   it('renders no bare text outside <Text> on any tab', async () => {
     await ready();
-    for (const section of ['Overview', 'Strength', 'TopSets', 'AllTime']) {
+    for (const section of ['Overview', 'TopSets', 'Nutrition', 'AllTime']) {
       goToSection(section);
       expectNoBareText();
     }

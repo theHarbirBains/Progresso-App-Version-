@@ -10,29 +10,21 @@ import { Card } from '../design/Card';
 import { Section } from '../design/Section';
 import { fromKg, roundWeight, formatWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
-import { ChartPointDetail } from '../progress/ChartPointDetail';
 import { MetricCard } from '../progress/MetricCard';
 import { ProgressEmptyState } from '../progress/ProgressEmptyState';
-import { ProgressionChart } from '../progress/ProgressionChart';
 import { progressStyles as styles } from '../progress/progressStyles';
-import { TimeRangeSelector } from '../progress/TimeRangeSelector';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchExerciseSetHistory, type HistoricalSet } from '../workouts/exerciseHistoryQueries';
-import {
-  filterByTimeRange,
-  summarizeProgress,
-  topSetProgressionDetailed,
-  type TimeRange,
-} from '../workouts/exerciseProgress';
+import { summarizeProgress, topSetProgressionDetailed } from '../workouts/exerciseProgress';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import { deriveMilestones } from '../workouts/progressMilestones';
 
 type Props = RootStackScreenProps<'ProgressExerciseDetail'>;
 
 // The shared "how has this one exercise progressed" destination, reached
-// from Overview's "Exercises Improving", Top Sets, 1 Rep Max, PRs, and
-// Exercises -- one implementation, reusing the exact same ProgressionChart
-// component rather than a bespoke chart per entry point.
+// from Overview's milestones, Top Sets, All Time and the live workout -- one
+// implementation for every entry point: the latest top set and how far it has
+// come, the best performances, and the progression journey. No line graph.
 export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
   const { exerciseId, exerciseName } = route.params;
   const { user } = useAuth();
@@ -44,8 +36,6 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
   const [history, setHistory] = useState<HistoricalSet[]>([]);
   const [repPRs, setRepPRs] = useState<RepPR[]>([]);
   const [oneRepMax, setOneRepMax] = useState<OneRepMax | null>(null);
-  const [range, setRange] = useState<TimeRange>('3m');
-  const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
   // Only the very first load for this exerciseId should replace the whole
   // screen with a spinner -- every later call (the focus listener below) is
   // a background refresh, same pattern as DashboardScreen/ProfileScreen.
@@ -85,39 +75,17 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
   }, [navigation, load]);
 
   const allTimePoints = useMemo(() => topSetProgressionDetailed(history), [history]);
-  const rangeFilteredSets = useMemo(() => filterByTimeRange(history, range), [history, range]);
-  const chartDetailPoints = useMemo(
-    () => topSetProgressionDetailed(rangeFilteredSets),
-    [rangeFilteredSets],
-  );
-  const chartPoints = useMemo(
-    () =>
-      chartDetailPoints.map((p) => ({
-        x: new Date(p.performedAt).getTime(),
-        y: roundWeight(fromKg(p.weightKg, weightUnit)),
-      })),
-    [chartDetailPoints, weightUnit],
-  );
   const summary = useMemo(() => summarizeProgress(allTimePoints), [allTimePoints]);
   const milestones = useMemo(
     () => deriveMilestones(allTimePoints, weightUnit),
     [allTimePoints, weightUnit],
   );
 
-  useEffect(() => {
-    setSelectedPointIndex(null);
-  }, [range]);
-
   if (loading || themeLoading) {
     return <LoadingState testID="progress-exercise-detail-loading" />;
   }
 
   const latest = allTimePoints[allTimePoints.length - 1] ?? null;
-  const selectedDetail = selectedPointIndex !== null ? chartDetailPoints[selectedPointIndex] : null;
-  const previousDetail =
-    selectedPointIndex !== null && selectedPointIndex > 0
-      ? chartDetailPoints[selectedPointIndex - 1]
-      : null;
 
   return (
     <Screen
@@ -170,58 +138,6 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
               ) : null}
             </Card>
           ) : null}
-
-          <Card testID="progress-exercise-detail-chart-card">
-            <TimeRangeSelector
-              value={range}
-              onChange={setRange}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-
-            {chartPoints.length > 0 ? (
-              <ProgressionChart
-                testID="progress-exercise-detail-chart"
-                points={chartPoints}
-                color={theme.accent}
-                selectedIndex={selectedPointIndex}
-                onSelectIndex={setSelectedPointIndex}
-              />
-            ) : (
-              <ProgressEmptyState
-                testID="progress-exercise-detail-chart-empty"
-                title="Not enough data yet"
-              />
-            )}
-
-            {selectedDetail ? (
-              <ChartPointDetail
-                testID="progress-exercise-detail-point-detail"
-                accentColor={theme.accent}
-                onDismiss={() => setSelectedPointIndex(null)}
-                data={{
-                  exerciseName,
-                  weightDisplay: roundWeight(fromKg(selectedDetail.weightKg, weightUnit)),
-                  reps: selectedDetail.reps,
-                  performedAt: selectedDetail.performedAt,
-                  unit: weightUnit,
-                  volumeDisplay: roundWeight(
-                    fromKg(selectedDetail.weightKg, weightUnit) * selectedDetail.reps,
-                  ),
-                  previous: previousDetail
-                    ? {
-                        weightDisplay: roundWeight(fromKg(previousDetail.weightKg, weightUnit)),
-                        reps: previousDetail.reps,
-                      }
-                    : null,
-                  trueOneRepMaxDisplay:
-                    selectedDetail.reps === 1
-                      ? roundWeight(fromKg(selectedDetail.weightKg, weightUnit))
-                      : null,
-                }}
-              />
-            ) : null}
-          </Card>
 
           <Section title="Best Performances">
             <View style={styles.metricsGrid}>

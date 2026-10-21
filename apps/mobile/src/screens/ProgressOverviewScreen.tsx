@@ -21,7 +21,6 @@ import { useProfile } from '../profile/ProfileProvider';
 import { ProgressHeader } from '../progress/ProgressHeader';
 import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
 import { progressStyles as styles } from '../progress/progressStyles';
-import { StrengthProgressSection } from '../progress/StrengthProgressSection';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { groupByExercise } from '../workouts/allExerciseHistoryQueries';
@@ -40,8 +39,8 @@ type Props = RootStackScreenProps<'ProgressOverview'>;
 // (ProgressExerciseDetail), unaffected by this restructuring.
 export function ProgressOverviewScreen({ navigation }: Props) {
   const { theme, weightUnit, themeLoading } = useProgressTheme();
-  // Progress always shows the same real content (Overview/Strength/Top
-  // Sets/All-Time, all Workout-performance analytics) regardless of which
+  // Progress always shows the same real content (Overview/Top Sets/
+  // Nutrition/All-Time) regardless of which
   // tab the user was on before -- there is no more Workout/Nutrition
   // toggle for it to follow, so it must not vary with navigation history
   // (see DESIGN.md §11; a dedicated Nutrition-side analytics screen, if
@@ -91,7 +90,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
           accentColor={theme.accent}
           // "Track Your Growth" + the supporting sentence are hidden on
           // every Progress tab now (Overview already shows its own "Your
-          // Progress" card; Top Sets/Strength have their own section
+          // Progress" card; Top Sets has its own section
           // titles right below) -- kept as a prop rather than deleted from
           // ProgressHeader in case a future section wants it back.
           showHeading={false}
@@ -132,8 +131,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 weightUnit={weightUnit}
                 accentColor={theme.accent}
                 navigation={navigation}
-                onViewDetails={() => setActiveSection('Strength')}
-                onViewAllMilestones={() => setActiveSection('Strength')}
+                onViewAllMilestones={() => setActiveSection('AllTime')}
                 top={
                   <>
                     <PhaseProgressBlock
@@ -156,17 +154,6 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                     />
                   </>
                 }
-              />
-            ) : null}
-
-            {activeSection === 'Strength' ? (
-              <StrengthProgressSection
-                history={history}
-                groups={groups}
-                weightUnit={weightUnit}
-                accentColor={theme.accent}
-                onAccentColor={theme.onAccent}
-                navigation={navigation}
               />
             ) : null}
 

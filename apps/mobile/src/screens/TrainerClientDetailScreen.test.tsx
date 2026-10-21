@@ -319,5 +319,12 @@ describe('TrainerClientDetailScreen -- Progress tab', () => {
     expect(fetchAllExerciseHistory).toHaveBeenCalledWith('client-1');
     expect(fetchAllRepPRs).toHaveBeenCalledWith('client-1');
     expect(fetchAllOneRepMaxes).toHaveBeenCalledWith('client-1');
+    // Progress's tabs, less Nutrition (a trainer doesn't see a client's food); no Strength.
+    for (const section of ['Overview', 'TopSets', 'AllTime']) {
+      expect(screen.getByTestId(`trainer-client-progress-tabs-${section}`)).toBeTruthy();
+    }
+    for (const missing of ['Strength', 'Nutrition']) {
+      expect(screen.queryByTestId(`trainer-client-progress-tabs-${missing}`)).toBeNull();
+    }
   });
 });

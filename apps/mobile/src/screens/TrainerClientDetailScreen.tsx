@@ -32,7 +32,6 @@ import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { OverviewSection } from '../progress/OverviewSection';
 import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
 import { progressStyles } from '../progress/progressStyles';
-import { StrengthProgressSection } from '../progress/StrengthProgressSection';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import {
@@ -64,6 +63,9 @@ type Props = RootStackScreenProps<'TrainerClientDetail'>;
 
 /** A client's page always shows pounds, whatever the trainer's own unit setting is. */
 const CLIENT_WEIGHT_UNIT = 'lb';
+
+/** Progress's tabs, less Nutrition: a trainer doesn't see a client's food. */
+const CLIENT_PROGRESS_SECTIONS = PROGRESS_SECTIONS.filter((section) => section.key !== 'Nutrition');
 
 type Tab = 'workouts' | 'records' | 'progress';
 
@@ -483,7 +485,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
               <View style={progressStyles.tabsWrap}>
                 <UnderlineTabs
                   testID="trainer-client-progress-tabs"
-                  categories={[...PROGRESS_SECTIONS]}
+                  categories={CLIENT_PROGRESS_SECTIONS}
                   active={progressSection}
                   onSelect={setProgressSection}
                   accentColor={theme.accent}
@@ -503,19 +505,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                     weightUnit={CLIENT_WEIGHT_UNIT}
                     accentColor={theme.accent}
                     navigation={progressNavigation}
-                    onViewDetails={() => setProgressSection('Strength')}
-                    onViewAllMilestones={() => setProgressSection('Strength')}
-                  />
-                ) : null}
-
-                {progressSection === 'Strength' ? (
-                  <StrengthProgressSection
-                    history={data?.allSetHistory ?? []}
-                    groups={progressGroups}
-                    weightUnit={CLIENT_WEIGHT_UNIT}
-                    accentColor={theme.accent}
-                    onAccentColor={theme.onAccent}
-                    navigation={progressNavigation}
+                    onViewAllMilestones={() => setProgressSection('AllTime')}
                   />
                 ) : null}
 

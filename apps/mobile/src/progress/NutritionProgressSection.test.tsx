@@ -120,6 +120,10 @@ describe('ConsistencyBlock', () => {
     expect(screen.getByTestId('progress-consistency-goal')).toHaveTextContent(
       '1 of the last 12 weeks reached your goal of 2 a week',
     );
+    // This week's two, and three over twelve weeks; no line graph.
+    expect(screen.getByTestId('progress-consistency-this-week')).toHaveTextContent(/^2/);
+    expect(screen.getByTestId('progress-consistency-average')).toHaveTextContent(/^0.3/);
+    expect(screen.queryByTestId('progress-consistency-chart')).toBeNull();
   });
 
   it('just shows workouts a week without a goal, and links to the workouts', () => {

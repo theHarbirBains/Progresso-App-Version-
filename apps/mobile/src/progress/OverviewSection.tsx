@@ -34,9 +34,7 @@ interface Props {
   weightUnit: 'kg' | 'lb';
   accentColor: string;
   navigation: Navigation;
-  /** Switches Progress to the Strength tab -- "Your Progress" card's "View Details" link. */
-  onViewDetails: () => void;
-  /** Switches Progress to the PRs tab -- "Recent Milestones" card's "View All" link. */
+  /** Switches Progress to All Time, where every record is -- "Recent Milestones" card's "View All" link. */
   onViewAllMilestones: () => void;
   /** Shown first, above everything else -- the Weekly Summary. */
   top?: ReactNode;
@@ -84,7 +82,6 @@ export function OverviewSection({
   weightUnit,
   accentColor,
   navigation,
-  onViewDetails,
   onViewAllMilestones,
   top,
 }: Props) {
@@ -133,9 +130,6 @@ export function OverviewSection({
               A quick snapshot of your lifting journey.
             </Text>
           </View>
-          <TouchableOpacity testID="progress-overview-view-details" onPress={onViewDetails}>
-            <Text style={[styles.viewAllText, { color: accentColor }]}>View Details</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.statsRow}>

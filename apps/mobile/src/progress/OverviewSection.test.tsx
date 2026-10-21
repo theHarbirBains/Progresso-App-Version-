@@ -43,7 +43,6 @@ const oneRepMaxes: OneRepMaxWithExercise[] = [
   },
 ];
 
-const onViewDetails = jest.fn();
 const onViewAllMilestones = jest.fn();
 
 function renderOverview(overrides: Partial<Parameters<typeof OverviewSection>[0]> = {}) {
@@ -58,7 +57,6 @@ function renderOverview(overrides: Partial<Parameters<typeof OverviewSection>[0]
       weightUnit="kg"
       accentColor="#2F80FF"
       navigation={navigation}
-      onViewDetails={onViewDetails}
       onViewAllMilestones={onViewAllMilestones}
       {...overrides}
     />,
@@ -67,7 +65,6 @@ function renderOverview(overrides: Partial<Parameters<typeof OverviewSection>[0]
 
 beforeEach(() => {
   mockNavigate.mockClear();
-  onViewDetails.mockClear();
   onViewAllMilestones.mockClear();
 });
 
@@ -87,12 +84,10 @@ describe('OverviewSection', () => {
     expect(screen.getByTestId('progress-overview-stat-sets')).toHaveTextContent(/120/);
   });
 
-  it('calls onViewDetails when "View Details" is pressed', () => {
+  it('has no "View Details" link', () => {
     renderOverview();
 
-    fireEvent.press(screen.getByTestId('progress-overview-view-details'));
-
-    expect(onViewDetails).toHaveBeenCalled();
+    expect(screen.queryByTestId('progress-overview-view-details')).toBeNull();
   });
 
   it('shows the most recent real PRs as Recent Milestones, most recent first', () => {

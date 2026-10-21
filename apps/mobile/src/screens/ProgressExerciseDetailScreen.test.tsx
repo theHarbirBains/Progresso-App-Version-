@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchExerciseSetHistory } from '../workouts/exerciseHistoryQueries';
@@ -98,40 +98,17 @@ describe('ProgressExerciseDetailScreen', () => {
     );
   });
 
-  it('renders a chart point for each session and shows its detail on tap', async () => {
+  it('draws no line graph and no time range', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
 
     render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
-    await screen.findByTestId('progress-exercise-detail-chart');
+    await screen.findByTestId('progress-exercise-detail-current');
 
-    fireEvent(screen.getByTestId('progress-exercise-detail-chart'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 280, height: 160 } },
-    });
-    fireEvent.press(screen.getByTestId('progress-exercise-detail-chart-point-1'));
-
-    const detail = await screen.findByTestId('progress-exercise-detail-point-detail');
-    expect(detail).toHaveTextContent(/110kg × 8/);
-    expect(within(detail).getByText(/100kg × 8/)).toBeTruthy();
-  });
-
-  it('dismisses the point detail', async () => {
-    mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
-
-    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-    await screen.findByTestId('progress-exercise-detail-chart');
-    fireEvent(screen.getByTestId('progress-exercise-detail-chart'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 280, height: 160 } },
-    });
-    fireEvent.press(screen.getByTestId('progress-exercise-detail-chart-point-1'));
-    await screen.findByTestId('progress-exercise-detail-point-detail');
-
-    fireEvent.press(screen.getByTestId('progress-exercise-detail-point-detail-dismiss'));
-
-    expect(screen.queryByTestId('progress-exercise-detail-point-detail')).toBeNull();
+    expect(screen.queryByTestId('progress-exercise-detail-chart')).toBeNull();
+    expect(screen.queryByTestId('progress-exercise-detail-chart-card')).toBeNull();
+    expect(screen.queryByText('4W')).toBeNull();
   });
 
   it('shows the true 1RM and rep PR count when present', async () => {

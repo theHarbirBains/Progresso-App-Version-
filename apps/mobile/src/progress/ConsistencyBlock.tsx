@@ -1,8 +1,9 @@
-import { TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
+import { widgetGap } from '../design/theme';
 import { progressStyles as styles } from './progressStyles';
 import { computeWeeklyWorkoutCounts } from './trainingOverTime';
-import { WeeklyTrendChart } from './WeeklyTrendChart';
 
 const WEEKS = 12;
 
@@ -11,19 +12,23 @@ interface Props {
   /** How many days a week the person means to train; null when not set. */
   weeklyGoal: number | null;
   accentColor: string;
-  /** Opens Workout History, where the workouts behind the chart are. */
+  /** Opens Workout History, where the workouts behind the figures are. */
   onOpenHistory: () => void;
 }
 
 /**
  * Progress Overview's consistency: workouts per week over the last 12 weeks, from completed
- * workouts only, with how many of those weeks reached the weekly goal when one is set. A quiet
- * week is a zero, never skipped; the workouts behind it are in Workout History.
+ * workouts only, with how many of those weeks reached the weekly goal when one is set, then this
+ * week's workouts and the weekly average as two figures (no line graph). A quiet week is a zero,
+ * never skipped; the workouts behind it are in Workout History.
  */
 export function ConsistencyBlock({ workouts, weeklyGoal, accentColor, onOpenHistory }: Props) {
   const points = computeWeeklyWorkoutCounts(workouts, WEEKS);
   const metGoal =
     weeklyGoal !== null ? points.filter((point) => point.value >= weeklyGoal).length : null;
+  const thisWeek = points[points.length - 1]?.value ?? 0;
+  const average =
+    Math.round((points.reduce((sum, point) => sum + point.value, 0) / WEEKS) * 10) / 10;
 
   return (
     <View testID="progress-consistency" style={styles.overviewCard}>
@@ -45,14 +50,26 @@ export function ConsistencyBlock({ workouts, weeklyGoal, accentColor, onOpenHist
           <Text style={[styles.viewAllText, { color: accentColor }]}>Workouts</Text>
         </TouchableOpacity>
       </View>
-      <WeeklyTrendChart
-        testID="progress-consistency-chart"
-        label="Workouts per week"
-        points={points}
-        accentColor={accentColor}
-        formatTotal={(total) => `${total} ${total === 1 ? 'workout' : 'workouts'}`}
-        emptyMessage="No workouts in the last 12 weeks."
-      />
+      <View style={local.figures}>
+        <StatBlock
+          testID="progress-consistency-this-week"
+          value={String(thisWeek)}
+          label="This Week"
+          valueColor={accentColor}
+        />
+        <StatBlock
+          testID="progress-consistency-average"
+          value={String(average)}
+          label="Weekly Average"
+        />
+      </View>
     </View>
   );
 }
+
+const local = StyleSheet.create({
+  figures: {
+    flexDirection: 'row',
+    gap: widgetGap,
+  },
+});
