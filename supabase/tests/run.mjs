@@ -4287,70 +4287,21 @@ async function main() {
     );
     record("Nobody else sees someone's split plan", planSeen.rows[0].n === 0);
 
-    // Phases.
-    await asUserCommitted(lifter, (c) =>
-      c.query(
-        "insert into public.training_phases (user_id, kind, start_date, end_date, calories) values ($1, 'bulk', '2026-06-01', '2026-07-31', 3000)",
-        [lifter],
-      ),
+    // Phases were removed (20261024100000_drop_training_phases.sql).
+    record(
+      'Phases are gone from the database',
+      (await admin.query("select to_regclass('public.training_phases') is null as gone")).rows[0]
+        .gone === true,
     );
-    await asUserCommitted(lifter, (c) =>
-      c.query(
-        "insert into public.training_phases (user_id, kind, start_date, calories, protein_g) values ($1, 'cut', '2026-09-01', 2200, 180)",
-        [lifter],
-      ),
-    );
-    record('Someone can keep past phases and one going now', true);
-    await expectThrows(
-      admin.query(
-        "insert into public.training_phases (user_id, kind, start_date) values ($1, 'maintenance', '2026-01-01')",
-        [lifter],
-      ),
-      'Only one phase can be going at a time',
-      /training_phases_one_active|duplicate key|phases cannot overlap/,
-    );
-    await expectThrows(
-      admin.query(
-        "insert into public.training_phases (user_id, kind, start_date, end_date) values ($1, 'maintenance', '2026-07-15', '2026-08-15')",
-        [lifter],
-      ),
-      'Phases cannot overlap',
-      /phases cannot overlap/,
-    );
-    await admin.query(
-      "insert into public.training_phases (user_id, kind, start_date, end_date) values ($1, 'maintenance', '2026-08-01', '2026-08-31')",
-      [lifter],
-    );
-    record('A phase can sit between two others', true);
-    await expectThrows(
-      admin.query(
-        "insert into public.training_phases (user_id, kind, start_date, end_date) values ($1, 'custom', '2025-01-01', '2025-02-01')",
-        [lifter],
-      ),
-      'A custom phase needs a name',
-      /check constraint/,
-    );
-    await expectThrows(
-      admin.query(
-        "insert into public.training_phases (user_id, kind, start_date, end_date) values ($1, 'cut', '2025-03-01', '2025-02-01')",
-        [lifter],
-      ),
-      "A phase can't end before it starts",
-      /check constraint/,
-    );
-    const phasesSeen = await asUser(stranger, (c) =>
-      c.query('select count(*)::int as n from public.training_phases'),
-    );
-    record("Nobody else sees someone's phases", phasesSeen.rows[0].n === 0);
 
     const ids = (await admin.query('select public.delete_account($1) as ids', [lifter])).rows[0]
       .ids;
     await admin.query('delete from auth.users where id = any($1::uuid[])', [ids]);
     record(
-      'Deleting an account removes its phases, plans and exercise settings',
+      'Deleting an account removes its plans and exercise settings',
       (
         await admin.query(
-          'select ((select count(*) from public.training_phases where user_id = $1) + (select count(*) from public.workout_split_day_exercises where user_id = $1) + (select count(*) from public.exercise_progression_settings where user_id = $1))::int as n',
+          'select ((select count(*) from public.workout_split_day_exercises where user_id = $1) + (select count(*) from public.exercise_progression_settings where user_id = $1))::int as n',
           [lifter],
         )
       ).rows[0].n === 0,
