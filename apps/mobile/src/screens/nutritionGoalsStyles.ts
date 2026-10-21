@@ -1,9 +1,9 @@
 import { StyleSheet } from 'react-native';
-import { colors, spacing, typeScale, widgetGap } from '../design/theme';
+import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
-// NutritionGoalsScreen. Token-only; the frame is the shared `Screen`, groups
-// are `Section`s and the custom target is the shared `TextInput`. The Nutrition
-// accent is only ever passed in by the screen (on the Save button).
+// NutritionGoalsScreen. Token-only; the frame is the shared `Screen`, the estimates are
+// `ChoiceTile`s and the macros are TargetsEditor's `MacroTargets`. The Nutrition accent is only
+// ever passed in by the screen.
 export const nutritionGoalsStyles = StyleSheet.create({
   // The widgets, `widgetGap` apart.
   content: {
@@ -11,82 +11,125 @@ export const nutritionGoalsStyles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
 
-  // "Based on your information": a plain line with Edit on its right.
-  infoRow: {
+  // Your Details: a title with Edit, then four tiles and the activity level.
+  infoHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.md,
   },
-  infoBody: {
+  infoTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+  },
+  detailGrid: {
+    flexDirection: 'row',
+    gap: widgetGap,
+  },
+  detailTile: {
     flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surfaceLift,
+    borderRadius: radii.md,
   },
-  infoSummary: {
+  detailValue: {
     ...typeScale.callout,
     fontFamily: typeScale.cardTitle.fontFamily,
     color: colors.textPrimary,
   },
-  infoActivity: {
-    ...typeScale.secondary,
+  detailLabel: {
+    ...typeScale.caption,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  activityText: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
   },
   infoIncomplete: {
     ...typeScale.secondary,
     color: colors.textMuted,
   },
 
-  // The four estimates.
-  optionRow: {
+  // A numbered step's heading.
+  stepHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    gap: spacing.md,
+    marginBottom: spacing.md,
   },
-  optionDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
+  stepBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  optionBody: {
+  stepNumber: {
+    ...typeScale.statSmall,
+  },
+  stepBody: {
     flex: 1,
   },
-  optionTitle: {
+  stepTitle: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
   },
-  optionMeta: {
+  stepDetail: {
     ...typeScale.secondary,
     color: colors.textSecondary,
     marginTop: 2,
   },
-  optionValueBlock: {
-    alignItems: 'flex-end',
+
+  // The four estimates, two by two.
+  grid: {
+    gap: widgetGap,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: widgetGap,
+  },
+  gridCell: {
+    flex: 1,
+  },
+  optionTitle: {
+    ...typeScale.callout,
+    fontFamily: typeScale.cardTitle.fontFamily,
+    color: colors.textPrimary,
+    marginTop: spacing.sm,
   },
   optionValue: {
     ...typeScale.statMedium,
     color: colors.textPrimary,
+    marginTop: spacing.xs,
   },
-  optionUnit: {
+  optionMeta: {
     ...typeScale.caption,
-    color: colors.textMuted,
+    color: colors.textSecondary,
     marginTop: 2,
+  },
+  customField: {
+    marginTop: spacing.lg,
   },
 
   incomplete: {
-    gap: spacing.sm,
-  },
-  incompleteTitle: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-  },
-  incompleteBody: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
+    alignItems: 'stretch',
+    gap: spacing.md,
   },
 
-  inputUnit: {
-    ...typeScale.secondary,
-    color: colors.textMuted,
+  // Step 3.
+  summary: {
+    gap: widgetGap,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: widgetGap,
   },
   actions: {
     gap: spacing.sm,
@@ -96,17 +139,23 @@ export const nutritionGoalsStyles = StyleSheet.create({
     ...typeScale.callout,
     color: colors.destructive,
   },
+  savedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
   savedText: {
     ...typeScale.callout,
     color: colors.textSecondary,
   },
   phaseNote: {
-    marginBottom: spacing.md,
+    marginTop: spacing.sm,
   },
   note: {
     ...typeScale.secondary,
     color: colors.textSecondary,
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
     lineHeight: 18,
   },
 });

@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { BottomSheet } from '../design/BottomSheet';
 import { PrimaryButton } from '../design/Button';
+import { ChoiceTile } from '../design/ChoiceTile';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
+import { Section } from '../design/Section';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { colors } from '../design/theme';
 import type { Gender, HeightUnit } from '../lib/api';
@@ -57,56 +59,40 @@ function formatWeight(weightKg: number, unit: 'kg' | 'lb'): string {
   return `${Math.round(value * 10) / 10} ${unit}`;
 }
 
-interface FieldRowProps {
-  testID?: string;
-  label: string;
-  /** A hairline above the row -- every row but the first. */
-  divider?: boolean;
-  children?: ReactNode;
-}
+const SEXES = [
+  { value: 'male', label: 'Male', icon: 'gender-male' },
+  { value: 'female', label: 'Female', icon: 'gender-female' },
+] as const;
 
-// One field: its label on the left and its control(s) on the right, separated
-// from the next by a hairline. Local to this screen since nothing else needs
-// it yet (see CLAUDE.md's no-premature-abstraction rule).
-function FieldRow({ testID, label, divider, children }: FieldRowProps) {
-  return (
-    <View testID={testID} style={[styles.fieldRow, divider && styles.fieldDivider]}>
-      <Text style={styles.fieldRowLabel} numberOfLines={1}>
-        {label}
-      </Text>
-      {children ? <View style={styles.fieldRowControl}>{children}</View> : null}
-    </View>
-  );
-}
-
-// A value that opens its picker sheet: the current value, then a disclosure
-// chevron, as one 44pt-tall target.
-function ValueButton({
-  testID,
-  valueTestID,
-  accessibilityLabel,
+// A height or weight tile's content: its glyph, what it is, and the value as a mono readout.
+function MeasureContent({
+  icon,
+  label,
   value,
-  onPress,
+  valueTestID,
+  accentColor,
+  accentBg,
 }: {
-  testID: string;
-  valueTestID: string;
-  accessibilityLabel: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
   value: string;
-  onPress: () => void;
+  valueTestID: string;
+  accentColor: string;
+  accentBg: string;
 }) {
   return (
-    <Pressable
-      testID={testID}
-      style={styles.valueButton}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-    >
-      <Text testID={valueTestID} style={styles.valueText}>
+    <View>
+      <View style={styles.measureHead}>
+        <View style={[styles.glyph, { backgroundColor: accentBg }]}>
+          <MaterialCommunityIcons name={icon} size={20} color={accentColor} />
+        </View>
+        <Feather name="chevron-right" size={16} color={colors.textMuted} />
+      </View>
+      <Text style={styles.tileLabel}>{label}</Text>
+      <Text testID={valueTestID} style={styles.measureValue} numberOfLines={1}>
         {value}
       </Text>
-      <Feather name="chevron-right" size={16} color={colors.textMuted} />
-    </Pressable>
+    </View>
   );
 }
 
@@ -133,9 +119,13 @@ function ValueButton({
 // birthday (not a separately-stored age) is the one persisted value, same as
 // every other screen that shows an age derived from it.
 //
-// Layout: the shared Screen with two widgets `widgetGap` apart -- one row per
-// field (label left, control right) separated by hairlines, then one filled
-// Save.
+// Layout: the shared Screen with four widgets `widgetGap` apart, rolling out
+// one after another -- About You (Male / Female as two tiles with their
+// glyphs, then the birthday as a wide tile with the age it makes), Body
+// (height and weight as two tiles, each a mono readout with its unit toggle
+// under it), Activity (one wide tile with the level and what it means), then
+// one filled Save. Every tile is a `ChoiceTile`: the chosen sex eases into
+// the accent with a check, and a pressed tile gives a little.
 export function CalorieEstimationScreen({ navigation }: Props) {
   const { openMenu } = useAppMenu();
   const { nutritionTheme: theme } = useProgressTheme();
@@ -183,7 +173,7 @@ export function CalorieEstimationScreen({ navigation }: Props) {
 
   const age = ageFromBirthday(toDateStringUTC(birthdayMonth, birthdayDay, birthdayYear));
   const errors: FormErrors = {};
-  if (gender === null) errors.gender = 'Select a gender';
+  if (gender === null) errors.gender = 'Select your sex';
   if (age === null || age < MIN_AGE || age > MAX_AGE) {
     errors.birthday = `Age must be between ${MIN_AGE} and ${MAX_AGE}`;
   }
@@ -243,102 +233,173 @@ export function CalorieEstimationScreen({ navigation }: Props) {
           />
         }
       >
-        <AppCard testID="calorie-estimation-fields">
-          <FieldRow testID="calorie-estimation-gender-card" label="Gender">
-            <SegmentedControl
-              testID="calorie-estimation-gender"
-              options={[
-                { label: 'Male', value: 'male' },
-                { label: 'Female', value: 'female' },
-              ]}
-              value={gender}
-              onChange={setGender}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-          </FieldRow>
-          {submitted && errors.gender ? (
-            <Text testID="calorie-estimation-gender-error" style={styles.fieldError}>
-              {errors.gender}
-            </Text>
-          ) : null}
+        <AppCard testID="calorie-estimation-about">
+          <Section title="About You">
+            <View testID="calorie-estimation-gender-card" style={styles.tileRow}>
+              {SEXES.map((sex) => {
+                const selected = gender === sex.value;
+                return (
+                  <ChoiceTile
+                    key={sex.value}
+                    testID={`calorie-estimation-gender-${sex.value}`}
+                    selected={selected}
+                    onPress={() => setGender(sex.value)}
+                    accentColor={theme.accent}
+                    onAccentColor={theme.onAccent}
+                    accessibilityLabel={sex.label}
+                    style={styles.tileCell}
+                  >
+                    <View style={styles.sexTile}>
+                      <View style={[styles.glyph, { backgroundColor: theme.accentBg }]}>
+                        <MaterialCommunityIcons
+                          name={sex.icon}
+                          size={22}
+                          color={selected ? theme.accent : colors.textSecondary}
+                        />
+                      </View>
+                      <Text style={styles.tileTitle}>{sex.label}</Text>
+                    </View>
+                  </ChoiceTile>
+                );
+              })}
+            </View>
+            {submitted && errors.gender ? (
+              <Text testID="calorie-estimation-gender-error" style={styles.fieldError}>
+                {errors.gender}
+              </Text>
+            ) : null}
 
-          <FieldRow testID="calorie-estimation-birthday-card" label="Birthday" divider>
-            <ValueButton
-              testID="calorie-estimation-birthday-expand"
-              valueTestID="calorie-estimation-birthday-value"
-              accessibilityLabel="Edit birthday"
-              value={formatMonthDayYear(new Date(birthdayYear, birthdayMonth, birthdayDay))}
-              onPress={() => setBirthdaySheetOpen(true)}
-            />
-          </FieldRow>
-          {submitted && errors.birthday ? (
-            <Text testID="calorie-estimation-birthday-error" style={styles.fieldError}>
-              {errors.birthday}
-            </Text>
-          ) : null}
+            <View testID="calorie-estimation-birthday-card" style={styles.wideTile}>
+              <ChoiceTile
+                testID="calorie-estimation-birthday-expand"
+                onPress={() => setBirthdaySheetOpen(true)}
+                accessibilityLabel="Edit birthday"
+              >
+                <View style={styles.wideTileRow}>
+                  <View style={[styles.glyph, { backgroundColor: theme.accentBg }]}>
+                    <MaterialCommunityIcons
+                      name="cake-variant-outline"
+                      size={20}
+                      color={theme.accent}
+                    />
+                  </View>
+                  <View style={styles.wideTileBody}>
+                    <Text style={styles.tileLabel}>Birthday</Text>
+                    <Text testID="calorie-estimation-birthday-value" style={styles.tileTitle}>
+                      {formatMonthDayYear(new Date(birthdayYear, birthdayMonth, birthdayDay))}
+                    </Text>
+                  </View>
+                  {age !== null && age >= 0 ? (
+                    <View style={styles.ageBlock}>
+                      <Text testID="calorie-estimation-age" style={styles.ageValue}>
+                        {age}
+                      </Text>
+                      <Text style={styles.tileLabel}>years</Text>
+                    </View>
+                  ) : null}
+                  <Feather name="chevron-right" size={16} color={colors.textMuted} />
+                </View>
+              </ChoiceTile>
+            </View>
+            {submitted && errors.birthday ? (
+              <Text testID="calorie-estimation-birthday-error" style={styles.fieldError}>
+                {errors.birthday}
+              </Text>
+            ) : null}
+          </Section>
+        </AppCard>
 
-          <FieldRow testID="calorie-estimation-height-card" label="Height" divider>
-            <ValueButton
-              testID="calorie-estimation-height-expand"
-              valueTestID="calorie-estimation-height-value"
-              accessibilityLabel="Edit height"
-              value={formatHeight(heightCm, heightUnit)}
-              onPress={() => setHeightSheetOpen(true)}
-            />
-            <SegmentedControl
-              testID="calorie-estimation-height-unit"
-              options={[
-                { label: 'ft/in', value: 'ft_in' as const },
-                { label: 'cm', value: 'cm' as const },
-              ]}
-              value={heightUnit}
-              onChange={setHeightUnit}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-          </FieldRow>
+        <AppCard testID="calorie-estimation-body">
+          <Section title="Body">
+            <View style={styles.tileRow}>
+              <View testID="calorie-estimation-height-card" style={styles.measureCell}>
+                <ChoiceTile
+                  testID="calorie-estimation-height-expand"
+                  onPress={() => setHeightSheetOpen(true)}
+                  accessibilityLabel="Edit height"
+                >
+                  <MeasureContent
+                    icon="human-male-height"
+                    label="Height"
+                    value={formatHeight(heightCm, heightUnit)}
+                    valueTestID="calorie-estimation-height-value"
+                    accentColor={theme.accent}
+                    accentBg={theme.accentBg}
+                  />
+                </ChoiceTile>
+                <SegmentedControl
+                  testID="calorie-estimation-height-unit"
+                  options={[
+                    { label: 'ft/in', value: 'ft_in' as const },
+                    { label: 'cm', value: 'cm' as const },
+                  ]}
+                  value={heightUnit}
+                  onChange={setHeightUnit}
+                  accentColor={theme.accent}
+                  onAccentColor={theme.onAccent}
+                />
+              </View>
+              <View testID="calorie-estimation-weight-card" style={styles.measureCell}>
+                <ChoiceTile
+                  testID="calorie-estimation-weight-expand"
+                  onPress={() => setWeightSheetOpen(true)}
+                  accessibilityLabel="Edit weight"
+                >
+                  <MeasureContent
+                    icon="scale-bathroom"
+                    label="Weight"
+                    value={formatWeight(weightKg, weightUnit)}
+                    valueTestID="calorie-estimation-weight-value"
+                    accentColor={theme.accent}
+                    accentBg={theme.accentBg}
+                  />
+                </ChoiceTile>
+                <SegmentedControl
+                  testID="calorie-estimation-weight-unit"
+                  options={[
+                    { label: 'lb', value: 'lb' as const },
+                    { label: 'kg', value: 'kg' as const },
+                  ]}
+                  value={weightUnit}
+                  onChange={setWeightUnit}
+                  accentColor={theme.accent}
+                  onAccentColor={theme.onAccent}
+                />
+              </View>
+            </View>
+          </Section>
+        </AppCard>
 
-          <FieldRow testID="calorie-estimation-weight-card" label="Weight" divider>
-            <ValueButton
-              testID="calorie-estimation-weight-expand"
-              valueTestID="calorie-estimation-weight-value"
-              accessibilityLabel="Edit weight"
-              value={formatWeight(weightKg, weightUnit)}
-              onPress={() => setWeightSheetOpen(true)}
-            />
-            <SegmentedControl
-              testID="calorie-estimation-weight-unit"
-              options={[
-                { label: 'lb', value: 'lb' as const },
-                { label: 'kg', value: 'kg' as const },
-              ]}
-              value={weightUnit}
-              onChange={setWeightUnit}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-          </FieldRow>
-
-          <FieldRow testID="calorie-estimation-activity-card" label="Activity Level" divider>
-            <Pressable
+        <AppCard testID="calorie-estimation-activity-card">
+          <Section title="Activity">
+            <ChoiceTile
               testID="calorie-estimation-activity-summary"
-              style={styles.valueButton}
               onPress={() => setActivitySheetOpen(true)}
-              accessibilityRole="button"
               accessibilityLabel="Select activity level"
             >
-              <Text style={styles.valueText} numberOfLines={1}>
-                {selectedActivity ? selectedActivity.label : 'Select your activity level'}
+              <View style={styles.wideTileRow}>
+                <View style={[styles.glyph, { backgroundColor: theme.accentBg }]}>
+                  <MaterialCommunityIcons name="run" size={20} color={theme.accent} />
+                </View>
+                <View style={styles.wideTileBody}>
+                  <Text style={styles.tileTitle} numberOfLines={1}>
+                    {selectedActivity ? selectedActivity.label : 'Select your activity level'}
+                  </Text>
+                  {selectedActivity ? (
+                    <Text style={styles.tileLabel} numberOfLines={2}>
+                      {selectedActivity.description}
+                    </Text>
+                  ) : null}
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.textMuted} />
+              </View>
+            </ChoiceTile>
+            {submitted && errors.activityLevel ? (
+              <Text testID="calorie-estimation-activity-error" style={styles.fieldError}>
+                {errors.activityLevel}
               </Text>
-              <Feather name="chevron-right" size={16} color={colors.textMuted} />
-            </Pressable>
-          </FieldRow>
-          {submitted && errors.activityLevel ? (
-            <Text testID="calorie-estimation-activity-error" style={styles.fieldError}>
-              {errors.activityLevel}
-            </Text>
-          ) : null}
+            ) : null}
+          </Section>
         </AppCard>
 
         <AppCard testID="calorie-estimation-actions" style={styles.actions}>

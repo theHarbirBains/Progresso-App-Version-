@@ -13,7 +13,12 @@ import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import { formatWeight, fromKg, roundWeight, toKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
-import { draftFromTargets, parseTargets, type TargetDraft } from '../nutrition/targetMath';
+import {
+  canSaveTargets,
+  draftFromTargets,
+  parseTargets,
+  type TargetDraft,
+} from '../nutrition/targetMath';
 import { TargetsEditor } from '../nutrition/TargetsEditor';
 import { DateField, formatDayKey } from '../phases/DateField';
 import { usePhases } from '../phases/PhaseProvider';
@@ -110,7 +115,7 @@ function PhaseForm({ navigation, editing }: Props & { editing: TrainingPhase | n
   const canSave =
     !saving &&
     ruleError === null &&
-    Object.keys(parsedTargets.errors).length === 0 &&
+    canSaveTargets(parsedTargets) &&
     startKg !== 'invalid' &&
     targetKg !== 'invalid' &&
     notes.length <= 1000;
@@ -290,6 +295,7 @@ function PhaseForm({ navigation, editing }: Props & { editing: TrainingPhase | n
                 startKg !== null && startKg !== 'invalid' ? startKg : (profile?.weightValue ?? null)
               }
               weightUnit={weightUnit}
+              accentColor={theme.accent}
               testIDPrefix="phase-targets"
             />
           </View>

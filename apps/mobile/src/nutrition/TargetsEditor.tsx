@@ -1,232 +1,331 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
+import { AnimatedBar } from '../design/AnimatedBar';
 import { TextButton } from '../design/Button';
-import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale } from '../design/theme';
 import {
-  MATCH_TOLERANCE_KCAL,
-  caloriesFromMacros,
-  draftCarbSuggestion,
-  editDraft,
+  FAT_G_PER_LB,
+  KCAL_PER_GRAM,
+  PROTEIN_G_PER_LB,
+  macroGuidance,
   parseTargets,
-  perKgGuidelines,
-  suggestMacros,
-  takeSuggestedCarbs,
   type TargetDraft,
 } from './targetMath';
 
-interface Props {
-  draft: TargetDraft;
-  onChange: (draft: TargetDraft) => void;
-  /** The person's body weight in kg, for the protein and fat suggestion; null when unknown. */
-  weightKg: number | null;
-  weightUnit: 'kg' | 'lb';
-  testIDPrefix?: string;
-}
+// Each macro's glyph -- the same set as Nutrition Today's macro rows.
+const GLYPHS = {
+  protein: 'food-drumstick-outline',
+  carbs: 'barley',
+  fat: 'water-outline',
+} as const satisfies Record<string, keyof typeof MaterialCommunityIcons.glyphMap>;
 
-function calories(value: number): string {
+function cal(value: number): string {
   return Math.round(value).toLocaleString();
 }
 
+function shareOf(macroCalories: number, calories: number | null): number | null {
+  return calories !== null && calories > 0 ? macroCalories / calories : null;
+}
+
+interface FieldProps {
+  draft: TargetDraft;
+  onChange: (draft: TargetDraft) => void;
+  testIDPrefix?: string;
+}
+
+/** The calorie target, typed. */
+export function CalorieTargetField({
+  draft,
+  onChange,
+  label = 'Calories',
+  testIDPrefix = 'targets',
+}: FieldProps & { label?: string }) {
+  const { errors } = parseTargets(draft);
+  return (
+    <TextInput
+      testID={`${testIDPrefix}-calories`}
+      label={label}
+      placeholder="e.g. 2200"
+      keyboardType="number-pad"
+      value={draft.calories}
+      onChangeText={(text) => onChange({ ...draft, calories: text })}
+      error={errors.calories}
+      rightAccessory={<Text style={styles.unit}>cal/day</Text>}
+    />
+  );
+}
+
+interface MacroProps extends FieldProps {
+  /** The person's body weight in kg, which protein and fat come from; null when unknown. */
+  weightKg: number | null;
+  weightUnit: 'kg' | 'lb';
+  accentColor: string;
+  /** Where to add a body weight when there isn't one; left out, it's only said. */
+  onAddWeight?: () => void;
+}
+
 /**
- * The four daily targets -- calories, protein, fat, carbs -- each the person's own to type, keep
- * blank or change. Around them, only suggestions, never applied without a tap:
- * - protein and fat from body weight (0.7-0.8 g and about 0.3 g per lb), with what they are and
- *   aren't (they don't make a deficit on their own);
- * - carbs from the calories left after protein and fat. Carbs fill in by themselves until the
- *   person types their own; after that their number stays, and the new suggestion is offered
- *   beside it with a "Use" button;
- * - the calories the four come to, and how far that is from the calorie target.
- * A conflict -- protein and fat alone past the calorie target -- is explained, never clamped.
+ * Protein, fat and carbs, laid out as the rule they follow -- one row each, with its glyph:
+ * - protein: 0.8 g per lb of body weight, and fat 0.3 g per lb, every time. Each is the person's
+ *   own to type; one that isn't the rule's number offers it with a "Use N g" button, never put
+ *   in by itself;
+ * - carbs: never typed -- whatever calories are left after protein and fat, at 4 cal a gram.
+ * Each row has a bar of its share of the calories, gliding as the figures change. Protein and fat
+ * that come to more than the calories are said plainly; carbs wait until one of them changes.
  */
-export function TargetsEditor({
+export function MacroTargets({
   draft,
   onChange,
   weightKg,
   weightUnit,
+  accentColor,
+  onAddWeight,
   testIDPrefix = 'targets',
-}: Props) {
-  const { values, errors } = parseTargets(draft);
-  const suggestion = draftCarbSuggestion(draft);
-  const macros = weightKg !== null ? suggestMacros(weightKg) : null;
-  const perKg = perKgGuidelines();
+}: MacroProps) {
+  const { values, carbs, errors } = parseTargets(draft);
+  const guide = weightKg !== null ? macroGuidance(weightKg) : null;
+  const weightText = guide
+    ? weightUnit === 'kg'
+      ? `${Math.round((weightKg ?? 0) * 10) / 10} kg (${guide.weightLb} lb)`
+      : `${guide.weightLb} lb`
+    : null;
 
-  let carbHint: string;
-  let carbAction: { label: string; onPress: () => void } | null = null;
-  if (values.calories === null) {
-    carbHint = 'A carb suggestion needs a calorie target.';
-  } else if (values.proteinG === null || values.fatG === null) {
-    carbHint = 'Add protein and fat to get a carb suggestion.';
-  } else if (suggestion?.kind === 'conflict') {
-    carbHint = `Protein and fat come to ${calories(suggestion.proteinFatCalories)} cal, ${calories(suggestion.overBy)} more than your calorie target. Lower protein or fat, or raise calories, and carbs can be suggested again.`;
-  } else if (suggestion?.kind === 'carbs') {
-    if (draft.carbsFollow) {
-      carbHint = `From the ${calories(suggestion.remainingCalories)} cal left after protein and fat.`;
-    } else if (values.carbsG !== null && Math.abs(values.carbsG - suggestion.carbsG) <= 1) {
-      carbHint = 'Matches the calories left after protein and fat.';
-    } else {
-      carbHint = `Your calories, protein and fat leave room for ${suggestion.carbsG} g. Your own number stays until you change it.`;
-      carbAction = {
-        label: `Use ${suggestion.carbsG} g`,
-        onPress: () => onChange(takeSuggestedCarbs(draft)),
-      };
-    }
-  } else {
-    carbHint = '';
-  }
+  const rows = [
+    {
+      key: 'protein' as const,
+      label: 'Protein',
+      field: 'proteinG' as const,
+      perLb: PROTEIN_G_PER_LB,
+      grams: values.proteinG,
+      suggested: guide?.proteinG ?? null,
+      kcal: KCAL_PER_GRAM.protein,
+    },
+    {
+      key: 'fat' as const,
+      label: 'Fat',
+      field: 'fatG' as const,
+      perLb: FAT_G_PER_LB,
+      grams: values.fatG,
+      suggested: guide?.fatG ?? null,
+      kcal: KCAL_PER_GRAM.fat,
+    },
+  ];
 
-  let totalLine: string | null = null;
-  if (values.proteinG !== null && values.carbsG !== null && values.fatG !== null) {
-    const total = caloriesFromMacros(values.proteinG, values.carbsG, values.fatG);
-    totalLine = `Your macros come to ${calories(total)} cal`;
-    if (values.calories !== null) {
-      const difference = Math.round(total - values.calories);
-      totalLine +=
-        Math.abs(difference) <= MATCH_TOLERANCE_KCAL
-          ? ', matching your calorie target.'
-          : `, ${calories(Math.abs(difference))} ${difference > 0 ? 'over' : 'under'} your ${calories(values.calories)} cal target.`;
-    } else {
-      totalLine += '.';
-    }
-  }
+  const carbsLine =
+    values.calories === null
+      ? 'Set your calories to work out carbs.'
+      : values.proteinG === null || values.fatG === null
+        ? 'Add protein and fat to work out carbs.'
+        : carbs?.kind === 'carbs'
+          ? `${cal(carbs.remainingCalories)} cal left after protein and fat, ÷ 4`
+          : null;
+  const carbShare =
+    carbs?.kind === 'carbs' ? shareOf(carbs.carbsG * KCAL_PER_GRAM.carbs, values.calories) : null;
 
   return (
     <View style={styles.group}>
-      <TextInput
-        testID={`${testIDPrefix}-calories`}
-        label="Calories"
-        placeholder="e.g. 2200"
-        keyboardType="number-pad"
-        value={draft.calories}
-        onChangeText={(text) => onChange(editDraft(draft, 'calories', text))}
-        error={errors.calories}
-        rightAccessory={<Text style={styles.unit}>cal/day</Text>}
-      />
-
-      <View testID={`${testIDPrefix}-macro-suggestion`} style={styles.suggestion}>
-        <SectionHeader label="Suggested protein and fat" />
-        {macros ? (
-          <>
-            <Text style={styles.suggestionLine}>
-              Protein {macros.proteinLowG}–{macros.proteinHighG} g · fat about {macros.fatG} g
-            </Text>
-            <Text style={styles.caption}>
-              {weightUnit === 'kg'
-                ? `About ${perKg.proteinLow}–${perKg.proteinHigh} g protein and ${perKg.fat} g fat per kg of body weight`
-                : '0.7–0.8 g protein and about 0.3 g fat per lb of body weight'}
-              , a rough starting point for a calorie deficit. They&apos;re guidelines, not rules,
-              and they don&apos;t make a deficit on their own: that comes from your calories against
-              what you burn.
-            </Text>
-            <TextButton
-              testID={`${testIDPrefix}-use-macros`}
-              label={`Use ${macros.proteinG} g Protein and ${macros.fatG} g Fat`}
-              onPress={() =>
-                onChange(
-                  editDraft(
-                    editDraft(draft, 'proteinG', String(macros.proteinG)),
-                    'fatG',
-                    String(macros.fatG),
-                  ),
-                )
-              }
-            />
-          </>
-        ) : (
-          <Text style={styles.caption}>
-            Add your weight under Personal Information to see suggested protein and fat.
-          </Text>
-        )}
-      </View>
-
-      <View style={styles.row}>
-        <View style={styles.cell}>
-          <TextInput
-            testID={`${testIDPrefix}-protein`}
-            label="Protein (g)"
-            placeholder="Optional"
-            keyboardType="decimal-pad"
-            value={draft.proteinG}
-            onChangeText={(text) => onChange(editDraft(draft, 'proteinG', text))}
-            error={errors.proteinG}
-          />
-        </View>
-        <View style={styles.cell}>
-          <TextInput
-            testID={`${testIDPrefix}-fat`}
-            label="Fat (g)"
-            placeholder="Optional"
-            keyboardType="decimal-pad"
-            value={draft.fatG}
-            onChangeText={(text) => onChange(editDraft(draft, 'fatG', text))}
-            error={errors.fatG}
-          />
-        </View>
-      </View>
-
-      <View>
-        <TextInput
-          testID={`${testIDPrefix}-carbs`}
-          label={draft.carbsFollow ? 'Carbs (g) · suggested' : 'Carbs (g)'}
-          placeholder="Optional"
-          keyboardType="decimal-pad"
-          value={draft.carbsG}
-          onChangeText={(text) => onChange(editDraft(draft, 'carbsG', text))}
-          error={errors.carbsG}
-        />
-        {carbHint ? (
-          <Text testID={`${testIDPrefix}-carb-hint`} style={styles.caption}>
-            {carbHint}
-          </Text>
-        ) : null}
-        {carbAction ? (
-          <TextButton
-            testID={`${testIDPrefix}-use-carbs`}
-            label={carbAction.label}
-            onPress={carbAction.onPress}
-          />
-        ) : null}
-      </View>
-
-      {totalLine ? (
-        <Text testID={`${testIDPrefix}-total`} style={styles.total}>
-          {totalLine}
+      {guide ? (
+        <Text testID={`${testIDPrefix}-guidance`} style={styles.lead}>
+          From your body weight, {weightText}
         </Text>
-      ) : null}
+      ) : (
+        <View testID={`${testIDPrefix}-no-weight`} style={styles.noWeight}>
+          <Text style={styles.lead}>
+            Add your body weight to get protein and fat from it: 0.8 g and 0.3 g per lb.
+          </Text>
+          {onAddWeight ? (
+            <TextButton
+              testID={`${testIDPrefix}-add-weight`}
+              label="Add Weight"
+              onPress={onAddWeight}
+            />
+          ) : null}
+        </View>
+      )}
+
+      {rows.map((row) => {
+        const share = row.grams !== null ? shareOf(row.grams * row.kcal, values.calories) : null;
+        const offRule = row.suggested !== null && row.grams !== row.suggested;
+        return (
+          <View key={row.key} testID={`${testIDPrefix}-${row.key}-row`} style={styles.row}>
+            <View style={styles.head}>
+              <View style={styles.glyph}>
+                <MaterialCommunityIcons name={GLYPHS[row.key]} size={18} color={accentColor} />
+              </View>
+              <View style={styles.body}>
+                <Text style={styles.label}>{row.label}</Text>
+                <Text testID={`${testIDPrefix}-${row.key}-rule`} style={styles.rule}>
+                  {guide ? `${row.perLb} g × ${guide.weightLb} lb` : `${row.perLb} g per lb`}
+                </Text>
+              </View>
+              <View style={styles.input}>
+                <TextInput
+                  testID={`${testIDPrefix}-${row.key}`}
+                  accessibilityLabel={`${row.label} (g)`}
+                  placeholder="—"
+                  keyboardType="decimal-pad"
+                  value={draft[row.field]}
+                  onChangeText={(text) => onChange({ ...draft, [row.field]: text })}
+                  error={errors[row.field]}
+                  rightAccessory={<Text style={styles.unit}>g</Text>}
+                />
+              </View>
+            </View>
+            {share !== null ? <AnimatedBar fraction={share} color={accentColor} /> : null}
+            <View style={styles.foot}>
+              <Text style={styles.caption}>
+                {row.grams !== null
+                  ? `${cal(row.grams * row.kcal)} cal${share !== null ? ` · ${Math.round(share * 100)}%` : ''}`
+                  : 'No target'}
+              </Text>
+              {offRule ? (
+                <TextButton
+                  testID={`${testIDPrefix}-${row.key}-use`}
+                  label={`Use ${row.suggested} g`}
+                  accessibilityLabel={`Use ${row.suggested} grams of ${row.label.toLowerCase()}, ${row.perLb} grams per pound`}
+                  onPress={() => onChange({ ...draft, [row.field]: String(row.suggested) })}
+                />
+              ) : null}
+            </View>
+          </View>
+        );
+      })}
+
+      <View testID={`${testIDPrefix}-carbs-row`} style={styles.row}>
+        <View style={styles.head}>
+          <View style={styles.glyph}>
+            <MaterialCommunityIcons name={GLYPHS.carbs} size={18} color={accentColor} />
+          </View>
+          <View style={styles.body}>
+            <Text style={styles.label}>Carbs</Text>
+            {carbsLine ? (
+              <Text testID={`${testIDPrefix}-carbs-rule`} style={styles.rule}>
+                {carbsLine}
+              </Text>
+            ) : null}
+          </View>
+          <View style={styles.readout}>
+            <Text testID={`${testIDPrefix}-carbs`} style={styles.readoutValue}>
+              {carbs?.kind === 'carbs' ? `${carbs.carbsG} g` : '—'}
+            </Text>
+            <Text style={styles.readoutTag}>Auto</Text>
+          </View>
+        </View>
+        {carbs?.kind === 'carbs' && carbShare !== null ? (
+          <>
+            <AnimatedBar fraction={carbShare} color={accentColor} />
+            <View style={styles.foot}>
+              <Text style={styles.caption}>
+                {`${cal(carbs.carbsG * KCAL_PER_GRAM.carbs)} cal · ${Math.round(carbShare * 100)}%`}
+              </Text>
+            </View>
+          </>
+        ) : null}
+        {carbs?.kind === 'conflict' ? (
+          <Text testID={`${testIDPrefix}-conflict`} style={styles.conflict}>
+            Protein and fat come to {cal(carbs.proteinFatCalories)} cal, {cal(carbs.overBy)} more
+            than your {cal(values.calories ?? 0)} cal. Lower protein or fat, or raise calories.
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/** Calories and the macros under them, as one block -- a phase's own targets. */
+export function TargetsEditor(props: MacroProps) {
+  return (
+    <View style={styles.editor}>
+      <CalorieTargetField
+        draft={props.draft}
+        onChange={props.onChange}
+        testIDPrefix={props.testIDPrefix}
+      />
+      <MacroTargets {...props} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  group: {
+  editor: {
     gap: spacing.lg,
   },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  cell: {
-    flex: 1,
+  group: {
+    gap: spacing.xs,
   },
   unit: {
     ...typeScale.secondary,
     color: colors.textMuted,
   },
-  suggestion: {
-    gap: spacing.xs,
+  lead: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
   },
-  suggestionLine: {
+  noWeight: {
+    alignItems: 'flex-start',
+  },
+  row: {
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  glyph: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceLift,
+  },
+  body: {
+    flex: 1,
+  },
+  label: {
     ...typeScale.callout,
+    fontFamily: typeScale.cardTitle.fontFamily,
     color: colors.textPrimary,
+  },
+  rule: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  input: {
+    width: 104,
+  },
+  readout: {
+    width: 104,
+    alignItems: 'flex-end',
+  },
+  readoutValue: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+  },
+  readoutTag: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  foot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 28,
   },
   caption: {
     ...typeScale.caption,
     color: colors.textMuted,
-    marginTop: spacing.xs,
   },
-  total: {
+  conflict: {
     ...typeScale.secondary,
-    color: colors.textSecondary,
+    color: colors.destructive,
   },
 });

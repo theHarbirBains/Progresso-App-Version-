@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
+import { fonts } from '../design/theme';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { updateMyProfile } from '../lib/api';
@@ -357,19 +358,45 @@ describe('CalorieEstimationScreen', () => {
   });
 });
 
-describe('CalorieEstimationScreen -- one row per field, in two widgets', () => {
-  it('puts the fields and the Save in two widgets, and separates rows with hairlines, none above the first', async () => {
+describe('CalorieEstimationScreen -- tiles, in four widgets', () => {
+  it('is four widgets: about you, body, activity, then Save', async () => {
     await renderScreen();
 
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
-    const first = StyleSheet.flatten(
-      screen.getByTestId('calorie-estimation-gender-card').props.style,
+    expect(screen.UNSAFE_queryAllByType(AppCard).map((card) => card.props.testID)).toEqual([
+      'calorie-estimation-about',
+      'calorie-estimation-body',
+      'calorie-estimation-activity-card',
+      'calorie-estimation-actions',
+    ]);
+  });
+
+  it('shows the age the birthday makes, and what the chosen activity level means', async () => {
+    mockFetchMyProfile.mockResolvedValue({
+      ...baseProfile,
+      birthday: '1996-03-10',
+      activityLevel: 'moderately_active',
+    });
+    await renderScreen();
+
+    expect(screen.getByTestId('calorie-estimation-age')).toHaveTextContent('30');
+    expect(screen.getByTestId('calorie-estimation-activity-summary')).toHaveTextContent(
+      /Moderately active.*Moderate exercise 3-5 days\/week/,
     );
-    const second = StyleSheet.flatten(
-      screen.getByTestId('calorie-estimation-birthday-card').props.style,
+  });
+
+  it('names each sex tile, and shows the height and weight as mono readouts', async () => {
+    await renderScreen();
+
+    expect(screen.getByTestId('calorie-estimation-gender-male').props.accessibilityLabel).toBe(
+      'Male',
     );
-    expect(first.borderTopWidth).toBeUndefined();
-    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+    expect(screen.getByTestId('calorie-estimation-gender-female').props.accessibilityLabel).toBe(
+      'Female',
+    );
+    expect(
+      StyleSheet.flatten(screen.getByTestId('calorie-estimation-height-value').props.style)
+        .fontFamily,
+    ).toBe(fonts.mono);
   });
 
   it('makes each picker value a named target of at least 44pt', async () => {

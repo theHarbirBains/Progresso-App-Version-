@@ -1,12 +1,17 @@
+import { Feather } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
+import { ChoiceTile } from '../design/ChoiceTile';
 import { LoadingState } from '../design/LoadingState';
+import { RiseIn } from '../design/RiseIn';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
+import { StatBlock } from '../design/StatBlock';
+import { Text } from '../design/Text';
+import { colors } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { ACTIVITY_LEVELS, ageFromBirthday } from '../nutrition/calorieEstimationInput';
@@ -16,27 +21,30 @@ import {
   type CalorieTargets,
 } from '../nutrition/calorieTargets';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
-import { useDailyTargets } from '../phases/PhaseProvider';
 import {
+  canSaveTargets,
   draftFromTargets,
-  editDraft,
+  macroGuidance,
   parseTargets,
   type TargetDraft,
 } from '../nutrition/targetMath';
-import { TargetsEditor } from '../nutrition/TargetsEditor';
+import { CalorieTargetField, MacroTargets } from '../nutrition/TargetsEditor';
 import { feetAndInchesFromCm, kgToLb } from '../onboarding/weightHeightConversion';
+import { useDailyTargets } from '../phases/PhaseProvider';
 import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { nutritionGoalsStyles as styles } from './nutritionGoalsStyles';
 
 type Props = RootStackScreenProps<'NutritionGoals'>;
 
-const GENDER_LABELS: Record<string, string> = {
+const SEX_LABELS: Record<string, string> = {
   male: 'Male',
   female: 'Female',
   other: 'Other',
-  prefer_not_to_say: 'Prefer not to say',
+  prefer_not_to_say: '—',
 };
+
+const NO_TARGETS = { calories: null, proteinG: null, carbsG: null, fatG: null };
 
 function formatHeight(heightCm: number, unit: 'cm' | 'ft_in'): string {
   if (unit === 'cm') return `${Math.round(heightCm)} cm`;
@@ -49,41 +57,79 @@ function formatWeight(weightKg: number, unit: 'kg' | 'lb'): string {
   return `${Math.round(value * 10) / 10} ${unit}`;
 }
 
-// The four calculated targets, in the order they are shown -- purely
-// informational rows (no press handler, no selection state).
+// The four estimates, from the most loss to gain, as a 2 x 2 grid of tiles.
 const OPTIONS = [
-  { key: 'surplus', testID: 'nutrition-goals-option-surplus', title: 'Weight Gain' },
-  { key: 'maintenance', testID: 'nutrition-goals-option-maintenance', title: 'Maintenance' },
-  { key: 'deficit', testID: 'nutrition-goals-option-deficit', title: 'Weight Loss' },
   {
     key: 'aggressiveDeficit',
     testID: 'nutrition-goals-option-aggressive',
     title: 'Aggressive Loss',
+    icon: 'chevrons-down',
+  },
+  {
+    key: 'deficit',
+    testID: 'nutrition-goals-option-deficit',
+    title: 'Weight Loss',
+    icon: 'chevron-down',
+  },
+  {
+    key: 'maintenance',
+    testID: 'nutrition-goals-option-maintenance',
+    title: 'Maintenance',
+    icon: 'minus',
+  },
+  {
+    key: 'surplus',
+    testID: 'nutrition-goals-option-surplus',
+    title: 'Weight Gain',
+    icon: 'chevron-up',
   },
 ] as const;
 
-// The reference-image Nutrition Goals screen: real, profile-derived calorie
-// estimates (Mifflin-St Jeor, see nutrition/calorieTargets.ts) and the
-// person's own four daily targets (nutrition_goals -- the same row Nutrition
-// Today reads). Personal data (gender/birthday/height/weight/activity level)
-// is never edited here -- CalorieEstimationScreen is the one place that
-// happens; "Edit" just navigates there, and this screen reads personal info
-// from the shared profile cache, so an edit there shows here at once. The
-// saved goals come from the shared NutritionGoalsProvider cache too, so a
-// save here is reflected on Today with no re-fetch of its own.
+/** A numbered step's heading: the number in an accent-tinted circle, the title, one line under. */
+function StepHeader({
+  step,
+  title,
+  detail,
+  accentColor,
+  accentBg,
+}: {
+  step: number;
+  title: string;
+  detail: string;
+  accentColor: string;
+  accentBg: string;
+}) {
+  return (
+    <View style={styles.stepHeader}>
+      <View style={[styles.stepBadge, { backgroundColor: accentBg }]}>
+        <Text style={[styles.stepNumber, { color: accentColor }]}>{step}</Text>
+      </View>
+      <View style={styles.stepBody}>
+        <Text style={styles.stepTitle} accessibilityRole="header">
+          {title}
+        </Text>
+        <Text style={styles.stepDetail}>{detail}</Text>
+      </View>
+    </View>
+  );
+}
+
+// Nutrition Goals (what Today's Edit Targets opens): the person's daily targets, set in three
+// numbered steps with the guidance in plain sight rather than tucked beside a field.
 //
-// Nothing here is fixed or filled in behind the person's back: an estimate is
-// only taken with its Use button, the protein/fat/carb suggestions live in
-// TargetsEditor beside the fields, and saved targets never change unless the
-// person saves new ones -- a new weight changes the suggestions, never the
-// targets.
+// - Your Details (the hero): sex, age, height and weight as four tiles and the activity level,
+//   with Edit -- CalorieEstimationScreen is the one place they're changed; this reads them from
+//   the shared profile cache, so an edit there shows here at once.
+// - 1, Choose your calories: the four Mifflin-St Jeor estimates (see nutrition/calorieTargets.ts)
+//   as tiles; tapping one makes it the calorie target, and the one matching the target is shown
+//   chosen. Or type your own under them.
+// - 2, Your macros: protein 0.8 g and fat 0.3 g per lb of body weight, carbs the calories left
+//   (nutrition/TargetsEditor.tsx's MacroTargets), each with a bar of its share of the calories.
+// - 3, Save your targets: the four figures as Today shows them, and one filled Save Targets.
 //
-// Layout: a plain summary line with Edit, then Your Daily Targets right
-// under it -- what Today's Edit Targets opens for, so the fields come first:
-// the four fields with their suggestions and one filled Save -- then the four
-// estimates as rows (name, how they differ from maintenance, the calories as
-// a mono readout and a Use action that fills the calorie field), then the
-// notes.
+// Protein and fat left blank fill in from the body weight when the page opens -- said in step 3,
+// and saved only when the person saves. A target is never changed by itself: a new weight
+// changes the rule's numbers (offered with "Use N g"), never the saved targets.
 export function NutritionGoalsScreen({ navigation }: Props) {
   const { openMenu } = useAppMenu();
   const { nutritionTheme: theme } = useProgressTheme();
@@ -93,15 +139,28 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   const { phaseName } = useDailyTargets();
 
   const [draft, setDraft] = useState<TargetDraft | null>(null);
+  const [filledFromWeight, setFilledFromWeight] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // The saved targets fill the fields once, when they first arrive. After that the fields are
-  // the person's: a goals refresh (a save from here) never resets what they're typing.
+  const weightKg = profile?.weightValue ?? null;
+
+  // The saved targets fill the fields once, when they first arrive -- protein and fat from the
+  // body weight where none are saved. After that the fields are the person's: a goals refresh (a
+  // save from here) never resets what they're typing.
   useEffect(() => {
-    if (goals && draft === null) setDraft(draftFromTargets(goals));
-  }, [goals, draft]);
+    if (draft !== null || goalsLoading || profileLoading) return;
+    const base = draftFromTargets(goals ?? NO_TARGETS);
+    const guide = weightKg !== null ? macroGuidance(weightKg) : null;
+    const fill = guide !== null && (base.proteinG === '' || base.fatG === '');
+    setFilledFromWeight(fill);
+    setDraft({
+      ...base,
+      proteinG: base.proteinG || (guide ? String(guide.proteinG) : ''),
+      fatG: base.fatG || (guide ? String(guide.fatG) : ''),
+    });
+  }, [draft, goals, goalsLoading, profileLoading, weightKg]);
 
   function change(next: TargetDraft) {
     setSaved(false);
@@ -110,14 +169,15 @@ export function NutritionGoalsScreen({ navigation }: Props) {
 
   async function handleSave() {
     if (!draft) return;
-    const { values, errors } = parseTargets(draft);
-    if (Object.keys(errors).length > 0) return;
+    const parsed = parseTargets(draft);
+    if (!canSaveTargets(parsed)) return;
     setError(null);
     setSaved(false);
     setSaving(true);
     try {
-      await saveGoals(values);
+      await saveGoals(parsed.values);
       setSaved(true);
+      setFilledFromWeight(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save your daily targets');
     } finally {
@@ -129,10 +189,9 @@ export function NutritionGoalsScreen({ navigation }: Props) {
     return <LoadingState testID="nutrition-goals-loading" />;
   }
 
-  // A failed profile fetch is shown as an error banner (below), not a
-  // permanently-stuck spinner -- the rest of the screen degrades to its
-  // normal "incomplete profile" state (buildCalorieProfileInput already
-  // returns null for every field left null here) rather than crashing.
+  // A failed profile fetch is shown as an error (in step 3), not a stuck spinner -- the rest of
+  // the page degrades to its "add your details" state (buildCalorieProfileInput returns null for
+  // any field left null).
   const calorieInput = profile
     ? buildCalorieProfileInput({
         gender: profile.gender,
@@ -142,24 +201,32 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         activityLevel: profile.activityLevel,
       })
     : null;
-  const targets: CalorieTargets | null = calorieInput ? computeCalorieTargets(calorieInput) : null;
+  const estimates: CalorieTargets | null = calorieInput
+    ? computeCalorieTargets(calorieInput)
+    : null;
 
   const age = profile?.birthday ? ageFromBirthday(profile.birthday) : null;
   const activityLabel = ACTIVITY_LEVELS.find((a) => a.value === profile?.activityLevel)?.label;
-  const summaryParts = [
-    profile?.gender ? GENDER_LABELS[profile.gender] : null,
-    age !== null ? `${age} years` : null,
-    profile?.heightValue !== null && profile?.heightValue !== undefined
-      ? formatHeight(profile.heightValue, profile.heightUnit)
-      : null,
-    profile?.weightValue !== null && profile?.weightValue !== undefined
-      ? formatWeight(profile.weightValue, profile.weightUnit)
-      : null,
-  ].filter((part): part is string => part !== null);
+  const details = [
+    { label: 'Sex', value: profile?.gender ? SEX_LABELS[profile.gender] : null },
+    { label: 'Age', value: age !== null ? String(age) : null },
+    {
+      label: 'Height',
+      value:
+        profile?.heightValue != null ? formatHeight(profile.heightValue, profile.heightUnit) : null,
+    },
+    {
+      label: 'Weight',
+      value: weightKg !== null ? formatWeight(weightKg, profile?.weightUnit ?? 'lb') : null,
+    },
+  ];
+  const anyDetails = details.some((detail) => detail.value !== null);
 
   const parsed = draft ? parseTargets(draft) : null;
-  const canSave = parsed !== null && Object.keys(parsed.errors).length === 0 && !saving;
+  const values = parsed?.values ?? NO_TARGETS;
+  const canSave = parsed !== null && canSaveTargets(parsed) && !saving;
   const displayError = error ?? profileError ?? goalsError;
+  const tileGrid = [OPTIONS.slice(0, 2), OPTIONS.slice(2)];
 
   return (
     <Screen
@@ -168,7 +235,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
       header={
         <AppHeader
           title="Nutrition Goals"
-          subtitle="Here are your estimated daily calorie targets."
+          subtitle="Choose your calories; your macros follow from your weight."
           leftAction={{
             icon: 'menu',
             onPress: () => openMenu(),
@@ -180,17 +247,8 @@ export function NutritionGoalsScreen({ navigation }: Props) {
       }
     >
       <AppCard hero topAccent={theme.accent} testID="nutrition-goals-info-card">
-        <View style={styles.infoRow}>
-          <View style={styles.infoBody}>
-            {summaryParts.length > 0 ? (
-              <Text testID="nutrition-goals-summary" style={styles.infoSummary}>
-                {summaryParts.join(' • ')}
-              </Text>
-            ) : (
-              <Text style={styles.infoIncomplete}>Add your information to see estimates</Text>
-            )}
-            {activityLabel ? <Text style={styles.infoActivity}>{activityLabel}</Text> : null}
-          </View>
+        <View style={styles.infoHead}>
+          <Text style={styles.infoTitle}>Your Details</Text>
           <TextButton
             testID="nutrition-goals-edit"
             label="Edit"
@@ -198,33 +256,197 @@ export function NutritionGoalsScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('CalorieEstimation')}
           />
         </View>
+        {anyDetails ? (
+          <View
+            testID="nutrition-goals-summary"
+            style={styles.detailGrid}
+            accessible
+            accessibilityLabel={details
+              .map((detail) => `${detail.label} ${detail.value ?? 'not set'}`)
+              .join(', ')}
+          >
+            {details.map((detail) => (
+              <View key={detail.label} style={styles.detailTile}>
+                <Text style={styles.detailValue} numberOfLines={1}>
+                  {detail.value ?? '—'}
+                </Text>
+                <Text style={styles.detailLabel}>{detail.label}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.infoIncomplete}>
+            Add your sex, age, height and weight to get calorie estimates.
+          </Text>
+        )}
+        {activityLabel ? (
+          <View style={styles.activityRow}>
+            <Feather name="activity" size={14} color={colors.textSecondary} />
+            <Text testID="nutrition-goals-activity" style={styles.activityText}>
+              {activityLabel}
+            </Text>
+          </View>
+        ) : null}
       </AppCard>
 
-      <AppCard testID="nutrition-goals-custom-card">
-        <Section title="Your Daily Targets">
-          {phaseName ? (
-            <View testID="nutrition-goals-phase-note" style={styles.phaseNote}>
-              <Text style={styles.note}>
-                Your {phaseName} has targets of its own, used in place of these while it&apos;s
-                going. These stay as they are and apply again when it ends.
-              </Text>
-              <TextButton
-                testID="nutrition-goals-view-phase"
-                label="View Phase"
-                onPress={() => navigation.navigate('Phases')}
-              />
-            </View>
-          ) : null}
-          {draft ? (
-            <TargetsEditor
+      <AppCard testID="nutrition-goals-calories-card">
+        <StepHeader
+          step={1}
+          title="Choose your calories"
+          detail={estimates ? 'Tap an estimate, or type your own.' : 'Type your own target.'}
+          accentColor={theme.accent}
+          accentBg={theme.accentBg}
+        />
+        {estimates ? (
+          <View testID="nutrition-goals-targets" style={styles.grid}>
+            {tileGrid.map((pair) => (
+              <View key={pair[0].key} style={styles.gridRow}>
+                {pair.map((option) => {
+                  const calories = estimates[option.key];
+                  const delta = calories - estimates.maintenance;
+                  const selected = values.calories === calories;
+                  return (
+                    <ChoiceTile
+                      key={option.key}
+                      testID={option.testID}
+                      selected={selected}
+                      onPress={() => draft && change({ ...draft, calories: String(calories) })}
+                      accentColor={theme.accent}
+                      onAccentColor={theme.onAccent}
+                      accessibilityLabel={`${option.title}, ${calories.toLocaleString()} calories a day`}
+                      style={styles.gridCell}
+                    >
+                      <Feather
+                        name={option.icon}
+                        size={16}
+                        color={selected ? theme.accent : colors.textSecondary}
+                      />
+                      <Text style={styles.optionTitle}>{option.title}</Text>
+                      <Text
+                        testID={`${option.testID}-value`}
+                        style={[styles.optionValue, selected && { color: theme.accent }]}
+                      >
+                        {calories.toLocaleString()}
+                      </Text>
+                      <Text style={styles.optionMeta}>
+                        {option.key === 'maintenance'
+                          ? 'Holds your weight'
+                          : `${delta > 0 ? '+' : '−'}${Math.abs(delta)} cal a day`}
+                      </Text>
+                    </ChoiceTile>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View testID="nutrition-goals-incomplete" style={styles.incomplete}>
+            <Text style={styles.note}>
+              Add your sex, age, height, weight and activity level, and four estimates are worked
+              out for you here.
+            </Text>
+            <SecondaryButton
+              testID="nutrition-goals-complete-profile"
+              label="Add Your Details"
+              accessibilityLabel="Add your information"
+              onPress={() => navigation.navigate('CalorieEstimation')}
+            />
+          </View>
+        )}
+        {draft ? (
+          <View style={styles.customField}>
+            <CalorieTargetField
               draft={draft}
               onChange={change}
-              weightKg={profile?.weightValue ?? null}
-              weightUnit={profile?.weightUnit ?? 'lb'}
+              label={estimates ? 'Or type your own' : 'Calories'}
               testIDPrefix="nutrition-goals"
             />
-          ) : null}
-        </Section>
+          </View>
+        ) : null}
+        {estimates ? (
+          <Text testID="nutrition-goals-estimate-note" style={styles.note}>
+            Maintenance is worked out from your sex, age, height and weight (the Mifflin-St Jeor
+            formula), times your activity. Weight loss is 300 below it, aggressive loss 500 below,
+            and weight gain 300 above.
+          </Text>
+        ) : null}
+      </AppCard>
+
+      <AppCard testID="nutrition-goals-macros">
+        <StepHeader
+          step={2}
+          title="Your macros"
+          detail="Protein and fat from your weight; carbs fill the calories left."
+          accentColor={theme.accent}
+          accentBg={theme.accentBg}
+        />
+        {draft ? (
+          <MacroTargets
+            draft={draft}
+            onChange={change}
+            weightKg={weightKg}
+            weightUnit={profile?.weightUnit ?? 'lb'}
+            accentColor={theme.accent}
+            onAddWeight={() => navigation.navigate('CalorieEstimation')}
+            testIDPrefix="nutrition-goals"
+          />
+        ) : null}
+      </AppCard>
+
+      <AppCard testID="nutrition-goals-save-card">
+        <StepHeader
+          step={3}
+          title="Save your targets"
+          detail="Today, This Week and Progress measure against these."
+          accentColor={theme.accent}
+          accentBg={theme.accentBg}
+        />
+        <View style={styles.summary}>
+          <View style={styles.summaryRow}>
+            <StatBlock
+              testID="nutrition-goals-summary-calories"
+              value={values.calories !== null ? values.calories.toLocaleString() : '—'}
+              label="Calories"
+              valueColor={theme.accent}
+            />
+            <StatBlock
+              testID="nutrition-goals-summary-protein"
+              value={values.proteinG !== null ? `${Math.round(values.proteinG)} g` : '—'}
+              label="Protein"
+            />
+          </View>
+          <View style={styles.summaryRow}>
+            <StatBlock
+              testID="nutrition-goals-summary-carbs"
+              value={values.carbsG !== null ? `${values.carbsG} g` : '—'}
+              label="Carbs"
+            />
+            <StatBlock
+              testID="nutrition-goals-summary-fat"
+              value={values.fatG !== null ? `${Math.round(values.fatG)} g` : '—'}
+              label="Fat"
+            />
+          </View>
+        </View>
+
+        {filledFromWeight ? (
+          <Text testID="nutrition-goals-filled-note" style={styles.note}>
+            Protein and fat are filled in from your weight. Save to keep them.
+          </Text>
+        ) : null}
+        {phaseName ? (
+          <View testID="nutrition-goals-phase-note" style={styles.phaseNote}>
+            <Text style={styles.note}>
+              Your {phaseName} has targets of its own, used in place of these while it&apos;s going.
+              These stay as they are and apply again when it ends.
+            </Text>
+            <TextButton
+              testID="nutrition-goals-view-phase"
+              label="View Phase"
+              onPress={() => navigation.navigate('Phases')}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.actions}>
           {displayError ? (
@@ -233,9 +455,12 @@ export function NutritionGoalsScreen({ navigation }: Props) {
             </Text>
           ) : null}
           {saved ? (
-            <Text testID="nutrition-goals-saved" style={styles.savedText}>
-              Saved
-            </Text>
+            <RiseIn>
+              <View testID="nutrition-goals-saved" style={styles.savedRow}>
+                <Feather name="check-circle" size={16} color={theme.accent} />
+                <Text style={styles.savedText}>Saved</Text>
+              </View>
+            </RiseIn>
           ) : null}
           <PrimaryButton
             testID="nutrition-goals-save"
@@ -249,73 +474,15 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         </View>
       </AppCard>
 
-      {targets ? (
-        <AppCard testID="nutrition-goals-targets">
-          <Section title="Estimated daily targets">
-            {OPTIONS.map((option, index) => {
-              const calories = targets[option.key];
-              const delta = calories - targets.maintenance;
-              return (
-                <View
-                  key={option.testID}
-                  testID={option.testID}
-                  style={[styles.optionRow, index > 0 && styles.optionDivider]}
-                >
-                  <View style={styles.optionBody}>
-                    <Text style={styles.optionTitle}>{option.title}</Text>
-                    <Text style={styles.optionMeta}>
-                      {option.key === 'maintenance'
-                        ? 'Holds your current weight'
-                        : `${delta > 0 ? '+' : ''}${delta} vs. maintenance`}
-                    </Text>
-                  </View>
-                  <View style={styles.optionValueBlock}>
-                    <Text testID={`${option.testID}-value`} style={styles.optionValue}>
-                      {calories.toLocaleString()}
-                    </Text>
-                    <Text style={styles.optionUnit}>calories/day</Text>
-                  </View>
-                  <TextButton
-                    testID={`${option.testID}-use`}
-                    label="Use"
-                    accessibilityLabel={`Use ${calories.toLocaleString()} calories as your daily target`}
-                    onPress={() => draft && change(editDraft(draft, 'calories', String(calories)))}
-                  />
-                </View>
-              );
-            })}
-            <Text testID="nutrition-goals-estimate-note" style={styles.note}>
-              Maintenance is estimated from your sex, age, height and weight (the Mifflin-St Jeor
-              formula), times your activity level. Weight loss is 300 calories below it, aggressive
-              loss 500 below, and weight gain 300 above.
-            </Text>
-          </Section>
-        </AppCard>
-      ) : (
-        <AppCard testID="nutrition-goals-incomplete" style={styles.incomplete}>
-          <Text style={styles.incompleteTitle}>Complete your information</Text>
-          <Text style={styles.incompleteBody}>
-            Add your gender, birthday, height, weight, and activity level to see personalized
-            calorie targets.
-          </Text>
-          <SecondaryButton
-            testID="nutrition-goals-complete-profile"
-            label="Add Information"
-            accessibilityLabel="Add your information"
-            onPress={() => navigation.navigate('CalorieEstimation')}
-          />
-        </AppCard>
-      )}
-
       <AppCard testID="nutrition-goals-notes">
         <Section title="Important Notes">
           <Text style={styles.note}>
-            • These are estimates and may vary based on your activity level and body composition.
+            • These are estimates and may vary with your activity and body composition.
           </Text>
           <Text style={styles.note}>• Adjust based on your progress and how you feel.</Text>
           <Text style={styles.note}>
-            • Every target is yours: leave any blank, and change them any time. Nothing changes them
-            for you.
+            • Every target is yours: change protein or fat, or leave any blank, any time. Nothing
+            changes them for you.
           </Text>
         </Section>
       </AppCard>

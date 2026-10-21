@@ -1,8 +1,8 @@
 import { StyleSheet } from 'react-native';
-import { colors, minTouchTarget, spacing, typeScale, widgetGap } from '../design/theme';
+import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
 // CalorieEstimationScreen ("Personal Information"). Token-only; the frame is
-// the shared `Screen`. One row per field, separated by hairlines.
+// the shared `Screen`, groups are `Section`s and every field is a `ChoiceTile`.
 export const calorieEstimationStyles = StyleSheet.create({
   // The widgets, `widgetGap` apart.
   content: {
@@ -10,46 +10,76 @@ export const calorieEstimationStyles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
 
-  fieldRow: {
+  // Two tiles side by side, `widgetGap` apart like StatBlocks.
+  tileRow: {
+    flexDirection: 'row',
+    gap: widgetGap,
+  },
+  tileCell: {
+    flex: 1,
+  },
+  // A height or weight: its tile, then its unit toggle.
+  measureCell: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  wideTile: {
+    marginTop: widgetGap,
+  },
+
+  // An icon well: the accent tint behind a glyph in the accent.
+  glyph: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sexTile: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  wideTileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: spacing.md,
-    minHeight: minTouchTarget + spacing.md,
-    paddingVertical: spacing.sm,
   },
-  fieldDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
+  wideTileBody: {
+    flex: 1,
   },
-  fieldRowLabel: {
+  tileTitle: {
     ...typeScale.callout,
     fontFamily: typeScale.cardTitle.fontFamily,
     color: colors.textPrimary,
   },
-  // The value(s) and any unit toggle, kept together on the right.
-  fieldRowControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    flexShrink: 1,
+  tileLabel: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
-  valueButton: {
-    minHeight: minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    flexShrink: 1,
+  ageBlock: {
+    alignItems: 'flex-end',
   },
-  valueText: {
-    ...typeScale.callout,
+  ageValue: {
+    ...typeScale.statMedium,
     color: colors.textPrimary,
-    flexShrink: 1,
+  },
+  measureHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  measureValue: {
+    ...typeScale.statMedium,
+    color: colors.textPrimary,
+    marginTop: 2,
   },
   fieldError: {
     ...typeScale.caption,
     color: colors.destructive,
-    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
   },
 
   actions: {

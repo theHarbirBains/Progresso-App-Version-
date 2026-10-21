@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, TextInput as RNTextInput } from 'react-native';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
 import { fonts } from '../design/theme';
@@ -110,6 +110,19 @@ beforeEach(() => {
   mockAddListener.mockClear();
 });
 
+const estimates = computeCalorieTargets({
+  gender: 'male',
+  age: 24,
+  heightCm: 180,
+  weightKg: 78,
+  activityLevel: 'moderately_active',
+});
+
+async function opened() {
+  renderScreen();
+  await screen.findByTestId('nutrition-goals-scroll');
+}
+
 describe('NutritionGoalsScreen', () => {
   it('shows a loading indicator while fetching', async () => {
     renderScreen();
@@ -119,217 +132,261 @@ describe('NutritionGoalsScreen', () => {
     await screen.findByTestId('nutrition-goals-scroll');
   });
 
-  it('shows a real, profile-derived summary and activity level -- never hardcoded', async () => {
+  it("shows the person's own details and activity level as tiles -- never hardcoded", async () => {
     renderScreen();
 
     const summary = await screen.findByTestId('nutrition-goals-summary');
     expect(summary).toHaveTextContent(/Male/);
-    expect(summary).toHaveTextContent(/24 years/);
+    expect(summary).toHaveTextContent(/24/);
     expect(summary).toHaveTextContent(/180 cm/);
-    expect(screen.getByText('Moderately active')).toBeTruthy();
+    // 78 kg, shown in the person's lb.
+    expect(summary).toHaveTextContent(/172 lb/);
+    expect(summary.props.accessibilityLabel).toBe('Sex Male, Age 24, Height 180 cm, Weight 172 lb');
+    expect(screen.getByTestId('nutrition-goals-activity')).toHaveTextContent('Moderately active');
   });
 
   it('navigates to CalorieEstimation when Edit is pressed', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+    await opened();
 
     fireEvent.press(screen.getByTestId('nutrition-goals-edit'));
 
     expect(mockNavigate).toHaveBeenCalledWith('CalorieEstimation');
   });
 
-  it('shows the four real calculated calorie options, computed from the Mifflin-St Jeor formula', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+  it('lays the page out as numbered steps: calories, macros, save', async () => {
+    await opened();
 
-    const targets = computeCalorieTargets({
-      gender: 'male',
-      age: 24,
-      heightCm: 180,
-      weightKg: 78,
-      activityLevel: 'moderately_active',
-    });
+    expect(screen.getByTestId('nutrition-goals-calories-card')).toHaveTextContent(
+      /1Choose your calories/,
+    );
+    expect(screen.getByTestId('nutrition-goals-macros')).toHaveTextContent(/2Your macros/);
+    expect(screen.getByTestId('nutrition-goals-save-card')).toHaveTextContent(/3Save your targets/);
+  });
+
+  it('shows the four real calculated calorie estimates, from the Mifflin-St Jeor formula', async () => {
+    await opened();
 
     expect(screen.getByTestId('nutrition-goals-option-maintenance-value')).toHaveTextContent(
-      targets.maintenance.toLocaleString(),
+      estimates.maintenance.toLocaleString(),
     );
     expect(screen.getByTestId('nutrition-goals-option-surplus-value')).toHaveTextContent(
-      targets.surplus.toLocaleString(),
+      estimates.surplus.toLocaleString(),
     );
     expect(screen.getByTestId('nutrition-goals-option-deficit-value')).toHaveTextContent(
-      targets.deficit.toLocaleString(),
+      estimates.deficit.toLocaleString(),
     );
     expect(screen.getByTestId('nutrition-goals-option-aggressive-value')).toHaveTextContent(
-      targets.aggressiveDeficit.toLocaleString(),
-    );
-  });
-
-  it('the four option cards are not pressable/selectable -- no navigation on press', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
-
-    fireEvent.press(screen.getByTestId('nutrition-goals-option-maintenance'));
-
-    expect(mockNavigate).not.toHaveBeenCalled();
-  });
-
-  it('shows a "complete your information" state instead of fake targets when the profile is incomplete', async () => {
-    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, activityLevel: null });
-    renderScreen();
-
-    await screen.findByTestId('nutrition-goals-incomplete');
-    expect(screen.queryByTestId('nutrition-goals-option-maintenance')).toBeNull();
-  });
-
-  it('leaves the calorie target blank until an estimate is taken with Use -- nothing is filled in by itself', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
-
-    expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp('value', '');
-    const targets = computeCalorieTargets({
-      gender: 'male',
-      age: 24,
-      heightCm: 180,
-      weightKg: 78,
-      activityLevel: 'moderately_active',
-    });
-    fireEvent.press(screen.getByTestId('nutrition-goals-option-deficit-use'));
-
-    expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp(
-      'value',
-      String(targets.deficit),
+      estimates.aggressiveDeficit.toLocaleString(),
     );
     expect(screen.getByTestId('nutrition-goals-estimate-note')).toHaveTextContent(
       /Mifflin-St Jeor/,
     );
   });
 
-  it('fills the fields from the saved targets', async () => {
+  it('makes a tapped estimate the calorie target and shows it chosen -- none is chosen by itself', async () => {
+    await opened();
+
+    const ids = ['aggressive', 'deficit', 'maintenance', 'surplus'].map(
+      (key) => `nutrition-goals-option-${key}`,
+    );
+    const chosen = () =>
+      ids.filter((id) => screen.getByTestId(id).props.accessibilityState.selected);
+    expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp('value', '');
+    expect(chosen()).toEqual([]);
+
+    fireEvent.press(screen.getByTestId('nutrition-goals-option-deficit'));
+
+    expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp(
+      'value',
+      String(estimates.deficit),
+    );
+    expect(chosen()).toEqual(['nutrition-goals-option-deficit']);
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    // Typing the same number as an estimate shows that one chosen too.
+    fireEvent.changeText(
+      screen.getByTestId('nutrition-goals-calories'),
+      String(estimates.maintenance),
+    );
+    expect(chosen()).toEqual(['nutrition-goals-option-maintenance']);
+  });
+
+  it('asks for the details instead of showing made-up estimates when the profile is incomplete', async () => {
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, activityLevel: null });
+    renderScreen();
+
+    await screen.findByTestId('nutrition-goals-incomplete');
+    expect(screen.queryByTestId('nutrition-goals-option-maintenance')).toBeNull();
+    // A calorie target can still be typed.
+    expect(screen.getByTestId('nutrition-goals-calories')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('nutrition-goals-complete-profile'));
+    expect(mockNavigate).toHaveBeenCalledWith('CalorieEstimation');
+  });
+
+  it('fills the fields from the saved targets, carbs worked out from them', async () => {
     mockFetchNutritionGoals.mockResolvedValue({
       calories: 2400,
       proteinG: 180,
       carbsG: 200,
       fatG: 60,
     });
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+    await opened();
 
     expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp('value', '2400');
     expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '180');
-    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '200');
     expect(screen.getByTestId('nutrition-goals-fat')).toHaveProp('value', '60');
+    // 2,400 - 180 x 4 - 60 x 9 = 1,140 cal, or 285 g.
+    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveTextContent('285 g');
+    expect(screen.queryByTestId('nutrition-goals-filled-note')).toBeNull();
   });
 
-  it('does not auto-save anything just from opening the screen', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+  it('fills blank protein and fat from body weight, says so, and saves nothing by itself', async () => {
+    await opened();
 
+    // 78 kg is 172 lb: 0.8 g protein and 0.3 g fat per lb.
+    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '138');
+    expect(screen.getByTestId('nutrition-goals-fat')).toHaveProp('value', '52');
+    expect(screen.getByTestId('nutrition-goals-filled-note')).toHaveTextContent(
+      'Protein and fat are filled in from your weight. Save to keep them.',
+    );
     expect(mockSaveNutritionGoals).not.toHaveBeenCalled();
   });
 
-  it('suggests protein and fat from body weight, and only uses them on a tap', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+  it('shows the rule each macro follows, from the body weight', async () => {
+    await opened();
 
-    // 78 kg is 172 lb: 0.7-0.8 g protein and 0.3 g fat per lb.
-    expect(screen.getByTestId('nutrition-goals-macro-suggestion')).toHaveTextContent(
-      /Protein 120–138 g · fat about 52 g/,
+    expect(screen.getByTestId('nutrition-goals-guidance')).toHaveTextContent(
+      'From your body weight, 172 lb',
     );
-    expect(screen.getByTestId('nutrition-goals-macro-suggestion')).toHaveTextContent(
-      /don't make a deficit on their own/,
-    );
-    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '');
-
-    fireEvent.press(screen.getByTestId('nutrition-goals-use-macros'));
-
-    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '129');
-    expect(screen.getByTestId('nutrition-goals-fat')).toHaveProp('value', '52');
+    expect(screen.getByTestId('nutrition-goals-protein-rule')).toHaveTextContent('0.8 g × 172 lb');
+    expect(screen.getByTestId('nutrition-goals-fat-rule')).toHaveTextContent('0.3 g × 172 lb');
   });
 
-  it('works carbs out from the calories left after protein and fat, and keeps carbs the person typed', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+  it("offers the rule's number beside a macro the person set differently, and uses it only on a tap", async () => {
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: 2400,
+      proteinG: 180,
+      carbsG: null,
+      fatG: 52,
+    });
+    await opened();
 
-    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2200');
-    expect(screen.getByTestId('nutrition-goals-carb-hint')).toHaveTextContent(
-      'Add protein and fat to get a carb suggestion.',
+    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '180');
+    expect(screen.queryByTestId('nutrition-goals-fat-use')).toBeNull();
+    fireEvent.press(screen.getByTestId('nutrition-goals-protein-use'));
+
+    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '138');
+    expect(screen.queryByTestId('nutrition-goals-protein-use')).toBeNull();
+  });
+
+  it('works carbs out from the calories left after protein and fat -- they are never typed', async () => {
+    await opened();
+
+    expect(screen.getByTestId('nutrition-goals-carbs-rule')).toHaveTextContent(
+      'Set your calories to work out carbs.',
     );
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2200');
     fireEvent.changeText(screen.getByTestId('nutrition-goals-protein'), '160');
     fireEvent.changeText(screen.getByTestId('nutrition-goals-fat'), '60');
-    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '255');
-    expect(screen.getByTestId('nutrition-goals-total')).toHaveTextContent(
-      'Your macros come to 2,200 cal, matching your calorie target.',
-    );
 
-    fireEvent.changeText(screen.getByTestId('nutrition-goals-carbs'), '230');
-    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2400');
-    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '230');
-    expect(screen.getByTestId('nutrition-goals-carb-hint')).toHaveTextContent(/room for 305 g/);
-    expect(screen.getByTestId('nutrition-goals-total')).toHaveTextContent(
-      /2,100 cal, 300 under your 2,400 cal target/,
+    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveTextContent('255 g');
+    expect(screen.getByTestId('nutrition-goals-carbs-rule')).toHaveTextContent(
+      '1,020 cal left after protein and fat, ÷ 4',
     );
+    expect(screen.getByTestId('nutrition-goals-summary-carbs')).toHaveTextContent(/255 g/);
+    // Calories, protein and fat are the only fields.
+    expect(screen.UNSAFE_queryAllByType(RNTextInput)).toHaveLength(3);
 
-    fireEvent.press(screen.getByTestId('nutrition-goals-use-carbs'));
-    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '305');
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-protein'), '');
+    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveTextContent('—');
+    expect(screen.getByTestId('nutrition-goals-carbs-rule')).toHaveTextContent(
+      'Add protein and fat to work out carbs.',
+    );
   });
 
-  it('explains protein and fat that pass the calorie target, rather than clamping carbs', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+  it('explains protein and fat that pass the calories, and holds Save until one changes', async () => {
+    await opened();
 
     fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '1500');
     fireEvent.changeText(screen.getByTestId('nutrition-goals-protein'), '200');
     fireEvent.changeText(screen.getByTestId('nutrition-goals-fat'), '100');
 
-    expect(screen.getByTestId('nutrition-goals-carb-hint')).toHaveTextContent(
-      /Protein and fat come to 1,700 cal, 200 more than your calorie target/,
+    expect(screen.getByTestId('nutrition-goals-conflict')).toHaveTextContent(
+      /Protein and fat come to 1,700 cal, 200 more than your 1,500 cal/,
     );
-    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '');
+    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveTextContent('—');
+    expect(screen.getByTestId('nutrition-goals-save').props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2000');
+    expect(screen.queryByTestId('nutrition-goals-conflict')).toBeNull();
+    expect(screen.getByTestId('nutrition-goals-save').props.accessibilityState.disabled).toBe(
+      false,
+    );
   });
 
-  it('says a carb suggestion needs a calorie target', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+  it('asks for a body weight when there is none, and fills nothing in', async () => {
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, weightValue: null });
+    await opened();
 
-    expect(screen.getByTestId('nutrition-goals-carb-hint')).toHaveTextContent(
-      'A carb suggestion needs a calorie target.',
+    expect(screen.getByTestId('nutrition-goals-no-weight')).toHaveTextContent(
+      /0.8 g and 0.3 g per lb/,
     );
+    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '');
+    expect(screen.getByTestId('nutrition-goals-protein-rule')).toHaveTextContent('0.8 g per lb');
+    fireEvent.press(screen.getByTestId('nutrition-goals-add-weight'));
+    expect(mockNavigate).toHaveBeenCalledWith('CalorieEstimation');
   });
 
   it('rejects a non-whole calorie target and disables Save', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+    await opened();
 
     fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2400.5');
 
     expect(screen.getByTestId('nutrition-goals-save').props.accessibilityState.disabled).toBe(true);
   });
 
-  it('saves all four targets as typed, blank as no target', async () => {
+  it('saves calories, protein, fat and the carbs worked out from them', async () => {
     mockSaveNutritionGoals.mockImplementation(async (_user: string, goals: object) => goals);
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+    await opened();
 
     fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2200');
-    fireEvent.changeText(screen.getByTestId('nutrition-goals-protein'), '160');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('nutrition-goals-save'));
+    });
+
+    // 2,200 - 138 x 4 - 52 x 9 = 1,180 cal, or 295 g.
+    expect(mockSaveNutritionGoals).toHaveBeenCalledWith('user-1', {
+      calories: 2200,
+      proteinG: 138,
+      carbsG: 295,
+      fatG: 52,
+    });
+    expect(screen.getByTestId('nutrition-goals-saved')).toHaveTextContent(/Saved/);
+    expect(screen.queryByTestId('nutrition-goals-filled-note')).toBeNull();
+  });
+
+  it('saves a blank field as no target, and carbs with it', async () => {
+    mockSaveNutritionGoals.mockImplementation(async (_user: string, goals: object) => goals);
+    await opened();
+
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2200');
+    fireEvent.changeText(screen.getByTestId('nutrition-goals-protein'), '');
     await act(async () => {
       fireEvent.press(screen.getByTestId('nutrition-goals-save'));
     });
 
     expect(mockSaveNutritionGoals).toHaveBeenCalledWith('user-1', {
       calories: 2200,
-      proteinG: 160,
+      proteinG: null,
       carbsG: null,
-      fatG: null,
+      fatG: 52,
     });
-    expect(screen.getByTestId('nutrition-goals-saved')).toBeTruthy();
   });
 
   it('shows an error message when saving fails', async () => {
     mockFetchNutritionGoals.mockResolvedValue({ ...emptyGoals, calories: 2000 });
     mockSaveNutritionGoals.mockRejectedValue(new Error('network error'));
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+    await opened();
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('nutrition-goals-save'));
@@ -346,7 +403,7 @@ describe('NutritionGoalsScreen', () => {
     expect(await screen.findByTestId('nutrition-goals-error')).toHaveTextContent('network error');
   });
 
-  it('recalculates the estimates whenever the shared profile cache updates elsewhere, never the targets', async () => {
+  it('recalculates the estimates and the rule whenever the shared profile cache updates elsewhere, never the targets', async () => {
     // Simulates CalorieEstimationScreen -- a different screen, not rendered
     // here -- saving a weight change via the same shared updateProfile.
     let capturedUpdateProfile: ProfileContextValue['updateProfile'] | undefined;
@@ -369,7 +426,6 @@ describe('NutritionGoalsScreen', () => {
       </ProfileProvider>,
     );
     await screen.findByTestId('nutrition-goals-scroll');
-    const initialSummary = screen.getByTestId('nutrition-goals-summary').props.children;
     const initialMaintenance = screen.getByTestId('nutrition-goals-option-maintenance-value').props
       .children;
 
@@ -377,76 +433,70 @@ describe('NutritionGoalsScreen', () => {
       await capturedUpdateProfile?.({ weightValue: 95 });
     });
 
-    expect(screen.getByTestId('nutrition-goals-summary').props.children).not.toEqual(
-      initialSummary,
-    );
+    expect(screen.getByTestId('nutrition-goals-summary')).toHaveTextContent(/209.4 lb/);
     expect(
       screen.getByTestId('nutrition-goals-option-maintenance-value').props.children,
     ).not.toEqual(initialMaintenance);
-    // A new weight changes the suggestions, never a saved target.
+    // A new weight changes the rule's numbers, never a target: they're offered, not put in.
     expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp('value', '2100');
+    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '138');
+    expect(screen.getByTestId('nutrition-goals-protein-use')).toHaveTextContent('Use 168 g');
     expect(mockSaveNutritionGoals).not.toHaveBeenCalled();
   });
 
   it('shows a concise Important Notes section', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+    await opened();
 
     expect(screen.getByTestId('nutrition-goals-notes')).toHaveTextContent(/estimates/i);
   });
 });
 
-describe('NutritionGoalsScreen -- rows and one labelled field, one primary action', () => {
-  it('is four widgets: your information, your daily targets, the estimates and the notes', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+describe('NutritionGoalsScreen -- tiles, rows and one primary action', () => {
+  it('is five widgets: your details, the three steps and the notes', async () => {
+    await opened();
 
     const cards = screen.UNSAFE_queryAllByType(AppCard);
-    expect(cards).toHaveLength(4);
-    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false]);
-    // Today's Edit Targets opens here for the targets, so they come straight after the summary.
     expect(cards.map((c) => c.props.testID)).toEqual([
       'nutrition-goals-info-card',
-      'nutrition-goals-custom-card',
-      'nutrition-goals-targets',
+      'nutrition-goals-calories-card',
+      'nutrition-goals-macros',
+      'nutrition-goals-save-card',
       'nutrition-goals-notes',
     ]);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false, false]);
   });
 
-  it('shows the four estimates as rows with the calories as a mono readout, separated by hairlines', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+  it('shows the estimates as tiles with the calories as a mono readout', async () => {
+    await opened();
 
     const value = StyleSheet.flatten(
       screen.getByTestId('nutrition-goals-option-maintenance-value').props.style,
     );
     expect(value.fontFamily).toBe(fonts.mono);
     expect(screen.getByTestId('nutrition-goals-option-maintenance')).toHaveTextContent(
-      /Holds your current weight/,
+      /Holds your weight/,
     );
     expect(screen.getByTestId('nutrition-goals-option-deficit')).toHaveTextContent(
-      /vs\. maintenance/,
+      /−300 cal a day/,
     );
-    const first = StyleSheet.flatten(
-      screen.getByTestId('nutrition-goals-option-surplus').props.style,
+    expect(screen.getByTestId('nutrition-goals-option-surplus')).toHaveTextContent(
+      /\+300 cal a day/,
     );
-    const second = StyleSheet.flatten(
-      screen.getByTestId('nutrition-goals-option-maintenance').props.style,
+    expect(screen.getByTestId('nutrition-goals-option-aggressive').props.accessibilityLabel).toBe(
+      `Aggressive Loss, ${estimates.aggressiveDeficit.toLocaleString()} calories a day`,
     );
-    expect(first.borderTopWidth).toBeUndefined();
-    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
   });
 
   it('labels the target fields and offers Edit as a plain 44pt text action', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+    await opened();
 
     expect(screen.getByTestId('nutrition-goals-calories').props.accessibilityLabel).toBe(
-      'Calories',
+      'Or type your own',
     );
     expect(screen.getByTestId('nutrition-goals-protein').props.accessibilityLabel).toBe(
       'Protein (g)',
     );
+    expect(screen.getByTestId('nutrition-goals-fat').props.accessibilityLabel).toBe('Fat (g)');
     const edit = screen.getByTestId('nutrition-goals-edit');
     expect(StyleSheet.flatten(edit.props.style).borderWidth).toBeUndefined();
     expect(StyleSheet.flatten(edit.props.style).minHeight).toBeGreaterThanOrEqual(44);
@@ -454,8 +504,7 @@ describe('NutritionGoalsScreen -- rows and one labelled field, one primary actio
 
   it('has one filled Save that reports busy while saving', async () => {
     mockSaveNutritionGoals.mockReturnValue(new Promise(() => undefined));
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+    await opened();
 
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
     fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2400');
@@ -470,8 +519,7 @@ describe('NutritionGoalsScreen -- rows and one labelled field, one primary actio
   });
 
   it('renders no bare text outside <Text>', async () => {
-    renderScreen();
-    await screen.findByTestId('nutrition-goals-scroll');
+    await opened();
 
     expectNoBareText();
   });
