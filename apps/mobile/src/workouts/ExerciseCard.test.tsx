@@ -1,7 +1,13 @@
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { Card } from '../design/Card';
 import { typeScale } from '../design/theme';
 import { arePropsEqual, ExerciseCard } from './ExerciseCard';
+
+/** Opens the exercise's menu, where reorder, its own range and remove are. */
+function openMenu() {
+  fireEvent.press(screen.getByTestId('exercise-card-menu'));
+}
 
 const baseProps = {
   exerciseName: 'Barbell Bench Press',
@@ -35,10 +41,19 @@ describe('ExerciseCard', () => {
     expect(screen.getByText('Shoulders')).toBeTruthy();
   });
 
-  it('renders no exercise image', () => {
+  it("shows the exercise's initial when it has no photo, with nothing to open", () => {
     render(<ExerciseCard {...baseProps} />);
 
-    expect(screen.queryByRole('image')).toBeNull();
+    expect(screen.getByTestId('exercise-card-photo')).toHaveTextContent('B');
+    expect(screen.queryByTestId('exercise-card-photo-zoom')).toBeNull();
+  });
+
+  it('shows its photo when it has one, opening full size on a tap', () => {
+    render(<ExerciseCard {...baseProps} photoUrl="https://example.com/bench.jpg" />);
+
+    expect(screen.queryByTestId('exercise-card-photo-lightbox')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-card-photo-zoom'));
+    expect(screen.getByTestId('exercise-card-photo-lightbox')).toBeTruthy();
   });
 
   it('renders exactly one set row for a newly added exercise', () => {
@@ -60,9 +75,13 @@ describe('ExerciseCard', () => {
     const onRemoveExercise = jest.fn();
     render(<ExerciseCard {...baseProps} onRemoveExercise={onRemoveExercise} />);
 
+    expect(screen.queryByTestId('exercise-card-remove')).toBeNull();
+    openMenu();
     fireEvent.press(screen.getByTestId('exercise-card-remove'));
 
     expect(onRemoveExercise).toHaveBeenCalled();
+    // The menu closes once an action is taken.
+    expect(screen.queryByTestId('exercise-card-actions')).toBeNull();
   });
 
   it('offers no remove control on a set row when onRemoveSet is omitted', () => {
@@ -98,6 +117,7 @@ describe('ExerciseCard', () => {
 
   it('does not render reorder controls when onMoveUp/onMoveDown are omitted', () => {
     render(<ExerciseCard {...baseProps} />);
+    openMenu();
 
     expect(screen.queryByTestId('exercise-card-move-up')).toBeNull();
     expect(screen.queryByTestId('exercise-card-move-down')).toBeNull();
@@ -108,7 +128,9 @@ describe('ExerciseCard', () => {
     const onMoveDown = jest.fn();
     render(<ExerciseCard {...baseProps} onMoveUp={onMoveUp} onMoveDown={onMoveDown} />);
 
+    openMenu();
     fireEvent.press(screen.getByTestId('exercise-card-move-up'));
+    openMenu();
     fireEvent.press(screen.getByTestId('exercise-card-move-down'));
 
     expect(onMoveUp).toHaveBeenCalled();
@@ -123,18 +145,21 @@ describe('ExerciseCard', () => {
     expect(screen.queryByText(/calor/i)).toBeNull();
   });
 
-  it('shows no Last Workout section when there is no prior session', () => {
+  it('shows no Last Time when there is no prior session', () => {
     render(<ExerciseCard {...baseProps} />);
 
-    expect(screen.queryByText('Last Workout')).toBeNull();
+    expect(screen.queryByTestId('exercise-card-last')).toBeNull();
+    expect(screen.queryByTestId('exercise-card-previous-session')).toBeNull();
   });
 
-  it('shows every set from the last session, in order, with a numbered badge each', () => {
+  it('shows every set from the last session, in order, in a carousel, and its top set', () => {
     render(
       <ExerciseCard
         {...baseProps}
         previousSession={{
           dateDisplay: 'Sep 1, 2026',
+          topSetDisplay: '225 lb × 5',
+          topSetNumber: 1,
           sets: [
             {
               setNumber: 1,
@@ -162,12 +187,23 @@ describe('ExerciseCard', () => {
       />,
     );
 
-    const section = screen.getByTestId('exercise-card-previous-session');
-    expect(section).toHaveTextContent(/Last Workout/);
-    expect(section).toHaveTextContent(/Sep 1, 2026/);
-    expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(/225 lb/);
-    expect(screen.getByTestId('exercise-card-previous-set-2')).toHaveTextContent(/220 lb/);
-    expect(screen.getByTestId('exercise-card-previous-set-3')).toHaveTextContent(/215 lb/);
+    expect(screen.getByTestId('exercise-card-previous-session')).toHaveTextContent(
+      /Last Time's Sets/,
+    );
+    expect(screen.getByTestId('exercise-card-last')).toHaveTextContent(
+      /Last Time.*225 lb × 5.*Sep 1, 2026 · 3 sets/,
+    );
+    expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(
+      /Set 1 of 3.*225 lb × 5.*Top Set/,
+    );
+    expect(screen.getByTestId('exercise-card-previous-set-2')).toHaveTextContent(/220 lb × 5/);
+    expect(screen.getByTestId('exercise-card-previous-set-2')).not.toHaveTextContent(/Top Set/);
+    expect(screen.getByTestId('exercise-card-previous-set-3')).toHaveTextContent(/215 lb × 6/);
+    // One dot per set, the first showing.
+    expect(screen.getByTestId('exercise-card-previous-dot-0').props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(screen.getByTestId('exercise-card-previous-dot-2')).toBeTruthy();
   });
 
   it("shows a side tag for a unilateral exercise's previous sets", () => {
@@ -189,7 +225,9 @@ describe('ExerciseCard', () => {
       />,
     );
 
-    expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(/L 42\.5 lb/);
+    expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(
+      /Set 1 of 1 · Left.*42\.5 lb × 10/,
+    );
   });
 
   it('calls onViewHistory when View History is pressed', () => {
@@ -334,9 +372,11 @@ describe('ExerciseCard (unilateral exercise)', () => {
   });
 });
 
-describe('ExerciseCard -- a plain block, quiet controls, previous numbers beside the sets', () => {
+describe('ExerciseCard -- a widget, with its records, last time and today', () => {
   const previousSession = {
     dateDisplay: 'Sep 1, 2026',
+    topSetDisplay: '225 lb × 5',
+    topSetNumber: 1,
     sets: [
       { setNumber: 1, weightDisplay: '225', unit: 'lb' as const, reps: 5, side: null },
       {
@@ -349,81 +389,90 @@ describe('ExerciseCard -- a plain block, quiet controls, previous numbers beside
     ],
   };
 
-  it('shows the muscle group as plain text, not a badge, and draws no card', () => {
+  it('is one widget, with the muscle group as plain text, not a badge', () => {
     render(<ExerciseCard {...baseProps} />);
 
+    expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(1);
     const muscle = screen.getByTestId('exercise-card-muscle-group');
     expect(StyleSheet.flatten(muscle.props.style).backgroundColor).toBeUndefined();
-    const root = StyleSheet.flatten(screen.getByTestId('exercise-card').props.style);
-    expect(root.backgroundColor).toBeUndefined();
-    expect(root.borderWidth).toBeUndefined();
   });
 
-  it('draws a hairline above the block only when asked (every exercise but the first)', () => {
-    const { rerender } = render(<ExerciseCard {...baseProps} />);
-    expect(
-      StyleSheet.flatten(screen.getByTestId('exercise-card').props.style).borderTopWidth,
-    ).toBeUndefined();
-
-    rerender(<ExerciseCard {...baseProps} divider />);
-    expect(StyleSheet.flatten(screen.getByTestId('exercise-card').props.style).borderTopWidth).toBe(
-      StyleSheet.hairlineWidth,
+  it('opens and closes its menu from a named 44pt "more" glyph, each action named for assistive tech', () => {
+    render(
+      <ExerciseCard
+        {...baseProps}
+        onMoveUp={jest.fn()}
+        onMoveDown={jest.fn()}
+        onEditProgression={jest.fn()}
+      />,
     );
-  });
 
-  it('gives reorder and remove a 44pt-tall target each, named for assistive tech', () => {
-    render(<ExerciseCard {...baseProps} onMoveUp={jest.fn()} onMoveDown={jest.fn()} />);
+    const more = screen.getByTestId('exercise-card-menu');
+    expect(more.props.accessibilityLabel).toBe('Barbell Bench Press options');
+    expect(more.props.accessibilityState).toEqual({ expanded: false });
+    expect(StyleSheet.flatten(more.props.style).height).toBeGreaterThanOrEqual(44);
 
+    openMenu();
+    expect(screen.getByTestId('exercise-card-menu').props.accessibilityState).toEqual({
+      expanded: true,
+    });
     for (const [id, label] of [
       ['exercise-card-move-up', 'Move exercise up'],
       ['exercise-card-move-down', 'Move exercise down'],
+      ['exercise-card-range', 'Change the rep range for Barbell Bench Press'],
       ['exercise-card-remove', 'Remove exercise'],
     ] as const) {
       const control = screen.getByTestId(id);
       expect(control.props.accessibilityLabel).toBe(label);
-      expect(StyleSheet.flatten(control.props.style).height).toBeGreaterThanOrEqual(44);
+      expect(StyleSheet.flatten(control.props.style).minHeight).toBeGreaterThanOrEqual(44);
     }
+
+    openMenu();
+    expect(screen.queryByTestId('exercise-card-actions')).toBeNull();
   });
 
-  it('puts each previous set in set-grid columns: number, weight with its side, then reps', () => {
-    render(<ExerciseCard {...baseProps} previousSession={previousSession} />);
+  it('opens its own rep range from the menu', () => {
+    const onEditProgression = jest.fn();
+    render(<ExerciseCard {...baseProps} onEditProgression={onEditProgression} />);
 
-    const first = within(screen.getByTestId('exercise-card-previous-set-1'));
-    expect(first.getByText('1')).toBeTruthy();
-    expect(first.getByText('225 lb')).toBeTruthy();
-    expect(first.getByText('5')).toBeTruthy();
+    openMenu();
+    fireEvent.press(screen.getByTestId('exercise-card-range'));
 
-    const second = within(screen.getByTestId('exercise-card-previous-set-2'));
-    expect(second.getByText('2')).toBeTruthy();
-    expect(second.getByText('R 42.5 lb')).toBeTruthy();
-    expect(second.getByText('10')).toBeTruthy();
+    expect(onEditProgression).toHaveBeenCalled();
   });
 
-  it('reads each previous set aloud as a whole sentence for assistive tech', () => {
+  it('names a range only when the exercise has one of its own', () => {
+    const { rerender } = render(<ExerciseCard {...baseProps} />);
+    expect(screen.queryByTestId('exercise-card-own-range')).toBeNull();
+
+    rerender(<ExerciseCard {...baseProps} ownRangeText="Own range 3–5" />);
+    expect(screen.getByTestId('exercise-card-own-range')).toHaveTextContent('Own range 3–5');
+  });
+
+  it("reads each of last time's sets aloud as a whole sentence for assistive tech", () => {
     render(<ExerciseCard {...baseProps} previousSession={previousSession} />);
 
+    expect(screen.getByTestId('exercise-card-previous-set-1').props.accessibilityLabel).toBe(
+      'Set 1 of 2: 225 lb × 5, top set',
+    );
     expect(screen.getByTestId('exercise-card-previous-set-2').props.accessibilityLabel).toBe(
-      'Set 2 right: 42.5 lb for 10 reps',
+      'Set 2 of 2 · Right: 42.5 lb × 10',
     );
   });
 
-  it('emphasises the reps with the statistic style rather than the weight', () => {
+  it("shows each of last time's sets as a large mono readout", () => {
     render(<ExerciseCard {...baseProps} previousSession={previousSession} />);
 
-    const reps = within(screen.getByTestId('exercise-card-previous-set-1')).getByText('5');
-    expect(StyleSheet.flatten(reps.props.style).fontFamily).toBe(typeScale.statSmall.fontFamily);
-    const weight = within(screen.getByTestId('exercise-card-previous-set-1')).getByText('225 lb');
-    expect(StyleSheet.flatten(weight.props.style).fontFamily).not.toBe(
-      typeScale.statSmall.fontFamily,
+    const value = within(screen.getByTestId('exercise-card-previous-set-1')).getByText(
+      '225 lb × 5',
     );
+    expect(StyleSheet.flatten(value.props.style).fontFamily).toBe(typeScale.statLarge.fontFamily);
   });
 
-  it('shows no per-set proportion bars or cards for the previous session', () => {
+  it("puts today's sets under their own heading", () => {
     render(<ExerciseCard {...baseProps} previousSession={previousSession} />);
 
-    const set = StyleSheet.flatten(screen.getByTestId('exercise-card-previous-set-1').props.style);
-    expect(set.backgroundColor).toBeUndefined();
-    expect(set.minWidth).toBeUndefined();
+    expect(screen.getByText('Today')).toBeTruthy();
   });
 
   it('gives Add Set a full-width 44pt secondary button', () => {
@@ -573,10 +622,10 @@ describe('ExerciseCard by what the exercise measures', () => {
     expect(screen.getAllByText('Time').length).toBeGreaterThan(0);
     expect(screen.queryByText('Weight')).toBeNull();
     expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(/1:15/);
-    expect(screen.getByLabelText('Set 1: 1:15')).toBeTruthy();
+    expect(screen.getByLabelText('Set 1 of 1: 1:15')).toBeTruthy();
   });
 
-  it("shows a bodyweight exercise's last session as BW and reps", () => {
+  it("shows a bodyweight exercise's last session as reps", () => {
     render(
       <ExerciseCard
         {...baseProps}
@@ -589,7 +638,7 @@ describe('ExerciseCard by what the exercise measures', () => {
       />,
     );
 
-    expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(/BW.*20/);
+    expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(/20 reps/);
     expect(screen.queryByText('Weight')).toBeNull();
   });
 
@@ -619,17 +668,26 @@ describe('ExerciseCard progression', () => {
     detail: 'Pick a weight you can lift for about 8 reps, then build back up to 12.',
   };
 
-  it("shows the best within the range under Last Workout's date, and what to aim for under its sets", () => {
+  it('shows the all-time best with its date, and what to aim for under last time', () => {
     render(
       <ExerciseCard
         {...baseProps}
         previousSession={lastSession}
-        bestLine="Best at 8–12: 60 lb × 9"
+        allTimeBest={{
+          measurementType: 'weight_reps',
+          weightKg: 60 * 0.45359237,
+          reps: 9,
+          durationSeconds: null,
+          achievedAt: '2026-09-02T12:00:00.000Z',
+        }}
         progressionCue={cue}
       />,
     );
 
-    expect(screen.getByTestId('exercise-card-best')).toHaveTextContent('Best at 8–12: 60 lb × 9');
+    // The rep range isn't named: the best is within it by default.
+    expect(screen.getByTestId('exercise-card-best')).toHaveTextContent(
+      /^All-Time Best60 lb × 9Sep 2, 2026$/,
+    );
     expect(screen.getByTestId('exercise-card-cue')).toHaveTextContent(/Increase the weight today/);
     expect(screen.getByTestId('exercise-card-cue')).toHaveTextContent(/about 8 reps/);
     expect(
@@ -670,6 +728,27 @@ describe('ExerciseCard progression', () => {
     );
   });
 
+  it("says Today, in the accent, once one of today's sets is the best", () => {
+    render(
+      <ExerciseCard
+        {...baseProps}
+        allTimeBest={{
+          measurementType: 'bodyweight',
+          weightKg: null,
+          reps: 21,
+          durationSeconds: null,
+          achievedAt: null,
+        }}
+      />,
+    );
+
+    const best = screen.getByTestId('exercise-card-best');
+    expect(best).toHaveTextContent(/21 reps.*Today/);
+    expect(StyleSheet.flatten(within(best).getByText('21 reps').props.style).color).toBe(
+      baseProps.accentColor,
+    );
+  });
+
   it('shows none of it when there is nothing to say', () => {
     render(<ExerciseCard {...baseProps} previousSession={lastSession} />);
 
@@ -678,13 +757,24 @@ describe('ExerciseCard progression', () => {
     expect(screen.queryByTestId('exercise-card-session-cue')).toBeNull();
   });
 
-  it('re-renders when the cue, the best line or the session cue changes, and not otherwise', () => {
+  it('re-renders when the cue, the all-time best or the session cue changes, and not otherwise', () => {
     const props = { ...baseProps, previousSession: lastSession, progressionCue: cue };
     expect(arePropsEqual(props, { ...props, progressionCue: { ...cue, options: [] } })).toBe(true);
     expect(
       arePropsEqual(props, { ...props, progressionCue: { ...cue, headline: 'Last time: 11' } }),
     ).toBe(false);
-    expect(arePropsEqual(props, { ...props, bestLine: 'Best at 8–12: 60 lb × 9' })).toBe(false);
+    const best = {
+      measurementType: 'weight_reps' as const,
+      weightKg: 27,
+      reps: 9,
+      durationSeconds: null,
+      achievedAt: '2026-09-02T12:00:00.000Z',
+    };
+    expect(
+      arePropsEqual({ ...props, allTimeBest: best }, { ...props, allTimeBest: { ...best } }),
+    ).toBe(true);
+    expect(arePropsEqual(props, { ...props, allTimeBest: best })).toBe(false);
+    expect(arePropsEqual(props, { ...props, ownRangeText: 'Own range 3–5' })).toBe(false);
     expect(arePropsEqual(props, { ...props, sessionCue: 'Top of your range.' })).toBe(false);
   });
 });

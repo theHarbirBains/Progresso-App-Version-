@@ -21,21 +21,17 @@ export const PER_SIDE_NOTE: Record<MeasurementType, string> = {
 /** The heading row above an exercise's sets: Set, then its value columns. */
 export function SetColumnHeader({
   measurementType = 'weight_reps',
-  previous = false,
 }: {
   measurementType?: MeasurementType;
-  /** The quieter heading over last session's sets, rather than the sets being logged. */
-  previous?: boolean;
 }) {
   const columns = COLUMN_LABELS[measurementType];
-  const columnStyle = previous ? styles.previousColumnInput : styles.setHeaderInput;
   return (
-    <View style={previous ? styles.previousColumnHeader : styles.setHeaderRow}>
-      <Text style={previous ? styles.previousColumnIndex : styles.setHeaderIndex}>Set</Text>
+    <View style={styles.setHeaderRow}>
+      <Text style={styles.setHeaderIndex}>Set</Text>
       {columns.map((column, index) => (
         <Text
           key={`${index}-${column}`}
-          style={[columnStyle, columns.length === 1 && styles.setInputWide]}
+          style={[styles.setHeaderInput, columns.length === 1 && styles.setInputWide]}
         >
           {column}
         </Text>

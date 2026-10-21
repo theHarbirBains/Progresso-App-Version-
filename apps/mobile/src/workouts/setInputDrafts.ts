@@ -1,6 +1,7 @@
 import type { MeasurementType } from '../exercises/movementTypes';
 import { formatDuration, parseDuration } from '../lib/duration';
 import { formatWeightKg, isValidWeightIncrement, roundWeight, toKg } from '../lib/units';
+import { bestLoggedSet, formatSetValues } from './setValues';
 import { formatShortDate } from './workoutFormat';
 import type {
   ExerciseCardSet,
@@ -40,8 +41,11 @@ export function buildPreviousSessionDisplay(
   type: MeasurementType = 'weight_reps',
 ): PreviousSessionDisplay | null {
   if (!previous || previous.sets.length === 0) return null;
+  const top = bestLoggedSet(previous.sets, type);
   return {
     dateDisplay: formatShortDate(previous.performedAt),
+    topSetDisplay: top ? formatSetValues({ ...top, measurementType: type }, unit) : null,
+    topSetNumber: top ? previous.sets.indexOf(top) + 1 : null,
     sets: previous.sets.map((s, i) => ({
       setNumber: i + 1,
       weightDisplay: type === 'weight_reps' ? formatWeightKg(s.weightKg ?? 0, unit) : '',

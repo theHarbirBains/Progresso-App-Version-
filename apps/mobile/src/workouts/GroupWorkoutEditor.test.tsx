@@ -157,7 +157,8 @@ describe('GroupWorkoutEditor', () => {
     renderEditor();
 
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
-    fireEvent.press(await screen.findByTestId('group-workout-exercise-squat-remove'));
+    fireEvent.press(await screen.findByTestId('group-workout-exercise-squat-menu'));
+    fireEvent.press(screen.getByTestId('group-workout-exercise-squat-remove'));
     // Confirm the removal in the alert: the second button is "Remove".
     const buttons = alertSpy.mock.calls[0][2] ?? [];
     buttons[1].onPress?.();

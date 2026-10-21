@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, StyleSheet, View } from 'react-native';
+import { Card } from '../design/Card';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { Text } from '../design/Text';
 import { UnderlineTabs } from '../design/UnderlineTabs';
-import { colors, spacing, typeScale } from '../design/theme';
+import { colors, typeScale, widgetGap } from '../design/theme';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import { computeTotalSets } from './workoutSummary';
@@ -422,13 +423,15 @@ export function GroupWorkoutEditor({
         />
       ) : null}
 
-      <WorkoutStats
-        testID={`${testID}-summary`}
-        performedAt={startedAt}
-        active
-        totalSets={computeTotalSets(selectedDetail?.exercises ?? [])}
-        totalExercises={selectedDetail?.exercises.length ?? 0}
-      />
+      <Card>
+        <WorkoutStats
+          testID={`${testID}-summary`}
+          performedAt={startedAt}
+          active
+          totalSets={computeTotalSets(selectedDetail?.exercises ?? [])}
+          totalExercises={selectedDetail?.exercises.length ?? 0}
+        />
+      </Card>
 
       {error ? (
         <Text testID={`${testID}-error`} style={styles.error}>
@@ -458,6 +461,7 @@ export function GroupWorkoutEditor({
             muscleGroup={row.muscleGroup}
             movementType={row.movementType}
             measurementType={type}
+            photoUrl={row.photoUrl}
             previousSession={previousSession}
             sets={
               row.movementType === 'unilateral' ? [] : computeCardSets(row.sets, setInputs, type)
@@ -478,7 +482,6 @@ export function GroupWorkoutEditor({
             }}
             onAddSet={() => void addSet(row)}
             onRemoveExercise={() => confirmRemove(row)}
-            divider
             accentColor={accentColor}
             onAccentColor={onAccentColor}
           />
@@ -535,7 +538,7 @@ function firstName(name: string | null): string {
 
 const styles = StyleSheet.create({
   root: {
-    gap: spacing.md,
+    gap: widgetGap,
   },
   error: {
     ...typeScale.secondary,

@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
+import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
 // Shared styles for the Live Workout experience: ActiveWorkoutScreen, its
 // stats strip, exercise blocks and set rows, and the Add Exercise picker.
@@ -8,18 +8,21 @@ import { colors, minTouchTarget, radii, spacing, typeScale } from '../design/the
 //
 // Design intent: this is the screen used mid-set, one-handed, between sets.
 // So: big numeric inputs (48pt tall, mono readout), a 44pt complete button
-// per set, the previous session's numbers printed right above the sets they
-// are meant to be compared with, and exactly one filled button (Finish
-// Workout). Exercises are plain blocks separated by hairlines, not cards.
+// per set, and exactly one filled button (Finish Workout). Each exercise is its
+// own widget (a `Card`): its photo, its records (All-Time Best, Last Time),
+// last session's sets in a carousel, then today's sets.
 export const liveWorkoutStyles = StyleSheet.create({
   // ---- Frame ---------------------------------------------------------------
   // The scrolling body: exercise blocks, then the add-exercise actions.
   flex: {
     flex: 1,
   },
+  // The exercise widgets, `widgetGap` apart.
   content: {
     paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.xxl,
+    gap: widgetGap,
   },
   errorText: {
     ...typeScale.callout,
@@ -34,14 +37,9 @@ export const liveWorkoutStyles = StyleSheet.create({
     paddingTop: spacing.xl,
     gap: spacing.xs,
   },
-  // Pinned under the header so the timer, set count and volume stay in view
-  // while the list scrolls.
+  // The duration, set count and exercise count, three neutral mono readouts in a row.
   statsBar: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
   },
   statCell: {
     flex: 1,
@@ -56,6 +54,36 @@ export const liveWorkoutStyles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
+  // Pinned under the header: the workout's widget -- its stats and the person's rep range --
+  // stays in view while the exercises scroll.
+  heroWrap: {
+    paddingHorizontal: spacing.xxl,
+    paddingBottom: spacing.sm,
+  },
+  rangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  rangeBody: {
+    flex: 1,
+  },
+  rangeText: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
+  },
+  rangeValue: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+  },
+  rangeNote: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+  },
   // Pinned above the bottom navigation: the one primary action. The bottom
   // navigation pads for the device inset itself, so this adds none.
   footer: {
@@ -66,18 +94,11 @@ export const liveWorkoutStyles = StyleSheet.create({
     borderTopColor: colors.divider,
   },
 
-  // ---- Exercise block --------------------------------------------------------
-  exerciseBlock: {
-    paddingVertical: spacing.xl,
-  },
-  exerciseDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-  },
+  // ---- Exercise widget ------------------------------------------------------
   exerciseHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   exerciseTitleBlock: {
     flex: 1,
@@ -91,6 +112,11 @@ export const liveWorkoutStyles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  // Only an exercise with a rep range of its own says so, in the accent.
+  ownRange: {
+    ...typeScale.caption,
+    marginTop: 2,
+  },
   // Explicit "weight is per side" note for a unilateral exercise -- makes the
   // per-side convention obvious rather than leaving it to the Left/Right
   // labels alone.
@@ -99,49 +125,75 @@ export const liveWorkoutStyles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
-  // The exercise's rep range, a quiet link to change it for this exercise.
-  rangeLink: {
-    ...typeScale.caption,
-    marginTop: 2,
-  },
+  // Edit Workout's and Log a Past Workout's reorder/remove glyphs, side by side.
   exerciseActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  // Reorder / remove: a bare glyph, but a full 44pt target.
+  // A bare glyph (the "more" glyph, reorder, remove), but a full 44pt target.
   exerciseAction: {
     width: 40,
     height: minTouchTarget,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // The exercise's actions, opened from its "more" glyph: a row of glyph-over-label targets.
+  menuRow: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceLift,
+  },
+  menuAction: {
+    flex: 1,
+    minHeight: minTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  menuActionLabel: {
+    ...typeScale.caption,
+  },
 
-  // ---- Last Workout ----------------------------------------------------------
-  // Every set from the user's last completed session with this exercise, as
-  // rows in the same columns as today's set rows (number, weight, reps) so each
-  // previous figure sits directly above the input it is compared with. All
-  // visible at once (nothing hides behind a horizontal scroll) while typing.
-  previousSession: {
+  // All-Time Best and Last Time, side by side, `widgetGap` apart like StatBlocks.
+  recordTiles: {
+    flexDirection: 'row',
+    gap: widgetGap,
     marginTop: spacing.md,
   },
-  previousHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  recordTile: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceLift,
   },
-  previousTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  previousTitle: {
-    ...typeScale.label,
+  recordLabel: {
+    ...typeScale.caption,
     color: colors.textSecondary,
   },
-  previousDate: {
+  recordValue: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+    marginTop: 2,
+  },
+  recordMeta: {
     ...typeScale.caption,
     color: colors.textMuted,
     marginTop: 2,
+  },
+
+  // ---- Last Time's sets --------------------------------------------------------
+  // Every set from the last session with this exercise, one at a time in a carousel that
+  // moves on by itself and can be swiped to any set.
+  previousSession: {
+    marginTop: spacing.lg,
+  },
+  previousHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
   },
   viewHistory: {
     flexDirection: 'row',
@@ -152,48 +204,26 @@ export const liveWorkoutStyles = StyleSheet.create({
     ...typeScale.secondary,
     fontFamily: typeScale.label.fontFamily,
   },
-  previousColumnHeader: {
-    flexDirection: 'row',
+  slide: {
     alignItems: 'center',
-    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
   },
-  previousColumnIndex: {
-    width: 28,
+  slideLabel: {
     ...typeScale.caption,
     color: colors.textMuted,
   },
-  previousColumnInput: {
-    flex: 1,
-    ...typeScale.caption,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  previousSets: {
+  slideValue: {
+    ...typeScale.statLarge,
+    color: colors.textPrimary,
     marginTop: spacing.xs,
   },
-  previousSet: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
-  },
-  previousSetNumber: {
-    width: 28,
+  slideTag: {
     ...typeScale.caption,
-    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
-  previousSetWeight: {
-    flex: 1,
-    marginHorizontal: spacing.xs,
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  previousSetReps: {
-    flex: 1,
-    marginHorizontal: spacing.xs,
-    ...typeScale.statSmall,
-    color: colors.textPrimary,
-    textAlign: 'center',
+  // Today's sets, under their own heading.
+  today: {
+    marginTop: spacing.lg,
   },
 
   // ---- Set rows --------------------------------------------------------------
@@ -309,11 +339,6 @@ export const liveWorkoutStyles = StyleSheet.create({
 
   // ---- Progression (workouts/progression.ts) ---------------------------------
   // Quiet text, never a card or a badge: the one accent is the small glyph.
-  bestLine: {
-    ...typeScale.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
   cue: {
     flexDirection: 'row',
     alignItems: 'flex-start',

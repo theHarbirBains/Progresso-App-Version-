@@ -1,20 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { AutoCarousel } from '../design/AutoCarousel';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
-import { useReduceMotionPreference } from '../navigation/navigationTransitions';
-import { useScreenFocused } from '../navigation/useScreenFocused';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import { formatSetValues } from '../workouts/setValues';
 
-const AUTO_ADVANCE_MS = 3500;
 const PHOTO_SIZE = 56;
 
 interface Props {
@@ -24,42 +15,15 @@ interface Props {
 }
 
 // A swipeable, self-advancing "Top Sets" strip for the most recent workout on
-// Feed: one slide per exercise with a real top set, paged by swipe, moving on
-// by itself every few seconds (held still while the user is dragging or Feed
-// isn't the page in view, and not animated when Reduce Motion is on), with a
-// quiet pagination indicator. Only
-// the exercise name and its top-set readout are the visual focus. When an
-// exercise has a machine photo it sits beside its readout, and tapping it opens
-// the full-size picture (ExercisePhoto's zoom) -- the same for everyone's cards.
+// Feed: one slide per exercise with a real top set (the shared AutoCarousel --
+// paged by swipe, moving on by itself every few seconds, held still while the
+// user is dragging or Feed isn't the page in view, not animated when Reduce
+// Motion is on, with a quiet pagination indicator). Only the exercise name and
+// its top-set readout are the visual focus. When an exercise has a machine
+// photo it sits beside its readout, and tapping it opens the full-size picture
+// (ExercisePhoto's zoom) -- the same for everyone's cards.
 export function RecentWorkoutTopSets({ topSets, weightUnit, testID }: Props) {
-  const reduceMotion = useReduceMotionPreference();
-  // Nobody sees it advance while another page is open on top of Feed.
-  const inView = useScreenFocused();
-  const [width, setWidth] = useState(0);
-  const [index, setIndex] = useState(0);
-  const indexRef = useRef(0);
-  const scrollRef = useRef<ScrollView>(null);
-  const draggingRef = useRef(false);
-  const count = topSets.length;
-
-  function goTo(next: number) {
-    indexRef.current = next;
-    setIndex(next);
-    scrollRef.current?.scrollTo({ x: next * width, animated: !reduceMotion });
-  }
-
-  useEffect(() => {
-    if (count < 2 || !inView) return;
-    const id = setInterval(() => {
-      if (draggingRef.current) return;
-      goTo((indexRef.current + 1) % count);
-    }, AUTO_ADVANCE_MS);
-    return () => clearInterval(id);
-    // goTo reads width/reduceMotion via closure; restart the timer if either changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [count, width, reduceMotion, inView]);
-
-  if (count === 0) {
+  if (topSets.length === 0) {
     return (
       <View testID={testID} style={styles.wrap}>
         <Text style={styles.heading}>Top Sets</Text>
@@ -70,34 +34,15 @@ export function RecentWorkoutTopSets({ topSets, weightUnit, testID }: Props) {
     );
   }
 
-  function handleMomentumEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    draggingRef.current = false;
-    if (width === 0) return;
-    const next = Math.round(event.nativeEvent.contentOffset.x / width);
-    indexRef.current = next;
-    setIndex(next);
-  }
-
   return (
     <View testID={testID} style={styles.wrap}>
       <Text style={styles.heading}>Top Sets</Text>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-        onScrollBeginDrag={() => {
-          draggingRef.current = true;
-        }}
-        onMomentumScrollEnd={handleMomentumEnd}
-      >
-        {topSets.map((topSet) => (
-          <View
-            key={topSet.exerciseId}
-            testID={testID ? `${testID}-slide-${topSet.exerciseId}` : undefined}
-            style={[styles.slide, { width: width || undefined }]}
-          >
+      <AutoCarousel
+        testID={testID}
+        items={topSets}
+        keyOf={(topSet) => topSet.exerciseId}
+        renderSlide={(topSet) => (
+          <View style={styles.slide}>
             {topSet.photoUrl ? (
               <ExercisePhoto
                 testID={testID ? `${testID}-photo-${topSet.exerciseId}` : undefined}
@@ -113,20 +58,8 @@ export function RecentWorkoutTopSets({ topSets, weightUnit, testID }: Props) {
               <Text style={styles.topSetValue}>{formatSetValues(topSet, weightUnit)}</Text>
             </View>
           </View>
-        ))}
-      </ScrollView>
-      {count > 1 ? (
-        <View style={styles.dots}>
-          {topSets.map((topSet, i) => (
-            <View
-              key={topSet.exerciseId}
-              testID={testID ? `${testID}-dot-${i}` : undefined}
-              accessibilityState={{ selected: i === index }}
-              style={[styles.dot, i === index ? styles.dotActive : null]}
-            />
-          ))}
-        </View>
-      ) : null}
+        )}
+      />
     </View>
   );
 }
@@ -161,20 +94,5 @@ const styles = StyleSheet.create({
   topSetValue: {
     ...typeScale.statMedium,
     color: colors.textPrimary,
-  },
-  dots: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    justifyContent: 'center',
-    marginTop: spacing.xs,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.textMuted,
-  },
-  dotActive: {
-    backgroundColor: colors.textPrimary,
   },
 });

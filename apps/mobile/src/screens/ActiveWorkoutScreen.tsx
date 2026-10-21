@@ -1,5 +1,7 @@
+import { Feather } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
+import { Card } from '../design/Card';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
@@ -15,6 +17,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { useProfile } from '../profile/ProfileProvider';
+import { RepRangeSheet } from '../settings/RepRangeSheet';
 import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
 import { ExerciseCard } from '../workouts/ExerciseCard';
@@ -101,7 +104,9 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     repPRs: allRepPRs,
     exerciseRecords: allExerciseRecords,
   } = useAllTimeStats();
-  const { profile } = useProfile();
+  const { profile, updateProfile } = useProfile();
+  // The person's own rep range being changed from the top of the workout; null while closed.
+  const [repRangeDraft, setRepRangeDraft] = useState<RepRange | null>(null);
   // Progressive overload (workouts/progression.ts): the person's one rep range, and whether to
   // suggest anything. Read off the shared profile, so a change in Settings shows straight away.
   const progressionSettings = {
@@ -823,6 +828,21 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     new Set(workout.exercises.map((ex) => MUSCLE_GROUP_LABELS[ex.muscleGroup])),
   ).join(', ');
   const totalSets = computeTotalSets(workout.exercises);
+  // Exercises in this workout with a range of their own, which the person's range doesn't apply to.
+  const ownRangeCount = workout.exercises.filter(
+    (exercise) =>
+      measurementTypeOf(exercise) !== 'timed' && exerciseSettings.get(exercise.exerciseId)?.range,
+  ).length;
+
+  async function saveRepRange(range: RepRange) {
+    setRepRangeDraft(null);
+    setError(null);
+    try {
+      await updateProfile({ repRangeMin: range.min, repRangeMax: range.max });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save your rep range');
+    }
+  }
 
   return (
     <>
@@ -837,13 +857,42 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               title={workout.name}
               subtitle={muscleGroupsLabel || undefined}
             />
-            <WorkoutStats
-              testID="active-workout-summary"
-              performedAt={workout.performedAt}
-              active={!workout.completedAt}
-              totalSets={totalSets}
-              totalExercises={workout.exercises.length}
-            />
+            <View style={styles.heroWrap}>
+              <Card testID="active-workout-hero">
+                <WorkoutStats
+                  testID="active-workout-summary"
+                  performedAt={workout.performedAt}
+                  active={!workout.completedAt}
+                  totalSets={totalSets}
+                  totalExercises={workout.exercises.length}
+                />
+                {/* The person's one rep range, for every exercise without its own. */}
+                <View testID="active-workout-rep-range" style={styles.rangeRow}>
+                  <Feather name="repeat" size={16} color={theme.accent} />
+                  <View style={styles.rangeBody}>
+                    <Text style={styles.rangeText}>
+                      Your rep range{' '}
+                      <Text testID="active-workout-rep-range-value" style={styles.rangeValue}>
+                        {formatRepRange(progressionSettings.range)}
+                      </Text>
+                    </Text>
+                    {ownRangeCount > 0 ? (
+                      <Text testID="active-workout-own-ranges" style={styles.rangeNote}>
+                        {ownRangeCount === 1
+                          ? '1 exercise here has its own'
+                          : `${ownRangeCount} exercises here have their own`}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <TextButton
+                    testID="active-workout-rep-range-edit"
+                    label="Edit"
+                    accessibilityLabel="Change your rep range"
+                    onPress={() => setRepRangeDraft(progressionSettings.range)}
+                  />
+                </View>
+              </Card>
+            </View>
           </View>
         }
       >
@@ -879,17 +928,16 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 library,
                 override: exerciseSettings.get(exercise.exerciseId) ?? null,
               })}
-              rangeText={
-                measurementTypeOf(exercise) === 'timed'
-                  ? null
-                  : exerciseSettings.get(exercise.exerciseId)?.range
-                    ? `Range ${formatRepRange(
-                        effectiveRepRange(
-                          progressionSettings.range,
-                          exerciseSettings.get(exercise.exerciseId)?.range ?? null,
-                        ),
-                      )} · this exercise`
-                    : `Range ${formatRepRange(progressionSettings.range)}`
+              ownRangeText={
+                measurementTypeOf(exercise) !== 'timed' &&
+                exerciseSettings.get(exercise.exerciseId)?.range
+                  ? `Own range ${formatRepRange(
+                      effectiveRepRange(
+                        progressionSettings.range,
+                        exerciseSettings.get(exercise.exerciseId)?.range ?? null,
+                      ),
+                    )}`
+                  : null
               }
               onEditProgression={
                 measurementTypeOf(exercise) === 'timed'
@@ -906,6 +954,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               muscleGroup={exercise.muscleGroup}
               movementType={exercise.movementType}
               measurementType={measurementTypeOf(exercise)}
+              photoUrl={exercise.photoUrl}
+              weightUnit={weightUnit}
               previousSession={buildPreviousSessionDisplay(
                 previousPerformance[exercise.exerciseId],
                 weightUnit,
@@ -943,7 +993,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               onMoveDown={
                 index < workout.exercises.length - 1 ? getMoveHandler(index, 1) : undefined
               }
-              divider={index > 0}
               accentColor={theme.accent}
               onAccentColor={theme.onAccent}
             />
@@ -996,6 +1045,15 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           setPickerOpen(false);
           setCustomExerciseOpen(true);
         }}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+      />
+
+      <RepRangeSheet
+        draft={repRangeDraft}
+        onChangeDraft={setRepRangeDraft}
+        onClose={() => setRepRangeDraft(null)}
+        onSave={(range) => void saveRepRange(range)}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
       />

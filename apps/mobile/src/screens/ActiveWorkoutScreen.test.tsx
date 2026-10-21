@@ -4,12 +4,13 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { fetchExerciseSettings, saveExerciseSetting } from '../workouts/exerciseSettingsQueries';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
+import { Card } from '../design/Card';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { colors, fonts } from '../design/theme';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
-import { createExercise } from '../lib/api';
+import { createExercise, updateMyProfile } from '../lib/api';
 import { fetchAllExercises } from '../exercises/exerciseQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
@@ -422,6 +423,7 @@ describe('ActiveWorkoutScreen', () => {
     });
     await screen.findByTestId('exercise-card-we1');
 
+    fireEvent.press(screen.getByTestId('exercise-card-we1-menu'));
     fireEvent.press(screen.getByTestId('exercise-card-we1-remove'));
 
     await waitFor(() => expect(mockRemoveExerciseFromWorkout).toHaveBeenCalledWith('we1'));
@@ -546,6 +548,7 @@ describe('ActiveWorkoutScreen', () => {
     });
     await screen.findByTestId('exercise-card-we2');
 
+    fireEvent.press(screen.getByTestId('exercise-card-we2-menu'));
     fireEvent.press(screen.getByTestId('exercise-card-we2-move-up'));
 
     await waitFor(() =>
@@ -1287,11 +1290,15 @@ describe('Last Workout', () => {
     await screen.findByTestId('exercise-card-we1');
 
     const section = await screen.findByTestId('exercise-card-we1-previous-session');
-    expect(section).toHaveTextContent(/Last Workout/);
+    expect(section).toHaveTextContent(/Last Time's Sets/);
     // In logged order, all 3 -- never capped or reduced to a single "top" set.
-    expect(screen.getByTestId('exercise-card-we1-previous-set-1')).toHaveTextContent(/100 kg/);
+    expect(screen.getByTestId('exercise-card-we1-previous-set-1')).toHaveTextContent(
+      /Set 1 of 3.*100 kg × 5.*Top Set/,
+    );
     expect(screen.getByTestId('exercise-card-we1-previous-set-2')).toHaveTextContent(/97\.5 kg/);
     expect(screen.getByTestId('exercise-card-we1-previous-set-3')).toHaveTextContent(/95 kg/);
+    // Last Time's tile: that session's top set, its date and how many sets.
+    expect(screen.getByTestId('exercise-card-we1-last')).toHaveTextContent(/100 kg × 5.*3 sets/);
   });
 
   it('fetches and shows the previous session for a newly added exercise too, not just ones already in the workout', async () => {
@@ -1445,12 +1452,12 @@ describe('Progressive overload', () => {
     expect(cue).toHaveTextContent(/about 8 reps, then build back up to 12/);
   });
 
-  it('says to keep the weight and work toward the top before then', async () => {
+  it('says, in general, to keep the top set weight the same until the top of the range', async () => {
     mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: 100, reps: 7 }]));
     renderScreen();
 
     expect(await screen.findByTestId('exercise-card-we1-cue')).toHaveTextContent(
-      /Last time: 7 at 100 kg\. Keep 100 kg and work toward 12\./,
+      /Keep your top set weight the same until you reach 12 reps, then we'll recommend your next increment\./,
     );
   });
 
@@ -1481,7 +1488,7 @@ describe('Progressive overload', () => {
     expect(screen.queryByTestId('exercise-card-we1-cue')).toBeNull();
   });
 
-  it('shows the best within the range from the PRs already kept', async () => {
+  it('shows the all-time best within the range, with its date, from the PRs already kept', async () => {
     mockFetchAllRepPRs.mockResolvedValue([
       {
         exerciseId: 'ex1',
@@ -1496,9 +1503,11 @@ describe('Progressive overload', () => {
     mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: 100, reps: 10 }]));
     renderScreen();
 
-    expect(await screen.findByTestId('exercise-card-we1-best')).toHaveTextContent(
-      'Best at 8–12: 105 kg × 9',
-    );
+    const best = await screen.findByTestId('exercise-card-we1-best');
+    expect(best).toHaveTextContent(/All-Time Best.*105 kg × 9/);
+    expect(best).not.toHaveTextContent(/8–12/);
+    // When it was set, as a date.
+    expect(best).toHaveTextContent(/[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
   });
 
   it("says so in the workout once today's top set reaches the top", async () => {
@@ -1610,21 +1619,17 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     await screen.findByTestId('exercise-card-we1');
   }
 
-  it('shows exercises as plain blocks, in no cards', async () => {
+  it("shows each exercise as its own widget, under the workout's own", async () => {
     mockFetchWorkoutDetail.mockResolvedValue(twoExercises);
     await renderReady();
 
     expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
-  });
-
-  it('separates exercises with a hairline, none above the first', async () => {
-    mockFetchWorkoutDetail.mockResolvedValue(twoExercises);
-    await renderReady();
-
-    const first = StyleSheet.flatten(screen.getByTestId('exercise-card-we1').props.style);
-    const second = StyleSheet.flatten(screen.getByTestId('exercise-card-we2').props.style);
-    expect(first.borderTopWidth).toBeUndefined();
-    expect(second.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+    // The workout's widget (pinned), then one per exercise.
+    expect(screen.UNSAFE_queryAllByType(Card).map((card) => card.props.testID)).toEqual([
+      'active-workout-hero',
+      'exercise-card-we1',
+      'exercise-card-we2',
+    ]);
   });
 
   it('shows the workout name and its muscles in the header', async () => {
@@ -1701,7 +1706,7 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     expect(screen.UNSAFE_getAllByType(KeyboardAvoidingView).length).toBeGreaterThan(0);
   });
 
-  it('shows the last session as plain text beside the sets -- all of it visible, none behind a horizontal scroll', async () => {
+  it("shows last time's sets one at a time, each as its own slide", async () => {
     mockFetchPreviousPerformance.mockResolvedValue({
       performedAt: '2026-01-05T00:00:00Z',
       sets: [
@@ -1713,14 +1718,13 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
 
     await screen.findByTestId('exercise-card-we1-previous-session');
     const lastSet1 = within(screen.getByTestId('exercise-card-we1-previous-set-1'));
-    expect(lastSet1.getByText('100 kg')).toBeTruthy();
-    expect(lastSet1.getByText('5')).toBeTruthy();
+    expect(lastSet1.getByText('100 kg × 5')).toBeTruthy();
     const lastSet2 = within(screen.getByTestId('exercise-card-we1-previous-set-2'));
-    expect(lastSet2.getByText('97.5 kg')).toBeTruthy();
-    expect(lastSet2.getByText('5')).toBeTruthy();
-    expect(
-      screen.UNSAFE_queryAllByType(ScrollView).filter((node) => node.props.horizontal),
-    ).toHaveLength(0);
+    expect(lastSet2.getByText('97.5 kg × 5')).toBeTruthy();
+    // The carousel: one horizontal, paged strip of slides.
+    const strips = screen.UNSAFE_queryAllByType(ScrollView).filter((node) => node.props.horizontal);
+    expect(strips).toHaveLength(1);
+    expect(strips[0].props.pagingEnabled).toBe(true);
   });
 });
 
@@ -1751,10 +1755,13 @@ describe("ActiveWorkoutScreen -- an exercise's own rep range", () => {
       wrapper: TestProviders,
     });
 
-    const link = await screen.findByTestId('exercise-card-we1-range');
-    expect(link).toHaveTextContent('Range 8–12');
+    expect(await screen.findByTestId('active-workout-rep-range')).toHaveTextContent(
+      /Your rep range 8–12/,
+    );
+    expect(screen.queryByTestId('exercise-card-we1-own-range')).toBeNull();
 
-    fireEvent.press(link);
+    fireEvent.press(screen.getByTestId('exercise-card-we1-menu'));
+    fireEvent.press(screen.getByTestId('exercise-card-we1-range'));
     fireEvent.press(screen.getByTestId('exercise-progression-source-own'));
     // The wheels start on the person's 8-12, and show the values from there on.
     fireEvent.press(screen.getByTestId('exercise-range-min-item-10'));
@@ -1768,9 +1775,12 @@ describe("ActiveWorkoutScreen -- an exercise's own rep range", () => {
       incrementKg: null,
     });
     await waitFor(() =>
-      expect(screen.getByTestId('exercise-card-we1-range')).toHaveTextContent(
-        'Range 10–14 · this exercise',
+      expect(screen.getByTestId('exercise-card-we1-own-range')).toHaveTextContent(
+        'Own range 10–14',
       ),
+    );
+    expect(screen.getByTestId('active-workout-own-ranges')).toHaveTextContent(
+      '1 exercise here has its own',
     );
   });
 
@@ -1793,10 +1803,51 @@ describe("ActiveWorkoutScreen -- an exercise's own rep range", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByTestId('exercise-card-we1-range')).toHaveTextContent(
-        'Range 5 · this exercise',
-      ),
+      expect(screen.getByTestId('exercise-card-we1-own-range')).toHaveTextContent('Own range 5'),
     );
     expect(fetchExerciseSettings).toHaveBeenCalledWith('user-1');
+  });
+});
+
+describe("ActiveWorkoutScreen -- the person's rep range, at the top", () => {
+  it('shows it once, in the pinned workout widget, and changes it there', async () => {
+    (updateMyProfile as jest.Mock).mockImplementation(async (_token: string, updates: object) => ({
+      id: 'user-1',
+      email: 'a@example.com',
+      role: 'user',
+      displayName: null,
+      username: null,
+      weightUnit: 'kg',
+      workoutAccentColor: null,
+      nutritionAccentColor: null,
+      activeWorkoutSplitId: null,
+      ...updates,
+    }));
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+
+    const row = await screen.findByTestId('active-workout-rep-range');
+    expect(
+      within(screen.UNSAFE_getByType(ScrollView)).queryByTestId('active-workout-rep-range'),
+    ).toBeNull();
+    expect(screen.getByTestId('active-workout-rep-range-value')).toHaveTextContent('8–12');
+    expect(row).not.toHaveTextContent(/have their own|has its own/);
+
+    fireEvent.press(screen.getByTestId('active-workout-rep-range-edit'));
+    // The wheels start on 8-12 and show the values from there on.
+    fireEvent.press(screen.getByTestId('rep-range-min-item-10'));
+    fireEvent.press(screen.getByTestId('rep-range-max-item-14'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('rep-range-save'));
+    });
+
+    expect(updateMyProfile).toHaveBeenCalledWith(
+      'token-123',
+      expect.objectContaining({ repRangeMin: 10, repRangeMax: 14 }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('active-workout-rep-range-value')).toHaveTextContent('10–14'),
+    );
   });
 });

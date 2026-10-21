@@ -4,13 +4,12 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '../design/Text';
 import { AppHeader } from '../design/AppHeader';
 import { BottomSheet } from '../design/BottomSheet';
-import { PrimaryButton, TextButton } from '../design/Button';
+import { TextButton } from '../design/Button';
 import { ListRow } from '../design/ListRow';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { Toggle } from '../design/Toggle';
-import { WheelPicker } from '../design/WheelPicker';
 import { colors, spacing, typeScale } from '../design/theme';
 import type { TrainingComfort, UpdateProfileInput } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -20,6 +19,7 @@ import {
 } from '../onboarding/onboardingOptions';
 import { TrainingComfortSelector } from '../onboarding/TrainingComfortSelector';
 import { useProfile } from '../profile/ProfileProvider';
+import { RepRangeSheet } from '../settings/RepRangeSheet';
 import { settingsStyles as styles } from '../settings/settingsStyles';
 import {
   clearExerciseSetting,
@@ -31,8 +31,6 @@ import { formatWeightKg } from '../lib/units';
 
 // Any range from 1 rep up to 50, as the database allows: the bottom never above the top. A
 // range of one number (5-5) is a fixed target.
-const RANGE_BOTTOMS = Array.from({ length: 50 }, (_, i) => String(i + 1));
-const RANGE_TOPS = RANGE_BOTTOMS;
 
 type Props = RootStackScreenProps<'SettingsWorkoutPreferences'>;
 
@@ -96,7 +94,6 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
     (option) => option.value === profile?.trainingComfort,
   );
   const range: RepRange = { min: profile?.repRangeMin ?? 8, max: profile?.repRangeMax ?? 12 };
-  const rangeDraftValid = rangeDraft !== null && rangeDraft.min <= rangeDraft.max;
 
   async function save(updates: UpdateProfileInput) {
     setSaveError(null);
@@ -120,9 +117,7 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
     await save({ trainingComfort: value });
   }
 
-  async function handleSaveRange() {
-    if (!rangeDraft || !rangeDraftValid) return;
-    const next = rangeDraft;
+  async function handleSaveRange(next: RepRange) {
     setRangeDraft(null);
     await save({ repRangeMin: next.min, repRangeMax: next.max });
   }
@@ -294,54 +289,12 @@ export function SettingsWorkoutPreferencesScreen({ navigation }: Props) {
         </View>
       </BottomSheet>
 
-      <BottomSheet
-        visible={rangeDraft !== null}
+      <RepRangeSheet
+        draft={rangeDraft}
+        onChangeDraft={setRangeDraft}
         onClose={() => setRangeDraft(null)}
-        testID="rep-range-sheet"
-      >
-        <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>Rep Range</Text>
-        <Text style={localStyles.sheetHelp}>
-          When an exercise&apos;s top set reaches the top of your range, it&apos;s time to go
-          heavier.
-        </Text>
-        {rangeDraft ? (
-          <View style={localStyles.wheels}>
-            <View style={localStyles.wheel}>
-              <Text style={localStyles.wheelLabel}>From</Text>
-              <WheelPicker
-                testID="rep-range-min"
-                values={RANGE_BOTTOMS}
-                selectedValue={String(rangeDraft.min)}
-                onChange={(value) =>
-                  setRangeDraft((prev) => prev && { ...prev, min: Number(value) })
-                }
-              />
-            </View>
-            <View style={localStyles.wheel}>
-              <Text style={localStyles.wheelLabel}>To</Text>
-              <WheelPicker
-                testID="rep-range-max"
-                values={RANGE_TOPS}
-                selectedValue={String(rangeDraft.max)}
-                onChange={(value) =>
-                  setRangeDraft((prev) => prev && { ...prev, max: Number(value) })
-                }
-              />
-            </View>
-          </View>
-        ) : null}
-        {rangeDraft && !rangeDraftValid ? (
-          <Text testID="rep-range-error" style={styles.errorText}>
-            The bottom of the range can&apos;t be above the top.
-          </Text>
-        ) : null}
-        <PrimaryButton
-          testID="rep-range-save"
-          label={rangeDraftValid ? `Save ${formatRepRange(rangeDraft)}` : 'Save'}
-          onPress={() => void handleSaveRange()}
-          disabled={!rangeDraftValid}
-        />
-      </BottomSheet>
+        onSave={(next) => void handleSaveRange(next)}
+      />
     </Screen>
   );
 }
@@ -354,19 +307,5 @@ const localStyles = StyleSheet.create({
   },
   comfortOptions: {
     marginTop: spacing.md,
-  },
-  wheels: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    marginVertical: spacing.lg,
-  },
-  wheel: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  wheelLabel: {
-    ...typeScale.label,
-    color: colors.textSecondary,
-    textAlign: 'center',
   },
 });

@@ -233,6 +233,24 @@ describe('bodyweight and timed sets', () => {
     expect(display?.sets[0]).toMatchObject({ setNumber: 1, durationDisplay: '1:15' });
   });
 
+  it("names last session's top set, and which set it was", () => {
+    const done = '2026-10-01T10:00:00.000Z';
+    const display = buildPreviousSessionDisplay(
+      {
+        performedAt: done,
+        sets: [
+          set('p1', 1, { weightKg: 60, reps: 10, completedAt: done }),
+          set('p2', 2, { weightKg: 65, reps: 8, completedAt: done }),
+          set('p3', 3, { weightKg: 65, reps: 7, completedAt: done }),
+        ],
+      },
+      'kg',
+    );
+
+    // The heaviest, the first one when two tie.
+    expect(display).toMatchObject({ topSetDisplay: '65 kg × 8', topSetNumber: 2 });
+  });
+
   it("fills a new timed set from last session's time", () => {
     const inputs = withPrefilledSets(
       {},

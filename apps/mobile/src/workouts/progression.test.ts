@@ -1,5 +1,5 @@
 import {
-  bestLine,
+  allTimeBest,
   cuesEqual,
   defaultRepRange,
   effectiveRepRange,
@@ -110,17 +110,23 @@ describe('next time, for a weighted exercise', () => {
     );
   });
 
-  it('says to keep the weight and work toward the top, even below the bottom of the range', () => {
+  it('says, in general, to keep the weight until the top of the range, even below its bottom', () => {
     expect(
       nextSessionCue({ ...weighted, guided: false, lastSessionSets: lifts([55, 10]) })?.headline,
-    ).toBe('Last time: 10 at 55 lb. Keep 55 lb and work toward 12.');
+    ).toBe(
+      "Keep your top set weight the same until you reach 12 reps, then we'll recommend your next increment.",
+    );
     const belowRange = nextSessionCue({
       ...weighted,
       guided: true,
       lastSessionSets: lifts([60, 7]),
     });
-    expect(belowRange?.headline).toBe('Last time: 7 at 60 lb. Keep 60 lb and work toward 12.');
-    expect(belowRange?.detail).toBe("When your top set reaches 12, it's time to go heavier.");
+    expect(belowRange?.headline).toBe(
+      "Keep your top set weight the same until you reach 12 reps, then we'll recommend your next increment.",
+    );
+    expect(belowRange?.detail).toBe(
+      'Owning the top of your range before going heavier keeps your form and your progress steady.',
+    );
     // Never "lighter", never a bad set.
     expect(JSON.stringify(belowRange)).not.toMatch(/lighter|under|below|bad/i);
   });
@@ -131,7 +137,7 @@ describe('next time, for a weighted exercise', () => {
       guided: false,
       lastSessionSets: lifts([45, 15], [55, 9]),
     });
-    expect(cue?.headline).toBe('Last time: 9 at 55 lb. Keep 55 lb and work toward 12.');
+    expect(cue?.headline).toMatch(/^Keep your top set weight the same until you reach 12 reps/);
   });
 
   it('follows the range: 5-10 makes 10 the top', () => {
@@ -171,7 +177,9 @@ describe('next time, for a weighted exercise', () => {
         set({ side: 'right', weightKg: 25 * LB, reps: 10 }),
       ],
     });
-    expect(oneSide?.headline).toBe('Last time: 10 at 25 lb. Keep 25 lb and work toward 12.');
+    expect(oneSide?.headline).toBe(
+      "Keep your top set weight the same until you reach 12 reps on both sides, then we'll recommend your next increment.",
+    );
   });
 
   it('shows kilograms for a kg user', () => {
@@ -224,7 +232,9 @@ describe('next time, for a bodyweight exercise', () => {
       guided: false,
       lastSessionSets: [set({ reps: 9 })],
     });
-    expect(cue?.headline).toBe('Last time: 9 reps. Work toward 12.');
+    expect(cue?.headline).toBe(
+      "Keep building until your best set reaches 12 reps, then we'll recommend how to make it harder.",
+    );
     expect(cue?.options).toEqual([]);
   });
 });
@@ -298,43 +308,89 @@ describe('in the workout itself', () => {
   });
 });
 
-describe('the best within the range', () => {
-  it('is the heaviest rep-count PR inside the range', () => {
-    expect(
-      bestLine({
-        measurementType: 'weight_reps',
-        range: { min: 8, max: 12 },
-        unit: 'lb',
-        repPRs: [
-          { reps: 5, bestWeightKg: 80 * LB },
-          { reps: 8, bestWeightKg: 60 * LB },
-          { reps: 10, bestWeightKg: 60 * LB },
-          { reps: 12, bestWeightKg: 50 * LB },
-        ],
-        recordValue: null,
-      }),
-    ).toBe('Best at 8–12: 60 lb × 10');
+describe('allTimeBest', () => {
+  const OLD = '2026-09-02T10:00:00.000Z';
+  const pr = (reps: number, lb: number, id = `pr-${reps}`) => ({
+    reps,
+    bestWeightKg: lb * LB,
+    achievedAt: OLD,
+    sourceSetId: id,
+  });
+  const weightedBest = {
+    measurementType: 'weight_reps' as const,
+    range: { min: 8, max: 12 },
+    record: null,
+    todaySets: [] as SetRecord[],
+  };
+
+  it('is the heaviest set within the rep range, with when it was set', () => {
+    const best = allTimeBest({
+      ...weightedBest,
+      repPRs: [pr(5, 80), pr(8, 60), pr(10, 60), pr(12, 50)],
+    });
+    expect(best?.weightKg).toBeCloseTo(60 * LB);
+    expect(best?.reps).toBe(10);
+    expect(best?.achievedAt).toBe(OLD);
   });
 
-  it('is nothing when no PR is inside the range', () => {
-    expect(
-      bestLine({
-        measurementType: 'weight_reps',
-        range: { min: 8, max: 12 },
-        unit: 'lb',
-        repPRs: [{ reps: 5, bestWeightKg: 80 }],
-        recordValue: null,
-      }),
-    ).toBeNull();
+  it('falls back to the heaviest set at any rep count with nothing in the range', () => {
+    const best = allTimeBest({ ...weightedBest, repPRs: [pr(5, 80), pr(3, 85)] });
+    expect(best?.weightKg).toBeCloseTo(85 * LB);
+    expect(best?.reps).toBe(3);
+  });
+
+  it("takes one of today's completed sets only when it beats the record", () => {
+    const tie = allTimeBest({
+      ...weightedBest,
+      repPRs: [pr(10, 60)],
+      todaySets: lifts([60, 10]),
+    });
+    expect(tie?.achievedAt).toBe(OLD);
+
+    const beaten = allTimeBest({
+      ...weightedBest,
+      repPRs: [pr(10, 60)],
+      todaySets: [...lifts([65, 9]), set({ weightKg: 90 * LB, reps: 9, completedAt: null })],
+    });
+    // 90 lb isn't completed, so it doesn't count.
+    expect(beaten?.weightKg).toBeCloseTo(65 * LB);
+    expect(beaten?.achievedAt).toBeNull();
+  });
+
+  it("says a record set today is today's", () => {
+    const today = lifts([70, 8]);
+    const best = allTimeBest({
+      ...weightedBest,
+      repPRs: [pr(8, 70, today[0].id)],
+      todaySets: today,
+    });
+    expect(best?.achievedAt).toBeNull();
   });
 
   it('is the most reps or the longest time for bodyweight and timed exercises', () => {
-    const base = { range: { min: 8, max: 12 }, unit: 'lb' as const, repPRs: [] };
-    expect(bestLine({ ...base, measurementType: 'bodyweight', recordValue: 25 })).toBe(
-      'Most reps: 25',
-    );
-    expect(bestLine({ ...base, measurementType: 'timed', recordValue: 105 })).toBe('Longest: 1:45');
-    expect(bestLine({ ...base, measurementType: 'timed', recordValue: null })).toBeNull();
+    const base = { range: { min: 8, max: 12 }, repPRs: [], todaySets: [] as SetRecord[] };
+    expect(
+      allTimeBest({
+        ...base,
+        measurementType: 'bodyweight',
+        record: { value: 25, achievedAt: OLD, sourceSetId: 'r' },
+      }),
+    ).toEqual({
+      measurementType: 'bodyweight',
+      weightKg: null,
+      reps: 25,
+      durationSeconds: null,
+      achievedAt: OLD,
+    });
+    expect(
+      allTimeBest({
+        ...base,
+        measurementType: 'timed',
+        record: { value: 105, achievedAt: OLD, sourceSetId: 'r' },
+        todaySets: [set({ durationSeconds: 120 })],
+      }),
+    ).toMatchObject({ durationSeconds: 120, achievedAt: null });
+    expect(allTimeBest({ ...base, measurementType: 'timed', record: null })).toBeNull();
   });
 });
 
@@ -379,16 +435,34 @@ describe('progressionForExercise', () => {
     lastSessionSets: lifts([50, 12]),
     settings: { range: { min: 8, max: 12 }, enabled: true, guided: false, unit: 'lb' as const },
     repPRs: [
-      { exerciseId: 'bench', reps: 10, bestWeightKg: 55 * LB },
-      { exerciseId: 'squat', reps: 10, bestWeightKg: 200 * LB },
+      {
+        exerciseId: 'bench',
+        reps: 10,
+        bestWeightKg: 55 * LB,
+        achievedAt: '2026-09-02T10:00:00.000Z',
+        sourceSetId: 'pr-bench',
+      },
+      {
+        exerciseId: 'squat',
+        reps: 10,
+        bestWeightKg: 200 * LB,
+        achievedAt: '2026-09-02T10:00:00.000Z',
+        sourceSetId: 'pr-squat',
+      },
     ],
     records: [],
     library: [],
   };
 
-  it("gives the card its best line, today's aim and today's own cue", () => {
+  it("gives the card its all-time best, today's aim and today's own cue", () => {
     expect(progressionForExercise(base)).toEqual({
-      bestLine: 'Best at 8–12: 55 lb × 10',
+      allTimeBest: {
+        measurementType: 'weight_reps',
+        weightKg: 55 * LB,
+        reps: 10,
+        durationSeconds: null,
+        achievedAt: '2026-09-02T10:00:00.000Z',
+      },
       progressionCue: {
         headline: 'Your top set hit 12 at 50 lb. Increase the weight today: try 55 lb.',
         options: [],
@@ -398,12 +472,12 @@ describe('progressionForExercise', () => {
     });
   });
 
-  it('keeps the best line, a record, when suggestions are off', () => {
+  it('keeps the all-time best, a record, when suggestions are off', () => {
     const result = progressionForExercise({
       ...base,
       settings: { ...base.settings, enabled: false },
     });
-    expect(result.bestLine).toBe('Best at 8–12: 55 lb × 10');
+    expect(result.allTimeBest?.reps).toBe(10);
     expect(result.progressionCue).toBeNull();
     expect(result.sessionCue).toBeNull();
   });

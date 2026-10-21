@@ -184,15 +184,15 @@ export function nextSessionCue(
       };
     }
     return {
-      headline: `Last time: ${top.reps} reps. Work toward ${range.max}.`,
+      headline: `Keep building until your best set reaches ${range.max} reps${bothSides}, then we'll recommend how to make it harder.`,
       options: [],
-      detail: guided ? `When you reach ${range.max}, it's time to make it harder.` : null,
+      detail: guided ? 'More reps first, then a harder version, keeps you progressing.' : null,
     };
   }
 
   if (top.weightKg == null) return null;
-  const weight = weightText(top.weightKg, unit);
   if (top.reps >= range.max) {
+    const weight = weightText(top.weightKg, unit);
     const heavier = weightText(top.weightKg + incrementKg, unit);
     return {
       headline: `Your top set hit ${top.reps}${bothSides} at ${weight}. Increase the weight today: try ${heavier}.`,
@@ -203,9 +203,11 @@ export function nextSessionCue(
     };
   }
   return {
-    headline: `Last time: ${top.reps} at ${weight}. Keep ${weight} and work toward ${range.max}.`,
+    headline: `Keep your top set weight the same until you reach ${range.max} reps${bothSides}, then we'll recommend your next increment.`,
     options: [],
-    detail: guided ? `When your top set reaches ${range.max}, it's time to go heavier.` : null,
+    detail: guided
+      ? 'Owning the top of your range before going heavier keeps your form and your progress steady.'
+      : null,
   };
 }
 
@@ -237,40 +239,95 @@ export function thisSessionCue(
   return 'Top of your range. Increase the weight next time.';
 }
 
+/** An exercise's all-time best set, as the live workout shows it. */
+export interface AllTimeBest {
+  measurementType: MeasurementType;
+  weightKg: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
+  /** When it was set; null when it's one of today's own sets. */
+  achievedAt: string | null;
+}
+
 /**
- * The best this person has done within their range, from records the database already keeps:
- * "Best at 8–12: 60 lb × 9" (the heaviest of their rep-count PRs inside the range), "Most reps:
- * 25" for a bodyweight exercise, "Longest: 1:45" for a timed one. Null when there's none yet.
+ * The best this person has ever done at an exercise, from the records the database keeps and
+ * today's own completed sets (which the records the app loaded don't include yet):
+ * - weight and reps: the heaviest set within their rep range (more reps breaking a tie) -- the
+ *   rep range is the default, so it isn't named. With nothing in the range yet, the heaviest
+ *   set at any rep count;
+ * - bodyweight: the most reps; timed: the longest time.
+ * A set of today's beats the record only by being better, never by tying it. Null when there's
+ * nothing logged yet.
  */
-export function bestLine(input: {
+export function allTimeBest(input: {
   measurementType: MeasurementType;
   range: RepRange;
-  unit: 'kg' | 'lb';
   /** This exercise's rep-count PRs. */
-  repPRs: { reps: number; bestWeightKg: number }[];
+  repPRs: { reps: number; bestWeightKg: number; achievedAt: string; sourceSetId: string }[];
   /** This exercise's most-reps or longest-time record, when it has one. */
-  recordValue: number | null;
-}): string | null {
-  const { measurementType, range, unit } = input;
-  if (measurementType === 'bodyweight') {
-    return input.recordValue != null ? `Most reps: ${input.recordValue}` : null;
+  record: { value: number; achievedAt: string; sourceSetId: string } | null;
+  /** This workout's own sets of the exercise; only completed ones count. */
+  todaySets: SetRecord[];
+}): AllTimeBest | null {
+  const { measurementType, range } = input;
+  const today = loggedSets(input.todaySets, measurementType);
+  const todayIds = new Set(today.map((set) => set.id));
+  const when = (achievedAt: string, setId: string) => (todayIds.has(setId) ? null : achievedAt);
+
+  if (measurementType !== 'weight_reps') {
+    const value = (set: SetRecord) =>
+      (measurementType === 'bodyweight' ? set.reps : set.durationSeconds) ?? 0;
+    let best: { value: number; achievedAt: string | null } | null = input.record
+      ? {
+          value: input.record.value,
+          achievedAt: when(input.record.achievedAt, input.record.sourceSetId),
+        }
+      : null;
+    for (const set of today) {
+      if (!best || value(set) > best.value) best = { value: value(set), achievedAt: null };
+    }
+    if (!best) return null;
+    return {
+      measurementType,
+      weightKg: null,
+      reps: measurementType === 'bodyweight' ? best.value : null,
+      durationSeconds: measurementType === 'timed' ? best.value : null,
+      achievedAt: best.achievedAt,
+    };
   }
-  if (measurementType === 'timed') {
-    return input.recordValue != null ? `Longest: ${formatDuration(input.recordValue)}` : null;
-  }
-  let best: { reps: number; bestWeightKg: number } | null = null;
-  for (const pr of input.repPRs) {
-    if (pr.reps < range.min || pr.reps > range.max) continue;
+
+  // The records first, so one of today's sets only wins by being better.
+  const candidates = [
+    ...input.repPRs.map((pr) => ({
+      weightKg: pr.bestWeightKg,
+      reps: pr.reps,
+      achievedAt: when(pr.achievedAt, pr.sourceSetId),
+    })),
+    ...today.map((set) => ({
+      weightKg: set.weightKg ?? 0,
+      reps: set.reps ?? 0,
+      achievedAt: null,
+    })),
+  ];
+  const inRange = candidates.filter((c) => c.reps >= range.min && c.reps <= range.max);
+  let best: (typeof candidates)[number] | null = null;
+  for (const candidate of inRange.length > 0 ? inRange : candidates) {
     if (
       !best ||
-      pr.bestWeightKg > best.bestWeightKg ||
-      (pr.bestWeightKg === best.bestWeightKg && pr.reps > best.reps)
+      candidate.weightKg > best.weightKg ||
+      (candidate.weightKg === best.weightKg && candidate.reps > best.reps)
     ) {
-      best = pr;
+      best = candidate;
     }
   }
   return best
-    ? `Best at ${formatRepRange(range)}: ${weightText(best.bestWeightKg, unit)} × ${best.reps}`
+    ? {
+        measurementType,
+        weightKg: best.weightKg,
+        reps: best.reps,
+        durationSeconds: null,
+        achievedAt: best.achievedAt,
+      }
     : null;
 }
 
@@ -308,9 +365,9 @@ export interface ProgressionSettings {
 }
 
 /**
- * Everything the live workout's exercise card shows about progression: the best within the
- * range (shown even with suggestions off: it's a record, not a suggestion), what to aim for
- * today from the last session, and what today's own sets already show.
+ * Everything the live workout's exercise card shows about progression: the all-time best (shown
+ * even with suggestions off: it's a record, not a suggestion), what to aim for today from the
+ * last session, and what today's own sets already show.
  */
 export function progressionForExercise(input: {
   exercise: {
@@ -323,15 +380,27 @@ export function progressionForExercise(input: {
   lastSessionSets: SetRecord[] | undefined;
   settings: ProgressionSettings;
   /** Every rep-count PR the person holds (filtered to this exercise here). */
-  repPRs: { exerciseId: string; reps: number; bestWeightKg: number }[];
+  repPRs: {
+    exerciseId: string;
+    reps: number;
+    bestWeightKg: number;
+    achievedAt: string;
+    sourceSetId: string;
+  }[];
   /** Every most-reps or longest-time record the person holds. */
-  records: { exerciseId: string; measurementType: MeasurementType; value: number }[];
+  records: {
+    exerciseId: string;
+    measurementType: MeasurementType;
+    value: number;
+    achievedAt: string;
+    sourceSetId: string;
+  }[];
   /** The person's exercise library, to find a weighted version. */
   library: { name: string; measurementType: MeasurementType; isActive: boolean }[];
   /** This exercise's own range and step, when it has them. */
   override?: ExerciseOverride | null;
 }): {
-  bestLine: string | null;
+  allTimeBest: AllTimeBest | null;
   progressionCue: ProgressionCue | null;
   sessionCue: string | null;
 } {
@@ -349,16 +418,16 @@ export function progressionForExercise(input: {
     weightedVariant,
   };
   return {
-    bestLine: bestLine({
+    allTimeBest: allTimeBest({
       measurementType,
       range,
-      unit: settings.unit,
       repPRs: input.repPRs.filter((pr) => pr.exerciseId === exercise.exerciseId),
-      recordValue:
+      record:
         input.records.find(
           (record) =>
             record.exerciseId === exercise.exerciseId && record.measurementType === measurementType,
-        )?.value ?? null,
+        ) ?? null,
+      todaySets: exercise.sets,
     }),
     progressionCue:
       settings.enabled && lastSessionSets

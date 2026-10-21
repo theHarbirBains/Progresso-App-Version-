@@ -1,16 +1,25 @@
-import { memo } from 'react';
-import { Alert, TouchableOpacity, View } from 'react-native';
-import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
+import { memo, useState } from 'react';
+import { TouchableOpacity, View } from 'react-native';
+import { AutoCarousel } from '../design/AutoCarousel';
 import { SecondaryButton } from '../design/Button';
+import { Card } from '../design/Card';
+import { RiseIn } from '../design/RiseIn';
+import { SectionHeader } from '../design/SectionHeader';
+import { Text } from '../design/Text';
 import { colors } from '../design/theme';
+import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import type { MeasurementType, MovementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
-import { cuesEqual, type ProgressionCue } from './progression';
+import { cuesEqual, type AllTimeBest, type ProgressionCue } from './progression';
 import { PER_SIDE_NOTE, SetColumnHeader } from './SetColumnHeader';
 import { SetRow } from './SetRow';
+import { formatSetValues } from './setValues';
 import { UnilateralSetRow, type UnilateralSideInput } from './UnilateralSetRow';
+import { formatShortDate } from './workoutFormat';
+
+const PHOTO_SIZE = 48;
 
 /** One set from the user's last completed session with this exercise --
  * already fully formatted by the caller (ActiveWorkoutScreen), which knows
@@ -28,6 +37,10 @@ export interface PreviousSessionSet {
 
 export interface PreviousSessionDisplay {
   dateDisplay: string;
+  /** That session's top set, as shown ("72.5 lb × 7"); null when it has none to show. */
+  topSetDisplay?: string | null;
+  /** Which of `sets` (by setNumber) was the top set. */
+  topSetNumber?: number | null;
   sets: PreviousSessionSet[];
 }
 
@@ -57,22 +70,26 @@ interface Props {
   movementType: MovementType;
   /** What the exercise is logged as: weight and reps, reps only, or a time. Defaults to weight and reps. */
   measurementType?: MeasurementType;
+  /** The exercise's machine photo, when it has one: beside its name, opening full size on a tap. */
+  photoUrl?: string | null;
+  /** The unit the all-time best is shown in. */
+  weightUnit?: 'kg' | 'lb';
   /** Every set from the user's last completed session with this exercise
    * (never today's own in-progress sets) -- null/omitted when there's no
-   * prior session yet, in which case the section is omitted entirely. */
+   * prior session yet, in which case Last Time is omitted entirely. */
   previousSession?: PreviousSessionDisplay | null;
   /** Opens this exercise's full history (Progress > Exercise Detail). Only
    * rendered when a previous session exists to link out from. */
   onViewHistory?: () => void;
-  /** The best within the person's rep range ("Best at 8–12: 60 lb × 9"), under Last Workout's date. */
-  bestLine?: string | null;
-  /** What to aim for today, from the last session (workouts/progression.ts), under its sets. */
+  /** The best set ever, within the person's rep range (progression.ts's allTimeBest). */
+  allTimeBest?: AllTimeBest | null;
+  /** What to aim for today, from the last session (workouts/progression.ts), under Last Time. */
   progressionCue?: ProgressionCue | null;
   /** Said once today's own top set reaches the top of the range, under today's sets. */
   sessionCue?: string | null;
-  /** The rep range this exercise is judged against ("Range 8–12", "Range 3–5 · this exercise"). */
-  rangeText?: string | null;
-  /** Opens this exercise's own range and weight step. Must be stable (see arePropsEqual). */
+  /** Only for an exercise with a rep range of its own ("Own range 3–5"); the person's own range is shown once, at the top of the workout. */
+  ownRangeText?: string | null;
+  /** Opens this exercise's own range and weight step, from its menu. Must be stable (see arePropsEqual). */
   onEditProgression?: () => void;
   /** Used when movementType is 'bilateral' -- one row per set, unchanged from before unilateral support existed. */
   sets: ExerciseCardSet[];
@@ -89,30 +106,105 @@ interface Props {
   onRemoveExercise: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
-  /** A hairline above this block -- every exercise but the first. */
-  divider?: boolean;
   accentColor: string;
   onAccentColor: string;
   testID?: string;
 }
 
-// One exercise in the live workout: its name and quiet controls, the last
-// session's numbers to compare against, then the sets to log. Despite the
-// legacy name it is a plain block on the screen, not a card -- consecutive
-// exercises are separated by a hairline, so a long workout reads as one
-// list rather than a stack of boxes. No exercise image: every exercise is
-// text.
+/** One of the exercise's two records: what it is, the figure, and when. */
+function RecordTile({
+  testID,
+  label,
+  value,
+  meta,
+  valueColor,
+}: {
+  testID?: string;
+  label: string;
+  value: string;
+  meta: string;
+  valueColor?: string;
+}) {
+  return (
+    <View
+      testID={testID}
+      style={styles.recordTile}
+      accessible
+      accessibilityLabel={`${label}: ${value}, ${meta}`}
+    >
+      <Text style={styles.recordLabel}>{label}</Text>
+      <Text
+        style={[styles.recordValue, valueColor ? { color: valueColor } : null]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {value}
+      </Text>
+      <Text style={styles.recordMeta}>{meta}</Text>
+    </View>
+  );
+}
+
+/** One action in an exercise's menu: a glyph over a short label, a 44pt target. */
+function MenuAction({
+  testID,
+  icon,
+  label,
+  accessibilityLabel,
+  onPress,
+  destructive,
+}: {
+  testID?: string;
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+  destructive?: boolean;
+}) {
+  const color = destructive ? colors.destructive : colors.textSecondary;
+  return (
+    <TouchableOpacity
+      testID={testID}
+      style={styles.menuAction}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Feather name={icon} size={18} color={color} />
+      <Text style={[styles.menuActionLabel, { color }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function slideValue(set: PreviousSessionSet, type: MeasurementType): string {
+  if (type === 'timed') return set.durationDisplay ?? '—';
+  if (type === 'bodyweight') return `${set.reps} ${set.reps === 1 ? 'rep' : 'reps'}`;
+  return `${set.weightDisplay} ${set.unit} × ${set.reps}`;
+}
+
+// One exercise in the live workout, as its own widget (a `Card`):
+// - its photo (tap for full size) or initial, name, muscle group, and -- only when it has one --
+//   its own rep range; a "more" glyph opens a row of actions inside the widget (Up, Down, Rep
+//   Range, Remove), so nothing opens over the workout;
+// - two records side by side: All-Time Best (the best set ever within the rep range, with its
+//   date, or "Today" in the accent once today's beats it) and Last Time (that session's top set,
+//   its date and how many sets);
+// - Last Time's sets as a carousel that moves on by itself and can be swiped to any set, the
+//   top set marked, with View History; then the suggestion for today;
+// - today's sets to log, as rows that never move, and Add Set.
 function ExerciseCardComponent({
   exerciseName,
   muscleGroup,
   movementType,
   measurementType = 'weight_reps',
+  photoUrl = null,
+  weightUnit = 'lb',
   previousSession = null,
   onViewHistory,
-  bestLine = null,
+  allTimeBest = null,
   progressionCue = null,
   sessionCue = null,
-  rangeText = null,
+  ownRangeText = null,
   onEditProgression,
   sets,
   unilateralSets,
@@ -125,105 +217,130 @@ function ExerciseCardComponent({
   onRemoveExercise,
   onMoveUp,
   onMoveDown,
-  divider,
   accentColor,
   onAccentColor,
   testID,
 }: Props) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const isUnilateral = movementType === 'unilateral';
   const hasRows = isUnilateral ? unilateralSets.length > 0 : sets.length > 0;
+  const previousSets = previousSession?.sets ?? [];
+  const id = (suffix: string) => (testID ? `${testID}-${suffix}` : undefined);
+
+  function fromMenu(action: () => void) {
+    return () => {
+      setMenuOpen(false);
+      action();
+    };
+  }
+
   return (
-    <View testID={testID} style={[styles.exerciseBlock, divider && styles.exerciseDivider]}>
+    <Card testID={testID}>
       <View style={styles.exerciseHeader}>
+        <ExercisePhoto testID={id('photo')} uri={photoUrl} name={exerciseName} size={PHOTO_SIZE} />
         <View style={styles.exerciseTitleBlock}>
           <Text style={styles.exerciseName}>{exerciseName}</Text>
-          <Text
-            testID={testID ? `${testID}-muscle-group` : undefined}
-            style={styles.exerciseMuscle}
-          >
+          <Text testID={id('muscle-group')} style={styles.exerciseMuscle}>
             {MUSCLE_GROUP_LABELS[muscleGroup]}
           </Text>
+          {ownRangeText ? (
+            <Text testID={id('own-range')} style={[styles.ownRange, { color: accentColor }]}>
+              {ownRangeText}
+            </Text>
+          ) : null}
           {isUnilateral ? (
-            <Text
-              testID={testID ? `${testID}-per-side-note` : undefined}
-              style={styles.perSideNote}
-            >
+            <Text testID={id('per-side-note')} style={styles.perSideNote}>
               {PER_SIDE_NOTE[measurementType]}
             </Text>
           ) : null}
-          {rangeText && onEditProgression ? (
-            <TouchableOpacity
-              testID={testID ? `${testID}-range` : undefined}
-              onPress={onEditProgression}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel={`${rangeText}. Change the rep range for ${exerciseName}`}
-            >
-              <Text style={[styles.rangeLink, { color: accentColor }]}>{rangeText}</Text>
-            </TouchableOpacity>
-          ) : null}
         </View>
-        <View style={styles.exerciseActions}>
-          {onMoveUp ? (
-            <TouchableOpacity
-              testID={testID ? `${testID}-move-up` : undefined}
-              style={styles.exerciseAction}
-              onPress={onMoveUp}
-              accessibilityLabel="Move exercise up"
-              accessibilityRole="button"
-            >
-              <Feather name="chevron-up" size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-          ) : null}
-          {onMoveDown ? (
-            <TouchableOpacity
-              testID={testID ? `${testID}-move-down` : undefined}
-              style={styles.exerciseAction}
-              onPress={onMoveDown}
-              accessibilityLabel="Move exercise down"
-              accessibilityRole="button"
-            >
-              <Feather name="chevron-down" size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-          ) : null}
-          <TouchableOpacity
-            testID={testID ? `${testID}-remove` : undefined}
-            style={styles.exerciseAction}
-            onPress={onRemoveExercise}
-            accessibilityLabel="Remove exercise"
-            accessibilityRole="button"
-          >
-            <Feather name="trash-2" size={18} color={colors.textMuted} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          testID={id('menu')}
+          style={styles.exerciseAction}
+          onPress={() => setMenuOpen((open) => !open)}
+          accessibilityRole="button"
+          accessibilityLabel={`${exerciseName} options`}
+          accessibilityState={{ expanded: menuOpen }}
+        >
+          <Feather
+            name={menuOpen ? 'x' : 'more-horizontal'}
+            size={18}
+            color={colors.textSecondary}
+          />
+        </TouchableOpacity>
       </View>
 
-      {previousSession && previousSession.sets.length > 0 ? (
-        <View
-          testID={testID ? `${testID}-previous-session` : undefined}
-          style={styles.previousSession}
-        >
+      {menuOpen ? (
+        <RiseIn>
+          <View testID={id('actions')} style={styles.menuRow}>
+            {onMoveUp ? (
+              <MenuAction
+                testID={id('move-up')}
+                icon="chevron-up"
+                label="Up"
+                accessibilityLabel="Move exercise up"
+                onPress={fromMenu(onMoveUp)}
+              />
+            ) : null}
+            {onMoveDown ? (
+              <MenuAction
+                testID={id('move-down')}
+                icon="chevron-down"
+                label="Down"
+                accessibilityLabel="Move exercise down"
+                onPress={fromMenu(onMoveDown)}
+              />
+            ) : null}
+            {onEditProgression ? (
+              <MenuAction
+                testID={id('range')}
+                icon="sliders"
+                label="Rep Range"
+                accessibilityLabel={`Change the rep range for ${exerciseName}`}
+                onPress={fromMenu(onEditProgression)}
+              />
+            ) : null}
+            <MenuAction
+              testID={id('remove')}
+              icon="trash-2"
+              label="Remove"
+              accessibilityLabel="Remove exercise"
+              onPress={fromMenu(onRemoveExercise)}
+              destructive
+            />
+          </View>
+        </RiseIn>
+      ) : null}
+
+      {allTimeBest || previousSession ? (
+        <View style={styles.recordTiles}>
+          {allTimeBest ? (
+            <RecordTile
+              testID={id('best')}
+              label="All-Time Best"
+              value={formatSetValues(allTimeBest, weightUnit)}
+              meta={allTimeBest.achievedAt ? formatShortDate(allTimeBest.achievedAt) : 'Today'}
+              valueColor={allTimeBest.achievedAt ? undefined : accentColor}
+            />
+          ) : null}
+          {previousSession ? (
+            <RecordTile
+              testID={id('last')}
+              label="Last Time"
+              value={previousSession.topSetDisplay ?? '—'}
+              meta={`${previousSession.dateDisplay} · ${previousSets.length} ${previousSets.length === 1 ? 'set' : 'sets'}`}
+            />
+          ) : null}
+        </View>
+      ) : null}
+
+      {previousSets.length > 0 ? (
+        <View testID={id('previous-session')} style={styles.previousSession}>
           <View style={styles.previousHeaderRow}>
-            <View style={styles.previousTitleRow}>
-              <Text style={styles.previousTitle}>Last Workout</Text>
-              <TouchableOpacity
-                testID={testID ? `${testID}-previous-session-info` : undefined}
-                onPress={() =>
-                  Alert.alert(
-                    'Last Workout',
-                    'Every set you logged for this exercise the last time you did it.',
-                  )
-                }
-                accessibilityRole="button"
-                accessibilityLabel="About Last Workout"
-                hitSlop={12}
-              >
-                <Feather name="info" size={14} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
+            <SectionHeader label="Last Time's Sets" />
             {onViewHistory ? (
               <TouchableOpacity
-                testID={testID ? `${testID}-view-history` : undefined}
+                testID={id('view-history')}
                 onPress={onViewHistory}
                 accessibilityRole="button"
                 accessibilityLabel="View History"
@@ -236,147 +353,135 @@ function ExerciseCardComponent({
               </TouchableOpacity>
             ) : null}
           </View>
-          <Text style={styles.previousDate}>{previousSession.dateDisplay}</Text>
-          {bestLine ? (
-            <Text testID={testID ? `${testID}-best` : undefined} style={styles.bestLine}>
-              {bestLine}
-            </Text>
-          ) : null}
-
-          <SetColumnHeader measurementType={measurementType} previous />
-          <View style={styles.previousSets}>
-            {previousSession.sets.map((set) => (
-              <View
-                key={`${set.setNumber}-${set.side ?? 'none'}`}
-                testID={testID ? `${testID}-previous-set-${set.setNumber}` : undefined}
-                style={styles.previousSet}
-                accessible
-                accessibilityLabel={`Set ${set.setNumber}${set.side ? ` ${set.side}` : ''}: ${previousSetDescription(set, measurementType)}`}
-              >
-                <Text style={styles.previousSetNumber}>{set.setNumber}</Text>
-                {measurementType === 'timed' ? (
-                  <Text style={[styles.previousSetReps, styles.setInputWide]}>
-                    {set.side ? `${set.side === 'left' ? 'L' : 'R'} ` : ''}
-                    {set.durationDisplay ?? '—'}
+          <AutoCarousel
+            testID={id('previous')}
+            items={previousSets}
+            keyOf={(set) => String(set.setNumber)}
+            renderSlide={(set) => {
+              const top = set.setNumber === previousSession?.topSetNumber;
+              const side = set.side ? ` · ${set.side === 'left' ? 'Left' : 'Right'}` : '';
+              const value = slideValue(set, measurementType);
+              return (
+                <View
+                  testID={id(`previous-set-${set.setNumber}`)}
+                  style={styles.slide}
+                  accessible
+                  accessibilityLabel={`Set ${set.setNumber} of ${previousSets.length}${side}: ${value}${top ? ', top set' : ''}`}
+                >
+                  <Text style={styles.slideLabel}>
+                    Set {set.setNumber} of {previousSets.length}
+                    {side}
                   </Text>
-                ) : (
-                  <>
-                    <Text style={styles.previousSetWeight}>
-                      {set.side ? `${set.side === 'left' ? 'L' : 'R'} ` : ''}
-                      {measurementType === 'bodyweight' ? 'BW' : `${set.weightDisplay} ${set.unit}`}
-                    </Text>
-                    <Text style={styles.previousSetReps}>{set.reps}</Text>
-                  </>
-                )}
-                <View style={styles.setHeaderComplete} />
-              </View>
-            ))}
-          </View>
-
-          {progressionCue ? (
-            <View
-              testID={testID ? `${testID}-cue` : undefined}
-              style={styles.cue}
-              accessible
-              accessibilityLabel={[
-                progressionCue.headline,
-                ...progressionCue.options,
-                progressionCue.detail,
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              <Feather name="trending-up" size={16} color={accentColor} style={styles.cueIcon} />
-              <View style={styles.cueBody}>
-                <Text style={styles.cueHeadline}>{progressionCue.headline}</Text>
-                {progressionCue.options.map((option) => (
-                  <Text key={option} style={styles.cueOption}>
-                    {option}
-                  </Text>
-                ))}
-                {progressionCue.detail ? (
-                  <Text style={styles.cueDetail}>{progressionCue.detail}</Text>
-                ) : null}
-              </View>
-            </View>
-          ) : null}
+                  <Text style={styles.slideValue}>{value}</Text>
+                  {top ? (
+                    <Text style={[styles.slideTag, { color: accentColor }]}>Top Set</Text>
+                  ) : null}
+                </View>
+              );
+            }}
+          />
         </View>
       ) : null}
 
-      {hasRows ? <SetColumnHeader measurementType={measurementType} /> : null}
-
-      {isUnilateral
-        ? unilateralSets.map((set, position) => (
-            <UnilateralSetRow
-              key={set.setIndex}
-              testID={testID ? `${testID}-set-${set.setIndex}` : undefined}
-              // Numbered by position, so removing a set never leaves a gap (1, 3).
-              setIndex={position + 1}
-              left={set.left}
-              right={set.right}
-              completed={set.left.completed && set.right.completed}
-              canComplete={set.left.canComplete && set.right.canComplete}
-              measurementType={measurementType}
-              onChangeWeight={onChangeWeight}
-              onChangeReps={onChangeReps}
-              onChangeDuration={onChangeDuration}
-              onToggleComplete={onToggleComplete}
-              onRemove={onRemoveSet}
-              accentColor={accentColor}
-              onAccentColor={onAccentColor}
-            />
-          ))
-        : sets.map((set, position) => (
-            <SetRow
-              key={set.id}
-              testID={testID ? `${testID}-set-${set.id}` : undefined}
-              setIndex={position + 1}
-              weight={set.weight}
-              reps={set.reps}
-              duration={set.duration ?? ''}
-              measurementType={measurementType}
-              completed={set.completed}
-              canComplete={set.canComplete}
-              setId={set.id}
-              onChangeWeight={onChangeWeight}
-              onChangeReps={onChangeReps}
-              onChangeDuration={onChangeDuration}
-              onToggleComplete={onToggleComplete}
-              onRemove={onRemoveSet}
-              accentColor={accentColor}
-              onAccentColor={onAccentColor}
-            />
-          ))}
-
-      {sessionCue ? (
+      {progressionCue ? (
         <View
-          testID={testID ? `${testID}-session-cue` : undefined}
-          style={styles.sessionCue}
+          testID={id('cue')}
+          style={styles.cue}
           accessible
-          accessibilityLabel={sessionCue}
+          accessibilityLabel={[
+            progressionCue.headline,
+            ...progressionCue.options,
+            progressionCue.detail,
+          ]
+            .filter(Boolean)
+            .join(' ')}
         >
-          <Feather name="check-circle" size={16} color={accentColor} />
-          <Text style={styles.sessionCueText}>{sessionCue}</Text>
+          <Feather name="trending-up" size={16} color={accentColor} style={styles.cueIcon} />
+          <View style={styles.cueBody}>
+            <Text style={styles.cueHeadline}>{progressionCue.headline}</Text>
+            {progressionCue.options.map((option) => (
+              <Text key={option} style={styles.cueOption}>
+                {option}
+              </Text>
+            ))}
+            {progressionCue.detail ? (
+              <Text style={styles.cueDetail}>{progressionCue.detail}</Text>
+            ) : null}
+          </View>
         </View>
       ) : null}
 
-      <View style={styles.addSet}>
-        <SecondaryButton
-          testID={testID ? `${testID}-add-set` : undefined}
-          size="md"
-          label="+ Add Set"
-          accessibilityLabel="Add Set"
-          onPress={onAddSet}
-        />
-      </View>
-    </View>
-  );
-}
+      <View style={styles.today}>
+        <SectionHeader label="Today" />
+        {hasRows ? <SetColumnHeader measurementType={measurementType} /> : null}
 
-function previousSetDescription(set: PreviousSessionSet, type: MeasurementType): string {
-  if (type === 'timed') return set.durationDisplay ?? 'no time';
-  if (type === 'bodyweight') return `${set.reps} reps at bodyweight`;
-  return `${set.weightDisplay} ${set.unit} for ${set.reps} reps`;
+        {isUnilateral
+          ? unilateralSets.map((set, position) => (
+              <UnilateralSetRow
+                key={set.setIndex}
+                testID={id(`set-${set.setIndex}`)}
+                // Numbered by position, so removing a set never leaves a gap (1, 3).
+                setIndex={position + 1}
+                left={set.left}
+                right={set.right}
+                completed={set.left.completed && set.right.completed}
+                canComplete={set.left.canComplete && set.right.canComplete}
+                measurementType={measurementType}
+                onChangeWeight={onChangeWeight}
+                onChangeReps={onChangeReps}
+                onChangeDuration={onChangeDuration}
+                onToggleComplete={onToggleComplete}
+                onRemove={onRemoveSet}
+                accentColor={accentColor}
+                onAccentColor={onAccentColor}
+              />
+            ))
+          : sets.map((set, position) => (
+              <SetRow
+                key={set.id}
+                testID={id(`set-${set.id}`)}
+                setIndex={position + 1}
+                weight={set.weight}
+                reps={set.reps}
+                duration={set.duration ?? ''}
+                measurementType={measurementType}
+                completed={set.completed}
+                canComplete={set.canComplete}
+                setId={set.id}
+                onChangeWeight={onChangeWeight}
+                onChangeReps={onChangeReps}
+                onChangeDuration={onChangeDuration}
+                onToggleComplete={onToggleComplete}
+                onRemove={onRemoveSet}
+                accentColor={accentColor}
+                onAccentColor={onAccentColor}
+              />
+            ))}
+
+        {sessionCue ? (
+          <View
+            testID={id('session-cue')}
+            style={styles.sessionCue}
+            accessible
+            accessibilityLabel={sessionCue}
+          >
+            <Feather name="check-circle" size={16} color={accentColor} />
+            <Text style={styles.sessionCueText}>{sessionCue}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.addSet}>
+          <SecondaryButton
+            testID={id('add-set')}
+            size="md"
+            label="+ Add Set"
+            accessibilityLabel="Add Set"
+            onPress={onAddSet}
+          />
+        </View>
+      </View>
+    </Card>
+  );
 }
 
 function arraysEqual<T>(a: T[], b: T[], elementEqual: (x: T, y: T) => boolean): boolean {
@@ -433,7 +538,13 @@ function previousSessionEqual(
 ): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  if (a.dateDisplay !== b.dateDisplay) return false;
+  if (
+    a.dateDisplay !== b.dateDisplay ||
+    (a.topSetDisplay ?? null) !== (b.topSetDisplay ?? null) ||
+    (a.topSetNumber ?? null) !== (b.topSetNumber ?? null)
+  ) {
+    return false;
+  }
   return arraysEqual(
     a.sets,
     b.sets,
@@ -447,39 +558,48 @@ function previousSessionEqual(
   );
 }
 
-// ActiveWorkoutScreen rebuilds `sets`/`unilateralSets`/`previousSession` as
-// fresh array/object literals on every render (they're derived from a
-// single flat setInputs map covering every exercise in the workout), so a
-// default reference-equality memo would never actually skip a re-render --
-// typing into one exercise's set would still re-render every OTHER
-// exercise's card too. This comparator checks those three props by value
-// instead. The set-mutation callbacks (onChangeWeight, onToggleComplete,
-// onAddSet, ...) are deliberately not compared: each is either a pure
-// functional state update (reads no stale closure state) or closes over
-// this exercise/set, which the value checks above already confirm is
-// unchanged -- so an old closure reference behaves identically to a new
-// one. onMoveUp/onMoveDown are the one exception (see ActiveWorkoutScreen's
-// own comment on why they're kept genuinely stable per position) and ARE
-// compared, via React.memo's own default shallow check on every other prop.
-// Exported (not just used internally) so its exact equality semantics --
-// the actual mechanism behind ExerciseCard's re-render fix -- can be unit
-// tested directly and deterministically, rather than only indirectly and
-// timing-sensitively through a Profiler-based render-count test.
+function allTimeBestEqual(a: AllTimeBest | null, b: AllTimeBest | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.measurementType === b.measurementType &&
+    a.weightKg === b.weightKg &&
+    a.reps === b.reps &&
+    a.durationSeconds === b.durationSeconds &&
+    a.achievedAt === b.achievedAt
+  );
+}
+
+// ActiveWorkoutScreen rebuilds `sets`/`unilateralSets`/`previousSession`/`allTimeBest` as
+// fresh array/object literals on every render (they're derived from a single flat setInputs
+// map covering every exercise in the workout), so a default reference-equality memo would
+// never actually skip a re-render -- typing into one exercise's set would still re-render
+// every OTHER exercise's widget too. This comparator checks those props by value instead. The
+// set-mutation callbacks (onChangeWeight, onToggleComplete, onAddSet, ...) are deliberately
+// not compared: each is either a pure functional state update (reads no stale closure state)
+// or closes over this exercise/set, which the value checks above already confirm is unchanged
+// -- so an old closure reference behaves identically to a new one. onMoveUp/onMoveDown are the
+// one exception (see ActiveWorkoutScreen's own comment on why they're kept genuinely stable
+// per position) and ARE compared, as is onEditProgression. Exported so its exact equality
+// semantics -- the actual mechanism behind ExerciseCard's re-render fix -- can be unit tested
+// directly and deterministically.
 export function arePropsEqual(prev: Props, next: Props): boolean {
   return (
     prev.exerciseName === next.exerciseName &&
     prev.muscleGroup === next.muscleGroup &&
     prev.movementType === next.movementType &&
     prev.measurementType === next.measurementType &&
-    prev.divider === next.divider &&
+    (prev.photoUrl ?? null) === (next.photoUrl ?? null) &&
+    prev.weightUnit === next.weightUnit &&
     prev.accentColor === next.accentColor &&
     prev.onAccentColor === next.onAccentColor &&
     prev.testID === next.testID &&
     prev.onMoveUp === next.onMoveUp &&
     prev.onMoveDown === next.onMoveDown &&
-    (prev.bestLine ?? null) === (next.bestLine ?? null) &&
+    (prev.onViewHistory === undefined) === (next.onViewHistory === undefined) &&
+    allTimeBestEqual(prev.allTimeBest ?? null, next.allTimeBest ?? null) &&
     (prev.sessionCue ?? null) === (next.sessionCue ?? null) &&
-    (prev.rangeText ?? null) === (next.rangeText ?? null) &&
+    (prev.ownRangeText ?? null) === (next.ownRangeText ?? null) &&
     prev.onEditProgression === next.onEditProgression &&
     cuesEqual(prev.progressionCue ?? null, next.progressionCue ?? null) &&
     previousSessionEqual(prev.previousSession, next.previousSession) &&
