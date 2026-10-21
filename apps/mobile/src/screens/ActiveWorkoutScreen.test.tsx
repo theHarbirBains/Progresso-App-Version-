@@ -1786,7 +1786,7 @@ describe("ActiveWorkoutScreen -- an exercise's own rep range", () => {
         'Own range 10–14',
       ),
     );
-    expect(screen.getByTestId('active-workout-own-ranges')).toHaveTextContent(
+    expect(screen.getByTestId('active-workout-rep-range-own')).toHaveTextContent(
       '1 exercise here has its own',
     );
   });

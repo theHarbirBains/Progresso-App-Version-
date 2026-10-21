@@ -33,6 +33,7 @@ import {
   withPrefilledSets,
   type SetInputDraft,
 } from './setInputDrafts';
+import { LiveProgressionSheets, RepRangeRow, useLiveProgression } from './useLiveProgression';
 import { useSetInputDrafts } from './useSetInputDrafts';
 import {
   addExerciseToWorkout,
@@ -75,6 +76,11 @@ interface Props {
  * across the top; the exercises are the group's, so adding or removing one changes
  * every person's workout. Only the sets differ: the tab shows that person's own sets,
  * with the weight lifted and reps done, and anyone in the group can enter them.
+ *
+ * The signed-in person's own tab also has everything Active Workout shows from their own
+ * records and settings (useLiveProgression): their rep range under the stats, and each
+ * exercise's All-Time Best, the suggestion and its own range. Other people's tabs don't --
+ * those come from records only their owner can read.
  */
 export function GroupWorkoutEditor({
   members,
@@ -96,6 +102,7 @@ export function GroupWorkoutEditor({
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
+  const progression = useLiveProgression({ userId, weightUnit, onError: setError });
 
   const memberKey = members.map((m) => `${m.userId}:${m.workoutId}`).join('|');
 
@@ -405,6 +412,9 @@ export function GroupWorkoutEditor({
   if (loading) return <LoadingState testID={`${testID}-loading`} />;
   if (members.length === 0) return null;
 
+  // The signed-in person's own tab: the one their own records and settings apply to.
+  const ownTab = selected?.userId === userId;
+
   const tabs = members.map((m) => ({
     key: m.userId,
     label: m.userId === userId ? 'You' : firstName(m.displayName),
@@ -431,6 +441,14 @@ export function GroupWorkoutEditor({
           totalSets={computeTotalSets(selectedDetail?.exercises ?? [])}
           totalExercises={selectedDetail?.exercises.length ?? 0}
         />
+        {ownTab ? (
+          <RepRangeRow
+            testID={`${testID}-rep-range`}
+            progression={progression}
+            exercises={selectedDetail?.exercises ?? []}
+            accentColor={accentColor}
+          />
+        ) : null}
       </Card>
 
       {error ? (
@@ -455,6 +473,7 @@ export function GroupWorkoutEditor({
         );
         return (
           <ExerciseCard
+            {...(ownTab ? progression.cardPropsFor(row, prior?.sets) : null)}
             key={row.exerciseId}
             testID={`${testID}-exercise-${row.exerciseId}`}
             exerciseName={row.exerciseName}
@@ -462,6 +481,7 @@ export function GroupWorkoutEditor({
             movementType={row.movementType}
             measurementType={type}
             photoUrl={row.photoUrl}
+            weightUnit={weightUnit}
             previousSession={previousSession}
             sets={
               row.movementType === 'unilateral' ? [] : computeCardSets(row.sets, setInputs, type)
@@ -494,6 +514,11 @@ export function GroupWorkoutEditor({
         onPress={() => setCustomOpen(true)}
       />
 
+      <LiveProgressionSheets
+        progression={progression}
+        accentColor={accentColor}
+        onAccentColor={onAccentColor}
+      />
       <ExercisePickerModal
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}

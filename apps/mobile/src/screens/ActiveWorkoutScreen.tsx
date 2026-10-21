@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { Card } from '../design/Card';
@@ -9,31 +8,21 @@ import { PrimaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { Screen } from '../design/Screen';
-import { fetchAllExercises, type ExerciseRow } from '../exercises/exerciseQueries';
+import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { useProfile } from '../profile/ProfileProvider';
-import { RepRangeSheet } from '../settings/RepRangeSheet';
 import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
 import { ExerciseCard } from '../workouts/ExerciseCard';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
 import {
-  effectiveRepRange,
-  formatRepRange,
-  progressionForExercise,
-  wantsGuidance,
-  type RepRange,
-} from '../workouts/progression';
-import { ExerciseProgressionSheet } from '../workouts/ExerciseProgressionSheet';
-import {
-  fetchExerciseSettings,
-  saveExerciseSetting,
-  type ExerciseProgressionSetting,
-} from '../workouts/exerciseSettingsQueries';
+  LiveProgressionSheets,
+  RepRangeRow,
+  useLiveProgression,
+} from '../workouts/useLiveProgression';
 import {
   buildPreviousSessionDisplay,
   computeCardSets,
@@ -98,106 +87,14 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
-  const {
-    refetch: refetchAllTimeStats,
-    repPRs: allRepPRs,
-    exerciseRecords: allExerciseRecords,
-  } = useAllTimeStats();
-  const { profile, updateProfile } = useProfile();
-  // The person's own rep range being changed from the top of the workout; null while closed.
-  const [repRangeDraft, setRepRangeDraft] = useState<RepRange | null>(null);
-  // Progressive overload (workouts/progression.ts): the person's one rep range, and whether to
-  // suggest anything. Read off the shared profile, so a change in Settings shows straight away.
-  const progressionSettings = {
-    range: { min: profile?.repRangeMin ?? 8, max: profile?.repRangeMax ?? 12 },
-    enabled: profile?.progressionCuesEnabled ?? true,
-    guided: wantsGuidance(profile?.trainingComfort ?? null),
-    unit: weightUnit,
-  };
-  // The person's exercise library (already cached for the picker), to suggest the weighted
-  // version of a bodyweight or timed exercise. Nothing breaks without it.
-  const [library, setLibrary] = useState<ExerciseRow[]>([]);
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    fetchAllExercises({ userId, search: '', muscleGroup: null, source: 'all' })
-      .then((rows) => {
-        if (!cancelled) setLibrary(rows);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  // Exercises with their own rep range or weight step (exerciseSettingsQueries.ts). An
-  // exercise's own range wins over the person's; nothing breaks without them.
-  const [exerciseSettings, setExerciseSettings] = useState<Map<string, ExerciseProgressionSetting>>(
-    new Map(),
-  );
-  const [editingRangeFor, setEditingRangeFor] = useState<{
-    exerciseId: string;
-    exerciseName: string;
-    measurementType: MeasurementType;
-  } | null>(null);
-  const [rangeSaving, setRangeSaving] = useState(false);
-  const [rangeError, setRangeError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    fetchExerciseSettings(userId)
-      .then((settings) => {
-        if (!cancelled) setExerciseSettings(settings);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  async function handleSaveExerciseRange(setting: {
-    range: RepRange | null;
-    incrementKg: number | null;
-  }) {
-    if (!userId || !editingRangeFor) return;
-    setRangeError(null);
-    setRangeSaving(true);
-    try {
-      const saved = await saveExerciseSetting(userId, editingRangeFor.exerciseId, setting);
-      setExerciseSettings((prev) => {
-        const next = new Map(prev);
-        if (saved) next.set(editingRangeFor.exerciseId, saved);
-        else next.delete(editingRangeFor.exerciseId);
-        return next;
-      });
-      setEditingRangeFor(null);
-    } catch (err) {
-      setRangeError(err instanceof Error ? err.message : 'Failed to save the range');
-    } finally {
-      setRangeSaving(false);
-    }
-  }
-
-  // One stable handler per exercise, so opening the range sheet never re-renders every card.
-  const rangeHandlersRef = useRef(new Map<string, () => void>());
-  function getRangeHandler(exercise: {
-    exerciseId: string;
-    exerciseName: string;
-    measurementType: MeasurementType;
-  }): () => void {
-    const cached = rangeHandlersRef.current.get(exercise.exerciseId);
-    if (cached) return cached;
-    const handler = () => {
-      setRangeError(null);
-      setEditingRangeFor(exercise);
-    };
-    rangeHandlersRef.current.set(exercise.exerciseId, handler);
-    return handler;
-  }
+  const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Progressive overload: the person's rep range, each exercise's own, their records and the
+  // suggestions (workouts/useLiveProgression.tsx, shared with a group session's own tab).
+  const progression = useLiveProgression({ userId, weightUnit, onError: setError });
   // Starting a planned day says here if not all of its plan made it into the workout. Kept apart
   // from `error`, which loading clears.
   const planError = route.params.planError ?? null;
@@ -809,22 +706,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     new Set(workout.exercises.map((ex) => MUSCLE_GROUP_LABELS[ex.muscleGroup])),
   ).join(', ');
   const totalSets = computeTotalSets(workout.exercises);
-  // Exercises in this workout with a range of their own, which the person's range doesn't apply to.
-  const ownRangeCount = workout.exercises.filter(
-    (exercise) =>
-      measurementTypeOf(exercise) !== 'timed' && exerciseSettings.get(exercise.exerciseId)?.range,
-  ).length;
-
-  async function saveRepRange(range: RepRange) {
-    setRepRangeDraft(null);
-    setError(null);
-    try {
-      await updateProfile({ repRangeMin: range.min, repRangeMax: range.max });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save your rep range');
-    }
-  }
-
   return (
     <>
       <Screen
@@ -848,30 +729,12 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                   totalExercises={workout.exercises.length}
                 />
                 {/* The person's one rep range, for every exercise without its own. */}
-                <View testID="active-workout-rep-range" style={styles.rangeRow}>
-                  <Feather name="repeat" size={16} color={theme.accent} />
-                  <View style={styles.rangeBody}>
-                    <Text style={styles.rangeText}>
-                      Your rep range{' '}
-                      <Text testID="active-workout-rep-range-value" style={styles.rangeValue}>
-                        {formatRepRange(progressionSettings.range)}
-                      </Text>
-                    </Text>
-                    {ownRangeCount > 0 ? (
-                      <Text testID="active-workout-own-ranges" style={styles.rangeNote}>
-                        {ownRangeCount === 1
-                          ? '1 exercise here has its own'
-                          : `${ownRangeCount} exercises here have their own`}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <TextButton
-                    testID="active-workout-rep-range-edit"
-                    label="Edit"
-                    accessibilityLabel="Change your rep range"
-                    onPress={() => setRepRangeDraft(progressionSettings.range)}
-                  />
-                </View>
+                <RepRangeRow
+                  testID="active-workout-rep-range"
+                  progression={progression}
+                  exercises={workout.exercises}
+                  accentColor={theme.accent}
+                />
               </Card>
             </View>
           </View>
@@ -900,35 +763,10 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
 
           {workout.exercises.map((exercise, index) => (
             <ExerciseCard
-              {...progressionForExercise({
+              {...progression.cardPropsFor(
                 exercise,
-                lastSessionSets: previousPerformance[exercise.exerciseId]?.sets,
-                settings: progressionSettings,
-                repPRs: allRepPRs,
-                records: allExerciseRecords,
-                library,
-                override: exerciseSettings.get(exercise.exerciseId) ?? null,
-              })}
-              ownRangeText={
-                measurementTypeOf(exercise) !== 'timed' &&
-                exerciseSettings.get(exercise.exerciseId)?.range
-                  ? `Own range ${formatRepRange(
-                      effectiveRepRange(
-                        progressionSettings.range,
-                        exerciseSettings.get(exercise.exerciseId)?.range ?? null,
-                      ),
-                    )}`
-                  : null
-              }
-              onEditProgression={
-                measurementTypeOf(exercise) === 'timed'
-                  ? undefined
-                  : getRangeHandler({
-                      exerciseId: exercise.exerciseId,
-                      exerciseName: exercise.exerciseName,
-                      measurementType: measurementTypeOf(exercise),
-                    })
-              }
+                previousPerformance[exercise.exerciseId]?.sets,
+              )}
               key={exercise.id}
               testID={`exercise-card-${exercise.id}`}
               exerciseName={exercise.exerciseName}
@@ -1026,28 +864,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         onAccentColor={theme.onAccent}
       />
 
-      <RepRangeSheet
-        draft={repRangeDraft}
-        onChangeDraft={setRepRangeDraft}
-        onClose={() => setRepRangeDraft(null)}
-        onSave={(range) => void saveRepRange(range)}
-        accentColor={theme.accent}
-        onAccentColor={theme.onAccent}
-      />
-
-      <ExerciseProgressionSheet
-        visible={editingRangeFor !== null}
-        exerciseName={editingRangeFor?.exerciseName ?? ''}
-        measurementType={editingRangeFor?.measurementType ?? 'weight_reps'}
-        personalRange={progressionSettings.range}
-        current={
-          editingRangeFor ? (exerciseSettings.get(editingRangeFor.exerciseId) ?? null) : null
-        }
-        unit={weightUnit}
-        saving={rangeSaving}
-        error={rangeError}
-        onSave={(setting) => void handleSaveExerciseRange(setting)}
-        onClose={() => setEditingRangeFor(null)}
+      <LiveProgressionSheets
+        progression={progression}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
       />

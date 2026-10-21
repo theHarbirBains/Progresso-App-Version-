@@ -31,6 +31,44 @@ jest.mock('../screens/ExerciseFormScreen', () => ({
   ExerciseFormScreen: () => null,
 }));
 
+// The signed-in person's own records and settings, for their own tab.
+jest.mock('../progress/AllTimeStatsProvider', () => ({
+  useAllTimeStats: () => ({
+    repPRs: [
+      {
+        exerciseId: 'squat',
+        reps: 5,
+        bestWeightKg: 120,
+        achievedAt: '2026-09-02T12:00:00.000Z',
+        sourceSetId: 'pr-1',
+      },
+    ],
+    exerciseRecords: [],
+    refetch: jest.fn(),
+  }),
+}));
+
+jest.mock('../profile/ProfileProvider', () => ({
+  useProfile: () => ({
+    profile: {
+      repRangeMin: 3,
+      repRangeMax: 6,
+      progressionCuesEnabled: true,
+      trainingComfort: null,
+    },
+    updateProfile: jest.fn(),
+  }),
+}));
+
+jest.mock('./exerciseSettingsQueries', () => ({
+  fetchExerciseSettings: jest.fn(async () => new Map()),
+  saveExerciseSetting: jest.fn(),
+}));
+
+jest.mock('../exercises/exerciseQueries', () => ({
+  fetchAllExercises: jest.fn(async () => []),
+}));
+
 jest.mock('../progress/useProgressTheme', () => ({
   useProgressTheme: () => ({ weightUnit: 'kg', theme: { accent: '#3DDC97', onAccent: '#000000' } }),
 }));
@@ -133,6 +171,46 @@ function renderEditor() {
 }
 
 describe('GroupWorkoutEditor', () => {
+  it("shows your own range, all-time best and suggestion on your tab only -- never someone else's", async () => {
+    mockFetchPrevious.mockImplementation(async (userId: string) => ({
+      performedAt: '2026-10-01T09:00:00.000Z',
+      sets: [
+        {
+          id: `prev-${userId}`,
+          setIndex: 1,
+          side: null,
+          weightKg: userId === 'me' ? 100 : 60,
+          reps: 5,
+          completedAt: '2026-10-01T09:30:00.000Z',
+        },
+      ],
+    }));
+    renderEditor();
+
+    expect(await screen.findByTestId('group-workout-rep-range')).toHaveTextContent(
+      /Your rep range 3–6/,
+    );
+    expect(screen.getByTestId('group-workout-exercise-squat-best')).toHaveTextContent(
+      /All-Time Best.*120 kg × 5/,
+    );
+    expect(await screen.findByTestId('group-workout-exercise-squat-cue')).toHaveTextContent(
+      /Keep your top set weight the same until you reach 6 reps/,
+    );
+    fireEvent.press(screen.getByTestId('group-workout-exercise-squat-menu'));
+    expect(screen.getByTestId('group-workout-exercise-squat-range')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Sam'));
+
+    // Sam's own last time still shows; nothing from your records or settings does.
+    expect(await screen.findByTestId('group-workout-exercise-squat-last')).toHaveTextContent(
+      /60 kg × 5/,
+    );
+    expect(screen.queryByTestId('group-workout-rep-range')).toBeNull();
+    expect(screen.queryByTestId('group-workout-exercise-squat-best')).toBeNull();
+    expect(screen.queryByTestId('group-workout-exercise-squat-cue')).toBeNull();
+    expect(screen.queryByTestId('group-workout-exercise-squat-range')).toBeNull();
+  });
+
   it('shows a tab for each person, with you first', async () => {
     renderEditor();
 
