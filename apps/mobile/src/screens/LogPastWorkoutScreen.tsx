@@ -368,6 +368,8 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
         scroll={false}
         padded={false}
         keyboardAvoiding
+        // Its widgets roll out from inside the list (RiseInStack), so the list doesn't also rise.
+        rollout={false}
         header={
           <AppHeader
             testID="log-past-workout-header"

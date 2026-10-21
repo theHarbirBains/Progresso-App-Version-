@@ -8,6 +8,7 @@ import { rememberLiveWorkout } from '../feed/liveWorkoutMemory';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
+import { RiseInStack } from '../design/RiseIn';
 import { Screen } from '../design/Screen';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
@@ -724,6 +725,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         scroll={false}
         padded={false}
         keyboardAvoiding
+        // Its widgets roll out from inside the list (below), so the list doesn't also rise.
+        rollout={false}
         header={
           <View>
             <AppHeader
@@ -758,94 +761,96 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {(error ?? planError) ? (
-            <Text testID="active-workout-error" style={styles.errorText}>
-              {error ?? planError}
-            </Text>
-          ) : null}
+          <RiseInStack>
+            {(error ?? planError) ? (
+              <Text testID="active-workout-error" style={styles.errorText}>
+                {error ?? planError}
+              </Text>
+            ) : null}
 
-          {workout.exercises.length === 0 ? (
-            <View style={styles.emptyWrap}>
-              <EmptyState
-                testID="active-workout-empty"
-                title="Add your first exercise to get started."
+            {workout.exercises.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <EmptyState
+                  testID="active-workout-empty"
+                  title="Add your first exercise to get started."
+                />
+              </View>
+            ) : null}
+
+            {workout.exercises.map((exercise, index) => (
+              <ExerciseCard
+                {...progression.cardPropsFor(
+                  exercise,
+                  previousPerformance[exercise.exerciseId]?.sets,
+                )}
+                key={exercise.id}
+                testID={`exercise-card-${exercise.id}`}
+                exerciseName={exercise.exerciseName}
+                muscleGroup={exercise.muscleGroup}
+                movementType={exercise.movementType}
+                measurementType={measurementTypeOf(exercise)}
+                photoUrl={exercise.photoUrl}
+                weightUnit={weightUnit}
+                previousSession={buildPreviousSessionDisplay(
+                  previousPerformance[exercise.exerciseId],
+                  weightUnit,
+                  measurementTypeOf(exercise),
+                )}
+                // Exercise progress charts weights; a bodyweight or timed exercise has none to show.
+                onViewHistory={
+                  previousPerformance[exercise.exerciseId] &&
+                  measurementTypeOf(exercise) === 'weight_reps'
+                    ? () =>
+                        navigation.navigate('ProgressExerciseDetail', {
+                          exerciseId: exercise.exerciseId,
+                          exerciseName: exercise.exerciseName,
+                        })
+                    : undefined
+                }
+                sets={
+                  exercise.movementType === 'unilateral'
+                    ? []
+                    : computeCardSets(exercise.sets, setInputs, measurementTypeOf(exercise))
+                }
+                unilateralSets={
+                  exercise.movementType === 'unilateral'
+                    ? computeUnilateralSets(exercise.sets, setInputs, measurementTypeOf(exercise))
+                    : []
+                }
+                onChangeWeight={changeSetWeight}
+                onChangeReps={changeSetReps}
+                onChangeDuration={changeSetDuration}
+                onToggleComplete={toggleSetComplete}
+                onAddSet={() => handleAddSet(exercise)}
+                onRemoveSet={removeSet}
+                onRemoveExercise={() => handleRemoveExercise(exercise.id)}
+                onMoveUp={index > 0 ? getMoveHandler(index, -1) : undefined}
+                onMoveDown={
+                  index < workout.exercises.length - 1 ? getMoveHandler(index, 1) : undefined
+                }
+                accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
+              />
+            ))}
+
+            <View style={styles.endActions}>
+              <AddExerciseButton
+                testID="active-workout-add-exercise"
+                onPress={() => setPickerOpen(true)}
+              />
+              <CreateCustomExerciseButton
+                testID="active-workout-create-custom"
+                onPress={() => setCustomExerciseOpen(true)}
+              />
+              <TextButton
+                testID="cancel-workout"
+                label={cancelling ? 'Cancelling…' : 'Cancel Workout'}
+                destructive
+                onPress={handleCancelWorkout}
+                disabled={cancelling || completing}
               />
             </View>
-          ) : null}
-
-          {workout.exercises.map((exercise, index) => (
-            <ExerciseCard
-              {...progression.cardPropsFor(
-                exercise,
-                previousPerformance[exercise.exerciseId]?.sets,
-              )}
-              key={exercise.id}
-              testID={`exercise-card-${exercise.id}`}
-              exerciseName={exercise.exerciseName}
-              muscleGroup={exercise.muscleGroup}
-              movementType={exercise.movementType}
-              measurementType={measurementTypeOf(exercise)}
-              photoUrl={exercise.photoUrl}
-              weightUnit={weightUnit}
-              previousSession={buildPreviousSessionDisplay(
-                previousPerformance[exercise.exerciseId],
-                weightUnit,
-                measurementTypeOf(exercise),
-              )}
-              // Exercise progress charts weights; a bodyweight or timed exercise has none to show.
-              onViewHistory={
-                previousPerformance[exercise.exerciseId] &&
-                measurementTypeOf(exercise) === 'weight_reps'
-                  ? () =>
-                      navigation.navigate('ProgressExerciseDetail', {
-                        exerciseId: exercise.exerciseId,
-                        exerciseName: exercise.exerciseName,
-                      })
-                  : undefined
-              }
-              sets={
-                exercise.movementType === 'unilateral'
-                  ? []
-                  : computeCardSets(exercise.sets, setInputs, measurementTypeOf(exercise))
-              }
-              unilateralSets={
-                exercise.movementType === 'unilateral'
-                  ? computeUnilateralSets(exercise.sets, setInputs, measurementTypeOf(exercise))
-                  : []
-              }
-              onChangeWeight={changeSetWeight}
-              onChangeReps={changeSetReps}
-              onChangeDuration={changeSetDuration}
-              onToggleComplete={toggleSetComplete}
-              onAddSet={() => handleAddSet(exercise)}
-              onRemoveSet={removeSet}
-              onRemoveExercise={() => handleRemoveExercise(exercise.id)}
-              onMoveUp={index > 0 ? getMoveHandler(index, -1) : undefined}
-              onMoveDown={
-                index < workout.exercises.length - 1 ? getMoveHandler(index, 1) : undefined
-              }
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-            />
-          ))}
-
-          <View style={styles.endActions}>
-            <AddExerciseButton
-              testID="active-workout-add-exercise"
-              onPress={() => setPickerOpen(true)}
-            />
-            <CreateCustomExerciseButton
-              testID="active-workout-create-custom"
-              onPress={() => setCustomExerciseOpen(true)}
-            />
-            <TextButton
-              testID="cancel-workout"
-              label={cancelling ? 'Cancelling…' : 'Cancel Workout'}
-              destructive
-              onPress={handleCancelWorkout}
-              disabled={cancelling || completing}
-            />
-          </View>
+          </RiseInStack>
         </ScrollView>
 
         {/* A group is only started before a workout begins (New Workout > Start a Group), never

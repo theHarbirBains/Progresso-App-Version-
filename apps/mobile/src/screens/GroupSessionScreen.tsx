@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { AppCard } from '../design/AppCard';
+import { RiseIn } from '../design/RiseIn';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { ErrorState } from '../design/ErrorState';
@@ -136,6 +137,8 @@ export function GroupSessionScreen({ navigation, route }: Props) {
       scroll={false}
       padded={false}
       keyboardAvoiding
+      // The group editor rolls its own widgets out; the cards around it rise on their own.
+      rollout={false}
       header={
         <AppHeader
           title={group.name}
@@ -158,12 +161,14 @@ export function GroupSessionScreen({ navigation, route }: Props) {
         ) : null}
 
         {group.status === 'finished' ? (
-          <AppCard testID="group-session-finished">
-            <ListRow
-              title="This group has finished"
-              subtitle="Its workouts are in each person’s history"
-            />
-          </AppCard>
+          <RiseIn>
+            <AppCard testID="group-session-finished">
+              <ListRow
+                title="This group has finished"
+                subtitle="Its workouts are in each person’s history"
+              />
+            </AppCard>
+          </RiseIn>
         ) : null}
 
         {isLive && editorMembers.length > 0 ? (
@@ -178,17 +183,19 @@ export function GroupSessionScreen({ navigation, route }: Props) {
         ) : null}
 
         {invited.length > 0 ? (
-          <AppCard testID="group-session-invited">
-            <SectionHeader label="Invited" />
-            {invited.map((member, index) => (
-              <ListRow
-                key={member.userId}
-                title={member.displayName ?? 'Invited'}
-                subtitle="Waiting for them to accept"
-                divider={index > 0}
-              />
-            ))}
-          </AppCard>
+          <RiseIn>
+            <AppCard testID="group-session-invited">
+              <SectionHeader label="Invited" />
+              {invited.map((member, index) => (
+                <ListRow
+                  key={member.userId}
+                  title={member.displayName ?? 'Invited'}
+                  subtitle="Waiting for them to accept"
+                  divider={index > 0}
+                />
+              ))}
+            </AppCard>
+          </RiseIn>
         ) : null}
       </ScrollView>
 

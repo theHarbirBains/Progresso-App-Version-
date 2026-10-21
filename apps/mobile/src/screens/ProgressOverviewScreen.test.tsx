@@ -1,3 +1,4 @@
+import { forgetShown } from '../lib/lastShown';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
@@ -174,6 +175,7 @@ const meaningfulBenchHistory = [
 ];
 
 beforeEach(() => {
+  forgetShown();
   mockFetchSummaryTraining.mockReset().mockResolvedValue({ workouts: [], sets: [] });
   mockFetchFoodLogsForRange.mockReset().mockResolvedValue([]);
   mockFetchNutritionGoals.mockReset().mockResolvedValue({

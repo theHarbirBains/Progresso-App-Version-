@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, StyleSheet, View } from 'react-native';
 import { Card } from '../design/Card';
+import { RiseInStack } from '../design/RiseIn';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { Text } from '../design/Text';
@@ -423,96 +424,98 @@ export function GroupWorkoutEditor({
 
   return (
     <View testID={testID} style={styles.root}>
-      {members.length > 1 ? (
-        <UnderlineTabs
-          categories={tabs}
-          active={selected?.userId ?? userId}
-          onSelect={setSelectedId}
-          accentColor={accentColor}
-          testID={`${testID}-tabs`}
-        />
-      ) : null}
-
-      <Card>
-        <WorkoutStats
-          testID={`${testID}-summary`}
-          performedAt={startedAt}
-          active
-          totalSets={computeTotalSets(selectedDetail?.exercises ?? [])}
-          totalExercises={selectedDetail?.exercises.length ?? 0}
-        />
-        {ownTab ? (
-          <RepRangeRow
-            testID={`${testID}-rep-range`}
-            progression={progression}
-            exercises={selectedDetail?.exercises ?? []}
+      <RiseInStack>
+        {members.length > 1 ? (
+          <UnderlineTabs
+            categories={tabs}
+            active={selected?.userId ?? userId}
+            onSelect={setSelectedId}
             accentColor={accentColor}
+            testID={`${testID}-tabs`}
           />
         ) : null}
-      </Card>
 
-      {error ? (
-        <Text testID={`${testID}-error`} style={styles.error}>
-          {error}
-        </Text>
-      ) : null}
-
-      {exercises.length === 0 ? (
-        <EmptyState testID={`${testID}-empty`} title="Add your first exercise to get started." />
-      ) : null}
-
-      {exercises.map((shape) => {
-        const row = rowFor(shape.exerciseId);
-        if (!row) return null;
-        const prior = selected ? previous[`${selected.userId}:${row.exerciseId}`] : undefined;
-        const type = measurementTypeOf(row);
-        const previousSession: PreviousSessionDisplay | null = buildPreviousSessionDisplay(
-          prior,
-          weightUnit,
-          type,
-        );
-        return (
-          <ExerciseCard
-            {...(ownTab ? progression.cardPropsFor(row, prior?.sets) : null)}
-            key={row.exerciseId}
-            testID={`${testID}-exercise-${row.exerciseId}`}
-            exerciseName={row.exerciseName}
-            muscleGroup={row.muscleGroup}
-            movementType={row.movementType}
-            measurementType={type}
-            photoUrl={row.photoUrl}
-            weightUnit={weightUnit}
-            previousSession={previousSession}
-            sets={
-              row.movementType === 'unilateral' ? [] : computeCardSets(row.sets, setInputs, type)
-            }
-            unilateralSets={
-              row.movementType === 'unilateral'
-                ? computeUnilateralSets(row.sets, setInputs, type)
-                : []
-            }
-            onChangeWeight={changeWeight}
-            onChangeReps={changeReps}
-            onChangeDuration={changeDuration}
-            onToggleComplete={(setId) => {
-              const set = row.sets.find((s) => s.id === setId);
-              if (!set) return;
-              if (row.movementType === 'unilateral') void toggleUnilateral(row, set.setIndex);
-              else void toggleSet(row, set);
-            }}
-            onAddSet={() => void addSet(row)}
-            onRemoveExercise={() => confirmRemove(row)}
-            accentColor={accentColor}
-            onAccentColor={onAccentColor}
+        <Card>
+          <WorkoutStats
+            testID={`${testID}-summary`}
+            performedAt={startedAt}
+            active
+            totalSets={computeTotalSets(selectedDetail?.exercises ?? [])}
+            totalExercises={selectedDetail?.exercises.length ?? 0}
           />
-        );
-      })}
+          {ownTab ? (
+            <RepRangeRow
+              testID={`${testID}-rep-range`}
+              progression={progression}
+              exercises={selectedDetail?.exercises ?? []}
+              accentColor={accentColor}
+            />
+          ) : null}
+        </Card>
 
-      <AddExerciseButton testID={`${testID}-add-exercise`} onPress={() => setPickerOpen(true)} />
-      <CreateCustomExerciseButton
-        testID={`${testID}-create-custom`}
-        onPress={() => setCustomOpen(true)}
-      />
+        {error ? (
+          <Text testID={`${testID}-error`} style={styles.error}>
+            {error}
+          </Text>
+        ) : null}
+
+        {exercises.length === 0 ? (
+          <EmptyState testID={`${testID}-empty`} title="Add your first exercise to get started." />
+        ) : null}
+
+        {exercises.map((shape) => {
+          const row = rowFor(shape.exerciseId);
+          if (!row) return null;
+          const prior = selected ? previous[`${selected.userId}:${row.exerciseId}`] : undefined;
+          const type = measurementTypeOf(row);
+          const previousSession: PreviousSessionDisplay | null = buildPreviousSessionDisplay(
+            prior,
+            weightUnit,
+            type,
+          );
+          return (
+            <ExerciseCard
+              {...(ownTab ? progression.cardPropsFor(row, prior?.sets) : null)}
+              key={row.exerciseId}
+              testID={`${testID}-exercise-${row.exerciseId}`}
+              exerciseName={row.exerciseName}
+              muscleGroup={row.muscleGroup}
+              movementType={row.movementType}
+              measurementType={type}
+              photoUrl={row.photoUrl}
+              weightUnit={weightUnit}
+              previousSession={previousSession}
+              sets={
+                row.movementType === 'unilateral' ? [] : computeCardSets(row.sets, setInputs, type)
+              }
+              unilateralSets={
+                row.movementType === 'unilateral'
+                  ? computeUnilateralSets(row.sets, setInputs, type)
+                  : []
+              }
+              onChangeWeight={changeWeight}
+              onChangeReps={changeReps}
+              onChangeDuration={changeDuration}
+              onToggleComplete={(setId) => {
+                const set = row.sets.find((s) => s.id === setId);
+                if (!set) return;
+                if (row.movementType === 'unilateral') void toggleUnilateral(row, set.setIndex);
+                else void toggleSet(row, set);
+              }}
+              onAddSet={() => void addSet(row)}
+              onRemoveExercise={() => confirmRemove(row)}
+              accentColor={accentColor}
+              onAccentColor={onAccentColor}
+            />
+          );
+        })}
+
+        <AddExerciseButton testID={`${testID}-add-exercise`} onPress={() => setPickerOpen(true)} />
+        <CreateCustomExerciseButton
+          testID={`${testID}-create-custom`}
+          onPress={() => setCustomOpen(true)}
+        />
+      </RiseInStack>
 
       <LiveProgressionSheets
         progression={progression}

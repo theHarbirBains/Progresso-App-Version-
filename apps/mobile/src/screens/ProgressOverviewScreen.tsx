@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
 import { LoadingState } from '../design/LoadingState';
+import { SkeletonCards } from '../design/Skeleton';
 import { Screen } from '../design/Screen';
 import { UnderlineTabs } from '../design/UnderlineTabs';
 import { useAppMenu } from '../navigation/AppMenuContext';
@@ -25,6 +26,21 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { groupByExercise } from '../workouts/allExerciseHistoryQueries';
 
 type Props = RootStackScreenProps<'ProgressOverview'>;
+
+// What the shared history works out to, kept for as long as the history itself is the same
+// object. Progress opens fresh on every visit (a section page), but the history only changes
+// when a workout is completed -- so a visit reuses these instead of working them out again in
+// the frame the tab is tapped.
+const groupsByHistory = new WeakMap<object, ReturnType<typeof groupByExercise>>();
+const statsByWorkouts = new WeakMap<object, ReturnType<typeof computeLifetimeStats>>();
+
+function remembered<K extends object, V>(cache: WeakMap<K, V>, key: K, make: () => V): V {
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+  const value = make();
+  cache.set(key, value);
+  return value;
+}
 
 // Progress's shell: header + the section navigation (`UnderlineTabs` --
 // Strava's own icon-over-label, underline-selected tab treatment, the same
@@ -69,8 +85,18 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   // This week's and last week's summaries, read once as Progress opens.
   const { summaries: weekSummaries, error: weekError } = useWeeklySummaries();
 
-  const groups = useMemo(() => groupByExercise(history), [history]);
-  const lifetimeStats = useMemo(() => computeLifetimeStats(completedWorkouts), [completedWorkouts]);
+  const groups = remembered(groupsByHistory, history, () => groupByExercise(history));
+  const lifetimeStats = remembered(statsByWorkouts, completedWorkouts, () =>
+    computeLifetimeStats(completedWorkouts),
+  );
+  // The page -- header, tabs and the section's widget -- draws first, in the frame the tab is
+  // tapped; the section's own content follows in the next one, so opening Progress never waits
+  // on it.
+  const [contentReady, setContentReady] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setContentReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const totalPRs = repPRs.length + oneRepMaxes.length + exerciseRecords.length;
 
   if (loading || themeLoading) {
@@ -118,7 +144,11 @@ export function ProgressOverviewScreen({ navigation }: Props) {
         {/* Fills the rest of the screen, like the card inside it. */}
         <RiseIn style={styles.sectionRise}>
           <AppCard testID="progress-section-card" style={styles.sectionCard}>
-            {activeSection === 'Overview' ? (
+            {!contentReady ? (
+              <SkeletonCards testID="progress-section-loading" heights={[132, 168, 112]} />
+            ) : null}
+
+            {contentReady && activeSection === 'Overview' ? (
               <OverviewSection
                 groups={groups}
                 lifetimeStats={lifetimeStats}
@@ -151,7 +181,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
               />
             ) : null}
 
-            {activeSection === 'TopSets' ? (
+            {contentReady && activeSection === 'TopSets' ? (
               <TopSetsSection
                 history={history}
                 weightUnit={weightUnit}
@@ -161,7 +191,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
               />
             ) : null}
 
-            {activeSection === 'Nutrition' ? (
+            {contentReady && activeSection === 'Nutrition' ? (
               <NutritionProgressSection
                 accentColor={theme.accent}
                 onAccentColor={theme.onAccent}
@@ -169,7 +199,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
               />
             ) : null}
 
-            {activeSection === 'AllTime' ? (
+            {contentReady && activeSection === 'AllTime' ? (
               <AllTimeSection
                 groups={groups}
                 history={history}

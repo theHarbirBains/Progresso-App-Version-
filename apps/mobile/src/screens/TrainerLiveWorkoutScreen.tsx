@@ -79,6 +79,8 @@ export function TrainerLiveWorkoutScreen({ navigation, route }: Props) {
       scroll={false}
       padded={false}
       keyboardAvoiding
+      // The editor rolls its own widgets out.
+      rollout={false}
       header={
         <AppHeader
           title={title}

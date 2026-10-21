@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
+import { recallShown, rememberShown } from '../lib/lastShown';
 import { fetchFoodLogsForRange } from '../nutrition/foodLogQueries';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { useProfile } from '../profile/ProfileProvider';
@@ -29,7 +30,9 @@ interface Loaded {
  * This week's and last week's summaries for Progress. Read once when Progress opens -- it opens
  * fresh on every visit, so a workout or a food logged elsewhere shows the next time -- in two
  * reads: the workouts and sets from COMPARISON_WEEKS before last week to now, and both weeks'
- * food logs. The targets and the weekly workout goal come from what's already loaded.
+ * food logs. The targets and the weekly workout goal come from what's already loaded. Until the
+ * read comes back it shows what Progress last showed this same week (lib/lastShown.ts), so a
+ * reopened Progress doesn't load the week from nothing.
  */
 export function useWeeklySummaries(now: Date = new Date()): {
   summaries: WeekSummaries | null;
@@ -39,10 +42,14 @@ export function useWeeklySummaries(now: Date = new Date()): {
   const userId = user?.id;
   const { goals } = useNutritionGoals();
   const { profile } = useProfile();
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   // The weeks are fixed when Progress opens.
   const [weeks] = useState(() => ({ thisWeek: weekRange(now), lastWeek: weekRange(now, 1) }));
+  const weekKey = weeks.thisWeek.start.toISOString();
+  const [loaded, setLoaded] = useState<Loaded | null>(() => {
+    const last = recallShown<{ weekKey: string; loaded: Loaded }>(userId, 'progress.week');
+    return last && last.weekKey === weekKey ? last.loaded : null;
+  });
 
   useEffect(() => {
     if (!userId) return;
@@ -59,14 +66,16 @@ export function useWeeklySummaries(now: Date = new Date()): {
     ])
       .then(([training, logs]) => {
         if (cancelled) return;
-        setLoaded({
+        const next = {
           ...training,
           foodLogs: logs.map((log) => ({
             loggedAt: log.loggedAt,
             calories: log.calories,
             proteinG: log.proteinG,
           })),
-        });
+        };
+        setLoaded(next);
+        rememberShown(userId, 'progress.week', { weekKey, loaded: next });
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load the week');
@@ -74,7 +83,7 @@ export function useWeeklySummaries(now: Date = new Date()): {
     return () => {
       cancelled = true;
     };
-  }, [userId, weeks]);
+  }, [userId, weeks, weekKey]);
 
   const summaries = useMemo(() => {
     if (!loaded) return null;

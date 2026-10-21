@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SectionHeader } from '../design/SectionHeader';
 import { SegmentedControl } from '../design/SegmentedControl';
+import { Skeleton } from '../design/Skeleton';
 import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
-import { colors, spacing, typeScale, widgetGap } from '../design/theme';
+import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 import { formatWeightKg } from '../lib/units';
 import { progressStyles } from './progressStyles';
 import { COMPARISON_WEEKS, type WeeklySummary } from './weeklySummary';
@@ -254,7 +255,16 @@ export function WeeklySummaryBlock({
           {error}
         </Text>
       ) : !shown ? (
-        <ActivityIndicator testID="weekly-summary-loading" color={colors.textMuted} />
+        <View
+          testID="weekly-summary-loading"
+          style={styles.loading}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel="Loading"
+        >
+          <Skeleton height={68} radius={radii.md} />
+          <Skeleton height={68} radius={radii.md} />
+        </View>
       ) : (
         <SummaryBody summary={shown.summary} week={week} weightUnit={weightUnit} />
       )}
@@ -263,6 +273,9 @@ export function WeeklySummaryBlock({
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    gap: widgetGap,
+  },
   switch: {
     marginBottom: spacing.lg,
   },
