@@ -24,7 +24,6 @@ import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import {
   canSaveTargets,
   draftFromTargets,
-  macroGuidance,
   parseTargets,
   type TargetDraft,
 } from '../nutrition/targetMath';
@@ -121,15 +120,16 @@ function StepHeader({
 //   with Edit -- CalorieEstimationScreen is the one place they're changed; this reads them from
 //   the shared profile cache, so an edit there shows here at once.
 // - 1, Choose your calories: the four Mifflin-St Jeor estimates (see nutrition/calorieTargets.ts)
-//   as tiles; tapping one makes it the calorie target, and the one matching the target is shown
-//   chosen. Or type your own under them.
+//   as tiles; tapping one puts it in the Calories field under them, and the one matching the
+//   field is shown chosen. The person can enter any number there.
 // - 2, Your macros: protein 0.8 g and fat 0.3 g per lb of body weight, carbs the calories left
-//   (nutrition/TargetsEditor.tsx's MacroTargets), each with a bar of its share of the calories.
+//   (nutrition/TargetsEditor.tsx's MacroTargets), each recommendation faded in its field.
 // - 3, Save your targets: the four figures as Today shows them, and one filled Save Targets.
 //
-// Protein and fat left blank fill in from the body weight when the page opens -- said in step 3,
-// and saved only when the person saves. A target is never changed by itself: a new weight
-// changes the rule's numbers (offered with "Use N g"), never the saved targets.
+// A blank macro field is its recommendation -- what's shown faded is what's saved -- and any field
+// can be typed over. A saved macro that is exactly its recommendation opens blank, so it keeps
+// following the recommendation (a new weight or calorie target moves it) until the person types
+// their own. A target is never changed by itself: nothing is saved until Save.
 export function NutritionGoalsScreen({ navigation }: Props) {
   const { openMenu } = useAppMenu();
   const { nutritionTheme: theme } = useProgressTheme();
@@ -139,27 +139,17 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   const { phaseName } = useDailyTargets();
 
   const [draft, setDraft] = useState<TargetDraft | null>(null);
-  const [filledFromWeight, setFilledFromWeight] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   const weightKg = profile?.weightValue ?? null;
 
-  // The saved targets fill the fields once, when they first arrive -- protein and fat from the
-  // body weight where none are saved. After that the fields are the person's: a goals refresh (a
-  // save from here) never resets what they're typing.
+  // The saved targets fill the fields once, when they first arrive. After that the fields are the
+  // person's: a goals refresh (a save from here) never resets what they're typing.
   useEffect(() => {
     if (draft !== null || goalsLoading || profileLoading) return;
-    const base = draftFromTargets(goals ?? NO_TARGETS);
-    const guide = weightKg !== null ? macroGuidance(weightKg) : null;
-    const fill = guide !== null && (base.proteinG === '' || base.fatG === '');
-    setFilledFromWeight(fill);
-    setDraft({
-      ...base,
-      proteinG: base.proteinG || (guide ? String(guide.proteinG) : ''),
-      fatG: base.fatG || (guide ? String(guide.fatG) : ''),
-    });
+    setDraft(draftFromTargets(goals ?? NO_TARGETS, weightKg, 'recommended'));
   }, [draft, goals, goalsLoading, profileLoading, weightKg]);
 
   function change(next: TargetDraft) {
@@ -169,7 +159,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
 
   async function handleSave() {
     if (!draft) return;
-    const parsed = parseTargets(draft);
+    const parsed = parseTargets(draft, weightKg, 'recommended');
     if (!canSaveTargets(parsed)) return;
     setError(null);
     setSaved(false);
@@ -177,7 +167,6 @@ export function NutritionGoalsScreen({ navigation }: Props) {
     try {
       await saveGoals(parsed.values);
       setSaved(true);
-      setFilledFromWeight(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save your daily targets');
     } finally {
@@ -222,7 +211,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   ];
   const anyDetails = details.some((detail) => detail.value !== null);
 
-  const parsed = draft ? parseTargets(draft) : null;
+  const parsed = draft ? parseTargets(draft, weightKg, 'recommended') : null;
   const values = parsed?.values ?? NO_TARGETS;
   const canSave = parsed !== null && canSaveTargets(parsed) && !saving;
   const displayError = error ?? profileError ?? goalsError;
@@ -293,7 +282,11 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         <StepHeader
           step={1}
           title="Choose your calories"
-          detail={estimates ? 'Tap an estimate, or type your own.' : 'Type your own target.'}
+          detail={
+            estimates
+              ? 'Estimated from your details. Tap one to use it.'
+              : 'Your daily calorie target.'
+          }
           accentColor={theme.accent}
           accentBg={theme.accentBg}
         />
@@ -355,12 +348,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         )}
         {draft ? (
           <View style={styles.customField}>
-            <CalorieTargetField
-              draft={draft}
-              onChange={change}
-              label={estimates ? 'Or type your own' : 'Calories'}
-              testIDPrefix="nutrition-goals"
-            />
+            <CalorieTargetField draft={draft} onChange={change} testIDPrefix="nutrition-goals" />
           </View>
         ) : null}
         {estimates ? (
@@ -376,7 +364,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
         <StepHeader
           step={2}
           title="Your macros"
-          detail="Protein and fat from your weight; carbs fill the calories left."
+          detail="Recommended from your weight and calories, each yours to change."
           accentColor={theme.accent}
           accentBg={theme.accentBg}
         />
@@ -386,6 +374,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
             onChange={change}
             weightKg={weightKg}
             weightUnit={profile?.weightUnit ?? 'lb'}
+            blankMeans="recommended"
             accentColor={theme.accent}
             onAddWeight={() => navigation.navigate('CalorieEstimation')}
             testIDPrefix="nutrition-goals"
@@ -429,11 +418,6 @@ export function NutritionGoalsScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {filledFromWeight ? (
-          <Text testID="nutrition-goals-filled-note" style={styles.note}>
-            Protein and fat are filled in from your weight. Save to keep them.
-          </Text>
-        ) : null}
         {phaseName ? (
           <View testID="nutrition-goals-phase-note" style={styles.phaseNote}>
             <Text style={styles.note}>

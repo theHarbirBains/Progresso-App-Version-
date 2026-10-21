@@ -10,7 +10,10 @@ import {
   KCAL_PER_GRAM,
   PROTEIN_G_PER_LB,
   macroGuidance,
+  macroTotal,
+  parseField,
   parseTargets,
+  type BlankMeans,
   type TargetDraft,
 } from './targetMath';
 
@@ -36,118 +39,125 @@ interface FieldProps {
 }
 
 /** The calorie target, typed. */
-export function CalorieTargetField({
-  draft,
-  onChange,
-  label = 'Calories',
-  testIDPrefix = 'targets',
-}: FieldProps & { label?: string }) {
-  const { errors } = parseTargets(draft);
+export function CalorieTargetField({ draft, onChange, testIDPrefix = 'targets' }: FieldProps) {
+  const parsed = parseField(draft.calories, 'calories');
   return (
     <TextInput
       testID={`${testIDPrefix}-calories`}
-      label={label}
+      label="Calories"
       placeholder="e.g. 2200"
       keyboardType="number-pad"
       value={draft.calories}
       onChangeText={(text) => onChange({ ...draft, calories: text })}
-      error={errors.calories}
+      error={parsed === 'invalid' ? 'Enter whole calories, above 0' : undefined}
       rightAccessory={<Text style={styles.unit}>cal/day</Text>}
     />
   );
 }
 
 interface MacroProps extends FieldProps {
-  /** The person's body weight in kg, which protein and fat come from; null when unknown. */
+  /** The person's body weight in kg, which protein and fat are recommended from; null when unknown. */
   weightKg: number | null;
   weightUnit: 'kg' | 'lb';
+  /** What a blank field means: the recommendation (daily targets) or no target (a phase's). */
+  blankMeans: BlankMeans;
   accentColor: string;
   /** Where to add a body weight when there isn't one; left out, it's only said. */
   onAddWeight?: () => void;
 }
 
 /**
- * Protein, fat and carbs, laid out as the rule they follow -- one row each, with its glyph:
- * - protein: 0.8 g per lb of body weight, and fat 0.3 g per lb, every time. Each is the person's
- *   own to type; one that isn't the rule's number offers it with a "Use N g" button, never put
- *   in by itself;
- * - carbs: never typed -- whatever calories are left after protein and fat, at 4 cal a gram.
- * Each row has a bar of its share of the calories, gliding as the figures change. Protein and fat
- * that come to more than the calories are said plainly; carbs wait until one of them changes.
+ * Protein, fat and carbs, one row each with its glyph and the rule it's recommended by:
+ * - protein 0.8 g and fat 0.3 g per lb of body weight, every time;
+ * - carbs, whatever calories are left after protein and fat, at 4 cal a gram.
+ * Every field is the person's own to type. For the daily targets the recommendation sits faded
+ * in a blank field and is what's saved unless they type over it; a field typed differently
+ * offers it back with "Use N g". For a phase, blank means "keep the daily target", so the
+ * recommendation is only offered. Each row has a bar of its share of the calories, gliding as
+ * the figures change, and under them what the macros come to against the calorie target.
+ * Protein and fat past the calories are said plainly, never clamped.
  */
 export function MacroTargets({
   draft,
   onChange,
   weightKg,
   weightUnit,
+  blankMeans,
   accentColor,
   onAddWeight,
   testIDPrefix = 'targets',
 }: MacroProps) {
-  const { values, carbs, errors } = parseTargets(draft);
+  const { values, recommended, carbs, errors } = parseTargets(draft, weightKg, blankMeans);
   const guide = weightKg !== null ? macroGuidance(weightKg) : null;
-  const weightText = guide
-    ? weightUnit === 'kg'
-      ? `${Math.round((weightKg ?? 0) * 10) / 10} kg (${guide.weightLb} lb)`
-      : `${guide.weightLb} lb`
-    : null;
+  const fillsBlanks = blankMeans === 'recommended';
+  const total = macroTotal(values);
 
   const rows = [
     {
       key: 'protein' as const,
       label: 'Protein',
       field: 'proteinG' as const,
-      perLb: PROTEIN_G_PER_LB,
-      grams: values.proteinG,
-      suggested: guide?.proteinG ?? null,
       kcal: KCAL_PER_GRAM.protein,
+      rule: guide
+        ? `${PROTEIN_G_PER_LB} g × ${guide.weightLb} lb = ${guide.proteinG} g`
+        : `${PROTEIN_G_PER_LB} g per lb of body weight`,
     },
     {
       key: 'fat' as const,
       label: 'Fat',
       field: 'fatG' as const,
-      perLb: FAT_G_PER_LB,
-      grams: values.fatG,
-      suggested: guide?.fatG ?? null,
       kcal: KCAL_PER_GRAM.fat,
+      rule: guide
+        ? `${FAT_G_PER_LB} g × ${guide.weightLb} lb = ${guide.fatG} g`
+        : `${FAT_G_PER_LB} g per lb of body weight`,
+    },
+    {
+      key: 'carbs' as const,
+      label: 'Carbs',
+      field: 'carbsG' as const,
+      kcal: KCAL_PER_GRAM.carbs,
+      rule:
+        carbs?.kind === 'carbs'
+          ? `${cal(carbs.remainingCalories)} cal left ÷ 4 = ${carbs.carbsG} g`
+          : carbs?.kind === 'conflict'
+            ? 'No calories left after protein and fat'
+            : 'The calories left after protein and fat',
     },
   ];
 
-  const carbsLine =
-    values.calories === null
-      ? 'Set your calories to work out carbs.'
-      : values.proteinG === null || values.fatG === null
-        ? 'Add protein and fat to work out carbs.'
-        : carbs?.kind === 'carbs'
-          ? `${cal(carbs.remainingCalories)} cal left after protein and fat, ÷ 4`
-          : null;
-  const carbShare =
-    carbs?.kind === 'carbs' ? shareOf(carbs.carbsG * KCAL_PER_GRAM.carbs, values.calories) : null;
+  let lead: string;
+  if (fillsBlanks) {
+    lead = guide
+      ? `Faded numbers are recommended, from your body weight (${weightText(weightKg ?? 0, weightUnit, guide.weightLb)}). Type over any to set your own.`
+      : 'Add your body weight to get protein and fat recommended: 0.8 g and 0.3 g per lb.';
+  } else {
+    lead = guide
+      ? `Recommended from ${weightText(weightKg ?? 0, weightUnit, guide.weightLb)}. Leave any blank to keep your daily target.`
+      : 'Leave any blank to keep your daily target.';
+  }
 
   return (
     <View style={styles.group}>
-      {guide ? (
-        <Text testID={`${testIDPrefix}-guidance`} style={styles.lead}>
-          From your body weight, {weightText}
-        </Text>
-      ) : (
-        <View testID={`${testIDPrefix}-no-weight`} style={styles.noWeight}>
-          <Text style={styles.lead}>
-            Add your body weight to get protein and fat from it: 0.8 g and 0.3 g per lb.
-          </Text>
-          {onAddWeight ? (
-            <TextButton
-              testID={`${testIDPrefix}-add-weight`}
-              label="Add Weight"
-              onPress={onAddWeight}
-            />
-          ) : null}
-        </View>
-      )}
+      <View testID={`${testIDPrefix}-guidance`} style={styles.leadBlock}>
+        <Text style={styles.lead}>{lead}</Text>
+        {!guide && onAddWeight ? (
+          <TextButton
+            testID={`${testIDPrefix}-add-weight`}
+            label="Add Weight"
+            onPress={onAddWeight}
+          />
+        ) : null}
+      </View>
 
       {rows.map((row) => {
-        const share = row.grams !== null ? shareOf(row.grams * row.kcal, values.calories) : null;
-        const offRule = row.suggested !== null && row.grams !== row.suggested;
+        const typed = draft[row.field].trim() !== '';
+        const recommendation = recommended[row.field];
+        const grams = values[row.field];
+        const share = grams !== null ? shareOf(grams * row.kcal, values.calories) : null;
+        // A typed number that isn't the recommendation is offered it back: for the daily targets
+        // by clearing the field (the faded number shows again), for a phase by filling it in.
+        const offer =
+          recommendation !== null && (fillsBlanks ? typed : true) && grams !== recommendation;
         return (
           <View key={row.key} testID={`${testIDPrefix}-${row.key}-row`} style={styles.row}>
             <View style={styles.head}>
@@ -157,14 +167,16 @@ export function MacroTargets({
               <View style={styles.body}>
                 <Text style={styles.label}>{row.label}</Text>
                 <Text testID={`${testIDPrefix}-${row.key}-rule`} style={styles.rule}>
-                  {guide ? `${row.perLb} g × ${guide.weightLb} lb` : `${row.perLb} g per lb`}
+                  {row.rule}
                 </Text>
               </View>
               <View style={styles.input}>
                 <TextInput
                   testID={`${testIDPrefix}-${row.key}`}
                   accessibilityLabel={`${row.label} (g)`}
-                  placeholder="—"
+                  placeholder={
+                    fillsBlanks ? (recommendation !== null ? String(recommendation) : '—') : 'Daily'
+                  }
                   keyboardType="decimal-pad"
                   value={draft[row.field]}
                   onChangeText={(text) => onChange({ ...draft, [row.field]: text })}
@@ -175,17 +187,23 @@ export function MacroTargets({
             </View>
             {share !== null ? <AnimatedBar fraction={share} color={accentColor} /> : null}
             <View style={styles.foot}>
-              <Text style={styles.caption}>
-                {row.grams !== null
-                  ? `${cal(row.grams * row.kcal)} cal${share !== null ? ` · ${Math.round(share * 100)}%` : ''}`
-                  : 'No target'}
+              <Text testID={`${testIDPrefix}-${row.key}-source`} style={styles.caption}>
+                {[
+                  grams === null ? 'No target' : typed ? 'Yours' : 'Recommended',
+                  grams !== null ? `${cal(grams * row.kcal)} cal` : null,
+                  share !== null ? `${Math.round(share * 100)}%` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </Text>
-              {offRule ? (
+              {offer ? (
                 <TextButton
                   testID={`${testIDPrefix}-${row.key}-use`}
-                  label={`Use ${row.suggested} g`}
-                  accessibilityLabel={`Use ${row.suggested} grams of ${row.label.toLowerCase()}, ${row.perLb} grams per pound`}
-                  onPress={() => onChange({ ...draft, [row.field]: String(row.suggested) })}
+                  label={`Use ${recommendation} g`}
+                  accessibilityLabel={`Use the recommended ${recommendation} grams of ${row.label.toLowerCase()}`}
+                  onPress={() =>
+                    onChange({ ...draft, [row.field]: fillsBlanks ? '' : String(recommendation) })
+                  }
                 />
               ) : null}
             </View>
@@ -193,45 +211,26 @@ export function MacroTargets({
         );
       })}
 
-      <View testID={`${testIDPrefix}-carbs-row`} style={styles.row}>
-        <View style={styles.head}>
-          <View style={styles.glyph}>
-            <MaterialCommunityIcons name={GLYPHS.carbs} size={18} color={accentColor} />
-          </View>
-          <View style={styles.body}>
-            <Text style={styles.label}>Carbs</Text>
-            {carbsLine ? (
-              <Text testID={`${testIDPrefix}-carbs-rule`} style={styles.rule}>
-                {carbsLine}
-              </Text>
-            ) : null}
-          </View>
-          <View style={styles.readout}>
-            <Text testID={`${testIDPrefix}-carbs`} style={styles.readoutValue}>
-              {carbs?.kind === 'carbs' ? `${carbs.carbsG} g` : '—'}
-            </Text>
-            <Text style={styles.readoutTag}>Auto</Text>
-          </View>
-        </View>
-        {carbs?.kind === 'carbs' && carbShare !== null ? (
-          <>
-            <AnimatedBar fraction={carbShare} color={accentColor} />
-            <View style={styles.foot}>
-              <Text style={styles.caption}>
-                {`${cal(carbs.carbsG * KCAL_PER_GRAM.carbs)} cal · ${Math.round(carbShare * 100)}%`}
-              </Text>
-            </View>
-          </>
-        ) : null}
-        {carbs?.kind === 'conflict' ? (
-          <Text testID={`${testIDPrefix}-conflict`} style={styles.conflict}>
-            Protein and fat come to {cal(carbs.proteinFatCalories)} cal, {cal(carbs.overBy)} more
-            than your {cal(values.calories ?? 0)} cal. Lower protein or fat, or raise calories.
-          </Text>
-        ) : null}
-      </View>
+      {carbs?.kind === 'conflict' ? (
+        <Text testID={`${testIDPrefix}-conflict`} style={styles.conflict}>
+          Protein and fat come to {cal(carbs.proteinFatCalories)} cal, {cal(carbs.overBy)} more than
+          your {cal(values.calories ?? 0)} cal, so no carbs are recommended. Lower protein or fat,
+          or raise calories, if that isn&apos;t what you meant.
+        </Text>
+      ) : null}
+      {total ? (
+        <Text testID={`${testIDPrefix}-total`} style={styles.total}>
+          {total.matches
+            ? `Your macros come to ${cal(total.total)} cal, matching your calorie target.`
+            : `Your macros come to ${cal(total.total)} cal, ${cal(Math.abs(total.difference))} ${total.difference > 0 ? 'over' : 'under'} your ${cal(values.calories ?? 0)} cal target.`}
+        </Text>
+      ) : null}
     </View>
   );
+}
+
+function weightText(weightKg: number, unit: 'kg' | 'lb', weightLb: number): string {
+  return unit === 'kg' ? `${Math.round(weightKg * 10) / 10} kg, ${weightLb} lb` : `${weightLb} lb`;
 }
 
 /** Calories and the macros under them, as one block -- a phase's own targets. */
@@ -259,12 +258,12 @@ const styles = StyleSheet.create({
     ...typeScale.secondary,
     color: colors.textMuted,
   },
+  leadBlock: {
+    alignItems: 'flex-start',
+  },
   lead: {
     ...typeScale.secondary,
     color: colors.textSecondary,
-  },
-  noWeight: {
-    alignItems: 'flex-start',
   },
   row: {
     gap: spacing.xs,
@@ -301,19 +300,6 @@ const styles = StyleSheet.create({
   input: {
     width: 104,
   },
-  readout: {
-    width: 104,
-    alignItems: 'flex-end',
-  },
-  readoutValue: {
-    ...typeScale.statSmall,
-    color: colors.textPrimary,
-  },
-  readoutTag: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
   foot: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -327,5 +313,10 @@ const styles = StyleSheet.create({
   conflict: {
     ...typeScale.secondary,
     color: colors.destructive,
+  },
+  total: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
 });

@@ -109,9 +109,12 @@ function PhaseForm({ navigation, editing }: Props & { editing: TrainingPhase | n
     { kind, name, startDate, endDate },
     endsActive ? [...others, { ...endsActive, endDate: dayBefore(startDate) }] : others,
   );
-  const parsedTargets = parseTargets(targets);
   const startKg = parseWeight(startWeight, weightUnit);
   const targetKg = parseWeight(targetWeight, weightUnit);
+  // The phase's own start weight, where it has one, is what its protein and fat are recommended from.
+  const phaseWeightKg =
+    startKg !== null && startKg !== 'invalid' ? startKg : (profile?.weightValue ?? null);
+  const parsedTargets = parseTargets(targets, phaseWeightKg, 'none');
   const canSave =
     !saving &&
     ruleError === null &&
@@ -291,10 +294,9 @@ function PhaseForm({ navigation, editing }: Props & { editing: TrainingPhase | n
             <TargetsEditor
               draft={targets}
               onChange={setTargets}
-              weightKg={
-                startKg !== null && startKg !== 'invalid' ? startKg : (profile?.weightValue ?? null)
-              }
+              weightKg={phaseWeightKg}
               weightUnit={weightUnit}
+              blankMeans="none"
               accentColor={theme.accent}
               testIDPrefix="phase-targets"
             />

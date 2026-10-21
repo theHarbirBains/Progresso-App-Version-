@@ -4,11 +4,13 @@ import {
   carbsFor,
   draftFromTargets,
   macroGuidance,
+  macroTotal,
   parseField,
   parseTargets,
 } from './targetMath';
 
 const LB = 0.45359237;
+const blank = { calories: '', proteinG: '', carbsG: '', fatG: '' };
 
 describe('macroGuidance', () => {
   it('is 0.8 g protein and 0.3 g fat per pound of body weight, every time', () => {
@@ -39,10 +41,6 @@ describe('carbsFor', () => {
       overBy: 340,
     });
   });
-
-  it('gives zero carbs when protein and fat use the calories exactly', () => {
-    expect(carbsFor(1180, 160, 60)).toEqual({ kind: 'carbs', carbsG: 0, remainingCalories: 0 });
-  });
 });
 
 describe('caloriesFromMacros', () => {
@@ -52,59 +50,149 @@ describe('caloriesFromMacros', () => {
 });
 
 describe('parseField', () => {
-  it('reads blank as no target and rejects what is not a positive number', () => {
+  it('reads blank as nothing typed and rejects what is not a positive number', () => {
     expect(parseField('', 'calories')).toBeNull();
     expect(parseField(' 2200 ', 'calories')).toBe(2200);
     expect(parseField('2200.5', 'calories')).toBe('invalid');
     expect(parseField('0', 'proteinG')).toBe('invalid');
-    expect(parseField('abc', 'fatG')).toBe('invalid');
+    expect(parseField('abc', 'carbsG')).toBe('invalid');
     expect(parseField('62.5', 'fatG')).toBe(62.5);
   });
 });
 
-describe('parseTargets', () => {
-  it('works carbs out from calories, protein and fat', () => {
-    const parsed = parseTargets({ calories: '2200', proteinG: '160', fatG: '60' });
+describe('parseTargets, for the daily targets (a blank field is its recommendation)', () => {
+  it('fills every blank macro with its recommendation', () => {
+    const parsed = parseTargets({ ...blank, calories: '2200' }, 200 * LB, 'recommended');
 
     expect(parsed.values).toEqual({ calories: 2200, proteinG: 160, carbsG: 255, fatG: 60 });
-    expect(parsed.carbs).toEqual({ kind: 'carbs', carbsG: 255, remainingCalories: 1020 });
-    expect(parsed.errors).toEqual({});
+    expect(parsed.recommended).toEqual({ proteinG: 160, fatG: 60, carbsG: 255 });
     expect(canSaveTargets(parsed)).toBe(true);
   });
 
-  it('leaves carbs without a target until calories, protein and fat are all there', () => {
-    const parsed = parseTargets({ calories: '2200', proteinG: '', fatG: '60' });
+  it('keeps what is typed, and recommends carbs from the protein and fat that will be saved', () => {
+    const parsed = parseTargets(
+      { ...blank, calories: '2200', proteinG: '180' },
+      200 * LB,
+      'recommended',
+    );
 
-    expect(parsed.values.carbsG).toBeNull();
-    expect(parsed.carbs).toBeNull();
-    expect(canSaveTargets(parsed)).toBe(true);
+    // 2,200 - 180 x 4 - 60 x 9 = 940 cal, or 235 g.
+    expect(parsed.values).toEqual({ calories: 2200, proteinG: 180, carbsG: 235, fatG: 60 });
+    expect(parsed.recommended).toEqual({ proteinG: 160, fatG: 60, carbsG: 235 });
   });
 
-  it('cannot be saved while protein and fat pass the calories', () => {
-    const parsed = parseTargets({ calories: '1000', proteinG: '200', fatG: '60' });
+  it('keeps typed carbs over the recommendation', () => {
+    const parsed = parseTargets(
+      { ...blank, calories: '2200', carbsG: '300' },
+      200 * LB,
+      'recommended',
+    );
 
+    expect(parsed.values.carbsG).toBe(300);
+    expect(parsed.recommended.carbsG).toBe(255);
+  });
+
+  it('recommends nothing for protein and fat without a body weight, nor carbs without calories', () => {
+    expect(parseTargets({ ...blank, calories: '2200' }, null, 'recommended').values).toEqual({
+      calories: 2200,
+      proteinG: null,
+      carbsG: null,
+      fatG: null,
+    });
+    expect(parseTargets(blank, 200 * LB, 'recommended').values).toEqual({
+      calories: null,
+      proteinG: 160,
+      carbsG: null,
+      fatG: 60,
+    });
+  });
+
+  it('explains protein and fat past the calories, recommends no carbs, and still saves', () => {
+    const parsed = parseTargets({ ...blank, calories: '1000' }, 200 * LB, 'recommended');
+
+    expect(parsed.carbs).toEqual({ kind: 'conflict', proteinFatCalories: 1180, overBy: 180 });
     expect(parsed.values.carbsG).toBeNull();
-    expect(parsed.carbs?.kind).toBe('conflict');
-    expect(canSaveTargets(parsed)).toBe(false);
+    expect(canSaveTargets(parsed)).toBe(true);
   });
 
   it('names each field that is wrong, and cannot be saved with one', () => {
-    const parsed = parseTargets({ calories: '-5', proteinG: 'x', fatG: '60' });
+    const parsed = parseTargets(
+      { calories: '-5', proteinG: 'x', carbsG: '0', fatG: '60' },
+      null,
+      'recommended',
+    );
 
     expect(parsed.errors).toEqual({
       calories: 'Enter whole calories, above 0',
       proteinG: 'Enter grams above 0',
+      carbsG: 'Enter grams above 0',
     });
     expect(canSaveTargets(parsed)).toBe(false);
   });
 });
 
+describe('parseTargets, for a phase (a blank field keeps the daily target)', () => {
+  it('leaves blanks without a target but still says what is recommended', () => {
+    const parsed = parseTargets({ ...blank, calories: '1900' }, 200 * LB, 'none');
+
+    expect(parsed.values).toEqual({ calories: 1900, proteinG: null, carbsG: null, fatG: null });
+    expect(parsed.recommended).toEqual({ proteinG: 160, fatG: 60, carbsG: null });
+  });
+
+  it('recommends carbs from the protein and fat typed for the phase', () => {
+    const parsed = parseTargets(
+      { ...blank, calories: '1900', proteinG: '160', fatG: '60' },
+      200 * LB,
+      'none',
+    );
+
+    expect(parsed.recommended.carbsG).toBe(180);
+    expect(parsed.values.carbsG).toBeNull();
+  });
+});
+
+describe('macroTotal', () => {
+  it('compares what the macros come to with the calorie target', () => {
+    expect(macroTotal({ calories: 2200, proteinG: 160, carbsG: 255, fatG: 60 })).toEqual({
+      total: 2200,
+      difference: 0,
+      matches: true,
+    });
+    expect(macroTotal({ calories: 2200, proteinG: 160, carbsG: 230, fatG: 60 })).toEqual({
+      total: 2100,
+      difference: -100,
+      matches: false,
+    });
+    expect(macroTotal({ calories: 2200, proteinG: 160, carbsG: null, fatG: 60 })).toBeNull();
+  });
+});
+
 describe('draftFromTargets', () => {
-  it('fills calories, protein and fat from saved targets; carbs are worked out again', () => {
+  it('fills each field from saved targets', () => {
     expect(draftFromTargets({ calories: 2200, proteinG: 160, carbsG: 300, fatG: null })).toEqual({
       calories: '2200',
       proteinG: '160',
+      carbsG: '300',
       fatG: '',
     });
+  });
+
+  it('leaves a saved macro that is its recommendation blank, so it keeps following it', () => {
+    // Fat 70 g leaves 2,200 - 640 - 630 = 930 cal, or 233 g of carbs: the recommendation.
+    expect(
+      draftFromTargets(
+        { calories: 2200, proteinG: 160, carbsG: 233, fatG: 70 },
+        200 * LB,
+        'recommended',
+      ),
+    ).toEqual({ calories: '2200', proteinG: '', carbsG: '', fatG: '70' });
+    // Carbs that aren't the recommendation stay as saved.
+    expect(
+      draftFromTargets(
+        { calories: 2200, proteinG: 160, carbsG: 300, fatG: 60 },
+        200 * LB,
+        'recommended',
+      ).carbsG,
+    ).toBe('300');
   });
 });
