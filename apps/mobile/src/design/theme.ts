@@ -63,6 +63,11 @@ export const colors = {
   // it never reads as an opaque patch blocking the background photo the
   // card lets through (see `widgetFillAlpha`).
   surfaceLift: 'rgba(245, 230, 210, 0.06)',
+
+  // The launch screen's wood (assets/launch-wood.jpg) as one colour: its overall tone, behind
+  // the picture while it decodes. app.json's native splash uses the same, so opening the app
+  // goes from the splash to the wood without a jump from near-black.
+  launchWood: '#2E1707',
 } as const;
 
 // Three working radii plus the pill, each with one role so nested surfaces
