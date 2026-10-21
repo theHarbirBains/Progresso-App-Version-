@@ -36,7 +36,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Progressive overload: one rep range for all your workouts (Settings › Workout Preferences). When an exercise's top set reaches the top of the range, the live workout says to increase the weight next time (a weight you can lift for about the bottom of the range, then build back up); until then, to keep the top set weight the same until it reaches the top, when the next increment is recommended. Bodyweight exercises at the top get more reps or the weighted version, and timed ones a new time to aim for. Your rep range shows once at the top of the live workout, where it can be changed; an exercise can have its own, from its menu. Suggestions only, never automatic, and they can be turned off
 - New sets start filled in from the set before them, or the same set from last session, ready to edit; a set only completes when you tap it
 - Unilateral exercises are logged per side, left and right
-- Group workouts: start a group from a workout; each person has their own tab of sets, and anyone in the group can enter them
+- Group workouts: start a group before the workout begins (Start Workout › Working Out as a Group); each person has their own tab of sets, and anyone in the group can enter them
 - Custom exercises alongside a shared default exercise library, each tagged with a muscle group, with optional equipment profiles and machine photos
 - Workout history with a month calendar view and per-day/per-workout detail; past workouts can be logged and completed ones edited
 - Workout sharing: a story-sized (9:16) workout card, shared to Instagram, TikTok and other apps through the share sheet

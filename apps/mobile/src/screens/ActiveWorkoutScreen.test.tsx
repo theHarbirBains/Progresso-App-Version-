@@ -1650,6 +1650,13 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     expect(screen.getByTestId('workout-summary-total-exercises')).toBeTruthy();
   });
 
+  it('offers no way to turn a workout already going into a group', async () => {
+    await renderReady();
+
+    expect(screen.queryByTestId('start-group-from-workout')).toBeNull();
+    expect(screen.queryByText(/group/i)).toBeNull();
+  });
+
   it('has exactly one filled button -- Finish Workout -- pinned outside the scrolling list', async () => {
     await renderReady();
 
