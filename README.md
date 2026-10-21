@@ -43,7 +43,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Progress & analytics**
 
-- A Progress tab with Overview (the phase going now, the Weekly Summary and 12 weeks of consistency), Top Sets, Nutrition (a week, month or three months of logged food against the targets in force each day, each day opening its foods) and All Time sections -- figures and rows, no line graphs
+- A Progress tab with Overview (the Weekly Summary and 12 weeks of consistency), Top Sets, Nutrition (a week, month or three months of logged food against the targets in force each day, each day opening its foods) and All Time sections -- figures and rows, no line graphs
 - A Weekly Summary at the top of Overview, for this week or last: workout days against your weekly goal, average calories and protein and the days on target, sets per muscle group against the 4 weeks before, and your main lifts' top sets against their best in the 4 weeks before
 - Per-exercise and lifetime top sets, rep-count PRs, and true 1RM tracking (1RM is only ever recorded from an actual 1-rep set), plus most reps and longest time for bodyweight and timed exercises
 - Progress metrics per exercise: the latest top set and how far it has come, best performances and its progression journey
@@ -52,7 +52,6 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Nutrition**
 
 - Today's calories and macros against your own targets, set on Nutrition Goals in three steps: calories (tap one of four estimates from your body data, or type your own), macros (recommended protein 0.8 g and fat 0.3 g per lb of body weight, and carbs from the calories left, each shown faded in its field and yours to type over), then Save -- any conflict explained
-- Phases: record a cut, bulk, maintenance or your own phase from a start date (today or earlier), with optional start and target weight, its own targets (used in place of your daily ones while it's going, never overwriting them) and notes; edit, end and review past phases
 - A weekly calorie budget (7 times your daily target, Monday to Sunday) on Today, so eating less one day leaves more for another
 - Log Food opens your Food Library: your saved meals, your usual foods (the ones you log on the most days) and your most recently logged foods first, ready to re-log at last time's amount, then your own foods (with photos) and recipes
 - Saved meals: foods you eat together, logged in one go, each as its own entry; build one in the Food Library or save today's foods as one

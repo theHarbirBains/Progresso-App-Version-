@@ -149,9 +149,6 @@ export const nutritionGoalsStyles = StyleSheet.create({
     ...typeScale.callout,
     color: colors.textSecondary,
   },
-  phaseNote: {
-    marginTop: spacing.sm,
-  },
   note: {
     ...typeScale.secondary,
     color: colors.textSecondary,

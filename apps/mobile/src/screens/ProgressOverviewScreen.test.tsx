@@ -6,8 +6,6 @@ import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchFoodLogsForRange } from '../nutrition/foodLogQueries';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
-import { PhaseProvider } from '../phases/PhaseProvider';
-import { fetchPhases } from '../phases/phaseQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchSummaryTraining } from '../progress/weeklySummaryQueries';
 import {
@@ -20,10 +18,6 @@ import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
 import { ProgressOverviewScreen } from './ProgressOverviewScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
-
-jest.mock('../phases/phaseQueries', () => ({
-  fetchPhases: jest.fn().mockResolvedValue([]),
-}));
 
 jest.mock('../profile/profileQueries', () => ({
   fetchMyProfile: jest.fn(),
@@ -92,13 +86,11 @@ function renderScreen(currentMode: 'workout' | 'nutrition' = 'workout') {
   return render(
     <ProfileProvider>
       <NutritionGoalsProvider>
-        <PhaseProvider>
-          <AllTimeStatsProvider>
-            <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
-              <ProgressOverviewScreen navigation={navigation} route={route} />
-            </AppMenuContext.Provider>
-          </AllTimeStatsProvider>
-        </PhaseProvider>
+        <AllTimeStatsProvider>
+          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
+            <ProgressOverviewScreen navigation={navigation} route={route} />
+          </AppMenuContext.Provider>
+        </AllTimeStatsProvider>
       </NutritionGoalsProvider>
     </ProfileProvider>,
   );
@@ -400,14 +392,12 @@ describe('ProgressOverviewScreen background refresh from the shared cache', () =
     render(
       <ProfileProvider>
         <NutritionGoalsProvider>
-          <PhaseProvider>
-            <AllTimeStatsProvider>
-              <CaptureRefetch />
-              <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
-                <ProgressOverviewScreen navigation={navigation} route={route} />
-              </AppMenuContext.Provider>
-            </AllTimeStatsProvider>
-          </PhaseProvider>
+          <AllTimeStatsProvider>
+            <CaptureRefetch />
+            <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'workout' }}>
+              <ProgressOverviewScreen navigation={navigation} route={route} />
+            </AppMenuContext.Provider>
+          </AllTimeStatsProvider>
         </NutritionGoalsProvider>
       </ProfileProvider>,
     );
@@ -515,40 +505,5 @@ describe('ProgressOverviewScreen -- Weekly Summary', () => {
     renderScreen();
 
     expect(await screen.findByTestId('weekly-summary-error')).toHaveTextContent('network error');
-  });
-});
-
-describe('ProgressOverviewScreen -- phases', () => {
-  afterEach(() => {
-    (fetchPhases as jest.Mock).mockResolvedValue([]);
-  });
-
-  it('offers to track a phase when none is going', async () => {
-    mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
-    renderScreen();
-
-    fireEvent.press(await screen.findByTestId('progress-phase-start'));
-    expect(mockNavigate).toHaveBeenCalledWith('Phases');
-  });
-
-  it('shows the phase going now above the weekly summary', async () => {
-    mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
-    (fetchPhases as jest.Mock).mockResolvedValue([
-      {
-        id: 'phase-1',
-        kind: 'cut',
-        name: null,
-        startDate: '2026-10-01',
-        endDate: null,
-        startWeightKg: 90,
-        targetWeightKg: 85,
-        targets: { calories: 1800, proteinG: null, carbsG: null, fatG: null },
-        notes: null,
-      },
-    ]);
-    renderScreen();
-
-    expect(await screen.findByTestId('progress-phase-name')).toHaveTextContent('Cut');
-    expect(await screen.findByTestId('progress-phase-summary-days')).toBeTruthy();
   });
 });

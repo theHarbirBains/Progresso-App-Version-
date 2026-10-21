@@ -29,7 +29,6 @@ import {
 } from '../nutrition/targetMath';
 import { CalorieTargetField, MacroTargets } from '../nutrition/TargetsEditor';
 import { feetAndInchesFromCm, kgToLb } from '../onboarding/weightHeightConversion';
-import { useDailyTargets } from '../phases/PhaseProvider';
 import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { nutritionGoalsStyles as styles } from './nutritionGoalsStyles';
@@ -135,8 +134,6 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   const { nutritionTheme: theme } = useProgressTheme();
   const { profile, loading: profileLoading, error: profileError } = useProfile();
   const { goals, loading: goalsLoading, error: goalsError, saveGoals } = useNutritionGoals();
-  // An active phase with targets of its own is used in place of these while it's going.
-  const { phaseName } = useDailyTargets();
 
   // What the person has typed; until they type, the fields are their saved targets.
   const [edited, setEdited] = useState<TargetDraft | null>(null);
@@ -151,9 +148,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   // save from here) never resets what they're typing.
   const draft =
     edited ??
-    (goalsLoading || profileLoading
-      ? null
-      : draftFromTargets(goals ?? NO_TARGETS, weightKg, 'recommended'));
+    (goalsLoading || profileLoading ? null : draftFromTargets(goals ?? NO_TARGETS, weightKg));
 
   function change(next: TargetDraft) {
     setSaved(false);
@@ -162,7 +157,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
 
   async function handleSave() {
     if (!draft) return;
-    const parsed = parseTargets(draft, weightKg, 'recommended');
+    const parsed = parseTargets(draft, weightKg);
     if (!canSaveTargets(parsed)) return;
     setError(null);
     setSaved(false);
@@ -214,7 +209,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   ];
   const anyDetails = details.some((detail) => detail.value !== null);
 
-  const parsed = draft ? parseTargets(draft, weightKg, 'recommended') : null;
+  const parsed = draft ? parseTargets(draft, weightKg) : null;
   const values = parsed?.values ?? NO_TARGETS;
   const canSave = parsed !== null && canSaveTargets(parsed) && !saving;
   const displayError = error ?? profileError ?? goalsError;
@@ -377,7 +372,6 @@ export function NutritionGoalsScreen({ navigation }: Props) {
             onChange={change}
             weightKg={weightKg}
             weightUnit={profile?.weightUnit ?? 'lb'}
-            blankMeans="recommended"
             accentColor={theme.accent}
             onAddWeight={() => navigation.navigate('CalorieEstimation')}
             testIDPrefix="nutrition-goals"
@@ -420,20 +414,6 @@ export function NutritionGoalsScreen({ navigation }: Props) {
             />
           </View>
         </View>
-
-        {phaseName ? (
-          <View testID="nutrition-goals-phase-note" style={styles.phaseNote}>
-            <Text style={styles.note}>
-              Your {phaseName} has targets of its own, used in place of these while it&apos;s going.
-              These stay as they are and apply again when it ends.
-            </Text>
-            <TextButton
-              testID="nutrition-goals-view-phase"
-              label="View Phase"
-              onPress={() => navigation.navigate('Phases')}
-            />
-          </View>
-        ) : null}
 
         <View style={styles.actions}>
           {displayError ? (

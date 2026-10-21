@@ -31,7 +31,6 @@ import {
   sumDailyTotals,
 } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
-import { useDailyTargets } from '../phases/PhaseProvider';
 import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { CopyYesterdaySheet, SaveAsMealSheet } from '../nutrition/TodayShortcutSheets';
 import { WeeklyCalorieBudget } from '../nutrition/WeeklyCalorieBudget';
@@ -88,11 +87,9 @@ export function NutritionTodayScreen({ navigation }: Props) {
   // through from here, LogFoodStep (Food Library/Search/Barcode Scanner) and
   // Delete/quantity edits below -- none of that needs a re-fetch of its own
   // any more, from this screen or any other.
-  const { loading: goalsLoading, error: goalsError } = useNutritionGoals();
-  // The targets that apply today: an active phase's own where it has them, the daily ones
-  // everywhere else (phases/phaseRules.ts). Every figure on this page is measured against these.
-  const { targets: dailyTargets, phaseName } = useDailyTargets();
-  const goals: NutritionGoals = dailyTargets ?? EMPTY_GOALS;
+  const { goals: savedGoals, loading: goalsLoading, error: goalsError } = useNutritionGoals();
+  // The daily targets. Every figure on this page is measured against these.
+  const goals: NutritionGoals = savedGoals ?? EMPTY_GOALS;
   const { logs, loading: logsLoading, error: logsError, updateQuantity, removeLog } = useFoodLog();
 
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
@@ -478,7 +475,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
 
       <AppCard testID="nutrition-today-targets">
         <Section
-          title={phaseName ? `${phaseName} Targets` : 'Daily Targets'}
+          title="Daily Targets"
           action={{
             label: 'Edit Targets',
             onPress: () => navigation.navigate('NutritionGoals'),

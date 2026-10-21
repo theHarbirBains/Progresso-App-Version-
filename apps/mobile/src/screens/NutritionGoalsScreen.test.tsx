@@ -9,16 +9,10 @@ import { updateMyProfile } from '../lib/api';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchNutritionGoals, saveNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
-import { PhaseProvider } from '../phases/PhaseProvider';
-import { fetchPhases } from '../phases/phaseQueries';
 import { computeCalorieTargets } from '../nutrition/calorieTargets';
 import { ProfileProvider, useProfile, type ProfileContextValue } from '../profile/ProfileProvider';
 import { NutritionGoalsScreen } from './NutritionGoalsScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
-
-jest.mock('../phases/phaseQueries', () => ({
-  fetchPhases: jest.fn().mockResolvedValue([]),
-}));
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -84,11 +78,9 @@ function renderScreen() {
   return render(
     <ProfileProvider>
       <NutritionGoalsProvider>
-        <PhaseProvider>
-          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-            <NutritionGoalsScreen navigation={navigation} route={route} />
-          </AppMenuContext.Provider>
-        </PhaseProvider>
+        <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+          <NutritionGoalsScreen navigation={navigation} route={route} />
+        </AppMenuContext.Provider>
       </NutritionGoalsProvider>
     </ProfileProvider>,
   );
@@ -416,12 +408,10 @@ describe('NutritionGoalsScreen', () => {
     render(
       <ProfileProvider>
         <NutritionGoalsProvider>
-          <PhaseProvider>
-            <CaptureUpdateProfile />
-            <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-              <NutritionGoalsScreen navigation={navigation} route={route} />
-            </AppMenuContext.Provider>
-          </PhaseProvider>
+          <CaptureUpdateProfile />
+          <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
+            <NutritionGoalsScreen navigation={navigation} route={route} />
+          </AppMenuContext.Provider>
         </NutritionGoalsProvider>
       </ProfileProvider>,
     );
@@ -524,37 +514,5 @@ describe('NutritionGoalsScreen -- tiles, rows and one primary action', () => {
     await opened();
 
     expectNoBareText();
-  });
-});
-
-describe('NutritionGoalsScreen -- a phase with its own targets', () => {
-  afterEach(() => {
-    (fetchPhases as jest.Mock).mockResolvedValue([]);
-  });
-
-  it("says the phase's targets are used in place of these, which stay as they are", async () => {
-    mockFetchNutritionGoals.mockResolvedValue({ ...emptyGoals, calories: 2200 });
-    (fetchPhases as jest.Mock).mockResolvedValue([
-      {
-        id: 'phase-1',
-        kind: 'cut',
-        name: null,
-        startDate: '2026-10-01',
-        endDate: null,
-        startWeightKg: 90,
-        targetWeightKg: 85,
-        targets: { calories: 1800, proteinG: null, carbsG: null, fatG: null },
-        notes: null,
-      },
-    ]);
-    renderScreen();
-
-    expect(await screen.findByTestId('nutrition-goals-phase-note')).toHaveTextContent(
-      /Your Cut has targets of its own/,
-    );
-    // The daily target itself is untouched.
-    expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp('value', '2200');
-    fireEvent.press(screen.getByTestId('nutrition-goals-view-phase'));
-    expect(mockNavigate).toHaveBeenCalledWith('Phases');
   });
 });

@@ -75,10 +75,6 @@ export type RootStackParamList = {
   NutritionGoals: undefined;
   /** `date` ("YYYY-MM-DD"): opens on that day, from a day in Progress. */
   NutritionHistory: { date?: string } | undefined;
-  /** Training phases: the one going now and past ones. */
-  Phases: undefined;
-  /** Starts a phase, or edits/reviews one (`phaseId`). */
-  PhaseForm: { phaseId?: string } | undefined;
   CalorieEstimation: undefined;
   ProgressOverview: undefined;
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };

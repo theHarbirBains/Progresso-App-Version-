@@ -14,7 +14,6 @@ import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { OverviewSection } from '../progress/OverviewSection';
 import { useWeeklySummaries } from '../progress/useWeeklySummaries';
 import { WeeklySummaryBlock } from '../progress/WeeklySummaryBlock';
-import { PhaseProgressBlock } from '../progress/PhaseProgressBlock';
 import { ConsistencyBlock } from '../progress/ConsistencyBlock';
 import { NutritionProgressSection } from '../progress/NutritionProgressSection';
 import { useProfile } from '../profile/ProfileProvider';
@@ -134,11 +133,6 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 onViewAllMilestones={() => setActiveSection('AllTime')}
                 top={
                   <>
-                    <PhaseProgressBlock
-                      weightUnit={weightUnit}
-                      accentColor={theme.accent}
-                      onOpenPhases={() => navigation.navigate('Phases')}
-                    />
                     <WeeklySummaryBlock
                       summaries={weekSummaries}
                       error={weekError}

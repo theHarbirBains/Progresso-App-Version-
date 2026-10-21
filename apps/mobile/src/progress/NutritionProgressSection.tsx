@@ -8,8 +8,7 @@ import { Text } from '../design/Text';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import { fetchIntakeForRange } from '../nutrition/foodLogQueries';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
-import { usePhases } from '../phases/PhaseProvider';
-import { dayFromKey, dayKey, effectiveTargets, phaseOn } from '../phases/phaseRules';
+import { dayFromKey, dayKey } from '../lib/dayKey';
 import { progressStyles } from './progressStyles';
 
 type Range = 'week' | 'month' | 'quarter';
@@ -27,13 +26,13 @@ export interface NutritionDay {
   key: string;
   calories: number;
   proteinG: number;
-  /** The calorie target in force that day: a phase's own, or the daily one; null with none. */
+  /** The daily calorie target; null with none. */
   calorieTarget: number | null;
 }
 
 /**
  * The days with food logged, newest first, each with the calorie target in force that day --
- * the phase going that day's own where it had one, the daily target otherwise. Pure.
+ * the daily target. Pure.
  */
 export function nutritionDays(
   logs: { loggedAt: string; calories: number; proteinG: number }[],
@@ -70,7 +69,6 @@ export function NutritionProgressSection({ accentColor, onAccentColor, onOpenDay
   const { user } = useAuth();
   const userId = user?.id;
   const { goals } = useNutritionGoals();
-  const { phases } = usePhases();
   const [range, setRange] = useState<Range>('week');
   const [logs, setLogs] = useState<
     { loggedAt: string; calories: number; proteinG: number }[] | null
@@ -100,11 +98,8 @@ export function NutritionProgressSection({ accentColor, onAccentColor, onOpenDay
   }, [userId, span]);
 
   const days = useMemo(
-    () =>
-      logs
-        ? nutritionDays(logs, (key) => effectiveTargets(goals, phaseOn(phases, key)).calories)
-        : [],
-    [logs, goals, phases],
+    () => (logs ? nutritionDays(logs, () => goals?.calories ?? null) : []),
+    [logs, goals],
   );
   const onTarget = (day: NutritionDay) =>
     day.calorieTarget !== null &&

@@ -4,9 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { fetchIntakeForRange } from '../nutrition/foodLogQueries';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
-import { PhaseProvider } from '../phases/PhaseProvider';
-import { fetchPhases } from '../phases/phaseQueries';
-import { dayKey } from '../phases/phaseRules';
+import { dayKey } from '../lib/dayKey';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ConsistencyBlock } from './ConsistencyBlock';
 import { NutritionProgressSection, nutritionDays } from './NutritionProgressSection';
@@ -14,14 +12,9 @@ import { NutritionProgressSection, nutritionDays } from './NutritionProgressSect
 jest.mock('../auth/AuthProvider', () => ({ useAuth: jest.fn() }));
 jest.mock('../nutrition/foodLogQueries', () => ({ fetchIntakeForRange: jest.fn() }));
 jest.mock('../nutrition/nutritionGoalQueries', () => ({ fetchNutritionGoals: jest.fn() }));
-jest.mock('../phases/phaseQueries', () => ({ fetchPhases: jest.fn() }));
 
 function Providers({ children }: PropsWithChildren) {
-  return (
-    <NutritionGoalsProvider>
-      <PhaseProvider>{children}</PhaseProvider>
-    </NutritionGoalsProvider>
-  );
+  return <NutritionGoalsProvider>{children}</NutritionGoalsProvider>;
 }
 
 /** An ISO instant `daysAgo` days before today, at noon local time. */
@@ -40,7 +33,6 @@ beforeEach(() => {
     carbsG: null,
     fatG: null,
   });
-  (fetchPhases as jest.Mock).mockResolvedValue([]);
   (fetchIntakeForRange as jest.Mock).mockReset().mockResolvedValue([]);
 });
 

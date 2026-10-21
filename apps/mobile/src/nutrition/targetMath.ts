@@ -1,5 +1,4 @@
-// Daily calorie and macro targets: the arithmetic behind Nutrition Goals (and a phase's own
-// targets). Pure, no I/O. The recommendations are fixed and the same every time:
+// Daily calorie and macro targets: the arithmetic behind Nutrition Goals. Pure, no I/O. The recommendations are fixed and the same every time:
 // - protein: 0.8 g per lb of body weight;
 // - fat: 0.3 g per lb of body weight;
 // - carbs: whatever calories are left after protein and fat, at 4 cal per gram.
@@ -82,14 +81,6 @@ export interface TargetDraft {
   fatG: string;
 }
 
-/**
- * What a blank field means:
- * - 'recommended' (the daily targets): the recommendation, shown faded in the field, is the
- *   target -- what's shown is what's saved;
- * - 'none' (a phase's targets): no target of its own, so the daily one carries on.
- */
-export type BlankMeans = 'recommended' | 'none';
-
 type TargetKey = keyof TargetDraft;
 
 const LIMITS: Record<TargetKey, { max: number; whole: boolean }> = {
@@ -142,13 +133,10 @@ export interface ParsedTargets {
 /**
  * The four fields as targets. Protein and fat are recommended from body weight; carbs from the
  * calories left after the protein and fat that will be saved (typed, or recommended). A typed
- * number always wins; a blank field is the recommendation or nothing, as `blankMeans` says.
+ * number always wins; a blank field is its recommendation, shown faded in it -- what's shown is
+ * what's saved.
  */
-export function parseTargets(
-  draft: TargetDraft,
-  weightKg: number | null,
-  blankMeans: BlankMeans,
-): ParsedTargets {
+export function parseTargets(draft: TargetDraft, weightKg: number | null): ParsedTargets {
   const errors: Partial<Record<TargetKey, string>> = {};
   const read = (key: TargetKey): number | null => {
     const parsed = parseField(draft[key], key);
@@ -159,7 +147,7 @@ export function parseTargets(
     return parsed;
   };
   const fillBlank = (typed: number | null, recommendation: number | null) =>
-    typed ?? (blankMeans === 'recommended' ? recommendation : null);
+    typed ?? recommendation;
 
   const guide = weightKg !== null ? macroGuidance(weightKg) : null;
   const calories = read('calories');
@@ -207,22 +195,17 @@ function toText(value: number | null): string {
 }
 
 /**
- * The fields for saved targets. With `blankMeans` 'recommended', a saved macro that is exactly
- * its recommendation starts blank, so it shows faded and keeps following the recommendation (a
- * new weight or calorie target moves it) until the person types their own.
+ * The fields for saved targets. A saved macro that is exactly its recommendation starts blank,
+ * so it shows faded and keeps following the recommendation (a new weight or calorie target
+ * moves it) until the person types their own.
  */
-export function draftFromTargets(
-  targets: TargetValues,
-  weightKg: number | null = null,
-  blankMeans: BlankMeans = 'none',
-): TargetDraft {
+export function draftFromTargets(targets: TargetValues, weightKg: number | null): TargetDraft {
   const draft: TargetDraft = {
     calories: toText(targets.calories),
     proteinG: toText(targets.proteinG),
     carbsG: toText(targets.carbsG),
     fatG: toText(targets.fatG),
   };
-  if (blankMeans !== 'recommended') return draft;
   const guide = weightKg !== null ? macroGuidance(weightKg) : null;
   const carbs =
     targets.calories !== null && targets.proteinG !== null && targets.fatG !== null

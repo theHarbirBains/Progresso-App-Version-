@@ -267,8 +267,8 @@ export async function fetchFoodLogsForRange(
 }
 
 /**
- * Each food log's time and calories from `start` up to (not including) `end` -- a phase's,
- * which can run for months -- read a page at a time, so a long phase is read in full.
+ * Each food log's time and calories from `start` up to (not including) `end` -- up to three
+ * months of them -- read a page at a time, so a long range is read in full.
  */
 export async function fetchIntakeForRange(
   userId: string,

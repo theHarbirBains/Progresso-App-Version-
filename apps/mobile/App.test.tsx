@@ -76,9 +76,6 @@ jest.mock('./src/nutrition/foodLogQueries', () => ({
   fetchFoodLogsForRange: jest.fn().mockResolvedValue([]),
   fetchIntakeForRange: jest.fn().mockResolvedValue([]),
 }));
-jest.mock('./src/phases/phaseQueries', () => ({
-  fetchPhases: jest.fn().mockResolvedValue([]),
-}));
 jest.mock('./src/nutrition/nutritionGoalQueries', () => ({
   fetchNutritionGoals: jest.fn().mockResolvedValue({
     calories: null,
@@ -629,7 +626,7 @@ describe('Universal side menu', () => {
     expect(screen.getByTestId('app-menu-item-NutritionHistory')).toHaveTextContent(
       /Nutrition History/,
     );
-    expect(screen.getByTestId('app-menu-item-Phases')).toHaveTextContent(/Phases/);
+    expect(screen.queryByTestId('app-menu-item-Phases')).toBeNull();
     expect(screen.getByTestId('app-menu-item-AccountSettings')).toHaveTextContent(/Settings/);
     // The Workout destinations are still there too -- one universal list.
     expect(screen.getByTestId('app-menu-item-WorkoutHistory')).toBeTruthy();
@@ -659,17 +656,6 @@ describe('Universal side menu', () => {
 
     expect(await screen.findByTestId('nutrition-history-header')).toBeTruthy();
     expect(screen.queryByTestId('app-menu-backdrop')).toBeNull();
-  });
-
-  it('opens Phases from the Nutrition menu', async () => {
-    await signIn();
-    fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
-    await screen.findByTestId('nutrition-today-open-menu');
-    fireEvent.press(screen.getByTestId('nutrition-today-open-menu'));
-
-    fireEvent.press(screen.getByTestId('app-menu-item-Phases'));
-
-    expect(await screen.findByTestId('phases-header')).toBeTruthy();
   });
 });
 

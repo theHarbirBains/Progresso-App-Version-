@@ -13,7 +13,6 @@ import {
   macroTotal,
   parseField,
   parseTargets,
-  type BlankMeans,
   type TargetDraft,
 } from './targetMath';
 
@@ -59,8 +58,6 @@ interface MacroProps extends FieldProps {
   /** The person's body weight in kg, which protein and fat are recommended from; null when unknown. */
   weightKg: number | null;
   weightUnit: 'kg' | 'lb';
-  /** What a blank field means: the recommendation (daily targets) or no target (a phase's). */
-  blankMeans: BlankMeans;
   accentColor: string;
   /** Where to add a body weight when there isn't one; left out, it's only said. */
   onAddWeight?: () => void;
@@ -70,10 +67,9 @@ interface MacroProps extends FieldProps {
  * Protein, fat and carbs, one row each with its glyph and the rule it's recommended by:
  * - protein 0.8 g and fat 0.3 g per lb of body weight, every time;
  * - carbs, whatever calories are left after protein and fat, at 4 cal a gram.
- * Every field is the person's own to type. For the daily targets the recommendation sits faded
- * in a blank field and is what's saved unless they type over it; a field typed differently
- * offers it back with "Use N g". For a phase, blank means "keep the daily target", so the
- * recommendation is only offered. Each row has a bar of its share of the calories, gliding as
+ * Every field is the person's own to type. The recommendation sits faded in a blank field and is
+ * what's saved unless they type over it; a field typed differently offers it back with
+ * "Use N g". Each row has a bar of its share of the calories, gliding as
  * the figures change, and under them what the macros come to against the calorie target.
  * Protein and fat past the calories are said plainly, never clamped.
  */
@@ -82,14 +78,12 @@ export function MacroTargets({
   onChange,
   weightKg,
   weightUnit,
-  blankMeans,
   accentColor,
   onAddWeight,
   testIDPrefix = 'targets',
 }: MacroProps) {
-  const { values, recommended, carbs, errors } = parseTargets(draft, weightKg, blankMeans);
+  const { values, recommended, carbs, errors } = parseTargets(draft, weightKg);
   const guide = weightKg !== null ? macroGuidance(weightKg) : null;
-  const fillsBlanks = blankMeans === 'recommended';
   const total = macroTotal(values);
 
   const rows = [
@@ -125,16 +119,9 @@ export function MacroTargets({
     },
   ];
 
-  let lead: string;
-  if (fillsBlanks) {
-    lead = guide
-      ? `Faded numbers are recommended, from your body weight (${weightText(weightKg ?? 0, weightUnit, guide.weightLb)}). Type over any to set your own.`
-      : 'Add your body weight to get protein and fat recommended: 0.8 g and 0.3 g per lb.';
-  } else {
-    lead = guide
-      ? `Recommended from ${weightText(weightKg ?? 0, weightUnit, guide.weightLb)}. Leave any blank to keep your daily target.`
-      : 'Leave any blank to keep your daily target.';
-  }
+  const lead = guide
+    ? `Faded numbers are recommended, from your body weight (${weightText(weightKg ?? 0, weightUnit, guide.weightLb)}). Type over any to set your own.`
+    : 'Add your body weight to get protein and fat recommended: 0.8 g and 0.3 g per lb.';
 
   return (
     <View style={styles.group}>
@@ -154,10 +141,9 @@ export function MacroTargets({
         const recommendation = recommended[row.field];
         const grams = values[row.field];
         const share = grams !== null ? shareOf(grams * row.kcal, values.calories) : null;
-        // A typed number that isn't the recommendation is offered it back: for the daily targets
-        // by clearing the field (the faded number shows again), for a phase by filling it in.
-        const offer =
-          recommendation !== null && (fillsBlanks ? typed : true) && grams !== recommendation;
+        // A typed number that isn't the recommendation is offered it back, by clearing the field
+        // so the faded number shows again.
+        const offer = recommendation !== null && typed && grams !== recommendation;
         return (
           <View key={row.key} testID={`${testIDPrefix}-${row.key}-row`} style={styles.row}>
             <View style={styles.head}>
@@ -174,9 +160,7 @@ export function MacroTargets({
                 <TextInput
                   testID={`${testIDPrefix}-${row.key}`}
                   accessibilityLabel={`${row.label} (g)`}
-                  placeholder={
-                    fillsBlanks ? (recommendation !== null ? String(recommendation) : '—') : 'Daily'
-                  }
+                  placeholder={recommendation !== null ? String(recommendation) : '—'}
                   keyboardType="decimal-pad"
                   value={draft[row.field]}
                   onChangeText={(text) => onChange({ ...draft, [row.field]: text })}
@@ -201,9 +185,7 @@ export function MacroTargets({
                   testID={`${testIDPrefix}-${row.key}-use`}
                   label={`Use ${recommendation} g`}
                   accessibilityLabel={`Use the recommended ${recommendation} grams of ${row.label.toLowerCase()}`}
-                  onPress={() =>
-                    onChange({ ...draft, [row.field]: fillsBlanks ? '' : String(recommendation) })
-                  }
+                  onPress={() => onChange({ ...draft, [row.field]: '' })}
                 />
               ) : null}
             </View>
@@ -233,24 +215,7 @@ function weightText(weightKg: number, unit: 'kg' | 'lb', weightLb: number): stri
   return unit === 'kg' ? `${Math.round(weightKg * 10) / 10} kg, ${weightLb} lb` : `${weightLb} lb`;
 }
 
-/** Calories and the macros under them, as one block -- a phase's own targets. */
-export function TargetsEditor(props: MacroProps) {
-  return (
-    <View style={styles.editor}>
-      <CalorieTargetField
-        draft={props.draft}
-        onChange={props.onChange}
-        testIDPrefix={props.testIDPrefix}
-      />
-      <MacroTargets {...props} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  editor: {
-    gap: spacing.lg,
-  },
   group: {
     gap: spacing.xs,
   },
