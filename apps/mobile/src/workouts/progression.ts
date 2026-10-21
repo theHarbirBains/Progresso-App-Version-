@@ -1,5 +1,4 @@
 import type { MeasurementType, MovementType } from '../exercises/movementTypes';
-import { formatDuration } from '../lib/duration';
 import type { TrainingComfort } from '../lib/api';
 import { formatWeightKg } from '../lib/units';
 import { bestLoggedSet, loggedSets } from './setValues';
@@ -9,19 +8,14 @@ import type { SetRecord } from './workoutQueries';
 // changes a weight: it only says what to aim for.
 //
 // Everyone has their own rep range (Settings > Workout Preferences), and any exercise can have
-// its own instead (exerciseSettingsQueries.ts): an exercise's own range wins over theirs. For a
-// weighted exercise, its top set (the heaviest completed set, the first one if several tie --
-// the same Top Set shown everywhere else) is judged against that range:
-// - reaching the top of the range, or beyond, means increase the weight next time -- by the
-//   exercise's own step when it has one (5 lb dumbbells, 2.5 kg plates), otherwise 5 lb or
-//   2.5 kg -- picking one you can lift for about the bottom of the range, then building back up
-//   week by week;
-// - anything short of the top is still good: stay at that weight and work toward the top.
+// its own instead (exerciseSettingsQueries.ts): an exercise's own range wins over theirs.
+// - Next time an exercise is done, each of last session's sets that reached the top of the
+//   range, or beyond, says to go up -- by the exercise's own step when it has one (5 lb
+//   dumbbells, 2.5 kg plates), otherwise 5 lb or 2.5 kg -- or, for a bodyweight exercise, to
+//   make it harder (more reps, the weighted version). Short of the top, nothing is said: there's
+//   no increment to recommend yet. A timed exercise has no range, so it's never told.
+// - In the workout itself, once today's top set reaches the top, it says so.
 // Falling short is never called a bad set, and the app never suggests going lighter.
-//
-// A bodyweight exercise's best set is judged the same way, and at the top it gets ways to make
-// it harder (more reps, the weighted version). A timed exercise has no range: it's always
-// asked to beat its last time.
 //
 // Not a PR, a Top Set or a 1RM: those keep their own definitions and records.
 
@@ -35,11 +29,6 @@ export function defaultRepRange(comfort: TrainingComfort | null): RepRange {
   return comfort === 'plans_and_progresses' || comfort === 'follows_method'
     ? { min: 5, max: 10 }
     : { min: 8, max: 12 };
-}
-
-/** Whether someone asked for guidance: they get a one-line why under each suggestion. */
-export function wantsGuidance(comfort: TrainingComfort | null): boolean {
-  return comfort === 'still_learning' || comfort === 'knows_basics';
 }
 
 /** "8–12", or "5" for a range of one number. */
@@ -57,26 +46,6 @@ export function defaultIncrementKg(unit: 'kg' | 'lb'): number {
 /** The range an exercise is judged against: its own when it has one, otherwise the person's. */
 export function effectiveRepRange(personal: RepRange, exerciseRange: RepRange | null): RepRange {
   return exerciseRange ?? personal;
-}
-
-/** A suggestion for the next time an exercise is done. */
-export interface ProgressionCue {
-  headline: string;
-  /** Ways to make a bodyweight or timed exercise harder, one per line. */
-  options: string[];
-  /** A one-line why, for people who asked for guidance. */
-  detail: string | null;
-}
-
-export function cuesEqual(a: ProgressionCue | null, b: ProgressionCue | null): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return (
-    a.headline === b.headline &&
-    a.detail === b.detail &&
-    a.options.length === b.options.length &&
-    a.options.every((option, i) => option === b.options[i])
-  );
 }
 
 /** A session's top set for what the exercise measures: the heaviest, the most reps, the longest. */
@@ -127,93 +96,48 @@ function weightText(kg: number, unit: 'kg' | 'lb'): string {
   return `${formatWeightKg(kg, unit)} ${unit}`;
 }
 
-/** How much longer to aim for: 5 seconds under a minute, 10 from a minute up. */
-function nextTimeGoal(seconds: number): number {
-  return seconds + (seconds < 60 ? 5 : 10);
-}
-
 interface CueInput {
   measurementType: MeasurementType;
   movementType: MovementType;
   range: RepRange;
   unit: 'kg' | 'lb';
-  guided: boolean;
   /** How much heavier to suggest, in kg -- the exercise's own step or the default. */
   incrementKg?: number;
   /** The weighted version of this exercise in the person's library ("Weighted Pull-Up"), if any. */
   weightedVariant?: string | null;
 }
 
-/** What to aim for this time, from the last session with this exercise. */
-export function nextSessionCue(
-  input: CueInput & { lastSessionSets: SetRecord[] },
-): ProgressionCue | null {
-  const { measurementType, movementType, range, unit, guided, weightedVariant } = input;
-  const incrementKg = input.incrementKg ?? defaultIncrementKg(unit);
-  const top = topSetOf(input.lastSessionSets, measurementType, movementType);
-  if (!top) return null;
-  const bothSides = movementType === 'unilateral' ? ' on both sides' : '';
-
-  if (measurementType === 'timed') {
-    if (top.durationSeconds == null) return null;
-    return {
-      headline: `Last time: ${formatDuration(top.durationSeconds)}. Go for a new time today.`,
-      options: [
-        `Aim for ${formatDuration(nextTimeGoal(top.durationSeconds))} or more`,
-        ...(weightedVariant ? [`Or add weight: try ${weightedVariant}`] : []),
-      ],
-      detail: guided
-        ? 'Holding a little longer each time is how a timed exercise gets harder.'
-        : null,
-    };
-  }
-
-  if (top.reps == null) return null;
-
-  if (measurementType === 'bodyweight') {
-    if (top.reps >= range.max) {
-      return {
-        headline: `Your best set hit ${top.reps} reps${bothSides}, the top of your range. Make it harder today:`,
-        options: [
-          `Add reps: go for ${top.reps + 1} or more`,
-          ...(weightedVariant ? [`Add weight: try ${weightedVariant}`] : []),
-        ],
-        detail: guided
-          ? 'Either one keeps the exercise challenging, so you keep getting stronger.'
-          : null,
-      };
+/**
+ * Next time, on last session's sets: each set that reached the top of the range, or beyond,
+ * gets one short line to go up -- "Hit 10! Go up to 77.5 lb today." -- or, for a bodyweight
+ * exercise, to make it harder. Keyed by the set's place in that session (1 for its first set),
+ * as Last Time's Sets numbers them. A set short of the top gets nothing, and a timed exercise,
+ * which has no range, gets nothing.
+ */
+export function lastTimeFlags(
+  input: Omit<CueInput, 'movementType'> & { lastSessionSets: SetRecord[] },
+): Record<number, string> {
+  const { measurementType, range, unit, weightedVariant } = input;
+  const step = input.incrementKg ?? defaultIncrementKg(unit);
+  const flags: Record<number, string> = {};
+  if (measurementType === 'timed') return flags;
+  input.lastSessionSets.forEach((set, index) => {
+    if (set.completedAt === null || set.reps == null || set.reps < range.max) return;
+    if (measurementType === 'bodyweight') {
+      flags[index + 1] = weightedVariant
+        ? `Hit ${set.reps}! Try ${weightedVariant} today.`
+        : `Hit ${set.reps}! Go for ${set.reps + 1} today.`;
+    } else if (set.weightKg != null) {
+      flags[index + 1] =
+        `Hit ${set.reps}! Go up to ${weightText(set.weightKg + step, unit)} today.`;
     }
-    return {
-      headline: `Keep building until your best set reaches ${range.max} reps${bothSides}, then we'll recommend how to make it harder.`,
-      options: [],
-      detail: guided ? 'More reps first, then a harder version, keeps you progressing.' : null,
-    };
-  }
-
-  if (top.weightKg == null) return null;
-  if (top.reps >= range.max) {
-    const weight = weightText(top.weightKg, unit);
-    const heavier = weightText(top.weightKg + incrementKg, unit);
-    return {
-      headline: `Your top set hit ${top.reps}${bothSides} at ${weight}. Increase the weight today: try ${heavier}.`,
-      options: [],
-      detail: guided
-        ? `Pick a weight you can lift for about ${range.min} reps, then build back up to ${range.max}.`
-        : null,
-    };
-  }
-  return {
-    headline: `Keep your top set weight the same until you reach ${range.max} reps${bothSides}, then we'll recommend your next increment.`,
-    options: [],
-    detail: guided
-      ? 'Owning the top of your range before going heavier keeps your form and your progress steady.'
-      : null,
-  };
+  });
+  return flags;
 }
 
 /** Said in the workout itself once today's top set reaches the top of the range (or beats last time). */
 export function thisSessionCue(
-  input: Omit<CueInput, 'unit' | 'guided'> & {
+  input: Omit<CueInput, 'unit'> & {
     sets: SetRecord[];
     lastSessionSets?: SetRecord[];
   },
@@ -360,14 +284,13 @@ export interface ProgressionSettings {
   range: RepRange;
   /** Whether to say anything at all (Settings > Workout Preferences > Progression Tips). */
   enabled: boolean;
-  guided: boolean;
   unit: 'kg' | 'lb';
 }
 
 /**
  * Everything the live workout's exercise card shows about progression: the all-time best (shown
- * even with suggestions off: it's a record, not a suggestion), what to aim for today from the
- * last session, and what today's own sets already show.
+ * even with suggestions off: it's a record, not a suggestion), the messages on last session's
+ * sets that reached the top of the range, and what today's own sets already show.
  */
 export function progressionForExercise(input: {
   exercise: {
@@ -401,7 +324,7 @@ export function progressionForExercise(input: {
   override?: ExerciseOverride | null;
 }): {
   allTimeBest: AllTimeBest | null;
-  progressionCue: ProgressionCue | null;
+  lastTimeFlags: Record<number, string>;
   sessionCue: string | null;
 } {
   const { exercise, settings, lastSessionSets } = input;
@@ -429,16 +352,17 @@ export function progressionForExercise(input: {
         ) ?? null,
       todaySets: exercise.sets,
     }),
-    progressionCue:
+    lastTimeFlags:
       settings.enabled && lastSessionSets
-        ? nextSessionCue({
-            ...shared,
+        ? lastTimeFlags({
+            measurementType,
+            range,
+            weightedVariant,
             unit: settings.unit,
-            guided: settings.guided,
             incrementKg: input.override?.incrementKg ?? undefined,
             lastSessionSets,
           })
-        : null,
+        : {},
     sessionCue: settings.enabled
       ? thisSessionCue({ ...shared, sets: exercise.sets, lastSessionSets })
       : null,

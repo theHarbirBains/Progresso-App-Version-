@@ -221,6 +221,17 @@ export const liveWorkoutStyles = StyleSheet.create({
     ...typeScale.caption,
     marginTop: spacing.xs,
   },
+  // On a set that reached the top of the range: an accent alert glyph and one short line.
+  slideFlag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  slideFlagText: {
+    ...typeScale.callout,
+    fontFamily: typeScale.label.fontFamily,
+  },
   // Today's sets, under their own heading.
   today: {
     marginTop: spacing.lg,
@@ -339,31 +350,6 @@ export const liveWorkoutStyles = StyleSheet.create({
 
   // ---- Progression (workouts/progression.ts) ---------------------------------
   // Quiet text, never a card or a badge: the one accent is the small glyph.
-  cue: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  cueIcon: {
-    marginTop: 2,
-  },
-  cueBody: {
-    flex: 1,
-    gap: 2,
-  },
-  cueHeadline: {
-    ...typeScale.callout,
-    color: colors.textPrimary,
-  },
-  cueOption: {
-    ...typeScale.callout,
-    color: colors.textSecondary,
-  },
-  cueDetail: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-  },
   sessionCue: {
     flexDirection: 'row',
     alignItems: 'center',

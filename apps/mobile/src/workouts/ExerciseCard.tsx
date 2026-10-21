@@ -12,7 +12,7 @@ import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import type { MeasurementType, MovementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
-import { cuesEqual, type AllTimeBest, type ProgressionCue } from './progression';
+import type { AllTimeBest } from './progression';
 import { PER_SIDE_NOTE, SetColumnHeader } from './SetColumnHeader';
 import { SetRow } from './SetRow';
 import { formatSetValues } from './setValues';
@@ -84,7 +84,8 @@ interface Props {
   /** The best set ever, within the person's rep range (progression.ts's allTimeBest). */
   allTimeBest?: AllTimeBest | null;
   /** What to aim for today, from the last session (workouts/progression.ts), under Last Time. */
-  progressionCue?: ProgressionCue | null;
+  /** On a set of Last Time's that reached the top of the range: what to do today ("Hit 10! Go up to 77.5 lb today."), by its setNumber. */
+  lastTimeFlags?: Record<number, string> | null;
   /** Said once today's own top set reaches the top of the range, under today's sets. */
   sessionCue?: string | null;
   /** Only for an exercise with a rep range of its own ("Own range 3–5"); the person's own range is shown once, at the top of the workout. */
@@ -190,7 +191,8 @@ function slideValue(set: PreviousSessionSet, type: MeasurementType): string {
 //   date, or "Today" in the accent once today's beats it) and Last Time (that session's top set,
 //   its date and how many sets);
 // - Last Time's sets as a carousel that moves on by itself and can be swiped to any set, the
-//   top set marked, with View History; then the suggestion for today;
+//   top set marked, with View History. A set that reached the top of the range says what to
+//   do about it today ("Hit 10! Go up to 77.5 lb today."), and the carousel opens on it;
 // - today's sets to log, as rows that never move, and Add Set.
 function ExerciseCardComponent({
   exerciseName,
@@ -202,7 +204,7 @@ function ExerciseCardComponent({
   previousSession = null,
   onViewHistory,
   allTimeBest = null,
-  progressionCue = null,
+  lastTimeFlags = null,
   sessionCue = null,
   ownRangeText = null,
   onEditProgression,
@@ -357,16 +359,22 @@ function ExerciseCardComponent({
             testID={id('previous')}
             items={previousSets}
             keyOf={(set) => String(set.setNumber)}
+            // It opens on the first set with something to do about it.
+            initialIndex={Math.max(
+              0,
+              previousSets.findIndex((set) => lastTimeFlags?.[set.setNumber]),
+            )}
             renderSlide={(set) => {
               const top = set.setNumber === previousSession?.topSetNumber;
               const side = set.side ? ` · ${set.side === 'left' ? 'Left' : 'Right'}` : '';
               const value = slideValue(set, measurementType);
+              const flag = lastTimeFlags?.[set.setNumber] ?? null;
               return (
                 <View
                   testID={id(`previous-set-${set.setNumber}`)}
                   style={styles.slide}
                   accessible
-                  accessibilityLabel={`Set ${set.setNumber} of ${previousSets.length}${side}: ${value}${top ? ', top set' : ''}`}
+                  accessibilityLabel={`Set ${set.setNumber} of ${previousSets.length}${side}: ${value}${top ? ', top set' : ''}${flag ? `. ${flag}` : ''}`}
                 >
                   <Text style={styles.slideLabel}>
                     Set {set.setNumber} of {previousSets.length}
@@ -376,38 +384,19 @@ function ExerciseCardComponent({
                   {top ? (
                     <Text style={[styles.slideTag, { color: accentColor }]}>Top Set</Text>
                   ) : null}
+                  {flag ? (
+                    <View
+                      testID={id(`previous-set-${set.setNumber}-flag`)}
+                      style={styles.slideFlag}
+                    >
+                      <Feather name="alert-circle" size={16} color={accentColor} />
+                      <Text style={[styles.slideFlagText, { color: accentColor }]}>{flag}</Text>
+                    </View>
+                  ) : null}
                 </View>
               );
             }}
           />
-        </View>
-      ) : null}
-
-      {progressionCue ? (
-        <View
-          testID={id('cue')}
-          style={styles.cue}
-          accessible
-          accessibilityLabel={[
-            progressionCue.headline,
-            ...progressionCue.options,
-            progressionCue.detail,
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        >
-          <Feather name="trending-up" size={16} color={accentColor} style={styles.cueIcon} />
-          <View style={styles.cueBody}>
-            <Text style={styles.cueHeadline}>{progressionCue.headline}</Text>
-            {progressionCue.options.map((option) => (
-              <Text key={option} style={styles.cueOption}>
-                {option}
-              </Text>
-            ))}
-            {progressionCue.detail ? (
-              <Text style={styles.cueDetail}>{progressionCue.detail}</Text>
-            ) : null}
-          </View>
         </View>
       ) : null}
 
@@ -558,6 +547,13 @@ function previousSessionEqual(
   );
 }
 
+function flagsEqual(a: Record<number, string> | null, b: Record<number, string> | null): boolean {
+  if (a === b) return true;
+  const aKeys = Object.keys(a ?? {});
+  if (aKeys.length !== Object.keys(b ?? {}).length) return false;
+  return aKeys.every((key) => a?.[Number(key)] === b?.[Number(key)]);
+}
+
 function allTimeBestEqual(a: AllTimeBest | null, b: AllTimeBest | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -601,7 +597,7 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     (prev.sessionCue ?? null) === (next.sessionCue ?? null) &&
     (prev.ownRangeText ?? null) === (next.ownRangeText ?? null) &&
     prev.onEditProgression === next.onEditProgression &&
-    cuesEqual(prev.progressionCue ?? null, next.progressionCue ?? null) &&
+    flagsEqual(prev.lastTimeFlags ?? null, next.lastTimeFlags ?? null) &&
     previousSessionEqual(prev.previousSession, next.previousSession) &&
     setsEqual(prev.sets, next.sets) &&
     unilateralSetsEqual(prev.unilateralSets, next.unilateralSets)

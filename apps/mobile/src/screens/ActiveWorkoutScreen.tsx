@@ -4,6 +4,7 @@ import { Card } from '../design/Card';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
+import { rememberLiveWorkout } from '../feed/liveWorkoutMemory';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
@@ -171,6 +172,15 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           return;
         }
         setWorkout(detail);
+        // Feed shows this workout going the moment it's opened, not "start your next workout"
+        // until its own check comes back (feed/liveWorkoutMemory.ts).
+        rememberLiveWorkout(userId, {
+          id: detail.id,
+          name: detail.name,
+          performedAt: detail.performedAt,
+          completedAt: null,
+          workoutSplitDayId: detail.workoutSplitDayId,
+        });
 
         const savedInputs: Record<string, SetInputDraft> = {};
         const openSetIds = new Set<string>();
@@ -618,6 +628,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     try {
       await completeWorkout(workout.id);
       void clearLiveWorkoutDraft(workout.id);
+      rememberLiveWorkout(userId, null);
       // The only thing that changes what AllTimeStatsProvider's cache holds
       // -- refreshes it now so Profile/Progress already have this workout's
       // stats and PRs the moment they're next visited, instead of a stale
@@ -649,6 +660,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       // affects PR/1RM data. See cancelWorkout's own comment.
       await cancelWorkout(workout.id);
       void clearLiveWorkoutDraft(workout.id);
+      rememberLiveWorkout(userId, null);
       navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to cancel workout');

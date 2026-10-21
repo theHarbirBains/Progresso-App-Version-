@@ -28,6 +28,8 @@ import {
   fetchNextExerciseOrderIndex,
 } from '../workouts/workoutQueries';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
+import { recallLiveWorkout } from '../feed/liveWorkoutMemory';
+import { forgetShown } from '../lib/lastShown';
 import { ActiveWorkoutScreen } from './ActiveWorkoutScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -591,6 +593,20 @@ describe('ActiveWorkoutScreen', () => {
     expect(screen.queryByTestId('workout-header-back')).toBeNull();
     expect(screen.queryByTestId('workout-header-options')).toBeNull();
     expect(within(screen.getByTestId('active-workout-header')).getByText('Push Day')).toBeTruthy();
+  });
+
+  it('tells Feed it is going as soon as it opens, and that it is not once finished', async () => {
+    forgetShown();
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    expect(recallLiveWorkout('user-1')).toMatchObject({ id: 'w1', completedAt: null });
+
+    fireEvent.press(screen.getByTestId('complete-workout'));
+    await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
+    await waitFor(() => expect(recallLiveWorkout('user-1')).toBeNull());
   });
 
   it('shows a prominent Finish Workout button that completes the workout via the same existing completeWorkout function -- exactly once, no duplicate record', async () => {
@@ -1435,7 +1451,7 @@ describe('Progressive overload', () => {
     mockFetchMyProfile.mockResolvedValue(profile);
   });
 
-  it("says to increase the weight once last time's top set reached the top of the range", async () => {
+  it('says to go up, on the set of last time that reached the top of the range', async () => {
     mockFetchPreviousPerformance.mockResolvedValue(
       lastSession([
         { weightKg: 100, reps: 12 },
@@ -1444,21 +1460,20 @@ describe('Progressive overload', () => {
     );
     renderScreen();
 
-    const cue = await screen.findByTestId('exercise-card-we1-cue');
-    expect(cue).toHaveTextContent(
-      /Your top set hit 12 at 100 kg\. Increase the weight today: try 102\.5 kg\./,
+    expect(await screen.findByTestId('exercise-card-we1-previous-set-1-flag')).toHaveTextContent(
+      /Hit 12! Go up to 102\.5 kg today\./,
     );
-    // They asked for guidance, so they're told how to pick the new weight.
-    expect(cue).toHaveTextContent(/about 8 reps, then build back up to 12/);
+    expect(screen.queryByTestId('exercise-card-we1-previous-set-2-flag')).toBeNull();
   });
 
-  it('says, in general, to keep the top set weight the same until the top of the range', async () => {
+  it('says nothing under or on last time short of the top of the range', async () => {
     mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: 100, reps: 7 }]));
     renderScreen();
 
-    expect(await screen.findByTestId('exercise-card-we1-cue')).toHaveTextContent(
-      /Keep your top set weight the same until you reach 12 reps, then we'll recommend your next increment\./,
-    );
+    await screen.findByTestId('exercise-card-we1-previous-set-1');
+    expect(screen.queryByTestId('exercise-card-we1-previous-set-1-flag')).toBeNull();
+    expect(screen.queryByTestId('exercise-card-we1-cue')).toBeNull();
+    expect(screen.queryByText(/Keep your top set weight/)).toBeNull();
   });
 
   it("follows the person's own range", async () => {
@@ -1471,12 +1486,9 @@ describe('Progressive overload', () => {
     mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: 140, reps: 10 }]));
     renderScreen();
 
-    const cue = await screen.findByTestId('exercise-card-we1-cue');
-    expect(cue).toHaveTextContent(
-      /Your top set hit 10 at 140 kg\. Increase the weight today: try 142\.5 kg\./,
+    expect(await screen.findByTestId('exercise-card-we1-previous-set-1-flag')).toHaveTextContent(
+      /Hit 10! Go up to 142\.5 kg today\./,
     );
-    // No how-to for someone who follows their own method.
-    expect(cue).not.toHaveTextContent(/build back up/);
   });
 
   it('says nothing when Progression Tips is off', async () => {
@@ -1484,8 +1496,8 @@ describe('Progressive overload', () => {
     mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: 100, reps: 12 }]));
     renderScreen();
 
-    await screen.findByTestId('exercise-card-we1-previous-session');
-    expect(screen.queryByTestId('exercise-card-we1-cue')).toBeNull();
+    await screen.findByTestId('exercise-card-we1-previous-set-1');
+    expect(screen.queryByTestId('exercise-card-we1-previous-set-1-flag')).toBeNull();
   });
 
   it('shows the all-time best within the range, with its date, from the PRs already kept', async () => {
@@ -1524,7 +1536,7 @@ describe('Progressive overload', () => {
     );
   });
 
-  it('offers more reps and the weighted version for a bodyweight exercise at the top', async () => {
+  it('offers the weighted version on a bodyweight set that reached the top', async () => {
     mockFetchExercises.mockResolvedValue([
       {
         id: 'ex-weighted',
@@ -1552,17 +1564,14 @@ describe('Progressive overload', () => {
     mockFetchPreviousPerformance.mockResolvedValue(lastSession([{ weightKg: null, reps: 12 }]));
     renderScreen();
 
-    const cue = await screen.findByTestId('exercise-card-we1-cue');
-    expect(cue).toHaveTextContent(/Your best set hit 12 reps, the top of your range/);
-    expect(cue).toHaveTextContent(/Add reps: go for 13 or more/);
     await waitFor(() =>
-      expect(screen.getByTestId('exercise-card-we1-cue')).toHaveTextContent(
-        /Add weight: try Weighted Pull-Up/,
+      expect(screen.getByTestId('exercise-card-we1-previous-set-1-flag')).toHaveTextContent(
+        /Hit 12! Try Weighted Pull-Up today\./,
       ),
     );
   });
 
-  it('asks for a new time on a timed exercise', async () => {
+  it('says nothing about last time on a timed exercise, which has no range', async () => {
     mockFetchWorkoutDetail.mockResolvedValue({
       ...baseWorkout,
       exercises: [
@@ -1590,9 +1599,8 @@ describe('Progressive overload', () => {
     });
     renderScreen();
 
-    const cue = await screen.findByTestId('exercise-card-we1-cue');
-    expect(cue).toHaveTextContent(/Last time: 1:15\. Go for a new time today\./);
-    expect(cue).toHaveTextContent(/Aim for 1:25 or more/);
+    expect(await screen.findByTestId('exercise-card-we1-previous-set-1')).toHaveTextContent(/1:15/);
+    expect(screen.queryByTestId('exercise-card-we1-previous-set-1-flag')).toBeNull();
   });
 });
 

@@ -660,15 +660,16 @@ describe('ExerciseCard by what the exercise measures', () => {
 describe('ExerciseCard progression', () => {
   const lastSession = {
     dateDisplay: 'Oct 1, 2026',
-    sets: [{ setNumber: 1, weightDisplay: '50', unit: 'lb' as const, reps: 12, side: null }],
+    topSetDisplay: '50 lb × 12',
+    topSetNumber: 1,
+    sets: [
+      { setNumber: 1, weightDisplay: '50', unit: 'lb' as const, reps: 12, side: null },
+      { setNumber: 2, weightDisplay: '45', unit: 'lb' as const, reps: 10, side: null },
+    ],
   };
-  const cue = {
-    headline: 'Your top set hit 12 at 50 lb. Increase the weight today.',
-    options: [],
-    detail: 'Pick a weight you can lift for about 8 reps, then build back up to 12.',
-  };
+  const flags = { 1: 'Hit 12! Go up to 55 lb today.' };
 
-  it('shows the all-time best with its date, and what to aim for under last time', () => {
+  it('shows the all-time best with its date', () => {
     render(
       <ExerciseCard
         {...baseProps}
@@ -680,7 +681,6 @@ describe('ExerciseCard progression', () => {
           durationSeconds: null,
           achievedAt: '2026-09-02T12:00:00.000Z',
         }}
-        progressionCue={cue}
       />,
     );
 
@@ -688,31 +688,34 @@ describe('ExerciseCard progression', () => {
     expect(screen.getByTestId('exercise-card-best')).toHaveTextContent(
       /^All-Time Best60 lb × 9Sep 2, 2026$/,
     );
-    expect(screen.getByTestId('exercise-card-cue')).toHaveTextContent(/Increase the weight today/);
-    expect(screen.getByTestId('exercise-card-cue')).toHaveTextContent(/about 8 reps/);
-    expect(
-      screen.getByLabelText(
-        'Your top set hit 12 at 50 lb. Increase the weight today. Pick a weight you can lift for about 8 reps, then build back up to 12.',
-      ),
-    ).toBeTruthy();
   });
 
-  it('lists ways to make a bodyweight exercise harder', () => {
+  it('says to go up on the set of last time that reached the top -- and only there', () => {
+    render(<ExerciseCard {...baseProps} previousSession={lastSession} lastTimeFlags={flags} />);
+
+    expect(screen.getByTestId('exercise-card-previous-set-1-flag')).toHaveTextContent(
+      /Hit 12! Go up to 55 lb today\./,
+    );
+    expect(screen.queryByTestId('exercise-card-previous-set-2-flag')).toBeNull();
+    expect(screen.getByTestId('exercise-card-previous-set-1').props.accessibilityLabel).toBe(
+      'Set 1 of 2: 50 lb × 12, top set. Hit 12! Go up to 55 lb today.',
+    );
+    // No general line under last time any more.
+    expect(screen.queryByTestId('exercise-card-cue')).toBeNull();
+  });
+
+  it('opens the carousel on the set with something to do about it', () => {
     render(
       <ExerciseCard
         {...baseProps}
-        measurementType="bodyweight"
         previousSession={lastSession}
-        progressionCue={{
-          headline: 'Your best set hit 12 reps, the top of your range. Make it harder today:',
-          options: ['Add reps: go for 13 or more', 'Add weight: try Weighted Pull-Up'],
-          detail: null,
-        }}
+        lastTimeFlags={{ 2: 'Hit 10! Go up to 50 lb today.' }}
       />,
     );
 
-    expect(screen.getByText('Add reps: go for 13 or more')).toBeTruthy();
-    expect(screen.getByText('Add weight: try Weighted Pull-Up')).toBeTruthy();
+    expect(screen.getByTestId('exercise-card-previous-dot-1').props.accessibilityState).toEqual({
+      selected: true,
+    });
   });
 
   it("says when today's top set reaches the top of the range", () => {
@@ -753,16 +756,17 @@ describe('ExerciseCard progression', () => {
     render(<ExerciseCard {...baseProps} previousSession={lastSession} />);
 
     expect(screen.queryByTestId('exercise-card-best')).toBeNull();
-    expect(screen.queryByTestId('exercise-card-cue')).toBeNull();
+    expect(screen.queryByTestId('exercise-card-previous-set-1-flag')).toBeNull();
     expect(screen.queryByTestId('exercise-card-session-cue')).toBeNull();
   });
 
-  it('re-renders when the cue, the all-time best or the session cue changes, and not otherwise', () => {
-    const props = { ...baseProps, previousSession: lastSession, progressionCue: cue };
-    expect(arePropsEqual(props, { ...props, progressionCue: { ...cue, options: [] } })).toBe(true);
+  it("re-renders when last time's messages, the all-time best or the session cue change, and not otherwise", () => {
+    const props = { ...baseProps, previousSession: lastSession, lastTimeFlags: flags };
+    expect(arePropsEqual(props, { ...props, lastTimeFlags: { ...flags } })).toBe(true);
     expect(
-      arePropsEqual(props, { ...props, progressionCue: { ...cue, headline: 'Last time: 11' } }),
+      arePropsEqual(props, { ...props, lastTimeFlags: { 1: 'Hit 12! Go up to 60 lb today.' } }),
     ).toBe(false);
+    expect(arePropsEqual(props, { ...props, lastTimeFlags: {} })).toBe(false);
     const best = {
       measurementType: 'weight_reps' as const,
       weightKg: 27,

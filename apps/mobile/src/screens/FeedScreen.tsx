@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
-import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { useHeroBackdrop } from '../design/AppBackgroundLayer';
 import { recallShown, rememberShown } from '../lib/lastShown';
 import { AppHeader } from '../design/AppHeader';
 import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
-import { PrimaryButton, TextButton } from '../design/Button';
+import { TextButton } from '../design/Button';
 import { Card } from '../design/Card';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
@@ -14,7 +13,6 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { RiseIn, RiseInGroup } from '../design/RiseIn';
 import { SkeletonCards } from '../design/Skeleton';
-import { colors } from '../design/theme';
 import { fetchFeedItems, type FeedItem } from '../feed/feedQueries';
 import {
   fetchFriendsFeed,
@@ -36,7 +34,9 @@ import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkou
 import { fetchActiveWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
 import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
+import { FeedHeroCard } from '../feed/FeedHeroCard';
 import { LiveNowCard } from '../feed/LiveNowCard';
+import { recallLiveWorkout, rememberLiveWorkout } from '../feed/liveWorkoutMemory';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
@@ -47,6 +47,11 @@ import {
 import { feedStyles as styles } from './feedStyles';
 
 type Props = RootStackScreenProps<'Feed'>;
+
+/** "6:42 PM": when a live workout started, today. */
+function startedTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
 
 function musclesLabel(day: NextWorkoutPlan['day']): string {
   return day.muscleGroups.map((g) => SPLIT_MUSCLE_GROUP_LABELS[g]).join(' • ');
@@ -144,6 +149,9 @@ export function FeedScreen({ navigation }: Props) {
     feed: recallShown<{ items: FeedItem[]; hasMore: boolean }>(userId, 'feed.items'),
     friends: recallShown<{ items: FriendsFeedItem[]; hasMore: boolean }>(userId, 'feed.friends'),
     nextPlan: recallShown<NextWorkoutPlan | null>(userId, 'feed.nextPlan'),
+    liveWorkout: recallLiveWorkout(userId),
+    liveGroups: recallShown<GroupSummary[]>(userId, 'feed.liveGroups'),
+    liveSessions: recallShown<TrainerOpenSession[]>(userId, 'feed.liveSessions'),
   }));
 
   const [items, setItems] = useState<FeedItem[]>(shown.feed?.items ?? []);
@@ -310,12 +318,16 @@ export function FeedScreen({ navigation }: Props) {
   loadNextWorkoutRef.current = loadNextWorkout;
 
   // A workout that is still open is shown here, so reopening the app finds it (it is never
-  // cancelled by the app itself). Tapping it resumes it.
-  const [liveWorkout, setLiveWorkout] = useState<WorkoutSummary | null>(null);
+  // cancelled by the app itself). Tapping it resumes it. It starts from what's known (Feed's own
+  // last check, or the live workout itself as it opened -- feed/liveWorkoutMemory.ts), so a
+  // workout going shows at once, never "start your next workout" first.
+  const [liveWorkout, setLiveWorkout] = useState<WorkoutSummary | null>(shown.liveWorkout ?? null);
   // Group workouts you are in, and live sessions a trainer is running, are listed too, so
   // nothing that is open is ever missing from the dashboard.
-  const [liveGroups, setLiveGroups] = useState<GroupSummary[]>([]);
-  const [liveSessions, setLiveSessions] = useState<TrainerOpenSession[]>([]);
+  const [liveGroups, setLiveGroups] = useState<GroupSummary[]>(shown.liveGroups ?? []);
+  const [liveSessions, setLiveSessions] = useState<TrainerOpenSession[]>(shown.liveSessions ?? []);
+  // Whether it's known what's open: until then the next workout isn't offered, in case one is.
+  const [liveKnown, setLiveKnown] = useState(shown.liveWorkout !== undefined);
   const loadLiveWorkout = useCallback(async () => {
     if (!userId) return;
     // Three independent checks, run concurrently -- none needs the others' result. Each
@@ -326,16 +338,77 @@ export function FeedScreen({ navigation }: Props) {
       Promise.resolve().then(() => (accessToken ? listGroups(accessToken) : [])),
       Promise.resolve().then(() => fetchMyOpenLiveSessions(userId)),
     ]);
-    setLiveWorkout(workoutResult.status === 'fulfilled' ? workoutResult.value : null);
-    setLiveGroups(groupsResult.status === 'fulfilled' ? groupsResult.value : []);
-    setLiveSessions(sessionsResult.status === 'fulfilled' ? sessionsResult.value : []);
+    const workout = workoutResult.status === 'fulfilled' ? workoutResult.value : null;
+    const groups = groupsResult.status === 'fulfilled' ? groupsResult.value : [];
+    const sessions = sessionsResult.status === 'fulfilled' ? sessionsResult.value : [];
+    setLiveWorkout(workout);
+    setLiveGroups(groups);
+    setLiveSessions(sessions);
+    setLiveKnown(true);
+    rememberLiveWorkout(userId, workout);
+    rememberShown(userId, 'feed.liveGroups', groups);
+    rememberShown(userId, 'feed.liveSessions', sessions);
   }, [userId, accessToken]);
-  // While any workout is open, its Live now card takes the place of the next-workout widget.
-  const anyWorkoutLive = liveWorkout !== null || liveGroups.length > 0 || liveSessions.length > 0;
-  const showNextWorkout = nextPlan !== null && !anyWorkoutLive;
-  // The Next Workout hero has no fill of its own; while it shows, the sunset photo behind Feed
-  // is brightened so it shows through the hero (see AppBackgroundLayer).
-  useHeroBackdrop(showNextWorkout);
+  // Everything open right now, most personal first. The first takes the place of the next
+  // workout as Feed's hero, with Resume; any others are Live now cards under it.
+  const liveEntries: {
+    testID: string;
+    title: string;
+    kind: string;
+    startedAt: string | null;
+    onPress: () => void;
+  }[] = [
+    ...(liveWorkout
+      ? [
+          {
+            testID: 'feed-live-workout',
+            title: liveWorkout.name,
+            kind: 'Your workout',
+            startedAt: liveWorkout.performedAt,
+            onPress: () => navigation.navigate('ActiveWorkout', { workoutId: liveWorkout.id }),
+          },
+        ]
+      : []),
+    ...(liveGroups.length === 1
+      ? [
+          {
+            testID: `feed-live-group-${liveGroups[0].id}`,
+            title: liveGroups[0].name,
+            kind: 'Group workout',
+            startedAt: liveGroups[0].startedAt,
+            onPress: () => navigation.navigate('GroupSession', { groupId: liveGroups[0].id }),
+          },
+        ]
+      : liveGroups.length > 1
+        ? [
+            {
+              testID: 'feed-live-groups',
+              title: `${liveGroups.length} group workouts`,
+              kind: 'Open Group Workouts to choose one',
+              startedAt: null,
+              onPress: () => navigation.navigate('Groups'),
+            },
+          ]
+        : []),
+    ...liveSessions.map((session) => ({
+      testID: `feed-live-session-${session.workoutId}`,
+      title: session.clientName,
+      kind: 'Live session with your client',
+      startedAt: session.startedAt,
+      onPress: () =>
+        navigation.navigate('TrainerLiveWorkout', {
+          workoutId: session.workoutId,
+          clientId: session.clientId,
+          clientName: session.clientName,
+          startedAt: session.startedAt,
+        }),
+    })),
+  ];
+  const [liveHero, ...moreLive] = liveEntries;
+  const showNextWorkout = nextPlan !== null && liveKnown && liveEntries.length === 0;
+  // The hero has no fill of its own; while it shows, the sunset photo behind Feed is
+  // brightened so it shows through the hero (see AppBackgroundLayer).
+  useHeroBackdrop(showNextWorkout || liveHero !== undefined);
   const loadLiveWorkoutRef = useRef(loadLiveWorkout);
   loadLiveWorkoutRef.current = loadLiveWorkout;
 
@@ -546,103 +619,53 @@ export function FeedScreen({ navigation }: Props) {
           />
         </BubbleMenu>
 
-        {liveWorkout ? (
+        {liveHero ? (
           <RiseIn>
-            <LiveNowCard
-              testID="feed-live-workout"
-              title={liveWorkout.name}
-              subtitle="Your workout"
-              onPress={() => navigation.navigate('ActiveWorkout', { workoutId: liveWorkout.id })}
-            />
-          </RiseIn>
-        ) : null}
-
-        {liveGroups.length === 1 ? (
-          <RiseIn>
-            <LiveNowCard
-              testID={`feed-live-group-${liveGroups[0].id}`}
-              title={liveGroups[0].name}
-              subtitle="Group workout"
-              onPress={() => navigation.navigate('GroupSession', { groupId: liveGroups[0].id })}
-            />
-          </RiseIn>
-        ) : null}
-
-        {liveGroups.length > 1 ? (
-          <RiseIn>
-            <LiveNowCard
-              testID="feed-live-groups"
-              title={`${liveGroups.length} group workouts`}
-              subtitle="Open Group Workouts to choose one"
-              onPress={() => navigation.navigate('Groups')}
-            />
-          </RiseIn>
-        ) : null}
-
-        {liveSessions.map((session) => (
-          <RiseIn key={session.workoutId}>
-            <LiveNowCard
-              testID={`feed-live-session-${session.workoutId}`}
-              title={session.clientName}
-              subtitle="Live session with your client"
-              onPress={() =>
-                navigation.navigate('TrainerLiveWorkout', {
-                  workoutId: session.workoutId,
-                  clientId: session.clientId,
-                  clientName: session.clientName,
-                  startedAt: session.startedAt,
-                })
+            <FeedHeroCard
+              testID={liveHero.testID}
+              eyebrow="Workout in Progress"
+              title={liveHero.title}
+              meta={
+                liveHero.startedAt
+                  ? `${liveHero.kind} · started ${startedTime(liveHero.startedAt)}`
+                  : liveHero.kind
               }
+              actionLabel="Resume Workout"
+              onPress={liveHero.onPress}
+              accessibilityLabel={`${liveHero.title}, ${liveHero.kind}. Workout in progress. Resume`}
+            />
+          </RiseIn>
+        ) : null}
+
+        {moreLive.map((entry) => (
+          <RiseIn key={entry.testID}>
+            <LiveNowCard
+              testID={entry.testID}
+              title={entry.title}
+              subtitle={entry.kind}
+              onPress={entry.onPress}
             />
           </RiseIn>
         ))}
 
         {showNextWorkout && nextPlan ? (
           <RiseIn>
-            <Card
-              hero
+            <FeedHeroCard
               testID="feed-next-workout"
+              eyebrow="Next Workout"
+              title={nextPlan.day.name}
+              muscles={nextPlan.day.muscleGroups.length > 0 ? musclesLabel(nextPlan.day) : null}
+              meta={
+                nextPlan.previousDayName
+                  ? `Up next after ${nextPlan.previousDayName}`
+                  : "Let's get started"
+              }
+              actionLabel="Start Workout"
               onPress={() => navigation.navigate('NewWorkout')}
               accessibilityLabel={`Next workout: ${nextPlan.day.name}${
                 nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
               }`}
-            >
-              <Text style={[styles.nextWorkoutEyebrow, { color: colors.textPrimary }]}>
-                Next Workout
-              </Text>
-              <Text style={[styles.nextWorkoutDayName, { color: colors.textPrimary }]}>
-                {nextPlan.day.name}
-              </Text>
-              {nextPlan.day.muscleGroups.length > 0 ? (
-                <Text style={[styles.nextWorkoutMuscles, { color: colors.textPrimary }]}>
-                  {musclesLabel(nextPlan.day)}
-                </Text>
-              ) : null}
-              <Text style={[styles.nextWorkoutMeta, { color: colors.textPrimary }]}>
-                {nextPlan.previousDayName
-                  ? `Up next after ${nextPlan.previousDayName}`
-                  : "Let's get started"}
-              </Text>
-              {/* The card is the one tap target (into NewWorkoutScreen, which
-                actually starts it); this is the real button, shown for the eye,
-                with its own touches off -- same convention as NewWorkoutScreen's
-                own hero card. A solid warm-cream pill with dark text, so it
-                reads as a real button against the photo rather than disappearing
-                into it. */}
-              <View
-                style={styles.nextWorkoutAction}
-                pointerEvents="none"
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-              >
-                <PrimaryButton
-                  label="Start Workout"
-                  onPress={() => undefined}
-                  accentColor={colors.heroAction}
-                  onAccentColor={colors.onAccent}
-                />
-              </View>
-            </Card>
+            />
           </RiseIn>
         ) : null}
 

@@ -171,7 +171,7 @@ function renderEditor() {
 }
 
 describe('GroupWorkoutEditor', () => {
-  it("shows your own range, all-time best and suggestion on your tab only -- never someone else's", async () => {
+  it("shows your own range and all-time best on your tab only -- never someone else's", async () => {
     mockFetchPrevious.mockImplementation(async (userId: string) => ({
       performedAt: '2026-10-01T09:00:00.000Z',
       sets: [
@@ -193,9 +193,9 @@ describe('GroupWorkoutEditor', () => {
     expect(screen.getByTestId('group-workout-exercise-squat-best')).toHaveTextContent(
       /All-Time Best.*120 kg × 5/,
     );
-    expect(await screen.findByTestId('group-workout-exercise-squat-cue')).toHaveTextContent(
-      /Keep your top set weight the same until you reach 6 reps/,
-    );
+    // 5 reps is short of 6: no message on last time.
+    await screen.findByTestId('group-workout-exercise-squat-previous-set-1');
+    expect(screen.queryByTestId('group-workout-exercise-squat-previous-set-1-flag')).toBeNull();
     fireEvent.press(screen.getByTestId('group-workout-exercise-squat-menu'));
     expect(screen.getByTestId('group-workout-exercise-squat-range')).toBeTruthy();
 
@@ -207,7 +207,6 @@ describe('GroupWorkoutEditor', () => {
     );
     expect(screen.queryByTestId('group-workout-rep-range')).toBeNull();
     expect(screen.queryByTestId('group-workout-exercise-squat-best')).toBeNull();
-    expect(screen.queryByTestId('group-workout-exercise-squat-cue')).toBeNull();
     expect(screen.queryByTestId('group-workout-exercise-squat-range')).toBeNull();
   });
 

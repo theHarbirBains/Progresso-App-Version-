@@ -17,6 +17,8 @@ import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
 } from '../workouts/workoutSplitQueries';
+import { rememberLiveWorkout } from '../feed/liveWorkoutMemory';
+import { forgetShown } from '../lib/lastShown';
 import { FeedScreen } from './FeedScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -145,6 +147,13 @@ function renderScreen() {
 }
 
 beforeEach(() => {
+  // What Feed last showed is kept in memory across a session; each test starts without it.
+  forgetShown();
+  // Nothing open unless a test says so (a test that opens groups or sessions mustn't leak them).
+  (jest.requireMock('../lib/api') as { listGroups: jest.Mock }).listGroups.mockResolvedValue([]);
+  (
+    jest.requireMock('../trainer/clientQueries') as { fetchMyOpenLiveSessions: jest.Mock }
+  ).fetchMyOpenLiveSessions.mockResolvedValue([]);
   mockUseAuth.mockReturnValue({
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
@@ -948,6 +957,61 @@ describe('FeedScreen live workout', () => {
     expect(await screen.findByTestId('feed-live-groups')).toHaveTextContent(/3 group workouts/);
     expect(screen.queryByTestId('feed-live-group-g1')).toBeNull();
     expect(screen.queryByTestId('feed-live-group-g2')).toBeNull();
+  });
+
+  it('is the hero while it is open: Workout in Progress, its name, and Resume Workout', async () => {
+    mockFetchActiveWorkout.mockResolvedValue({
+      id: 'live-1',
+      name: 'Leg Day',
+      performedAt: '2026-10-05T10:00:00Z',
+      completedAt: null,
+      workoutSplitDayId: null,
+    });
+    renderScreen();
+
+    const hero = await screen.findByTestId('feed-live-workout');
+    expect(hero).toHaveTextContent(/Workout in Progress.*Leg Day.*Your workout · started/);
+    expect(StyleSheet.flatten(hero.props.style).backgroundColor).toBeUndefined();
+    const button = screen.UNSAFE_getByType(PrimaryButton);
+    expect(button.props.label).toBe('Resume Workout');
+    expect(button.props.accentColor).toBe(colors.heroAction);
+  });
+
+  it('shows a workout going at once, from what the live workout noted, before its own check comes back', async () => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
+    mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
+    mockFetchActiveWorkout.mockReturnValue(new Promise(() => undefined));
+    rememberLiveWorkout('user-1', {
+      id: 'live-1',
+      name: 'Leg Day',
+      performedAt: '2026-10-05T10:00:00Z',
+      completedAt: null,
+      workoutSplitDayId: null,
+    });
+    renderScreen();
+
+    expect(screen.getByTestId('feed-live-workout')).toHaveTextContent(/Leg Day/);
+    await waitFor(() => expect(mockFetchWorkoutSplitDetail).toHaveBeenCalled());
+    expect(screen.queryByTestId('feed-next-workout')).toBeNull();
+  });
+
+  it("doesn't offer the next workout until it knows no workout is open", async () => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
+    mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
+    let settle: (value: null) => void = () => undefined;
+    mockFetchActiveWorkout.mockReturnValue(
+      new Promise((resolve) => {
+        settle = resolve;
+      }),
+    );
+    renderScreen();
+
+    await waitFor(() => expect(mockFetchWorkoutSplitDetail).toHaveBeenCalled());
+    expect(screen.queryByTestId('feed-next-workout')).toBeNull();
+    await act(async () => {
+      settle(null);
+    });
+    expect(await screen.findByTestId('feed-next-workout')).toBeTruthy();
   });
 
   it('replaces the next-workout widget with the live workout while one is open', async () => {

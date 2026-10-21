@@ -19,7 +19,6 @@ import {
   effectiveRepRange,
   formatRepRange,
   progressionForExercise,
-  wantsGuidance,
   type ProgressionSettings,
   type RepRange,
 } from './progression';
@@ -39,7 +38,7 @@ export interface LiveProgression {
     lastSessionSets: SetRecord[] | undefined,
   ) => Pick<
     ReturnType<typeof progressionForExercise>,
-    'allTimeBest' | 'progressionCue' | 'sessionCue'
+    'allTimeBest' | 'lastTimeFlags' | 'sessionCue'
   > & { ownRangeText: string | null; onEditProgression?: () => void };
   /** How many of these exercises have a range of their own. */
   ownRangeCount: (exercises: WorkoutExerciseWithSets[]) => number;
@@ -85,7 +84,6 @@ export function useLiveProgression({
   const settings: ProgressionSettings = {
     range: { min: profile?.repRangeMin ?? 8, max: profile?.repRangeMax ?? 12 },
     enabled: profile?.progressionCuesEnabled ?? true,
-    guided: wantsGuidance(profile?.trainingComfort ?? null),
     unit: weightUnit,
   };
 
@@ -180,7 +178,7 @@ export function useLiveProgression({
     cardPropsFor(exercise, lastSessionSets) {
       const type = measurementTypeOf(exercise);
       const own = ownRange(exercise);
-      const { allTimeBest, progressionCue, sessionCue } = progressionForExercise({
+      const { allTimeBest, lastTimeFlags, sessionCue } = progressionForExercise({
         exercise,
         lastSessionSets,
         settings,
@@ -191,7 +189,7 @@ export function useLiveProgression({
       });
       return {
         allTimeBest,
-        progressionCue,
+        lastTimeFlags,
         sessionCue,
         ownRangeText: own
           ? `Own range ${formatRepRange(effectiveRepRange(settings.range, own))}`

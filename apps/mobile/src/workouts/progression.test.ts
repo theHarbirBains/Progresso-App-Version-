@@ -1,15 +1,13 @@
 import {
   allTimeBest,
-  cuesEqual,
   defaultRepRange,
   effectiveRepRange,
   findWeightedVariant,
   formatRepRange,
-  nextSessionCue,
+  lastTimeFlags,
   progressionForExercise,
   thisSessionCue,
   topSetOf,
-  wantsGuidance,
 } from './progression';
 import type { SetRecord } from './workoutQueries';
 
@@ -52,11 +50,7 @@ describe('the starting range and guidance', () => {
     expect(defaultRepRange(null)).toEqual({ min: 8, max: 12 });
   });
 
-  it('explains suggestions only to people who asked for guidance', () => {
-    expect(wantsGuidance('still_learning')).toBe(true);
-    expect(wantsGuidance('knows_basics')).toBe(true);
-    expect(wantsGuidance('plans_and_progresses')).toBe(false);
-    expect(wantsGuidance(null)).toBe(false);
+  it('shows a range as "8–12"', () => {
     expect(formatRepRange({ min: 8, max: 12 })).toBe('8–12');
   });
 });
@@ -82,188 +76,64 @@ describe('the top set', () => {
   });
 });
 
-describe('next time, for a weighted exercise', () => {
-  it('says to increase the weight once the top set reaches the top of the range', () => {
-    const cue = nextSessionCue({
-      ...weighted,
-      guided: false,
-      lastSessionSets: lifts([50, 12], [50, 10]),
-    });
-    expect(cue).toEqual({
-      headline: 'Your top set hit 12 at 50 lb. Increase the weight today: try 55 lb.',
-      options: [],
-      detail: null,
-    });
-  });
-
-  it('counts going past the top too', () => {
-    const cue = nextSessionCue({ ...weighted, guided: false, lastSessionSets: lifts([50, 14]) });
-    expect(cue?.headline).toBe(
-      'Your top set hit 14 at 50 lb. Increase the weight today: try 55 lb.',
-    );
-  });
-
-  it('tells someone who wants guidance how to pick the new weight', () => {
-    const cue = nextSessionCue({ ...weighted, guided: true, lastSessionSets: lifts([50, 12]) });
-    expect(cue?.detail).toBe(
-      'Pick a weight you can lift for about 8 reps, then build back up to 12.',
-    );
-  });
-
-  it('says, in general, to keep the weight until the top of the range, even below its bottom', () => {
+describe("next time, on last time's sets", () => {
+  it('says to go up on each set that reached the top of the range, or beyond, by 5 lb', () => {
     expect(
-      nextSessionCue({ ...weighted, guided: false, lastSessionSets: lifts([55, 10]) })?.headline,
-    ).toBe(
-      "Keep your top set weight the same until you reach 12 reps, then we'll recommend your next increment.",
-    );
-    const belowRange = nextSessionCue({
-      ...weighted,
-      guided: true,
-      lastSessionSets: lifts([60, 7]),
-    });
-    expect(belowRange?.headline).toBe(
-      "Keep your top set weight the same until you reach 12 reps, then we'll recommend your next increment.",
-    );
-    expect(belowRange?.detail).toBe(
-      'Owning the top of your range before going heavier keeps your form and your progress steady.',
-    );
-    // Never "lighter", never a bad set.
-    expect(JSON.stringify(belowRange)).not.toMatch(/lighter|under|below|bad/i);
+      lastTimeFlags({ ...weighted, lastSessionSets: lifts([50, 12], [50, 10], [45, 14]) }),
+    ).toEqual({ 1: 'Hit 12! Go up to 55 lb today.', 3: 'Hit 14! Go up to 50 lb today.' });
   });
 
-  it('judges the top set, not a lighter set that happened to reach the top', () => {
-    const cue = nextSessionCue({
-      ...weighted,
-      guided: false,
-      lastSessionSets: lifts([45, 15], [55, 9]),
-    });
-    expect(cue?.headline).toMatch(/^Keep your top set weight the same until you reach 12 reps/);
+  it('says nothing about a set short of the top -- there is no increment to recommend yet', () => {
+    expect(lastTimeFlags({ ...weighted, lastSessionSets: lifts([60, 7], [60, 11]) })).toEqual({});
+  });
+
+  it('only counts completed sets', () => {
+    expect(
+      lastTimeFlags({
+        ...weighted,
+        lastSessionSets: [set({ weightKg: 50 * LB, reps: 12, completedAt: null })],
+      }),
+    ).toEqual({});
   });
 
   it('follows the range: 5-10 makes 10 the top', () => {
-    const cue = nextSessionCue({
-      ...weighted,
-      range: { min: 5, max: 10 },
-      guided: true,
-      lastSessionSets: lifts([100, 10]),
-    });
-    expect(cue?.headline).toBe(
-      'Your top set hit 10 at 100 lb. Increase the weight today: try 105 lb.',
-    );
-    expect(cue?.detail).toBe(
-      'Pick a weight you can lift for about 5 reps, then build back up to 10.',
-    );
+    expect(
+      lastTimeFlags({ ...weighted, range: { min: 5, max: 10 }, lastSessionSets: lifts([50, 10]) }),
+    ).toEqual({ 1: 'Hit 10! Go up to 55 lb today.' });
   });
 
-  it('needs both sides of a unilateral exercise at the top', () => {
-    const both = nextSessionCue({
-      ...weighted,
-      movementType: 'unilateral',
-      guided: false,
-      lastSessionSets: [
-        set({ side: 'left', weightKg: 25 * LB, reps: 12 }),
-        set({ side: 'right', weightKg: 25 * LB, reps: 12 }),
-      ],
-    });
-    expect(both?.headline).toBe(
-      'Your top set hit 12 on both sides at 25 lb. Increase the weight today: try 30 lb.',
-    );
-    const oneSide = nextSessionCue({
-      ...weighted,
-      movementType: 'unilateral',
-      guided: false,
-      lastSessionSets: [
-        set({ side: 'left', weightKg: 25 * LB, reps: 12 }),
-        set({ side: 'right', weightKg: 25 * LB, reps: 10 }),
-      ],
-    });
-    expect(oneSide?.headline).toBe(
-      "Keep your top set weight the same until you reach 12 reps on both sides, then we'll recommend your next increment.",
-    );
+  it('shows kilograms for a kg user, up 2.5 kg', () => {
+    expect(
+      lastTimeFlags({
+        ...weighted,
+        unit: 'kg',
+        lastSessionSets: [set({ weightKg: 100, reps: 12 })],
+      }),
+    ).toEqual({ 1: 'Hit 12! Go up to 102.5 kg today.' });
   });
 
-  it('shows kilograms for a kg user', () => {
-    const cue = nextSessionCue({
-      ...weighted,
-      unit: 'kg',
-      guided: false,
-      lastSessionSets: [set({ weightKg: 60, reps: 12 })],
-    });
-    expect(cue?.headline).toBe(
-      'Your top set hit 12 at 60 kg. Increase the weight today: try 62.5 kg.',
-    );
-  });
-
-  it('says nothing without a logged set', () => {
-    expect(nextSessionCue({ ...weighted, guided: false, lastSessionSets: [] })).toBeNull();
-  });
-});
-
-describe('next time, for a bodyweight exercise', () => {
-  const bodyweight = { ...weighted, measurementType: 'bodyweight' as const };
-
-  it('offers more reps and the weighted version once the best set reaches the top', () => {
-    const cue = nextSessionCue({
-      ...bodyweight,
-      guided: false,
-      weightedVariant: 'Weighted Pull-Up',
-      lastSessionSets: [set({ reps: 12 }), set({ reps: 9 })],
-    });
-    expect(cue).toEqual({
-      headline: 'Your best set hit 12 reps, the top of your range. Make it harder today:',
-      options: ['Add reps: go for 13 or more', 'Add weight: try Weighted Pull-Up'],
-      detail: null,
+  it('says to make a bodyweight exercise harder: the weighted version, or a rep more', () => {
+    const base = { ...weighted, measurementType: 'bodyweight' as const };
+    expect(
+      lastTimeFlags({
+        ...base,
+        weightedVariant: 'Weighted Pull-Up',
+        lastSessionSets: [set({ reps: 12 })],
+      }),
+    ).toEqual({ 1: 'Hit 12! Try Weighted Pull-Up today.' });
+    expect(lastTimeFlags({ ...base, lastSessionSets: [set({ reps: 13 })] })).toEqual({
+      1: 'Hit 13! Go for 14 today.',
     });
   });
 
-  it('offers more reps alone when there is no weighted version', () => {
-    const cue = nextSessionCue({
-      ...bodyweight,
-      guided: true,
-      lastSessionSets: [set({ reps: 15 })],
-    });
-    expect(cue?.options).toEqual(['Add reps: go for 16 or more']);
-    expect(cue?.detail).not.toBeNull();
-  });
-
-  it('says to work toward the top before then', () => {
-    const cue = nextSessionCue({
-      ...bodyweight,
-      guided: false,
-      lastSessionSets: [set({ reps: 9 })],
-    });
-    expect(cue?.headline).toBe(
-      "Keep building until your best set reaches 12 reps, then we'll recommend how to make it harder.",
-    );
-    expect(cue?.options).toEqual([]);
-  });
-});
-
-describe('next time, for a timed exercise', () => {
-  const timed = { ...weighted, measurementType: 'timed' as const };
-
-  it('asks for a new time: 5 seconds more under a minute', () => {
-    const cue = nextSessionCue({
-      ...timed,
-      guided: false,
-      lastSessionSets: [set({ durationSeconds: 45 }), set({ durationSeconds: 40 })],
-    });
-    expect(cue).toEqual({
-      headline: 'Last time: 0:45. Go for a new time today.',
-      options: ['Aim for 0:50 or more'],
-      detail: null,
-    });
-  });
-
-  it('10 seconds more from a minute up, and the weighted version when there is one', () => {
-    const cue = nextSessionCue({
-      ...timed,
-      guided: true,
-      weightedVariant: 'Weighted Plank',
-      lastSessionSets: [set({ durationSeconds: 90 })],
-    });
-    expect(cue?.options).toEqual(['Aim for 1:40 or more', 'Or add weight: try Weighted Plank']);
-    expect(cue?.detail).toMatch(/longer each time/);
+  it('says nothing for a timed exercise, which has no range', () => {
+    expect(
+      lastTimeFlags({
+        ...weighted,
+        measurementType: 'timed',
+        lastSessionSets: [set({ durationSeconds: 90 })],
+      }),
+    ).toEqual({});
   });
 });
 
@@ -412,16 +282,6 @@ describe('the weighted version', () => {
   });
 });
 
-describe('cuesEqual', () => {
-  it('compares cues by value', () => {
-    const a = { headline: 'x', options: ['a'], detail: null };
-    expect(cuesEqual(a, { ...a, options: ['a'] })).toBe(true);
-    expect(cuesEqual(a, { ...a, options: ['b'] })).toBe(false);
-    expect(cuesEqual(null, null)).toBe(true);
-    expect(cuesEqual(a, null)).toBe(false);
-  });
-});
-
 describe('progressionForExercise', () => {
   const exercise = {
     exerciseId: 'bench',
@@ -433,7 +293,7 @@ describe('progressionForExercise', () => {
   const base = {
     exercise,
     lastSessionSets: lifts([50, 12]),
-    settings: { range: { min: 8, max: 12 }, enabled: true, guided: false, unit: 'lb' as const },
+    settings: { range: { min: 8, max: 12 }, enabled: true, unit: 'lb' as const },
     repPRs: [
       {
         exerciseId: 'bench',
@@ -454,7 +314,7 @@ describe('progressionForExercise', () => {
     library: [],
   };
 
-  it("gives the card its all-time best, today's aim and today's own cue", () => {
+  it("gives the card its all-time best, last time's messages and today's own cue", () => {
     expect(progressionForExercise(base)).toEqual({
       allTimeBest: {
         measurementType: 'weight_reps',
@@ -463,11 +323,7 @@ describe('progressionForExercise', () => {
         durationSeconds: null,
         achievedAt: '2026-09-02T10:00:00.000Z',
       },
-      progressionCue: {
-        headline: 'Your top set hit 12 at 50 lb. Increase the weight today: try 55 lb.',
-        options: [],
-        detail: null,
-      },
+      lastTimeFlags: { 1: 'Hit 12! Go up to 55 lb today.' },
       sessionCue: 'Top of your range. Increase the weight next time.',
     });
   });
@@ -478,14 +334,14 @@ describe('progressionForExercise', () => {
       settings: { ...base.settings, enabled: false },
     });
     expect(result.allTimeBest?.reps).toBe(10);
-    expect(result.progressionCue).toBeNull();
+    expect(result.lastTimeFlags).toEqual({});
     expect(result.sessionCue).toBeNull();
   });
 
-  it('has no aim for today without a last session', () => {
-    expect(
-      progressionForExercise({ ...base, lastSessionSets: undefined }).progressionCue,
-    ).toBeNull();
+  it('has no messages without a last session', () => {
+    expect(progressionForExercise({ ...base, lastSessionSets: undefined }).lastTimeFlags).toEqual(
+      {},
+    );
   });
 });
 
@@ -501,24 +357,14 @@ describe('exercise-specific ranges and steps', () => {
   });
 
   it("goes heavier by the exercise's own step when it has one", () => {
-    const cue = nextSessionCue({
-      ...weighted,
-      guided: false,
-      incrementKg: 1.25,
-      unit: 'kg',
-      lastSessionSets: [
-        {
-          id: 's1',
-          setIndex: 1,
-          weightKg: 60,
-          reps: 12,
-          completedAt: '2026-01-01T00:00:00Z',
-        } as SetRecord,
-      ],
-    });
-    expect(cue?.headline).toBe(
-      'Your top set hit 12 at 60 kg. Increase the weight today: try 61.25 kg.',
-    );
+    expect(
+      lastTimeFlags({
+        ...weighted,
+        incrementKg: 1.25,
+        unit: 'kg',
+        lastSessionSets: [set({ weightKg: 60, reps: 12 })],
+      }),
+    ).toEqual({ 1: 'Hit 12! Go up to 61.25 kg today.' });
   });
 
   it("judges against the exercise's own range, top included, in the live workout", () => {
@@ -539,14 +385,12 @@ describe('exercise-specific ranges and steps', () => {
           completedAt: '2026-01-01T00:00:00Z',
         } as SetRecord,
       ],
-      settings: { range: { min: 8, max: 12 }, enabled: true, guided: false, unit: 'kg' },
+      settings: { range: { min: 8, max: 12 }, enabled: true, unit: 'kg' },
       repPRs: [],
       records: [],
       library: [],
       override: { range: { min: 3, max: 5 }, incrementKg: 5 },
     });
-    expect(result.progressionCue?.headline).toBe(
-      'Your top set hit 5 at 140 kg. Increase the weight today: try 145 kg.',
-    );
+    expect(result.lastTimeFlags).toEqual({ 1: 'Hit 5! Go up to 145 kg today.' });
   });
 });
