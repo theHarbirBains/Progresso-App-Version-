@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { View } from 'react-native';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
@@ -138,23 +138,26 @@ export function NutritionGoalsScreen({ navigation }: Props) {
   // An active phase with targets of its own is used in place of these while it's going.
   const { phaseName } = useDailyTargets();
 
-  const [draft, setDraft] = useState<TargetDraft | null>(null);
+  // What the person has typed; until they type, the fields are their saved targets.
+  const [edited, setEdited] = useState<TargetDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   const weightKg = profile?.weightValue ?? null;
 
-  // The saved targets fill the fields once, when they first arrive. After that the fields are the
-  // person's: a goals refresh (a save from here) never resets what they're typing.
-  useEffect(() => {
-    if (draft !== null || goalsLoading || profileLoading) return;
-    setDraft(draftFromTargets(goals ?? NO_TARGETS, weightKg, 'recommended'));
-  }, [draft, goals, goalsLoading, profileLoading, weightKg]);
+  // The fields show the saved targets -- worked out on this render, so they're there the moment
+  // the page is -- until the person types. From then on they're the person's: a goals refresh (a
+  // save from here) never resets what they're typing.
+  const draft =
+    edited ??
+    (goalsLoading || profileLoading
+      ? null
+      : draftFromTargets(goals ?? NO_TARGETS, weightKg, 'recommended'));
 
   function change(next: TargetDraft) {
     setSaved(false);
-    setDraft(next);
+    setEdited(next);
   }
 
   async function handleSave() {

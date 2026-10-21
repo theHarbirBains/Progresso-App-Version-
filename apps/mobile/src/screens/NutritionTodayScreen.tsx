@@ -206,7 +206,7 @@ export function NutritionTodayScreen({ navigation }: Props) {
   const header = (
     <AppHeader
       testID="nutrition-today-header"
-      title="Today"
+      title="Nutrition"
       leftAction={{
         icon: 'menu',
         onPress: () => openMenu(),

@@ -158,6 +158,15 @@ describe('NutritionTodayScreen', () => {
     await screen.findByTestId('food-log-empty');
   });
 
+  it('is titled Nutrition, like its tab', async () => {
+    renderScreen();
+
+    expect(
+      within(screen.getByTestId('nutrition-today-header')).getByText('Nutrition'),
+    ).toBeTruthy();
+    await screen.findByTestId('food-log-empty');
+  });
+
   it('shows an error message when loading fails', async () => {
     mockFetchTodaysFoodLogs.mockRejectedValue(new Error('network error'));
 
