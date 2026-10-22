@@ -1,3 +1,4 @@
+import type { MeasurementType } from '../exercises/movementTypes';
 import { supabase } from '../lib/supabase';
 import type { RepRange } from './progression';
 
@@ -7,12 +8,15 @@ import type { RepRange } from './progression';
 // changes a set, a record or a weight.
 //
 // Which range applies: this exercise's own, when set; otherwise the person's (Settings >
-// Workout Preferences). A range a trainer sets would sit above both once programs exist.
+// Workout Preferences). These are the person's "exceptions" to their range; their trainer can
+// set them too, through the API (trainerApi.ts), and they're the same rows either way.
 
 export interface ExerciseProgressionSetting {
   exerciseId: string;
   /** The exercise's name, for listing settings in Settings. */
   exerciseName: string;
+  /** What the exercise measures: only a weighted one has a weight step. */
+  measurementType: MeasurementType;
   range: RepRange | null;
   incrementKg: number | null;
 }
@@ -22,7 +26,10 @@ interface SettingDbRow {
   rep_range_min: number | null;
   rep_range_max: number | null;
   weight_increment_kg: string | number | null;
-  exercises: { name: string } | { name: string }[] | null;
+  exercises:
+    | { name: string; measurement_type: MeasurementType | null }
+    | { name: string; measurement_type: MeasurementType | null }[]
+    | null;
 }
 
 function toSetting(row: SettingDbRow): ExerciseProgressionSetting {
@@ -30,6 +37,7 @@ function toSetting(row: SettingDbRow): ExerciseProgressionSetting {
   return {
     exerciseId: row.exercise_id,
     exerciseName: exercise?.name ?? 'Exercise',
+    measurementType: exercise?.measurement_type ?? 'weight_reps',
     range:
       row.rep_range_min !== null && row.rep_range_max !== null
         ? { min: row.rep_range_min, max: row.rep_range_max }
@@ -38,7 +46,8 @@ function toSetting(row: SettingDbRow): ExerciseProgressionSetting {
   };
 }
 
-const COLUMNS = 'exercise_id, rep_range_min, rep_range_max, weight_increment_kg, exercises(name)';
+const COLUMNS =
+  'exercise_id, rep_range_min, rep_range_max, weight_increment_kg, exercises(name, measurement_type)';
 
 /** Every exercise the person has their own settings for, by exercise id. */
 export async function fetchExerciseSettings(

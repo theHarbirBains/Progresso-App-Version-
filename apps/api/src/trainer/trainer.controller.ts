@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Put,
+} from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/types/authenticated-request';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -7,6 +17,7 @@ import { AddClientDto } from './dto/add-client.dto';
 import { ClaimHistoryDto } from './dto/claim-history.dto';
 import { ResolveExerciseDto, StartLiveWorkoutDto } from './dto/live-session.dto';
 import { LogWorkoutDto } from './dto/log-workout.dto';
+import { ClientExerciseRangeDto, ClientRepRangeDto } from './dto/rep-ranges.dto';
 import { RespondTrainerRequestDto } from './dto/respond-trainer-request.dto';
 import { TrackClientDto } from './dto/track-client.dto';
 import { UpdateClientProfileDto } from './dto/update-client-profile.dto';
@@ -169,6 +180,55 @@ export class TrainerController {
     @Body() dto: ResolveExerciseDto,
   ) {
     return this.trainerService.resolveClientExercise(user.id, clientId, dto);
+  }
+
+  // A client's rep range and their exceptions to it, set by their trainer.
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Get('clients/:clientId/rep-ranges')
+  async clientRepRanges(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+  ) {
+    return this.trainerService.getClientRepRanges(user.id, clientId);
+  }
+
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Put('clients/:clientId/rep-range')
+  async setClientRepRange(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @Body() dto: ClientRepRangeDto,
+  ) {
+    return this.trainerService.setClientRepRange(user.id, clientId, dto);
+  }
+
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Put('clients/:clientId/rep-ranges/:exerciseId')
+  async setClientExerciseRange(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @Param('exerciseId', ParseUUIDPipe) exerciseId: string,
+    @Body() dto: ClientExerciseRangeDto,
+  ) {
+    return {
+      exception: await this.trainerService.setClientExerciseRange(
+        user.id,
+        clientId,
+        exerciseId,
+        dto,
+      ),
+    };
+  }
+
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Delete('clients/:clientId/rep-ranges/:exerciseId')
+  async clearClientExerciseRange(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @Param('exerciseId', ParseUUIDPipe) exerciseId: string,
+  ) {
+    await this.trainerService.clearClientExerciseRange(user.id, clientId, exerciseId);
+    return { ok: true };
   }
 
   // Attaches invites sent to this person's (confirmed) email. The app calls it at sign-in.

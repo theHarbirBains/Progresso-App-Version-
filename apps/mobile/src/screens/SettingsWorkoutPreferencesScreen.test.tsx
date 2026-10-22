@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { clearExerciseSetting, fetchExerciseSettings } from '../workouts/exerciseSettingsQueries';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fetchExerciseSettings } from '../workouts/exerciseSettingsQueries';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { updateMyProfile } from '../lib/api';
@@ -215,22 +215,14 @@ describe('SettingsWorkoutPreferencesScreen -- exercise ranges', () => {
         ],
       ]),
     );
-    (clearExerciseSetting as jest.Mock).mockReset().mockResolvedValue(undefined);
   });
 
-  it("lists the exercises with their own range, and takes one back to the person's", async () => {
+  it('counts the rep range exceptions, and opens their own page', async () => {
     renderScreen();
 
     await waitFor(() => expect(screen.getByTestId('open-exercise-ranges')).toHaveTextContent(/1/));
+    expect(screen.getByTestId('open-exercise-ranges')).toHaveTextContent(/Rep Range Exceptions/);
     fireEvent.press(screen.getByTestId('open-exercise-ranges'));
-    expect(screen.getByTestId('exercise-range-row-ex-1')).toHaveTextContent(/Deadlift/);
-    expect(screen.getByTestId('exercise-range-row-ex-1')).toHaveTextContent(/Range 3–5/);
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('exercise-range-reset-ex-1'));
-    });
-
-    expect(clearExerciseSetting).toHaveBeenCalledWith('user-1', 'ex-1');
-    expect(screen.getByTestId('exercise-ranges-empty')).toBeTruthy();
+    expect(navigation.navigate).toHaveBeenCalledWith('RepRangeExceptions');
   });
 });

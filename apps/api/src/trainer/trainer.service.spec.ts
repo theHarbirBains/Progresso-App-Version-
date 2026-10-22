@@ -26,6 +26,7 @@ const CHAIN_METHODS = [
   'update',
   'delete',
   'is',
+  'upsert',
 ] as const;
 
 /**
@@ -887,5 +888,176 @@ describe('TrainerService: cancelling a live session', () => {
     await expect(service.cancelLiveWorkout(TRAINER, CLIENT, WORKOUT)).rejects.toThrow(
       NotFoundException,
     );
+  });
+});
+
+describe("TrainerService: a client's rep ranges", () => {
+  const EXERCISE = '55555555-5555-4555-8555-555555555555';
+  const CLIENT_COPY = '66666666-6666-4666-8666-666666666666';
+  const activeLink = () => ok({ id: 'l1', status: 'active', source: 'linked' });
+
+  it('refuses a client who is not one of the trainer’s active clients', async () => {
+    const { mock, service } = setup();
+    mock.queue('subscriptions', activeTrainer());
+    mock.queue('trainer_clients', ok({ id: 'l1', status: 'pending', source: 'linked' }));
+
+    await expect(service.getClientRepRanges(TRAINER, CLIENT)).rejects.toThrow(ForbiddenException);
+    expect(mock.calls.some((c) => c.target === 'users')).toBe(false);
+  });
+
+  it("reads the client's range and their exceptions, by exercise name", async () => {
+    const { mock, service } = setup();
+    mock.queue('subscriptions', activeTrainer());
+    mock.queue('trainer_clients', activeLink());
+    mock.queue('users', ok({ rep_range_min: 6, rep_range_max: 10 }));
+    mock.queue(
+      'exercise_progression_settings',
+      ok([
+        {
+          exercise_id: 'e2',
+          rep_range_min: null,
+          rep_range_max: null,
+          weight_increment_kg: '1.25',
+          exercises: { name: 'Lateral Raise', measurement_type: 'weight_reps' },
+        },
+        {
+          exercise_id: 'e1',
+          rep_range_min: 3,
+          rep_range_max: 5,
+          weight_increment_kg: null,
+          exercises: { name: 'Deadlift', measurement_type: 'weight_reps' },
+        },
+      ]),
+    );
+
+    await expect(service.getClientRepRanges(TRAINER, CLIENT)).resolves.toEqual({
+      range: { min: 6, max: 10 },
+      exceptions: [
+        {
+          exerciseId: 'e1',
+          exerciseName: 'Deadlift',
+          measurementType: 'weight_reps',
+          range: { min: 3, max: 5 },
+          incrementKg: null,
+        },
+        {
+          exerciseId: 'e2',
+          exerciseName: 'Lateral Raise',
+          measurementType: 'weight_reps',
+          range: null,
+          incrementKg: 1.25,
+        },
+      ],
+    });
+  });
+
+  it("sets the client's own range and records it", async () => {
+    const { mock, service } = setup();
+    mock.queue('subscriptions', activeTrainer());
+    mock.queue('trainer_clients', activeLink());
+    mock.queue('users', ok());
+    mock.queue('trainer_actions', ok());
+
+    await expect(service.setClientRepRange(TRAINER, CLIENT, { min: 6, max: 10 })).resolves.toEqual({
+      min: 6,
+      max: 10,
+    });
+    const update = mock.calls.find((c) => c.target === 'users' && c.method === 'update');
+    expect(update?.args[0]).toEqual({ rep_range_min: 6, rep_range_max: 10 });
+    const audit = mock.calls.find((c) => c.target === 'trainer_actions' && c.method === 'insert');
+    expect(audit?.args[0]).toMatchObject({ action: 'client.rep_range_updated', client_id: CLIENT });
+  });
+
+  it('refuses a range whose bottom is above its top, before touching anything', async () => {
+    const { mock, service } = setup();
+
+    await expect(service.setClientRepRange(TRAINER, CLIENT, { min: 12, max: 8 })).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(
+      service.setClientExerciseRange(TRAINER, CLIENT, EXERCISE, { min: 5, max: null }),
+    ).rejects.toThrow(BadRequestException);
+    expect(mock.calls).toEqual([]);
+  });
+
+  it("saves an exception on the client's copy of the exercise, and records it", async () => {
+    const { mock, service } = setup();
+    mock.queue('subscriptions', activeTrainer());
+    mock.queue('trainer_clients', activeLink());
+    mock.queueRpc('resolve_client_exercise', ok(CLIENT_COPY));
+    mock.queue(
+      'exercise_progression_settings',
+      ok({
+        exercise_id: CLIENT_COPY,
+        rep_range_min: 3,
+        rep_range_max: 5,
+        weight_increment_kg: '2.5',
+        exercises: { name: 'Deadlift' },
+      }),
+    );
+    mock.queue('trainer_actions', ok());
+
+    await expect(
+      service.setClientExerciseRange(TRAINER, CLIENT, EXERCISE, {
+        min: 3,
+        max: 5,
+        incrementKg: 2.5,
+      }),
+    ).resolves.toEqual({
+      exerciseId: CLIENT_COPY,
+      exerciseName: 'Deadlift',
+      measurementType: 'weight_reps',
+      range: { min: 3, max: 5 },
+      incrementKg: 2.5,
+    });
+    const resolve = mock.calls.find((c) => c.target === 'rpc:resolve_client_exercise');
+    expect(resolve?.args[0]).toEqual({
+      p_trainer: TRAINER,
+      p_client: CLIENT,
+      p_exercise: EXERCISE,
+    });
+    const upsert = mock.calls.find((c) => c.method === 'upsert');
+    expect(upsert?.args[0]).toEqual({
+      user_id: CLIENT,
+      exercise_id: CLIENT_COPY,
+      rep_range_min: 3,
+      rep_range_max: 5,
+      weight_increment_kg: 2.5,
+    });
+    const audit = mock.calls.find((c) => c.target === 'trainer_actions' && c.method === 'insert');
+    expect(audit?.args[0]).toMatchObject({
+      action: 'client.exercise_range_updated',
+      target_id: CLIENT_COPY,
+    });
+  });
+
+  it('removes the exception when neither a range nor a step is given', async () => {
+    const { mock, service } = setup();
+    mock.queue('subscriptions', activeTrainer());
+    mock.queue('trainer_clients', activeLink());
+    mock.queueRpc('resolve_client_exercise', ok(CLIENT_COPY));
+    mock.queue('exercise_progression_settings', ok());
+    mock.queue('trainer_actions', ok());
+
+    await expect(service.setClientExerciseRange(TRAINER, CLIENT, EXERCISE, {})).resolves.toBeNull();
+    expect(mock.calls.some((c) => c.method === 'upsert')).toBe(false);
+    const remove = mock.calls.find(
+      (c) => c.target === 'exercise_progression_settings' && c.method === 'delete',
+    );
+    expect(remove).toBeTruthy();
+    const audit = mock.calls.find((c) => c.target === 'trainer_actions' && c.method === 'insert');
+    expect(audit?.args[0]).toMatchObject({ action: 'client.exercise_range_cleared' });
+  });
+
+  it("says plainly when the exercise isn't one the client can have", async () => {
+    const { mock, service } = setup();
+    mock.queue('subscriptions', activeTrainer());
+    mock.queue('trainer_clients', activeLink());
+    mock.queueRpc('resolve_client_exercise', ok(CLIENT_COPY));
+    mock.queue('exercise_progression_settings', fail('exercise not available'));
+
+    await expect(
+      service.setClientExerciseRange(TRAINER, CLIENT, EXERCISE, { min: 3, max: 5 }),
+    ).rejects.toThrow(BadRequestException);
   });
 });

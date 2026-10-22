@@ -15,9 +15,61 @@ import type { AddClientDto } from './dto/add-client.dto';
 import type { TrackClientDto } from './dto/track-client.dto';
 import type { ResolveExerciseDto, StartLiveWorkoutDto } from './dto/live-session.dto';
 import type { LogWorkoutDto } from './dto/log-workout.dto';
+import type { ClientExerciseRangeDto, ClientRepRangeDto } from './dto/rep-ranges.dto';
 import type { UpdateClientProfileDto } from './dto/update-client-profile.dto';
 
 export type TrainerLinkStatus = 'pending' | 'active' | 'ended';
+
+export interface RepRange {
+  min: number;
+  max: number;
+}
+
+/** One exercise a client trains outside their range: its own range and/or weight step. */
+export interface ClientRangeException {
+  exerciseId: string;
+  exerciseName: string;
+  /** What the exercise measures: only a weighted one has a weight step. */
+  measurementType: 'weight_reps' | 'bodyweight' | 'timed';
+  range: RepRange | null;
+  incrementKg: number | null;
+}
+
+/** A client's rep range (null when they have none set) and their exceptions to it. */
+export interface ClientRepRanges {
+  range: RepRange | null;
+  exceptions: ClientRangeException[];
+}
+
+interface ExceptionRow {
+  exercise_id: string;
+  rep_range_min: number | null;
+  rep_range_max: number | null;
+  weight_increment_kg: string | number | null;
+  exercises: ExceptionExercise | ExceptionExercise[] | null;
+}
+
+interface ExceptionExercise {
+  name: string;
+  measurement_type: ClientRangeException['measurementType'] | null;
+}
+
+const EXCEPTION_COLUMNS =
+  'exercise_id, rep_range_min, rep_range_max, weight_increment_kg, exercises(name, measurement_type)';
+
+function toException(row: ExceptionRow): ClientRangeException {
+  const exercise = Array.isArray(row.exercises) ? row.exercises[0] : row.exercises;
+  return {
+    exerciseId: row.exercise_id,
+    exerciseName: exercise?.name ?? 'Exercise',
+    measurementType: exercise?.measurement_type ?? 'weight_reps',
+    range:
+      row.rep_range_min !== null && row.rep_range_max !== null
+        ? { min: row.rep_range_min, max: row.rep_range_max }
+        : null,
+    incrementKg: row.weight_increment_kg === null ? null : Number(row.weight_increment_kg),
+  };
+}
 export type TrainerLinkSource = 'managed' | 'linked';
 
 export interface TrainerClientSummary {
@@ -910,6 +962,162 @@ export class TrainerService {
     });
     if (error) throw this.mapLogError(error.message);
     return { exerciseId: data as string };
+  }
+
+  // ---- rep ranges ------------------------------------------------------------
+  //
+  // A trainer sets an active client's own rep range and exceptions -- the same settings the
+  // client sees and can change themselves (users.rep_range_min/max and
+  // exercise_progression_settings), so the app treats them exactly as the client's own. Any
+  // active link, managed or linked. Every change is recorded in trainer_actions.
+
+  /** The client's rep range and their exceptions to it. */
+  async getClientRepRanges(trainerId: string, clientId: string): Promise<ClientRepRanges> {
+    await this.assertTrainer(trainerId);
+    await this.assertActiveLink(trainerId, clientId);
+    const db = this.supabaseService.getClient();
+    const { data: profile, error: profileError } = await db
+      .from('users')
+      .select('rep_range_min, rep_range_max')
+      .eq('id', clientId)
+      .maybeSingle();
+    if (profileError) throw new InternalServerErrorException('Failed to load the client range');
+    const { data: rows, error: rowsError } = await db
+      .from('exercise_progression_settings')
+      .select(EXCEPTION_COLUMNS)
+      .eq('user_id', clientId);
+    if (rowsError) throw new InternalServerErrorException('Failed to load the client exceptions');
+    const min = (profile as { rep_range_min: number | null } | null)?.rep_range_min ?? null;
+    const max = (profile as { rep_range_max: number | null } | null)?.rep_range_max ?? null;
+    return {
+      range: min !== null && max !== null ? { min, max } : null,
+      exceptions: ((rows ?? []) as unknown as ExceptionRow[])
+        .map(toException)
+        .sort((a, b) => a.exerciseName.localeCompare(b.exerciseName)),
+    };
+  }
+
+  /** Sets the client's own rep range. */
+  async setClientRepRange(
+    trainerId: string,
+    clientId: string,
+    dto: ClientRepRangeDto,
+  ): Promise<RepRange> {
+    if (dto.min > dto.max) {
+      throw new BadRequestException("The bottom of the range can't be above the top");
+    }
+    await this.assertTrainer(trainerId);
+    await this.assertActiveLink(trainerId, clientId);
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('users')
+      .update({ rep_range_min: dto.min, rep_range_max: dto.max })
+      .eq('id', clientId);
+    if (error) throw new InternalServerErrorException('Failed to save the client range');
+    await this.audit(trainerId, clientId, 'client.rep_range_updated', 'users', clientId, {
+      min: dto.min,
+      max: dto.max,
+    });
+    return { min: dto.min, max: dto.max };
+  }
+
+  /**
+   * Sets one exercise's exception for the client: its own range and/or weight step. The exercise
+   * may be the trainer's own -- the client's copy of it is used (made if needed), as in a live
+   * session. With neither a range nor a step, the exception is removed. Returns what's saved
+   * (with the client's exercise id), or null once removed.
+   */
+  async setClientExerciseRange(
+    trainerId: string,
+    clientId: string,
+    exerciseId: string,
+    dto: ClientExerciseRangeDto,
+  ): Promise<ClientRangeException | null> {
+    const min = dto.min ?? null;
+    const max = dto.max ?? null;
+    const incrementKg = dto.incrementKg ?? null;
+    if ((min === null) !== (max === null)) {
+      throw new BadRequestException('A range needs both a bottom and a top');
+    }
+    if (min !== null && max !== null && min > max) {
+      throw new BadRequestException("The bottom of the range can't be above the top");
+    }
+    await this.assertTrainer(trainerId);
+    await this.assertActiveLink(trainerId, clientId);
+    const db = this.supabaseService.getClient();
+    const { data: resolved, error: resolveError } = await db.rpc('resolve_client_exercise', {
+      p_trainer: trainerId,
+      p_client: clientId,
+      p_exercise: exerciseId,
+    });
+    if (resolveError) throw this.mapLogError(resolveError.message);
+    const clientExerciseId = resolved as string;
+
+    if (min === null && incrementKg === null) {
+      await this.removeClientException(trainerId, clientId, clientExerciseId);
+      return null;
+    }
+    const { data, error } = await db
+      .from('exercise_progression_settings')
+      .upsert(
+        {
+          user_id: clientId,
+          exercise_id: clientExerciseId,
+          rep_range_min: min,
+          rep_range_max: max,
+          weight_increment_kg: incrementKg,
+        },
+        { onConflict: 'user_id,exercise_id' },
+      )
+      .select(EXCEPTION_COLUMNS)
+      .single();
+    if (error) {
+      throw /not available/.test(error.message)
+        ? new BadRequestException("That exercise isn't available to this client")
+        : new InternalServerErrorException('Failed to save the exception');
+    }
+    await this.audit(
+      trainerId,
+      clientId,
+      'client.exercise_range_updated',
+      'exercise_progression_settings',
+      clientExerciseId,
+      { min, max, incrementKg },
+    );
+    return toException(data as unknown as ExceptionRow);
+  }
+
+  /** Takes one exercise back to the client's own range and the default step. */
+  async clearClientExerciseRange(
+    trainerId: string,
+    clientId: string,
+    exerciseId: string,
+  ): Promise<void> {
+    await this.assertTrainer(trainerId);
+    await this.assertActiveLink(trainerId, clientId);
+    await this.removeClientException(trainerId, clientId, exerciseId);
+  }
+
+  private async removeClientException(
+    trainerId: string,
+    clientId: string,
+    exerciseId: string,
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('exercise_progression_settings')
+      .delete()
+      .eq('user_id', clientId)
+      .eq('exercise_id', exerciseId);
+    if (error) throw new InternalServerErrorException('Failed to remove the exception');
+    await this.audit(
+      trainerId,
+      clientId,
+      'client.exercise_range_cleared',
+      'exercise_progression_settings',
+      exerciseId,
+      {},
+    );
   }
 
   // ---- internals -----------------------------------------------------------

@@ -264,3 +264,72 @@ export function resolveClientExercise(
     { method: 'POST', body: JSON.stringify({ exerciseId }) },
   );
 }
+
+export interface ClientRepRange {
+  min: number;
+  max: number;
+}
+
+/** One exercise a client trains outside their range. */
+export interface ClientRangeException {
+  exerciseId: string;
+  exerciseName: string;
+  measurementType: 'weight_reps' | 'bodyweight' | 'timed';
+  range: ClientRepRange | null;
+  incrementKg: number | null;
+}
+
+/** A client's rep range (null with none set) and their exceptions to it. */
+export interface ClientRepRanges {
+  range: ClientRepRange | null;
+  exceptions: ClientRangeException[];
+}
+
+/** A client's rep range and exceptions, for their trainer to set. */
+export function getClientRepRanges(
+  accessToken: string,
+  clientId: string,
+): Promise<ClientRepRanges> {
+  return request<ClientRepRanges>(
+    `/api/v1/trainer/clients/${encodeURIComponent(clientId)}/rep-ranges`,
+    accessToken,
+  );
+}
+
+/** Sets a client's own rep range. */
+export function setClientRepRange(
+  accessToken: string,
+  clientId: string,
+  range: ClientRepRange,
+): Promise<ClientRepRange> {
+  return request<ClientRepRange>(
+    `/api/v1/trainer/clients/${encodeURIComponent(clientId)}/rep-range`,
+    accessToken,
+    { method: 'PUT', body: JSON.stringify(range) },
+  );
+}
+
+/**
+ * Sets one exercise's exception for a client (the client's copy of a trainer's exercise is
+ * used). With neither a range nor a step it's removed, and null comes back.
+ */
+export async function setClientExerciseRange(
+  accessToken: string,
+  clientId: string,
+  exerciseId: string,
+  setting: { range: ClientRepRange | null; incrementKg: number | null },
+): Promise<ClientRangeException | null> {
+  const { exception } = await request<{ exception: ClientRangeException | null }>(
+    `/api/v1/trainer/clients/${encodeURIComponent(clientId)}/rep-ranges/${encodeURIComponent(exerciseId)}`,
+    accessToken,
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        min: setting.range?.min ?? null,
+        max: setting.range?.max ?? null,
+        incrementKg: setting.incrementKg,
+      }),
+    },
+  );
+  return exception;
+}

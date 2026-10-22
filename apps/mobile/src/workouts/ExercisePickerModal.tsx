@@ -29,7 +29,8 @@ interface Props {
    * convention NewWorkoutScreen already used. */
   alreadyAddedIds: string[];
   /** Opens the Create Custom Exercise flow without leaving this picker. */
-  onCreateCustom: () => void;
+  /** Offers "Create Custom Exercise" at the top of the list; left out, it isn't offered. */
+  onCreateCustom?: () => void;
   /** Defaults to the static brand accent -- pass the user's Workout accent. */
   accentColor?: string;
   onAccentColor?: string;
@@ -153,14 +154,16 @@ export function ExercisePickerModal({
             onSelectRow={onSelect}
             onPhotoPress={(exercise) => setPhotoOpen(exercise.photoUrl)}
             listHeader={
-              <ListRow
-                testID="exercise-picker-create-custom"
-                icon="plus"
-                title="Create Custom Exercise"
-                subtitle="Can't find the exercise? Create your own."
-                onPress={onCreateCustom}
-                accessibilityLabel="Create Custom Exercise. Can't find the exercise? Create your own."
-              />
+              onCreateCustom ? (
+                <ListRow
+                  testID="exercise-picker-create-custom"
+                  icon="plus"
+                  title="Create Custom Exercise"
+                  subtitle="Can't find the exercise? Create your own."
+                  onPress={onCreateCustom}
+                  accessibilityLabel="Create Custom Exercise. Can't find the exercise? Create your own."
+                />
+              ) : undefined
             }
             testID="exercise-picker"
           />

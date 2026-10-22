@@ -31,6 +31,8 @@ interface Props {
   onClose: () => void;
   accentColor: string;
   onAccentColor: string;
+  /** Whose range the exercise otherwise follows: "My Range", or a client's for their trainer. */
+  personalLabel?: string;
 }
 
 /**
@@ -53,6 +55,7 @@ export function ExerciseProgressionSheet({
   onClose,
   accentColor,
   onAccentColor,
+  personalLabel = 'My Range',
 }: Props) {
   const [source, setSource] = useState<Source>('personal');
   const [range, setRange] = useState<RepRange>(personalRange);
@@ -102,7 +105,7 @@ export function ExerciseProgressionSheet({
         <SegmentedControl
           testID="exercise-progression-source"
           options={[
-            { label: `My Range (${formatRepRange(personalRange)})`, value: 'personal' },
+            { label: `${personalLabel} (${formatRepRange(personalRange)})`, value: 'personal' },
             { label: 'Its Own', value: 'own' },
           ]}
           value={source}

@@ -37,6 +37,7 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   AccountSettings: 'you',
   SettingsPersonalInfo: 'you',
   SettingsWorkoutPreferences: 'you',
+  RepRangeExceptions: 'you',
   SettingsNutrition: 'you',
   SettingsNotifications: 'you',
   SettingsAccountSecurity: 'you',
@@ -47,6 +48,7 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   // The Trainer Workspace's pages, under its own three tabs.
   TrainerClients: 'clients',
   TrainerClientDetail: 'clients',
+  TrainerClientRepRanges: 'clients',
   TrainerClientForm: 'clients',
   TrainerEditClient: 'clients',
   TrainerClaimCode: 'clients',

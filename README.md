@@ -33,7 +33,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 - Create, edit, view, duplicate, and delete workout splits, including a set of built-in split presets (e.g. Push/Pull/Legs) that can be copied into an editable, user-owned split
 - Live workout tracking: log exercises, sets, reps, and weight (or reps alone for a bodyweight exercise, or a time like 45 or 1:30 for a timed one) against a split in progress, with a running workout timer; each exercise is its own widget -- its photo (tap for full size), its all-time best with the date, last time's top set, and last time's sets in a carousel that moves on by itself and can be swiped -- above today's sets
-- Progressive overload: one rep range for all your workouts (Settings › Workout Preferences). When a set reaches the top of the range, the next time you do that exercise its slide in Last Time's Sets says to go up ("Hit 10! Go up to 77.5 lb today."); a bodyweight exercise is told to add a rep or try the weighted version. Short of the top, nothing is said. Your rep range shows once at the top of the live workout, where it can be changed; an exercise can have its own, from its menu. Suggestions only, never automatic, and they can be turned off
+- Progressive overload: one rep range for all your workouts (Settings › Workout Preferences). When a set reaches the top of the range, the next time you do that exercise its slide in Last Time's Sets says to go up ("Hit 10! Go up to 77.5 lb today."); a bodyweight exercise is told to add a rep or try the weighted version. Short of the top, nothing is said. Your rep range shows once at the top of the live workout, where it can be changed; exercises trained outside it -- exceptions, with their own range or weight step -- are set from an exercise's menu or Settings › Workout Preferences › Rep Range Exceptions. Suggestions only, never automatic, and they can be turned off
 - New sets start filled in from the set before them, or the same set from last session, ready to edit; a set only completes when you tap it
 - Unilateral exercises are logged per side, left and right
 - Group workouts: start a group before the workout begins (Start Workout › Working Out as a Group); each person has their own tab of sets, and anyone in the group can enter them
@@ -64,6 +64,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Trainer mode**
 
+- Trainers set an active client's rep range and their exceptions (exercises trained outside it) from the client's page -- the same settings the client sees
 - Trainers switch between My Workspace and a Trainer Workspace (a switcher at the top of Feed) with its own bottom tabs -- Clients, Activity (every client's latest workouts in one feed) and Sessions (live sessions to resume, and Start / Log for each client) -- where they manage clients, log workouts for them and run live sessions, behind a "trainer" entitlement; there's no in-app purchase for it yet, so it's switched on by hand during internal testing (`supabase/dev/trainer-access.sql`)
 
 **Settings**

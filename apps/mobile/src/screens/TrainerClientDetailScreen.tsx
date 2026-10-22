@@ -557,6 +557,18 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
             }}
           />
         ) : null}
+        {client && client.status === 'active' ? (
+          <ListRow
+            testID="trainer-client-rep-ranges"
+            title="Rep Ranges"
+            subtitle="Their range, and exercises outside it"
+            divider={!liveSession}
+            onPress={() => {
+              setManageOpen(false);
+              navigation.navigate('TrainerClientRepRanges', { clientId, clientName: title });
+            }}
+          />
+        ) : null}
         {client?.source === 'managed' ? (
           <ListRow
             testID="trainer-client-edit"

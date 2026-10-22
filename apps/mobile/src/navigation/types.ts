@@ -12,6 +12,8 @@ export type RootStackParamList = {
   AccountSettings: undefined;
   SettingsPersonalInfo: undefined;
   SettingsWorkoutPreferences: undefined;
+  /** The person's rep range and the exercises they train outside it. */
+  RepRangeExceptions: undefined;
   SettingsNutrition: undefined;
   SettingsNotifications: undefined;
   SettingsAccountSecurity: undefined;
@@ -40,6 +42,8 @@ export type RootStackParamList = {
   /** The same form as TrainerClientForm, editing one managed client's details. */
   TrainerEditClient: { clientId: string };
   TrainerClientDetail: { clientId: string; clientName?: string };
+  /** A client's rep range and exceptions, set by their trainer. */
+  TrainerClientRepRanges: { clientId: string; clientName?: string };
   /** The Trainer Workspace's Activity tab: every client's latest finished workouts, newest first. */
   TrainerActivity: undefined;
   /** The Trainer Workspace's Sessions tab: live sessions to resume, and Start / Log for each client. */

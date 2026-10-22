@@ -93,6 +93,8 @@ import { SettingsNutritionScreen } from './src/screens/SettingsNutritionScreen';
 import { SettingsPersonalInfoScreen } from './src/screens/SettingsPersonalInfoScreen';
 import { SettingsSupportScreen } from './src/screens/SettingsSupportScreen';
 import { SettingsWorkoutPreferencesScreen } from './src/screens/SettingsWorkoutPreferencesScreen';
+import { RepRangeExceptionsScreen } from './src/screens/RepRangeExceptionsScreen';
+import { TrainerClientRepRangesScreen } from './src/screens/TrainerClientRepRangesScreen';
 import { ShareWorkoutScreen } from './src/screens/ShareWorkoutScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { WorkoutDetailScreen } from './src/screens/WorkoutDetailScreen';
@@ -363,6 +365,7 @@ function Root() {
                     name="SettingsWorkoutPreferences"
                     component={SettingsWorkoutPreferencesScreen}
                   />
+                  <Stack.Screen name="RepRangeExceptions" component={RepRangeExceptionsScreen} />
                   <Stack.Screen name="SettingsNutrition" component={SettingsNutritionScreen} />
                   <Stack.Screen
                     name="SettingsNotifications"
@@ -422,6 +425,10 @@ function Root() {
                   <Stack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
                   <Stack.Screen name="TrainerEditClient" component={TrainerClientFormScreen} />
                   <Stack.Screen name="TrainerClientDetail" component={TrainerClientDetailScreen} />
+                  <Stack.Screen
+                    name="TrainerClientRepRanges"
+                    component={TrainerClientRepRangesScreen}
+                  />
                   <Stack.Screen name="TrainerActivity" component={TrainerActivityScreen} />
                   <Stack.Screen name="TrainerSessions" component={TrainerSessionsScreen} />
                   <Stack.Screen name="FindPeople" component={FindPeopleScreen} />

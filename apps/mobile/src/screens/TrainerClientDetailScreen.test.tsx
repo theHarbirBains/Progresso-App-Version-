@@ -186,6 +186,19 @@ describe('TrainerClientDetailScreen', () => {
     });
   });
 
+  it("opens the client's rep ranges from the menu, for any active client", async () => {
+    mockListTrainerClients.mockResolvedValue([{ ...client, source: 'linked' }]);
+    renderDetail();
+
+    fireEvent.press(await screen.findByTestId('trainer-client-manage'));
+    fireEvent.press(await screen.findByTestId('trainer-client-rep-ranges'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('TrainerClientRepRanges', {
+      clientId: 'client-1',
+      clientName: 'Sam',
+    });
+  });
+
   it('offers editing only for a managed client, from the menu', async () => {
     mockListTrainerClients.mockResolvedValue([{ ...client, source: 'linked' }]);
     renderDetail();

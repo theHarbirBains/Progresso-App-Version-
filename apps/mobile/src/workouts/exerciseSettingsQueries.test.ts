@@ -42,7 +42,7 @@ const row = {
   rep_range_min: 3,
   rep_range_max: 5,
   weight_increment_kg: '2.50',
-  exercises: { name: 'Deadlift' },
+  exercises: { name: 'Deadlift', measurement_type: 'weight_reps' },
 };
 
 describe('fetchExerciseSettings', () => {
@@ -59,6 +59,7 @@ describe('fetchExerciseSettings', () => {
     expect(settings.get('ex-1')).toEqual({
       exerciseId: 'ex-1',
       exerciseName: 'Deadlift',
+      measurementType: 'weight_reps',
       range: { min: 3, max: 5 },
       incrementKg: 2.5,
     });
