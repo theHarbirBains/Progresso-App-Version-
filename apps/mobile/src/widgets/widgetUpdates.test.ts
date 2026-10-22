@@ -120,7 +120,7 @@ describe('updating the widgets', () => {
       expect.objectContaining({ signedIn: false, title: '' }),
     );
     expect(stepsWidget.updateSnapshot).toHaveBeenCalledWith(
-      expect.objectContaining({ signedIn: false, steps: null }),
+      expect.objectContaining({ signedIn: false, caption: '' }),
     );
     expect(card.end).toHaveBeenCalledWith('immediate');
   });

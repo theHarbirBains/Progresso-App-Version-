@@ -4,13 +4,18 @@ import type { NutritionGoalValues, NutritionTotals } from '../nutrition/nutritio
 // own little runtime outside the app (expo-widgets), sees only these props, and can't import
 // anything -- so every figure arrives here already worded and rounded, and the widget just lays
 // it out. Built in the app from what it already has; nothing here is fetched for a widget alone.
+//
+// No prop is ever null: expo-widgets keeps a widget's props in iOS's shared UserDefaults, which
+// only holds property-list values, and a null there (it arrives as NSNull) raises an exception
+// that kills the app outright -- builds 28 and 29 did exactly that. Something that isn't known is
+// left out instead, and plistSafe strips anything else unsafe on the way out.
 
 /** One of Today's Nutrition's macros: "92 / 180 g", and how far along it is when it has a target. */
 export interface WidgetMacro {
   label: string;
   amount: string;
-  /** 0-1, or null when there's no target to measure it against. */
-  progress: number | null;
+  /** 0-1; absent when there's no target to measure it against. */
+  progress?: number;
 }
 
 export interface NutritionWidgetProps {
@@ -19,8 +24,8 @@ export interface NutritionWidgetProps {
   calories: string;
   /** "cal left", "cal over" or "cal eaten". */
   caption: string;
-  /** Calories eaten against the target, 0-1, or null with no target. */
-  progress: number | null;
+  /** Calories eaten against the target, 0-1; absent with no target. */
+  progress?: number;
   macros: WidgetMacro[];
 }
 
@@ -39,8 +44,8 @@ export interface NextWorkoutWidgetProps {
 
 export interface StepsWidgetProps {
   signedIn: boolean;
-  /** Today's steps, or null when they aren't known for the day shown. */
-  steps: string | null;
+  /** Today's steps; absent when they aren't known for the day shown. */
+  steps?: string;
   /** "As of 3:42 PM", or what to do to see them. */
   caption: string;
 }
@@ -58,7 +63,6 @@ export const SIGNED_OUT_NUTRITION: NutritionWidgetProps = {
   signedIn: false,
   calories: '',
   caption: '',
-  progress: null,
   macros: [],
 };
 
@@ -71,7 +75,7 @@ export const SIGNED_OUT_NEXT_WORKOUT: NextWorkoutWidgetProps = {
   url: 'progresso://feed',
 };
 
-export const SIGNED_OUT_STEPS: StepsWidgetProps = { signedIn: false, steps: null, caption: '' };
+export const SIGNED_OUT_STEPS: StepsWidgetProps = { signedIn: false, caption: '' };
 
 const NOTHING_EATEN: NutritionTotals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
 
@@ -79,16 +83,17 @@ function whole(value: number): string {
   return Math.round(value).toLocaleString();
 }
 
-function share(eaten: number, target: number | null): number | null {
-  if (target === null || target <= 0) return null;
-  return Math.min(1, Math.max(0, eaten / target));
+/** How far along, 0-1, as a prop: `{ progress }`, or nothing at all without a target. */
+function share(eaten: number, target: number | null): { progress?: number } {
+  if (target === null || target <= 0) return {};
+  return { progress: Math.min(1, Math.max(0, eaten / target)) };
 }
 
 function macro(label: string, eaten: number, target: number | null): WidgetMacro {
   return {
     label,
     amount: target === null ? `${whole(eaten)} g` : `${whole(eaten)} / ${whole(target)} g`,
-    progress: share(eaten, target),
+    ...share(eaten, target),
   };
 }
 
@@ -102,7 +107,7 @@ export function nutritionWidgetProps(
     signedIn: true,
     calories: whole(left === null ? eaten.calories : Math.abs(left)),
     caption: left === null ? 'cal eaten' : Math.round(left) < 0 ? 'cal over' : 'cal left',
-    progress: share(eaten.calories, targets.calories),
+    ...share(eaten.calories, targets.calories),
     macros: [
       macro('Protein', eaten.proteinG, targets.proteinG),
       macro('Carbs', eaten.carbsG, targets.carbsG),
@@ -140,13 +145,47 @@ export function stepsTimeline(
 ): { date: Date; props: StepsWidgetProps }[] {
   const today: StepsWidgetProps =
     steps === null
-      ? { signedIn: true, steps: null, caption: 'Connect Apple Health in Progresso' }
+      ? { signedIn: true, caption: 'Connect Apple Health in Progresso' }
       : { signedIn: true, steps: whole(steps), caption: `As of ${clockTime(now)}` };
   return [
     { date: now, props: today },
-    {
-      date: nextMidnight(now),
-      props: { signedIn: true, steps: null, caption: 'Open Progresso to update' },
-    },
+    { date: nextMidnight(now), props: { signedIn: true, caption: 'Open Progresso to update' } },
   ];
+}
+
+/**
+ * Props made safe for iOS's UserDefaults, where expo-widgets keeps them: null and undefined
+ * values and non-finite numbers are left out of plain objects and arrays alike (a null there
+ * would crash the app -- see the top of this file). Strings, finite numbers, booleans, arrays and
+ * plain objects pass through; anything else (a Date) is left as it is.
+ */
+export function plistSafe<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.filter(isKept).map((item) => plistSafe(item)) as T;
+  }
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    Object.getPrototypeOf(value) === Object.prototype
+  ) {
+    const kept: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (isKept(item)) kept[key] = plistSafe(item);
+    }
+    return kept as T;
+  }
+  return value;
+}
+
+/** A timeline with each entry's props made safe; its dates are left as they are. */
+export function plistSafeTimeline<P>(
+  entries: { date: Date; props: P }[],
+): { date: Date; props: P }[] {
+  return entries.map((entry) => ({ date: entry.date, props: plistSafe(entry.props) }));
+}
+
+function isKept(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'number') return Number.isFinite(value);
+  return true;
 }

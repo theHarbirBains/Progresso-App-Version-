@@ -2,10 +2,37 @@ import {
   nextMidnight,
   nutritionTimeline,
   nutritionWidgetProps,
+  plistSafe,
+  plistSafeTimeline,
+  SIGNED_OUT_NEXT_WORKOUT,
+  SIGNED_OUT_NUTRITION,
+  SIGNED_OUT_STEPS,
   stepsTimeline,
 } from './widgetProps';
+import { nextWorkoutProps } from './widgetUpdates';
 
 const TARGETS = { calories: 2000, proteinG: 150, carbsG: 220, fatG: 60 };
+const NO_TARGETS = { calories: null, proteinG: null, carbsG: null, fatG: null };
+
+/** Where a value iOS's UserDefaults can't hold sits, if anywhere: a null, undefined or non-finite number. */
+function unsafeAt(value: unknown, path = 'props'): string | null {
+  if (value === null || value === undefined) return path;
+  if (typeof value === 'number') return Number.isFinite(value) ? null : path;
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      const found = unsafeAt(item, `${path}[${index}]`);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof value === 'object') {
+    for (const [key, item] of Object.entries(value)) {
+      const found = unsafeAt(item, `${path}.${key}`);
+      if (found) return found;
+    }
+  }
+  return null;
+}
 
 describe('nutritionWidgetProps', () => {
   it('gives the calories left, and each macro against its target', () => {
@@ -33,13 +60,21 @@ describe('nutritionWidgetProps', () => {
     expect(props.macros[0].progress).toBe(1);
   });
 
-  it('shows what was eaten, with no bars, when no targets are set', () => {
+  it('shows what was eaten, with no bars -- and no empty values -- when no targets are set', () => {
     const props = nutritionWidgetProps(
       { calories: 500, proteinG: 30, carbsG: 50, fatG: 10 },
-      { calories: null, proteinG: null, carbsG: null, fatG: null },
+      NO_TARGETS,
     );
-    expect(props).toMatchObject({ calories: '500', caption: 'cal eaten', progress: null });
-    expect(props.macros[0]).toEqual({ label: 'Protein', amount: '30 g', progress: null });
+    expect(props).toEqual({
+      signedIn: true,
+      calories: '500',
+      caption: 'cal eaten',
+      macros: [
+        { label: 'Protein', amount: '30 g' },
+        { label: 'Carbs', amount: '50 g' },
+        { label: 'Fat', amount: '10 g' },
+      ],
+    });
   });
 });
 
@@ -73,15 +108,76 @@ describe('the timelines', () => {
     });
     expect(tomorrow).toEqual({
       date: new Date(2026, 9, 23),
-      props: { signedIn: true, steps: null, caption: 'Open Progresso to update' },
+      props: { signedIn: true, caption: 'Open Progresso to update' },
     });
   });
 
   it('ask to connect Apple Health when steps are not read yet', () => {
     expect(stepsTimeline(null, now)[0].props).toEqual({
       signedIn: true,
-      steps: null,
       caption: 'Connect Apple Health in Progresso',
     });
+  });
+});
+
+// expo-widgets keeps every widget's props in iOS's UserDefaults; a null there is NSNull, which
+// UserDefaults refuses by crashing the whole app -- what builds 28 and 29 did at launch.
+describe('never a value iOS can’t store', () => {
+  const now = new Date(2026, 9, 22, 15, 42);
+  const plan = {
+    splitId: 's1',
+    splitName: 'PPL',
+    day: { id: 'd1', name: 'Push', orderIndex: 0, muscleGroups: [] },
+    previousDayName: null,
+  };
+
+  it.each([
+    [
+      'nutrition, with targets',
+      nutritionTimeline({ calories: 1, proteinG: 1, carbsG: 1, fatG: 1 }, TARGETS, now),
+    ],
+    [
+      'nutrition, without targets',
+      nutritionTimeline({ calories: 1, proteinG: 1, carbsG: 1, fatG: 1 }, NO_TARGETS, now),
+    ],
+    [
+      'nutrition, with a zero target',
+      nutritionTimeline(
+        { calories: 1, proteinG: 1, carbsG: 1, fatG: 1 },
+        { ...TARGETS, calories: 0 },
+        now,
+      ),
+    ],
+    ['steps, read', stepsTimeline(8412, now)],
+    ['steps, not connected', stepsTimeline(null, now)],
+    ['next workout, the next day', nextWorkoutProps(null, plan as never)],
+    [
+      'next workout, one going',
+      nextWorkoutProps({ title: 'Push', kind: 'Your workout', startedAt: null, url: 'u' }, null),
+    ],
+    ['next workout, no split', nextWorkoutProps(null, null)],
+    ['signed out', [SIGNED_OUT_NUTRITION, SIGNED_OUT_NEXT_WORKOUT, SIGNED_OUT_STEPS]],
+  ])('%s', (_name, props) => {
+    expect(unsafeAt(props)).toBeNull();
+  });
+
+  it('a timeline keeps its dates as dates, with only the props cleaned', () => {
+    const [entry] = plistSafeTimeline([{ date: now, props: { a: null, b: 1 } }]);
+    expect(entry.date).toBe(now);
+    expect(entry.props).toEqual({ b: 1 });
+  });
+
+  it('plistSafe leaves out nulls, undefined and non-finite numbers, at any depth', () => {
+    expect(
+      plistSafe({
+        a: null,
+        b: undefined,
+        c: Number.NaN,
+        d: 1,
+        e: '',
+        f: false,
+        g: [null, { h: null, i: 2 }, Number.POSITIVE_INFINITY, 'x'],
+      }),
+    ).toEqual({ d: 1, e: '', f: false, g: [{ i: 2 }, 'x'] });
   });
 });

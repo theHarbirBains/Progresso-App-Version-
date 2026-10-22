@@ -173,12 +173,38 @@ jest.mock('expo-image', () => {
 // methods are jest.fn()s, and keep the layout they were given -- already a string, since the
 // widget Babel transform runs in Jest too -- so widgetLayouts.test.ts can run each layout the way
 // the widget itself does. A started card's own end() is a jest.fn() too.
+//
+// On a phone, a widget's props are kept in iOS's UserDefaults, which can't hold a null (or
+// undefined, or a non-finite number): writing one crashes the whole app, which is what builds 28
+// and 29 did at launch. So the stand-ins check what they're handed the way the phone would, and
+// note anything it couldn't store; jest.setup.after-env.js fails the test that did it. A timeline
+// entry's date must be a Date, as the real updateTimeline calls getTime() on it.
+global.__widgetStorageViolations = [];
+function mockCheckWidgetStorable(value, path) {
+  if (value === null || value === undefined) {
+    global.__widgetStorageViolations.push(`${path} is ${value}`);
+  } else if (typeof value === 'number' && !Number.isFinite(value)) {
+    global.__widgetStorageViolations.push(`${path} is ${value}`);
+  } else if (Array.isArray(value)) {
+    value.forEach((item, index) => mockCheckWidgetStorable(item, `${path}[${index}]`));
+  } else if (typeof value === 'object') {
+    for (const [key, item] of Object.entries(value))
+      mockCheckWidgetStorable(item, `${path}.${key}`);
+  }
+}
 jest.mock('expo-widgets', () => ({
   createWidget: jest.fn((name, layout) => ({
     name,
     layout,
-    updateTimeline: jest.fn(),
-    updateSnapshot: jest.fn(),
+    updateTimeline: jest.fn((entries) => {
+      entries.forEach((entry, index) => {
+        if (!(entry.date instanceof Date)) {
+          global.__widgetStorageViolations.push(`${name} timeline[${index}].date is not a Date`);
+        }
+        mockCheckWidgetStorable(entry.props, `${name} timeline[${index}].props`);
+      });
+    }),
+    updateSnapshot: jest.fn((props) => mockCheckWidgetStorable(props, `${name} snapshot`)),
     reload: jest.fn(),
     getTimeline: jest.fn().mockResolvedValue([]),
   })),

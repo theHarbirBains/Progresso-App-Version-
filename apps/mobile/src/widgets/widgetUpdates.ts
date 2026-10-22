@@ -5,6 +5,8 @@ import { withWidgets } from './loadWidgets';
 import {
   clockTime,
   nutritionTimeline,
+  plistSafe,
+  plistSafeTimeline,
   SIGNED_OUT_NEXT_WORKOUT,
   SIGNED_OUT_NUTRITION,
   SIGNED_OUT_STEPS,
@@ -26,14 +28,14 @@ export function showNutritionWidget(
   now = new Date(),
 ): Promise<void> {
   return withWidgets('nutrition', ({ nutritionWidget }) =>
-    nutritionWidget.updateTimeline(nutritionTimeline(eaten, targets, now)),
+    nutritionWidget.updateTimeline(plistSafeTimeline(nutritionTimeline(eaten, targets, now))),
   );
 }
 
 /** Today's Steps: the count just read from Apple Health, or null without access. */
 export function showStepsWidget(steps: number | null, now = new Date()): Promise<void> {
   return withWidgets('steps', ({ stepsWidget }) =>
-    stepsWidget.updateTimeline(stepsTimeline(steps, now)),
+    stepsWidget.updateTimeline(plistSafeTimeline(stepsTimeline(steps, now))),
   );
 }
 
@@ -92,16 +94,16 @@ export function showNextWorkoutWidget(
   plan: NextWorkoutPlan | null,
 ): Promise<void> {
   return withWidgets('nextWorkout', ({ nextWorkoutWidget }) =>
-    nextWorkoutWidget.updateSnapshot(nextWorkoutProps(open, plan)),
+    nextWorkoutWidget.updateSnapshot(plistSafe(nextWorkoutProps(open, plan))),
   );
 }
 
 /** Signed out: no one's figures stay on the home screen, and no workout card on the Lock Screen. */
 export async function clearWidgets(): Promise<void> {
   await withWidgets('signOut', ({ nutritionWidget, nextWorkoutWidget, stepsWidget }) => {
-    nutritionWidget.updateSnapshot(SIGNED_OUT_NUTRITION);
-    nextWorkoutWidget.updateSnapshot(SIGNED_OUT_NEXT_WORKOUT);
-    stepsWidget.updateSnapshot(SIGNED_OUT_STEPS);
+    nutritionWidget.updateSnapshot(plistSafe(SIGNED_OUT_NUTRITION));
+    nextWorkoutWidget.updateSnapshot(plistSafe(SIGNED_OUT_NEXT_WORKOUT));
+    stepsWidget.updateSnapshot(plistSafe(SIGNED_OUT_STEPS));
   });
   await endWorkoutActivities();
 }

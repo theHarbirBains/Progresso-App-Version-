@@ -74,7 +74,7 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
         {props.calories}
       </Text>
       <Text modifiers={[font({ size: 13 }), foregroundStyle(QUIET)]}>{props.caption}</Text>
-      {props.progress === null ? null : (
+      {typeof props.progress !== 'number' ? null : (
         <ProgressView value={props.progress} modifiers={[tint(AMBER)]} />
       )}
     </VStack>
@@ -106,7 +106,7 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
                 {item.amount}
               </Text>
             </HStack>
-            {item.progress === null ? null : (
+            {typeof item.progress !== 'number' ? null : (
               <ProgressView value={item.progress} modifiers={[tint(AMBER)]} />
             )}
           </VStack>

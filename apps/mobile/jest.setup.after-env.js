@@ -18,3 +18,14 @@ const { forgetShown } = require('./src/lib/lastShown');
 afterEach(() => {
   forgetShown();
 });
+
+// A widget handed something iOS's UserDefaults can't store (see the expo-widgets mock in
+// jest.setup.js) would crash the app on a phone, so it fails the test here.
+afterEach(() => {
+  const violations = global.__widgetStorageViolations.splice(0);
+  if (violations.length > 0) {
+    throw new Error(
+      `A widget was handed something iOS can't store, which crashes the app on a phone:\n${violations.join('\n')}`,
+    );
+  }
+});
