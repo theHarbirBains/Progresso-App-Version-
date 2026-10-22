@@ -64,7 +64,42 @@
           "color": "#12110F"
         }
       ],
-      "expo-image"
+      "expo-image",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.harbirbains.progresso.widgets",
+          "groupIdentifier": "group.com.harbirbains.progresso",
+          "widgets": [
+            {
+              "name": "NutritionToday",
+              "displayName": "Today's Nutrition",
+              "description": "Calories left today, with your protein, carbs and fat.",
+              "ios": { "supportedFamilies": ["systemSmall", "systemMedium"] }
+            },
+            {
+              "name": "NextWorkout",
+              "displayName": "Next Workout",
+              "description": "The next day of your split, or the workout you're doing.",
+              "ios": { "supportedFamilies": ["systemSmall", "systemMedium"] }
+            },
+            {
+              "name": "StepsToday",
+              "displayName": "Today's Steps",
+              "description": "Today's steps from Apple Health.",
+              "ios": { "supportedFamilies": ["systemSmall"] }
+            }
+          ]
+        }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Progresso reads your step count to show today's steps. It never writes to Apple Health, and your steps stay on your phone.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
+      ]
     ]
   }
 }

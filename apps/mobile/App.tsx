@@ -103,6 +103,7 @@ import { WorkoutSplitFormScreen } from './src/screens/WorkoutSplitFormScreen';
 import { WorkoutSplitsScreen } from './src/screens/WorkoutSplitsScreen';
 import { WorkoutSplitViewScreen } from './src/screens/WorkoutSplitViewScreen';
 import { SplitDayPlanScreen } from './src/screens/SplitDayPlanScreen';
+import { WidgetSync } from './src/widgets/WidgetSync';
 
 type AuthMode = 'signIn' | 'signUp' | 'forgotPassword';
 
@@ -552,6 +553,7 @@ function App() {
             <FoodLogProvider>
               <AllTimeStatsProvider>
                 <AppShell fontsLoaded={fontsLoaded} />
+                <WidgetSync />
                 <StatusBar style="light" />
               </AllTimeStatsProvider>
             </FoodLogProvider>

@@ -30,6 +30,9 @@ import {
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { recallLiveWorkout } from '../feed/liveWorkoutMemory';
 import { forgetShown } from '../lib/lastShown';
+import { nextWorkoutWidget, workoutActivity } from '../widgets/homeWidgets';
+import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
+import { endWorkoutActivities } from '../widgets/workoutActivity';
 import { ActiveWorkoutScreen } from './ActiveWorkoutScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -55,6 +58,7 @@ jest.mock('../lib/api', () => ({
   createEquipmentProfile: jest.fn(),
 }));
 
+jest.mock('../widgets/nextWorkoutRefresh', () => ({ refreshNextWorkout: jest.fn() }));
 jest.mock('../profile/profileQueries', () => ({
   fetchMyProfile: jest.fn(),
 }));
@@ -607,6 +611,53 @@ describe('ActiveWorkoutScreen', () => {
     fireEvent.press(screen.getByTestId('complete-workout'));
     await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
     await waitFor(() => expect(recallLiveWorkout('user-1')).toBeNull());
+  });
+
+  it('is on the Lock Screen and the Next Workout widget while it goes, and off the Lock Screen once finished', async () => {
+    await endWorkoutActivities();
+    const start = workoutActivity.start as jest.Mock;
+    start.mockClear();
+    (refreshNextWorkout as jest.Mock).mockClear();
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    expect(start).toHaveBeenCalledWith(
+      { title: 'Push Day', kind: 'Your workout', startedAt: Date.parse('2026-01-01T00:00:00Z') },
+      'progresso://workouts/w1/live',
+    );
+    expect(nextWorkoutWidget.updateSnapshot).toHaveBeenLastCalledWith(
+      expect.objectContaining({ eyebrow: 'Workout in Progress', title: 'Push Day' }),
+    );
+
+    const card = start.mock.results[0].value;
+    (workoutActivity.getInstances as jest.Mock).mockReturnValueOnce([card]);
+    fireEvent.press(screen.getByTestId('complete-workout'));
+
+    await waitFor(() => expect(card.end).toHaveBeenCalledWith('immediate'));
+    expect(refreshNextWorkout).toHaveBeenCalledWith('user-1', null);
+  });
+
+  it('comes off the Lock Screen when it is cancelled too', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === 'Cancel Workout')?.onPress?.();
+    });
+    await endWorkoutActivities();
+    const start = workoutActivity.start as jest.Mock;
+    start.mockClear();
+    (refreshNextWorkout as jest.Mock).mockClear();
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+    const card = start.mock.results[0].value;
+    (workoutActivity.getInstances as jest.Mock).mockReturnValueOnce([card]);
+
+    fireEvent.press(screen.getByTestId('cancel-workout'));
+
+    await waitFor(() => expect(card.end).toHaveBeenCalledWith('immediate'));
+    expect(refreshNextWorkout).toHaveBeenCalledWith('user-1', null);
   });
 
   it('shows a prominent Finish Workout button that completes the workout via the same existing completeWorkout function -- exactly once, no duplicate record', async () => {

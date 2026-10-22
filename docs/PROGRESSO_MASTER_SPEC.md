@@ -152,7 +152,7 @@ Users should eventually be able to export their data and delete their account/da
 | 11    | Design Polish + Push Notifications | Partial — theme/accent design system is implemented; devices register for push and a daily reminder job exists, but nothing triggers it yet and iOS delivery needs an APNs key; no email delivery |
 | 12    | Beta Launch Preparation            | In progress — internal TestFlight builds through EAS, Sentry, CI checks including an iOS bundle export                                                                                            |
 
-**Post-v1:** likes/comments/leaderboards and other deeper social features, home screen widgets, Apple Watch/Wear OS, exercise form media, AI features beyond the existing AI Food Search, other advanced functionality. Social v1 (follow graph + Friends feed) is implemented ahead of schedule as an approved, explicitly-scoped exception — see Section 17.
+**Post-v1:** likes/comments/leaderboards and other deeper social features, Apple Watch/Wear OS, exercise form media, AI features beyond the existing AI Food Search, other advanced functionality. Social v1 (follow graph + Friends feed) is implemented ahead of schedule as an approved, explicitly-scoped exception — see Section 17. So are iPhone home-screen widgets and Apple Health steps (Section 17).
 
 ## 17. Current Implementation State
 
@@ -169,7 +169,9 @@ Progresso is **past the Phase 0 foundation** and has an implemented core loop, n
 - Progress/strength analytics: a tabbed Progress section (Overview, Top Sets, Nutrition, All Time; the Strength tab and every Progress line graph were later removed at the product owner's request), muscle-group visualization, and PRs and true 1RMs (also listed on the You tab).
 - Nutrition: today's calories and macros against user-set daily goals (with goal estimates from body data), a history calendar, and every logging method in Section 8 — custom foods, food search, barcode scanning, AI Food Search (with a per-user hourly and daily limit), usual and recent foods, saved meals, recipes, Copy Yesterday and logging by pieces, weight or volume.
 - Trainer mode and group workouts: a trainer manages clients, logs workouts for them and runs live sessions, behind a "trainer" entitlement with no purchase flow yet (switched on by hand during internal testing); anyone can start a group before a workout begins, with each person's sets in their own tab.
-- Deep links: `progresso://feed`, `progresso://nutrition`, `progresso://workouts/<id>` and `progresso://workouts/<id>/live`, opened once the user is signed in.
+- Deep links: `progresso://feed`, `progresso://nutrition`, `progresso://workouts/new`, `progresso://workouts/<id>`, `progresso://workouts/<id>/live` and `progresso://groups/<id>`, opened once the user is signed in.
+- Home-screen widgets (iPhone, approved): Today's Nutrition, Next Workout and Today's Steps, plus a Lock Screen card (Live Activity) while a workout or group workout is going. The app hands them what it already has; they're cleared on sign-out.
+- Apple Health (iPhone, approved): reads today's step count only, for Feed's Steps card and the Steps widget, on the phone -- never stored, never sent to the API, nothing written to Health.
 - Settings: an app-wide Settings hub — a root list of Profile & Personal Information, Workout Preferences, Nutrition & Goals, Notifications, Account & Security and Support & About, each its own page. The look is fixed (Warm Minimal: the warm gym photo behind the top of every screen and one amber accent), with no background themes or colour customization.
 - Backend: JWT-authenticated NestJS API with role-based authorization (`user`/`support_admin`/`full_admin`), user profile endpoints, exercise and equipment-profile endpoints, food search, barcode lookup and AI food search, follows and the Friends feed, trainer and group endpoints, push token registration with a daily reminder job, and RevenueCat webhook processing (signature verification, idempotent event handling, subscription projection).
 - Social v1: a one-directional, accept-gated follow graph (send/accept/reject/unfollow, user search) and a read-only Friends tab on Feed showing accepted followees' own completed workouts and logged foods. No likes, comments, or leaderboards yet.
@@ -184,6 +186,5 @@ Progresso is **past the Phase 0 foundation** and has an implemented core loop, n
 
 - Change Email and Delete Account (Settings → Account & Security).
 - Help & FAQ, Contact Support and Report a Problem (Settings → Support & About), and the finer notification categories (Settings → Notifications).
-- Apple Health — not offered; onboarding's former placeholder step was removed until HealthKit is approved.
 
 **Not yet started:** nutrition analytics/trends, privacy tooling (data export, account deletion), full admin dashboard, design-polish pass beyond the current theme system, and everything listed under Post-v1 in Section 16.

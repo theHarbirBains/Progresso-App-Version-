@@ -12,8 +12,10 @@ export const LINK_CONFIG: NonNullable<LinkingOptions<RootStackParamList>['config
   screens: {
     Feed: 'feed',
     Nutrition: 'nutrition',
+    NewWorkout: 'workouts/new',
     WorkoutDetail: 'workouts/:workoutId',
     ActiveWorkout: 'workouts/:workoutId/live',
+    GroupSession: 'groups/:groupId',
   },
 };
 

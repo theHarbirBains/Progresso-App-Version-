@@ -28,6 +28,13 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 - The landing screen: your own completed workouts and logged foods as activity cards, and a Friends tab with the people you follow
 - Your next workout in the active split, a card for a workout that's in progress, and a "+" shortcut to Start Workout or Log Food
+- On iPhone, today's steps from Apple Health under Next Workout, after you connect it from that card. Progresso only reads the step count; it stays on your phone and is never sent to Progresso's servers
+
+**Home Screen widgets (iPhone)**
+
+- Today's Nutrition (calories left, and protein, carbs and fat against your targets on the wide size), Next Workout (the next day of your split with Start, or the workout going with Resume) and Today's Steps; add them from the Home Screen's Edit > Add Widget. They show what the app last knew and turn over to a new day at midnight
+- While a workout or group workout is going, it's on the Lock Screen and in the Dynamic Island with its name and a running timer, until it's finished or cancelled
+- Signing out clears every widget
 
 **Workouts**
 
@@ -74,7 +81,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Notification preferences: push and email opt-in toggles are real and saved; more granular categories (workout reminders, PR alerts, weekly summaries) are shown as explicit "Coming Soon" rows rather than toggles that wouldn't do anything
 - Account & Security: Blocked People (each with Unblock), Terms of Service and Privacy Policy (the pages the API serves at `/legal/terms` and `/legal/privacy`), and Delete Account, which asks twice and then deletes the account and everything it owns
 - Change Email and the help and contact rows are visible but not yet implemented ("Coming Soon")
-- There is no Apple Health (HealthKit) integration, and onboarding doesn't offer one
+- Apple Health is connected from Feed's Steps card (iPhone only), not from onboarding or Settings; it's turned off in the Health app
 
 **Social**
 
@@ -248,7 +255,8 @@ Some areas are intentionally incomplete rather than hidden:
 - **Account actions**: Change Email is visible in Settings but marked "Coming Soon." Delete Account works.
 - **Backups**: a nightly, encrypted database backup runs in GitHub Actions once its two secrets are set ([docs/BACKUPS.md](docs/BACKUPS.md)).
 - **Legal pages**: the Privacy Policy and Terms of Service (`/legal/privacy`, `/legal/terms`; operator and contact in `apps/api/src/legal/legal-details.ts`) are first drafts that need review before external testers.
-- **Apple Health**: not offered; there is no HealthKit integration.
+- **Apple Health**: iPhone only, and it reads today's step count only -- nothing else is read and nothing is written.
+- **Widgets**: iPhone only; they need a new EAS build (they're a separate widget extension) and haven't been checked on a device yet.
 - **Admin**: role-based authorization is implemented and tested end to end, but the admin surface itself is a minimal placeholder route, not a full admin dashboard.
 - **Subscriptions**: RevenueCat webhook handling exists, but there is no in-app purchase or paywall yet.
 

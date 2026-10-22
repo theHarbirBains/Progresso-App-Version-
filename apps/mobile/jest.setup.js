@@ -167,3 +167,45 @@ jest.mock('expo-image', () => {
   const { Image } = require('react-native');
   return { Image };
 });
+
+// expo-widgets (the home-screen widgets and the Lock Screen workout card) talks to an iOS widget
+// extension that doesn't exist in Jest. createWidget/createLiveActivity hand back stand-ins whose
+// methods are jest.fn()s, and keep the layout they were given -- already a string, since the
+// widget Babel transform runs in Jest too -- so widgetLayouts.test.ts can run each layout the way
+// the widget itself does. A started card's own end() is a jest.fn() too.
+jest.mock('expo-widgets', () => ({
+  createWidget: jest.fn((name, layout) => ({
+    name,
+    layout,
+    updateTimeline: jest.fn(),
+    updateSnapshot: jest.fn(),
+    reload: jest.fn(),
+    getTimeline: jest.fn().mockResolvedValue([]),
+  })),
+  createLiveActivity: jest.fn((name, layout) => ({
+    name,
+    layout,
+    start: jest.fn(() => ({
+      getId: () => 'activity',
+      update: jest.fn().mockResolvedValue(undefined),
+      end: jest.fn().mockResolvedValue(undefined),
+    })),
+    getInstances: jest.fn(() => []),
+  })),
+}));
+
+// The SwiftUI views and modifiers the widget layouts are written with only exist inside the
+// widget (see above): in the app, and so in Jest, the layouts are strings and these are never
+// called.
+jest.mock('@expo/ui/swift-ui', () => ({}));
+jest.mock('@expo/ui/swift-ui/modifiers', () => ({}));
+
+// Apple Health (health/steps.ts) is a native module. By default it reports itself unavailable, as
+// off iPhone, so Feed shows no Steps card; a test that cares makes it available.
+jest.mock('@kingstinct/react-native-healthkit', () => ({
+  AuthorizationRequestStatus: { unknown: 0, shouldRequest: 1, unnecessary: 2 },
+  isHealthDataAvailable: jest.fn(() => false),
+  getRequestStatusForAuthorization: jest.fn().mockResolvedValue(1),
+  requestAuthorization: jest.fn().mockResolvedValue(true),
+  queryStatisticsForQuantity: jest.fn().mockResolvedValue({ sources: [] }),
+}));

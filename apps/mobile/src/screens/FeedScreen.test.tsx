@@ -19,6 +19,14 @@ import {
 } from '../workouts/workoutSplitQueries';
 import { rememberLiveWorkout } from '../feed/liveWorkoutMemory';
 import { forgetShown } from '../lib/lastShown';
+import {
+  getRequestStatusForAuthorization,
+  isHealthDataAvailable,
+  queryStatisticsForQuantity,
+  requestAuthorization,
+} from '@kingstinct/react-native-healthkit';
+import { nextWorkoutWidget, stepsWidget, workoutActivity } from '../widgets/homeWidgets';
+import { endWorkoutActivities, showWorkoutActivity } from '../widgets/workoutActivity';
 import { FeedScreen } from './FeedScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -1026,5 +1034,122 @@ describe('FeedScreen live workout', () => {
 
     expect(await screen.findByTestId('feed-live-workout')).toBeTruthy();
     expect(screen.queryByTestId('feed-next-workout')).toBeNull();
+  });
+});
+
+describe('FeedScreen -- the home-screen widgets', () => {
+  beforeEach(async () => {
+    await endWorkoutActivities();
+    mockFetchActiveWorkout.mockResolvedValue(null);
+    jest.mocked(nextWorkoutWidget.updateSnapshot).mockClear();
+  });
+
+  it('tells the Next Workout widget the next day once it is known', async () => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
+    renderScreen();
+
+    await screen.findByTestId('feed-next-workout');
+    await waitFor(() =>
+      expect(nextWorkoutWidget.updateSnapshot).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          eyebrow: 'Next Workout',
+          title: 'Push',
+          action: 'Start',
+          url: 'progresso://workouts/new',
+        }),
+      ),
+    );
+  });
+
+  it('tells it the workout that is going, to resume', async () => {
+    mockFetchActiveWorkout.mockResolvedValue({
+      id: 'live-1',
+      name: 'Leg Day',
+      performedAt: '2026-10-05T10:00:00Z',
+      completedAt: null,
+      workoutSplitDayId: null,
+    });
+    renderScreen();
+
+    await screen.findByTestId('feed-live-workout');
+    await waitFor(() =>
+      expect(nextWorkoutWidget.updateSnapshot).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          eyebrow: 'Workout in Progress',
+          title: 'Leg Day',
+          action: 'Resume',
+          url: 'progresso://workouts/live-1/live',
+        }),
+      ),
+    );
+  });
+
+  it('never tells it "no split" while the split is still being read', async () => {
+    mockFetchWorkoutSplitDetail.mockReturnValue(new Promise(() => undefined));
+    renderScreen();
+
+    await waitFor(() => expect(mockFetchActiveWorkout).toHaveBeenCalled());
+    await waitFor(() => expect(mockFetchWorkoutSplitDetail).toHaveBeenCalled());
+    expect(nextWorkoutWidget.updateSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('takes a Lock Screen card off once its workout is no longer open', async () => {
+    await showWorkoutActivity(
+      'workout:old',
+      { title: 'Push Day', kind: 'Your workout', startedAt: 0 },
+      'progresso://workouts/old/live',
+    );
+    const card = jest.mocked(workoutActivity.start).mock.results.at(-1)?.value;
+    jest.mocked(workoutActivity.getInstances).mockReturnValueOnce([card]);
+    renderScreen();
+
+    await waitFor(() => expect(card.end).toHaveBeenCalledWith('immediate'));
+  });
+});
+
+describe('FeedScreen -- Steps', () => {
+  beforeEach(() => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(true);
+    jest.mocked(stepsWidget.updateTimeline).mockClear();
+  });
+
+  afterEach(() => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+  });
+
+  it('shows no Steps card where Apple Health is not available', async () => {
+    jest.mocked(isHealthDataAvailable).mockReturnValue(false);
+    renderScreen();
+
+    await screen.findByTestId('feed-empty');
+    expect(screen.queryByTestId('feed-steps')).toBeNull();
+  });
+
+  it("offers to connect Apple Health, then shows today's steps and hands them to the widget", async () => {
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValueOnce(1).mockResolvedValue(2);
+    jest
+      .mocked(queryStatisticsForQuantity)
+      .mockResolvedValue({ sumQuantity: { unit: 'count', quantity: 8412 }, sources: [] } as never);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('feed-steps-connect'));
+
+    await waitFor(() => expect(screen.getByTestId('feed-steps-count')).toHaveTextContent('8,412'));
+    expect(requestAuthorization).toHaveBeenCalledWith({
+      toRead: ['HKQuantityTypeIdentifierStepCount'],
+    });
+    expect(jest.mocked(stepsWidget.updateTimeline).mock.calls.at(-1)?.[0][0].props.steps).toBe(
+      '8,412',
+    );
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
+  });
+
+  it('says where to check when no steps come back', async () => {
+    jest.mocked(getRequestStatusForAuthorization).mockResolvedValueOnce(2);
+    jest.mocked(queryStatisticsForQuantity).mockResolvedValueOnce({ sources: [] } as never);
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-steps-count')).toHaveTextContent('0');
+    expect(screen.getByTestId('feed-steps-hint')).toHaveTextContent(/Health app/);
   });
 });

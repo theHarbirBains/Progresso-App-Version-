@@ -36,6 +36,10 @@ import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { FeedHeroCard } from '../feed/FeedHeroCard';
 import { LiveNowCard } from '../feed/LiveNowCard';
+import { StepsCard } from '../feed/StepsCard';
+import { useStepsToday } from '../health/useStepsToday';
+import { showNextWorkoutWidget } from '../widgets/widgetUpdates';
+import { endClosedWorkoutActivities } from '../widgets/workoutActivity';
 import { recallLiveWorkout, rememberLiveWorkout } from '../feed/liveWorkoutMemory';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
@@ -141,7 +145,13 @@ export function FeedScreen({ navigation }: Props) {
   const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
   const workspace = useWorkspace();
-  const { weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId } = useProgressTheme();
+  const { weightUnit, displayName, username, avatarUrl, activeWorkoutSplitId, themeLoading } =
+    useProgressTheme();
+  // Today's steps from Apple Health, under Next Workout (iPhone only). A local read, so it's read
+  // again on every visit, never gated.
+  const steps = useStepsToday();
+  const refreshStepsRef = useRef(steps.refresh);
+  refreshStepsRef.current = steps.refresh;
 
   // What Feed showed last time (lib/lastShown.ts): a reopened Feed starts from
   // it -- no spinner -- and refreshes in the background as always.
@@ -202,6 +212,9 @@ export function FeedScreen({ navigation }: Props) {
   // days -- never a "choose a split" prompt here, since Notifications
   // already carries that reminder (see NotificationsScreen).
   const [nextPlan, setNextPlanState] = useState<NextWorkoutPlan | null>(shown.nextPlan ?? null);
+  // Whether the next workout has been read at least once -- until then a missing one isn't
+  // "no split", just not known yet, and the Next Workout widget isn't told otherwise.
+  const [nextLoaded, setNextLoaded] = useState(shown.nextPlan !== undefined);
   const setNextPlan = useCallback(
     (plan: NextWorkoutPlan | null) => {
       setNextPlanState(plan);
@@ -288,6 +301,7 @@ export function FeedScreen({ navigation }: Props) {
         fetchLastWorkoutSplitDayId(userId),
       ]);
       setNextPlan(computeNextWorkout(detail, lastDayId));
+      setNextLoaded(true);
       lastNextWorkoutLoadAtRef.current = Date.now();
     } catch {
       // A preview widget failing to load isn't worth a screen-level error --
@@ -341,6 +355,14 @@ export function FeedScreen({ navigation }: Props) {
     const workout = workoutResult.status === 'fulfilled' ? workoutResult.value : null;
     const groups = groupsResult.status === 'fulfilled' ? groupsResult.value : [];
     const sessions = sessionsResult.status === 'fulfilled' ? sessionsResult.value : [];
+    // The Lock Screen workout card ends if its workout isn't open any more -- only when both
+    // checks came back, so a failed one never ends a card for a workout that's still going.
+    if (workoutResult.status === 'fulfilled' && groupsResult.status === 'fulfilled') {
+      void endClosedWorkoutActivities([
+        ...(workout ? [`workout:${workout.id}`] : []),
+        ...groups.map((group) => `group:${group.id}`),
+      ]);
+    }
     setLiveWorkout(workout);
     setLiveGroups(groups);
     setLiveSessions(sessions);
@@ -351,11 +373,13 @@ export function FeedScreen({ navigation }: Props) {
   }, [userId, accessToken]);
   // Everything open right now, most personal first. The first takes the place of the next
   // workout as Feed's hero, with Resume; any others are Live now cards under it.
+  // `url` is where the Next Workout widget's Resume opens the app (navigation/linking.ts).
   const liveEntries: {
     testID: string;
     title: string;
     kind: string;
     startedAt: string | null;
+    url: string;
     onPress: () => void;
   }[] = [
     ...(liveWorkout
@@ -365,6 +389,7 @@ export function FeedScreen({ navigation }: Props) {
             title: liveWorkout.name,
             kind: 'Your workout',
             startedAt: liveWorkout.performedAt,
+            url: `progresso://workouts/${liveWorkout.id}/live`,
             onPress: () => navigation.navigate('ActiveWorkout', { workoutId: liveWorkout.id }),
           },
         ]
@@ -376,6 +401,7 @@ export function FeedScreen({ navigation }: Props) {
             title: liveGroups[0].name,
             kind: 'Group workout',
             startedAt: liveGroups[0].startedAt,
+            url: `progresso://groups/${liveGroups[0].id}`,
             onPress: () => navigation.navigate('GroupSession', { groupId: liveGroups[0].id }),
           },
         ]
@@ -386,6 +412,7 @@ export function FeedScreen({ navigation }: Props) {
               title: `${liveGroups.length} group workouts`,
               kind: 'Open Group Workouts to choose one',
               startedAt: null,
+              url: 'progresso://feed',
               onPress: () => navigation.navigate('Groups'),
             },
           ]
@@ -395,6 +422,7 @@ export function FeedScreen({ navigation }: Props) {
       title: session.clientName,
       kind: 'Live session with your client',
       startedAt: session.startedAt,
+      url: 'progresso://feed',
       onPress: () =>
         navigation.navigate('TrainerLiveWorkout', {
           workoutId: session.workoutId,
@@ -409,6 +437,23 @@ export function FeedScreen({ navigation }: Props) {
   // The hero has no fill of its own; while it shows, the sunset photo behind Feed is
   // brightened so it shows through the hero (see AppBackgroundLayer).
   useHeroBackdrop(showNextWorkout || liveHero !== undefined);
+
+  // The Next Workout widget shows what Feed's hero does, once Feed knows: what's open, and, with
+  // nothing open, the next day of the split (or that there's no split).
+  const nextKnown = !themeLoading && (activeWorkoutSplitId === null || nextLoaded);
+  const heroTitle = liveHero?.title;
+  const heroKind = liveHero?.kind;
+  const heroStartedAt = liveHero?.startedAt ?? null;
+  const heroUrl = liveHero?.url;
+  useEffect(() => {
+    if (!liveKnown || (heroTitle === undefined && !nextKnown)) return;
+    showNextWorkoutWidget(
+      heroTitle !== undefined && heroKind !== undefined && heroUrl !== undefined
+        ? { title: heroTitle, kind: heroKind, startedAt: heroStartedAt, url: heroUrl }
+        : null,
+      nextPlan,
+    );
+  }, [liveKnown, nextKnown, heroTitle, heroKind, heroStartedAt, heroUrl, nextPlan]);
   const loadLiveWorkoutRef = useRef(loadLiveWorkout);
   loadLiveWorkoutRef.current = loadLiveWorkout;
 
@@ -427,6 +472,7 @@ export function FeedScreen({ navigation }: Props) {
       if (isStale(lastBadgeLoadAtRef.current)) void loadNotificationBadgeCount();
       if (isStale(lastNextWorkoutLoadAtRef.current)) void loadNextWorkoutRef.current();
       void loadLiveWorkoutRef.current();
+      void refreshStepsRef.current();
     });
     return unsubscribe;
   }, [navigation, load, loadFriends, loadNotificationBadgeCount]);
@@ -665,6 +711,17 @@ export function FeedScreen({ navigation }: Props) {
               accessibilityLabel={`Next workout: ${nextPlan.day.name}${
                 nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
               }`}
+            />
+          </RiseIn>
+        ) : null}
+
+        {steps.access === 'notAsked' || steps.access === 'asked' ? (
+          <RiseIn>
+            <StepsCard
+              access={steps.access}
+              steps={steps.steps}
+              connecting={steps.connecting}
+              onConnect={() => void steps.connect()}
             />
           </RiseIn>
         ) : null}

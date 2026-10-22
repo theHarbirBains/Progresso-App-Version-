@@ -5,6 +5,9 @@ import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { rememberLiveWorkout } from '../feed/liveWorkoutMemory';
+import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
+import { showNextWorkoutWidget } from '../widgets/widgetUpdates';
+import { endWorkoutActivities, showWorkoutActivity } from '../widgets/workoutActivity';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
@@ -88,7 +91,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const { workoutId, planned } = route.params;
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const { theme, weightUnit, themeLoading } = useProgressTheme();
+  const { theme, weightUnit, themeLoading, activeWorkoutSplitId } = useProgressTheme();
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
@@ -182,6 +185,22 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           completedAt: null,
           workoutSplitDayId: detail.workoutSplitDayId,
         });
+        // On the Lock Screen and the Next Workout widget while it's going.
+        const liveUrl = `progresso://workouts/${detail.id}/live`;
+        void showWorkoutActivity(
+          `workout:${detail.id}`,
+          { title: detail.name, kind: 'Your workout', startedAt: Date.parse(detail.performedAt) },
+          liveUrl,
+        );
+        showNextWorkoutWidget(
+          {
+            title: detail.name,
+            kind: 'Your workout',
+            startedAt: detail.performedAt,
+            url: liveUrl,
+          },
+          null,
+        );
 
         const savedInputs: Record<string, SetInputDraft> = {};
         const openSetIds = new Set<string>();
@@ -630,6 +649,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       await completeWorkout(workout.id);
       void clearLiveWorkoutDraft(workout.id);
       rememberLiveWorkout(userId, null);
+      void endWorkoutActivities();
+      void refreshNextWorkout(userId, activeWorkoutSplitId);
       // The only thing that changes what AllTimeStatsProvider's cache holds
       // -- refreshes it now so Profile/Progress already have this workout's
       // stats and PRs the moment they're next visited, instead of a stale
@@ -662,6 +683,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       await cancelWorkout(workout.id);
       void clearLiveWorkoutDraft(workout.id);
       rememberLiveWorkout(userId, null);
+      void endWorkoutActivities();
+      void refreshNextWorkout(userId, activeWorkoutSplitId);
       navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to cancel workout');

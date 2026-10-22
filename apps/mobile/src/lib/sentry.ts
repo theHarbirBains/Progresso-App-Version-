@@ -101,6 +101,14 @@ export function clearSentryUser(): void {
   Sentry.setUser(null);
 }
 
+/**
+ * Something that failed without stopping what the person was doing -- a home-screen widget that
+ * couldn't be updated, Apple Health not answering -- captured so it's seen rather than lost.
+ */
+export function recordQuietFailure(area: string, error: unknown): void {
+  Sentry.captureException(error, { tags: { area } });
+}
+
 export type ApiRequestOutcome = 'ok' | 'http_error' | 'timeout' | 'network_error';
 
 /**

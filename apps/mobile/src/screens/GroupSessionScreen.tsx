@@ -16,6 +16,13 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
 import { GroupWorkoutEditor } from '../workouts/GroupWorkoutEditor';
+import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
+import { showNextWorkoutWidget } from '../widgets/widgetUpdates';
+import {
+  endWorkoutActivities,
+  endWorkoutActivity,
+  showWorkoutActivity,
+} from '../widgets/workoutActivity';
 
 type Props = RootStackScreenProps<'GroupSession'>;
 
@@ -30,7 +37,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
   const userId = user?.id ?? '';
-  const { theme } = useProgressTheme();
+  const { theme, activeWorkoutSplitId } = useProgressTheme();
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +56,36 @@ export function GroupSessionScreen({ navigation, route }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // While the group is going and you're training in it, it's on the Lock Screen and the Next
+  // Workout widget; found finished, its Lock Screen card ends.
+  useEffect(() => {
+    if (!group) return;
+    const key = `group:${group.id}`;
+    const training = group.members.some(
+      (member) => member.userId === userId && member.status === 'joined',
+    );
+    if (group.status === 'live' && training) {
+      const url = `progresso://groups/${group.id}`;
+      void showWorkoutActivity(
+        key,
+        { title: group.name, kind: 'Group workout', startedAt: Date.parse(group.startedAt) },
+        url,
+      );
+      showNextWorkoutWidget(
+        { title: group.name, kind: 'Group workout', startedAt: group.startedAt, url },
+        null,
+      );
+    } else {
+      void endWorkoutActivity(key);
+    }
+  }, [group, userId]);
+
+  /** The group ended for you: off the Lock Screen, and Next Workout shows what's next again. */
+  function afterEnded() {
+    void endWorkoutActivities();
+    void refreshNextWorkout(userId, activeWorkoutSplitId);
+  }
 
   /** Runs one change. Resolves true only if it saved, so a failed change never leaves the screen. */
   async function run(action: () => Promise<unknown>, failure: string): Promise<boolean> {
@@ -76,7 +113,9 @@ export function GroupSessionScreen({ navigation, route }: Props) {
         onPress: () =>
           void run(() => finishGroup(accessToken, groupId), 'Could not finish the group').then(
             (saved) => {
-              if (saved) navigation.goBack();
+              if (!saved) return;
+              afterEnded();
+              navigation.goBack();
             },
           ),
       },
@@ -99,7 +138,9 @@ export function GroupSessionScreen({ navigation, route }: Props) {
           onPress: () =>
             void run(() => cancelGroupWorkout(accessToken, groupId), 'Could not cancel').then(
               (saved) => {
-                if (saved) navigation.goBack();
+                if (!saved) return;
+                afterEnded();
+                navigation.goBack();
               },
             ),
         },

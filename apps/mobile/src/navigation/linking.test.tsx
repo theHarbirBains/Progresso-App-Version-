@@ -18,6 +18,9 @@ describe('LINK_CONFIG', () => {
     ['nutrition', ['Feed', 'Nutrition']],
     ['workouts/w-1', ['Feed', 'WorkoutDetail']],
     ['workouts/w-1/live', ['Feed', 'ActiveWorkout']],
+    // The Next Workout widget's Start, and a group workout's Resume.
+    ['workouts/new', ['Feed', 'NewWorkout']],
+    ['groups/g-1', ['Feed', 'GroupSession']],
   ])('opens %s on top of Feed', (path, routes) => {
     const state = getStateFromPath(path, LINK_CONFIG);
 
@@ -30,6 +33,9 @@ describe('LINK_CONFIG', () => {
     });
     expect(getStateFromPath('workouts/w-1/live', LINK_CONFIG)?.routes[1]?.params).toEqual({
       workoutId: 'w-1',
+    });
+    expect(getStateFromPath('groups/g-1', LINK_CONFIG)?.routes[1]?.params).toEqual({
+      groupId: 'g-1',
     });
   });
 

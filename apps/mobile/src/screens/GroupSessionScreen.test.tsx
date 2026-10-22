@@ -2,6 +2,9 @@ import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { finishGroup, getGroup } from '../lib/api';
+import { nextWorkoutWidget, workoutActivity } from '../widgets/homeWidgets';
+import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
+import { endWorkoutActivities } from '../widgets/workoutActivity';
 import { GroupSessionScreen } from './GroupSessionScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -18,8 +21,11 @@ jest.mock('../progress/useProgressTheme', () => ({
   useProgressTheme: () => ({
     theme: { accent: '#3DDC97', onAccent: '#000000' },
     weightUnit: 'kg',
+    activeWorkoutSplitId: 'split-1',
   }),
 }));
+
+jest.mock('../widgets/nextWorkoutRefresh', () => ({ refreshNextWorkout: jest.fn() }));
 
 // The group editor is covered on its own; here it is a marker listing the workouts it was given.
 jest.mock('../workouts/GroupWorkoutEditor', () => {
@@ -93,7 +99,13 @@ function renderScreen() {
   );
 }
 
-beforeEach(() => {
+const mockStartActivity = workoutActivity.start as jest.Mock;
+
+beforeEach(async () => {
+  await endWorkoutActivities();
+  mockStartActivity.mockClear();
+  (nextWorkoutWidget.updateSnapshot as jest.Mock).mockClear();
+  (refreshNextWorkout as jest.Mock).mockClear();
   mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' }, user: { id: 'me' } });
   mockGetGroup.mockReset().mockResolvedValue(group());
   mockFinish.mockReset().mockResolvedValue({ ok: true });
@@ -139,5 +151,52 @@ describe('GroupSessionScreen', () => {
 
     await waitFor(() => expect(mockFinish).toHaveBeenCalledWith('token-1', 'g1'));
     alert.mockRestore();
+  });
+
+  it('puts the group on the Lock Screen and the Next Workout widget while you train in it', async () => {
+    renderScreen();
+    await screen.findByTestId('group-workout');
+
+    expect(mockStartActivity).toHaveBeenCalledTimes(1);
+    expect(mockStartActivity).toHaveBeenCalledWith(
+      {
+        title: 'Thursday legs',
+        kind: 'Group workout',
+        startedAt: Date.parse('2026-10-06T09:00:00.000Z'),
+      },
+      'progresso://groups/g1',
+    );
+    expect(nextWorkoutWidget.updateSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eyebrow: 'Workout in Progress',
+        title: 'Thursday legs',
+        action: 'Resume',
+        url: 'progresso://groups/g1',
+      }),
+    );
+  });
+
+  it('takes the card off the Lock Screen once the group is finished, and updates Next Workout', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('group-finish'));
+    const card = mockStartActivity.mock.results[0].value;
+    (workoutActivity.getInstances as jest.Mock).mockReturnValueOnce([card]);
+    (alert.mock.calls[0][2] ?? []).find((button) => button.text === 'Finish')?.onPress?.();
+
+    await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
+    expect(card.end).toHaveBeenCalledWith('immediate');
+    expect(refreshNextWorkout).toHaveBeenCalledWith('me', 'split-1');
+    alert.mockRestore();
+  });
+
+  it('starts no card for a group that has already finished', async () => {
+    mockGetGroup.mockResolvedValue(
+      group({ status: 'finished', finishedAt: '2026-10-06T10:00:00.000Z' }),
+    );
+    renderScreen();
+
+    await screen.findByTestId('group-session-finished');
+    expect(mockStartActivity).not.toHaveBeenCalled();
   });
 });
