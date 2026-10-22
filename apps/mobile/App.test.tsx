@@ -23,6 +23,7 @@ jest.mock('./src/lib/sentry', () => ({
   wrapApp: (component: unknown) => component,
   setSentryUser: jest.fn(),
   clearSentryUser: jest.fn(),
+  recordQuietFailure: jest.fn(),
 }));
 
 // AccountSettingsScreen's own profile fetch/save is covered by its own

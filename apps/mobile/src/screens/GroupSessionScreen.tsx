@@ -72,7 +72,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
         { title: group.name, kind: 'Group workout', startedAt: Date.parse(group.startedAt) },
         url,
       );
-      showNextWorkoutWidget(
+      void showNextWorkoutWidget(
         { title: group.name, kind: 'Group workout', startedAt: group.startedAt, url },
         null,
       );

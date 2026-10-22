@@ -1,6 +1,6 @@
 import type { LiveActivity } from 'expo-widgets';
 import { recordQuietFailure } from '../lib/sentry';
-import { workoutActivity } from './homeWidgets';
+import { withWidgets } from './loadWidgets';
 import type { WorkoutActivityProps } from './widgetProps';
 
 // The Lock Screen card (an iOS Live Activity) while a workout is going: its name, whose it is,
@@ -10,22 +10,15 @@ import type { WorkoutActivityProps } from './widgetProps';
 // another phone, say). The card the app last started is remembered while the app runs; after a
 // restart it only knows cards exist, not whose, so it ends those only when nothing is open.
 
-/** The workout the card shows: "workout:<id>" or "group:<id>". */
-let current: { key: string; activity: LiveActivity<WorkoutActivityProps> } | null = null;
+type Card = LiveActivity<WorkoutActivityProps>;
 
-function existing(): LiveActivity<WorkoutActivityProps>[] {
-  try {
-    return workoutActivity.getInstances();
-  } catch (error) {
-    recordQuietFailure('widget.workoutActivity', error);
-    return [];
-  }
-}
+/** The workout the card shows ("workout:<id>" or "group:<id>"), noted before it's started. */
+let shown: { key: string } | null = null;
 
-async function endEach(activities: LiveActivity<WorkoutActivityProps>[]) {
+async function endEach(cards: Card[]) {
   await Promise.all(
-    activities.map((activity) =>
-      activity
+    cards.map((card) =>
+      card
         .end('immediate')
         .catch((error: unknown) => recordQuietFailure('widget.workoutActivity', error)),
     ),
@@ -38,28 +31,32 @@ export async function showWorkoutActivity(
   props: WorkoutActivityProps,
   url: string,
 ): Promise<void> {
-  if (current?.key === key) return;
-  // Started before the others end, so two calls close together never leave two cards.
-  const others = existing();
-  current = null;
-  try {
-    current = { key, activity: workoutActivity.start(props, url) };
-  } catch (error) {
-    // Live Activities turned off for the app, or the system refusing one: the workout goes on.
-    recordQuietFailure('widget.workoutActivity', error);
-  }
-  await endEach(others);
+  if (shown?.key === key) return;
+  shown = { key };
+  await withWidgets('workoutActivity', async ({ workoutActivity }) => {
+    // Started before the others end, so two calls close together never leave two cards.
+    const others = workoutActivity.getInstances();
+    try {
+      workoutActivity.start(props, url);
+    } catch (error) {
+      // Live Activities turned off for the app, or the system refusing one: the workout goes on.
+      recordQuietFailure('widget.workoutActivity', error);
+    }
+    await endEach(others);
+  });
 }
 
 /** Ends the card: the workout was finished or cancelled, or the person signed out. */
 export async function endWorkoutActivities(): Promise<void> {
-  current = null;
-  await endEach(existing());
+  shown = null;
+  await withWidgets('workoutActivity', ({ workoutActivity }) =>
+    endEach(workoutActivity.getInstances()),
+  );
 }
 
 /** Ends the card if it's this workout's -- a group found finished when it's opened. */
 export async function endWorkoutActivity(key: string): Promise<void> {
-  if (current?.key === key) await endWorkoutActivities();
+  if (shown?.key === key) await endWorkoutActivities();
 }
 
 /**
@@ -67,9 +64,9 @@ export async function endWorkoutActivity(key: string): Promise<void> {
  * from Feed's own check.
  */
 export async function endClosedWorkoutActivities(openKeys: string[]): Promise<void> {
-  if (current) {
-    if (!openKeys.includes(current.key)) await endWorkoutActivities();
+  if (shown) {
+    if (!openKeys.includes(shown.key)) await endWorkoutActivities();
     return;
   }
-  if (openKeys.length === 0) await endEach(existing());
+  if (openKeys.length === 0) await endWorkoutActivities();
 }

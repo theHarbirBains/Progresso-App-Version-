@@ -23,13 +23,13 @@ export function WidgetSync() {
   const { goals, loading: goalsLoading, error: goalsError } = useNutritionGoals();
 
   useEffect(() => {
-    if (status === 'signedOut') clearWidgets();
+    if (status === 'signedOut') void clearWidgets();
   }, [status]);
 
   useEffect(() => {
     // Only once both are really known: never a half-loaded day, nor a failed read's empty one.
     if (status !== 'signedIn' || logsLoading || goalsLoading || logsError || goalsError) return;
-    showNutritionWidget(sumDailyTotals(logs), goals ?? NO_TARGETS);
+    void showNutritionWidget(sumDailyTotals(logs), goals ?? NO_TARGETS);
   }, [status, logs, goals, logsLoading, goalsLoading, logsError, goalsError]);
 
   return null;

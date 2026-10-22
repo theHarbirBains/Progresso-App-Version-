@@ -11,6 +11,8 @@ interface Props {
   access: StepsAccess | null;
   steps: number | null;
   connecting: boolean;
+  /** Why Apple Health couldn't be reached, if it couldn't. */
+  failure?: string | null;
   onConnect: () => void;
 }
 
@@ -20,7 +22,22 @@ interface Props {
  * Feed's other figures. Absent off iPhone. Apple Health hides whether reading was allowed, so a
  * count of 0 comes with where to check.
  */
-export function StepsCard({ access, steps, connecting, onConnect }: Props) {
+export function StepsCard({ access, steps, connecting, failure, onConnect }: Props) {
+  if (failure && access !== 'asked') {
+    return (
+      <Card testID="feed-steps">
+        <View style={styles.heading}>
+          <Feather name="trending-up" size={13} color={colors.textMuted} />
+          <Text style={styles.label}>Steps</Text>
+          <Text style={styles.source}>Apple Health</Text>
+        </View>
+        <Text style={styles.body}>Apple Health couldn’t be reached, so steps can’t show.</Text>
+        <Text testID="feed-steps-failure" style={styles.failure}>
+          {failure}
+        </Text>
+      </Card>
+    );
+  }
   if (access === null || access === 'unavailable') return null;
 
   const heading = (
@@ -94,6 +111,11 @@ const styles = StyleSheet.create({
   hint: {
     ...typeScale.secondary,
     color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  failure: {
+    ...typeScale.caption,
+    color: colors.textMuted,
     marginTop: spacing.xs,
   },
 });

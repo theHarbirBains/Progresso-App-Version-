@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { recordQuietFailure } from '../lib/sentry';
 import { showStepsWidget } from '../widgets/widgetUpdates';
 import { askForSteps, stepsAccess, stepsToday, type StepsAccess } from './steps';
@@ -10,6 +10,8 @@ export interface StepsToday {
   /** Today's count once asked, else null. */
   steps: number | null;
   connecting: boolean;
+  /** Why Apple Health couldn't be reached, when it couldn't -- shown on the card, not hidden. */
+  failure: string | null;
   /** Reads the count again -- Feed calls it each time it's shown. */
   refresh: () => Promise<void>;
   /** Asks Apple Health for steps, then reads them. */
@@ -26,27 +28,36 @@ export function useStepsToday(): StepsToday {
   const [access, setAccess] = useState<StepsAccess | null>(null);
   const [steps, setSteps] = useState<number | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const mounted = useRef(true);
+
+  const failed = useCallback((error: unknown) => {
+    recordQuietFailure('health.steps', error);
+    if (mounted.current && Platform.OS === 'ios') {
+      setFailure(error instanceof Error ? error.message || error.name : String(error));
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
       const nextAccess = await stepsAccess();
       if (!mounted.current) return;
       setAccess(nextAccess);
+      setFailure(null);
       if (nextAccess === 'unavailable') return;
       if (nextAccess === 'notAsked') {
-        showStepsWidget(null);
+        void showStepsWidget(null);
         return;
       }
       const count = await stepsToday();
       if (!mounted.current) return;
       setSteps(count);
-      showStepsWidget(count);
+      void showStepsWidget(count);
     } catch (error) {
-      // The card keeps what it last showed; Feed goes on.
-      recordQuietFailure('health.steps', error);
+      // Feed goes on; the card says what went wrong.
+      failed(error);
     }
-  }, []);
+  }, [failed]);
 
   const connect = useCallback(async () => {
     setConnecting(true);
@@ -54,11 +65,11 @@ export function useStepsToday(): StepsToday {
       await askForSteps();
       await refresh();
     } catch (error) {
-      recordQuietFailure('health.steps', error);
+      failed(error);
     } finally {
       if (mounted.current) setConnecting(false);
     }
-  }, [refresh]);
+  }, [refresh, failed]);
 
   useEffect(() => {
     mounted.current = true;
@@ -71,5 +82,5 @@ export function useStepsToday(): StepsToday {
     };
   }, [refresh]);
 
-  return { access, steps, connecting, refresh, connect };
+  return { access, steps, connecting, failure, refresh, connect };
 }

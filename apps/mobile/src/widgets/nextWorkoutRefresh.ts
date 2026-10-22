@@ -13,14 +13,14 @@ import { showNextWorkoutWidget } from './widgetUpdates';
 export async function refreshNextWorkout(userId: string, activeSplitId: string | null) {
   try {
     if (!activeSplitId) {
-      showNextWorkoutWidget(null, null);
+      await showNextWorkoutWidget(null, null);
       return;
     }
     const [detail, lastDayId] = await Promise.all([
       fetchWorkoutSplitDetail(activeSplitId),
       fetchLastWorkoutSplitDayId(userId),
     ]);
-    showNextWorkoutWidget(null, computeNextWorkout(detail, lastDayId));
+    await showNextWorkoutWidget(null, computeNextWorkout(detail, lastDayId));
   } catch (error) {
     recordQuietFailure('widget.nextWorkout', error);
   }

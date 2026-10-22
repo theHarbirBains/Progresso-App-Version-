@@ -74,31 +74,31 @@ describe('nextWorkoutProps', () => {
 });
 
 describe('updating the widgets', () => {
-  it("hands Today's Nutrition its timeline", () => {
+  it("hands Today's Nutrition its timeline", async () => {
     const now = new Date(2026, 9, 22, 12);
-    showNutritionWidget({ calories: 760, proteinG: 92, carbsG: 80, fatG: 21 }, TARGETS, now);
+    await showNutritionWidget({ calories: 760, proteinG: 92, carbsG: 80, fatG: 21 }, TARGETS, now);
     const [entries] = (nutritionWidget.updateTimeline as jest.Mock).mock.calls[0];
     expect(entries).toHaveLength(2);
     expect(entries[0]).toMatchObject({ date: now, props: { calories: '1,240' } });
   });
 
-  it('hands Steps and Next Workout what they show', () => {
-    showStepsWidget(8412, new Date(2026, 9, 22, 12));
+  it('hands Steps and Next Workout what they show', async () => {
+    await showStepsWidget(8412, new Date(2026, 9, 22, 12));
     expect((stepsWidget.updateTimeline as jest.Mock).mock.calls[0][0][0].props.steps).toBe('8,412');
-    showNextWorkoutWidget(null, PLAN);
+    await showNextWorkoutWidget(null, PLAN);
     expect(nextWorkoutWidget.updateSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Pull' }),
     );
   });
 
-  it("records a widget that can't be updated, without stopping the app", () => {
+  it("records a widget that can't be updated, without stopping the app", async () => {
     const failure = new Error('No app group');
     (nutritionWidget.updateTimeline as jest.Mock).mockImplementationOnce(() => {
       throw failure;
     });
-    expect(() =>
+    await expect(
       showNutritionWidget({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, TARGETS),
-    ).not.toThrow();
+    ).resolves.toBeUndefined();
     expect(recordQuietFailure).toHaveBeenCalledWith('widget.nutrition', failure);
   });
 
@@ -111,7 +111,7 @@ describe('updating the widgets', () => {
     const card = (workoutActivity.start as jest.Mock).mock.results[0].value;
     (workoutActivity.getInstances as jest.Mock).mockReturnValueOnce([card]);
 
-    clearWidgets();
+    await clearWidgets();
 
     expect(nutritionWidget.updateSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({ signedIn: false, calories: '', macros: [] }),
@@ -122,7 +122,6 @@ describe('updating the widgets', () => {
     expect(stepsWidget.updateSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({ signedIn: false, steps: null }),
     );
-    await Promise.resolve();
     expect(card.end).toHaveBeenCalledWith('immediate');
   });
 });

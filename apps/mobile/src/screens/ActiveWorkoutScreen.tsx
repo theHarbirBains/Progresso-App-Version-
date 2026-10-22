@@ -192,7 +192,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           { title: detail.name, kind: 'Your workout', startedAt: Date.parse(detail.performedAt) },
           liveUrl,
         );
-        showNextWorkoutWidget(
+        void showNextWorkoutWidget(
           {
             title: detail.name,
             kind: 'Your workout',

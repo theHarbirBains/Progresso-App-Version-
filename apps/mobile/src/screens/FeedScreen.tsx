@@ -447,7 +447,7 @@ export function FeedScreen({ navigation }: Props) {
   const heroUrl = liveHero?.url;
   useEffect(() => {
     if (!liveKnown || (heroTitle === undefined && !nextKnown)) return;
-    showNextWorkoutWidget(
+    void showNextWorkoutWidget(
       heroTitle !== undefined && heroKind !== undefined && heroUrl !== undefined
         ? { title: heroTitle, kind: heroKind, startedAt: heroStartedAt, url: heroUrl }
         : null,
@@ -715,12 +715,13 @@ export function FeedScreen({ navigation }: Props) {
           </RiseIn>
         ) : null}
 
-        {steps.access === 'notAsked' || steps.access === 'asked' ? (
+        {steps.access === 'notAsked' || steps.access === 'asked' || steps.failure ? (
           <RiseIn>
             <StepsCard
               access={steps.access}
               steps={steps.steps}
               connecting={steps.connecting}
+              failure={steps.failure}
               onConnect={() => void steps.connect()}
             />
           </RiseIn>

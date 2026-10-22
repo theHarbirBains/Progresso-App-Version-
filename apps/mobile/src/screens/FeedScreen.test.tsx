@@ -1144,6 +1144,17 @@ describe('FeedScreen -- Steps', () => {
     jest.mocked(getRequestStatusForAuthorization).mockResolvedValue(1);
   });
 
+  it("says Apple Health couldn't be reached, and why, rather than hiding the card", async () => {
+    jest.mocked(isHealthDataAvailable).mockImplementation(() => {
+      throw new Error('NitroModules are not installed');
+    });
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-steps-failure')).toHaveTextContent(
+      'NitroModules are not installed',
+    );
+  });
+
   it('says where to check when no steps come back', async () => {
     jest.mocked(getRequestStatusForAuthorization).mockResolvedValueOnce(2);
     jest.mocked(queryStatisticsForQuantity).mockResolvedValueOnce({ sources: [] } as never);
