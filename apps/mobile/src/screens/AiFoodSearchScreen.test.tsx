@@ -156,6 +156,10 @@ const CHOOSE = {
             brand: null,
             score: 0.88,
             reasons: [],
+            figures: {
+              nutrients: { calories: 93, proteinG: 2.5, carbsG: 21.2, fatG: 0.1 },
+              per: 'for 100 g',
+            },
           },
           {
             sourceKind: 'progresso_catalog' as const,
@@ -164,6 +168,10 @@ const CHOOSE = {
             brand: null,
             score: 0.83,
             reasons: [],
+            figures: {
+              nutrients: { calories: 90, proteinG: 2, carbsG: 20.7, fatG: 0.2 },
+              per: 'for 100 g',
+            },
           },
         ],
       },
@@ -248,7 +256,7 @@ describe('AiFoodSearchScreen', () => {
       '100 g air fried potatoes',
     );
     expect(screen.getByTestId('ai-food-review-calories')).toHaveTextContent('93', { exact: false });
-    expect(screen.getByTestId('ai-food-review-component-0')).toHaveTextContent(
+    expect(screen.getByTestId('ai-food-review-part-0')).toHaveTextContent(
       'From Progresso food data: Potato (baked) (verified)',
       { exact: false },
     );
@@ -315,6 +323,25 @@ describe('AiFoodSearchScreen', () => {
     expect(mockInterpret).toHaveBeenCalledTimes(1);
   });
 
+  it('shows each choice with its calories and macros, the closest match marked', async () => {
+    mockInterpret.mockResolvedValue(CHOOSE);
+    renderScreen();
+    describeFood('potato');
+
+    const first = await screen.findByTestId('ai-food-choice-0-0');
+    expect(first).toHaveTextContent(/Potato \(baked\).*Best match.*93.*cal for 100 g/);
+    expect(first).toHaveTextContent(/2\.5 g.*Protein.*21\.2 g.*Carbs.*0\.1 g.*Fat/);
+    const second = screen.getByTestId('ai-food-choice-0-1');
+    expect(second).toHaveTextContent(/Sweet Potato \(baked\).*90/);
+    expect(second).not.toHaveTextContent(/Best match/);
+    expect(second.props.accessibilityLabel).toBe(
+      'Choose Sweet Potato (baked): 90 calories, 2 grams protein, 20.7 carbs, 0.2 fat, for 100 g',
+    );
+    expect(screen.getByTestId('ai-food-review-incomplete')).toHaveTextContent(
+      'One part needs you below; then the totals appear.',
+    );
+  });
+
   it('does not allow adding while any part is still pending', async () => {
     mockInterpret.mockResolvedValue(NEEDS_AMOUNT);
     renderScreen();
@@ -351,7 +378,7 @@ describe('AiFoodSearchScreen', () => {
     describeFood('dragon fruit');
 
     expect(await screen.findByTestId('ai-food-review-estimate-warning')).toBeTruthy();
-    expect(screen.getByTestId('ai-food-review-component-0')).toHaveTextContent(
+    expect(screen.getByTestId('ai-food-review-part-0')).toHaveTextContent(
       'AI estimate, not verified',
       { exact: false },
     );

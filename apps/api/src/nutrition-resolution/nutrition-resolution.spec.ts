@@ -1,7 +1,7 @@
 // Tests for the nutrition-resolution modules. Pure logic only: no network, no database.
 
 import { candidateFromUsda, measuresFromUsda, nutrientsFromUsda } from './usda-fdc.mapping';
-import { resolveComponent, type ComponentInput } from './resolver';
+import { choiceFigures, resolveComponent, type ComponentInput } from './resolver';
 import { scaleFor } from './quantity';
 import { nameScore, brandScore, scoreCandidate, tokenize } from './scoring';
 import type {
@@ -348,6 +348,34 @@ describe('resolveComponent', () => {
     expect(outcome).toMatchObject({ status: 'choose' });
     if (outcome.status !== 'choose') throw new Error('expected choose');
     expect(outcome.choices).toHaveLength(2);
+    // "1 item" doesn't name a size, so each choice says what it comes to per 100 g.
+    expect(outcome.choices[0]!.figures).toEqual({
+      nutrients: { calories: 93, proteinG: 2.5, carbsG: 21.2, fatG: 0.1 },
+      per: 'per 100 g',
+    });
+  });
+
+  it("gives each choice's figures for the amount given, when the source can express it", () => {
+    const potato = candidate({ matchedName: 'Potato, baked' });
+    expect(choiceFigures(potato, { amount: 150, unit: 'g' })).toEqual({
+      nutrients: { calories: 140, proteinG: 3.8, carbsG: 31.8, fatG: 0.2 },
+      per: 'for 150 g',
+    });
+    expect(choiceFigures(potato, null).per).toBe('per 100 g');
+
+    const bar = candidate({
+      matchedName: 'Protein bar',
+      basis: {
+        kind: 'per_serving',
+        size: 60,
+        unit: 'g',
+        nutrients: { calories: 220, proteinG: 20, carbsG: 24, fatG: 7 },
+      },
+    });
+    expect(choiceFigures(bar, { amount: 2, unit: 'cup' })).toEqual({
+      nutrients: { calories: 220, proteinG: 20, carbsG: 24, fatG: 7 },
+      per: 'per serving (60 g)',
+    });
   });
 
   it('never resolves a named brand to a different product', async () => {

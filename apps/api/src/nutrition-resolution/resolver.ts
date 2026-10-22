@@ -11,6 +11,7 @@ import {
 } from './scoring';
 import type {
   FoodQuery,
+  Nutrients,
   NutritionSource,
   Provenance,
   ResolvedComponent,
@@ -47,6 +48,12 @@ export interface Choice {
   brand: string | null;
   score: number;
   reasons: string[];
+  /**
+   * What this candidate comes to, so the person can tell the choices apart: for the amount they
+   * gave when the source can express it ("for 2 large"), otherwise for the source's own basis
+   * ("per 100 g", "per serving (30 g)"). Calories whole, macros to 0.1 g.
+   */
+  figures: { nutrients: Nutrients; per: string };
 }
 
 export type ResolutionOutcome =
@@ -114,18 +121,58 @@ function provenanceFor(
   };
 }
 
-function chooseOutcome(name: string, ranked: ScoredCandidate[]): ResolutionOutcome {
+function rounded(nutrients: Nutrients): Nutrients {
+  const tenth = (value: number) => Math.round(value * 10) / 10;
+  return {
+    calories: Math.round(nutrients.calories),
+    proteinG: tenth(nutrients.proteinG),
+    carbsG: tenth(nutrients.carbsG),
+    fatG: tenth(nutrients.fatG),
+  };
+}
+
+/** A candidate's figures for the amount given when it can be worked out, else for its own basis. */
+export function choiceFigures(
+  candidate: SourceCandidate,
+  quantity: Amount | null,
+): Choice['figures'] {
+  if (quantity) {
+    const scale = scaleFor(quantity, candidate);
+    if (scale.ok) {
+      return {
+        nutrients: rounded(scaleNutrients(candidate.basis.nutrients, scale.factor)),
+        per: `for ${quantity.amount} ${quantity.unit}`,
+      };
+    }
+  }
+  const { basis } = candidate;
+  return {
+    nutrients: rounded(basis.nutrients),
+    per: basis.kind === 'per_100g' ? 'per 100 g' : `per serving (${basis.size} ${basis.unit})`,
+  };
+}
+
+function choiceFrom(scored: ScoredCandidate, quantity: Amount | null): Choice {
+  return {
+    sourceKind: scored.candidate.sourceKind,
+    sourceId: scored.candidate.sourceId,
+    matchedName: scored.candidate.matchedName,
+    brand: scored.candidate.brand,
+    score: scored.score,
+    reasons: scored.reasons,
+    figures: choiceFigures(scored.candidate, quantity),
+  };
+}
+
+function chooseOutcome(
+  name: string,
+  ranked: ScoredCandidate[],
+  quantity: Amount | null,
+): ResolutionOutcome {
   return {
     status: 'choose',
     name,
-    choices: ranked.slice(0, 3).map((scored) => ({
-      sourceKind: scored.candidate.sourceKind,
-      sourceId: scored.candidate.sourceId,
-      matchedName: scored.candidate.matchedName,
-      brand: scored.candidate.brand,
-      score: scored.score,
-      reasons: scored.reasons,
-    })),
+    choices: ranked.slice(0, 3).map((scored) => choiceFrom(scored, quantity)),
   };
 }
 
@@ -169,7 +216,7 @@ export async function resolveComponent(
     if (!unambiguous) {
       // A strong but ambiguous set stops the search: the user chooses among the closest real
       // matches, rather than a weaker source silently taking over. A weak set is only a fallback.
-      if (top.score >= AUTO_ACCEPT_SCORE) return chooseOutcome(input.name, ranked);
+      if (top.score >= AUTO_ACCEPT_SCORE) return chooseOutcome(input.name, ranked, input.quantity);
       firstWithChoices ??= ranked;
       continue;
     }
@@ -216,19 +263,6 @@ export async function resolveComponent(
 
   if (firstNeedsQuantity) return firstNeedsQuantity;
 
-  if (firstWithChoices) {
-    return {
-      status: 'choose',
-      name: input.name,
-      choices: firstWithChoices.slice(0, 3).map((scored) => ({
-        sourceKind: scored.candidate.sourceKind,
-        sourceId: scored.candidate.sourceId,
-        matchedName: scored.candidate.matchedName,
-        brand: scored.candidate.brand,
-        score: scored.score,
-        reasons: scored.reasons,
-      })),
-    };
-  }
+  if (firstWithChoices) return chooseOutcome(input.name, firstWithChoices, input.quantity);
   return { status: 'not_found', name: input.name };
 }

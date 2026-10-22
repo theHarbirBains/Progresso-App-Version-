@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
+import { ChoiceTile } from '../design/ChoiceTile';
+import { RiseInStack } from '../design/RiseIn';
+import { Section } from '../design/Section';
 import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 import type {
+  Choice,
   ComponentPick,
   ComponentRequest,
   ComponentStatus,
@@ -44,9 +48,24 @@ const SOURCE_LABEL: Record<string, string> = {
   usda_fdc: 'USDA FoodData Central',
 };
 
-// The review of an interpreted food, before anything is saved. Each part states where its figures
-// came from. Parts still missing an amount or a choice can be resolved right here, so the whole
-// search never has to restart.
+function grams(value: number): string {
+  return `${Math.round(value * 10) / 10} g`;
+}
+
+type Figured = Extract<ComponentStatus, { component: unknown }>;
+
+// The review of an interpreted food, before anything is saved, as widgets that roll out in turn:
+// - the food: its name and amount, how it was prepared, the AI-estimate warning, and its totals
+//   as four StatBlocks (or a line saying they come once every part is set);
+// - one widget per part still waiting on the person: "Which potato did you mean?" with each
+//   candidate as a tile -- its name and brand, where the figures come from, its calories in the
+//   accent and protein / carbs / fat, for the amount described (or per 100 g / per serving when
+//   that amount can't be worked out), the closest match marked -- or "How much?" with the
+//   source's own amounts as tiles and a field for their own;
+// - what's in it: each settled part with its amount, calories and where they came from;
+// - the actions: Review & Log, Add to Food Library, Describe again.
+// Each part says where its figures came from, and a part can be settled right here, so the
+// whole search never has to restart.
 export function InterpretedFoodReview({
   interpretation,
   duplicateName,
@@ -65,268 +84,430 @@ export function InterpretedFoodReview({
     interpretation.servingSize !== null && interpretation.servingUnit !== null
       ? `${interpretation.servingSize} ${interpretation.servingUnit} ${interpretation.name}`
       : interpretation.name;
+  const pending = interpretation.components.filter(
+    (status) => status.state !== 'resolved' && status.state !== 'ai_estimate',
+  );
+  const figured = interpretation.components.filter(
+    (status): status is Figured => status.state === 'resolved' || status.state === 'ai_estimate',
+  );
 
   return (
-    <AppCard testID="ai-food-review">
-      <View style={styles.group}>
-        <Text style={styles.title}>Review before adding</Text>
-        <Text testID="ai-food-review-serving" style={styles.serving}>
-          {servingLine}
-        </Text>
-        {interpretation.preparation ? (
-          <Text testID="ai-food-review-preparation" style={styles.secondary}>
-            {`Prepared: ${interpretation.preparation}`}
+    <View style={styles.widgets}>
+      <RiseInStack>
+        <AppCard hero topAccent={accentColor} testID="ai-food-review">
+          <Text style={styles.eyebrow}>Your food</Text>
+          <Text testID="ai-food-review-serving" style={styles.title}>
+            {servingLine}
           </Text>
-        ) : null}
+          {interpretation.preparation ? (
+            <Text testID="ai-food-review-preparation" style={styles.secondary}>
+              {`Prepared: ${interpretation.preparation}`}
+            </Text>
+          ) : null}
+          {interpretation.hasEstimate ? (
+            <Text testID="ai-food-review-estimate-warning" style={styles.secondary}>
+              {
+                "Includes an AI estimate that hasn't been checked against food data. Check it before adding."
+              }
+            </Text>
+          ) : null}
+          {totals ? (
+            <View style={styles.statRows}>
+              <View style={styles.statRow}>
+                <StatBlock
+                  testID="ai-food-review-calories"
+                  value={`${totals.calories}`}
+                  label="Calories"
+                  valueColor={accentColor}
+                />
+                <StatBlock
+                  testID="ai-food-review-protein"
+                  value={grams(totals.proteinG)}
+                  label="Protein"
+                />
+              </View>
+              <View style={styles.statRow}>
+                <StatBlock
+                  testID="ai-food-review-carbs"
+                  value={grams(totals.carbsG)}
+                  label="Carbs"
+                />
+                <StatBlock testID="ai-food-review-fat" value={grams(totals.fatG)} label="Fat" />
+              </View>
+            </View>
+          ) : (
+            <Text testID="ai-food-review-incomplete" style={styles.secondary}>
+              {pending.length === 1
+                ? 'One part needs you below; then the totals appear.'
+                : `${pending.length} parts need you below; then the totals appear.`}
+            </Text>
+          )}
+        </AppCard>
 
-        {interpretation.hasEstimate ? (
-          <Text testID="ai-food-review-estimate-warning" style={styles.warning}>
-            {
-              "Includes an AI estimate that hasn't been checked against food data. Check it before adding."
-            }
-          </Text>
-        ) : null}
-
-        {totals ? (
-          <View style={styles.stats}>
-            <StatBlock
-              testID="ai-food-review-calories"
-              value={`${totals.calories}`}
-              label="Calories"
-            />
-            <StatBlock
-              testID="ai-food-review-protein"
-              value={`${totals.proteinG} g`}
-              label="Protein"
-            />
-            <StatBlock testID="ai-food-review-carbs" value={`${totals.carbsG} g`} label="Carbs" />
-            <StatBlock testID="ai-food-review-fat" value={`${totals.fatG} g`} label="Fat" />
-          </View>
-        ) : (
-          <Text testID="ai-food-review-incomplete" style={styles.secondary}>
-            Totals appear once every part has its amount and source.
-          </Text>
-        )}
-
-        <View style={styles.components}>
-          {interpretation.components.map((status) => {
-            const index = status.request.index;
-            const busy = resolvingIndex === index;
-            return (
-              <View
-                key={index}
-                testID={`ai-food-review-component-${index}`}
-                style={styles.component}
-              >
-                {status.state === 'resolved' || status.state === 'ai_estimate' ? (
-                  <FigureRow status={status} />
-                ) : null}
-
-                {status.state === 'needs_quantity' ? (
-                  <View style={styles.pending}>
-                    <Text style={styles.componentName}>{`How much ${status.request.name}?`}</Text>
-                    <Text style={styles.componentDetail}>{status.reason}</Text>
-                    <View style={styles.chips}>
-                      {status.options.map((option, optionIndex) => (
-                        <Pressable
-                          key={`${option.label}-${optionIndex}`}
-                          testID={`ai-food-option-${index}-${optionIndex}`}
-                          disabled={busy}
-                          onPress={() =>
-                            onResolve(status.request, null, {
-                              amount: option.amount,
-                              unit: option.unit,
-                            })
-                          }
-                          accessibilityRole="button"
-                          accessibilityLabel={`Use ${option.label}`}
-                          style={[styles.chip, { borderColor: accentColor }]}
-                        >
-                          <Text style={styles.chipText}>{option.label}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                    <View style={styles.amountRow}>
-                      <TextInput
-                        testID={`ai-food-amount-input-${index}`}
-                        placeholder="e.g. 2 large or 150 g"
-                        value={amountDrafts[index] ?? ''}
-                        onChangeText={(text) =>
-                          setAmountDrafts((drafts) => ({ ...drafts, [index]: text }))
-                        }
-                        autoCapitalize="none"
-                      />
-                      <SecondaryButton
-                        testID={`ai-food-amount-submit-${index}`}
-                        label="Use amount"
-                        disabled={busy || parseAmount(amountDrafts[index] ?? '') === null}
-                        onPress={() => {
-                          const parsed = parseAmount(amountDrafts[index] ?? '');
-                          if (parsed) onResolve(status.request, null, parsed);
-                        }}
-                      />
-                    </View>
-                  </View>
-                ) : null}
-
-                {status.state === 'choose' ? (
-                  <View style={styles.pending}>
-                    <Text
-                      style={styles.componentName}
-                    >{`Which ${status.request.name} did you mean?`}</Text>
+        {pending.map((status) => {
+          const index = status.request.index;
+          const busy = resolvingIndex === index;
+          return (
+            <AppCard key={index} testID={`ai-food-review-component-${index}`}>
+              {status.state === 'choose' ? (
+                <Section title={`Which ${status.request.name} did you mean?`}>
+                  <Text style={styles.secondary}>Tap the one closest to what you ate.</Text>
+                  <View style={styles.tiles}>
                     {status.choices.map((choice, choiceIndex) => (
-                      <Pressable
+                      <ChoiceTile
                         key={`${choice.sourceKind}-${choice.sourceId}`}
                         testID={`ai-food-choice-${index}-${choiceIndex}`}
-                        disabled={busy}
-                        onPress={() =>
+                        onPress={() => {
+                          if (busy) return;
                           onResolve(
                             status.request,
                             { sourceKind: choice.sourceKind, sourceId: choice.sourceId },
                             status.request.quantity,
-                          )
-                        }
-                        accessibilityRole="button"
-                        accessibilityLabel={`Choose ${choice.matchedName}`}
-                        style={styles.choice}
+                          );
+                        }}
+                        accentColor={accentColor}
+                        onAccentColor={onAccentColor}
+                        accessibilityLabel={choiceLabel(choice)}
                       >
-                        <Text style={styles.componentName}>
-                          {choice.brand
-                            ? `${choice.brand} · ${choice.matchedName}`
-                            : choice.matchedName}
-                        </Text>
-                        <Text style={styles.componentDetail}>
-                          {SOURCE_LABEL[choice.sourceKind] ?? choice.sourceKind}
-                        </Text>
-                      </Pressable>
+                        <ChoiceBody
+                          choice={choice}
+                          best={choiceIndex === 0}
+                          accentColor={accentColor}
+                        />
+                      </ChoiceTile>
                     ))}
                   </View>
-                ) : null}
+                </Section>
+              ) : null}
 
-                {status.state === 'not_found' ? (
-                  <Text style={styles.warning}>{`${status.request.name}: ${status.reason}`}</Text>
-                ) : null}
-                {busy ? <Text style={styles.componentDetail}>Looking this up…</Text> : null}
-              </View>
-            );
-          })}
-        </View>
+              {status.state === 'needs_quantity' ? (
+                <Section title={`How much ${status.request.name}?`}>
+                  <Text style={styles.secondary}>{status.reason}</Text>
+                  <View style={styles.amounts}>
+                    {status.options.map((option, optionIndex) => (
+                      <ChoiceTile
+                        key={`${option.label}-${optionIndex}`}
+                        testID={`ai-food-option-${index}-${optionIndex}`}
+                        onPress={() => {
+                          if (busy) return;
+                          onResolve(status.request, null, {
+                            amount: option.amount,
+                            unit: option.unit,
+                          });
+                        }}
+                        accessibilityLabel={`Use ${option.label}`}
+                        style={styles.amountTile}
+                      >
+                        <Text style={styles.amountText}>{option.label}</Text>
+                      </ChoiceTile>
+                    ))}
+                  </View>
+                  <View style={styles.ownAmount}>
+                    <TextInput
+                      testID={`ai-food-amount-input-${index}`}
+                      label="Or your own amount"
+                      placeholder="e.g. 2 large or 150 g"
+                      value={amountDrafts[index] ?? ''}
+                      onChangeText={(text) =>
+                        setAmountDrafts((drafts) => ({ ...drafts, [index]: text }))
+                      }
+                      autoCapitalize="none"
+                    />
+                    <SecondaryButton
+                      testID={`ai-food-amount-submit-${index}`}
+                      label="Use amount"
+                      disabled={busy || parseAmount(amountDrafts[index] ?? '') === null}
+                      onPress={() => {
+                        const parsed = parseAmount(amountDrafts[index] ?? '');
+                        if (parsed) onResolve(status.request, null, parsed);
+                      }}
+                    />
+                  </View>
+                </Section>
+              ) : null}
 
-        {duplicateName ? (
-          <Text testID="ai-food-review-duplicate" style={styles.warning}>
-            {`"${duplicateName}" is already in your Food Library, so it won't be added twice.`}
-          </Text>
+              {status.state === 'not_found' ? (
+                <Section title={status.request.name}>
+                  <Text style={styles.secondary}>{status.reason}</Text>
+                </Section>
+              ) : null}
+
+              {busy ? (
+                <View testID={`ai-food-review-busy-${index}`} style={styles.busy}>
+                  <ActivityIndicator color={colors.textMuted} />
+                  <Text style={styles.caption}>Looking this up…</Text>
+                </View>
+              ) : null}
+            </AppCard>
+          );
+        })}
+
+        {figured.length > 0 ? (
+          <AppCard testID="ai-food-review-parts">
+            <Section title="What's in it">
+              {figured.map((status, position) => (
+                <View
+                  key={status.request.index}
+                  testID={`ai-food-review-part-${status.request.index}`}
+                  style={[styles.part, position > 0 && styles.partDivider]}
+                >
+                  <View style={styles.partHead}>
+                    <Text style={styles.partName}>
+                      {`${status.component.quantity.amount} ${status.component.quantity.unit} ${status.component.name}`}
+                    </Text>
+                    <Text style={styles.partCalories}>
+                      {`${status.component.nutrients.calories} cal`}
+                    </Text>
+                  </View>
+                  <Text style={styles.caption}>{componentSourceLabel(status)}</Text>
+                  {status.component.provenance.assumptions.map((assumption) => (
+                    <Text key={assumption} style={styles.caption}>
+                      {assumption}
+                    </Text>
+                  ))}
+                </View>
+              ))}
+            </Section>
+          </AppCard>
         ) : null}
 
-        <PrimaryButton
-          testID="ai-food-log"
-          label="Review & Log"
-          disabled={adding || !interpretation.complete}
-          onPress={onLog}
-          accentColor={accentColor}
-          onAccentColor={onAccentColor}
-        />
-        <SecondaryButton
-          testID="ai-food-add"
-          label={adding ? 'Adding…' : 'Add to Food Library'}
-          loading={adding}
-          disabled={adding || !interpretation.complete || duplicateName !== null}
-          onPress={onAdd}
-        />
-        <SecondaryButton
-          testID="ai-food-describe-again"
-          label="Describe again"
-          disabled={adding}
-          onPress={onDescribeAgain}
-        />
-      </View>
-    </AppCard>
+        <AppCard testID="ai-food-review-actions">
+          <View style={styles.actions}>
+            {duplicateName ? (
+              <Text testID="ai-food-review-duplicate" style={styles.secondary}>
+                {`"${duplicateName}" is already in your Food Library, so it won't be added twice.`}
+              </Text>
+            ) : null}
+            <PrimaryButton
+              testID="ai-food-log"
+              label="Review & Log"
+              disabled={adding || !interpretation.complete}
+              onPress={onLog}
+              accentColor={accentColor}
+              onAccentColor={onAccentColor}
+            />
+            <SecondaryButton
+              testID="ai-food-add"
+              label={adding ? 'Adding…' : 'Add to Food Library'}
+              loading={adding}
+              disabled={adding || !interpretation.complete || duplicateName !== null}
+              onPress={onAdd}
+            />
+            <SecondaryButton
+              testID="ai-food-describe-again"
+              label="Describe again"
+              disabled={adding}
+              onPress={onDescribeAgain}
+            />
+          </View>
+        </AppCard>
+      </RiseInStack>
+    </View>
   );
 }
 
-function FigureRow({ status }: { status: Extract<ComponentStatus, { component: unknown }> }) {
-  const { component } = status;
+function choiceName(choice: Choice): string {
+  return choice.brand ? `${choice.brand} · ${choice.matchedName}` : choice.matchedName;
+}
+
+function choiceLabel(choice: Choice): string {
+  const name = choiceName(choice);
+  if (!choice.figures) return `Choose ${name}`;
+  const { nutrients, per } = choice.figures;
+  return `Choose ${name}: ${nutrients.calories} calories, ${nutrients.proteinG} grams protein, ${nutrients.carbsG} carbs, ${nutrients.fatG} fat, ${per}`;
+}
+
+/** One candidate: its name, where it's from, and what it comes to. */
+function ChoiceBody({
+  choice,
+  best,
+  accentColor,
+}: {
+  choice: Choice;
+  best: boolean;
+  accentColor: string;
+}) {
   return (
-    <>
-      <Text style={styles.componentName}>
-        {`${component.quantity.amount} ${component.quantity.unit} ${component.name}`}
-      </Text>
-      <Text style={styles.componentDetail}>
-        {`${component.nutrients.calories} kcal · ${componentSourceLabel(status)}`}
-      </Text>
-      {component.provenance.assumptions.map((assumption) => (
-        <Text key={assumption} style={styles.componentDetail}>
-          {assumption}
-        </Text>
-      ))}
-    </>
+    <View style={styles.choice}>
+      <View style={styles.choiceHead}>
+        <View style={styles.choiceNames}>
+          <Text style={styles.choiceName}>{choice.matchedName}</Text>
+          <Text style={styles.caption}>
+            {[choice.brand, SOURCE_LABEL[choice.sourceKind] ?? choice.sourceKind]
+              .filter(Boolean)
+              .join(' · ')}
+          </Text>
+        </View>
+        {best ? (
+          <View style={[styles.bestTag, { borderColor: accentColor }]}>
+            <Text style={[styles.bestText, { color: accentColor }]}>Best match</Text>
+          </View>
+        ) : null}
+      </View>
+      {choice.figures ? (
+        <View style={styles.figures}>
+          <View style={styles.calories}>
+            <Text style={[styles.caloriesValue, { color: accentColor }]}>
+              {choice.figures.nutrients.calories}
+            </Text>
+            <Text style={styles.caption}>{`cal ${choice.figures.per}`}</Text>
+          </View>
+          <View style={styles.macros}>
+            <Macro label="Protein" value={choice.figures.nutrients.proteinG} />
+            <Macro label="Carbs" value={choice.figures.nutrients.carbsG} />
+            <Macro label="Fat" value={choice.figures.nutrients.fatG} />
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function Macro({ label, value }: { label: string; value: number }) {
+  return (
+    <View style={styles.macro}>
+      <Text style={styles.macroValue}>{grams(value)}</Text>
+      <Text style={styles.caption}>{label}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  group: {
-    gap: spacing.md,
+  widgets: {
+    gap: widgetGap,
+    marginTop: widgetGap,
+  },
+  eyebrow: {
+    ...typeScale.sectionHeading,
+    color: colors.textMuted,
   },
   title: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
-  },
-  serving: {
-    ...typeScale.callout,
-    color: colors.textPrimary,
+    marginTop: spacing.xs,
   },
   secondary: {
     ...typeScale.secondary,
     color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
-  warning: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-  },
-  stats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  components: {
-    gap: spacing.md,
-  },
-  component: {
-    gap: spacing.xs,
-  },
-  pending: {
-    gap: spacing.sm,
-  },
-  componentName: {
-    ...typeScale.callout,
-    color: colors.textPrimary,
-  },
-  componentDetail: {
+  caption: {
     ...typeScale.caption,
     color: colors.textMuted,
   },
-  chips: {
+  statRows: {
+    gap: widgetGap,
+    marginTop: spacing.md,
+  },
+  statRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: widgetGap,
   },
-  chip: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderRadius: radii.md,
-  },
-  chipText: {
-    ...typeScale.callout,
-    color: colors.textPrimary,
-  },
-  amountRow: {
-    gap: spacing.sm,
+  tiles: {
+    gap: widgetGap,
+    marginTop: spacing.md,
   },
   choice: {
-    minHeight: 44,
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
+    gap: spacing.md,
+    // Room for the check a chosen tile shows in its corner.
+    paddingRight: spacing.lg,
+  },
+  choiceHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  choiceNames: {
+    flex: 1,
+    gap: 2,
+  },
+  choiceName: {
+    ...typeScale.callout,
+    fontFamily: typeScale.cardTitle.fontFamily,
+    color: colors.textPrimary,
+  },
+  bestTag: {
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  bestText: {
+    ...typeScale.caption,
+  },
+  figures: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.md,
+  },
+  calories: {
+    flexShrink: 1,
+  },
+  caloriesValue: {
+    ...typeScale.statMedium,
+  },
+  macros: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.md,
+  },
+  macro: {
+    alignItems: 'flex-end',
+  },
+  macroValue: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+  },
+  amounts: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: widgetGap,
+    marginTop: spacing.md,
+  },
+  amountTile: {
+    minWidth: 96,
+  },
+  amountText: {
+    ...typeScale.callout,
+    fontFamily: typeScale.cardTitle.fontFamily,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  ownAmount: {
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  busy: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  part: {
+    gap: 2,
+    paddingVertical: spacing.sm,
+  },
+  partDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  partHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  partName: {
+    ...typeScale.callout,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  partCalories: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+  },
+  actions: {
+    gap: spacing.sm,
   },
 });

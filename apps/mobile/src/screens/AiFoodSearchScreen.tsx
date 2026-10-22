@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton } from '../design/Button';
+import { RiseIn } from '../design/RiseIn';
 import { Screen } from '../design/Screen';
 import { TextInput } from '../design/TextInput';
 import {
@@ -227,6 +228,8 @@ export function AiFoodSearchScreen({ navigation }: Props) {
   return (
     <Screen
       keyboardAvoiding
+      // The search card rises here, and the review rolls its own widgets out as they arrive.
+      rollout={false}
       scrollTestID="ai-food-search-scroll"
       header={
         <AppHeader
@@ -236,52 +239,54 @@ export function AiFoodSearchScreen({ navigation }: Props) {
         />
       }
     >
-      <AppCard testID="ai-food-search-card">
-        <View style={styles.group}>
-          <Text style={styles.description}>
-            Describe what you ate. Progresso works out the amount and ingredients, and takes the
-            calories and macros from its food data. Review the result before anything is saved.
-          </Text>
-          <Text testID="ai-food-search-accuracy" style={styles.guidance}>
-            For the most accurate estimate, include the amount, serving unit, preparation method,
-            and any oils, sauces, or other ingredients used.
-          </Text>
-          <Text testID="ai-food-search-example" style={styles.example}>
-            {'Example: "150 g chicken breast, air fried with 1 tsp olive oil."'}
-          </Text>
-          <TextInput
-            testID="ai-food-search-input"
-            label="What did you eat?"
-            placeholder="e.g. 100 grams of air fried potatoes with no oil"
-            value={description}
-            onChangeText={setDescription}
-            autoCapitalize="none"
-            returnKeyType="done"
-            onSubmitEditing={handleInterpret}
-          />
-          {clarification ? (
-            <Text testID="ai-food-search-clarification" style={styles.clarificationText}>
-              {clarification}
+      <RiseIn>
+        <AppCard testID="ai-food-search-card">
+          <View style={styles.group}>
+            <Text style={styles.description}>
+              Describe what you ate. Progresso works out the amount and ingredients, and takes the
+              calories and macros from its food data. Review the result before anything is saved.
             </Text>
-          ) : null}
-          {error ? (
-            <Text testID="ai-food-search-error" style={styles.errorText}>
-              {error}
+            <Text testID="ai-food-search-accuracy" style={styles.guidance}>
+              For the most accurate estimate, include the amount, serving unit, preparation method,
+              and any oils, sauces, or other ingredients used.
             </Text>
-          ) : null}
-          {interpretation ? null : (
-            <PrimaryButton
-              testID="ai-food-search-submit"
-              label={loading ? 'Reading…' : 'Get Estimate'}
-              loading={loading}
-              disabled={trimmed.length === 0}
-              onPress={handleInterpret}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
+            <Text testID="ai-food-search-example" style={styles.example}>
+              {'Example: "150 g chicken breast, air fried with 1 tsp olive oil."'}
+            </Text>
+            <TextInput
+              testID="ai-food-search-input"
+              label="What did you eat?"
+              placeholder="e.g. 100 grams of air fried potatoes with no oil"
+              value={description}
+              onChangeText={setDescription}
+              autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handleInterpret}
             />
-          )}
-        </View>
-      </AppCard>
+            {clarification ? (
+              <Text testID="ai-food-search-clarification" style={styles.clarificationText}>
+                {clarification}
+              </Text>
+            ) : null}
+            {error ? (
+              <Text testID="ai-food-search-error" style={styles.errorText}>
+                {error}
+              </Text>
+            ) : null}
+            {interpretation ? null : (
+              <PrimaryButton
+                testID="ai-food-search-submit"
+                label={loading ? 'Reading…' : 'Get Estimate'}
+                loading={loading}
+                disabled={trimmed.length === 0}
+                onPress={handleInterpret}
+                accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
+              />
+            )}
+          </View>
+        </AppCard>
+      </RiseIn>
 
       {interpretation ? (
         <InterpretedFoodReview

@@ -83,6 +83,12 @@ export interface Choice {
   brand: string | null;
   score: number;
   reasons: string[];
+  /**
+   * What this candidate comes to, to tell the choices apart: for the amount described when the
+   * source can express it ("for 2 large"), otherwise per the source's own basis ("per 100 g").
+   * Missing from an older API.
+   */
+  figures?: { nutrients: NutrientFigures; per: string };
 }
 
 export interface ComponentRequest {
