@@ -8,8 +8,10 @@ import { Platform } from 'react-native';
 // steps back. So the app can only know whether it has asked, and a count of 0 may mean either.
 //
 // The Apple Health library is loaded the first time steps are needed, not when the app starts:
-// it sets up its native side as it loads, and that must never be able to stop the app opening.
-// A failure to load surfaces as a rejected promise from these functions.
+// it sets up its native side as it loads. Once loaded, a failure from Apple Health surfaces as a
+// rejected promise from these functions. A failure while the library itself loads can't be caught
+// -- Metro treats a file that fails while it loads after startup as fatal -- so it's kept to the
+// library's own setup, which has run on a real iPhone.
 
 const STEPS = 'HKQuantityTypeIdentifierStepCount' as const;
 

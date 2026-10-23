@@ -25,10 +25,12 @@ import {
   queryStatisticsForQuantity,
   requestAuthorization,
 } from '@kingstinct/react-native-healthkit';
-import { nextWorkoutWidget, stepsWidget, workoutActivity } from '../widgets/homeWidgets';
+import { homeWidgets } from '../widgets/homeWidgets';
 import { endWorkoutActivities, showWorkoutActivity } from '../widgets/workoutActivity';
 import { FeedScreen } from './FeedScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
+
+const { nextWorkoutWidget, stepsWidget, workoutActivity } = homeWidgets();
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),

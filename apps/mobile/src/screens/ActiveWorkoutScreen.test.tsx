@@ -30,11 +30,13 @@ import {
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { recallLiveWorkout } from '../feed/liveWorkoutMemory';
 import { forgetShown } from '../lib/lastShown';
-import { nextWorkoutWidget, workoutActivity } from '../widgets/homeWidgets';
+import { homeWidgets } from '../widgets/homeWidgets';
 import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
 import { endWorkoutActivities } from '../widgets/workoutActivity';
 import { ActiveWorkoutScreen } from './ActiveWorkoutScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
+
+const { nextWorkoutWidget, workoutActivity } = homeWidgets();
 
 // completeWorkout is the one thing that invalidates AllTimeStatsProvider's
 // shared cache (see that provider's own comment) -- present so it fetches

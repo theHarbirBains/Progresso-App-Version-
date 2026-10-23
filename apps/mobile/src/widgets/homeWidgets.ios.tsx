@@ -15,6 +15,7 @@ import {
   activityBackgroundTint,
 } from '@expo/ui/swift-ui/modifiers';
 import { createLiveActivity, createWidget, type WidgetEnvironment } from 'expo-widgets';
+import type { HomeWidgets } from './homeWidgetsTypes';
 import type {
   NextWorkoutWidgetProps,
   NutritionWidgetProps,
@@ -31,6 +32,11 @@ import type {
 // heroAction, onAccent -- widgetLayouts.test.ts checks they still match). The app's fonts aren't
 // in the widget, so it uses the system face, figures in its monospaced design like the app's
 // mono readouts. Props may be empty before the app has run once, so each one copes with that.
+//
+// Loading this file does nothing but define the layouts: it's loaded after the app starts
+// (loadWidgets.ts), and Metro treats any failure while a file loads then as fatal, whatever
+// catches it. Creating the widgets -- the part that hands iOS each layout -- happens in
+// homeWidgets(), a plain call loadWidgets can catch a failure from.
 
 const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironment) => {
   'widget';
@@ -264,7 +270,15 @@ const WorkoutInProgress = (props: WorkoutActivityProps) => {
   };
 };
 
-export const nutritionWidget = createWidget('NutritionToday', NutritionToday);
-export const nextWorkoutWidget = createWidget('NextWorkout', NextWorkout);
-export const stepsWidget = createWidget('StepsToday', StepsToday);
-export const workoutActivity = createLiveActivity('WorkoutInProgress', WorkoutInProgress);
+let created: HomeWidgets | null = null;
+
+/** The widgets and the Lock Screen card, created the first time they're asked for. */
+export function homeWidgets(): HomeWidgets {
+  created ??= {
+    nutritionWidget: createWidget('NutritionToday', NutritionToday),
+    nextWorkoutWidget: createWidget('NextWorkout', NextWorkout),
+    stepsWidget: createWidget('StepsToday', StepsToday),
+    workoutActivity: createLiveActivity('WorkoutInProgress', WorkoutInProgress),
+  };
+  return created;
+}

@@ -1,5 +1,5 @@
 import { recordQuietFailure } from '../lib/sentry';
-import { nextWorkoutWidget, nutritionWidget, stepsWidget, workoutActivity } from './homeWidgets';
+import { homeWidgets } from './homeWidgets';
 import {
   clearWidgets,
   nextWorkoutProps,
@@ -8,6 +8,8 @@ import {
   showStepsWidget,
 } from './widgetUpdates';
 import { showWorkoutActivity } from './workoutActivity';
+
+const { nextWorkoutWidget, nutritionWidget, stepsWidget, workoutActivity } = homeWidgets();
 
 jest.mock('../lib/sentry', () => ({ recordQuietFailure: jest.fn() }));
 

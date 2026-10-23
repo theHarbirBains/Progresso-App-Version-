@@ -2,10 +2,12 @@ import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { finishGroup, getGroup } from '../lib/api';
-import { nextWorkoutWidget, workoutActivity } from '../widgets/homeWidgets';
+import { homeWidgets } from '../widgets/homeWidgets';
 import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
 import { endWorkoutActivities } from '../widgets/workoutActivity';
 import { GroupSessionScreen } from './GroupSessionScreen';
+
+const { nextWorkoutWidget, workoutActivity } = homeWidgets();
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),

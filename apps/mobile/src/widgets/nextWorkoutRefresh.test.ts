@@ -3,8 +3,10 @@ import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
 } from '../workouts/workoutSplitQueries';
-import { nextWorkoutWidget } from './homeWidgets';
+import { homeWidgets } from './homeWidgets';
 import { refreshNextWorkout } from './nextWorkoutRefresh';
+
+const { nextWorkoutWidget } = homeWidgets();
 
 jest.mock('../lib/sentry', () => ({ recordQuietFailure: jest.fn() }));
 jest.mock('../workouts/workoutSplitQueries', () => ({

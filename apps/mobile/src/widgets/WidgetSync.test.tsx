@@ -2,8 +2,10 @@ import { render } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
-import { nutritionWidget, stepsWidget } from './homeWidgets';
+import { homeWidgets } from './homeWidgets';
 import { WidgetSync } from './WidgetSync';
+
+const { nutritionWidget, stepsWidget } = homeWidgets();
 
 jest.mock('../auth/AuthProvider', () => ({ useAuth: jest.fn() }));
 jest.mock('../nutrition/FoodLogProvider', () => ({ useFoodLog: jest.fn() }));

@@ -1,7 +1,9 @@
 import { colors } from '../design/theme';
-import { nextWorkoutWidget, nutritionWidget, stepsWidget, workoutActivity } from './homeWidgets';
+import { homeWidgets } from './homeWidgets';
 import { nutritionWidgetProps, SIGNED_OUT_NUTRITION, SIGNED_OUT_STEPS } from './widgetProps';
 import { nextWorkoutProps } from './widgetUpdates';
+
+const { nextWorkoutWidget, nutritionWidget, stepsWidget, workoutActivity } = homeWidgets();
 
 // Each layout runs here the way the widget itself runs it (expo-widgets evaluates the layout's
 // string with only its own runtime's names in scope): @expo/ui's SwiftUI views and modifiers and

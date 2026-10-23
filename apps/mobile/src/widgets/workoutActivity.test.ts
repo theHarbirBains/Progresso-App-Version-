@@ -1,11 +1,13 @@
 import { recordQuietFailure } from '../lib/sentry';
-import { workoutActivity } from './homeWidgets';
+import { homeWidgets } from './homeWidgets';
 import {
   endClosedWorkoutActivities,
   endWorkoutActivities,
   endWorkoutActivity,
   showWorkoutActivity,
 } from './workoutActivity';
+
+const { workoutActivity } = homeWidgets();
 
 jest.mock('../lib/sentry', () => ({ recordQuietFailure: jest.fn() }));
 

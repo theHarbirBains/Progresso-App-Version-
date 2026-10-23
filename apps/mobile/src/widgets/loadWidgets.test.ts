@@ -1,11 +1,16 @@
-// loadWidgets loads the widgets on first use. Loaded here in a fresh module registry each time,
-// so the widgets can be made to fail to load; the Alert spied on is that registry's own.
+// loadWidgets loads and creates the widgets on first use. Loaded here in a fresh module registry
+// each time, so creating the widgets can be made to fail; the Alert spied on is that registry's
+// own.
 
 function loadWith(homeWidgets: () => unknown) {
+  return loadModule(() => ({ homeWidgets }));
+}
+
+function loadModule(homeWidgetsFile: () => unknown) {
   const recordQuietFailure = jest.fn();
   jest.resetModules();
   jest.doMock('../lib/sentry', () => ({ recordQuietFailure }));
-  jest.doMock('./homeWidgets', homeWidgets);
+  jest.doMock('./homeWidgets', homeWidgetsFile);
   const { Alert } = jest.requireActual<typeof import('react-native')>('react-native');
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   const { withWidgets } = jest.requireActual<typeof import('./loadWidgets')>('./loadWidgets');
@@ -23,10 +28,11 @@ it('hands over the widgets once loaded', async () => {
   expect(nutritionWidget.updateSnapshot).toHaveBeenCalledWith({ signedIn: true });
 });
 
-it("carries on when the widgets can't load -- recorded, and said once", async () => {
-  const { withWidgets, recordQuietFailure, alert } = loadWith(() => {
-    throw new Error("Cannot find native module 'ExpoWidgets'");
+it("carries on when iOS won't take the widgets -- recorded, said once, and not tried again", async () => {
+  const create = jest.fn(() => {
+    throw new Error("Calling the 'constructor' function has failed");
   });
+  const { withWidgets, recordQuietFailure, alert } = loadWith(create);
   const run = jest.fn();
 
   await expect(withWidgets('nutrition', run)).resolves.toBeUndefined();
@@ -37,8 +43,19 @@ it("carries on when the widgets can't load -- recorded, and said once", async ()
   expect(alert).toHaveBeenCalledTimes(1);
   expect(alert).toHaveBeenCalledWith(
     'Home Screen widgets couldn’t start',
-    expect.stringContaining("Cannot find native module 'ExpoWidgets'"),
+    expect.stringContaining("Calling the 'constructor' function has failed"),
   );
+  expect(create).toHaveBeenCalledTimes(1);
+});
+
+it('creates the widgets once, however many updates there are', async () => {
+  const create = jest.fn(() => ({}));
+  const { withWidgets } = loadWith(create);
+
+  await withWidgets('nutrition', () => undefined);
+  await withWidgets('steps', () => undefined);
+
+  expect(create).toHaveBeenCalledTimes(1);
 });
 
 it('records a widget that fails to update, without saying so', async () => {
