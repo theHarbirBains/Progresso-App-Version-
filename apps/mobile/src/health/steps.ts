@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { hasHealthKitNative } from '../lib/nativeModules';
 
 // Today's steps from Apple Health -- the only thing Progresso reads from it, and it never writes
 // to it. The count is read on the phone each time it's shown and kept nowhere: not in Supabase,
@@ -25,11 +26,14 @@ async function loadHealthKit(): Promise<HealthKit> {
   return healthKit;
 }
 
-/** 'unavailable': not on this device. 'notAsked': Progresso hasn't asked yet. 'asked': it has. */
+/**
+ * 'unavailable': not on this device, or not in this copy of the app (Expo Go has no Apple Health).
+ * 'notAsked': Progresso hasn't asked yet. 'asked': it has.
+ */
 export type StepsAccess = 'unavailable' | 'notAsked' | 'asked';
 
 export async function stepsAccess(): Promise<StepsAccess> {
-  if (Platform.OS !== 'ios') return 'unavailable';
+  if (Platform.OS !== 'ios' || !hasHealthKitNative()) return 'unavailable';
   const hk = await loadHealthKit();
   if (!hk.isHealthDataAvailable()) return 'unavailable';
   const status = await hk.getRequestStatusForAuthorization({ toRead: [STEPS] });

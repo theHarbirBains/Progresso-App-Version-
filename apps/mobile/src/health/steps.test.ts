@@ -5,6 +5,7 @@ import {
   requestAuthorization,
 } from '@kingstinct/react-native-healthkit';
 import { Platform } from 'react-native';
+import { hasHealthKitNative } from '../lib/nativeModules';
 import { askForSteps, stepsAccess, stepsToday } from './steps';
 
 const STEPS = 'HKQuantityTypeIdentifierStepCount';
@@ -22,6 +23,13 @@ describe('stepsAccess', () => {
   it('is unavailable where Apple Health is not', async () => {
     (isHealthDataAvailable as jest.Mock).mockReturnValue(false);
     expect(await stepsAccess()).toBe('unavailable');
+  });
+
+  it('is unavailable in Expo Go, which has no Apple Health, without loading it', async () => {
+    jest.mocked(hasHealthKitNative).mockReturnValueOnce(false);
+    expect(await stepsAccess()).toBe('unavailable');
+    expect(isHealthDataAvailable).not.toHaveBeenCalled();
+    expect(getRequestStatusForAuthorization).not.toHaveBeenCalled();
   });
 
   it('is unavailable off iPhone, without asking Apple Health', async () => {

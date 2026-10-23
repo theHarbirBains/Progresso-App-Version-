@@ -1119,6 +1119,22 @@ describe('FeedScreen -- Steps', () => {
     jest.mocked(isHealthDataAvailable).mockReturnValue(false);
   });
 
+  it('shows no Steps card in Expo Go, which has no Apple Health', async () => {
+    const { hasHealthKitNative } = jest.requireMock('../lib/nativeModules') as {
+      hasHealthKitNative: jest.Mock;
+    };
+    hasHealthKitNative.mockReturnValue(false);
+    jest.mocked(isHealthDataAvailable).mockClear();
+    try {
+      renderScreen();
+      await screen.findByTestId('feed-empty');
+      expect(screen.queryByTestId('feed-steps')).toBeNull();
+      expect(isHealthDataAvailable).not.toHaveBeenCalled();
+    } finally {
+      hasHealthKitNative.mockReturnValue(true);
+    }
+  });
+
   it('shows no Steps card where Apple Health is not available', async () => {
     jest.mocked(isHealthDataAvailable).mockReturnValue(false);
     renderScreen();

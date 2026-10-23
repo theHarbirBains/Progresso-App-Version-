@@ -2,15 +2,16 @@
 // each time, so creating the widgets can be made to fail; the Alert spied on is that registry's
 // own.
 
-function loadWith(homeWidgets: () => unknown) {
-  return loadModule(() => ({ homeWidgets }));
+function loadWith(homeWidgets: () => unknown, builtWithWidgets = true) {
+  return loadModule(() => ({ homeWidgets }), builtWithWidgets);
 }
 
-function loadModule(homeWidgetsFile: () => unknown) {
+function loadModule(homeWidgetsFile: () => unknown, builtWithWidgets = true) {
   const recordQuietFailure = jest.fn();
   jest.resetModules();
   jest.doMock('../lib/sentry', () => ({ recordQuietFailure }));
   jest.doMock('./homeWidgets', homeWidgetsFile);
+  jest.doMock('../lib/nativeModules', () => ({ hasWidgetsNative: () => builtWithWidgets }));
   const { Alert } = jest.requireActual<typeof import('react-native')>('react-native');
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   const { withWidgets } = jest.requireActual<typeof import('./loadWidgets')>('./loadWidgets');
@@ -46,6 +47,19 @@ it("carries on when iOS won't take the widgets -- recorded, said once, and not t
     expect.stringContaining("Calling the 'constructor' function has failed"),
   );
   expect(create).toHaveBeenCalledTimes(1);
+});
+
+it('loads nothing, and says nothing, where the app has no widgets -- Expo Go, Android', async () => {
+  const create = jest.fn(() => ({}));
+  const run = jest.fn();
+  const { withWidgets, recordQuietFailure, alert } = loadWith(create, false);
+
+  await withWidgets('nutrition', run);
+
+  expect(create).not.toHaveBeenCalled();
+  expect(run).not.toHaveBeenCalled();
+  expect(recordQuietFailure).not.toHaveBeenCalled();
+  expect(alert).not.toHaveBeenCalled();
 });
 
 it('creates the widgets once, however many updates there are', async () => {

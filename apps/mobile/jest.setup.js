@@ -220,6 +220,13 @@ jest.mock('expo-widgets', () => ({
   })),
 }));
 
+// Tests stand for a real build, which has the widgets' and Apple Health's native sides (Expo Go
+// has neither); lib/nativeModules.test.ts and the tests that cover going without them say so.
+jest.mock('./src/lib/nativeModules', () => ({
+  hasWidgetsNative: jest.fn(() => true),
+  hasHealthKitNative: jest.fn(() => true),
+}));
+
 // The SwiftUI views and modifiers the widget layouts are written with only exist inside the
 // widget (see above): in the app, and so in Jest, the layouts are strings and these are never
 // called.
