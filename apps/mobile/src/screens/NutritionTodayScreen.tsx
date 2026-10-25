@@ -23,7 +23,7 @@ import { FoodImage } from '../nutrition/FoodImage';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
 import { fetchFoodLogsForRange, type FoodLogRow } from '../nutrition/foodLogQueries';
-import { dayLabel, isTodayKey, shiftDay, todayKey } from '../nutrition/logDay';
+import { isTodayKey, shiftDay, todayKey } from '../nutrition/logDay';
 import { servingMeasures, servingsFor, unitWord } from '../nutrition/logQuantity';
 import {
   calculateRemaining,
@@ -299,7 +299,6 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     { key: 'fat', label: 'Fat', value: goals.fatG, unit: 'g' },
   ];
 
-  const label = dayLabel(day);
   const dayWidgets = (
     <>
       {displayError ? (
@@ -445,9 +444,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
 
           <AppCard testID="nutrition-today-foods">
             <Section
-              title={
-                isToday ? "Today's Foods" : label === 'Yesterday' ? "Yesterday's Foods" : 'Foods'
-              }
+              title={isToday ? "Today's Foods" : 'Foods'}
               action={{
                 label: 'View All',
                 onPress: () => navigation.navigate('NutritionHistory'),

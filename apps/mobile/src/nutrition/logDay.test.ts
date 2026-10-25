@@ -32,9 +32,9 @@ describe('the days', () => {
 });
 
 describe('dayLabel', () => {
-  it('says Today and Yesterday', () => {
-    expect(dayLabel('2026-10-24', now)).toBe('Today');
-    expect(dayLabel('2026-10-23', now)).toBe('Yesterday');
+  it('names every day by its date -- today and yesterday too, never in words', () => {
+    expect(dayLabel('2026-10-24', now)).toBe('Saturday, October 24');
+    expect(dayLabel('2026-10-23', now)).toBe('Friday, October 23');
   });
 
   it("names any other day, with the year only when it isn't this year", () => {
@@ -62,15 +62,15 @@ describe('loggedAtFor', () => {
 });
 
 describe('daySwipe', () => {
-  it('moves to the day before on a swipe left', () => {
-    expect(daySwipe(-100, 0, false)).toBe('previous');
-    expect(daySwipe(-30, -0.8, true)).toBe('previous');
+  it('moves to the day before on a swipe from left to right', () => {
+    expect(daySwipe(100, 0, false)).toBe('previous');
+    expect(daySwipe(30, 0.8, true)).toBe('previous');
   });
 
-  it('moves to the day after on a swipe right, but never past today', () => {
-    expect(daySwipe(100, 0, true)).toBe('next');
-    expect(daySwipe(30, 0.8, true)).toBe('next');
-    expect(daySwipe(100, 0, false)).toBeNull();
+  it('moves to the day after on a swipe from right to left, but never past today', () => {
+    expect(daySwipe(-100, 0, true)).toBe('next');
+    expect(daySwipe(-30, -0.8, true)).toBe('next');
+    expect(daySwipe(-100, 0, false)).toBeNull();
   });
 
   it('moves nowhere on a short or slow drag', () => {

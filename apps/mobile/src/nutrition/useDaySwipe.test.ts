@@ -115,7 +115,20 @@ describe('useDaySwipe', () => {
       expect(result.current.swiping).toBe(false);
     });
 
-    it('turns the day when a swipe goes far enough', () => {
+    it('turns to the day before on a swipe from left to right', () => {
+      const { result, onDay } = renderTurn(yesterday, true);
+      const handlers = result.current.panHandlers;
+
+      act(() => {
+        handlers.onResponderGrant!(fakeTouch(0, 0, 1));
+        handlers.onResponderMove!(fakeTouch(120, 4, 120, { x: 0, y: 0, time: 1 }));
+        handlers.onResponderRelease!(fakeTouch(120, 4, 130, { x: 120, y: 4, time: 120 }));
+      });
+
+      expect(onDay).toHaveBeenCalledWith(shiftDay(yesterday, -1));
+    });
+
+    it('turns to the day after on a swipe from right to left', () => {
       const { result, onDay } = renderTurn(yesterday, true);
       const handlers = result.current.panHandlers;
 
@@ -125,7 +138,20 @@ describe('useDaySwipe', () => {
         handlers.onResponderRelease!(fakeTouch(-120, 4, 130, { x: -120, y: 4, time: 120 }));
       });
 
-      expect(onDay).toHaveBeenCalledWith(shiftDay(yesterday, -1));
+      expect(onDay).toHaveBeenCalledWith(today);
+    });
+
+    it('goes nowhere on a swipe from right to left on today', () => {
+      const { result, onDay } = renderTurn(today, true);
+      const handlers = result.current.panHandlers;
+
+      act(() => {
+        handlers.onResponderGrant!(fakeTouch(0, 0, 1));
+        handlers.onResponderMove!(fakeTouch(-160, 4, 120, { x: 0, y: 0, time: 1 }));
+        handlers.onResponderRelease!(fakeTouch(-160, 4, 130, { x: -160, y: 4, time: 120 }));
+      });
+
+      expect(onDay).not.toHaveBeenCalled();
     });
   });
 });

@@ -75,9 +75,9 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
       return;
     }
     turning.current = true;
-    // Swiping left goes back a day, so the day leaves to the left and the earlier one comes in
-    // from the right; forward in time is the other way round.
-    const sign = direction === 'previous' ? -1 : 1;
+    // Swiping right goes back a day, so the day leaves to the right and the earlier one comes in
+    // from the left; forward in time (swiping left) is the other way round.
+    const sign = direction === 'previous' ? 1 : -1;
     const out = sign * widthRef.current;
     // A flick carries on at its own speed; a slow release still leaves briskly.
     const remaining = Math.abs(out - position.current);
@@ -139,7 +139,8 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
       onPanResponderGrant: () => setSwiping(true),
       onPanResponderMove: (_event, gesture) => {
         if (turning.current) return;
-        const pastToday = gesture.dx > 0 && !isPastKey(dayRef.current);
+        // Swiping left is forward in time: from today it only gives a little.
+        const pastToday = gesture.dx < 0 && !isPastKey(dayRef.current);
         position.current = pastToday ? gesture.dx * PAST_TODAY_GIVE : gesture.dx;
         slide.setValue(position.current);
       },
@@ -204,7 +205,7 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
         if (cancelled || turning.current) return;
         Animated.sequence([
           Animated.timing(slide, {
-            toValue: -36,
+            toValue: 36,
             duration: 260,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,

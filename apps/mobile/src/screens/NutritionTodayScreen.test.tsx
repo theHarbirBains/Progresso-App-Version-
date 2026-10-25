@@ -822,9 +822,9 @@ describe('NutritionTodayScreen -- any day', () => {
     renderScreen();
 
     await screen.findByTestId('food-log-empty');
-    expect(dayLabelText()).toHaveTextContent('Today');
+    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
     turn('next');
-    expect(dayLabelText()).toHaveTextContent('Today');
+    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
     expect(screen.queryByTestId('nutrition-day-today')).toBeNull();
   });
 
@@ -849,19 +849,19 @@ describe('NutritionTodayScreen -- any day', () => {
     expect(page().props.scrollEnabled).toBe(true);
   });
 
-  it('turns to the day before on a swipe left across the page', async () => {
+  it('turns to the day before on a swipe from left to right across the page', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
     const content = screen.getByTestId('nutrition-day-content');
 
     act(() => {
       content.props.onResponderGrant(fakeTouch(0, 0, 1));
-      content.props.onResponderMove(fakeTouch(-140, 6, 140, { x: 0, y: 0, time: 1 }));
-      content.props.onResponderRelease(fakeTouch(-140, 6, 150, { x: -140, y: 6, time: 140 }));
+      content.props.onResponderMove(fakeTouch(140, 6, 140, { x: 0, y: 0, time: 1 }));
+      content.props.onResponderRelease(fakeTouch(140, 6, 150, { x: 140, y: 6, time: 140 }));
     });
 
     expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
-    expect(dayLabelText()).toHaveTextContent('Yesterday');
+    expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
   });
 
   it('has no arrows: the day is swiped, and the date is adjustable for VoiceOver', async () => {
@@ -871,7 +871,9 @@ describe('NutritionTodayScreen -- any day', () => {
     expect(screen.queryByTestId('nutrition-day-previous')).toBeNull();
     expect(screen.queryByTestId('nutrition-day-next')).toBeNull();
     expect(dayLabelText().props.accessibilityRole).toBe('adjustable');
-    expect(dayLabelText().props.accessibilityValue).toEqual({ text: 'Today' });
+    expect(dayLabelText().props.accessibilityValue).toEqual({
+      text: 'Today, Wednesday, October 21',
+    });
     // The day's widgets take the swipe (as does the bar above them).
     expect(screen.getByTestId('nutrition-day-content').props.onResponderMove).toEqual(
       expect.any(Function),
@@ -885,8 +887,10 @@ describe('NutritionTodayScreen -- any day', () => {
     turn('previous');
 
     expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
-    expect(dayLabelText()).toHaveTextContent('Yesterday');
-    expect(screen.getByText("Yesterday's Foods")).toBeTruthy();
+    expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
+    // Named by its date at the top; the list is just its foods.
+    expect(screen.getByText('Foods')).toBeTruthy();
+    expect(screen.queryByText(/Yesterday/)).toBeNull();
     // Today's own shortcuts -- the week's budget and Copy Yesterday -- are today's only.
     expect(screen.queryByTestId('nutrition-today-week')).toBeNull();
     expect(screen.queryByTestId('nutrition-today-copy-yesterday')).toBeNull();
@@ -939,12 +943,12 @@ describe('NutritionTodayScreen -- any day', () => {
     turn('previous');
     await screen.findByTestId('food-log-row-log-tuesday');
     turn('next');
-    expect(dayLabelText()).toHaveTextContent('Today');
+    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
 
     turn('previous');
     await screen.findByTestId('food-log-row-log-tuesday');
     fireEvent.press(screen.getByTestId('nutrition-day-today'));
-    expect(dayLabelText()).toHaveTextContent('Today');
+    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
     expect(screen.getByTestId('nutrition-today-week')).toBeTruthy();
   });
 
@@ -966,12 +970,12 @@ describe('NutritionTodayScreen -- any day', () => {
   it('opens on a day handed to it, and never on one after today', async () => {
     const { unmount } = renderScreen({ params: { day: '2026-10-20' } } as never);
     expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
-    expect(dayLabelText()).toHaveTextContent('Yesterday');
+    expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
     unmount();
 
     renderScreen({ params: { day: '2026-10-22' } } as never);
     await screen.findByTestId('food-log-empty');
-    expect(dayLabelText()).toHaveTextContent('Today');
+    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
   });
 
   it('opens the calendar from the date, on the day shown', async () => {

@@ -24,14 +24,15 @@ export function shiftDay(key: string, days: number): string {
   return dayKey(day);
 }
 
-/** "Today", "Yesterday", or "Mon, Oct 20" -- with the year when it isn't this year's. */
+/**
+ * The day's date, always -- "Saturday, October 24", with the year when it isn't this year's --
+ * never "Yesterday": the day shown is named by its date (the day bar marks today besides).
+ */
 export function dayLabel(key: string, now: Date = new Date()): string {
-  if (isTodayKey(key, now)) return 'Today';
-  if (key === shiftDay(dayKey(now), -1)) return 'Yesterday';
   const day = dayFromKey(key);
   return day.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
+    weekday: 'long',
+    month: 'long',
     day: 'numeric',
     ...(day.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
   });
@@ -52,12 +53,13 @@ export function loggedAtFor(key: string | undefined, now: Date = new Date()): Da
 export type DaySwipe = 'previous' | 'next' | null;
 
 /**
- * Which way a horizontal swipe on the Nutrition screen moves: left to the day before, right to
- * the day after -- never past today. A short or slow drag moves nowhere.
+ * Which way a horizontal swipe on the Nutrition screen moves, as pages turn: right to left (the
+ * finger moving left) to the day after -- never past today -- and left to right to the day before.
+ * A short or slow drag moves nowhere.
  */
 export function daySwipe(dx: number, vx: number, canGoNext: boolean): DaySwipe {
   const far = Math.abs(dx) > 72 || (Math.abs(dx) > 24 && Math.abs(vx) > 0.5);
   if (!far) return null;
-  if (dx < 0) return 'previous';
+  if (dx > 0) return 'previous';
   return canGoNext ? 'next' : null;
 }

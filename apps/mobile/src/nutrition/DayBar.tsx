@@ -19,8 +19,8 @@ interface Props {
 }
 
 /**
- * The Nutrition screen's day: its name ("Today", "Yesterday", "Mon, Oct 20") -- tapping it opens
- * the calendar -- and, on any day but today, a way straight back to today. There are no arrows:
+ * The Nutrition screen's day: its date ("Saturday, October 24"), with a small "Today" above it on
+ * today -- tapping it opens the calendar -- and, on any other day, a way straight back to today. There are no arrows:
  * the screen is swiped from day to day (useDaySwipe), and the date glides with the swipe at a
  * slower pace, fading as it goes. For VoiceOver it's an adjustable control: swipe up for the
  * next day, down for the day before.
@@ -28,6 +28,7 @@ interface Props {
 export function DayBar({ day, slide, width, onToday, onChooseDay, onAdjust }: Props) {
   const today = isTodayKey(day);
   const label = dayLabel(day);
+  const spoken = today ? `Today, ${label}` : label;
   const glide = {
     opacity: slide.interpolate({
       inputRange: [-width * 0.5, 0, width * 0.5],
@@ -51,7 +52,7 @@ export function DayBar({ day, slide, width, onToday, onChooseDay, onAdjust }: Pr
         testID="nutrition-day-label"
         accessibilityRole="adjustable"
         accessibilityLabel="Day"
-        accessibilityValue={{ text: label }}
+        accessibilityValue={{ text: spoken }}
         accessibilityHint="Double-tap to choose a day."
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(event) => {
@@ -61,8 +62,15 @@ export function DayBar({ day, slide, width, onToday, onChooseDay, onAdjust }: Pr
         onPress={onChooseDay}
         style={styles.label}
       >
-        <Animated.View style={glide}>
-          <Text style={styles.labelText}>{label}</Text>
+        <Animated.View style={[styles.glide, glide]}>
+          {today ? (
+            <Text testID="nutrition-day-today-mark" style={styles.todayMark}>
+              Today
+            </Text>
+          ) : null}
+          <Text style={styles.labelText} numberOfLines={1}>
+            {label}
+          </Text>
         </Animated.View>
       </Pressable>
       {today ? null : (
@@ -83,6 +91,15 @@ const styles = StyleSheet.create({
     minHeight: minTouchTarget,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  glide: {
+    alignItems: 'center',
+  },
+  todayMark: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   labelText: {
     ...typeScale.cardTitle,
