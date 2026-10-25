@@ -52,7 +52,7 @@ function setup(
 }
 
 describe('AccountDeletionService', () => {
-  it('removes photos, then the data, then the auth accounts -- theirs first, then their guests', async () => {
+  it('removes photos and feedback screenshots, then the data, then the auth accounts -- theirs first, then their guests', async () => {
     const { steps, service } = setup({
       listings: {
         avatars: [{ data: [{ id: 'a', name: 'avatar.jpg' }], error: null }],
@@ -65,6 +65,7 @@ describe('AccountDeletionService', () => {
             error: null,
           },
         ],
+        'feedback-screenshots': [{ data: [{ id: 'c', name: 'shot.png' }], error: null }],
       },
       rpc: { data: [ME, GUEST], error: null },
     });
@@ -77,6 +78,8 @@ describe('AccountDeletionService', () => {
       `list equipment-photos/${ME}`,
       `remove equipment-photos ${ME}/one.jpg`,
       `list food-photos/${ME}`,
+      `list feedback-screenshots/${ME}`,
+      `remove feedback-screenshots ${ME}/shot.png`,
       `rpc delete_account {"p_user":"${ME}"}`,
       `deleteUser ${ME}`,
       `deleteUser ${GUEST}`,

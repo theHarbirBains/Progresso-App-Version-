@@ -1,8 +1,16 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
-/** The Storage buckets that hold a person's own photos, each under a folder named for them. */
-const PHOTO_BUCKETS = ['avatars', 'equipment-photos', 'food-photos'] as const;
+/**
+ * The Storage buckets that hold a person's own photos -- and the screenshots they sent with
+ * feedback -- each under a folder named for them.
+ */
+const PHOTO_BUCKETS = [
+  'avatars',
+  'equipment-photos',
+  'food-photos',
+  'feedback-screenshots',
+] as const;
 const LIST_PAGE = 100;
 /** 5,000 photos a bucket: far past anyone's, and a stop should a removal not take. */
 const MAX_PAGES = 50;

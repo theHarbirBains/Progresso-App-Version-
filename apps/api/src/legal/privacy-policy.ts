@@ -18,6 +18,7 @@ const BODY = `
   <li><strong>Your nutrition.</strong> Foods you log, custom foods and their photos, your nutrition goals, and the foods you search for or barcodes you scan.</li>
   <li><strong>People.</strong> Who you follow and who follows you, group workouts you join, trainers or clients you link with, and the people you block or report.</li>
   <li><strong>Your device.</strong> A push notification token if you allow notifications, and crash reports that include the app version, what went wrong and your account ID. Crash reports are stripped of other personal details before they're sent.</li>
+  <li><strong>Feedback you send.</strong> What you write in Feedback &amp; Suggestions, any screenshot you add to it, and the app version, platform and system version it was sent from.</li>
 </ul>
 <p>We don't use advertising trackers, we don't run analytics on how you use the app, and we don't sell your data.</p>
 
@@ -28,6 +29,7 @@ const BODY = `
   <li>To look up foods and nutrition when you search, scan a barcode or describe a meal.</li>
   <li>To send the notifications you've turned on.</li>
   <li>To keep Progresso safe: reviewing reports, and keeping blocked people away from you.</li>
+  <li>To read the feedback you send, follow it up and improve Progresso with it.</li>
   <li>To fix crashes and keep the service secure.</li>
 </ul>
 
@@ -45,6 +47,7 @@ const BODY = `
       <li>Sentry: crash reports.</li>
     </ul>
   </li>
+  <li><strong>Feedback you send</strong> is seen only by you and Progresso's admins, who may add notes to it that only they see. You see its status as they move it on.</li>
   <li><strong>When the law requires it</strong>, for example a valid court order.</li>
 </ul>
 
@@ -54,7 +57,7 @@ const BODY = `
 <p><strong>Widgets.</strong> If you add a Progresso widget to your Home Screen, or start a workout with Live Activities on, your phone keeps what it shows (today's calories and macros, your next or current workout, your steps) so the widget can show it. It stays on your phone and is cleared when you sign out.</p>
 
 <h2>Keeping and deleting your data</h2>
-<p>We keep your data while you have an account. You can delete your account at any time in Settings &gt; Account &amp; Security &gt; Delete Account. That deletes your profile, photos, workouts, records, nutrition logs, custom exercises and foods, follows and everything else in your account. A few things stay, because they're part of someone else's history:</p>
+<p>We keep your data while you have an account. You can delete your account at any time in Settings &gt; Account &amp; Security &gt; Delete Account. That deletes your profile, photos, workouts, records, nutrition logs, custom exercises and foods, follows, the feedback you've sent and its screenshots, and everything else in your account. A few things stay, because they're part of someone else's history:</p>
 <ul>
   <li>If a friend used one of your custom exercises in a group workout, they keep their own copy of it, without your photos.</li>
   <li>Reports you made about other people are kept for review, without your name on them.</li>

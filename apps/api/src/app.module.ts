@@ -16,6 +16,7 @@ import { LegalModule } from './legal/legal.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RevenueCatModule } from './revenuecat/revenuecat.module';
 import { SafetyModule } from './safety/safety.module';
+import { FeedbackModule } from './feedback/feedback.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { TrainerModule } from './trainer/trainer.module';
 import { GroupsModule } from './groups/groups.module';
@@ -44,6 +45,7 @@ import { UsersModule } from './users/users.module';
     RevenueCatModule,
     NotificationsModule,
     SafetyModule,
+    FeedbackModule,
   ],
   providers: [
     {
