@@ -170,6 +170,29 @@ describe('useDayLogs', () => {
     expect(result.current.logs).toEqual([log('log-1')]);
   });
 
+  it("hands over a remembered day's foods from the very first render of it", async () => {
+    const navigation = fakeNavigation();
+    const renders: { day: string | null; loading: boolean }[] = [];
+    const { result, rerender } = renderHook(
+      ({ day }: { day: string }) => {
+        const shown = useDayLogs('user-1', day, navigation);
+        renders.push({ day: shown.day, loading: shown.loading });
+        return shown;
+      },
+      { initialProps: { day: '2026-10-20' } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    rerender({ day: '2026-10-19' });
+    await waitFor(() => expect(result.current.day).toBe('2026-10-19'));
+
+    mockFetch.mockReturnValue(new Promise(() => {}));
+    renders.length = 0;
+    rerender({ day: '2026-10-20' });
+
+    // Never a frame still on the day before, nor one loading: a swipe lands on the day's foods.
+    expect(renders[0]).toEqual({ day: '2026-10-20', loading: false });
+  });
+
   it('reads a day ahead only once, and that read is what the day shows', async () => {
     mockFetch.mockResolvedValue([log('log-ahead')]);
     readAheadDayLogs('user-1', '2026-10-18');

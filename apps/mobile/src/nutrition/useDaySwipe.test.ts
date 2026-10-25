@@ -55,6 +55,27 @@ describe('useDaySwipe', () => {
     });
   });
 
+  it("deals the new day's widgets in one after another, from the side the day comes in", async () => {
+    const { result, onDay, rerender } = renderTurn(yesterday, false);
+    const value = (node: unknown) => (node as { __getValue(): number }).__getValue();
+    const top = result.current.widgetStyle(0);
+    const bottom = result.current.widgetStyle(4);
+    expect(value(bottom.opacity)).toBe(1);
+
+    act(() => result.current.turnTo('next'));
+    await waitFor(() => expect(onDay).toHaveBeenCalledWith(today));
+    rerender({ shown: today });
+
+    // Just after it hands over: the bottom widget is further out and fainter than the top one,
+    // on the right -- a day after comes in from the right.
+    const offset = (style: typeof top) =>
+      value((style.transform[0] as { translateX: unknown }).translateX);
+    expect(offset(bottom)).toBeGreaterThan(offset(top));
+    expect(offset(bottom)).toBeGreaterThan(0);
+    expect(value(bottom.opacity)).toBeLessThanOrEqual(value(top.opacity));
+    // (It plays out natively from here, which Jest's stand-in for the native animator doesn't run.)
+  });
+
   it('nudges once, the first time it is seen on this phone, to show the day turns', async () => {
     renderTurn(today, false);
     await waitFor(async () =>

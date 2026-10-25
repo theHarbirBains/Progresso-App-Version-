@@ -353,239 +353,250 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
       ) : null}
 
       {logsLoading ? (
-        <SkeletonCards testID="nutrition-day-loading" heights={[216, 176]} />
+        <Animated.View style={dayTurn.widgetStyle(0)}>
+          <SkeletonCards testID="nutrition-day-loading" heights={[216, 176]} />
+        </Animated.View>
       ) : (
         <>
-          <AppCard hero testID="nutrition-today-macros">
-            <View style={styles.summary}>
-              <View style={styles.ringColumn}>
-                <CalorieRing
-                  testID="nutrition-today-calorie-ring"
-                  consumed={consumed.calories}
-                  goal={goals.calories}
-                  accentColor={accent}
-                  size={RING_SIZE}
-                  strokeWidth={12}
-                />
-                {remaining.calories !== null ? (
-                  <Text testID="calories-remaining" style={styles.ringRemaining}>
-                    {remaining.calories} cal remaining
-                  </Text>
-                ) : null}
-              </View>
-
-              <View style={styles.macroColumn}>
-                {macros.map((macro, index) => {
-                  const fraction =
-                    macro.goal !== null && macro.goal > 0
-                      ? Math.min(macro.consumed / macro.goal, 1)
-                      : 0;
-                  return (
-                    <View
-                      key={macro.key}
-                      testID={`${macro.key}-row`}
-                      style={[styles.macroRow, index > 0 && styles.divider]}
-                      accessible
-                      accessibilityLabel={
-                        macro.goal !== null
-                          ? `${macro.label}, ${Math.round(macro.consumed)} of ${macro.goal} grams`
-                          : `${macro.label}, ${Math.round(macro.consumed)} grams`
-                      }
-                    >
-                      <View style={styles.macroGlyph}>
-                        <MaterialCommunityIcons
-                          name={MACRO_GLYPHS[macro.key]}
-                          size={18}
-                          color={accent}
-                        />
-                      </View>
-                      <View style={styles.macroBody}>
-                        <Text style={styles.macroLabel}>{macro.label}</Text>
-                        <View style={styles.macroFigures}>
-                          <Text testID={`${macro.key}-consumed`} style={styles.macroValue}>
-                            {grams(macro.consumed)}
-                          </Text>
-                          {macro.goal !== null ? (
-                            <Text testID={`${macro.key}-goal`} style={styles.macroGoal}>
-                              / {grams(macro.goal)}
-                            </Text>
-                          ) : null}
-                        </View>
-                        {macro.goal !== null ? (
-                          <View style={styles.barTrack}>
-                            <View
-                              testID={`${macro.key}-bar`}
-                              style={[
-                                styles.barFill,
-                                { width: `${fraction * 100}%`, backgroundColor: accent },
-                              ]}
-                            />
-                          </View>
-                        ) : null}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-          </AppCard>
-
-          <WeeklyCalorieBudget
-            title={week.title}
-            today={isToday}
-            consumed={week.earlier === null ? null : week.earlier + consumed.calories}
-            dailyTarget={goals.calories}
-            daysLeft={week.daysLeft}
-            failed={weekFailed}
-            accentColor={accent}
-            onSetTarget={() => navigation.navigate('NutritionGoals')}
-          />
-
-          <AppCard testID="nutrition-today-actions" style={styles.actions}>
-            <PrimaryButton
-              testID="log-food-button"
-              label="Log Food"
-              icon="plus"
-              onPress={() => logVia('FoodLibrary')}
-              accentColor={accent}
-              onAccentColor={nutritionTheme.onAccent}
-            />
-            <View style={styles.secondaryActions}>
-              <View style={styles.secondaryAction}>
-                <SecondaryButton
-                  testID="scan-barcode-button"
-                  label="Scan Barcode"
-                  icon="maximize"
-                  size="md"
-                  onPress={() => logVia('BarcodeScanner')}
-                />
-              </View>
-              <View style={styles.secondaryAction}>
-                <SecondaryButton
-                  testID="search-food-button"
-                  label="Search Food"
-                  icon="search"
-                  size="md"
-                  onPress={() => logVia('FoodSearch')}
-                />
-              </View>
-            </View>
-            <SecondaryButton
-              testID="ai-food-search-button"
-              label="Describe a Food (AI)"
-              accessibilityLabel="AI Food Search"
-              icon="zap"
-              size="md"
-              onPress={() => logVia('AiFoodSearch')}
-            />
-            <SecondaryButton
-              testID="quick-food-entry-button"
-              label="Quick Macro Entry"
-              icon="edit-3"
-              size="md"
-              onPress={() => logVia('QuickFoodEntry')}
-            />
-          </AppCard>
-
-          <AppCard testID="nutrition-today-foods">
-            <Section
-              title={isToday ? "Today's Foods" : 'Foods'}
-              action={{
-                label: 'View All',
-                onPress: () => navigation.navigate('NutritionHistory'),
-                testID: 'nutrition-today-view-all',
-              }}
-            >
-              {logs.length === 0 ? (
-                <EmptyState
-                  testID="food-log-empty"
-                  icon={
-                    <View style={styles.emptyGlyph}>
-                      <Feather name="coffee" size={22} color={colors.textSecondary} />
-                    </View>
-                  }
-                  title={isToday ? 'No foods logged today' : 'No foods logged this day'}
-                  action={{
-                    label: isToday ? 'Log Your First Meal' : 'Log a Food',
-                    onPress: () => logVia('FoodLibrary'),
-                    testID: 'food-log-empty-log',
-                  }}
-                />
-              ) : (
-                logs.map((log, index) => (
-                  <View
-                    key={log.id}
-                    testID={`food-log-row-${log.id}`}
-                    style={[styles.logRow, index > 0 && styles.divider]}
-                  >
-                    <FoodImage
-                      testID={`food-log-image-${log.id}`}
-                      uri={log.imageUrl}
-                      name={log.foodNameSnapshot}
-                      size={44}
-                      zoomable
-                    />
-                    <View style={styles.logInfo}>
-                      <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
-                      <Text style={styles.logMeta}>
-                        {log.calories} cal · {log.proteinG}g protein · {log.carbsG}g carbs ·{' '}
-                        {log.fatG}g fat
-                      </Text>
-                    </View>
-                    <View style={styles.quantityColumn}>
-                      <TextInput
-                        testID={`food-log-quantity-${log.id}`}
-                        style={styles.quantityInput}
-                        accessibilityLabel={`Amount of ${log.foodNameSnapshot}, in ${unitWord(
-                          2,
-                          log.enteredUnit ?? 'servings',
-                          servingMeasures(log).pieces,
-                        )}`}
-                        keyboardType="decimal-pad"
-                        value={quantityInputs[log.id] ?? ''}
-                        onChangeText={(text) =>
-                          setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))
-                        }
-                        onEndEditing={() => handleUpdateQuantity(log)}
-                      />
-                      <Text testID={`food-log-unit-${log.id}`} style={styles.quantityUnit}>
-                        {unitWord(
-                          log.enteredAmount ?? log.quantity,
-                          log.enteredUnit ?? 'servings',
-                          servingMeasures(log).pieces,
-                        )}
-                      </Text>
-                    </View>
-                    <TextButton
-                      testID={`food-log-delete-${log.id}`}
-                      label="Delete"
-                      accessibilityLabel={`Delete ${log.foodNameSnapshot}`}
-                      destructive
-                      onPress={() => handleDelete(log.id)}
-                    />
-                  </View>
-                ))
-              )}
-              {(isToday && yesterdayLogs.length > 0) || logs.some((log) => log.foodId !== null) ? (
-                <View style={styles.foodShortcuts}>
-                  {isToday && yesterdayLogs.length > 0 ? (
-                    <TextButton
-                      testID="nutrition-today-copy-yesterday"
-                      label="Copy Yesterday"
-                      onPress={() => setCopyOpen(true)}
-                    />
-                  ) : null}
-                  {logs.some((log) => log.foodId !== null) ? (
-                    <TextButton
-                      testID="nutrition-today-save-meal"
-                      label="Save as Meal"
-                      onPress={() => setSaveMealOpen(true)}
-                    />
+          <Animated.View style={dayTurn.widgetStyle(0)}>
+            <AppCard hero testID="nutrition-today-macros">
+              <View style={styles.summary}>
+                <View style={styles.ringColumn}>
+                  <CalorieRing
+                    testID="nutrition-today-calorie-ring"
+                    consumed={consumed.calories}
+                    goal={goals.calories}
+                    accentColor={accent}
+                    size={RING_SIZE}
+                    strokeWidth={12}
+                  />
+                  {remaining.calories !== null ? (
+                    <Text testID="calories-remaining" style={styles.ringRemaining}>
+                      {remaining.calories} cal remaining
+                    </Text>
                   ) : null}
                 </View>
-              ) : null}
-            </Section>
-          </AppCard>
+
+                <View style={styles.macroColumn}>
+                  {macros.map((macro, index) => {
+                    const fraction =
+                      macro.goal !== null && macro.goal > 0
+                        ? Math.min(macro.consumed / macro.goal, 1)
+                        : 0;
+                    return (
+                      <View
+                        key={macro.key}
+                        testID={`${macro.key}-row`}
+                        style={[styles.macroRow, index > 0 && styles.divider]}
+                        accessible
+                        accessibilityLabel={
+                          macro.goal !== null
+                            ? `${macro.label}, ${Math.round(macro.consumed)} of ${macro.goal} grams`
+                            : `${macro.label}, ${Math.round(macro.consumed)} grams`
+                        }
+                      >
+                        <View style={styles.macroGlyph}>
+                          <MaterialCommunityIcons
+                            name={MACRO_GLYPHS[macro.key]}
+                            size={18}
+                            color={accent}
+                          />
+                        </View>
+                        <View style={styles.macroBody}>
+                          <Text style={styles.macroLabel}>{macro.label}</Text>
+                          <View style={styles.macroFigures}>
+                            <Text testID={`${macro.key}-consumed`} style={styles.macroValue}>
+                              {grams(macro.consumed)}
+                            </Text>
+                            {macro.goal !== null ? (
+                              <Text testID={`${macro.key}-goal`} style={styles.macroGoal}>
+                                / {grams(macro.goal)}
+                              </Text>
+                            ) : null}
+                          </View>
+                          {macro.goal !== null ? (
+                            <View style={styles.barTrack}>
+                              <View
+                                testID={`${macro.key}-bar`}
+                                style={[
+                                  styles.barFill,
+                                  { width: `${fraction * 100}%`, backgroundColor: accent },
+                                ]}
+                              />
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            </AppCard>
+          </Animated.View>
+
+          <Animated.View style={dayTurn.widgetStyle(1)}>
+            <WeeklyCalorieBudget
+              title={week.title}
+              today={isToday}
+              consumed={week.earlier === null ? null : week.earlier + consumed.calories}
+              dailyTarget={goals.calories}
+              daysLeft={week.daysLeft}
+              failed={weekFailed}
+              accentColor={accent}
+              onSetTarget={() => navigation.navigate('NutritionGoals')}
+            />
+          </Animated.View>
+
+          <Animated.View style={dayTurn.widgetStyle(2)}>
+            <AppCard testID="nutrition-today-actions" style={styles.actions}>
+              <PrimaryButton
+                testID="log-food-button"
+                label="Log Food"
+                icon="plus"
+                onPress={() => logVia('FoodLibrary')}
+                accentColor={accent}
+                onAccentColor={nutritionTheme.onAccent}
+              />
+              <View style={styles.secondaryActions}>
+                <View style={styles.secondaryAction}>
+                  <SecondaryButton
+                    testID="scan-barcode-button"
+                    label="Scan Barcode"
+                    icon="maximize"
+                    size="md"
+                    onPress={() => logVia('BarcodeScanner')}
+                  />
+                </View>
+                <View style={styles.secondaryAction}>
+                  <SecondaryButton
+                    testID="search-food-button"
+                    label="Search Food"
+                    icon="search"
+                    size="md"
+                    onPress={() => logVia('FoodSearch')}
+                  />
+                </View>
+              </View>
+              <SecondaryButton
+                testID="ai-food-search-button"
+                label="Describe a Food (AI)"
+                accessibilityLabel="AI Food Search"
+                icon="zap"
+                size="md"
+                onPress={() => logVia('AiFoodSearch')}
+              />
+              <SecondaryButton
+                testID="quick-food-entry-button"
+                label="Quick Macro Entry"
+                icon="edit-3"
+                size="md"
+                onPress={() => logVia('QuickFoodEntry')}
+              />
+            </AppCard>
+          </Animated.View>
+
+          <Animated.View style={dayTurn.widgetStyle(3)}>
+            <AppCard testID="nutrition-today-foods">
+              <Section
+                title={isToday ? "Today's Foods" : 'Foods'}
+                action={{
+                  label: 'View All',
+                  onPress: () => navigation.navigate('NutritionHistory'),
+                  testID: 'nutrition-today-view-all',
+                }}
+              >
+                {logs.length === 0 ? (
+                  <EmptyState
+                    testID="food-log-empty"
+                    icon={
+                      <View style={styles.emptyGlyph}>
+                        <Feather name="coffee" size={22} color={colors.textSecondary} />
+                      </View>
+                    }
+                    title={isToday ? 'No foods logged today' : 'No foods logged this day'}
+                    action={{
+                      label: isToday ? 'Log Your First Meal' : 'Log a Food',
+                      onPress: () => logVia('FoodLibrary'),
+                      testID: 'food-log-empty-log',
+                    }}
+                  />
+                ) : (
+                  logs.map((log, index) => (
+                    <View
+                      key={log.id}
+                      testID={`food-log-row-${log.id}`}
+                      style={[styles.logRow, index > 0 && styles.divider]}
+                    >
+                      <FoodImage
+                        testID={`food-log-image-${log.id}`}
+                        uri={log.imageUrl}
+                        name={log.foodNameSnapshot}
+                        size={44}
+                        zoomable
+                      />
+                      <View style={styles.logInfo}>
+                        <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
+                        <Text style={styles.logMeta}>
+                          {log.calories} cal · {log.proteinG}g protein · {log.carbsG}g carbs ·{' '}
+                          {log.fatG}g fat
+                        </Text>
+                      </View>
+                      <View style={styles.quantityColumn}>
+                        <TextInput
+                          testID={`food-log-quantity-${log.id}`}
+                          style={styles.quantityInput}
+                          accessibilityLabel={`Amount of ${log.foodNameSnapshot}, in ${unitWord(
+                            2,
+                            log.enteredUnit ?? 'servings',
+                            servingMeasures(log).pieces,
+                          )}`}
+                          keyboardType="decimal-pad"
+                          value={quantityInputs[log.id] ?? ''}
+                          onChangeText={(text) =>
+                            setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))
+                          }
+                          onEndEditing={() => handleUpdateQuantity(log)}
+                        />
+                        <Text testID={`food-log-unit-${log.id}`} style={styles.quantityUnit}>
+                          {unitWord(
+                            log.enteredAmount ?? log.quantity,
+                            log.enteredUnit ?? 'servings',
+                            servingMeasures(log).pieces,
+                          )}
+                        </Text>
+                      </View>
+                      <TextButton
+                        testID={`food-log-delete-${log.id}`}
+                        label="Delete"
+                        accessibilityLabel={`Delete ${log.foodNameSnapshot}`}
+                        destructive
+                        onPress={() => handleDelete(log.id)}
+                      />
+                    </View>
+                  ))
+                )}
+                {(isToday && yesterdayLogs.length > 0) ||
+                logs.some((log) => log.foodId !== null) ? (
+                  <View style={styles.foodShortcuts}>
+                    {isToday && yesterdayLogs.length > 0 ? (
+                      <TextButton
+                        testID="nutrition-today-copy-yesterday"
+                        label="Copy Yesterday"
+                        onPress={() => setCopyOpen(true)}
+                      />
+                    ) : null}
+                    {logs.some((log) => log.foodId !== null) ? (
+                      <TextButton
+                        testID="nutrition-today-save-meal"
+                        label="Save as Meal"
+                        onPress={() => setSaveMealOpen(true)}
+                      />
+                    ) : null}
+                  </View>
+                ) : null}
+              </Section>
+            </AppCard>
+          </Animated.View>
 
           <CopyYesterdaySheet
             visible={copyOpen}
@@ -604,28 +615,30 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
         </>
       )}
 
-      <AppCard testID="nutrition-today-targets">
-        <Section
-          title="Daily Targets"
-          action={{
-            label: 'Edit Targets',
-            onPress: () => navigation.navigate('NutritionGoals'),
-            testID: 'nutrition-today-edit-targets',
-          }}
-          actionColor={accent}
-        >
-          <View style={styles.targets}>
-            {targets.map((target) => (
-              <StatBlock
-                key={target.key}
-                testID={`target-${target.key}`}
-                value={target.value !== null ? `${target.value}${target.unit}` : '—'}
-                label={target.label}
-              />
-            ))}
-          </View>
-        </Section>
-      </AppCard>
+      <Animated.View style={dayTurn.widgetStyle(4)}>
+        <AppCard testID="nutrition-today-targets">
+          <Section
+            title="Daily Targets"
+            action={{
+              label: 'Edit Targets',
+              onPress: () => navigation.navigate('NutritionGoals'),
+              testID: 'nutrition-today-edit-targets',
+            }}
+            actionColor={accent}
+          >
+            <View style={styles.targets}>
+              {targets.map((target) => (
+                <StatBlock
+                  key={target.key}
+                  testID={`target-${target.key}`}
+                  value={target.value !== null ? `${target.value}${target.unit}` : '—'}
+                  label={target.label}
+                />
+              ))}
+            </View>
+          </Section>
+        </AppCard>
+      </Animated.View>
     </>
   );
 

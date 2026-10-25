@@ -130,5 +130,21 @@ export function useDayLogs(
     setState((prev) => ({ ...prev, logs: prev.logs.filter((l) => l.id !== logId) }));
   }, []);
 
+  // A day moved to shows what it last showed from its very first frame -- not a frame of loading
+  // before the read below picks it up -- so a swipe lands on the day's foods, never a blank.
+  if (userId && day && state.day !== day) {
+    const remembered = recallShown<FoodLogRow[]>(userId, shownKey(day));
+    if (remembered) {
+      return {
+        day,
+        logs: remembered,
+        loading: false,
+        error: null,
+        refetch,
+        updateQuantity,
+        removeLog,
+      };
+    }
+  }
   return { ...state, refetch, updateQuantity, removeLog };
 }

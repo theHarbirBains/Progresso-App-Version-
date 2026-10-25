@@ -61,11 +61,10 @@ export function DayBar({ day, slide, width, onChooseDay, onAdjust }: Props) {
         style={styles.label}
       >
         <Animated.View style={[styles.glide, glide]}>
-          {today ? (
-            <Text testID="nutrition-day-today-mark" style={styles.todayMark}>
-              Today
-            </Text>
-          ) : null}
+          {/* Its line is kept on every day, so the page never jumps as the day turns. */}
+          <Text testID={today ? 'nutrition-day-today-mark' : undefined} style={styles.todayMark}>
+            {today ? 'Today' : '\u00a0'}
+          </Text>
           <Text style={styles.labelText} numberOfLines={1}>
             {label}
           </Text>
