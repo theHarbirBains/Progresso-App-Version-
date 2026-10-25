@@ -4,6 +4,7 @@ import {
   TextInput as RNTextInput,
   View,
   type KeyboardTypeOptions,
+  type TextInputInstance,
   type TextInputProps as RNTextInputProps,
 } from 'react-native';
 import { Text } from './Text';
@@ -34,7 +35,7 @@ interface Props {
   errorTestID?: string;
   accessibilityLabel?: string;
   /** Ref to the native input, for moving focus to the next field on submit. */
-  inputRef?: Ref<RNTextInput>;
+  inputRef?: Ref<TextInputInstance>;
 }
 
 // Component Logic: one bordered row (label above, helper/error text below,

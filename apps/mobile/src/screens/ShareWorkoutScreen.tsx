@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
+import { View, type LayoutChangeEvent, type ViewInstance } from 'react-native';
 import { Text } from '../design/Text';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
@@ -31,7 +31,7 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
   const accessToken = session?.access_token;
   const { theme, weightUnit } = useProgressTheme();
 
-  const cardRef = useRef<View>(null);
+  const cardRef = useRef<ViewInstance>(null);
 
   const [cardData, setCardData] = useState<ShareCardData | null>(null);
   const [loading, setLoading] = useState(true);

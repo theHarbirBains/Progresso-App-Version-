@@ -123,6 +123,7 @@ jest.mock('expo-secure-store', () => {
 jest.mock('expo-constants', () => ({
   __esModule: true,
   default: { expoConfig: { extra: { eas: { projectId: 'test-project-id' } } } },
+  ExecutionEnvironment: { Bare: 'bare', Standalone: 'standalone', StoreClient: 'storeClient' },
 }));
 
 // expo-notifications has no jest-expo auto-mock either. Only the
@@ -134,6 +135,16 @@ jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
   requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
   getExpoPushTokenAsync: jest.fn().mockResolvedValue({ data: 'ExponentPushToken[test]' }),
+}));
+
+// expo-status-bar draws nothing in a test, and loading the real one pulls in
+// all of expo -- whose native modules jest-expo looks up by walking a
+// stack-trace path up to its package.json. Under a folder name like
+// "Progresso (APP VERSION)" the source-mapped path comes out malformed
+// ("...(APP VERSION)../../../../node_modules/..."), the walk finds no
+// package.json, and the lookup throws. App only uses the component.
+jest.mock('expo-status-bar', () => ({
+  StatusBar: () => null,
 }));
 
 jest.mock('expo-crypto', () => {

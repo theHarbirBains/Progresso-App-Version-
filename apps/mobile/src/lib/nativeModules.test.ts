@@ -1,4 +1,5 @@
 import { requireOptionalNativeModule } from 'expo';
+import Constants from 'expo-constants';
 import { TurboModuleRegistry } from 'react-native';
 
 // jest.setup.js stands this module in as "a real build"; here is the real one.
@@ -12,6 +13,7 @@ const optionalModule = requireOptionalNativeModule as jest.Mock;
 afterEach(() => {
   jest.restoreAllMocks();
   optionalModule.mockReset();
+  (Constants as { executionEnvironment?: string }).executionEnvironment = undefined;
 });
 
 describe('hasWidgetsNative', () => {
@@ -24,6 +26,12 @@ describe('hasWidgetsNative', () => {
 
   it('is false in Expo Go, which has neither', () => {
     optionalModule.mockReturnValue(null);
+    expect(hasWidgetsNative()).toBe(false);
+  });
+
+  it("is false in an Expo Go that carries both modules: there's no widget extension there", () => {
+    optionalModule.mockImplementation((name: string) => ({ name }));
+    (Constants as { executionEnvironment?: string }).executionEnvironment = 'storeClient';
     expect(hasWidgetsNative()).toBe(false);
   });
 

@@ -111,7 +111,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 ## Tech Stack
 
-- **Mobile:** React Native 0.86 + Expo SDK 57, TypeScript, React Navigation (native stack)
+- **Mobile:** React Native 0.88 + Expo SDK 58, TypeScript, React Navigation (native stack)
 - **Backend:** NestJS 11 on the Fastify adapter, TypeScript
 - **Database:** PostgreSQL via Supabase, version-controlled SQL migrations, Row-Level Security
 - **Auth:** Supabase Auth (email/password, plus Google and Apple through a web sign-in flow)
@@ -224,7 +224,7 @@ npm run lint           # lint all workspaces
 npm run format         # check formatting
 ```
 
-`apps/mobile` is currently pinned to Expo SDK 57 to match the version shipped by Expo Go; check compatibility before upgrading.
+`apps/mobile` is on Expo SDK 58, the version the current Expo Go runs; check compatibility before upgrading. Expo Go previews everything but the Home Screen widgets and Apple Health, which need a real build.
 
 iOS builds run from `apps/mobile`, which holds the project's only `app.json` and `eas.json`:
 

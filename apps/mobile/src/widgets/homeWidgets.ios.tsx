@@ -62,7 +62,7 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
   }
   const summary = (
     <VStack alignment="leading" spacing={4}>
-      <HStack>
+      <HStack spacing={0}>
         <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(QUIET)]}>
           Today
         </Text>
@@ -87,7 +87,7 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
   );
   if (environment.widgetFamily !== 'systemMedium') {
     return (
-      <VStack alignment="leading" modifiers={root}>
+      <VStack alignment="leading" spacing={0} modifiers={root}>
         {summary}
       </VStack>
     );
@@ -98,7 +98,7 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
       <VStack alignment="leading" spacing={8}>
         {props.macros.map((item) => (
           <VStack key={item.label} alignment="leading" spacing={3}>
-            <HStack>
+            <HStack spacing={0}>
               <Text modifiers={[font({ size: 12, weight: 'semibold' }), foregroundStyle(QUIET)]}>
                 {item.label}
               </Text>
@@ -195,7 +195,7 @@ const StepsToday = (props: StepsWidgetProps) => {
       spacing={4}
       modifiers={[containerBackground(FILL, 'widget'), widgetURL('progresso://feed')]}
     >
-      <HStack>
+      <HStack spacing={0}>
         <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(QUIET)]}>
           Steps
         </Text>

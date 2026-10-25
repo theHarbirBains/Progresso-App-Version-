@@ -234,7 +234,7 @@ export function FoodPickerStep({ title, excludeId, onPick, onCancel }: Props) {
                   <Text testID="food-picker-search-error" style={styles.error}>
                     {searchError}
                   </Text>
-                ) : null
+                ) : undefined
               }
             />
           )}

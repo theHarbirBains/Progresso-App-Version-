@@ -5,6 +5,7 @@ import {
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ScrollViewInstance,
 } from 'react-native';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { useScreenFocused } from '../navigation/useScreenFocused';
@@ -38,7 +39,7 @@ export function AutoCarousel<T>({ items, keyOf, renderSlide, initialIndex = 0, t
   const start = initialIndex > 0 && initialIndex < items.length ? initialIndex : 0;
   const [index, setIndex] = useState(start);
   const indexRef = useRef(start);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const draggingRef = useRef(false);
   const count = items.length;
 

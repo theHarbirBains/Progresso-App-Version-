@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { StyleSheet, TextInput as RNTextInput, View } from 'react-native';
+import { StyleSheet, View, type TextInputInstance } from 'react-native';
 import { Text } from '../design/Text';
 import { PasswordVisibilityToggle } from '../design/PasswordVisibilityToggle';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
@@ -62,10 +62,10 @@ export function CreateAccountStep({
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const usernameRef = useRef<RNTextInput>(null);
-  const emailRef = useRef<RNTextInput>(null);
-  const passwordRef = useRef<RNTextInput>(null);
-  const confirmRef = useRef<RNTextInput>(null);
+  const usernameRef = useRef<TextInputInstance>(null);
+  const emailRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
+  const confirmRef = useRef<TextInputInstance>(null);
 
   const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password;
   const anySubmitting = submitting || googleSubmitting;

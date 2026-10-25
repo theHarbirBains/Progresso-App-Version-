@@ -7,12 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#2E1707"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.harbirbains.progresso",
@@ -31,13 +25,21 @@
         "backgroundImage": "./assets/adaptive-icon-background.png",
         "backgroundColor": "#12110F"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 360,
+          "resizeMode": "contain",
+          "backgroundColor": "#2E1707"
+        }
+      ],
       "@sentry/react-native",
       "expo-web-browser",
       "expo-font",
@@ -75,19 +77,25 @@
               "name": "NutritionToday",
               "displayName": "Today's Nutrition",
               "description": "Calories left today, with your protein, carbs and fat.",
-              "ios": { "supportedFamilies": ["systemSmall", "systemMedium"] }
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium"]
+              }
             },
             {
               "name": "NextWorkout",
               "displayName": "Next Workout",
               "description": "The next day of your split, or the workout you're doing.",
-              "ios": { "supportedFamilies": ["systemSmall", "systemMedium"] }
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium"]
+              }
             },
             {
               "name": "StepsToday",
               "displayName": "Today's Steps",
               "description": "Today's steps from Apple Health.",
-              "ios": { "supportedFamilies": ["systemSmall"] }
+              "ios": {
+                "supportedFamilies": ["systemSmall"]
+              }
             }
           ]
         }

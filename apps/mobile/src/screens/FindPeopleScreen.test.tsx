@@ -222,7 +222,10 @@ describe('FindPeopleScreen -- Suggested/Contacts (shown when search is empty)', 
   });
 
   it('invites via the OS share sheet', async () => {
-    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({
+      action: 'sharedAction',
+      activityType: undefined,
+    });
     renderScreen();
     await screen.findByTestId('find-people-invite');
 

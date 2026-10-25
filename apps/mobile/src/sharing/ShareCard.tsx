@@ -1,5 +1,5 @@
 import type { Ref } from 'react';
-import { View } from 'react-native';
+import { View, type ViewInstance } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -145,7 +145,7 @@ function Thumb({ set, size }: { set: ShareTopSet; size: number }) {
 // The shareable workout image: the card, inside its warm frame, on a 9:16
 // story canvas. This whole canvas is what gets captured -- the preview IS the
 // image.
-export function ShareStory({ storyRef, ...cardProps }: Props & { storyRef?: Ref<View> }) {
+export function ShareStory({ storyRef, ...cardProps }: Props & { storyRef?: Ref<ViewInstance> }) {
   return (
     <View
       ref={storyRef}
