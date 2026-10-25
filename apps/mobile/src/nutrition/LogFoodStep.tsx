@@ -13,7 +13,13 @@ import { FoodImage } from './FoodImage';
 import { FoodMacros } from './FoodFacts';
 import { loggedJustNow } from './duplicateLog';
 import { useFoodLog } from './FoodLogProvider';
-import { amountFor, servingMeasures, servingsFor, type QuantityUnit } from './logQuantity';
+import {
+  amountFor,
+  entryServingGrams,
+  servingMeasures,
+  servingsFor,
+  type QuantityUnit,
+} from './logQuantity';
 import { defaultMealTypeForTime } from './mealTypes';
 import type { EnteredAmount } from './foodLogQueries';
 import { calculateLogTotals } from './nutritionCalculations';
@@ -97,12 +103,22 @@ export function LogFoodStep({
   day,
 }: LogFoodStepProps) {
   const { logs, logFoodEntry } = useFoodLog();
-  const measures = servingMeasures(food);
-  const { servingGrams, servingMl, pieces } = measures;
+  const { servingMl, pieces, ...known } = servingMeasures(food);
+  // Grams are always on offer. A serving's weight is its own, or its wording's, or what last
+  // time's amount by weight showed; failing those, the person says what one serving weighs --
+  // a drink's millilitres to start, since most drinks weigh about the same.
+  const knownGrams = known.servingGrams ?? entryServingGrams(initialEntry, initialQuantity);
+  const [servingWeight, setServingWeight] = useState(() =>
+    knownGrams === null && servingMl !== null ? String(servingMl) : '',
+  );
+  const typedWeight = Number(servingWeight);
+  const servingGrams = knownGrams ?? (servingWeight !== '' && typedWeight > 0 ? typedWeight : null);
+  const measures = { servingGrams, servingMl, pieces };
   const available = (candidate: QuantityUnit): boolean =>
     candidate === 'servings' ||
+    candidate === 'g' ||
+    candidate === 'oz' ||
     (candidate === 'pieces' && pieces !== null) ||
-    ((candidate === 'g' || candidate === 'oz') && servingGrams !== null) ||
     (candidate === 'ml' && servingMl !== null);
   // Last time's amount as it was typed, when it can still be measured that way; otherwise the
   // serving's pieces when it names them, or servings.
@@ -130,12 +146,8 @@ export function LogFoodStep({
   const unitOptions: { label: string; value: QuantityUnit; accessibilityLabel?: string }[] = [
     { label: 'Servings', value: 'servings' },
     ...(pieces ? [{ label: capitalize(pieces.plural), value: 'pieces' as const }] : []),
-    ...(servingGrams !== null
-      ? [
-          { label: 'g', value: 'g' as const, accessibilityLabel: 'Grams' },
-          { label: 'oz', value: 'oz' as const, accessibilityLabel: 'Ounces' },
-        ]
-      : []),
+    { label: 'g', value: 'g', accessibilityLabel: 'Grams' },
+    { label: 'oz', value: 'oz', accessibilityLabel: 'Ounces' },
     ...(servingMl !== null
       ? [{ label: 'ml', value: 'ml' as const, accessibilityLabel: 'Millilitres' }]
       : []),
@@ -264,6 +276,24 @@ export function LogFoodStep({
           keyboardType="decimal-pad"
         />
 
+        {/* By weight, for a serving with no weight of its own: what one serving weighs. */}
+        {(unit === 'g' || unit === 'oz') && knownGrams === null ? (
+          <View style={styles.servingWeight}>
+            <TextInput
+              testID="log-food-serving-weight"
+              label={`One serving (${food.servingSize} ${food.servingUnit}) weighs, in grams`}
+              value={servingWeight}
+              onChangeText={setServingWeight}
+              keyboardType="decimal-pad"
+            />
+            <Text testID="log-food-serving-weight-note" style={styles.serving}>
+              {servingMl !== null
+                ? 'Most drinks weigh about the same in grams as in millilitres.'
+                : 'From its label, or weigh one.'}
+            </Text>
+          </View>
+        ) : null}
+
         <Text testID="log-food-serving" style={styles.serving}>
           {food.recipeServings
             ? `Recipe · makes ${food.recipeServings} ${food.recipeServings === 1 ? 'serving' : 'servings'}`
@@ -323,6 +353,9 @@ const styles = StyleSheet.create({
   },
   unitSwitch: {
     marginBottom: spacing.md,
+  },
+  servingWeight: {
+    marginTop: spacing.md,
   },
   serving: {
     ...typeScale.secondary,

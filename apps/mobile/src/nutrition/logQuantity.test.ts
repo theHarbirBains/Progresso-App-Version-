@@ -1,4 +1,13 @@
-import { fromServings, gramsPerServing, servingPieces, toServings } from './logQuantity';
+import {
+  entryServingGrams,
+  fromServings,
+  gramsPerServing,
+  labelGrams,
+  logMeasures,
+  servingMeasures,
+  servingPieces,
+  toServings,
+} from './logQuantity';
 
 describe('gramsPerServing', () => {
   it('weighs a serving given in grams, kilograms or ounces', () => {
@@ -100,5 +109,57 @@ describe('pieces as servings', () => {
     expect(toServings(6, 'pieces', 34, 3)).toBe(2);
     expect(fromServings(1, 'pieces', 34, 3)).toBe('3');
     expect(fromServings(0.5, 'pieces', null, 1)).toBe('0.5');
+  });
+});
+
+describe('a serving by weight, whatever its unit', () => {
+  it("reads the grams a serving's wording states -- never milligrams or kilograms", () => {
+    expect(labelGrams('1 cup (240 g)')).toBe(240);
+    expect(labelGrams('1 bar (40g)')).toBe(40);
+    expect(labelGrams('2 slices, 56.5 grams')).toBe(56.5);
+    expect(labelGrams('1 tablet (500 mg)')).toBeNull();
+    expect(labelGrams('1 bag (1.5 kg)')).toBeNull();
+    expect(labelGrams('1 can (330 ml)')).toBeNull();
+    expect(labelGrams(null)).toBeNull();
+  });
+
+  it('weighs a serving by its own unit first, then by its wording', () => {
+    expect(
+      servingMeasures({ servingSize: 30, servingUnit: 'g', servingLabel: '1 bar (40 g)' })
+        .servingGrams,
+    ).toBe(30);
+    expect(
+      servingMeasures({ servingSize: 1, servingUnit: 'cup', servingLabel: '1 cup (240 g)' })
+        .servingGrams,
+    ).toBe(240);
+    expect(servingMeasures({ servingSize: 1, servingUnit: 'cup' }).servingGrams).toBeNull();
+  });
+
+  it('works out the weight of a serving from an amount typed by weight', () => {
+    expect(entryServingGrams({ amount: 250, unit: 'g' }, 2.5)).toBe(100);
+    expect(entryServingGrams({ amount: 1, unit: 'oz' }, 1)).toBeCloseTo(28.35, 2);
+    expect(entryServingGrams({ amount: 2, unit: 'servings' }, 2)).toBeNull();
+    expect(entryServingGrams({ amount: 250, unit: 'g' }, 0)).toBeNull();
+    expect(entryServingGrams(null, 1)).toBeNull();
+  });
+
+  it('edits a log made by weight in grams, even when its serving has no weight of its own', () => {
+    const log = {
+      servingSize: 1,
+      servingUnit: 'cup',
+      servingLabel: null,
+      quantity: 0.5,
+      enteredAmount: 120,
+      enteredUnit: 'g' as const,
+    };
+
+    expect(logMeasures(log).servingGrams).toBe(240);
+    expect(toServings(360, 'g', logMeasures(log).servingGrams)).toBe(1.5);
+  });
+
+  it('never takes grams for servings when there is no weight to divide by', () => {
+    expect(toServings(250, 'g', null)).toBeNaN();
+    expect(toServings(8, 'oz', null)).toBeNaN();
+    expect(fromServings(2, 'g', null)).toBe('');
   });
 });

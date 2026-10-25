@@ -85,11 +85,57 @@ describe('LogFoodStep', () => {
     expect(screen.getByTestId('log-food-unit-oz').props.accessibilityLabel).toBe('Ounces');
   });
 
-  it('offers no unit switch when the serving is not a weight', () => {
-    renderStep({ ...rice, servingSize: 1, servingUnit: 'cup' });
+  it('always offers grams -- for a serving with no weight, asking what one serving weighs', async () => {
+    const cup = { ...rice, servingSize: 1, servingUnit: 'cup' };
+    renderStep(cup);
 
-    expect(screen.queryByTestId('log-food-unit')).toBeNull();
     expect(screen.getByTestId('log-food-quantity').props.accessibilityLabel).toBe('Quantity');
+    expect(screen.queryByTestId('log-food-serving-weight')).toBeNull();
+    fireEvent.press(screen.getByTestId('log-food-unit-g'));
+
+    // No weight to turn 1 cup into grams with yet: nothing is made up.
+    expect(screen.getByTestId('log-food-serving-weight').props.accessibilityLabel).toBe(
+      'One serving (1 cup) weighs, in grams',
+    );
+    expect(screen.getByTestId('log-food-serving-weight-note')).toHaveTextContent(
+      'From its label, or weigh one.',
+    );
+    expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '');
+    fireEvent.changeText(screen.getByTestId('log-food-quantity'), '120');
+    expect(screen.getByTestId('log-food-submit').props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.changeText(screen.getByTestId('log-food-serving-weight'), '240');
+    expect(screen.getByTestId('log-food-amount')).toHaveTextContent('120 g · 0.5 servings');
+    await submit();
+
+    expect(mockLogFoodEntry).toHaveBeenCalledWith(
+      cup,
+      0.5,
+      MEAL,
+      { amount: 120, unit: 'g' },
+      undefined,
+    );
+  });
+
+  it('takes the weight its serving wording states, asking nothing', () => {
+    renderStep({ ...rice, servingSize: 1, servingUnit: 'cup', servingLabel: '1 cup (240 g)' });
+
+    fireEvent.press(screen.getByTestId('log-food-unit-g'));
+
+    expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '240');
+    expect(screen.queryByTestId('log-food-serving-weight')).toBeNull();
+  });
+
+  it("starts a drink's serving weight at its millilitres, which most weigh about the same as", () => {
+    renderStep({ ...rice, name: 'Cola', servingSize: 330, servingUnit: 'ml' });
+
+    fireEvent.press(screen.getByTestId('log-food-unit-g'));
+
+    expect(screen.getByTestId('log-food-serving-weight')).toHaveProp('value', '330');
+    expect(screen.getByTestId('log-food-serving-weight-note')).toHaveTextContent(
+      'Most drinks weigh about the same in grams as in millilitres.',
+    );
+    expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '330');
   });
 
   it('logs 250 g of a 100 g serving as 2.5 servings', async () => {
@@ -291,12 +337,31 @@ describe('LogFoodStep -- drinks, last time and double taps', () => {
     expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '150');
   });
 
-  it("falls back to servings when last time's unit no longer fits the food", () => {
+  it("keeps last time's amount by weight, the serving's weight worked out from it", () => {
     render(
       <LogFoodStep
         food={{ ...rice, servingSize: 1, servingUnit: 'cup' }}
         initialQuantity={2}
         initialEntry={{ amount: 150, unit: 'g' }}
+        accentColor="#3DDC97"
+        onAccentColor="#000000"
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    // 150 g was 2 cups: 75 g a cup, so nothing needs asking.
+    expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '150');
+    expect(screen.queryByTestId('log-food-serving-weight')).toBeNull();
+    expect(screen.getByTestId('log-food-amount')).toHaveTextContent('150 g · 2 servings');
+  });
+
+  it("falls back to servings when last time's pieces no longer fit the food", () => {
+    render(
+      <LogFoodStep
+        food={rice}
+        initialQuantity={2}
+        initialEntry={{ amount: 3, unit: 'pieces' }}
         accentColor="#3DDC97"
         onAccentColor="#000000"
         onDone={jest.fn()}
@@ -391,6 +456,10 @@ describe('LogFoodStep -- a recipe', () => {
     });
 
     expect(screen.getByTestId('log-food-serving')).toHaveTextContent('Recipe · makes 4 servings');
-    expect(screen.queryByTestId('log-food-unit')).toBeNull();
+    // By servings to start -- and, like any food, by weight.
+    expect(screen.getByTestId('log-food-unit-servings').props.accessibilityState.selected).toBe(
+      true,
+    );
+    expect(screen.getByTestId('log-food-unit-g')).toBeTruthy();
   });
 });

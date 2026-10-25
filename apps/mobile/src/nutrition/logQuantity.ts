@@ -1,9 +1,10 @@
-// The amount typed on the log step, and the servings it comes to -- what a log stores. A food
-// whose serving is a weight (g, kg, oz) can also be logged by weight: 250 g of a food whose
-// serving is 100 g is 2.5 servings. A drink whose serving is a volume (ml, l) can be logged in
-// millilitres. A food whose serving names its pieces ("3 cookies (34 g)", the provider's own
-// wording) can also be logged in those pieces: 2 cookies is 2/3 of a serving. Every other
-// serving unit is logged in servings only. A log keeps the amount as typed too
+// The amount typed on the log step, and the servings it comes to -- what a log stores. Every
+// food can be logged by weight: 250 g of a food whose serving is 100 g is 2.5 servings. A
+// serving's weight is its own when it is one (g, kg, oz), else the one its wording states
+// ("1 cup (240 g)"), else the one the person gives on the log step (LogFoodStep). A drink whose
+// serving is a volume (ml, l) can be logged in millilitres. A food whose serving names its
+// pieces ("3 cookies (34 g)", the provider's own wording) can also be logged in those pieces: 2
+// cookies is 2/3 of a serving. A log keeps the amount as typed too
 // (food_logs.entered_amount/entered_unit), so it's shown and edited that way afterwards.
 
 /** What the log step's amount is typed in. */
@@ -22,6 +23,31 @@ const GRAMS_PER_SERVING_UNIT: Record<string, number> = {
 export function gramsPerServing(food: { servingSize: number; servingUnit: string }): number | null {
   const perUnit = GRAMS_PER_SERVING_UNIT[food.servingUnit.trim().toLowerCase()];
   return perUnit === undefined ? null : food.servingSize * perUnit;
+}
+
+// A weight in grams in a serving's own wording -- "1 cup (240 g)", "1 bar (40g)" -- never mg or kg.
+const LABEL_GRAMS = /(?:^|[^a-z\d.,])(\d+(?:[.,]\d+)?)\s*(?:g|gr|grams?)(?![a-z])/;
+
+/** The grams a serving's wording says it weighs, or null when it says none. */
+export function labelGrams(label: string | null | undefined): number | null {
+  const match = label?.trim().toLowerCase().match(LABEL_GRAMS);
+  if (!match) return null;
+  const grams = Number(match[1]!.replace(',', '.'));
+  return grams > 0 ? grams : null;
+}
+
+/**
+ * The grams one serving weighs, as an amount typed by weight shows it -- 250 g logged as 2.5
+ * servings is 100 g a serving. Null for an amount typed any other way.
+ */
+export function entryServingGrams(
+  entry: { amount: number; unit: QuantityUnit } | null | undefined,
+  servings: number,
+): number | null {
+  if (!entry || !(entry.amount > 0) || !(servings > 0)) return null;
+  if (entry.unit === 'g') return entry.amount / servings;
+  if (entry.unit === 'oz') return (entry.amount * GRAMS_PER_OUNCE) / servings;
+  return null;
 }
 
 // The serving units that are volumes, in millilitres per unit.
@@ -147,7 +173,9 @@ export function toServings(
 ): number {
   if (unit === 'pieces') return round2(piecesPerServing ? amount / piecesPerServing : amount);
   if (unit === 'ml') return round2(servingMl ? amount / servingMl : amount);
-  if (unit === 'servings' || servingGrams === null) return round2(amount);
+  if (unit === 'servings') return round2(amount);
+  // A weight with no serving weight to divide by comes to nothing -- never grams taken as servings.
+  if (servingGrams === null) return NaN;
   const grams = unit === 'g' ? amount : amount * GRAMS_PER_OUNCE;
   return round2(grams / servingGrams);
 }
@@ -162,7 +190,9 @@ export function fromServings(
 ): string {
   if (unit === 'pieces') return String(round2(servings * (piecesPerServing ?? 1)));
   if (unit === 'ml') return String(round2(servings * (servingMl ?? 1)));
-  if (unit === 'servings' || servingGrams === null) return String(round2(servings));
+  if (unit === 'servings') return String(round2(servings));
+  // No serving weight: no amount in grams to show yet.
+  if (servingGrams === null) return '';
   const grams = servings * servingGrams;
   return String(round2(unit === 'g' ? grams : grams / GRAMS_PER_OUNCE));
 }
@@ -181,9 +211,35 @@ export function servingMeasures(food: {
   servingLabel?: string | null;
 }): ServingMeasures {
   return {
-    servingGrams: gramsPerServing(food),
+    servingGrams: gramsPerServing(food) ?? labelGrams(food.servingLabel),
     servingMl: mlPerServing(food),
     pieces: servingPieces(food.servingLabel),
+  };
+}
+
+/**
+ * A log's serving measures from its own snapshot -- and, for a serving with no weight of its
+ * own that was logged by weight, the weight that entry shows, so the amount is still edited in
+ * grams.
+ */
+export function logMeasures(log: {
+  servingSize: number;
+  servingUnit: string;
+  servingLabel?: string | null;
+  quantity: number;
+  enteredAmount?: number | null;
+  enteredUnit?: QuantityUnit | null;
+}): ServingMeasures {
+  const measures = servingMeasures(log);
+  if (measures.servingGrams !== null || log.enteredAmount == null || !log.enteredUnit) {
+    return measures;
+  }
+  return {
+    ...measures,
+    servingGrams: entryServingGrams(
+      { amount: log.enteredAmount, unit: log.enteredUnit },
+      log.quantity,
+    ),
   };
 }
 

@@ -72,7 +72,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Tap a food's photo to see it full screen, and pinch to zoom in
 - Search Food covers Progresso's food catalog and Open Food Facts; Scan Barcode looks products up on Open Food Facts, with Enter Manually when one isn't found
 - AI Food Search (from the Nutrition dashboard or the Food Library) takes how much (an amount and a unit), what food and, optionally, how it was prepared, turns them into the food's parts and takes their figures from Progresso's catalog, USDA data and Open Food Facts; Claude's own estimate is used only as a labelled last resort. Review & Log lets you check and change the name and figures before setting the amount and logging it, without adding a duplicate to your library. Each user has an hourly and a daily limit
-- A food can be logged in servings, in the pieces its serving names (cookies, slices), in grams or ounces when its serving is a weight, or in millilitres when it's a drink; a log keeps the amount as typed and is edited that way, and logging the same food twice within seconds asks first
+- A food can be logged in servings, in the pieces its serving names (cookies, slices), always in grams or ounces (by its serving's weight, the weight its label states, or -- for a serving with no weight -- one the person gives), or in millilitres when it's a drink; a log keeps the amount as typed and is edited that way, and logging the same food twice within seconds asks first
 - Every log keeps the figures it was logged with, even if the food (or recipe) changes later
 
 **Trainer mode**

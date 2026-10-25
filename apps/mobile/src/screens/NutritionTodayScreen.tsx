@@ -25,7 +25,7 @@ import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
 import { fetchFoodLogsForRange, type FoodLogRow } from '../nutrition/foodLogQueries';
 import { isTodayKey, shiftDay, todayKey, weekOfLabel } from '../nutrition/logDay';
 import { dayFromKey, dayKey } from '../lib/dayKey';
-import { servingMeasures, servingsFor, unitWord } from '../nutrition/logQuantity';
+import { logMeasures, servingMeasures, servingsFor, unitWord } from '../nutrition/logQuantity';
 import {
   calculateRemaining,
   daysLeftInWeek,
@@ -271,7 +271,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     const unit = log.enteredUnit ?? 'servings';
     if (!Number.isFinite(amount) || amount <= 0) return;
     if (amount === (log.enteredAmount ?? log.quantity)) return;
-    const servings = servingsFor(amount, unit, servingMeasures(log));
+    const servings = servingsFor(amount, unit, logMeasures(log));
     if (!(servings > 0)) return;
     setError(null);
     try {
