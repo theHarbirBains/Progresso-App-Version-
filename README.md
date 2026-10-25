@@ -45,7 +45,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - New sets start filled in from the set before them, or the same set from last session, ready to edit; a set only completes when you tap it
 - Unilateral exercises are logged per side, left and right
 - Group workouts: start a group before the workout begins (Start Workout › Working Out as a Group); each person has their own tab of sets, and anyone in the group can enter them
-- Custom exercises alongside a shared default exercise library, each tagged with a muscle group, with optional equipment profiles and machine photos
+- Custom exercises alongside a shared default exercise library, each tagged with a muscle group (the legs as Quadriceps, Hamstrings, Adductors, Glutes and Calves), with optional equipment profiles and machine photos
 - Workout history with a month calendar view and per-day/per-workout detail; past workouts can be logged and completed ones edited
 - Workout sharing: a story-sized (9:16) workout card, shared to Instagram, TikTok and other apps through the share sheet
 

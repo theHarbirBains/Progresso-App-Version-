@@ -3,8 +3,8 @@
 // day's muscle groups are a general, high-level vocabulary meant for quick
 // scanning when building/choosing a split -- not the finer per-head
 // classification exercises use. Biceps/Triceps/Forearms and
-// Quads/Hamstrings/Glutes/Calves are each kept as distinct categories (an
-// explicit product decision) rather than merged into one "Arms"/"Legs"
+// Quads/Hamstrings/Adductors/Glutes/Calves are each kept as distinct
+// categories (an explicit product decision) rather than merged into one "Arms"/"Legs"
 // bucket, while every other region collapses to one general label (e.g.
 // front/side/rear delts all become "Shoulders"). Exercise filtering/
 // recommendation by muscle group is explicitly deferred, so there is no
@@ -19,6 +19,7 @@ export const SPLIT_MUSCLE_GROUPS = [
   'abs',
   'quads',
   'hamstrings',
+  'adductors',
   'glutes',
   'calves',
 ] as const;
@@ -35,6 +36,7 @@ export const SPLIT_MUSCLE_GROUP_LABELS: Record<SplitMuscleGroup, string> = {
   abs: 'Abs',
   quads: 'Quads',
   hamstrings: 'Hamstrings',
+  adductors: 'Adductors',
   glutes: 'Glutes',
   calves: 'Calves',
 };

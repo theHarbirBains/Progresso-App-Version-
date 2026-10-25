@@ -8,6 +8,7 @@ export const MUSCLE_GROUPS = [
   'forearms',
   'quadriceps',
   'hamstrings',
+  'adductors',
   'glutes',
   'calves',
   'core',
