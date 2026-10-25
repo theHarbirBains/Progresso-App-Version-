@@ -104,12 +104,11 @@ export function computeWeeklyCalorieSummary(
 }
 
 /**
- * The days left in the Monday-to-Sunday week, today included: 7 on a Monday, 1 on a Sunday --
+ * The days left in the Sunday-to-Saturday week, today included: 7 on a Sunday, 1 on a Saturday --
  * what's left of a weekly calorie budget can be spread over.
  */
 export function daysLeftInWeek(now: Date = new Date()): number {
-  const day = now.getDay(); // 0 = Sunday .. 6 = Saturday
-  return day === 0 ? 1 : 8 - day;
+  return 7 - now.getDay(); // getDay() is 0 on a Sunday .. 6 on a Saturday
 }
 
 /**

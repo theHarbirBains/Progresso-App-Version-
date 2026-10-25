@@ -1,6 +1,5 @@
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, StyleSheet } from 'react-native';
 import { Card } from '../design/Card';
-import { TextButton } from '../design/Button';
 import { Text } from '../design/Text';
 import { colors, minTouchTarget, spacing, typeScale } from '../design/theme';
 import { dayLabel, isTodayKey } from './logDay';
@@ -11,7 +10,6 @@ interface Props {
   /** The day's widgets' movement as they're swiped (useDaySwipe): the date glides along with it. */
   slide: Animated.Value;
   width: number;
-  onToday: () => void;
   /** Tapping the date: the calendar, to pick any day. */
   onChooseDay: () => void;
   /** Assistive tech's way to change day -- a swipe isn't something VoiceOver can do. */
@@ -20,12 +18,12 @@ interface Props {
 
 /**
  * The Nutrition screen's day: its date ("Saturday, October 24"), with a small "Today" above it on
- * today -- tapping it opens the calendar -- and, on any other day, a way straight back to today. There are no arrows:
- * the screen is swiped from day to day (useDaySwipe), and the date glides with the swipe at a
- * slower pace, fading as it goes. For VoiceOver it's an adjustable control: swipe up for the
+ * today -- tapping it opens the calendar. There are no arrows and no button back to today: the
+ * screen is swiped from day to day (useDaySwipe), and opens on today again once it's left and
+ * come back to. The date glides with the swipe at a slower pace, fading as it goes. For VoiceOver it's an adjustable control: swipe up for the
  * next day, down for the day before.
  */
-export function DayBar({ day, slide, width, onToday, onChooseDay, onAdjust }: Props) {
+export function DayBar({ day, slide, width, onChooseDay, onAdjust }: Props) {
   const today = isTodayKey(day);
   const label = dayLabel(day);
   const spoken = today ? `Today, ${label}` : label;
@@ -73,11 +71,6 @@ export function DayBar({ day, slide, width, onToday, onChooseDay, onAdjust }: Pr
           </Text>
         </Animated.View>
       </Pressable>
-      {today ? null : (
-        <View style={styles.today}>
-          <TextButton testID="nutrition-day-today" label="Back to Today" onPress={onToday} />
-        </View>
-      )}
     </Card>
   );
 }
@@ -104,8 +97,5 @@ const styles = StyleSheet.create({
   labelText: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
-  },
-  today: {
-    alignItems: 'center',
   },
 });

@@ -168,11 +168,11 @@ describe('recalculateForQuantity', () => {
 });
 
 describe('daysLeftInWeek', () => {
-  it('counts the days left to Sunday, today included', () => {
-    // 19 October 2026 is a Monday.
-    expect(daysLeftInWeek(new Date(2026, 9, 19, 8, 0))).toBe(7);
-    expect(daysLeftInWeek(new Date(2026, 9, 21, 23, 0))).toBe(5);
-    expect(daysLeftInWeek(new Date(2026, 9, 24, 12, 0))).toBe(2);
-    expect(daysLeftInWeek(new Date(2026, 9, 25, 12, 0))).toBe(1);
+  it('counts the days left to Saturday, today included', () => {
+    // 18 October 2026 is a Sunday.
+    expect(daysLeftInWeek(new Date(2026, 9, 18, 8, 0))).toBe(7);
+    expect(daysLeftInWeek(new Date(2026, 9, 21, 23, 0))).toBe(4);
+    expect(daysLeftInWeek(new Date(2026, 9, 23, 12, 0))).toBe(2);
+    expect(daysLeftInWeek(new Date(2026, 9, 24, 23, 59))).toBe(1);
   });
 });

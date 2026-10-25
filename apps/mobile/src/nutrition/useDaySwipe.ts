@@ -37,7 +37,7 @@ interface Options {
  *   (`Screen`'s `scrollEnabled`), so the page neither drifts nor takes the touch;
  * - `panHandlers`: for the widgets and the day bar -- a sideways drag on either turns the day;
  * - `contentStyle`: the widgets' turn -- depth, tilt, shrink and fade, all from `slide`;
- * - `turnTo`: turns to the day before or after, or to any day (Back to Today), with the same turn.
+ * - `turnTo`: turns to the day before or after, as a swipe does (VoiceOver's way to change day).
  */
 export type DaySwipe = ReturnType<typeof useDaySwipe>;
 
@@ -58,15 +58,9 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
   const reduceMotionRef = useRef(reduceMotion);
   reduceMotionRef.current = reduceMotion;
 
-  const turnTo = useRef((direction: DayDirection, to?: string, velocity = 0) => {
-    const from = dayRef.current;
-    const target = to ?? shiftDay(from, direction === 'previous' ? -1 : 1);
+  const turnTo = useRef((direction: DayDirection, velocity = 0) => {
+    const target = shiftDay(dayRef.current, direction === 'previous' ? -1 : 1);
     if (turning.current) return;
-    if (target === from) {
-      position.current = 0;
-      Animated.spring(slide, { toValue: 0, useNativeDriver: true, bounciness: 8 }).start();
-      return;
-    }
     if (reduceMotionRef.current) {
       slide.setValue(0);
       onDayRef.current(target);
@@ -143,7 +137,7 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
       onPanResponderRelease: (_event, gesture) => {
         setSwiping(false);
         const direction = daySwipe(gesture.dx, gesture.vx);
-        if (direction) turnTo(direction, undefined, gesture.vx);
+        if (direction) turnTo(direction, gesture.vx);
         else springBack();
       },
       onPanResponderTerminate: () => {

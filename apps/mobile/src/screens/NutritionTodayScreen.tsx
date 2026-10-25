@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
@@ -71,8 +71,8 @@ function grams(value: number): string {
 // - **Today** (the hero): the calorie ring and what's left on the left; on the
 //   right, protein / carbs / fat, each with its glyph, what's been eaten against
 //   the target and a thin bar of the way there.
-// - **This Week**: the week's calorie budget -- 7 times the daily target, Monday to
-//   Sunday -- against what's been eaten so far, as a bar, with what's left and the days
+// - **This Week**: the week's calorie budget -- 7 times the daily target, Sunday to
+//   Saturday -- against what's been eaten so far, as a bar, with what's left and the days
 //   left to spread it over (WeeklyCalorieBudget).
 // - **Actions**: Log Food, the one filled button, with Scan Barcode and Search
 //   Food outlined side by side under it, and AI Food Search ("Describe a Food")
@@ -126,6 +126,36 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   // Each way to log logs to the day shown: nothing for today, the day for any other.
   const logParams = isToday ? undefined : { day };
 
+  // Leaving the page and coming back to it shows today again -- there's no button back to today.
+  // A way to log is the exception: it logs to the day shown and comes back to it, so the food
+  // just logged is there to see.
+  const leftToLog = useRef(false);
+  function logVia(
+    to: 'FoodLibrary' | 'BarcodeScanner' | 'FoodSearch' | 'AiFoodSearch' | 'QuickFoodEntry',
+  ) {
+    leftToLog.current = true;
+    navigation.navigate(to, logParams);
+  }
+  useEffect(() => {
+    let left = false;
+    const offBlur = navigation.addListener('blur', () => {
+      left = true;
+    });
+    const offFocus = navigation.addListener('focus', () => {
+      if (!left) return;
+      left = false;
+      if (leftToLog.current) {
+        leftToLog.current = false;
+        return;
+      }
+      setDay(todayKey());
+    });
+    return () => {
+      offBlur();
+      offFocus();
+    };
+  }, [navigation]);
+
   // Moving between days: a swipe turns the day (useDaySwipe) -- no arrows. Swiping right goes
   // back a day, left forward -- tomorrow and on too.
   const reduceMotion = useReduceMotionPreference();
@@ -176,7 +206,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   }, [userId, day]);
 
   // This week's days before today, for the week's calorie budget -- read each time Today opens,
-  // like yesterday's. On a Monday there are none.
+  // like yesterday's. On a Sunday there are none.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
@@ -275,7 +305,6 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
         day={day}
         slide={dayTurn.slide}
         width={width}
-        onToday={() => dayTurn.turnTo('next', todayKey())}
         onChooseDay={() => navigation.navigate('NutritionHistory', { date: day })}
         onAdjust={(direction) => dayTurn.turnTo(direction)}
       />
@@ -405,7 +434,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
               testID="log-food-button"
               label="Log Food"
               icon="plus"
-              onPress={() => navigation.navigate('FoodLibrary', logParams)}
+              onPress={() => logVia('FoodLibrary')}
               accentColor={accent}
               onAccentColor={nutritionTheme.onAccent}
             />
@@ -416,7 +445,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                   label="Scan Barcode"
                   icon="maximize"
                   size="md"
-                  onPress={() => navigation.navigate('BarcodeScanner', logParams)}
+                  onPress={() => logVia('BarcodeScanner')}
                 />
               </View>
               <View style={styles.secondaryAction}>
@@ -425,7 +454,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                   label="Search Food"
                   icon="search"
                   size="md"
-                  onPress={() => navigation.navigate('FoodSearch', logParams)}
+                  onPress={() => logVia('FoodSearch')}
                 />
               </View>
             </View>
@@ -435,14 +464,14 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
               accessibilityLabel="AI Food Search"
               icon="zap"
               size="md"
-              onPress={() => navigation.navigate('AiFoodSearch', logParams)}
+              onPress={() => logVia('AiFoodSearch')}
             />
             <SecondaryButton
               testID="quick-food-entry-button"
               label="Quick Macro Entry"
               icon="edit-3"
               size="md"
-              onPress={() => navigation.navigate('QuickFoodEntry', logParams)}
+              onPress={() => logVia('QuickFoodEntry')}
             />
           </AppCard>
 
@@ -466,7 +495,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                   title={isToday ? 'No foods logged today' : 'No foods logged this day'}
                   action={{
                     label: isToday ? 'Log Your First Meal' : 'Log a Food',
-                    onPress: () => navigation.navigate('FoodLibrary', logParams),
+                    onPress: () => logVia('FoodLibrary'),
                     testID: 'food-log-empty-log',
                   }}
                 />

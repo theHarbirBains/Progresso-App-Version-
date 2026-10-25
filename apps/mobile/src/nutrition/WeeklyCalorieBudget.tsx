@@ -7,7 +7,7 @@ import { colors, spacing, typeScale } from '../design/theme';
 import { computeWeeklyCalorieSummary } from './nutritionCalculations';
 
 interface Props {
-  /** Calories eaten this week so far, Monday to now; null while the earlier days are read. */
+  /** Calories eaten this week so far, Sunday to now; null while the earlier days are read. */
   consumed: number | null;
   /** The daily calorie target; the week's budget is 7 times it. Null when none is set. */
   dailyTarget: number | null;
@@ -25,7 +25,7 @@ function calories(value: number): string {
 
 /**
  * Nutrition Today's "This Week" widget: the week's calorie budget -- 7 times the daily target,
- * Monday to Sunday -- against what's been eaten so far, as a bar in the accent, with what's
+ * Sunday to Saturday -- against what's been eaten so far, as a bar in the accent, with what's
  * left and the days left to spread it over. Eating under the target one day leaves more for
  * another, and this is where that shows. Over budget is said plainly, never as an error. With
  * no daily target there's no budget to show, only a way to set one.

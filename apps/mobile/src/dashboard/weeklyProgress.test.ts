@@ -1,25 +1,27 @@
 import { getCurrentWeekRange } from './weeklyProgress';
 
 describe('getCurrentWeekRange', () => {
-  it('returns Monday..the following Monday for a mid-week date', () => {
+  it('returns Sunday..the following Sunday for a mid-week date', () => {
     // 2026-09-09 is a Wednesday.
     const { start, end } = getCurrentWeekRange(new Date('2026-09-09T12:00:00'));
 
-    expect(start.toDateString()).toBe(new Date('2026-09-07T00:00:00').toDateString()); // Monday
-    expect(end.toDateString()).toBe(new Date('2026-09-14T00:00:00').toDateString()); // next Monday
+    expect(start.toDateString()).toBe(new Date('2026-09-06T00:00:00').toDateString()); // Sunday
+    expect(end.toDateString()).toBe(new Date('2026-09-13T00:00:00').toDateString()); // next Sunday
   });
 
-  it('treats Sunday as the last day of its week, not the start of the next one', () => {
+  it('treats Saturday as the last day of its week', () => {
+    // 2026-09-12 is a Saturday.
+    const { start, end } = getCurrentWeekRange(new Date('2026-09-12T23:30:00'));
+
+    expect(start.toDateString()).toBe(new Date('2026-09-06T00:00:00').toDateString());
+    expect(end.toDateString()).toBe(new Date('2026-09-13T00:00:00').toDateString());
+  });
+
+  it('starts a new week on Sunday', () => {
     // 2026-09-13 is a Sunday.
-    const { start, end } = getCurrentWeekRange(new Date('2026-09-13T12:00:00'));
+    const { start, end } = getCurrentWeekRange(new Date('2026-09-13T08:00:00'));
 
-    expect(start.toDateString()).toBe(new Date('2026-09-07T00:00:00').toDateString());
-    expect(end.toDateString()).toBe(new Date('2026-09-14T00:00:00').toDateString());
-  });
-
-  it('starts exactly on Monday when `now` already is Monday', () => {
-    const { start } = getCurrentWeekRange(new Date('2026-09-07T08:00:00'));
-
-    expect(start.toDateString()).toBe(new Date('2026-09-07T00:00:00').toDateString());
+    expect(start.toDateString()).toBe(new Date('2026-09-13T00:00:00').toDateString());
+    expect(end.toDateString()).toBe(new Date('2026-09-20T00:00:00').toDateString());
   });
 });

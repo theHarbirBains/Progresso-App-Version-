@@ -40,14 +40,6 @@ describe('useDaySwipe', () => {
     expect(onDay).toHaveBeenCalledWith(shiftDay(today, 1));
   });
 
-  it('turns straight back to today from any day', () => {
-    const { result, onDay } = renderTurn(shiftDay(today, -9), true);
-
-    act(() => result.current.turnTo('next', today));
-
-    expect(onDay).toHaveBeenCalledWith(today);
-  });
-
   it('turns away first, then hands over the day, when motion is on', async () => {
     const { result, onDay, rerender } = renderTurn(yesterday, false);
 

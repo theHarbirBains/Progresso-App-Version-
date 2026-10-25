@@ -86,16 +86,31 @@ const navigation: any = {
 const route = {} as never;
 const mockOpenMenu = jest.fn();
 
+// A navigation whose focus and blur are the test's to send, as leaving the page and coming back.
+function navigationWithEvents() {
+  const listeners: Record<string, Set<() => void>> = {};
+  return {
+    ...navigation,
+    addListener: jest.fn((event: string, cb: () => void) => {
+      (listeners[event] ??= new Set()).add(cb);
+      return () => listeners[event]?.delete(cb);
+    }),
+    emit(event: 'focus' | 'blur') {
+      act(() => listeners[event]?.forEach((cb) => cb()));
+    },
+  };
+}
+
 // NutritionTodayScreen opens the app-level side menu (via AppMenuContext)
 // from its own header, same as every other tab-root screen -- this stands in
 // for that root-level provider.
-function renderScreen(screenRoute: never = route) {
+function renderScreen(screenRoute: never = route, screenNavigation: unknown = navigation) {
   return render(
     <ProfileProvider>
       <NutritionGoalsProvider>
         <FoodLogProvider>
           <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-            <NutritionTodayScreen navigation={navigation} route={screenRoute} />
+            <NutritionTodayScreen navigation={screenNavigation as never} route={screenRoute} />
           </AppMenuContext.Provider>
         </FoodLogProvider>
       </NutritionGoalsProvider>
@@ -718,15 +733,34 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     renderScreen();
 
     expect(await screen.findByTestId('weekly-budget-remaining')).toHaveTextContent(
-      '10,670 cal left · 5 days to go, today included',
+      '10,670 cal left · 4 days to go, today included',
     );
     expect(screen.getByTestId('weekly-budget-consumed')).toHaveTextContent('3,330');
     expect(screen.getByTestId('weekly-budget-target')).toHaveTextContent('/ 14,000 cal');
-    // Monday 00:00 up to today 00:00 -- today's own come from the shared cache.
+    // Sunday 00:00 up to today 00:00 -- today's own come from the shared cache.
     expect(mockFetchFoodLogsForRange).toHaveBeenCalledWith(
       'user-1',
-      new Date(2026, 9, 19),
+      new Date(2026, 9, 18),
       new Date(2026, 9, 21),
+    );
+  });
+
+  it('counts the whole week through Saturday, its last day', async () => {
+    setToday(new Date(2026, 9, 24, 20, 0));
+    mockFetchNutritionGoals.mockResolvedValue(goals);
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    mockFetchFoodLogsForRange.mockResolvedValue([
+      { ...sampleLog, id: 'sun-to-fri', calories: 11000 },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('weekly-budget-remaining')).toHaveTextContent(
+      '2,670 cal left · 1 day to go, today included',
+    );
+    expect(mockFetchFoodLogsForRange).toHaveBeenCalledWith(
+      'user-1',
+      new Date(2026, 9, 18),
+      new Date(2026, 9, 24),
     );
   });
 
@@ -746,8 +780,8 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     expect(screen.getByTestId('weekly-budget-consumed')).toHaveTextContent('1,000');
   });
 
-  it('reads no earlier days on a Monday', async () => {
-    setToday(new Date(2026, 9, 19, 12, 0));
+  it('starts again from 0 on a Sunday, with no earlier days to read', async () => {
+    setToday(new Date(2026, 9, 25, 12, 0));
     mockFetchNutritionGoals.mockResolvedValue(goals);
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     renderScreen();
@@ -818,12 +852,11 @@ describe('NutritionTodayScreen -- any day', () => {
     });
   }
 
-  it('starts on today, with no way back to today needed', async () => {
+  it('starts on today', async () => {
     renderScreen();
 
     await screen.findByTestId('food-log-empty');
     expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
-    expect(screen.queryByTestId('nutrition-day-today')).toBeNull();
   });
 
   it('turns from today to tomorrow, logs to tomorrow there, and comes back', async () => {
@@ -837,7 +870,7 @@ describe('NutritionTodayScreen -- any day', () => {
     fireEvent.press(screen.getByTestId('quick-food-entry-button'));
     expect(mockNavigate).toHaveBeenCalledWith('QuickFoodEntry', { day: '2026-10-22' });
 
-    fireEvent.press(screen.getByTestId('nutrition-day-today'));
+    turn('previous');
     expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
   });
 
@@ -963,20 +996,72 @@ describe('NutritionTodayScreen -- any day', () => {
     expect(mockNavigate).toHaveBeenCalledWith('QuickFoodEntry', undefined);
   });
 
-  it('comes back to today, by the next day or straight back', async () => {
+  it('comes back to today by the next day, with no button back to today on any day', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
 
     turn('previous');
     await screen.findByTestId('food-log-row-log-tuesday');
+    expect(screen.queryByText('Back to Today')).toBeNull();
+    turn('previous');
+    turn('previous');
+    expect(dayLabelText()).toHaveTextContent('Sunday, October 18');
+    expect(screen.queryByText('Back to Today')).toBeNull();
     turn('next');
-    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
+    turn('next');
+    turn('next');
+    turn('next');
+    expect(dayLabelText()).toHaveTextContent('Thursday, October 22');
+    expect(screen.queryByText('Back to Today')).toBeNull();
 
     turn('previous');
-    await screen.findByTestId('food-log-row-log-tuesday');
-    fireEvent.press(screen.getByTestId('nutrition-day-today'));
     expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
     expect(screen.getByTestId('nutrition-today-week')).toBeTruthy();
+  });
+
+  it('shows today again once the page is left and come back to', async () => {
+    const nav = navigationWithEvents();
+    renderScreen(route, nav);
+    nav.emit('focus');
+    await screen.findByTestId('food-log-empty');
+    turn('previous');
+    await screen.findByTestId('food-log-row-log-tuesday');
+
+    // Off to Nutrition History, say, and back.
+    fireEvent.press(screen.getByTestId('nutrition-today-view-all'));
+    nav.emit('blur');
+    nav.emit('focus');
+
+    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
+  });
+
+  it('comes back to the day it logged to, then shows today again the next time', async () => {
+    const nav = navigationWithEvents();
+    renderScreen(route, nav);
+    nav.emit('focus');
+    await screen.findByTestId('food-log-empty');
+    turn('previous');
+    await screen.findByTestId('food-log-row-log-tuesday');
+
+    fireEvent.press(screen.getByTestId('search-food-button'));
+    expect(mockNavigate).toHaveBeenCalledWith('FoodSearch', { day: '2026-10-20' });
+    nav.emit('blur');
+    nav.emit('focus');
+    expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
+
+    fireEvent.press(screen.getByTestId('nutrition-today-edit-targets'));
+    nav.emit('blur');
+    nav.emit('focus');
+    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
+  });
+
+  it('keeps a day handed to it as the page opens', async () => {
+    const nav = navigationWithEvents();
+    renderScreen({ params: { day: '2026-10-20' } } as never, nav);
+    nav.emit('focus');
+
+    expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
+    expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
   });
 
   it("deletes a past day's food there", async () => {

@@ -60,7 +60,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Nutrition**
 
 - Today's calories and macros against your own targets, set on Nutrition Goals in three steps: calories (tap one of four estimates from your body data, or type your own), macros (recommended protein 0.8 g and fat 0.3 g per lb of body weight, and carbs from the calories left, each shown faded in its field and yours to type over), then Save -- any conflict explained
-- A weekly calorie budget (7 times your daily target, Monday to Sunday) on Today, so eating less one day leaves more for another
+- A weekly calorie budget (7 times your daily target, Sunday to Saturday) on Today, so eating less one day leaves more for another
 - Log Food opens your Food Library: your saved meals, your usual foods (the ones you log on the most days) and your most recently logged foods first, ready to re-log at last time's amount, then your own foods (with photos) and recipes
 - Saved meals: foods you eat together, logged in one go, each as its own entry; build one in the Food Library or save today's foods as one
 - Recipes: a drink or a meal always made the same way -- its ingredients and how many servings it makes -- logged as a single food, with its figures per serving worked out from the ingredients
