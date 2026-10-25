@@ -28,6 +28,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 - The landing screen: your own completed workouts and logged foods as activity cards, and a Friends tab with the people you follow
 - Your next workout in the active split, a card for a workout that's in progress, and a "+" shortcut to Start Workout or Log Food
+- The Workouts tab leads with the same Next Workout, started in one tap with that day's plan, or a way to choose a split when there isn't one
 - On iPhone, today's steps from Apple Health under Next Workout, after you connect it from that card. Progresso only reads the step count; it stays on your phone and is never sent to Progresso's servers
 
 **Home Screen widgets (iPhone)**

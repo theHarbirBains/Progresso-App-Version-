@@ -33,6 +33,10 @@ export const workoutHistoryStyles = StyleSheet.create({
   logPastWorkoutWrap: {
     alignItems: 'center',
   },
+  startError: {
+    ...typeScale.callout,
+    color: colors.destructive,
+  },
 
   // Calendar legend
   legendRow: {

@@ -8,10 +8,17 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { ProfileProvider } from '../profile/ProfileProvider';
+import { fetchMyProfile } from '../profile/profileQueries';
 import { addMonths, MONTH_LABELS, toLocalDateKey } from '../design/calendarGrid';
 import { enrichWorkoutSummaries } from '../workouts/workoutHistoryEnrichment';
+import { applyPlanToWorkout, fetchDayPlan } from '../workouts/splitPlanQueries';
+import {
+  fetchLastWorkoutSplitDayId,
+  fetchWorkoutSplitDetail,
+} from '../workouts/workoutSplitQueries';
 import {
   completeWorkout,
+  createWorkout,
   fetchActiveWorkout,
   fetchWorkoutDetail,
   fetchWorkoutHistory,
@@ -23,13 +30,24 @@ jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
-// The profile isn't part of these tests; leave it loading.
+// The profile only matters for its active split (none, unless a test gives one).
 jest.mock('../profile/profileQueries', () => ({
-  fetchMyProfile: jest.fn(() => new Promise(() => {})),
+  fetchMyProfile: jest.fn(),
+}));
+
+jest.mock('../workouts/workoutSplitQueries', () => ({
+  fetchWorkoutSplitDetail: jest.fn(),
+  fetchLastWorkoutSplitDayId: jest.fn(),
+}));
+
+jest.mock('../workouts/splitPlanQueries', () => ({
+  fetchDayPlan: jest.fn(),
+  applyPlanToWorkout: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
   completeWorkout: jest.fn(),
+  createWorkout: jest.fn(),
   fetchActiveWorkout: jest.fn(),
   fetchWorkoutDetail: jest.fn(),
   fetchWorkoutHistory: jest.fn(),
@@ -49,6 +67,12 @@ jest.mock('../workouts/workoutHistoryEnrichment', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
+const mockFetchMyProfile = fetchMyProfile as jest.Mock;
+const mockFetchWorkoutSplitDetail = fetchWorkoutSplitDetail as jest.Mock;
+const mockFetchLastWorkoutSplitDayId = fetchLastWorkoutSplitDayId as jest.Mock;
+const mockFetchDayPlan = fetchDayPlan as jest.Mock;
+const mockApplyPlanToWorkout = applyPlanToWorkout as jest.Mock;
+const mockCreateWorkout = createWorkout as jest.Mock;
 const mockFetchActiveWorkout = fetchActiveWorkout as jest.Mock;
 const mockFetchWorkoutHistory = fetchWorkoutHistory as jest.Mock;
 const mockFetchWorkoutsForMonth = fetchWorkoutsForMonth as jest.Mock;
@@ -108,8 +132,26 @@ function enrichedFixture(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const profile = {
+  id: 'user-1',
+  email: 'a@example.com',
+  role: 'user',
+  displayName: null,
+  username: null,
+  weightUnit: 'lb' as const,
+  workoutAccentColor: null,
+  nutritionAccentColor: null,
+  activeWorkoutSplitId: null as string | null,
+};
+
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
+  mockFetchMyProfile.mockReset().mockResolvedValue(profile);
+  mockFetchWorkoutSplitDetail.mockReset();
+  mockFetchLastWorkoutSplitDayId.mockReset();
+  mockFetchDayPlan.mockReset().mockResolvedValue([]);
+  mockApplyPlanToWorkout.mockReset().mockResolvedValue(undefined);
+  mockCreateWorkout.mockReset();
   mockFetchActiveWorkout.mockReset().mockResolvedValue(null);
   mockFetchWorkoutsForMonth.mockReset().mockResolvedValue([]);
   mockFetchWorkoutHistory.mockReset().mockResolvedValue({ rows: [], hasMore: false });
@@ -360,8 +402,10 @@ describe('WorkoutHistoryScreen', () => {
   it('shows a polished empty state when there is no workout history at all', async () => {
     renderScreen();
 
-    await waitFor(() => expect(screen.queryByTestId('workout-history-loading')).toBeNull());
-    expect(screen.getByTestId('workout-history-empty')).toBeTruthy();
+    // Waits for the empty state itself: a failing toBeNull() inside waitFor pretty-prints the
+    // whole rendered tree on every retry, which alone can outlast the test's timeout.
+    expect(await screen.findByTestId('workout-history-empty')).toBeTruthy();
+    expect(screen.queryByTestId('workout-history-loading')).toBeNull();
     await settle();
   });
 
@@ -758,5 +802,114 @@ describe('unfinished workout recovery', () => {
 
     expect(await screen.findByTestId('resume-active-workout')).toBeTruthy();
     expect(screen.queryByText('Did you finish this workout?')).toBeNull();
+  });
+});
+
+describe('WorkoutHistoryScreen -- Next Workout', () => {
+  const split = {
+    id: 'split-1',
+    name: 'Push Pull Legs',
+    days: [
+      { id: 'day-push', name: 'Push', orderIndex: 0, muscleGroups: ['chest', 'triceps'] },
+      { id: 'day-pull', name: 'Pull', orderIndex: 1, muscleGroups: ['back', 'biceps'] },
+      { id: 'day-legs', name: 'Legs', orderIndex: 2, muscleGroups: [] },
+    ],
+  };
+
+  beforeEach(() => {
+    mockFetchMyProfile.mockResolvedValue({ ...profile, activeWorkoutSplitId: 'split-1' });
+    mockFetchWorkoutSplitDetail.mockResolvedValue(split);
+    mockFetchLastWorkoutSplitDayId.mockResolvedValue('day-push');
+  });
+
+  it("shows the active split's next day -- the one after the last done, as on Feed", async () => {
+    renderScreen();
+
+    const hero = await screen.findByTestId('workout-history-next');
+    expect(hero).toHaveTextContent(/Next Workout/);
+    expect(hero).toHaveTextContent(/Pull/);
+    expect(hero).toHaveTextContent(/Back • Biceps/);
+    expect(hero).toHaveTextContent(/Up next after Push/);
+    expect(mockFetchWorkoutSplitDetail).toHaveBeenCalledWith('split-1');
+    expect(screen.queryByTestId('start-new-workout')).toBeNull();
+    await settle();
+  });
+
+  it('starts that day straight from here, its plan copied in, and opens the live workout', async () => {
+    mockFetchDayPlan.mockResolvedValue([{ exerciseId: 'ex-1' }]);
+    mockCreateWorkout.mockResolvedValue({ type: 'created', workout: { id: 'w-new' } });
+    renderScreen();
+
+    const hero = await screen.findByTestId('workout-history-next');
+    await act(async () => {
+      fireEvent.press(hero);
+    });
+
+    expect(mockFetchDayPlan).toHaveBeenCalledWith('day-pull');
+    expect(mockCreateWorkout).toHaveBeenCalledWith('user-1', 'Pull', 'day-pull');
+    expect(mockApplyPlanToWorkout).toHaveBeenCalledWith('w-new', [{ exerciseId: 'ex-1' }]);
+    expect(mockNavigate).toHaveBeenCalledWith('ActiveWorkout', {
+      workoutId: 'w-new',
+      planned: true,
+    });
+    await settle();
+  });
+
+  it('says so, and shows the workout already going, when one is open', async () => {
+    const open = {
+      id: 'w-open',
+      name: 'Legs',
+      performedAt: fixtureDate.toISOString(),
+      completedAt: null,
+      workoutSplitDayId: null,
+    };
+    mockCreateWorkout.mockResolvedValue({ type: 'conflict', existingWorkout: open });
+    mockFetchWorkoutDetail.mockResolvedValue({ ...open, exercises: [] });
+    renderScreen();
+
+    const hero = await screen.findByTestId('workout-history-next');
+    mockFetchActiveWorkout.mockResolvedValue(open);
+    await act(async () => {
+      fireEvent.press(hero);
+    });
+
+    expect(screen.getByTestId('workout-history-start-error')).toHaveTextContent(
+      /already have a workout going/,
+    );
+    expect(await screen.findByTestId('resume-active-workout')).toBeTruthy();
+    expect(mockNavigate).not.toHaveBeenCalledWith('ActiveWorkout', expect.anything());
+    await settle();
+  });
+
+  it("still offers the split's other days and other workouts", async () => {
+    renderScreen();
+    await screen.findByTestId('workout-history-next');
+
+    fireEvent.press(screen.getByTestId('workout-history-other-workout'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
+    await settle();
+  });
+
+  it('offers to choose a split when there is none', async () => {
+    mockFetchMyProfile.mockResolvedValue(profile);
+    renderScreen();
+
+    expect(await screen.findByTestId('start-new-workout')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('workout-history-choose-split'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('ChooseWorkoutSplit');
+    expect(screen.queryByTestId('workout-history-next')).toBeNull();
+    expect(mockFetchWorkoutSplitDetail).not.toHaveBeenCalled();
+    await settle();
+  });
+
+  it('falls back to Start New Workout when the split has no days, or cannot be read', async () => {
+    mockFetchWorkoutSplitDetail.mockRejectedValue(new Error('offline'));
+    renderScreen();
+
+    expect(await screen.findByTestId('start-new-workout')).toBeTruthy();
+    expect(screen.queryByTestId('workout-history-next')).toBeNull();
+    await settle();
   });
 });

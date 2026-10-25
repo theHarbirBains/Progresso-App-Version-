@@ -14,13 +14,16 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { StatBlock } from '../design/StatBlock';
 import { colors, radii } from '../design/theme';
+import { FeedHeroCard } from '../feed/FeedHeroCard';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { Skeleton, SkeletonRows } from '../design/Skeleton';
 import { recallShown, rememberShown } from '../lib/lastShown';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
+import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
+import { startPlannedWorkout } from '../workouts/startPlannedWorkout';
 import { UnfinishedWorkoutSheet } from '../workouts/UnfinishedWorkoutSheet';
 import {
   assessUnfinishedWorkout,
@@ -41,6 +44,10 @@ import {
   fetchWorkoutsForMonth,
   type WorkoutSummary,
 } from '../workouts/workoutQueries';
+import {
+  fetchLastWorkoutSplitDayId,
+  fetchWorkoutSplitDetail,
+} from '../workouts/workoutSplitQueries';
 import { workoutHistoryStyles as styles } from './workoutHistoryStyles';
 
 const RECENT_PAGE_SIZE = 20;
@@ -55,6 +62,10 @@ function formatIdleMinutes(minutes: number): string {
 }
 
 type Props = RootStackScreenProps<'WorkoutHistory'>;
+
+function musclesLabel(day: NextWorkoutPlan['day']): string {
+  return day.muscleGroups.map((g) => SPLIT_MUSCLE_GROUP_LABELS[g]).join(' • ');
+}
 
 export interface WorkoutRowProps {
   workout: EnrichedWorkoutSummary;
@@ -82,7 +93,7 @@ export function WorkoutRow({ workout, divider, onPress }: WorkoutRowProps) {
 export function WorkoutHistoryScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const { theme } = useProgressTheme();
+  const { theme, activeWorkoutSplitId, themeLoading } = useProgressTheme();
   const { openMenu } = useAppMenu();
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
@@ -102,6 +113,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       userId,
       'history.recent',
     ),
+    nextPlan: recallShown<NextWorkoutPlan | null>(userId, 'history.nextPlan'),
   }));
   const [monthWorkouts, setMonthWorkouts] = useState<EnrichedWorkoutSummary[]>(shown.month ?? []);
   const [monthLoading, setMonthLoading] = useState(!shown.month);
@@ -115,6 +127,12 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
   const [recentLoading, setRecentLoading] = useState(!shown.recent);
   const [recentLoadingMore, setRecentLoadingMore] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
+
+  // The next workout of the active split -- worked out exactly as Feed's (computeNextWorkout:
+  // the day after the last one done; a missed workout never moves it on). Undefined until known.
+  const [nextPlan, setNextPlan] = useState<NextWorkoutPlan | null | undefined>(shown.nextPlan);
+  const [startingNext, setStartingNext] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const [activeAssessment, setActiveAssessment] = useState<UnfinishedWorkoutAssessment | null>(
     null,
@@ -155,6 +173,54 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       setPromptOpen(false);
     }
   }, [userId]);
+
+  // Read on every focus, like this page's other lists: finishing a workout (one hop away) is
+  // what moves it on.
+  const loadNext = useCallback(async () => {
+    if (!userId || !activeWorkoutSplitId) {
+      setNextPlan(null);
+      return;
+    }
+    try {
+      const [detail, lastDayId] = await Promise.all([
+        fetchWorkoutSplitDetail(activeWorkoutSplitId),
+        fetchLastWorkoutSplitDayId(userId),
+      ]);
+      const plan = computeNextWorkout(detail, lastDayId);
+      setNextPlan(plan);
+      rememberShown(userId, 'history.nextPlan', plan);
+    } catch {
+      // Starting a workout is still one tap away (Start New Workout) -- not worth an error.
+      setNextPlan(null);
+    }
+  }, [userId, activeWorkoutSplitId]);
+
+  // The active split arrives with the profile, after the first focus.
+  useEffect(() => {
+    if (!themeLoading) void loadNext();
+  }, [themeLoading, loadNext]);
+  const loadNextRef = useRef(loadNext);
+  loadNextRef.current = loadNext;
+
+  // Starts the next day straight from here, its plan copied in, as Start Workout does.
+  async function startNext(plan: NextWorkoutPlan) {
+    if (!userId || startingNext) return;
+    setStartError(null);
+    setStartingNext(true);
+    try {
+      const result = await startPlannedWorkout(userId, plan.day.name, plan.day.id);
+      if (result.type === 'conflict') {
+        setStartError('You already have a workout going -- resume it above.');
+        await loadActive();
+        return;
+      }
+      navigation.navigate('ActiveWorkout', result.params);
+    } catch (err) {
+      setStartError(err instanceof Error ? err.message : 'Failed to start workout');
+    } finally {
+      setStartingNext(false);
+    }
+  }
 
   async function finishSuggested() {
     if (!activeWorkout || !activeAssessment?.suggestedEndAt || finishingSuggested) return;
@@ -242,6 +308,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
     const unsubscribe = navigation.addListener('focus', () => {
       const silent = hasLoadedOnce.current;
       loadActive();
+      void loadNextRef.current();
       loadMonth(year, month, { silent });
       loadRecent({ silent });
       hasLoadedOnce.current = true;
@@ -332,9 +399,32 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
             onAccentColor={colors.onAccent}
           />
         </Card>
+      ) : nextPlan ? (
+        <FeedHeroCard
+          testID="workout-history-next"
+          eyebrow="Next Workout"
+          title={nextPlan.day.name}
+          muscles={nextPlan.day.muscleGroups.length > 0 ? musclesLabel(nextPlan.day) : null}
+          meta={
+            nextPlan.previousDayName
+              ? `Up next after ${nextPlan.previousDayName}`
+              : "Let's get started"
+          }
+          actionLabel={startingNext ? 'Starting…' : 'Start Workout'}
+          onPress={() => void startNext(nextPlan)}
+          accessibilityLabel={`Start ${nextPlan.day.name} workout${
+            nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
+          }`}
+        />
+      ) : nextPlan === undefined && (themeLoading || activeWorkoutSplitId) ? (
+        <Skeleton testID="workout-history-next-loading" height={176} radius={radii.lg} />
       ) : (
         <Card hero testID="workout-history-start">
-          <Text style={[styles.actionLine, { color: colors.textPrimary }]}>Ready to train?</Text>
+          <Text style={[styles.actionLine, { color: colors.textPrimary }]}>
+            {activeWorkoutSplitId || themeLoading
+              ? 'Ready to train?'
+              : 'Choose a workout split, and the next day is always one tap away.'}
+          </Text>
           <PrimaryButton
             testID="start-new-workout"
             label="Start New Workout"
@@ -345,7 +435,28 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
         </Card>
       )}
 
+      {startError ? (
+        <Text testID="workout-history-start-error" style={styles.startError}>
+          {startError}
+        </Text>
+      ) : null}
+
       <View style={styles.logPastWorkoutWrap}>
+        {/* The split's other days, a group, or something different: Start Workout's own page. */}
+        {nextPlan && !activeWorkout ? (
+          <TextButton
+            testID="workout-history-other-workout"
+            label="Choose a Different Workout"
+            onPress={() => navigation.navigate('NewWorkout')}
+          />
+        ) : null}
+        {!activeWorkout && !activeWorkoutSplitId && !themeLoading ? (
+          <TextButton
+            testID="workout-history-choose-split"
+            label="Choose a Workout Split"
+            onPress={() => navigation.navigate('ChooseWorkoutSplit')}
+          />
+        ) : null}
         <TextButton
           testID="workout-history-log-past"
           label="Log a Past Workout"
