@@ -45,6 +45,7 @@ import {
 } from '../workouts/workoutHistoryEnrichment';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 import { profileStyles as styles } from './profileStyles';
+import { wholeFigureText } from '../nutrition/wholeFigures';
 
 type Props = RootStackScreenProps<'Profile'>;
 type ProfileTab = 'Workouts' | 'Stats' | 'PRs';
@@ -65,8 +66,8 @@ function formatCount(n: number): string {
 
 /** "1,850 / 2,200 cal" when a goal is set, else just "1,850 cal". Shared by every macro in the Calories & Macros widget. */
 function formatMacro(consumed: number, goal: number | null, unit: string): string {
-  const consumedText = `${formatCount(consumed)}${unit}`;
-  return goal !== null ? `${consumedText} / ${formatCount(goal)}${unit}` : consumedText;
+  const consumedText = `${wholeFigureText(consumed)}${unit}`;
+  return goal !== null ? `${consumedText} / ${wholeFigureText(goal)}${unit}` : consumedText;
 }
 
 function errorMessage(reason: unknown): string {

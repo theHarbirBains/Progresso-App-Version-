@@ -5,6 +5,7 @@ import { Section } from '../design/Section';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
 import { computeWeeklyCalorieSummary } from './nutritionCalculations';
+import { wholeFigureText } from './wholeFigures';
 
 interface Props {
   /** "This Week", or another week's name ("Week of October 18"). */
@@ -27,7 +28,7 @@ interface Props {
 }
 
 function calories(value: number): string {
-  return Math.round(value).toLocaleString();
+  return wholeFigureText(value);
 }
 
 /**

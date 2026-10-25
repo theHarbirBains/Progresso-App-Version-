@@ -21,6 +21,7 @@ import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { foodSearchStyles as styles } from './foodSearchStyles';
 import { SkeletonRows } from '../design/Skeleton';
+import { wholeFigure } from '../nutrition/wholeFigures';
 
 type Props = RootStackScreenProps<'FoodSearch'>;
 
@@ -224,7 +225,7 @@ export function FoodSearchScreen({ navigation, route }: Props) {
                 leading={<FoodImage uri={food.imageUrl} name={food.name} size={44} />}
                 title={food.name}
                 subtitle={`${food.brand ? `${food.brand} · ` : ''}${food.servingSize} ${food.servingUnit}`}
-                value={`${food.calories} cal`}
+                value={`${wholeFigure(food.calories)} cal`}
                 divider={index > 0}
                 onPress={() => setSelected(food)}
               />

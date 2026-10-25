@@ -15,6 +15,7 @@ import {
   parseTargets,
   type TargetDraft,
 } from './targetMath';
+import { wholeFigureText } from './wholeFigures';
 
 // Each macro's glyph -- the same set as Nutrition Today's macro rows.
 const GLYPHS = {
@@ -24,7 +25,7 @@ const GLYPHS = {
 } as const satisfies Record<string, keyof typeof MaterialCommunityIcons.glyphMap>;
 
 function cal(value: number): string {
-  return Math.round(value).toLocaleString();
+  return wholeFigureText(value);
 }
 
 function shareOf(macroCalories: number, calories: number | null): number | null {

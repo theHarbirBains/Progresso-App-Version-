@@ -3,6 +3,7 @@ import {
   computeWeeklyCalorieSummary,
   type WeeklyCalorieSummary,
 } from '../nutrition/nutritionCalculations';
+import { wholeFigure } from '../nutrition/wholeFigures';
 
 // A week's summary: what was trained and eaten, Monday to Sunday, in plain numbers. Pure, no
 // I/O -- every figure is a count, a sum or an average of what was logged. It describes what
@@ -177,8 +178,8 @@ export function computeWeeklySummary(input: WeeklySummaryInput): WeeklySummary {
   const proteinTarget = input.dailyProteinTarget;
   const nutrition = {
     loggedDays,
-    avgCalories: loggedDays > 0 ? Math.round(totalCalories / loggedDays) : null,
-    avgProteinG: loggedDays > 0 ? Math.round(totalProtein / loggedDays) : null,
+    avgCalories: loggedDays > 0 ? wholeFigure(totalCalories / loggedDays) : null,
+    avgProteinG: loggedDays > 0 ? wholeFigure(totalProtein / loggedDays) : null,
     daysWithinCalories:
       calorieTarget === null
         ? null

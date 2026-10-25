@@ -21,6 +21,7 @@ import { computeNutritionMonthSummary } from '../nutrition/nutritionMonthSummary
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { nutritionHistoryStyles as styles } from './nutritionHistoryStyles';
 import { SkeletonRows } from '../design/Skeleton';
+import { wholeFigure } from '../nutrition/wholeFigures';
 
 type Props = RootStackScreenProps<'NutritionHistory'>;
 
@@ -163,7 +164,7 @@ export function NutritionHistoryScreen({ navigation, route }: Props) {
             />
             <StatBlock
               testID="nutrition-history-total-calories"
-              value={String(monthSummary.totalCalories)}
+              value={String(wholeFigure(monthSummary.totalCalories))}
               label="Total Calories"
             />
             <StatBlock
@@ -201,8 +202,8 @@ export function NutritionHistoryScreen({ navigation, route }: Props) {
                 <View style={styles.logInfo}>
                   <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
                   <Text style={styles.logMeta}>
-                    {log.calories} cal · {log.proteinG}g protein · {log.carbsG}g carbs · {log.fatG}g
-                    fat
+                    {wholeFigure(log.calories)} cal · {wholeFigure(log.proteinG)}g protein ·{' '}
+                    {wholeFigure(log.carbsG)}g carbs · {wholeFigure(log.fatG)}g fat
                   </Text>
                 </View>
               </View>

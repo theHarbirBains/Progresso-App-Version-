@@ -21,6 +21,7 @@ import { searchFoods } from '../lib/foodsApi';
 import { FoodImage } from './FoodImage';
 import { fetchAllFoods, fetchRecentFoods, type FoodRow } from './foodQueries';
 import { SkeletonRows } from '../design/Skeleton';
+import { wholeFigure } from './wholeFigures';
 
 const SEARCH_DEBOUNCE_MS = 300;
 // Recent here is a wider net than the Food Library's: it's where foods from Search live.
@@ -163,7 +164,7 @@ export function FoodPickerStep({ title, excludeId, onPick, onCancel }: Props) {
             ? 'Recipe'
             : [item.brand, `${item.servingSize}${item.servingUnit}`].filter(Boolean).join(' · ')
         }
-        value={`${Math.round(item.calories)} cal`}
+        value={`${wholeFigure(item.calories)} cal`}
         chevron={false}
         divider={index > 0}
         onPress={() => onPick(item)}

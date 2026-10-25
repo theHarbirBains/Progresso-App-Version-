@@ -15,6 +15,7 @@ import type { FoodLogRow } from './foodLogQueries';
 import { fetchFoodsByIds } from './foodQueries';
 import { amountText, servingMeasures } from './logQuantity';
 import { createSavedMeal } from './savedMealQueries';
+import { wholeFigure } from './wholeFigures';
 
 const MAX_NAME_LENGTH = 80;
 
@@ -51,7 +52,7 @@ function LogChecklist({
             testID={`${testIDPrefix}-${log.id}`}
             leading={<FoodImage uri={log.imageUrl} name={log.foodNameSnapshot} size={44} />}
             title={log.foodNameSnapshot}
-            subtitle={`${logAmount(log)} · ${Math.round(log.calories)} cal`}
+            subtitle={`${logAmount(log)} · ${wholeFigure(log.calories)} cal`}
             trailing={
               <Feather
                 name={ticked ? 'check-circle' : 'circle'}

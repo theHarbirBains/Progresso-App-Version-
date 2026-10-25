@@ -17,6 +17,7 @@ import type {
   FoodInterpretation,
 } from '../lib/api';
 import { componentSourceLabel, parseAmount } from './interpretedFood';
+import { wholeFigure } from './wholeFigures';
 
 interface Props {
   interpretation: FoodInterpretation;
@@ -49,7 +50,7 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 function grams(value: number): string {
-  return `${Math.round(value * 10) / 10} g`;
+  return `${wholeFigure(value)} g`;
 }
 
 type Figured = Extract<ComponentStatus, { component: unknown }>;
@@ -116,7 +117,7 @@ export function InterpretedFoodReview({
               <View style={styles.statRow}>
                 <StatBlock
                   testID="ai-food-review-calories"
-                  value={`${totals.calories}`}
+                  value={`${wholeFigure(totals.calories)}`}
                   label="Calories"
                   valueColor={accentColor}
                 />
@@ -256,7 +257,7 @@ export function InterpretedFoodReview({
                       {`${status.component.quantity.amount} ${status.component.quantity.unit} ${status.component.name}`}
                     </Text>
                     <Text style={styles.partCalories}>
-                      {`${status.component.nutrients.calories} cal`}
+                      {`${wholeFigure(status.component.nutrients.calories)} cal`}
                     </Text>
                   </View>
                   <Text style={styles.caption}>{componentSourceLabel(status)}</Text>
@@ -314,7 +315,7 @@ function choiceLabel(choice: Choice): string {
   const name = choiceName(choice);
   if (!choice.figures) return `Choose ${name}`;
   const { nutrients, per } = choice.figures;
-  return `Choose ${name}: ${nutrients.calories} calories, ${nutrients.proteinG} grams protein, ${nutrients.carbsG} carbs, ${nutrients.fatG} fat, ${per}`;
+  return `Choose ${name}: ${wholeFigure(nutrients.calories)} calories, ${wholeFigure(nutrients.proteinG)} grams protein, ${wholeFigure(nutrients.carbsG)} carbs, ${wholeFigure(nutrients.fatG)} fat, ${per}`;
 }
 
 /** One candidate: its name, where it's from, and what it comes to. */
@@ -348,7 +349,7 @@ function ChoiceBody({
         <View style={styles.figures}>
           <View style={styles.calories}>
             <Text style={[styles.caloriesValue, { color: accentColor }]}>
-              {choice.figures.nutrients.calories}
+              {wholeFigure(choice.figures.nutrients.calories)}
             </Text>
             <Text style={styles.caption}>{`cal ${choice.figures.per}`}</Text>
           </View>

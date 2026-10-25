@@ -18,9 +18,14 @@ describe('macroGuidance', () => {
     expect(macroGuidance(150 * LB)).toEqual({ weightLb: 150, proteinG: 120, fatG: 45 });
   });
 
-  it('works from a body weight stored in kilograms', () => {
-    // 80 kg is 176.4 lb.
-    expect(macroGuidance(80)).toEqual({ weightLb: 176, proteinG: 141, fatG: 53 });
+  it('works from a body weight stored in kilograms, to the pound, rounding each down', () => {
+    // 80 kg is 176.4 lb, shown as 176 lb: 140.8 g protein and 52.8 g fat, rounded down.
+    expect(macroGuidance(80)).toEqual({ weightLb: 176, proteinG: 140, fatG: 52 });
+  });
+
+  it("is exactly what's shown: 0.8 g x 200 lb is 160 g, never a gram short", () => {
+    // 90.7 kg is 199.96 lb -- shown, and worked out, as 200 lb.
+    expect(macroGuidance(90.7)).toEqual({ weightLb: 200, proteinG: 160, fatG: 60 });
   });
 });
 
@@ -148,9 +153,10 @@ describe('draftFromTargets', () => {
   });
 
   it('leaves a saved macro that is its recommendation blank, so it keeps following it', () => {
-    // Fat 70 g leaves 2,200 - 640 - 630 = 930 cal, or 233 g of carbs: the recommendation.
+    // Fat 70 g leaves 2,200 - 640 - 630 = 930 cal, or 232.5 g of carbs, rounded down to 232:
+    // the recommendation.
     expect(
-      draftFromTargets({ calories: 2200, proteinG: 160, carbsG: 233, fatG: 70 }, 200 * LB),
+      draftFromTargets({ calories: 2200, proteinG: 160, carbsG: 232, fatG: 70 }, 200 * LB),
     ).toEqual({ calories: '2200', proteinG: '', carbsG: '', fatG: '70' });
     // Carbs that aren't the recommendation stay as saved.
     expect(

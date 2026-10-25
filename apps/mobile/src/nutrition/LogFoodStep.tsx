@@ -24,6 +24,7 @@ import { defaultMealTypeForTime } from './mealTypes';
 import type { EnteredAmount } from './foodLogQueries';
 import { calculateLogTotals } from './nutritionCalculations';
 import type { FoodRow } from './foodQueries';
+import { wholeFigure } from './wholeFigures';
 
 export type LoggableFood = Pick<
   FoodRow,
@@ -246,7 +247,7 @@ export function LogFoodStep({
             </Text>
             <StatValue
               testID="log-food-calories"
-              value={totals ? String(Math.round(totals.calories)) : '—'}
+              value={totals ? String(wholeFigure(totals.calories)) : '—'}
               unit={totals ? ' cal' : undefined}
               color={accentColor}
             />
@@ -303,9 +304,9 @@ export function LogFoodStep({
 
       <FoodMacros
         testID="log-food-macros"
-        proteinG={totals ? Math.round(totals.proteinG * 10) / 10 : null}
-        carbsG={totals ? Math.round(totals.carbsG * 10) / 10 : null}
-        fatG={totals ? Math.round(totals.fatG * 10) / 10 : null}
+        proteinG={totals ? totals.proteinG : null}
+        carbsG={totals ? totals.carbsG : null}
+        fatG={totals ? totals.fatG : null}
         testIDs={{ protein: 'log-food-protein', carbs: 'log-food-carbs', fat: 'log-food-fat' }}
       />
 

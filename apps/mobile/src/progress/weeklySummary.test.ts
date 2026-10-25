@@ -113,7 +113,8 @@ describe('computeWeeklySummary -- nutrition', () => {
 
     expect(summary.nutrition).toMatchObject({
       loggedDays: 3,
-      avgCalories: 2067,
+      // 6,200 over 3 days is 2,066.7, rounded down.
+      avgCalories: 2066,
       avgProteinG: 150,
       daysWithinCalories: 2,
       daysProteinMet: 2,

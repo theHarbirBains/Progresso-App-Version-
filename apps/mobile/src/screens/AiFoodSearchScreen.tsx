@@ -48,6 +48,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { aiFoodSearchStyles as styles } from './aiFoodSearchStyles';
+import { wholeFigure } from '../nutrition/wholeFigures';
 
 type Props = RootStackScreenProps<'AiFoodSearch'>;
 
@@ -193,7 +194,7 @@ export function AiFoodSearchScreen({ navigation, route }: Props) {
       }
       Alert.alert(
         `"${existing.name}" is already in your Food Library`,
-        `Saved: ${Math.round(existing.calories)} cal for ${existing.servingSize} ${existing.servingUnit}. This search: ${Math.round(food.calories)} cal for ${food.servingSize} ${food.servingUnit}.`,
+        `Saved: ${wholeFigure(existing.calories)} cal for ${existing.servingSize} ${existing.servingUnit}. This search: ${wholeFigure(food.calories)} cal for ${food.servingSize} ${food.servingUnit}.`,
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Use Saved', onPress: () => setStep({ type: 'log', food: existing }) },

@@ -220,16 +220,16 @@ describe('NutritionGoalsScreen', () => {
       calories: 2400,
       proteinG: 180,
       carbsG: 200,
-      fatG: 52,
+      fatG: 51,
     });
     await opened();
 
     expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp('value', '2400');
     expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '180');
     expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('value', '200');
-    // 52 g is 0.3 g x 172 lb: it opens blank, the recommendation faded in it.
+    // 51 g is 0.3 g x 172 lb (51.6), rounded down: it opens blank, the recommendation faded in it.
     expect(screen.getByTestId('nutrition-goals-fat')).toHaveProp('value', '');
-    expect(screen.getByTestId('nutrition-goals-fat')).toHaveProp('placeholder', '52');
+    expect(screen.getByTestId('nutrition-goals-fat')).toHaveProp('placeholder', '51');
   });
 
   it('shows each recommendation faded in its blank field, and saves nothing by itself', async () => {
@@ -237,16 +237,16 @@ describe('NutritionGoalsScreen', () => {
 
     // 78 kg is 172 lb: 0.8 g protein and 0.3 g fat per lb.
     expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '');
-    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('placeholder', '138');
-    expect(screen.getByTestId('nutrition-goals-fat')).toHaveProp('placeholder', '52');
+    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('placeholder', '137');
+    expect(screen.getByTestId('nutrition-goals-fat')).toHaveProp('placeholder', '51');
     // Carbs wait for a calorie target.
     expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('placeholder', '—');
     expect(screen.getByTestId('nutrition-goals-protein-source')).toHaveTextContent(/^Recommended/);
 
     fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2200');
-    // 2,200 - 138 x 4 - 52 x 9 = 1,180 cal, or 295 g.
-    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('placeholder', '295');
-    expect(screen.getByTestId('nutrition-goals-summary-carbs')).toHaveTextContent(/295 g/);
+    // 2,200 - 137 x 4 - 51 x 9 = 1,193 cal, or 298.25 g, rounded down.
+    expect(screen.getByTestId('nutrition-goals-carbs')).toHaveProp('placeholder', '298');
+    expect(screen.getByTestId('nutrition-goals-summary-carbs')).toHaveTextContent(/298 g/);
     expect(mockSaveNutritionGoals).not.toHaveBeenCalled();
   });
 
@@ -257,17 +257,17 @@ describe('NutritionGoalsScreen', () => {
       'Faded numbers are recommended, from your body weight (172 lb). Type over any to set your own.',
     );
     expect(screen.getByTestId('nutrition-goals-protein-rule')).toHaveTextContent(
-      '0.8 g × 172 lb = 138 g',
+      '0.8 g × 172 lb = 137 g',
     );
     expect(screen.getByTestId('nutrition-goals-fat-rule')).toHaveTextContent(
-      '0.3 g × 172 lb = 52 g',
+      '0.3 g × 172 lb = 51 g',
     );
     expect(screen.getByTestId('nutrition-goals-carbs-rule')).toHaveTextContent(
       'The calories left after protein and fat',
     );
     fireEvent.changeText(screen.getByTestId('nutrition-goals-calories'), '2200');
     expect(screen.getByTestId('nutrition-goals-carbs-rule')).toHaveTextContent(
-      '1,180 cal left ÷ 4 = 295 g',
+      '1,193 cal left ÷ 4 = 298 g',
     );
   });
 
@@ -349,9 +349,9 @@ describe('NutritionGoalsScreen', () => {
 
     expect(mockSaveNutritionGoals).toHaveBeenCalledWith('user-1', {
       calories: 2200,
-      proteinG: 138,
-      carbsG: 295,
-      fatG: 52,
+      proteinG: 137,
+      carbsG: 298,
+      fatG: 51,
     });
     expect(screen.getByTestId('nutrition-goals-saved')).toHaveTextContent(/Saved/);
   });
@@ -371,7 +371,7 @@ describe('NutritionGoalsScreen', () => {
       calories: 2200,
       proteinG: 150,
       carbsG: 250,
-      fatG: 52,
+      fatG: 51,
     });
   });
 
@@ -430,7 +430,8 @@ describe('NutritionGoalsScreen', () => {
     // A new weight moves the recommendation faded in a blank field; nothing is saved by itself.
     expect(screen.getByTestId('nutrition-goals-calories')).toHaveProp('value', '2100');
     expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('value', '');
-    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('placeholder', '168');
+    // 209 lb x 0.8 is 167.2 g, rounded down.
+    expect(screen.getByTestId('nutrition-goals-protein')).toHaveProp('placeholder', '167');
     expect(mockSaveNutritionGoals).not.toHaveBeenCalled();
   });
 

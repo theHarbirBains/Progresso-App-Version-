@@ -37,6 +37,7 @@ import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { CopyYesterdaySheet, SaveAsMealSheet } from '../nutrition/TodayShortcutSheets';
 import { readAheadDayLogs, readDayLogs, useDayLogs } from '../nutrition/useDayLogs';
 import { WeeklyCalorieBudget } from '../nutrition/WeeklyCalorieBudget';
+import { wholeFigure } from '../nutrition/wholeFigures';
 
 type Props = RootStackScreenProps<'Nutrition'>;
 
@@ -55,7 +56,7 @@ const MACRO_GLYPHS: Record<MacroKey, keyof typeof MaterialCommunityIcons.glyphMa
 };
 
 function grams(value: number): string {
-  return `${Math.round(value)}g`;
+  return `${wholeFigure(value)}g`;
 }
 
 // The Nutrition tab's own root screen (see App.tsx's bottom nav) -- a day's
@@ -372,7 +373,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                   />
                   {remaining.calories !== null ? (
                     <Text testID="calories-remaining" style={styles.ringRemaining}>
-                      {remaining.calories} cal remaining
+                      {wholeFigure(remaining.calories)} cal remaining
                     </Text>
                   ) : null}
                 </View>
@@ -391,8 +392,8 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                         accessible
                         accessibilityLabel={
                           macro.goal !== null
-                            ? `${macro.label}, ${Math.round(macro.consumed)} of ${macro.goal} grams`
-                            : `${macro.label}, ${Math.round(macro.consumed)} grams`
+                            ? `${macro.label}, ${wholeFigure(macro.consumed)} of ${wholeFigure(macro.goal)} grams`
+                            : `${macro.label}, ${wholeFigure(macro.consumed)} grams`
                         }
                       >
                         <View style={styles.macroGlyph}>
@@ -537,8 +538,8 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                       <View style={styles.logInfo}>
                         <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
                         <Text style={styles.logMeta}>
-                          {log.calories} cal · {log.proteinG}g protein · {log.carbsG}g carbs ·{' '}
-                          {log.fatG}g fat
+                          {wholeFigure(log.calories)} cal · {wholeFigure(log.proteinG)}g protein ·{' '}
+                          {wholeFigure(log.carbsG)}g carbs · {wholeFigure(log.fatG)}g fat
                         </Text>
                       </View>
                       <View style={styles.quantityColumn}>
@@ -631,7 +632,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                 <StatBlock
                   key={target.key}
                   testID={`target-${target.key}`}
-                  value={target.value !== null ? `${target.value}${target.unit}` : '—'}
+                  value={target.value !== null ? `${wholeFigure(target.value)}${target.unit}` : '—'}
                   label={target.label}
                 />
               ))}

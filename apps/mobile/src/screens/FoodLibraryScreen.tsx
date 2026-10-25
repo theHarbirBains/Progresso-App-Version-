@@ -41,6 +41,7 @@ import { foodLibraryStyles as styles } from './foodLibraryStyles';
 import { FoodFormScreen } from './FoodFormScreen';
 import { FoodGroupFormScreen } from './FoodGroupFormScreen';
 import { SkeletonRows } from '../design/Skeleton';
+import { wholeFigure } from '../nutrition/wholeFigures';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const RECENT_LIMIT = 8;
@@ -348,7 +349,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
       if (item.kind === 'meal') {
         const { meal } = item;
         const count = meal.items.length;
-        const calories = Math.round(
+        const calories = wholeFigure(
           groupTotals(meal.items.filter((entry) => entry.food.isActive)).calories,
         );
         return (
@@ -398,7 +399,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
               leading={<FoodImage uri={food.imageUrl} name={food.name} size={44} />}
               title={food.name}
               subtitle={foodSubtitle(food)}
-              value={`${Math.round(food.calories)} cal`}
+              value={`${wholeFigure(food.calories)} cal`}
               chevron={false}
               onPress={() =>
                 setMode({
@@ -582,7 +583,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
             <Text testID="food-meal-sheet-summary" style={styles.sheetSummary}>
               {(() => {
                 const active = openMeal.items.filter((entry) => entry.food.isActive);
-                const calories = Math.round(groupTotals(active).calories);
+                const calories = wholeFigure(groupTotals(active).calories);
                 return `${active.length} ${active.length === 1 ? 'food' : 'foods'} · ${calories} cal`;
               })()}
             </Text>

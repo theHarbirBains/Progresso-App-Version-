@@ -37,6 +37,7 @@ import {
   type SavedMeal,
 } from '../nutrition/savedMealQueries';
 import { SkeletonRows } from '../design/Skeleton';
+import { wholeFigure } from '../nutrition/wholeFigures';
 
 const MAX_NAME_LENGTH = 80;
 // recipe_servings is numeric(6, 2).
@@ -272,7 +273,7 @@ export function FoodGroupFormScreen(props: Props) {
           ) : (
             <View>
               {items.map((item, index) => {
-                const calories = Math.round(calculateLogTotals(item.food, item.quantity).calories);
+                const calories = wholeFigure(calculateLogTotals(item.food, item.quantity).calories);
                 const gone = !item.food.isActive;
                 return (
                   <View
@@ -325,22 +326,22 @@ export function FoodGroupFormScreen(props: Props) {
         <Text style={styles.totalsLabel}>{isRecipe ? 'Per serving' : 'Total'}</Text>
         <StatValue
           testID="food-group-calories"
-          value={totals ? String(Math.round(totals.calories)) : '—'}
+          value={totals ? String(wholeFigure(totals.calories)) : '—'}
           unit={totals ? ' cal' : undefined}
           color={props.accentColor}
         />
         {batchCalories !== null ? (
           <Text testID="food-group-batch" style={styles.batch}>
-            Whole recipe: {Math.round(batchCalories)} cal
+            Whole recipe: {wholeFigure(batchCalories)} cal
           </Text>
         ) : null}
       </AppCard>
 
       <FoodMacros
         testID="food-group-macros"
-        proteinG={totals ? Math.round(totals.proteinG * 10) / 10 : null}
-        carbsG={totals ? Math.round(totals.carbsG * 10) / 10 : null}
-        fatG={totals ? Math.round(totals.fatG * 10) / 10 : null}
+        proteinG={totals ? totals.proteinG : null}
+        carbsG={totals ? totals.carbsG : null}
+        fatG={totals ? totals.fatG : null}
         testIDs={{
           protein: 'food-group-protein',
           carbs: 'food-group-carbs',

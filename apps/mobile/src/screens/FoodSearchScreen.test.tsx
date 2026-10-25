@@ -212,7 +212,8 @@ describe('FoodSearchScreen', () => {
     expect(screen.getByTestId('food-search-detail-calories')).toHaveTextContent(/165/);
     expect(screen.getByTestId('food-search-detail-protein')).toHaveTextContent(/31/);
     expect(screen.getByTestId('food-search-detail-carbs')).toHaveTextContent(/0/);
-    expect(screen.getByTestId('food-search-detail-fat')).toHaveTextContent(/3\.6/);
+    // 3.6 g of fat, rounded down to the gram.
+    expect(screen.getByTestId('food-search-detail-fat')).toHaveTextContent('3g');
   });
 
   it('shows a dash (never a fabricated 0) for a macro the provider did not report', async () => {

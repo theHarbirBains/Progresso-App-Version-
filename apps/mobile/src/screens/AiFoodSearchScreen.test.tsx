@@ -329,12 +329,13 @@ describe('AiFoodSearchScreen', () => {
 
     const first = await screen.findByTestId('ai-food-choice-0-0');
     expect(first).toHaveTextContent(/Potato \(baked\).*Best match.*93.*cal for 100 g/);
-    expect(first).toHaveTextContent(/2\.5 g.*Protein.*21\.2 g.*Carbs.*0\.1 g.*Fat/);
+    // 2.5 g, 21.2 g and 0.1 g, each rounded down to the gram.
+    expect(first).toHaveTextContent(/2 g.*Protein.*21 g.*Carbs.*0 g.*Fat/);
     const second = screen.getByTestId('ai-food-choice-0-1');
     expect(second).toHaveTextContent(/Sweet Potato \(baked\).*90/);
     expect(second).not.toHaveTextContent(/Best match/);
     expect(second.props.accessibilityLabel).toBe(
-      'Choose Sweet Potato (baked): 90 calories, 2 grams protein, 20.7 carbs, 0.2 fat, for 100 g',
+      'Choose Sweet Potato (baked): 90 calories, 2 grams protein, 20 carbs, 0 fat, for 100 g',
     );
     expect(screen.getByTestId('ai-food-review-incomplete')).toHaveTextContent(
       'One part needs you below; then the totals appear.',

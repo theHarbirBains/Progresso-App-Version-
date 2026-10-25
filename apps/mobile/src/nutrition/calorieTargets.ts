@@ -1,5 +1,6 @@
 import type { ActivityLevel, Gender } from '../lib/api';
 import { ageFromBirthday } from './calorieEstimationInput';
+import { wholeFigure } from './wholeFigures';
 
 // The Mifflin-St Jeor calorie-estimation formula -- already named as the
 // intended method by CalorieEstimationScreen's own footnote and this
@@ -40,7 +41,7 @@ export function computeBMR(
 
 /** Maintenance calories (kcal/day) -- BMR x this activity level's multiplier. */
 export function computeMaintenanceCalories(input: CalorieProfileInput): number {
-  return Math.round(computeBMR(input) * ACTIVITY_MULTIPLIERS[input.activityLevel]);
+  return wholeFigure(computeBMR(input) * ACTIVITY_MULTIPLIERS[input.activityLevel]);
 }
 
 // Fixed adjustment amounts, matching the approved design reference exactly

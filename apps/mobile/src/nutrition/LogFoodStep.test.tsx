@@ -205,9 +205,10 @@ describe('LogFoodStep', () => {
 
     expect(screen.getByTestId('log-food-amount')).toHaveTextContent('1.5 servings · 150 g');
     expect(screen.getByTestId('log-food-calories')).toHaveTextContent(/195/);
-    expect(screen.getByTestId('log-food-protein')).toHaveTextContent(/4\.1/);
-    expect(screen.getByTestId('log-food-carbs')).toHaveTextContent(/42/);
-    expect(screen.getByTestId('log-food-fat')).toHaveTextContent(/0\.5/);
+    // 4.05 g protein and 0.45 g fat, each rounded down to the gram.
+    expect(screen.getByTestId('log-food-protein')).toHaveTextContent('4g');
+    expect(screen.getByTestId('log-food-carbs')).toHaveTextContent('42g');
+    expect(screen.getByTestId('log-food-fat')).toHaveTextContent('0g');
   });
 
   it('shows the serving the amount is measured against', () => {

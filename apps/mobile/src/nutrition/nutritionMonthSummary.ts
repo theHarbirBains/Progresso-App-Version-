@@ -1,5 +1,6 @@
 import { isoToLocalDateKey } from '../design/calendarGrid';
 import type { FoodLogRow } from './foodLogQueries';
+import { wholeFigure } from './wholeFigures';
 
 export interface NutritionMonthSummary {
   daysLogged: number;
@@ -18,6 +19,6 @@ export function computeNutritionMonthSummary(logs: FoodLogRow[]): NutritionMonth
   return {
     daysLogged,
     totalCalories,
-    avgCaloriesPerLoggedDay: daysLogged > 0 ? Math.round(totalCalories / daysLogged) : 0,
+    avgCaloriesPerLoggedDay: daysLogged > 0 ? wholeFigure(totalCalories / daysLogged) : 0,
   };
 }

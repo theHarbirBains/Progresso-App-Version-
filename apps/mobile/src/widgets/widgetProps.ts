@@ -1,4 +1,5 @@
 import type { NutritionGoalValues, NutritionTotals } from '../nutrition/nutritionCalculations';
+import { wholeFigure, wholeFigureText } from '../nutrition/wholeFigures';
 
 // What the home-screen widgets and the Lock Screen workout card are shown. A widget runs in its
 // own little runtime outside the app (expo-widgets), sees only these props, and can't import
@@ -80,7 +81,7 @@ export const SIGNED_OUT_STEPS: StepsWidgetProps = { signedIn: false, caption: ''
 const NOTHING_EATEN: NutritionTotals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
 
 function whole(value: number): string {
-  return Math.round(value).toLocaleString();
+  return wholeFigureText(value);
 }
 
 /** How far along, 0-1, as a prop: `{ progress }`, or nothing at all without a target. */
@@ -106,7 +107,7 @@ export function nutritionWidgetProps(
   return {
     signedIn: true,
     calories: whole(left === null ? eaten.calories : Math.abs(left)),
-    caption: left === null ? 'cal eaten' : Math.round(left) < 0 ? 'cal over' : 'cal left',
+    caption: left === null ? 'cal eaten' : wholeFigure(left) < 0 ? 'cal over' : 'cal left',
     ...share(eaten.calories, targets.calories),
     macros: [
       macro('Protein', eaten.proteinG, targets.proteinG),

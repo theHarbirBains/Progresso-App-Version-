@@ -40,13 +40,14 @@ describe('nutritionWidgetProps', () => {
       nutritionWidgetProps({ calories: 760.4, proteinG: 92.3, carbsG: 80, fatG: 21.6 }, TARGETS),
     ).toEqual({
       signedIn: true,
-      calories: '1,240',
+      // 1,239.6 left, rounded down.
+      calories: '1,239',
       caption: 'cal left',
       progress: 0.3802,
       macros: [
         { label: 'Protein', amount: '92 / 150 g', progress: 92.3 / 150 },
         { label: 'Carbs', amount: '80 / 220 g', progress: 80 / 220 },
-        { label: 'Fat', amount: '22 / 60 g', progress: 21.6 / 60 },
+        { label: 'Fat', amount: '21 / 60 g', progress: 21.6 / 60 },
       ],
     });
   });

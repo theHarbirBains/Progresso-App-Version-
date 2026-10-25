@@ -4,6 +4,7 @@ import { StatValue } from '../design/StatValue';
 import { Text } from '../design/Text';
 import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 import { FoodImage } from './FoodImage';
+import { wholeFigure } from './wholeFigures';
 
 interface FoodFactsTestIDs {
   summary?: string;
@@ -35,7 +36,7 @@ interface Props {
 }
 
 function formatMacro(value: number | null): string {
-  return value === null ? '—' : String(value);
+  return value === null ? '—' : String(wholeFigure(value));
 }
 
 interface FoodMacrosProps {
@@ -104,7 +105,7 @@ export function FoodFacts({
             </Text>
             <StatValue
               testID={testIDs.calories}
-              value={String(calories)}
+              value={String(wholeFigure(calories))}
               unit=" cal"
               color={accentColor}
             />

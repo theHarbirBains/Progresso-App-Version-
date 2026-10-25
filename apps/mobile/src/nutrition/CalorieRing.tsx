@@ -6,6 +6,7 @@ import { Text } from '../design/Text';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { usePageArrived } from '../navigation/useAfterTransition';
 import { colors, spacing, typeScale } from '../design/theme';
+import { wholeFigure } from './wholeFigures';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -76,8 +77,8 @@ export function CalorieRing({
       accessible
       accessibilityLabel={
         goal !== null
-          ? `${consumed} of ${goal} calories logged today`
-          : `${consumed} calories logged today, no goal set`
+          ? `${wholeFigure(consumed)} of ${wholeFigure(goal)} calories logged today`
+          : `${wholeFigure(consumed)} calories logged today, no goal set`
       }
     >
       {arrived ? (
@@ -111,9 +112,9 @@ export function CalorieRing({
       <View style={StyleSheet.absoluteFill} importantForAccessibility="no-hide-descendants">
         <View style={styles.center}>
           <Text testID={testID ? `${testID}-value` : undefined} style={styles.value}>
-            {consumed}
+            {wholeFigure(consumed)}
           </Text>
-          <Text style={styles.unit}>{goal !== null ? `of ${goal} cal` : 'cal'}</Text>
+          <Text style={styles.unit}>{goal !== null ? `of ${wholeFigure(goal)} cal` : 'cal'}</Text>
         </View>
       </View>
     </View>

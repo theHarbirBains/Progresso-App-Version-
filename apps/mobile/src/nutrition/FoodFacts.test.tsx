@@ -25,7 +25,8 @@ describe('FoodFacts', () => {
     expect(screen.getByTestId('s')).toHaveTextContent('Serving: 100 g');
     expect(screen.getByTestId('c')).toHaveTextContent('165 cal');
     expect(screen.getByTestId('p')).toHaveTextContent('31g');
-    expect(screen.getByTestId('f')).toHaveTextContent('3.6g');
+    // Rounded down to the gram: 3.6 g shows as 3 g.
+    expect(screen.getByTestId('f')).toHaveTextContent('3g');
   });
 
   it('makes calories the one accent readout and the macros neutral mono readouts', () => {

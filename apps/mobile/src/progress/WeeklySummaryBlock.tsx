@@ -10,6 +10,7 @@ import { formatWeightKg } from '../lib/units';
 import { progressStyles } from './progressStyles';
 import { COMPARISON_WEEKS, type WeeklySummary } from './weeklySummary';
 import type { WeekSummaries } from './useWeeklySummaries';
+import { wholeFigureText } from '../nutrition/wholeFigures';
 
 type Week = 'thisWeek' | 'lastWeek';
 
@@ -166,7 +167,7 @@ function SummaryBody({
             <Text testID="weekly-summary-logged-days" style={styles.note}>
               Out of {count(nutrition.loggedDays, 'day', 'days')} with food logged
               {nutrition.budget
-                ? ` · ${Math.round(nutrition.budget.consumed).toLocaleString()} of ${nutrition.budget.target.toLocaleString()} cal for the week`
+                ? ` · ${wholeFigureText(nutrition.budget.consumed)} of ${wholeFigureText(nutrition.budget.target)} cal for the week`
                 : ''}
             </Text>
           </>

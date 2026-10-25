@@ -11,6 +11,7 @@ import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { dayFromKey, dayKey } from '../lib/dayKey';
 import { progressStyles } from './progressStyles';
 import { SkeletonRows } from '../design/Skeleton';
+import { wholeFigure, wholeFigureText } from '../nutrition/wholeFigures';
 
 type Range = 'week' | 'month' | 'quarter';
 
@@ -108,7 +109,7 @@ export function NutritionProgressSection({ accentColor, onAccentColor, onOpenDay
   const withTarget = days.filter((day) => day.calorieTarget !== null);
   const avg = (pick: (day: NutritionDay) => number) =>
     days.length > 0
-      ? Math.round(days.reduce((sum, day) => sum + pick(day), 0) / days.length)
+      ? wholeFigure(days.reduce((sum, day) => sum + pick(day), 0) / days.length)
       : null;
   const avgCalories = avg((day) => day.calories);
   const avgProtein = avg((day) => day.proteinG);
@@ -177,7 +178,7 @@ export function NutritionProgressSection({ accentColor, onAccentColor, onOpenDay
           <View style={styles.list}>
             {days.map((day, index) => {
               const diff =
-                day.calorieTarget !== null ? Math.round(day.calories - day.calorieTarget) : null;
+                day.calorieTarget !== null ? wholeFigure(day.calories - day.calorieTarget) : null;
               return (
                 <ListRow
                   key={day.key}
@@ -189,12 +190,12 @@ export function NutritionProgressSection({ accentColor, onAccentColor, onOpenDay
                   })}
                   subtitle={
                     diff === null
-                      ? `${Math.round(day.proteinG)} g protein`
+                      ? `${wholeFigure(day.proteinG)} g protein`
                       : onTarget(day)
-                        ? `On target · ${Math.round(day.proteinG)} g protein`
-                        : `${Math.abs(diff).toLocaleString()} ${diff > 0 ? 'over' : 'under'} · ${Math.round(day.proteinG)} g protein`
+                        ? `On target · ${wholeFigure(day.proteinG)} g protein`
+                        : `${Math.abs(diff).toLocaleString()} ${diff > 0 ? 'over' : 'under'} · ${wholeFigure(day.proteinG)} g protein`
                   }
-                  value={`${Math.round(day.calories).toLocaleString()} cal`}
+                  value={`${wholeFigureText(day.calories)} cal`}
                   divider={index > 0}
                   onPress={() => onOpenDay(day.key)}
                 />

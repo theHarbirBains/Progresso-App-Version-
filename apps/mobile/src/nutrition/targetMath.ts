@@ -1,3 +1,4 @@
+import { wholeFigure } from './wholeFigures';
 // Daily calorie and macro targets: the arithmetic behind Nutrition Goals. Pure, no I/O. The recommendations are fixed and the same every time:
 // - protein: 0.8 g per lb of body weight;
 // - fat: 0.3 g per lb of body weight;
@@ -23,13 +24,16 @@ export interface MacroGuidance {
   fatG: number;
 }
 
-/** Protein (0.8 g/lb) and fat (0.3 g/lb) for this body weight, stored in kg. */
+/**
+ * Protein (0.8 g/lb) and fat (0.3 g/lb) for this body weight, stored in kg -- from the weight to
+ * the pound, as it's shown ("0.8 g x 200 lb = 160 g"), rounded down to the gram.
+ */
 export function macroGuidance(weightKg: number): MacroGuidance {
-  const lb = weightKg * LB_PER_KG;
+  const weightLb = Math.round(weightKg * LB_PER_KG);
   return {
-    weightLb: Math.round(lb),
-    proteinG: Math.round(lb * PROTEIN_G_PER_LB),
-    fatG: Math.round(lb * FAT_G_PER_LB),
+    weightLb,
+    proteinG: wholeFigure(weightLb * PROTEIN_G_PER_LB),
+    fatG: wholeFigure(weightLb * FAT_G_PER_LB),
   };
 }
 
@@ -45,7 +49,7 @@ export type CarbResult =
   | { kind: 'conflict'; proteinFatCalories: number; overBy: number };
 
 /**
- * Carbohydrates = (calories - protein x 4 - fat x 9) / 4, to the nearest gram: 2,200 cal with
+ * Carbohydrates = (calories - protein x 4 - fat x 9) / 4, rounded down to the gram: 2,200 cal with
  * 160 g protein (640 cal) and 60 g fat (540 cal) leaves 1,020 cal, or 255 g. When protein and
  * fat already pass the calorie target, it says so rather than giving zero.
  */
@@ -55,14 +59,14 @@ export function carbsFor(calories: number, proteinG: number, fatG: number): Carb
   if (remainingCalories < 0) {
     return {
       kind: 'conflict',
-      proteinFatCalories: Math.round(proteinFatCalories),
-      overBy: Math.round(-remainingCalories),
+      proteinFatCalories: wholeFigure(proteinFatCalories),
+      overBy: wholeFigure(-remainingCalories),
     };
   }
   return {
     kind: 'carbs',
-    carbsG: Math.round(remainingCalories / KCAL_PER_GRAM.carbs),
-    remainingCalories: Math.round(remainingCalories),
+    carbsG: wholeFigure(remainingCalories / KCAL_PER_GRAM.carbs),
+    remainingCalories: wholeFigure(remainingCalories),
   };
 }
 
@@ -185,7 +189,7 @@ export function macroTotal(
 ): { total: number; difference: number; matches: boolean } | null {
   const { calories, proteinG, carbsG, fatG } = values;
   if (calories === null || proteinG === null || carbsG === null || fatG === null) return null;
-  const total = Math.round(caloriesFromMacros(proteinG, carbsG, fatG));
+  const total = wholeFigure(caloriesFromMacros(proteinG, carbsG, fatG));
   const difference = total - calories;
   return { total, difference, matches: Math.abs(difference) <= MATCH_TOLERANCE_KCAL };
 }
