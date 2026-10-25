@@ -1,11 +1,12 @@
 import { Switch } from 'react-native';
 import { colors } from './theme';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   value: boolean;
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
-  /** Defaults to colors.accent -- pass a contextual Workout/Nutrition accent where relevant. */
+  /** Defaults to the app theme's accent. */
   accentColor?: string;
   /**
    * The thumb color while ON. Defaults to colors.background -- a plain dark
@@ -30,11 +31,15 @@ export function Toggle({
   value,
   onValueChange,
   disabled,
-  accentColor = colors.accent,
-  onAccentColor = colors.background,
+  accentColor: accentColorProp,
+  onAccentColor: onAccentColorProp,
   accessibilityLabel,
   testID,
 }: Props) {
+  // Unless told otherwise, the app theme's accent and the ink that reads on it.
+  const themeAccent = useAppTheme().accent;
+  const accentColor = accentColorProp ?? themeAccent.accent;
+  const onAccentColor = onAccentColorProp ?? themeAccent.onAccent;
   return (
     <Switch
       testID={testID}

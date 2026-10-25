@@ -42,7 +42,7 @@ import { PermissionStep } from '../onboarding/PermissionStep';
 import { WeightWheelPicker } from '../onboarding/WeightWheelPicker';
 import { TrainingComfortSelector } from '../onboarding/TrainingComfortSelector';
 import { requestNotificationPermission } from '../lib/pushNotifications';
-import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
+import { useAppTheme } from '../theme/appThemeContext';
 import { WorkoutSplitPresetPicker } from '../workouts/WorkoutSplitPresetPicker';
 import { onboardingStyles as styles } from './onboardingStyles';
 
@@ -86,6 +86,7 @@ const DEFAULT_BIRTH_YEAR = new Date().getFullYear() - 25;
 // onboardingDraftStorage) is what makes this resumable across an app kill,
 // the same guarantee the old profile-backed flow had.
 export function OnboardingScreen({ onSwitchToSignIn }: Props) {
+  const { accent } = useAppTheme();
   const { signUpWithPassword, signInWithProvider } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -448,7 +449,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 workout. */}
             <WorkoutSplitPresetPicker
               testID="onboarding-step-workout-split"
-              theme={DEFAULT_WORKOUT_THEME}
+              theme={accent}
               materializeImmediately={false}
               onPresetActivated={(presetId) => {
                 updateDraft({ selectedSplitPresetId: presetId, wantsCustomSplit: false });

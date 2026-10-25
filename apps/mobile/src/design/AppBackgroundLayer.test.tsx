@@ -1,6 +1,10 @@
 import { render, screen } from '@testing-library/react-native';
+import type { ReactNode } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import * as navigationTransitions from '../navigation/navigationTransitions';
+import { buildAccentTheme } from '../theme/accentColor';
+import { AppThemeContext } from '../theme/appThemeContext';
+import { themeById, type AppThemeId } from '../theme/appThemes';
 import { AppBackgroundLayer, ScreenBackdrop, useHeroBackdrop } from './AppBackgroundLayer';
 import { colors } from './theme';
 
@@ -200,5 +204,53 @@ describe('ScreenBackdrop behind a photo hero', () => {
 
   it('is a no-op outside a backdrop', () => {
     expect(() => render(<Hero />)).not.toThrow();
+  });
+});
+
+describe('ScreenBackdrop in a theme', () => {
+  function inTheme(id: AppThemeId, children: ReactNode) {
+    const theme = themeById(id);
+    return (
+      <AppThemeContext.Provider
+        value={{
+          theme,
+          accent: buildAccentTheme(theme.accent),
+          chosenId: id,
+          followSeasons: false,
+          loaded: true,
+          choose: () => undefined,
+          setFollowSeasons: () => undefined,
+        }}
+      >
+        <ScreenBackdrop>{children}</ScreenBackdrop>
+      </AppThemeContext.Provider>
+    );
+  }
+
+  it("shows the theme's own photo, under the same everyday darkening", () => {
+    render(inTheme('alpine', <Text>page</Text>));
+
+    expect(screen.getByTestId('screen-backdrop-photo-image').props.source).toBe(
+      themeById('alpine').photo,
+    );
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.7, 2);
+  });
+
+  it("keeps a brighter photo as dark behind a hero as that theme's measure says", () => {
+    render(inTheme('alpine', <Hero />));
+
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(themeById('alpine').heroDarkness, 2);
+  });
+
+  it('shows Golden Hour Gym by default', () => {
+    render(
+      <ScreenBackdrop>
+        <Text>page</Text>
+      </ScreenBackdrop>,
+    );
+
+    expect(screen.getByTestId('screen-backdrop-photo-image').props.source).toBe(
+      themeById('golden-hour-gym').photo,
+    );
   });
 });

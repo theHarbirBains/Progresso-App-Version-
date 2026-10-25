@@ -43,6 +43,8 @@ import { NutritionGoalsProvider } from './src/nutrition/NutritionGoalsProvider';
 import { submitOnboardingDraft } from './src/onboarding/onboardingDraft';
 import { clearOnboardingDraft, loadOnboardingDraft } from './src/onboarding/onboardingDraftStorage';
 import { ProfileProvider, useProfile } from './src/profile/ProfileProvider';
+import { AppThemeProvider } from './src/theme/AppThemeProvider';
+import { useAppTheme } from './src/theme/appThemeContext';
 import { AllTimeStatsProvider } from './src/progress/AllTimeStatsProvider';
 import { useProgressTheme } from './src/progress/useProgressTheme';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
@@ -90,6 +92,7 @@ import { SettingsAccountSecurityScreen } from './src/screens/SettingsAccountSecu
 import { SettingsChangePasswordScreen } from './src/screens/SettingsChangePasswordScreen';
 import { SettingsBlockedPeopleScreen } from './src/screens/SettingsBlockedPeopleScreen';
 import { SettingsNotificationsScreen } from './src/screens/SettingsNotificationsScreen';
+import { SettingsAppearanceScreen } from './src/screens/SettingsAppearanceScreen';
 import { SettingsNutritionScreen } from './src/screens/SettingsNutritionScreen';
 import { SettingsPersonalInfoScreen } from './src/screens/SettingsPersonalInfoScreen';
 import { SettingsSupportScreen } from './src/screens/SettingsSupportScreen';
@@ -373,6 +376,7 @@ function Root() {
                     name="SettingsNotifications"
                     component={SettingsNotificationsScreen}
                   />
+                  <Stack.Screen name="SettingsAppearance" component={SettingsAppearanceScreen} />
                   <Stack.Screen
                     name="SettingsAccountSecurity"
                     component={SettingsAccountSecurityScreen}
@@ -519,7 +523,9 @@ function Root() {
 // logo up for as long as it actually takes.
 function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { status } = useAuth();
-  const ready = fontsLoaded && status !== 'loading';
+  // The chosen theme is read before anything shows, so the default never flashes first.
+  const { loaded: themeLoaded } = useAppTheme();
+  const ready = fontsLoaded && status !== 'loading' && themeLoaded;
 
   return (
     <View style={styles.shell}>
@@ -554,7 +560,9 @@ function App() {
           <NutritionGoalsProvider>
             <FoodLogProvider>
               <AllTimeStatsProvider>
-                <AppShell fontsLoaded={fontsLoaded} />
+                <AppThemeProvider>
+                  <AppShell fontsLoaded={fontsLoaded} />
+                </AppThemeProvider>
                 <WidgetSync />
                 <StatusBar style="light" />
               </AllTimeStatsProvider>

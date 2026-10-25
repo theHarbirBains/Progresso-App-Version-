@@ -37,6 +37,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { findPeopleStyles as styles } from './findPeopleStyles';
 import { SkeletonRows } from '../design/Skeleton';
+import { useAppTheme } from '../theme/appThemeContext';
 
 type Props = RootStackScreenProps<'FindPeople'>;
 type FindPeopleTab = 'friends' | 'requests';
@@ -77,6 +78,7 @@ function rowLabel(user: FollowUser): { title: string; subtitle: string | undefin
  * drops them from every list here.
  */
 export function FindPeopleScreen({ navigation }: Props) {
+  const accent = useAppTheme().accent.accent;
   const { session } = useAuth();
   const accessToken = session?.access_token;
 
@@ -336,7 +338,7 @@ export function FindPeopleScreen({ navigation }: Props) {
             ]}
             active={tab}
             onSelect={setTab}
-            accentColor={colors.accent}
+            accentColor={accent}
           />
           {tab === 'friends' ? (
             <View style={styles.searchRow}>
@@ -458,7 +460,7 @@ export function FindPeopleScreen({ navigation }: Props) {
               ]}
               active={friendsSubTab}
               onSelect={setFriendsSubTab}
-              accentColor={colors.accent}
+              accentColor={accent}
             />
           </View>
 

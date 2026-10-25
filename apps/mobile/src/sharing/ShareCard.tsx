@@ -3,7 +3,7 @@ import { View, type ViewInstance } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BACKGROUND_ASPECT, BACKGROUND_IMAGE } from '../design/AppBackgroundLayer';
+import { BACKGROUND_ASPECT } from '../design/AppBackgroundLayer';
 import { Avatar } from '../design/Avatar';
 import { Text } from '../design/Text';
 import { colors } from '../design/theme';
@@ -13,6 +13,7 @@ import { formatSetValues } from '../workouts/setValues';
 import type { ShareCardData, ShareTopSet } from './shareCardData';
 import { shareCardBodyStyles as card, shareCardStyles as styles } from './shareCardStyles';
 import { CARD_WIDTH, STORY_CANVAS, STORY_SAFE_AREA, cardPt } from './storyLayout';
+import { useAppTheme } from '../theme/appThemeContext';
 
 export {
   CARD_MAX_HEIGHT,
@@ -31,14 +32,16 @@ const ROW_GAP = 5;
 const MAX_ROW_HEIGHT = 46;
 const MAX_ROWS = 7;
 
-// The frame around the card: a warm sunset gradient from the app's own amber
-// into its warm near-black, so the space Instagram or TikTok covers with its
-// own controls is still on-brand colour, never empty.
-export const STORY_FRAME = [
-  mixHex(colors.accent, colors.background, 0.62),
-  mixHex(colors.accent, colors.background, 0.84),
-  colors.background,
-] as const;
+// The frame around the card: a gradient from the app theme's accent (soft
+// amber in the default) into the warm near-black, so the space Instagram or
+// TikTok covers with its own controls is still on-brand colour, never empty.
+export function storyFrame(accent: string) {
+  return [
+    mixHex(accent, colors.background, 0.62),
+    mixHex(accent, colors.background, 0.84),
+    colors.background,
+  ] as const;
+}
 
 // The photo at the top of the card: the sunset photo, a little larger than the
 // card and placed so the sun glows low on the right, clear of the date and the
@@ -146,6 +149,7 @@ function Thumb({ set, size }: { set: ShareTopSet; size: number }) {
 // story canvas. This whole canvas is what gets captured -- the preview IS the
 // image.
 export function ShareStory({ storyRef, ...cardProps }: Props & { storyRef?: Ref<ViewInstance> }) {
+  const { accent } = useAppTheme();
   return (
     <View
       ref={storyRef}
@@ -155,7 +159,7 @@ export function ShareStory({ storyRef, ...cardProps }: Props & { storyRef?: Ref<
     >
       <LinearGradient
         testID="share-story-frame"
-        colors={STORY_FRAME}
+        colors={storyFrame(accent.accent)}
         locations={[0, 0.5, 1]}
         style={styles.fill}
       />
@@ -171,13 +175,15 @@ const STORY_SAFE_AREA_STYLE = {
   bottom: STORY_SAFE_AREA.bottom,
 } as const;
 
-// The card: the sunset photo behind the brand mark, date and the workout's
+// The card: the theme's photo behind the brand mark, date and the workout's
 // own name (nothing under it -- the name is the user's); then the session as
 // four stats (duration, exercises, sets, volume), and every exercise's top set
 // in workout order, a personal record marked quietly in the accent. Everything is real logged data in the user's unit;
 // nothing is estimated, and no account detail (name, email, id) is ever drawn.
 // Nothing on it looks tappable (no chevrons, no "View All") -- it's a picture.
 export function ShareCard({ data, weightUnit, accentColor }: Props) {
+  // The theme's photo -- the card looks like the app it came from.
+  const { theme } = useAppTheme();
   const overflow = data.topSets.length > MAX_ROWS;
   const shown = overflow ? data.topSets.slice(0, MAX_ROWS - 1) : data.topSets;
   const hiddenCount = data.topSets.length - shown.length;
@@ -193,7 +199,7 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
       <View style={card.hero}>
         <Image
           testID="share-card-photo"
-          source={BACKGROUND_IMAGE}
+          source={theme.photo}
           style={PHOTO_STYLE}
           contentFit="cover"
         />

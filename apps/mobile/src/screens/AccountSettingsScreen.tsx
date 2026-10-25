@@ -66,6 +66,14 @@ export function AccountSettingsScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('SettingsNutrition')}
         />
         <ListRow
+          testID="settings-category-appearance"
+          icon="image"
+          title="Appearance"
+          subtitle="Theme, and changing with the seasons"
+          divider
+          onPress={() => navigation.navigate('SettingsAppearance')}
+        />
+        <ListRow
           testID="settings-category-notifications"
           icon="bell"
           title="Notifications"

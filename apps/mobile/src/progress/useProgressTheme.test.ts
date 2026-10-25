@@ -48,7 +48,7 @@ describe('useProgressTheme', () => {
     expect(result.current.avatarUrl).toBe('https://example.com/avatar.jpg');
   });
 
-  it('always uses the one amber accent, ignoring any colors an account saved with the old pickers', () => {
+  it("uses the app theme's accent -- amber in the default -- ignoring colors saved with the old pickers", () => {
     mockUseProfile.mockReturnValue(
       profileContext({
         profile: {
@@ -60,8 +60,8 @@ describe('useProgressTheme', () => {
 
     const { result } = renderHook(() => useProgressTheme());
 
-    expect(result.current.theme).toBe(DEFAULT_WORKOUT_THEME);
-    expect(result.current.nutritionTheme).toBe(DEFAULT_NUTRITION_THEME);
+    expect(result.current.theme).toEqual(DEFAULT_WORKOUT_THEME);
+    expect(result.current.nutritionTheme).toEqual(DEFAULT_NUTRITION_THEME);
     expect(result.current.theme.accent).toBe('#D99A50');
     expect(result.current.nutritionTheme.accent).toBe('#D99A50');
   });
@@ -72,8 +72,8 @@ describe('useProgressTheme', () => {
     const { result } = renderHook(() => useProgressTheme());
 
     expect(result.current.themeLoading).toBe(true);
-    expect(result.current.theme).toBe(DEFAULT_WORKOUT_THEME);
-    expect(result.current.nutritionTheme).toBe(DEFAULT_NUTRITION_THEME);
+    expect(result.current.theme).toEqual(DEFAULT_WORKOUT_THEME);
+    expect(result.current.nutritionTheme).toEqual(DEFAULT_NUTRITION_THEME);
     expect(result.current.weightUnit).toBe('lb');
     expect(result.current.activeWorkoutSplitId).toBeNull();
     expect(result.current.displayName).toBeNull();
@@ -89,7 +89,7 @@ describe('useProgressTheme', () => {
     const { result } = renderHook(() => useProgressTheme());
 
     expect(result.current.themeLoading).toBe(false);
-    expect(result.current.theme).toBe(DEFAULT_WORKOUT_THEME);
+    expect(result.current.theme).toEqual(DEFAULT_WORKOUT_THEME);
     expect(result.current.weightUnit).toBe('lb');
     expect(result.current.activeWorkoutSplitId).toBeNull();
   });

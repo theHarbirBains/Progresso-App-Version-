@@ -12,6 +12,7 @@ import { colors, spacing, typeScale } from '../design/theme';
 import type { FollowUser } from '../lib/followsApi';
 import { blockUser, reportUser } from '../lib/safetyApi';
 import { REPORT_REASON_LABELS, REPORT_REASONS, type ReportReason } from './reportReasons';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   /** Who the sheet is about. Null closes it. */
@@ -43,10 +44,14 @@ export function PersonActionsSheet({
   workoutId,
   onClose,
   onBlocked,
-  accentColor = colors.accent,
-  onAccentColor = colors.onAccent,
+  accentColor: accentColorProp,
+  onAccentColor: onAccentColorProp,
   testID = 'person-actions',
 }: Props) {
+  // Unless told otherwise, the app theme's accent and the ink that reads on it.
+  const themeAccent = useAppTheme().accent;
+  const accentColor = accentColorProp ?? themeAccent.accent;
+  const onAccentColor = onAccentColorProp ?? themeAccent.onAccent;
   const { session } = useAuth();
   const accessToken = session?.access_token;
   const [step, setStep] = useState<Step>('menu');

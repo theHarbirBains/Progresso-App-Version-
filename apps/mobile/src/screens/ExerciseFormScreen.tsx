@@ -23,6 +23,7 @@ import {
 } from '../exercises/movementTypes';
 import { createExercise, updateExercise } from '../lib/api';
 import { uploadEquipmentPhoto } from '../lib/equipmentPhotoUpload';
+import { useAppTheme } from '../theme/appThemeContext';
 
 type Props = {
   onDone: () => void;
@@ -52,8 +53,9 @@ export function ExerciseFormScreen(props: Props) {
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
   const userId = user?.id;
-  const accentColor = props.accentColor ?? colors.accent;
-  const onAccentColor = props.onAccentColor ?? colors.onAccent;
+  const themeAccent = useAppTheme().accent;
+  const accentColor = props.accentColor ?? themeAccent.accent;
+  const onAccentColor = props.onAccentColor ?? themeAccent.onAccent;
 
   const [name, setName] = useState(props.mode === 'edit' ? props.exercise.name : '');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(

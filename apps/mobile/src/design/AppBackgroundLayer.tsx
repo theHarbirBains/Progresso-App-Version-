@@ -12,18 +12,20 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { withAlpha } from '../theme/accentColor';
+import { useAppTheme } from '../theme/appThemeContext';
+import { THEME_PHOTO_ASPECT } from '../theme/appThemes';
 import { colors } from './theme';
 
-// The golden gym photo behind every screen (Warm Minimal -- see DESIGN.md §3a): the original
-// workout photo cropped to the gym itself -- the window with the sun on the mountain line, the
-// plates on the right, the bench in front -- graded golden and high-contrast like the reference,
-// sharp, with the sun's glow bloomed to a hot core; upscaled 1.5x with light sharpening so a
-// phone stretches it less. Text over it stays readable
-// through the darkening layers below, not blur. Exported for the one other place it appears:
-// the top of the workout share card.
+// The theme's photo behind every screen (DESIGN.md §3a; the themes are theme/appThemes.ts). The
+// default, Golden Hour Gym, is the original workout photo cropped to the gym itself -- the
+// window with the sun on the mountain line, the plates on the right, the bench in front --
+// graded golden and high-contrast like the Warm Minimal reference, sharp, with the sun's glow
+// bloomed to a hot core; every other theme's photo is cut to the same proportions and graded to
+// sit beside it. Text over any of them stays readable through the darkening layers below, not
+// blur. The default's photo, for what only ever shows it.
 export const BACKGROUND_IMAGE = require('../../assets/background-gym-sunset.jpg');
-// The photo's own width / height, so it keeps its proportions.
-export const BACKGROUND_ASPECT = 852 / 1300;
+// Every theme photo's width / height, so it keeps its proportions.
+export const BACKGROUND_ASPECT = THEME_PHOTO_ASPECT;
 // Shown at the screen's full width, pinned to the top: the whole gym in view, the plates down
 // the right edge and the sun near the top right, as in the reference.
 const PHOTO_ZOOM = 1;
@@ -55,17 +57,20 @@ const EVERYDAY: Stops = [
   [0.55, 0.8],
   [1, 1],
 ];
-// Down the photo while Feed's Next Workout shows (useHeroBackdrop): the sunset nearly in full
-// behind the whole hero, down past its button, darkening below it. Measured the same way: the
-// header keeps AA at every pixel, the hero's title the large-text 3:1, its smaller lines AA
-// over all but the brightest specks, and text in a card AA at every pixel, wherever a card
-// scrolls to.
-const HERO: Stops = [
-  [0, 0.1],
-  [0.35, 0.1],
-  [0.5, 0.62],
-  [1, 1],
-];
+// Down the photo while Feed's Next Workout shows (useHeroBackdrop): the photo nearly in full
+// behind the whole hero, down past its button, darkening below it. Over the gym photo, 10%
+// through the upper part, measured the same way: the header keeps AA at every pixel, the hero's
+// title the large-text 3:1, its smaller lines AA over all but the brightest specks, and text in
+// a card AA at every pixel, wherever a card scrolls to. Each theme says how dark its own photo
+// stays there (`heroDarkness`), measured to give hero text at least the gym photo's contrast.
+function heroStops(darkness: number): Stops {
+  return [
+    [0, darkness],
+    [0.35, darkness],
+    [0.5, 0.62],
+    [1, 1],
+  ];
+}
 const BRIGHTEN_MS = 300;
 
 function darknessAt(stops: Stops, y: number): number {
@@ -87,11 +92,13 @@ const EXTRA_LOCATIONS: GradientLocations = [0, 0.35, 0.39, 0.42, 0.46, 0.5, 0.52
 type GradientColors = readonly [string, string, ...string[]];
 type GradientLocations = readonly [number, number, ...number[]];
 
-const EXTRA_COLORS = EXTRA_LOCATIONS.map((y) => {
-  const at = Math.min(y, 0.999);
-  const extra = 1 - (1 - darknessAt(EVERYDAY, at)) / (1 - darknessAt(HERO, at));
-  return withAlpha(colors.background, Math.round(extra * 1000) / 1000);
-}) as unknown as GradientColors;
+function extraColors(hero: Stops): GradientColors {
+  return EXTRA_LOCATIONS.map((y) => {
+    const at = Math.min(y, 0.999);
+    const extra = 1 - (1 - darknessAt(EVERYDAY, at)) / (1 - darknessAt(hero, at));
+    return withAlpha(colors.background, Math.round(extra * 1000) / 1000);
+  }) as unknown as GradientColors;
+}
 
 const gradient = (stops: Stops) => ({
   colors: stops.map(([, darkness]) =>
@@ -194,6 +201,8 @@ export function ScreenBackdrop({
 // of the screen is the plain warm background. `bright` (Feed's hero is showing) eases it to
 // the lighter hero darkening.
 function Photo({ testIDPrefix, bright = false }: { testIDPrefix: string; bright?: boolean }) {
+  const { theme } = useAppTheme();
+  const hero = heroStops(theme.heroDarkness);
   const reduceMotion = useReduceMotionPreference();
   const everydayOpacity = useRef(new Animated.Value(bright ? 0 : 1)).current;
   useEffect(() => {
@@ -214,10 +223,16 @@ function Photo({ testIDPrefix, bright = false }: { testIDPrefix: string; bright?
   return (
     <>
       <View testID={`${testIDPrefix}-photo`} style={styles.photo} pointerEvents="none">
-        <Image source={BACKGROUND_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <Image
+          testID={`${testIDPrefix}-photo-image`}
+          source={theme.photo}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={reduceMotion ? 0 : 250}
+        />
         <LinearGradient
           testID={`${testIDPrefix}-photo-fade`}
-          {...gradient(HERO)}
+          {...gradient(hero)}
           style={StyleSheet.absoluteFill}
         />
         <Animated.View
@@ -225,7 +240,7 @@ function Photo({ testIDPrefix, bright = false }: { testIDPrefix: string; bright?
           style={[StyleSheet.absoluteFill, { opacity: everydayOpacity }]}
         >
           <LinearGradient
-            colors={EXTRA_COLORS}
+            colors={extraColors(hero)}
             locations={EXTRA_LOCATIONS}
             style={StyleSheet.absoluteFill}
           />

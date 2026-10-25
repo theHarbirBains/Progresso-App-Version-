@@ -2,6 +2,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   testID: string;
@@ -9,7 +10,7 @@ interface Props {
   description?: string;
   selected: boolean;
   onPress: () => void;
-  /** Defaults to colors.accent -- pass a contextual Workout/Nutrition accent where relevant (same override pattern as SegmentedControl/PrimaryButton). */
+  /** Defaults to the app theme's accent. */
   accentColor?: string;
 }
 
@@ -20,8 +21,11 @@ export function OnboardingOptionCard({
   description,
   selected,
   onPress,
-  accentColor = colors.accent,
+  accentColor: accentColorProp,
 }: Props) {
+  // Unless told otherwise, the app theme's accent.
+  const themeAccent = useAppTheme().accent.accent;
+  const accentColor = accentColorProp ?? themeAccent;
   return (
     <TouchableOpacity
       testID={testID}

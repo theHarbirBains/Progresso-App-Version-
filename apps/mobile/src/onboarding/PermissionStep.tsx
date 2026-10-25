@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { Text } from '../design/Text';
 import { colors, radii, spacing, typeScale } from '../design/theme';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   testID: string;
@@ -29,10 +30,11 @@ export function PermissionStep({
   onSkip,
   connectBusy = false,
 }: Props) {
+  const accent = useAppTheme().accent.accent;
   return (
     <View testID={testID} style={styles.container}>
       <View style={styles.iconCircle}>
-        <Feather name={icon} size={32} color={colors.accent} />
+        <Feather name={icon} size={32} color={accent} />
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.description}>{description}</Text>

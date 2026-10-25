@@ -11,6 +11,7 @@ import {
   intRange,
   nearestValue,
 } from './weightHeightConversion';
+import { useAppTheme } from '../theme/appThemeContext';
 
 const CM_VALUES = intRange(HEIGHT_CM_RANGE.min, HEIGHT_CM_RANGE.max);
 const FT_VALUES = intRange(HEIGHT_FT_RANGE.min, HEIGHT_FT_RANGE.max);
@@ -33,6 +34,7 @@ export function HeightWheelPicker({
   onChangeUnit,
   onChangeHeightCm,
 }: Props) {
+  const { accent } = useAppTheme();
   const { feet, inches } = feetAndInchesFromCm(heightCm);
 
   function handleCmSelect(value: string) {
@@ -52,17 +54,19 @@ export function HeightWheelPicker({
       <View style={styles.unitToggle}>
         <TouchableOpacity
           testID={`${testID}-unit-cm`}
-          style={[styles.unitOption, unit === 'cm' && styles.unitOptionSelected]}
+          style={[styles.unitOption, unit === 'cm' && { backgroundColor: accent.accent }]}
           onPress={() => onChangeUnit('cm')}
         >
-          <Text style={[styles.unitText, unit === 'cm' && styles.unitTextSelected]}>cm</Text>
+          <Text style={[styles.unitText, unit === 'cm' && { color: accent.onAccent }]}>cm</Text>
         </TouchableOpacity>
         <TouchableOpacity
           testID={`${testID}-unit-ft_in`}
-          style={[styles.unitOption, unit === 'ft_in' && styles.unitOptionSelected]}
+          style={[styles.unitOption, unit === 'ft_in' && { backgroundColor: accent.accent }]}
           onPress={() => onChangeUnit('ft_in')}
         >
-          <Text style={[styles.unitText, unit === 'ft_in' && styles.unitTextSelected]}>ft/in</Text>
+          <Text style={[styles.unitText, unit === 'ft_in' && { color: accent.onAccent }]}>
+            ft/in
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -125,16 +129,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     borderRadius: radii.pill,
   },
-  unitOptionSelected: {
-    backgroundColor: colors.accent,
-  },
   unitText: {
     ...typeScale.callout,
     color: colors.textSecondary,
     fontFamily: fonts.display,
-  },
-  unitTextSelected: {
-    color: colors.onAccent,
   },
   row: {
     flexDirection: 'row',

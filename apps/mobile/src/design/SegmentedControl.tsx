@@ -2,6 +2,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from './Text';
 import { GlassBackground } from './GlassBackground';
 import { colors, fonts, radii, spacing, typeScale } from './theme';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Option<T extends string> {
   label: string;
@@ -16,7 +17,7 @@ interface Props<T extends string> {
   value: T | null;
   onChange: (value: T) => void;
   disabled?: boolean;
-  /** Defaults to colors.accent -- pass a contextual Workout/Nutrition accent where relevant. */
+  /** Defaults to the app theme's accent. */
   accentColor?: string;
   onAccentColor?: string;
   testID?: string;
@@ -31,10 +32,14 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   disabled,
-  accentColor = colors.accent,
-  onAccentColor = colors.onAccent,
+  accentColor: accentColorProp,
+  onAccentColor: onAccentColorProp,
   testID,
 }: Props<T>) {
+  // Unless told otherwise, the app theme's accent and the ink that reads on it.
+  const themeAccent = useAppTheme().accent;
+  const accentColor = accentColorProp ?? themeAccent.accent;
+  const onAccentColor = onAccentColorProp ?? themeAccent.onAccent;
   return (
     <View testID={testID} style={[styles.track, disabled && styles.disabled]}>
       <GlassBackground />

@@ -4,6 +4,7 @@ import { Animated, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { withAlpha } from '../theme/accentColor';
 import { colors, radii, spacing } from './theme';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   children: ReactNode;
@@ -35,12 +36,16 @@ export function ChoiceTile({
   children,
   onPress,
   selected,
-  accentColor = colors.accent,
-  onAccentColor = colors.onAccent,
+  accentColor: accentColorProp,
+  onAccentColor: onAccentColorProp,
   accessibilityLabel,
   testID,
   style,
 }: Props) {
+  // Unless told otherwise, the app theme's accent and the ink that reads on it.
+  const themeAccent = useAppTheme().accent;
+  const accentColor = accentColorProp ?? themeAccent.accent;
+  const onAccentColor = onAccentColorProp ?? themeAccent.onAccent;
   const reduceMotion = useReduceMotionPreference();
   const scale = useRef(new Animated.Value(1)).current;
   const chosen = useRef(new Animated.Value(selected ? 1 : 0)).current;

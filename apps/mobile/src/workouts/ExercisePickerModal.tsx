@@ -16,6 +16,7 @@ import type { MuscleGroup } from '../exercises/muscleGroups';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
 import { withAlpha } from '../theme/accentColor';
+import { useAppTheme } from '../theme/appThemeContext';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -49,9 +50,13 @@ export function ExercisePickerModal({
   userId,
   alreadyAddedIds,
   onCreateCustom,
-  accentColor = colors.accent,
-  onAccentColor = colors.onAccent,
+  accentColor: accentColorProp,
+  onAccentColor: onAccentColorProp,
 }: Props) {
+  // Unless told otherwise, the app theme's accent and the ink that reads on it.
+  const themeAccent = useAppTheme().accent;
+  const accentColor = accentColorProp ?? themeAccent.accent;
+  const onAccentColor = onAccentColorProp ?? themeAccent.onAccent;
   const reduceMotion = useReduceMotionPreference();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');

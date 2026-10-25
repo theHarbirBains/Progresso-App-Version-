@@ -2,6 +2,7 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { Feather } from '@expo/vector-icons';
 import { GlassBackground } from './GlassBackground';
 import { colors, minTouchTarget, radii, typeScale } from './theme';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   icon: keyof typeof Feather.glyphMap;
@@ -49,6 +50,7 @@ export function IconButton({
   badgeCount,
   testID,
 }: Props) {
+  const themeAccent = useAppTheme().accent;
   return (
     <View style={styles.wrap}>
       <TouchableOpacity
@@ -79,10 +81,12 @@ export function IconButton({
       {badgeCount ? (
         <View
           testID={testID ? `${testID}-badge` : undefined}
-          style={styles.badge}
+          style={[styles.badge, { backgroundColor: themeAccent.accent }]}
           pointerEvents="none"
         >
-          <Text style={styles.badgeText}>{badgeCount > 9 ? '9+' : String(badgeCount)}</Text>
+          <Text style={[styles.badgeText, { color: themeAccent.onAccent }]}>
+            {badgeCount > 9 ? '9+' : String(badgeCount)}
+          </Text>
         </View>
       ) : null}
     </View>
@@ -112,7 +116,6 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     paddingHorizontal: 4,
-    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -120,6 +123,5 @@ const styles = StyleSheet.create({
     ...typeScale.caption,
     fontSize: 10,
     lineHeight: 12,
-    color: colors.onAccent,
   },
 });

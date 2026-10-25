@@ -1,18 +1,17 @@
 import { useProfile } from '../profile/ProfileProvider';
-import {
-  DEFAULT_NUTRITION_THEME,
-  DEFAULT_WORKOUT_THEME,
-  type AccentTheme,
-} from '../theme/accentColor';
+import type { AccentTheme } from '../theme/accentColor';
+import { useAppTheme } from '../theme/appThemeContext';
 
 /**
- * `theme`/`nutritionTheme` are the app's one fixed soft amber accent (Warm
- * Minimal) -- there is no color customization, so every screen, and the
- * bottom nav's highlight of the page you're on, always shows the same
- * accent. Any `workoutAccentColor`/`nutritionAccentColor` still stored on an
- * account from the old color pickers is deliberately ignored. Kept as two
- * fields so every existing `theme.accent`/`nutritionTheme.accent` call site
- * stays unchanged.
+ * `theme`/`nutritionTheme` are the app theme's one accent (Settings >
+ * Appearance -- theme/AppThemeProvider.tsx; soft amber in the default,
+ * Golden Hour Gym), the same in both modes, so every screen, and the bottom
+ * nav's highlight of the page you're on, shows the same accent. There is no
+ * free colour picking: a theme's accent is chosen with its photo. Any
+ * `workoutAccentColor`/`nutritionAccentColor` still stored on an account
+ * from the old color pickers is deliberately ignored. Kept as two fields so
+ * every existing `theme.accent`/`nutritionTheme.accent` call site stays
+ * unchanged.
  *
  * Also exposes the identity fields (`displayName`, `username`,
  * `avatarUrl`) and `weightUnit`/`activeWorkoutSplitId` off the one shared
@@ -35,10 +34,11 @@ export function useProgressTheme(): {
   themeLoading: boolean;
 } {
   const { profile, loading } = useProfile();
+  const { accent } = useAppTheme();
 
   return {
-    theme: DEFAULT_WORKOUT_THEME,
-    nutritionTheme: DEFAULT_NUTRITION_THEME,
+    theme: accent,
+    nutritionTheme: accent,
     weightUnit: profile?.weightUnit ?? 'lb',
     activeWorkoutSplitId: profile?.activeWorkoutSplitId ?? null,
     displayName: profile?.displayName ?? null,

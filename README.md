@@ -82,8 +82,8 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Settings**
 
-- A root list of six categories, each its own page: Profile & Personal Information, Workout Preferences, Nutrition & Goals, Notifications, Account & Security, Support & About
-- One fixed Warm Minimal look: the warm gym photo behind the top of every screen and one amber accent. There are no background themes or colour pickers, so the app always looks as designed
+- A root list of seven categories, each its own page: Profile & Personal Information, Workout Preferences, Nutrition & Goals, Appearance, Notifications, Account & Security, Support & About
+- Appearance: eight curated themes, each a photo behind the top of every screen and one accent -- Golden Hour Gym (the original, default look), Forest, Alpine, Coast, Spring, Summer, Autumn and Winter -- and an optional Change with the seasons that follows the season where you live. Everything else stays the same warm dark, so every theme reads as well as the default; there are no free colour pickers
 - Notification preferences: push and email opt-in toggles are real and saved; more granular categories (workout reminders, PR alerts, weekly summaries) are shown as explicit "Coming Soon" rows rather than toggles that wouldn't do anything
 - Account & Security: Blocked People (each with Unblock), Terms of Service and Privacy Policy (the pages the API serves at `/legal/terms` and `/legal/privacy`), and Delete Account, which asks twice and then deletes the account and everything it owns
 - Change Email and the help and contact rows are visible but not yet implemented ("Coming Soon")

@@ -8,6 +8,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { Text } from './Text';
 import { colors, fonts, minTouchTarget, radii, spacing } from './theme';
+import { useAppTheme } from '../theme/appThemeContext';
 
 export type ButtonSize = 'lg' | 'md' | 'sm';
 
@@ -27,7 +28,7 @@ interface ButtonProps {
 }
 
 interface PrimaryButtonProps extends ButtonProps {
-  /** Defaults to colors.accent -- pass a contextual Workout/Nutrition accent where the button should follow the user's chosen theme color rather than the static brand accent (same override pattern as SegmentedControl/Toggle). */
+  /** Defaults to the app theme's accent (and its ink) -- pass a colour only where the button must differ. */
   accentColor?: string;
   onAccentColor?: string;
 }
@@ -95,15 +96,19 @@ function Frame({
 }
 
 export function PrimaryButton({
-  accentColor = colors.accent,
-  onAccentColor = colors.onAccent,
+  accentColor: accentColorProp,
+  onAccentColor: onAccentColorProp,
   ...props
 }: PrimaryButtonProps) {
+  // Unless told otherwise, the app theme's accent and the ink that reads on it.
+  const themeAccent = useAppTheme().accent;
+  const accentColor = accentColorProp ?? themeAccent.accent;
+  const onAccentColor = onAccentColorProp ?? themeAccent.onAccent;
   return (
     <Frame
       {...props}
       // backgroundColor is always supplied inline (accentColor prop, default
-      // colors.accent) -- not set in the stylesheet, so there is no stale
+      // the theme's accent) -- not set in the stylesheet, so there is no stale
       // value to fall out of sync with the actual default. The label color
       // likewise always comes from onAccentColor.
       variantStyle={{ backgroundColor: accentColor }}

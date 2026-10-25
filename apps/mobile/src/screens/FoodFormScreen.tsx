@@ -364,7 +364,6 @@ export function FoodFormScreen(props: Props) {
                   setServingUnit(option.value);
                   setUnitSheetOpen(false);
                 }}
-                accentColor={colors.accent}
               />
             ))}
           </ScrollView>

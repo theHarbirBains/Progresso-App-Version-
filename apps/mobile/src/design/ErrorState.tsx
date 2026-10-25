@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from './Text';
 import { colors, fonts, minTouchTarget, spacing, typeScale } from './theme';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   title?: string;
@@ -24,6 +25,7 @@ export function ErrorState({
   icon,
   testID,
 }: Props) {
+  const accent = useAppTheme().accent.accent;
   return (
     <View style={styles.container}>
       {icon}
@@ -43,9 +45,9 @@ export function ErrorState({
           accessibilityState={{ disabled: Boolean(retrying) }}
         >
           {retrying ? (
-            <ActivityIndicator size="small" color={colors.accent} />
+            <ActivityIndicator size="small" color={accent} />
           ) : (
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={[styles.retryText, { color: accent }]}>Retry</Text>
           )}
         </TouchableOpacity>
       ) : null}
@@ -79,6 +81,5 @@ const styles = StyleSheet.create({
   retryText: {
     ...typeScale.callout,
     fontFamily: fonts.display,
-    color: colors.accent,
   },
 });

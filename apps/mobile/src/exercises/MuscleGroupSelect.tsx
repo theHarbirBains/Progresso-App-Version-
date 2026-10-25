@@ -6,6 +6,7 @@ import { BottomSheet } from '../design/BottomSheet';
 import { ListRow } from '../design/ListRow';
 import { colors, radii, spacing, typeScale } from '../design/theme';
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   value: MuscleGroup | null;
@@ -20,7 +21,15 @@ interface Props {
 // Exercise) doesn't fit a create/edit form's own single required choice as
 // well as one tappable field does, so this is a separate component rather
 // than a variant of that one.
-export function MuscleGroupSelect({ value, onChange, accentColor = colors.accent, testID }: Props) {
+export function MuscleGroupSelect({
+  value,
+  onChange,
+  accentColor: accentColorProp,
+  testID,
+}: Props) {
+  // Unless told otherwise, the app theme's accent.
+  const themeAccent = useAppTheme().accent.accent;
+  const accentColor = accentColorProp ?? themeAccent;
   const [open, setOpen] = useState(false);
 
   return (

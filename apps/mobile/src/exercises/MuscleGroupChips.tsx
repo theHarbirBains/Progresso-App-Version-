@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text } from '../design/Text';
 import { colors, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   value: MuscleGroup | null;
@@ -29,11 +30,15 @@ export function MuscleGroupChips({
   value,
   onChange,
   includeAll = false,
-  accentColor = colors.accent,
-  onAccentColor = colors.onAccent,
+  accentColor: accentColorProp,
+  onAccentColor: onAccentColorProp,
   chipBorderColor = colors.border,
   chipTextColor = colors.textSecondary,
 }: Props) {
+  // Unless told otherwise, the app theme's accent and the ink that reads on it.
+  const themeAccent = useAppTheme().accent;
+  const accentColor = accentColorProp ?? themeAccent.accent;
+  const onAccentColor = onAccentColorProp ?? themeAccent.onAccent;
   const options: (MuscleGroup | null)[] = includeAll
     ? [null, ...MUSCLE_GROUPS]
     : [...MUSCLE_GROUPS];

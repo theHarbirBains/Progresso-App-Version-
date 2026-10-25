@@ -10,6 +10,7 @@ import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { withAlpha } from '../theme/accentColor';
 import { WORKSPACES, useWorkspace, type Workspace } from './WorkspaceContext';
+import { useAppTheme } from '../theme/appThemeContext';
 
 const SLIDE_MS = 260;
 const PANEL_TRAVEL = 420;
@@ -81,11 +82,12 @@ function WorkspaceAvatar({
   initial: string | null;
   size: number;
 }) {
+  const accent = useAppTheme().accent.accent;
   const frame = { width: size, height: size, borderRadius: size / 2 };
   if (which === 'trainer') {
     return (
-      <View style={[styles.avatar, frame, { backgroundColor: withAlpha(colors.accent, 0.16) }]}>
-        <Feather name="users" size={Math.round(size * 0.5)} color={colors.accent} />
+      <View style={[styles.avatar, frame, { backgroundColor: withAlpha(accent, 0.16) }]}>
+        <Feather name="users" size={Math.round(size * 0.5)} color={accent} />
       </View>
     );
   }
@@ -120,6 +122,8 @@ function SwitchWorkspacePanel({
   onClose: () => void;
   onPick: (workspace: Workspace) => void;
 }) {
+  const { accent: themeAccent } = useAppTheme();
+  const accent = themeAccent.accent;
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotionPreference();
   const progress = useRef(new Animated.Value(0)).current;
@@ -186,8 +190,8 @@ function SwitchWorkspacePanel({
               style={[
                 styles.option,
                 selected && {
-                  borderColor: colors.accent,
-                  backgroundColor: withAlpha(colors.accent, 0.08),
+                  borderColor: accent,
+                  backgroundColor: withAlpha(accent, 0.08),
                 },
               ]}
               onPress={() => onPick(which)}
@@ -203,8 +207,8 @@ function SwitchWorkspacePanel({
                 <Text style={styles.optionDescription}>{info.description}</Text>
               </View>
               {selected ? (
-                <View style={[styles.mark, styles.markOn]}>
-                  <Feather name="check" size={14} color={colors.onAccent} />
+                <View style={[styles.mark, { backgroundColor: accent }]}>
+                  <Feather name="check" size={14} color={themeAccent.onAccent} />
                 </View>
               ) : (
                 <View style={[styles.mark, styles.markOff]} />
@@ -309,9 +313,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  markOn: {
-    backgroundColor: colors.accent,
   },
   markOff: {
     borderWidth: 1.5,

@@ -16,6 +16,8 @@ export type RootStackParamList = {
   RepRangeExceptions: undefined;
   SettingsNutrition: undefined;
   SettingsNotifications: undefined;
+  /** How the app looks on this phone: its theme, and following the seasons. */
+  SettingsAppearance: undefined;
   SettingsAccountSecurity: undefined;
   SettingsChangePassword: undefined;
   SettingsBlockedPeople: undefined;

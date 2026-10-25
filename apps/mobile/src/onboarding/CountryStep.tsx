@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { TextInput } from '../design/TextInput';
 import { colors, radii, spacing, typeScale } from '../design/theme';
 import { COUNTRIES, countryFlagEmoji, type Country } from './countries';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   testID: string;
@@ -28,19 +29,21 @@ export function CountryStep({ testID, value, onChange }: Props) {
     return COUNTRIES.filter((c) => c.name.toLowerCase().includes(q));
   }, [query]);
 
+  const accent = useAppTheme().accent.accent;
+
   function renderItem({ item }: { item: Country }) {
     const selected = item.code === value;
     return (
       <TouchableOpacity
         testID={`${testID}-option-${item.code}`}
-        style={[styles.row, selected && { borderColor: colors.accent }]}
+        style={[styles.row, selected && { borderColor: accent }]}
         onPress={() => onChange(item.code)}
         accessibilityRole="button"
         accessibilityState={{ selected }}
       >
         <Text style={styles.flag}>{countryFlagEmoji(item.code)}</Text>
         <Text style={styles.name}>{item.name}</Text>
-        {selected ? <Feather name="check" size={18} color={colors.accent} /> : null}
+        {selected ? <Feather name="check" size={18} color={accent} /> : null}
       </TouchableOpacity>
     );
   }

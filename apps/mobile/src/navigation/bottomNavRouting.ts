@@ -41,6 +41,7 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   RepRangeExceptions: 'you',
   SettingsNutrition: 'you',
   SettingsNotifications: 'you',
+  SettingsAppearance: 'you',
   SettingsAccountSecurity: 'you',
   SettingsChangePassword: 'you',
   SettingsBlockedPeople: 'you',

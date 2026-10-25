@@ -13,6 +13,7 @@ import {
   useSetTimer,
   useTimerClock,
 } from './setTimers';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   setId: string;
@@ -41,10 +42,13 @@ export function TimedSetField({
   completed,
   onChangeDuration,
   timer: offerTimer = false,
-  accentColor = colors.accent,
+  accentColor: accentColorProp,
   fieldStyle,
   testID,
 }: Props) {
+  // Unless told otherwise, the app theme's accent.
+  const themeAccent = useAppTheme().accent.accent;
+  const accentColor = accentColorProp ?? themeAccent;
   const timer = useSetTimer(setId);
   const running = timer?.startedAt != null;
   const now = useTimerClock(running);
