@@ -271,6 +271,18 @@ describe('FoodLibraryScreen', () => {
     expect(screen.queryByTestId('food-library-section-Z')).toBeNull();
   });
 
+  it('gives each letter its own key, so React never sees two sections keyed the same', async () => {
+    const errors = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      renderScreen();
+      await screen.findByTestId('food-item-food-banana');
+
+      expect(errors.mock.calls.flat().map(String).join(' ')).not.toMatch(/same key/);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
   it('scrolls the letter headings with their foods, rather than pinning them', async () => {
     renderScreen();
     await screen.findByTestId('food-item-food-apple');

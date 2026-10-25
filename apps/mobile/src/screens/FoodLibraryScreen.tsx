@@ -70,7 +70,9 @@ type LibraryItem =
 /** A heading's rows: Saved Meals, Usual, Recent, or one letter of the library. */
 interface LibrarySection {
   title: string;
-  key: 'meals' | 'usual' | 'recent' | 'letter';
+  kind: 'meals' | 'usual' | 'recent' | 'letter';
+  /** The list's own key for the section -- each one's own, a letter's included ("letter-A"). */
+  key: string;
 }
 
 /** The shortcuts above the letters: each is only a shortcut, so a failure only leaves it out. */
@@ -271,7 +273,8 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
   const listSections = useMemo(() => {
     const letters = sections.map((section) => ({
       title: section.letter,
-      key: 'letter' as const,
+      kind: 'letter' as const,
+      key: `letter-${section.letter}`,
       data: section.data.map((food): LibraryItem => ({ kind: 'food', id: food.id, food })),
     }));
     const query = search.trim().toLowerCase();
@@ -283,7 +286,8 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         ? [
             {
               title: 'Saved Meals',
-              key: 'meals' as const,
+              kind: 'meals' as const,
+              key: 'meals',
               data: shownMeals.map((meal): LibraryItem => ({ kind: 'meal', id: meal.id, meal })),
             },
           ]
@@ -294,6 +298,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         ? [
             {
               title,
+              kind: key,
               key,
               data: entries.map((entry): LibraryItem => ({
                 kind: 'food',
@@ -377,12 +382,12 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         );
       }
       const { food, last } = item;
-      const shortcut = section.key === 'usual' || section.key === 'recent';
+      const shortcut = section.kind === 'usual' || section.kind === 'recent';
       const row = (
         <View style={[styles.row, shortcut && index > 0 && styles.rowDivider]}>
           <View style={styles.flex}>
             <ListRow
-              testID={shortcut ? `food-${section.key}-${food.id}` : `food-item-${food.id}`}
+              testID={shortcut ? `food-${section.kind}-${food.id}` : `food-item-${food.id}`}
               leading={<FoodImage uri={food.imageUrl} name={food.name} size={44} />}
               title={food.name}
               subtitle={foodSubtitle(food)}
