@@ -1,7 +1,12 @@
-import { StyleSheet } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { fetchAllExercises, fetchExerciseSourceCounts } from '../exercises/exerciseQueries';
+import {
+  fetchAllExercises,
+  fetchExerciseSourceCounts,
+  invalidateExerciseCache,
+} from '../exercises/exerciseQueries';
+import { updateExercise } from '../lib/api';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { colors } from '../design/theme';
@@ -24,6 +29,10 @@ jest.mock('../exercises/exerciseQueries', () => ({
   fetchAllExercises: jest.fn(),
   invalidateExerciseCache: jest.fn(),
   fetchExerciseSourceCounts: jest.fn(),
+}));
+
+jest.mock('../lib/api', () => ({
+  updateExercise: jest.fn(),
 }));
 
 // Isolates this screen's own list/filter logic from the form's
@@ -61,6 +70,8 @@ jest.mock('./ExerciseFormScreen', () => {
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchAllExercises = fetchAllExercises as jest.Mock;
 const mockFetchExerciseSourceCounts = fetchExerciseSourceCounts as jest.Mock;
+const mockInvalidateExerciseCache = invalidateExerciseCache as jest.Mock;
+const mockUpdateExercise = updateExercise as jest.Mock;
 const mockGoBack = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation = { goBack: mockGoBack } as any;
@@ -105,7 +116,9 @@ const mineRow = {
 };
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
+  mockUseAuth.mockReturnValue({ user: { id: 'user-1' }, session: { access_token: 'token-1' } });
+  mockUpdateExercise.mockReset();
+  mockInvalidateExerciseCache.mockClear();
   mockFetchAllExercises.mockReset().mockResolvedValue([builtinRow, mineRow]);
   mockFetchExerciseSourceCounts.mockReset();
   mockFetchExerciseSourceCounts.mockResolvedValue({ all: 328, builtin: 245, mine: 12 });
@@ -447,6 +460,95 @@ describe('ExerciseLibraryScreen -- two widgets, source blocks, New Exercise in t
     await screen.findByTestId('exercise-item-ex-builtin');
 
     expectNoBareText();
+    await settle();
+  });
+});
+
+describe('ExerciseLibraryScreen -- deleting your own exercises', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  function answer(button: 'Delete' | 'Keep it') {
+    return jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === button)?.onPress?.();
+    });
+  }
+
+  function deleteAction(testID: string) {
+    fireEvent(screen.getByTestId(testID), 'accessibilityAction', {
+      nativeEvent: { actionName: 'delete' },
+    });
+  }
+
+  it('offers Delete on their own exercises, by swipe or for assistive tech -- never on a built-in', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-mine');
+
+    expect(screen.getByTestId('exercise-swipe-ex-mine')).toBeTruthy();
+    expect(screen.getByTestId('exercise-item-ex-mine').props.accessibilityActions).toEqual([
+      { name: 'delete', label: 'Delete' },
+    ]);
+    expect(screen.queryByTestId('exercise-swipe-ex-builtin')).toBeNull();
+    expect(
+      screen.getByTestId('exercise-item-ex-builtin').props.accessibilityActions,
+    ).toBeUndefined();
+    await settle();
+  });
+
+  it('asks first, then deletes it as the form does, keeping past workouts', async () => {
+    const alert = answer('Delete');
+    mockUpdateExercise.mockResolvedValue({ ...mineRow, isActive: false });
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-mine');
+    await waitFor(() =>
+      expect(screen.getByTestId('exercise-source-mine-count')).toHaveTextContent('12'),
+    );
+
+    await act(async () => {
+      deleteAction('exercise-item-ex-mine');
+    });
+
+    expect(alert).toHaveBeenCalledWith(
+      'Delete My Curl Variation?',
+      'It leaves your library. Past workouts keep their history.',
+      expect.any(Array),
+    );
+    // Deactivated -- never removed, so every past workout keeps it.
+    expect(mockUpdateExercise).toHaveBeenCalledWith('token-1', 'ex-mine', { isActive: false });
+    expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');
+    await waitFor(() => expect(screen.queryByTestId('exercise-item-ex-mine')).toBeNull());
+    expect(screen.getByTestId('exercise-item-ex-builtin')).toBeTruthy();
+    expect(screen.getByTestId('exercise-source-mine-count')).toHaveTextContent('11');
+    await settle();
+  });
+
+  it('deletes nothing when they keep it', async () => {
+    answer('Keep it');
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-mine');
+
+    await act(async () => {
+      deleteAction('exercise-item-ex-mine');
+    });
+
+    expect(mockUpdateExercise).not.toHaveBeenCalled();
+    expect(screen.getByTestId('exercise-item-ex-mine')).toBeTruthy();
+    await settle();
+  });
+
+  it('keeps the exercise and says why when it cannot be deleted', async () => {
+    const alert = answer('Delete');
+    mockUpdateExercise.mockRejectedValue(new Error('network down'));
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-mine');
+
+    await act(async () => {
+      deleteAction('exercise-item-ex-mine');
+    });
+
+    expect(alert).toHaveBeenCalledWith("Couldn't delete My Curl Variation", 'network down');
+    expect(screen.getByTestId('exercise-item-ex-mine')).toBeTruthy();
     await settle();
   });
 });

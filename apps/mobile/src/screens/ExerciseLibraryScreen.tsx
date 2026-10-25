@@ -5,12 +5,14 @@ import { Screen } from '../design/Screen';
 import {
   fetchAllExercises,
   fetchExerciseSourceCounts,
+  invalidateExerciseCache,
   type ExerciseRow,
   type ExerciseSource,
   type ExerciseSourceCounts,
 } from '../exercises/exerciseQueries';
 import { ExerciseBrowser } from '../exercises/ExerciseBrowser';
 import { type MuscleGroup } from '../exercises/muscleGroups';
+import { updateExercise } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -35,11 +37,12 @@ type Mode = { type: 'list' } | { type: 'create' } | { type: 'edit'; exercise: Ex
 // rows under letter headings -- each with its machine photo (or a plain
 // initial, "like a contact photo" -- see ExercisePhoto), name,
 // "Muscle · Movement", and a quiet Built-in/Mine marker. New Exercise is the
-// header's "+". Your own exercises open for editing; built-ins are
-// read-only.
+// header's "+". Your own exercises open for editing, and swipe left to
+// delete; built-ins are read-only.
 export function ExerciseLibraryScreen({ navigation }: Props) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const userId = user?.id ?? '';
+  const accessToken = session?.access_token;
   const { openMenu } = useAppMenu();
   // "Progress" in the hook's own name is a holdover from its first caller --
   // it's really just "the user's Workout accent theme", already reused the
@@ -108,6 +111,19 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     void load();
   }
 
+  // Deleting one of their own exercises from the list does what the form's Delete does: it's
+  // deactivated, leaving the library and the picker, and every past workout keeps its history.
+  const deleteMine = useCallback(
+    async (exercise: ExerciseRow) => {
+      if (!accessToken) throw new Error('Please sign in again.');
+      await updateExercise(accessToken, exercise.id, { isActive: false });
+      invalidateExerciseCache(userId);
+      setRows((prev) => prev.filter((row) => row.id !== exercise.id));
+      setSourceCounts((prev) => prev && { ...prev, all: prev.all - 1, mine: prev.mine - 1 });
+    },
+    [accessToken, userId],
+  );
+
   if (mode.type === 'create') {
     return (
       <ExerciseFormScreen
@@ -173,6 +189,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         onRetry={load}
         accent={{ color: theme.accent, background: theme.accentBg, onColor: theme.onAccent }}
         onOpenMine={(exercise) => setMode({ type: 'edit', exercise })}
+        onDeleteMine={deleteMine}
         testID="exercise-library"
       />
     </Screen>

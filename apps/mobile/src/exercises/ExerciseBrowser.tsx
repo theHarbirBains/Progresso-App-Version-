@@ -1,11 +1,12 @@
-import { useCallback, useMemo, type ReactNode } from 'react';
-import { SectionList, TouchableOpacity, View, type SectionListData } from 'react-native';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { Alert, SectionList, TouchableOpacity, View, type SectionListData } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { SectionHeader } from '../design/SectionHeader';
+import { SwipeToDelete } from '../design/SwipeToDelete';
 import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
@@ -49,6 +50,12 @@ interface Props {
   onOpenMine?: (exercise: ExerciseRow) => void;
   /** When given, a photo tap calls this instead of opening the photo itself (the picker shows it). */
   onPhotoPress?: (exercise: ExerciseRow) => void;
+  /**
+   * The library's delete for a person's own exercise: swiping its row left shows Delete (and
+   * assistive tech gets it as an action). It asks first; this does the deleting. Without it, as
+   * in the picker, no row can be deleted.
+   */
+  onDeleteMine?: (exercise: ExerciseRow) => Promise<void>;
   /** A row shown first in the list, above the exercises (the picker's Create Custom). */
   listHeader?: ReactNode;
   testID?: string;
@@ -78,9 +85,41 @@ export function ExerciseBrowser({
   rowSuffix,
   onOpenMine,
   onPhotoPress,
+  onDeleteMine,
   listHeader,
   testID = 'exercise-browser',
 }: Props) {
+  // The one row showing Delete, if any; and whether a row is being swiped, when the list holds
+  // its scroll still.
+  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
+  const [rowSwiping, setRowSwiping] = useState(false);
+
+  const requestDelete = useCallback(
+    (exercise: ExerciseRow) => {
+      if (!onDeleteMine) return;
+      const remove = async () => {
+        try {
+          await onDeleteMine(exercise);
+          setSwipeOpenId(null);
+        } catch (err) {
+          Alert.alert(
+            `Couldn't delete ${exercise.name}`,
+            err instanceof Error ? err.message : 'Please try again.',
+          );
+        }
+      };
+      Alert.alert(
+        `Delete ${exercise.name}?`,
+        'It leaves your library. Past workouts keep their history.',
+        [
+          { text: 'Keep it', style: 'cancel', onPress: () => setSwipeOpenId(null) },
+          { text: 'Delete', style: 'destructive', onPress: () => void remove() },
+        ],
+      );
+    },
+    [onDeleteMine],
+  );
+
   const sections = useMemo(() => groupExercisesByLetter(rows), [rows]);
   const listSections = useMemo(
     () => sections.map((section) => ({ title: section.letter, data: section.data })),
@@ -99,6 +138,7 @@ export function ExerciseBrowser({
   const renderItem = useCallback(
     ({ item, index }: { item: ExerciseRow; index: number }) => {
       const isMine = item.createdBy != null;
+      const deletable = isMine && onDeleteMine !== undefined;
       const disabled = isRowDisabled?.(item) ?? false;
       const onRowPress = onSelectRow
         ? () => onSelectRow(item)
@@ -124,8 +164,8 @@ export function ExerciseBrowser({
             onEdit={isMine && onOpenMine ? () => onOpenMine(item) : undefined}
           />
         );
-      return (
-        <View style={[styles.row, index > 0 && styles.rowDivider]}>
+      const row = (
+        <View style={[styles.row, !deletable && index > 0 && styles.rowDivider]}>
           <ListRow
             testID={`exercise-item-${item.id}`}
             leading={photo}
@@ -133,6 +173,10 @@ export function ExerciseBrowser({
             subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
             onPress={disabled ? undefined : onRowPress}
             disabled={disabled}
+            accessibilityActions={deletable ? [{ name: 'delete', label: 'Delete' }] : undefined}
+            onAccessibilityAction={(event) => {
+              if (deletable && event.nativeEvent.actionName === 'delete') requestDelete(item);
+            }}
             trailing={
               <>
                 <Text
@@ -148,8 +192,32 @@ export function ExerciseBrowser({
           />
         </View>
       );
+      if (!deletable) return row;
+      return (
+        <SwipeToDelete
+          testID={`exercise-swipe-${item.id}`}
+          style={index > 0 && styles.rowDivider}
+          name={item.name}
+          open={swipeOpenId === item.id}
+          onOpenChange={(open) => setSwipeOpenId(open ? item.id : null)}
+          onSwipingChange={setRowSwiping}
+          onDelete={() => requestDelete(item)}
+        >
+          {row}
+        </SwipeToDelete>
+      );
     },
-    [accent.color, isRowDisabled, onOpenMine, onPhotoPress, onSelectRow, rowSuffix],
+    [
+      accent.color,
+      isRowDisabled,
+      onDeleteMine,
+      onOpenMine,
+      onPhotoPress,
+      onSelectRow,
+      requestDelete,
+      rowSuffix,
+      swipeOpenId,
+    ],
   );
 
   // Its two cards roll out in turn (the list card keeps filling the rest of
@@ -234,6 +302,7 @@ export function ExerciseBrowser({
               sections={listSections}
               keyExtractor={(item) => item.id}
               keyboardShouldPersistTaps="handled"
+              scrollEnabled={!rowSwiping}
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={listHeader ? <>{listHeader}</> : undefined}
               ListEmptyComponent={

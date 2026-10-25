@@ -270,6 +270,9 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
 
   // Only letters that have foods -- groupFoodsByLetter makes no empty sections.
   const sections = useMemo(() => groupFoodsByLetter(rows), [rows]);
+  // The user's own foods: the library itself (Usual and Recent show only when it's unsearched,
+  // so it's all of them then).
+  const ownFoodIds = useMemo(() => new Set(rows.map((food) => food.id)), [rows]);
   const listSections = useMemo(() => {
     const letters = sections.map((section) => ({
       title: section.letter,
@@ -383,8 +386,12 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
       }
       const { food, last } = item;
       const shortcut = section.kind === 'usual' || section.kind === 'recent';
+      // A usual or recent food can come from Search, which isn't the user's to delete: only one
+      // of their own -- in the library below -- swipes to Delete there.
+      const deletable = !shortcut || ownFoodIds.has(food.id);
+      const swipeId = `${section.kind}-food-${food.id}`;
       const row = (
-        <View style={[styles.row, shortcut && index > 0 && styles.rowDivider]}>
+        <View style={[styles.row, !deletable && index > 0 && styles.rowDivider]}>
           <View style={styles.flex}>
             <ListRow
               testID={shortcut ? `food-${section.kind}-${food.id}` : `food-item-${food.id}`}
@@ -401,9 +408,9 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
                   entered: last?.entered ?? null,
                 })
               }
-              accessibilityActions={shortcut ? undefined : [{ name: 'delete', label: 'Delete' }]}
+              accessibilityActions={deletable ? [{ name: 'delete', label: 'Delete' }] : undefined}
               onAccessibilityAction={(event) => {
-                if (event.nativeEvent.actionName === 'delete') requestDelete(item);
+                if (deletable && event.nativeEvent.actionName === 'delete') requestDelete(item);
               }}
             />
           </View>
@@ -425,16 +432,14 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
           )}
         </View>
       );
-      // A usual or recent food is only a shortcut (and may be from Search): it's deleted from
-      // its own letter.
-      if (shortcut) return row;
+      if (!deletable) return row;
       return (
         <SwipeToDelete
-          testID={`food-swipe-${food.id}`}
+          testID={shortcut ? `food-${section.kind}-swipe-${food.id}` : `food-swipe-${food.id}`}
           style={index > 0 && styles.rowDivider}
           name={food.name}
-          open={swipeOpenId === `food-${food.id}`}
-          onOpenChange={(open) => setSwipeOpenId(open ? `food-${food.id}` : null)}
+          open={swipeOpenId === swipeId}
+          onOpenChange={(open) => setSwipeOpenId(open ? swipeId : null)}
           onSwipingChange={setRowSwiping}
           onDelete={() => requestDelete(item)}
         >
@@ -442,7 +447,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         </SwipeToDelete>
       );
     },
-    [swipeOpenId, requestDelete],
+    [swipeOpenId, requestDelete, ownFoodIds],
   );
 
   if (mode.type === 'meal-form' || mode.type === 'recipe-form') {

@@ -1341,14 +1341,41 @@ describe('FoodLibraryScreen -- deleting from the list', () => {
     expect(mockUpdateFood).not.toHaveBeenCalled();
   });
 
-  it('offers no Delete on a Usual or Recent shortcut -- a food is deleted from its own letter', async () => {
+  it('offers Delete on a Usual or Recent food of their own, and none on one from Search', async () => {
+    const searched = { ...banana, id: 'food-searched', name: 'Searched Oats' };
+    mockFetchRecentFoods.mockResolvedValue([
+      { food: banana, quantity: 1 },
+      { food: searched, quantity: 1 },
+    ]);
+    renderScreen();
+    await screen.findByTestId('food-recent-food-banana');
+
+    expect(screen.getByTestId('food-recent-swipe-food-banana')).toBeTruthy();
+    expect(screen.getByTestId('food-recent-food-banana').props.accessibilityActions).toEqual([
+      { name: 'delete', label: 'Delete' },
+    ]);
+    expect(screen.queryByTestId('food-recent-swipe-food-searched')).toBeNull();
+    expect(
+      screen.getByTestId('food-recent-food-searched').props.accessibilityActions,
+    ).toBeUndefined();
+    // Its own letter's row swipes too.
+    expect(screen.getByTestId('food-swipe-food-banana')).toBeTruthy();
+  });
+
+  it('deletes a Recent food of their own from there, and it leaves the library too', async () => {
+    answer('Delete');
+    mockUpdateFood.mockResolvedValue({ ...banana, isActive: false });
     mockFetchRecentFoods.mockResolvedValue([{ food: banana, quantity: 1 }]);
     renderScreen();
     await screen.findByTestId('food-recent-food-banana');
 
-    expect(
-      screen.getByTestId('food-recent-food-banana').props.accessibilityActions,
-    ).toBeUndefined();
-    expect(screen.getByTestId('food-swipe-food-banana')).toBeTruthy();
+    mockFetchRecentFoods.mockResolvedValue([]);
+    await act(async () => {
+      deleteAction('food-recent-food-banana');
+    });
+
+    expect(mockUpdateFood).toHaveBeenCalledWith('food-banana', { isActive: false });
+    await waitFor(() => expect(screen.queryByTestId('food-item-food-banana')).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId('food-recent-food-banana')).toBeNull());
   });
 });
