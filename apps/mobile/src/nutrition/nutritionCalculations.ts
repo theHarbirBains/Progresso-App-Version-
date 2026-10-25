@@ -1,4 +1,5 @@
 import type { FoodLogRow } from './foodLogQueries';
+import { wholeFigureText } from './wholeFigures';
 
 // Pure, deterministic nutrition math -- no I/O, no Supabase, nothing
 // estimated or invented. Every value here is either a direct sum of
@@ -130,4 +131,76 @@ export function recalculateForQuantity(
     carbsG: round2(log.carbsG * ratio),
     fatG: round2(log.fatG * ratio),
   };
+}
+
+/** What the daily calorie target is for: losing, keeping or gaining weight. */
+export type CalorieGoal = 'cut' | 'maintain' | 'bulk';
+
+/**
+ * How far from the maintenance estimate a target has to be to be a cut or a bulk: half the
+ * calculator's step (Nutrition Goals' maintenance, then 300 either way).
+ */
+export const GOAL_MARGIN_KCAL = 150;
+
+export interface CalorieGoalReading {
+  goal: CalorieGoal;
+  /** The daily target less maintenance: negative for a cut. */
+  offset: number;
+}
+
+/**
+ * The goal a daily calorie target is set for, from the target against the maintenance estimate
+ * (computeMaintenanceCalories, the calculator's own): 150 or more below is a cut, 150 or more
+ * above a bulk, anything nearer maintaining. Null without both -- never guessed.
+ */
+export function calorieGoalFor(
+  target: number | null,
+  maintenance: number | null,
+): CalorieGoalReading | null {
+  if (target === null || maintenance === null) return null;
+  const offset = target - maintenance;
+  const goal: CalorieGoal =
+    offset <= -GOAL_MARGIN_KCAL ? 'cut' : offset >= GOAL_MARGIN_KCAL ? 'bulk' : 'maintain';
+  return { goal, offset };
+}
+
+/** "Cutting · 300 below maintenance", "Bulking · 300 above maintenance", "Maintaining". */
+export function calorieGoalLabel(reading: CalorieGoalReading): string {
+  switch (reading.goal) {
+    case 'cut':
+      return `Cutting · ${wholeFigureText(-reading.offset)} below maintenance`;
+    case 'bulk':
+      return `Bulking · ${wholeFigureText(reading.offset)} above maintenance`;
+    default:
+      return 'Maintaining';
+  }
+}
+
+/**
+ * What the week so far means for the goal, against the daily target for each of its days so far
+ * (the day shown included): under it is on track for a cut, at or over it on track for a bulk,
+ * within 5% of it on track to maintain. Said plainly either way.
+ */
+export function weekGoalNote(
+  goal: CalorieGoal,
+  consumed: number,
+  dailyTarget: number,
+  daysSoFar: number,
+): string {
+  const target = dailyTarget * daysSoFar;
+  const over = consumed - target;
+  switch (goal) {
+    case 'cut':
+      return over <= 0
+        ? 'Under your target so far: on track for your cut.'
+        : `${wholeFigureText(over)} cal over your target so far for your cut.`;
+    case 'bulk':
+      return over >= 0
+        ? 'At or over your target so far: on track for your bulk.'
+        : `${wholeFigureText(-over)} cal under your target so far: eat a little more for your bulk.`;
+    default:
+      return Math.abs(over) <= target * 0.05
+        ? 'Close to your target so far: on track to maintain.'
+        : `${wholeFigureText(Math.abs(over))} cal ${over > 0 ? 'over' : 'under'} your target so far.`;
+  }
 }

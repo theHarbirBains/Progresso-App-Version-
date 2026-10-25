@@ -1,4 +1,4 @@
-import { Image, ScrollView, StyleSheet } from 'react-native';
+import { Image, Keyboard, ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
@@ -28,6 +28,7 @@ import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { NutritionTodayScreen } from './NutritionTodayScreen';
+import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -152,6 +153,13 @@ beforeEach(() => {
   mockGoBack.mockClear();
   mockNavigate.mockClear();
 });
+
+/** Deletes a food from its row, as VoiceOver's Delete action -- and the swipe's Delete -- do. */
+function deleteFood(logId: string) {
+  fireEvent(screen.getByTestId(`food-log-info-${logId}`), 'accessibilityAction', {
+    nativeEvent: { actionName: 'delete' },
+  });
+}
 
 // CalorieRing hides its own value text from the accessibility tree (its
 // single accessibilityLabel covers it) -- see CalorieRing.test.tsx.
@@ -357,7 +365,7 @@ describe('NutritionTodayScreen', () => {
     await screen.findByTestId('food-log-row-log-1');
 
     await act(async () => {
-      fireEvent.press(screen.getByTestId('food-log-delete-log-1'));
+      deleteFood('log-1');
     });
 
     expect(mockDeleteFoodLog).toHaveBeenCalledWith('log-1');
@@ -550,10 +558,15 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
     expect(
       screen.getByTestId(`food-log-quantity-${sampleLog.id}`).props.accessibilityLabel,
     ).toMatch(/^Amount of Chicken Breast, in servings/);
-    const del = screen.getByTestId(`food-log-delete-${sampleLog.id}`);
-    expect(del.props.accessibilityLabel).toMatch(/^Delete /);
-    expect(StyleSheet.flatten(del.props.style).borderWidth).toBeUndefined();
-    expect(StyleSheet.flatten(del.props.style).minHeight).toBeGreaterThanOrEqual(44);
+    // No Delete button: each row swipes to Delete, and VoiceOver has it as an action.
+    expect(screen.queryByTestId(`food-log-delete-${sampleLog.id}`)).toBeNull();
+    expect(screen.getByTestId(`food-log-swipe-${sampleLog.id}`)).toBeTruthy();
+    expect(
+      screen.getByTestId(`food-log-swipe-${sampleLog.id}-delete`).props.accessibilityLabel,
+    ).toBe('Delete Chicken Breast');
+    expect(screen.getByTestId(`food-log-info-${sampleLog.id}`).props.accessibilityActions).toEqual([
+      { name: 'delete', label: 'Delete' },
+    ]);
   });
 
   it('renders no bare text outside <Text>', async () => {
@@ -777,7 +790,7 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     expect(await screen.findByTestId('weekly-budget-consumed')).toHaveTextContent('1,330');
 
     await act(async () => {
-      fireEvent.press(screen.getByTestId('food-log-delete-log-1'));
+      deleteFood('log-1');
     });
 
     expect(screen.getByTestId('weekly-budget-consumed')).toHaveTextContent('1,000');
@@ -799,6 +812,33 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
       'user-1',
       new Date(2026, 9, 25),
       new Date(2026, 9, 32),
+    );
+  });
+
+  it('reads the week for what the target is for -- a cut, from the target against maintenance', async () => {
+    setToday(new Date(2026, 9, 21, 12, 0));
+    // About 2,750 a day to maintain for this profile; a 2,000 target is a cut.
+    (fetchMyProfile as jest.Mock).mockResolvedValueOnce({
+      id: 'user-1',
+      displayName: null,
+      username: null,
+      weightUnit: 'kg',
+      gender: 'male',
+      birthday: '1995-01-01',
+      heightValue: 180,
+      heightUnit: 'cm',
+      weightValue: 80,
+      activityLevel: 'moderately_active',
+    });
+    mockFetchNutritionGoals.mockResolvedValue(goals);
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    renderScreen();
+
+    expect(await screen.findByTestId('weekly-budget-goal-label')).toHaveTextContent(
+      /^Cutting · [\d,]+ below maintenance$/,
+    );
+    expect(screen.getByTestId('weekly-budget-goal-note')).toHaveTextContent(
+      'Under your target so far: on track for your cut.',
     );
   });
 
@@ -1143,7 +1183,7 @@ describe('NutritionTodayScreen -- any day', () => {
     await screen.findByTestId('food-log-row-log-tuesday');
 
     await act(async () => {
-      fireEvent.press(screen.getByTestId('food-log-delete-log-tuesday'));
+      deleteFood('log-tuesday');
     });
 
     expect(mockDeleteFoodLog).toHaveBeenCalledWith('log-tuesday');
@@ -1170,5 +1210,27 @@ describe('NutritionTodayScreen -- any day', () => {
     fireEvent.press(screen.getByTestId('nutrition-day-label'));
 
     expect(mockNavigate).toHaveBeenCalledWith('NutritionHistory', { date: '2026-10-20' });
+  });
+});
+
+describe('NutritionTodayScreen -- saving an amount from the keyboard', () => {
+  it('puts a check above the number pad that finishes the amount, which saves it', async () => {
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    mockUpdateFoodLogQuantity.mockResolvedValue({ ...sampleLog, quantity: 3 });
+    renderScreen();
+    const field = await screen.findByTestId(`food-log-quantity-${sampleLog.id}`);
+
+    expect(field.props.inputAccessoryViewID).toBe('food-log-amount-done');
+    expect(field.props.returnKeyType).toBe('done');
+    fireEvent.changeText(field, '3');
+    fireEvent.press(screen.getByTestId('food-log-amount-save'));
+    expect(dismiss).toHaveBeenCalled();
+    // The keyboard going away ends the editing, which saves the amount.
+    await act(async () => {
+      fireEvent(field, 'endEditing');
+    });
+    expect(mockUpdateFoodLogQuantity).toHaveBeenCalledWith(sampleLog, 3, undefined);
+    dismiss.mockRestore();
   });
 });

@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
+import {
+  Animated,
+  InputAccessoryView,
+  Keyboard,
+  Platform,
+  StyleSheet,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { Text } from '../design/Text';
@@ -19,6 +28,10 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { CalorieRing } from '../nutrition/CalorieRing';
 import { DayBar } from '../nutrition/DayBar';
+import { IconButton } from '../design/IconButton';
+import { SwipeToDelete } from '../design/SwipeToDelete';
+import { useProfile } from '../profile/ProfileProvider';
+import { buildCalorieProfileInput, computeMaintenanceCalories } from '../nutrition/calorieTargets';
 import { MacroRows, type MacroFigure } from '../nutrition/MacroRows';
 import { FoodImage } from '../nutrition/FoodImage';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
@@ -29,6 +42,7 @@ import { dayFromKey, dayKey } from '../lib/dayKey';
 import { logMeasures, servingMeasures, servingsFor, unitWord } from '../nutrition/logQuantity';
 import {
   calculateRemaining,
+  calorieGoalFor,
   daysLeftInWeek,
   sumDailyTotals,
 } from '../nutrition/nutritionCalculations';
@@ -45,6 +59,8 @@ type Props = RootStackScreenProps<'Nutrition'>;
 const EMPTY_GOALS: NutritionGoals = { calories: null, proteinG: null, carbsG: null, fatG: null };
 // Another day's foods before they've been read: one array, so what depends on the foods stays put.
 const NO_LOGS: FoodLogRow[] = [];
+// Links each food row's amount field to the check above the number pad (iPhone).
+const AMOUNT_DONE_ID = 'food-log-amount-done';
 
 // The Nutrition tab's own root screen (see App.tsx's bottom nav) -- a day's
 // intake against the user's targets, with the day's logged foods. Today by
@@ -160,6 +176,10 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   const dayTurn = useDaySwipe({ day, onDay: showDay, width, reduceMotion });
 
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
+  // The one food row showing Delete, if any; and whether a row is being swiped, when the page
+  // holds its scroll still.
+  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
+  const [rowSwiping, setRowSwiping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [yesterdayLogs, setYesterdayLogs] = useState<FoodLogRow[]>([]);
   // The foods of the week the day shown is in (Sunday to Saturday), for its calorie budget.
@@ -231,6 +251,22 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   }, [logs]);
 
   const consumed = useMemo(() => sumDailyTotals(logs), [logs]);
+  // What the daily target is for -- a cut, maintaining or a bulk -- from it against the
+  // maintenance estimate Nutrition Goals' calculator works out from the profile; none without
+  // the details it needs.
+  const { profile } = useProfile();
+  const calorieGoal = useMemo(() => {
+    const input = profile
+      ? buildCalorieProfileInput({
+          gender: profile.gender,
+          birthday: profile.birthday,
+          heightCm: profile.heightValue,
+          weightKg: profile.weightValue,
+          activityLevel: profile.activityLevel,
+        })
+      : null;
+    return calorieGoalFor(goals.calories, input ? computeMaintenanceCalories(input) : null);
+  }, [profile, goals.calories]);
   // The week through the day shown: its days before that day from the week's read, and the day's
   // own from its foods above, so a food logged, edited or deleted here moves the bar at once.
   const week = useMemo(() => {
@@ -277,10 +313,13 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     }
   }
 
+  // A food is deleted from its row's swipe (or VoiceOver's Delete action): the swipe and the tap
+  // on Delete are the two deliberate steps, so nothing more is asked.
   async function handleDelete(logId: string) {
     setError(null);
     try {
       await removeLog(logId);
+      setSwipeOpenId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete food log');
     }
@@ -377,6 +416,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
               consumed={week.earlier === null ? null : week.earlier + consumed.calories}
               dailyTarget={goals.calories}
               daysLeft={week.daysLeft}
+              goal={calorieGoal}
               failed={weekFailed}
               accentColor={accent}
               onSetTarget={() => navigation.navigate('NutritionGoals')}
@@ -457,59 +497,73 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                     }}
                   />
                 ) : (
-                  logs.map((log, index) => (
-                    <View
-                      key={log.id}
-                      testID={`food-log-row-${log.id}`}
-                      style={[styles.logRow, index > 0 && styles.divider]}
-                    >
-                      <FoodImage
-                        testID={`food-log-image-${log.id}`}
-                        uri={log.imageUrl}
+                  <View {...dayTurn.rowSwipeZone}>
+                    {logs.map((log, index) => (
+                      <SwipeToDelete
+                        key={log.id}
+                        testID={`food-log-swipe-${log.id}`}
+                        style={index > 0 && styles.divider}
                         name={log.foodNameSnapshot}
-                        size={44}
-                        zoomable
-                      />
-                      <View style={styles.logInfo}>
-                        <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
-                        <Text style={styles.logMeta}>
-                          {wholeFigure(log.calories)} cal · {wholeFigure(log.proteinG)}g protein ·{' '}
-                          {wholeFigure(log.carbsG)}g carbs · {wholeFigure(log.fatG)}g fat
-                        </Text>
-                      </View>
-                      <View style={styles.quantityColumn}>
-                        <TextInput
-                          testID={`food-log-quantity-${log.id}`}
-                          style={styles.quantityInput}
-                          accessibilityLabel={`Amount of ${log.foodNameSnapshot}, in ${unitWord(
-                            2,
-                            log.enteredUnit ?? 'servings',
-                            servingMeasures(log).pieces,
-                          )}`}
-                          keyboardType="decimal-pad"
-                          value={quantityInputs[log.id] ?? ''}
-                          onChangeText={(text) =>
-                            setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))
-                          }
-                          onEndEditing={() => handleUpdateQuantity(log)}
-                        />
-                        <Text testID={`food-log-unit-${log.id}`} style={styles.quantityUnit}>
-                          {unitWord(
-                            log.enteredAmount ?? log.quantity,
-                            log.enteredUnit ?? 'servings',
-                            servingMeasures(log).pieces,
-                          )}
-                        </Text>
-                      </View>
-                      <TextButton
-                        testID={`food-log-delete-${log.id}`}
-                        label="Delete"
-                        accessibilityLabel={`Delete ${log.foodNameSnapshot}`}
-                        destructive
-                        onPress={() => handleDelete(log.id)}
-                      />
-                    </View>
-                  ))
+                        open={swipeOpenId === log.id}
+                        onOpenChange={(open) => setSwipeOpenId(open ? log.id : null)}
+                        onSwipingChange={setRowSwiping}
+                        onDelete={() => void handleDelete(log.id)}
+                      >
+                        <View testID={`food-log-row-${log.id}`} style={styles.logRow}>
+                          <FoodImage
+                            testID={`food-log-image-${log.id}`}
+                            uri={log.imageUrl}
+                            name={log.foodNameSnapshot}
+                            size={44}
+                            zoomable
+                          />
+                          <View
+                            testID={`food-log-info-${log.id}`}
+                            style={styles.logInfo}
+                            accessible
+                            accessibilityLabel={`${log.foodNameSnapshot}, ${wholeFigure(log.calories)} calories`}
+                            accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
+                            onAccessibilityAction={(event) => {
+                              if (event.nativeEvent.actionName === 'delete')
+                                void handleDelete(log.id);
+                            }}
+                          >
+                            <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
+                            <Text style={styles.logMeta}>
+                              {wholeFigure(log.calories)} cal · {wholeFigure(log.proteinG)}g protein
+                              · {wholeFigure(log.carbsG)}g carbs · {wholeFigure(log.fatG)}g fat
+                            </Text>
+                          </View>
+                          <View style={styles.quantityColumn}>
+                            <TextInput
+                              testID={`food-log-quantity-${log.id}`}
+                              style={styles.quantityInput}
+                              accessibilityLabel={`Amount of ${log.foodNameSnapshot}, in ${unitWord(
+                                2,
+                                log.enteredUnit ?? 'servings',
+                                servingMeasures(log).pieces,
+                              )}`}
+                              keyboardType="decimal-pad"
+                              returnKeyType="done"
+                              inputAccessoryViewID={AMOUNT_DONE_ID}
+                              value={quantityInputs[log.id] ?? ''}
+                              onChangeText={(text) =>
+                                setQuantityInputs((prev) => ({ ...prev, [log.id]: text }))
+                              }
+                              onEndEditing={() => handleUpdateQuantity(log)}
+                            />
+                            <Text testID={`food-log-unit-${log.id}`} style={styles.quantityUnit}>
+                              {unitWord(
+                                log.enteredAmount ?? log.quantity,
+                                log.enteredUnit ?? 'servings',
+                                servingMeasures(log).pieces,
+                              )}
+                            </Text>
+                          </View>
+                        </View>
+                      </SwipeToDelete>
+                    ))}
+                  </View>
                 )}
                 {(isToday && yesterdayLogs.length > 0) ||
                 logs.some((log) => log.foodId !== null) ? (
@@ -583,8 +637,23 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
       contentContainerStyle={styles.content}
       header={header}
       rollout={false}
-      scrollEnabled={!dayTurn.swiping}
+      scrollEnabled={!dayTurn.swiping && !rowSwiping}
     >
+      {/* iPhone's number pad has no key to finish with: a check on the bar above it saves the
+          amount typed (it ends the editing, which saves). Android's has its own. */}
+      {Platform.OS === 'ios' ? (
+        <InputAccessoryView nativeID={AMOUNT_DONE_ID}>
+          <View style={styles.amountBar}>
+            <IconButton
+              testID="food-log-amount-save"
+              icon="check"
+              accessibilityLabel="Save amount"
+              color={accent}
+              onPress={() => Keyboard.dismiss()}
+            />
+          </View>
+        </InputAccessoryView>
+      ) : null}
       <RiseIn>{dayBar}</RiseIn>
       <Animated.View
         testID="nutrition-day-content"
@@ -687,6 +756,15 @@ const styles = StyleSheet.create({
     ...typeScale.caption,
     color: colors.textMuted,
     maxWidth: 72,
+  },
+  // The bar above the number pad, with its one check at the right.
+  amountBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surfaceRaised,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
   },
   quantityInput: {
     width: 64,

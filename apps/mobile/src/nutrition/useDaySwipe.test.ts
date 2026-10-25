@@ -98,6 +98,21 @@ describe('useDaySwipe', () => {
       expect(capture(fakeTouch(8, 1, 16))).toBe(true);
     });
 
+    it("leaves a sideways drag that starts on a food row to the row's own swipe", () => {
+      const { result } = renderTurn(yesterday, true);
+      const capture = result.current.panHandlers.onMoveShouldSetResponderCapture!;
+
+      act(() => result.current.rowSwipeZone.onTouchStart());
+      expect(capture(fakeTouch(-30, 1, 16))).toBe(false);
+
+      // Once that touch is over, a sideways drag turns the day again.
+      act(() => result.current.rowSwipeZone.onTouchEnd());
+      expect(capture(fakeTouch(-30, 1, 32))).toBe(true);
+      act(() => result.current.rowSwipeZone.onTouchStart());
+      act(() => result.current.rowSwipeZone.onTouchCancel());
+      expect(capture(fakeTouch(-30, 1, 48))).toBe(true);
+    });
+
     it('leaves an up-and-down drag to the page', () => {
       const { result } = renderTurn(yesterday, true);
       const capture = result.current.panHandlers.onMoveShouldSetResponderCapture!;

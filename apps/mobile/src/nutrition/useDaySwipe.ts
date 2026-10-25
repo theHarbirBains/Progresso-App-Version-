@@ -50,7 +50,9 @@ interface Options {
  * - `contentStyle`: the widgets' turn -- depth, tilt, shrink and fade, all from `slide`;
  * - `widgetStyle(index)`: the day's widget at `index` (0 at the top), as the new day's widgets are
  *   dealt in one after another;
- * - `turnTo`: turns to the day before or after, as a swipe does (VoiceOver's way to change day).
+ * - `turnTo`: turns to the day before or after, as a swipe does (VoiceOver's way to change day);
+ * - `rowSwipeZone`: for a part of the page whose rows swipe for themselves (Today's Foods' swipe to
+ *   delete) -- a drag that starts there is left to them, never taken for a turn of the day.
  */
 export type DaySwipe = ReturnType<typeof useDaySwipe>;
 
@@ -73,6 +75,8 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
   widthRef.current = width;
   const reduceMotionRef = useRef(reduceMotion);
   reduceMotionRef.current = reduceMotion;
+  // A touch that began in a rowSwipeZone, while it lasts.
+  const inRowZone = useRef(false);
 
   const turnTo = useRef((direction: DayDirection, velocity = 0) => {
     const target = shiftDay(dayRef.current, direction === 'previous' ? -1 : 1);
@@ -145,7 +149,7 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
       }).start();
     };
     const claims = (gesture: { dx: number; dy: number }) =>
-      !turning.current && isSidewaysDrag(gesture.dx, gesture.dy);
+      !turning.current && !inRowZone.current && isSidewaysDrag(gesture.dx, gesture.dy);
     return PanResponder.create({
       // Asked on the way down (capture), so the day takes a sideways drag before anything inside
       // it -- or the page's scroll -- can; never a scroll, nor a tap on a field.
@@ -265,5 +269,22 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
     // Re-run only when Reduce Motion is learned to be on, which cancels a hint not yet shown.
   }, [reduceMotion, slide]);
 
-  return { slide, swiping, panHandlers, contentStyle, widgetStyle, turnTo };
+  // Touch events bubble without claiming anything, so the zone knows a touch began in it before the
+  // first move asks who takes the drag.
+  const rowSwipeZone = useMemo(
+    () => ({
+      onTouchStart: () => {
+        inRowZone.current = true;
+      },
+      onTouchEnd: () => {
+        inRowZone.current = false;
+      },
+      onTouchCancel: () => {
+        inRowZone.current = false;
+      },
+    }),
+    [],
+  );
+
+  return { slide, swiping, panHandlers, contentStyle, widgetStyle, turnTo, rowSwipeZone };
 }

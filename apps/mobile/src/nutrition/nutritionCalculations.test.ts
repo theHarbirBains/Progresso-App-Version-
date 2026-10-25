@@ -6,6 +6,9 @@ import {
   daysLeftInWeek,
   recalculateForQuantity,
   sumDailyTotals,
+  calorieGoalFor,
+  calorieGoalLabel,
+  weekGoalNote,
 } from './nutritionCalculations';
 
 function log(overrides: Partial<FoodLogRow> = {}): FoodLogRow {
@@ -174,5 +177,60 @@ describe('daysLeftInWeek', () => {
     expect(daysLeftInWeek(new Date(2026, 9, 21, 23, 0))).toBe(4);
     expect(daysLeftInWeek(new Date(2026, 9, 23, 12, 0))).toBe(2);
     expect(daysLeftInWeek(new Date(2026, 9, 24, 23, 59))).toBe(1);
+  });
+});
+
+describe('calorieGoalFor', () => {
+  it('reads a target 150 or more below maintenance as a cut, 150 or more above as a bulk', () => {
+    expect(calorieGoalFor(2200, 2500)).toEqual({ goal: 'cut', offset: -300 });
+    expect(calorieGoalFor(2350, 2500)).toEqual({ goal: 'cut', offset: -150 });
+    expect(calorieGoalFor(2800, 2500)).toEqual({ goal: 'bulk', offset: 300 });
+    expect(calorieGoalFor(2650, 2500)).toEqual({ goal: 'bulk', offset: 150 });
+  });
+
+  it('reads anything nearer as maintaining', () => {
+    expect(calorieGoalFor(2500, 2500)?.goal).toBe('maintain');
+    expect(calorieGoalFor(2400, 2500)?.goal).toBe('maintain');
+    expect(calorieGoalFor(2600, 2500)?.goal).toBe('maintain');
+  });
+
+  it('reads nothing without a target or a maintenance estimate', () => {
+    expect(calorieGoalFor(null, 2500)).toBeNull();
+    expect(calorieGoalFor(2200, null)).toBeNull();
+  });
+
+  it('names it', () => {
+    expect(calorieGoalLabel({ goal: 'cut', offset: -500 })).toBe('Cutting · 500 below maintenance');
+    expect(calorieGoalLabel({ goal: 'bulk', offset: 300 })).toBe('Bulking · 300 above maintenance');
+    expect(calorieGoalLabel({ goal: 'maintain', offset: 40 })).toBe('Maintaining');
+  });
+});
+
+describe('weekGoalNote', () => {
+  // Three days so far at 2,000 a day: 6,000.
+  it('reads under the target as on track for a cut, and over it plainly', () => {
+    expect(weekGoalNote('cut', 5400, 2000, 3)).toBe(
+      'Under your target so far: on track for your cut.',
+    );
+    expect(weekGoalNote('cut', 6450, 2000, 3)).toBe(
+      '450 cal over your target so far for your cut.',
+    );
+  });
+
+  it('reads at or over the target as on track for a bulk, and under it as room to eat', () => {
+    expect(weekGoalNote('bulk', 6600, 2000, 3)).toBe(
+      'At or over your target so far: on track for your bulk.',
+    );
+    expect(weekGoalNote('bulk', 5200, 2000, 3)).toBe(
+      '800 cal under your target so far: eat a little more for your bulk.',
+    );
+  });
+
+  it('reads within 5% of the target as on track to maintain', () => {
+    expect(weekGoalNote('maintain', 6250, 2000, 3)).toBe(
+      'Close to your target so far: on track to maintain.',
+    );
+    expect(weekGoalNote('maintain', 5000, 2000, 3)).toBe('1,000 cal under your target so far.');
+    expect(weekGoalNote('maintain', 6900, 2000, 3)).toBe('900 cal over your target so far.');
   });
 });

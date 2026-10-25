@@ -102,3 +102,34 @@ describe('WeeklyCalorieBudget', () => {
     expectNoBareText();
   });
 });
+
+describe('WeeklyCalorieBudget -- read for what the target is for', () => {
+  it("says it's a cut, and that being under is on track for it", () => {
+    // Wednesday: 4 days so far at 2,000 a day.
+    renderBudget({ consumed: 7400, daysLeft: 4, goal: { goal: 'cut', offset: -300 } });
+
+    expect(screen.getByTestId('weekly-budget-goal-label')).toHaveTextContent(
+      'Cutting · 300 below maintenance',
+    );
+    expect(screen.getByTestId('weekly-budget-goal-note')).toHaveTextContent(
+      'Under your target so far: on track for your cut.',
+    );
+  });
+
+  it('says being over is on track for a bulk', () => {
+    renderBudget({ consumed: 8600, daysLeft: 4, goal: { goal: 'bulk', offset: 300 } });
+
+    expect(screen.getByTestId('weekly-budget-goal-label')).toHaveTextContent(
+      'Bulking · 300 above maintenance',
+    );
+    expect(screen.getByTestId('weekly-budget-goal-note')).toHaveTextContent(
+      'At or over your target so far: on track for your bulk.',
+    );
+  });
+
+  it('shows nothing of a goal it cannot tell', () => {
+    renderBudget({ goal: null });
+
+    expect(screen.queryByTestId('weekly-budget-goal')).toBeNull();
+  });
+});

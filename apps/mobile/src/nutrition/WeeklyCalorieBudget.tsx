@@ -4,7 +4,12 @@ import { TextButton } from '../design/Button';
 import { Section } from '../design/Section';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
-import { computeWeeklyCalorieSummary } from './nutritionCalculations';
+import {
+  calorieGoalLabel,
+  computeWeeklyCalorieSummary,
+  weekGoalNote,
+  type CalorieGoalReading,
+} from './nutritionCalculations';
 import { wholeFigureText } from './wholeFigures';
 
 interface Props {
@@ -21,6 +26,11 @@ interface Props {
   dailyTarget: number | null;
   /** Days left in the week, the day shown included. */
   daysLeft: number;
+  /**
+   * What the daily target is for -- a cut, maintaining or a bulk (calorieGoalFor) -- so the week
+   * is read for it: under is good for a cut, over can be good for a bulk. Null when unknown.
+   */
+  goal?: CalorieGoalReading | null;
   /** The week's earlier days couldn't be read. */
   failed?: boolean;
   accentColor: string;
@@ -45,6 +55,7 @@ export function WeeklyCalorieBudget({
   consumed,
   dailyTarget,
   daysLeft,
+  goal = null,
   failed = false,
   accentColor,
   onSetTarget,
@@ -56,6 +67,12 @@ export function WeeklyCalorieBudget({
       ? `${calories(summary.remaining)} cal left · ${days}`
       : `${calories(-summary.remaining)} cal over ${today ? "this week's" : "the week's"} budget`
     : null;
+  // The week so far, read for the goal: its days up to the day shown, that day included.
+  const goalNote =
+    summary && goal && dailyTarget !== null
+      ? weekGoalNote(goal.goal, summary.consumed, dailyTarget, 8 - daysLeft)
+      : null;
+  const goalLabel = goal ? calorieGoalLabel(goal) : null;
 
   return (
     <AppCard testID="nutrition-today-week">
@@ -80,7 +97,14 @@ export function WeeklyCalorieBudget({
             accessible
             accessibilityLabel={
               summary
-                ? `${title}, ${calories(summary.consumed)} of ${calories(summary.target)} calories. ${remainingText}`
+                ? [
+                    `${title}, ${calories(summary.consumed)} of ${calories(summary.target)} calories.`,
+                    remainingText,
+                    goalLabel,
+                    goalNote,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
                 : `${title}, loading`
             }
           >
@@ -105,6 +129,16 @@ export function WeeklyCalorieBudget({
               <Text testID="weekly-budget-remaining" style={styles.caption}>
                 {remainingText}
               </Text>
+            ) : null}
+            {goalLabel && goalNote ? (
+              <View testID="weekly-budget-goal" style={styles.goal}>
+                <Text testID="weekly-budget-goal-label" style={styles.goalLabel}>
+                  {goalLabel}
+                </Text>
+                <Text testID="weekly-budget-goal-note" style={styles.goalNote}>
+                  {goalNote}
+                </Text>
+              </View>
             ) : null}
           </View>
         )}
@@ -146,5 +180,21 @@ const styles = StyleSheet.create({
   },
   noTarget: {
     alignItems: 'flex-start',
+  },
+  // What the target is for, and how the week so far sits with it.
+  goal: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+    gap: 2,
+  },
+  goalLabel: {
+    ...typeScale.label,
+    color: colors.textPrimary,
+  },
+  goalNote: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
   },
 });
