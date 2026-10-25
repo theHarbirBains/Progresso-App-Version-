@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { dayKey } from '../lib/dayKey';
 import { deleteFoodLog, fetchFoodLogsForDay, updateFoodLogQuantity } from './foodLogQueries';
-import { useDayLogs } from './useDayLogs';
+import { readAheadDayLogs, useDayLogs } from './useDayLogs';
 
 jest.mock('./foodLogQueries', () => ({
   fetchFoodLogsForDay: jest.fn(),
@@ -151,5 +151,36 @@ describe('useDayLogs', () => {
     });
     expect(mockDelete).toHaveBeenCalledWith('log-1');
     expect(result.current.logs).toEqual([]);
+  });
+
+  it('shows a day seen before at once, while it reads it again', async () => {
+    const navigation = fakeNavigation();
+    const { result, rerender } = renderHook(
+      ({ day }: { day: string }) => useDayLogs('user-1', day, navigation),
+      { initialProps: { day: '2026-10-20' } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    rerender({ day: '2026-10-19' });
+    await waitFor(() => expect(result.current.day).toBe('2026-10-19'));
+
+    mockFetch.mockReturnValue(new Promise(() => {}));
+    rerender({ day: '2026-10-20' });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.logs).toEqual([log('log-1')]);
+  });
+
+  it('reads a day ahead only once, and that read is what the day shows', async () => {
+    mockFetch.mockResolvedValue([log('log-ahead')]);
+    readAheadDayLogs('user-1', '2026-10-18');
+    readAheadDayLogs('user-1', '2026-10-18');
+    await act(async () => {});
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    mockFetch.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useDayLogs('user-1', '2026-10-18', fakeNavigation()));
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.logs.map((l) => l.id)).toEqual(['log-ahead']);
   });
 });

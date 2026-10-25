@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { dayFromKey } from '../lib/dayKey';
+import { recallShown, rememberShown } from '../lib/lastShown';
 import {
   deleteFoodLog,
   fetchFoodLogsForDay,
@@ -7,6 +8,34 @@ import {
   type EnteredAmount,
   type FoodLogRow,
 } from './foodLogQueries';
+
+const shownKey = (day: string) => `nutrition.day.${day}`;
+
+/**
+ * Reads a day's logs and remembers them for the session (lib/lastShown.ts), so the Nutrition
+ * screen can show that day at once when it's turned to.
+ */
+export async function readDayLogs(userId: string, day: string): Promise<FoodLogRow[]> {
+  const rows = await fetchFoodLogsForDay(userId, dayFromKey(day));
+  rememberShown(userId, shownKey(day), rows);
+  return rows;
+}
+
+/**
+ * Reads a day ahead of being turned to -- the day before the one shown, the next swipe's -- so the
+ * swipe lands on its foods rather than a placeholder. Only a day not read yet this session; a
+ * failure just means that day loads as usual when it's reached.
+ */
+const readingAhead = new Set<string>();
+
+export function readAheadDayLogs(userId: string, day: string): void {
+  const reading = `${userId}:${day}`;
+  if (readingAhead.has(reading) || recallShown(userId, shownKey(day)) !== undefined) return;
+  readingAhead.add(reading);
+  readDayLogs(userId, day)
+    .catch(() => undefined)
+    .finally(() => readingAhead.delete(reading));
+}
 
 export interface DayLogs {
   /** The day these are for -- the Nutrition screen shows them only when it matches its own. */
@@ -27,8 +56,9 @@ export interface DayLogs {
  * A past day's food logs, for the Nutrition screen (today's are the shared FoodLogProvider's).
  * Read when the day is chosen and each time the screen is shown again -- a food logged to that day
  * from the logging screens lands there -- with no staleness gate, like a section page opened
- * fresh. Only the latest read is kept, so swiping quickly through days never shows one day's
- * foods under another's date. Null `day` reads nothing.
+ * fresh. A day already seen (or read ahead) this session shows at once while it's read again.
+ * Only the latest read is kept, so swiping quickly through days never shows one day's foods under
+ * another's date. Null `day` reads nothing.
  */
 export function useDayLogs(
   userId: string | undefined,
@@ -46,12 +76,17 @@ export function useDayLogs(
   const refetch = useCallback(async () => {
     if (!userId || !day) return;
     const request = ++latest.current;
-    // A new day starts blank and loading; the same day keeps what it shows while it's read again.
-    setState((prev) =>
-      prev.day === day ? { ...prev, error: null } : { day, logs: [], loading: true, error: null },
-    );
+    // A new day starts from what it last showed, else blank and loading; the same day keeps what
+    // it shows while it's read again.
+    setState((prev) => {
+      if (prev.day === day) return { ...prev, error: null };
+      const remembered = recallShown<FoodLogRow[]>(userId, shownKey(day));
+      return remembered
+        ? { day, logs: remembered, loading: false, error: null }
+        : { day, logs: [], loading: true, error: null };
+    });
     try {
-      const rows = await fetchFoodLogsForDay(userId, dayFromKey(day));
+      const rows = await readDayLogs(userId, day);
       if (request === latest.current) setState({ day, logs: rows, loading: false, error: null });
     } catch (err) {
       if (request !== latest.current) return;
@@ -70,6 +105,11 @@ export function useDayLogs(
   const refetchRef = useRef(refetch);
   refetchRef.current = refetch;
   useEffect(() => navigation.addListener('focus', () => void refetchRef.current()), [navigation]);
+
+  // An edit or a delete here is what the day shows next time too.
+  useEffect(() => {
+    if (state.day && !state.loading) rememberShown(userId, shownKey(state.day), state.logs);
+  }, [userId, state]);
 
   const updateQuantity = useCallback(
     async (log: FoodLogRow, newQuantity: number, entered?: EnteredAmount | null) => {

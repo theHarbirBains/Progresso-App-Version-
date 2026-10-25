@@ -1,12 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  PanResponder,
-  StyleSheet,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Animated, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { Text } from '../design/Text';
@@ -29,12 +22,8 @@ import { DayBar } from '../nutrition/DayBar';
 import { FoodImage } from '../nutrition/FoodImage';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
-import {
-  fetchFoodLogsForDay,
-  fetchFoodLogsForRange,
-  type FoodLogRow,
-} from '../nutrition/foodLogQueries';
-import { daySwipe, dayLabel, isPastKey, isTodayKey, shiftDay, todayKey } from '../nutrition/logDay';
+import { fetchFoodLogsForRange, type FoodLogRow } from '../nutrition/foodLogQueries';
+import { dayLabel, isTodayKey, shiftDay, todayKey } from '../nutrition/logDay';
 import { servingMeasures, servingsFor, unitWord } from '../nutrition/logQuantity';
 import {
   calculateRemaining,
@@ -42,9 +31,10 @@ import {
   sumDailyTotals,
 } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
+import { useDaySwipe } from '../nutrition/useDaySwipe';
 import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { CopyYesterdaySheet, SaveAsMealSheet } from '../nutrition/TodayShortcutSheets';
-import { useDayLogs } from '../nutrition/useDayLogs';
+import { readAheadDayLogs, readDayLogs, useDayLogs } from '../nutrition/useDayLogs';
 import { WeeklyCalorieBudget } from '../nutrition/WeeklyCalorieBudget';
 
 type Props = RootStackScreenProps<'Nutrition'>;
@@ -136,81 +126,19 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   // Each way to log logs to the day shown: nothing for today, the day for a past one.
   const logParams = isToday ? undefined : { day };
 
-  // Moving between days: the content slides out the way it's moving and the new day slides in,
-  // following a swipe as it's dragged (none under Reduce Motion). One move at a time.
+  // Moving between days: a swipe turns the day (useDaySwipe) -- no arrows. Swiping left goes
+  // back a day, right forward, never past today.
   const reduceMotion = useReduceMotionPreference();
   const { width } = useWindowDimensions();
-  const slide = useRef(new Animated.Value(0)).current;
-  const fade = useRef(new Animated.Value(1)).current;
-  const moving = useRef(false);
-  const dayRef = useRef(day);
-  dayRef.current = day;
   // The widgets rise in as the page opens, like every page's; once the day has been moved,
-  // they slide with it instead, so a new day's widgets never rise in on top of the slide.
+  // they turn with it instead, so a new day's widgets never rise in on top of the turn.
   const [moved, setMoved] = useState(false);
 
   function showDay(to: string) {
     setMoved(true);
     setDay(to);
   }
-
-  function settle() {
-    Animated.spring(slide, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
-  }
-
-  function moveTo(direction: 'previous' | 'next') {
-    const from = dayRef.current;
-    if (moving.current || (direction === 'next' && !isPastKey(from))) {
-      settle();
-      return;
-    }
-    const to = shiftDay(from, direction === 'previous' ? -1 : 1);
-    if (reduceMotion) {
-      slide.setValue(0);
-      showDay(to);
-      return;
-    }
-    moving.current = true;
-    // Swiping left moves to the day before, so its content leaves to the left.
-    const away = direction === 'previous' ? -width : width;
-    Animated.parallel([
-      Animated.timing(slide, { toValue: away, duration: 160, useNativeDriver: true }),
-      Animated.timing(fade, { toValue: 0, duration: 160, useNativeDriver: true }),
-    ]).start(() => {
-      showDay(to);
-      slide.setValue(-away * 0.35);
-      Animated.parallel([
-        Animated.spring(slide, { toValue: 0, useNativeDriver: true, bounciness: 3 }),
-        Animated.timing(fade, { toValue: 1, duration: 200, useNativeDriver: true }),
-      ]).start(() => {
-        moving.current = false;
-      });
-    });
-  }
-  const moveToRef = useRef(moveTo);
-  moveToRef.current = moveTo;
-
-  const swipe = useMemo(() => {
-    const springBack = () =>
-      Animated.spring(slide, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
-    return PanResponder.create({
-      // A clearly sideways drag -- never a scroll, nor a tap on a row's field.
-      onMoveShouldSetPanResponder: (_event, gesture) =>
-        Math.abs(gesture.dx) > 16 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.8,
-      onPanResponderMove: (_event, gesture) => {
-        if (moving.current) return;
-        // Toward a day after today it gives a little, then stops.
-        const blocked = gesture.dx > 0 && !isPastKey(dayRef.current);
-        slide.setValue(blocked ? gesture.dx * 0.2 : gesture.dx);
-      },
-      onPanResponderRelease: (_event, gesture) => {
-        const direction = daySwipe(gesture.dx, gesture.vx, isPastKey(dayRef.current));
-        if (direction) moveToRef.current(direction);
-        else springBack();
-      },
-      onPanResponderTerminate: springBack,
-    });
-  }, [slide]);
+  const dayTurn = useDaySwipe({ day, onDay: showDay, width, reduceMotion });
 
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -227,9 +155,8 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    fetchFoodLogsForDay(userId, yesterday)
+    // The same read a swipe to yesterday shows at once (readDayLogs remembers it).
+    readDayLogs(userId, shiftDay(todayKey(), -1))
       .then((rows) => {
         if (!cancelled) setYesterdayLogs(rows);
       })
@@ -238,6 +165,11 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
       cancelled = true;
     };
   }, [userId]);
+
+  // On a past day, the day before it is read ahead: the next swipe's.
+  useEffect(() => {
+    if (userId && !isToday) readAheadDayLogs(userId, shiftDay(day, -1));
+  }, [userId, day, isToday]);
 
   // This week's days before today, for the week's calorie budget -- read each time Today opens,
   // like yesterday's. On a Monday there are none.
@@ -334,13 +266,16 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   );
 
   const dayBar = (
-    <DayBar
-      day={day}
-      onPrevious={() => moveTo('previous')}
-      onNext={() => moveTo('next')}
-      onToday={() => showDay(todayKey())}
-      onChooseDay={() => navigation.navigate('NutritionHistory', { date: day })}
-    />
+    <View {...dayTurn.panHandlers}>
+      <DayBar
+        day={day}
+        slide={dayTurn.slide}
+        width={width}
+        onToday={() => dayTurn.turnTo('next', todayKey())}
+        onChooseDay={() => navigation.navigate('NutritionHistory', { date: day })}
+        onAdjust={(direction) => dayTurn.turnTo(direction)}
+      />
+    </View>
   );
 
   if (goalsLoading || (isToday && logsLoading)) {
@@ -657,8 +592,8 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
       <RiseIn>{dayBar}</RiseIn>
       <Animated.View
         testID="nutrition-day-content"
-        style={[styles.dayContent, { opacity: fade, transform: [{ translateX: slide }] }]}
-        {...swipe.panHandlers}
+        style={[styles.dayContent, dayTurn.contentStyle]}
+        {...dayTurn.panHandlers}
       >
         {moved ? dayWidgets : <RiseInStack>{dayWidgets}</RiseInStack>}
       </Animated.View>

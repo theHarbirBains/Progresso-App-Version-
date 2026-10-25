@@ -1,54 +1,70 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Card } from '../design/Card';
-import { IconButton } from '../design/IconButton';
 import { TextButton } from '../design/Button';
 import { Text } from '../design/Text';
 import { colors, minTouchTarget, spacing, typeScale } from '../design/theme';
 import { dayLabel, isTodayKey } from './logDay';
+import type { DayDirection } from './useDaySwipe';
 
 interface Props {
   day: string;
-  onPrevious: () => void;
-  onNext: () => void;
+  /** The day's widgets' movement as they're swiped (useDaySwipe): the date glides along with it. */
+  slide: Animated.Value;
+  width: number;
   onToday: () => void;
   /** Tapping the date: the calendar, to pick any day. */
   onChooseDay: () => void;
+  /** Assistive tech's way to change day -- a swipe isn't something VoiceOver can do. */
+  onAdjust: (direction: DayDirection) => void;
 }
 
 /**
- * The Nutrition screen's day: the day shown, with the day before and the day after on either
- * side (never past today), and -- on any day but today -- a way straight back to today. The date
- * itself opens the calendar. Swiping the screen moves between days too.
+ * The Nutrition screen's day: its name ("Today", "Yesterday", "Mon, Oct 20") -- tapping it opens
+ * the calendar -- and, on any day but today, a way straight back to today. There are no arrows:
+ * the screen is swiped from day to day (useDaySwipe), and the date glides with the swipe at a
+ * slower pace, fading as it goes. For VoiceOver it's an adjustable control: swipe up for the
+ * next day, down for the day before.
  */
-export function DayBar({ day, onPrevious, onNext, onToday, onChooseDay }: Props) {
+export function DayBar({ day, slide, width, onToday, onChooseDay, onAdjust }: Props) {
   const today = isTodayKey(day);
   const label = dayLabel(day);
+  const glide = {
+    opacity: slide.interpolate({
+      inputRange: [-width * 0.5, 0, width * 0.5],
+      outputRange: [0, 1, 0],
+      extrapolate: 'clamp',
+    }),
+    transform: [
+      {
+        translateX: slide.interpolate({
+          inputRange: [-width, 0, width],
+          outputRange: [-width * 0.4, 0, width * 0.4],
+          extrapolate: 'clamp',
+        }),
+      },
+    ],
+  };
+
   return (
     <Card testID="nutrition-day-bar" style={styles.card}>
-      <View style={styles.row}>
-        <IconButton
-          testID="nutrition-day-previous"
-          icon="chevron-left"
-          accessibilityLabel="Previous day"
-          onPress={onPrevious}
-        />
-        <Pressable
-          testID="nutrition-day-label"
-          accessibilityRole="button"
-          accessibilityLabel={`${label}. Choose a day`}
-          onPress={onChooseDay}
-          style={styles.label}
-        >
+      <Pressable
+        testID="nutrition-day-label"
+        accessibilityRole="adjustable"
+        accessibilityLabel="Day"
+        accessibilityValue={{ text: label }}
+        accessibilityHint="Double-tap to choose a day."
+        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'increment') onAdjust('next');
+          if (event.nativeEvent.actionName === 'decrement') onAdjust('previous');
+        }}
+        onPress={onChooseDay}
+        style={styles.label}
+      >
+        <Animated.View style={glide}>
           <Text style={styles.labelText}>{label}</Text>
-        </Pressable>
-        <IconButton
-          testID="nutrition-day-next"
-          icon="chevron-right"
-          accessibilityLabel="Next day"
-          onPress={onNext}
-          disabled={today}
-        />
-      </View>
+        </Animated.View>
+      </Pressable>
       {today ? null : (
         <View style={styles.today}>
           <TextButton testID="nutrition-day-today" label="Back to Today" onPress={onToday} />
@@ -61,14 +77,9 @@ export function DayBar({ day, onPrevious, onNext, onToday, onChooseDay }: Props)
 const styles = StyleSheet.create({
   card: {
     paddingVertical: spacing.sm,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    overflow: 'hidden',
   },
   label: {
-    flex: 1,
     minHeight: minTouchTarget,
     alignItems: 'center',
     justifyContent: 'center',

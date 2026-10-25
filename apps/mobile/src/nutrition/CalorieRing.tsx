@@ -1,9 +1,13 @@
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Skeleton } from '../design/Skeleton';
 import { Text } from '../design/Text';
+import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { usePageArrived } from '../navigation/useAfterTransition';
 import { colors, spacing, typeScale } from '../design/theme';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface Props {
   /** Calories logged so far today. */
@@ -27,6 +31,9 @@ const DEFAULT_STROKE_WIDTH = 14;
 // owns that). Fills clockwise from the top, capped at a full ring past 100%
 // of the goal (overeating doesn't draw past the circle). With no goal set,
 // renders as an empty (unfilled) track so it never implies false progress.
+// When the figure changes -- a food logged, or another day turned to on the
+// Nutrition screen -- the ring sweeps to it rather than jumping (instantly
+// under Reduce Motion); it's drawn at rest the first time.
 export function CalorieRing({
   consumed,
   goal,
@@ -38,7 +45,27 @@ export function CalorieRing({
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const fraction = goal !== null && goal > 0 ? Math.min(consumed / goal, 1) : 0;
-  const dashOffset = circumference * (1 - fraction);
+  const reduceMotion = useReduceMotionPreference();
+  const progress = useRef(new Animated.Value(fraction)).current;
+  useEffect(() => {
+    if (reduceMotion) {
+      progress.setValue(fraction);
+      return undefined;
+    }
+    // The ring's dash can't run on the native driver, so this sweep is a short JS animation.
+    const sweep = Animated.timing(progress, {
+      toValue: fraction,
+      duration: 650,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    });
+    sweep.start();
+    return () => sweep.stop();
+  }, [fraction, reduceMotion, progress]);
+  const dashOffset = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [circumference, 0],
+  });
   // The ring is drawn once the page has arrived; its numbers show at once.
   const arrived = usePageArrived();
 
@@ -63,7 +90,7 @@ export function CalorieRing({
             strokeWidth={strokeWidth}
             fill="none"
           />
-          <Circle
+          <AnimatedCircle
             cx={size / 2}
             cy={size / 2}
             r={radius}

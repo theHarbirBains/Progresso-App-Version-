@@ -810,26 +810,46 @@ describe('NutritionTodayScreen -- any day', () => {
   });
 
   const dayLabelText = () => screen.getByTestId('nutrition-day-label');
+  // A swipe turns the day; assistive tech adjusts the date instead -- the same turn.
+  function turn(direction: 'previous' | 'next') {
+    fireEvent(dayLabelText(), 'accessibilityAction', {
+      nativeEvent: { actionName: direction === 'previous' ? 'decrement' : 'increment' },
+    });
+  }
 
   it('starts on today, with no day after it and no way back to today', async () => {
     renderScreen();
 
     await screen.findByTestId('food-log-empty');
     expect(dayLabelText()).toHaveTextContent('Today');
-    expect(screen.getByTestId('nutrition-day-next')).toBeDisabled();
+    turn('next');
+    expect(dayLabelText()).toHaveTextContent('Today');
     expect(screen.queryByTestId('nutrition-day-today')).toBeNull();
+  });
+
+  it('has no arrows: the day is swiped, and the date is adjustable for VoiceOver', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    expect(screen.queryByTestId('nutrition-day-previous')).toBeNull();
+    expect(screen.queryByTestId('nutrition-day-next')).toBeNull();
+    expect(dayLabelText().props.accessibilityRole).toBe('adjustable');
+    expect(dayLabelText().props.accessibilityValue).toEqual({ text: 'Today' });
+    // The day's widgets take the swipe (as does the bar above them).
+    expect(screen.getByTestId('nutrition-day-content').props.onResponderMove).toEqual(
+      expect.any(Function),
+    );
   });
 
   it("moves to the day before and shows that day's foods, with its own wording", async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
 
-    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    turn('previous');
 
     expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
     expect(dayLabelText()).toHaveTextContent('Yesterday');
     expect(screen.getByText("Yesterday's Foods")).toBeTruthy();
-    expect(screen.getByTestId('nutrition-day-next')).not.toBeDisabled();
     // Today's own shortcuts -- the week's budget and Copy Yesterday -- are today's only.
     expect(screen.queryByTestId('nutrition-today-week')).toBeNull();
     expect(screen.queryByTestId('nutrition-today-copy-yesterday')).toBeNull();
@@ -839,9 +859,9 @@ describe('NutritionTodayScreen -- any day', () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
 
-    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    turn('previous');
     await screen.findByTestId('food-log-row-log-tuesday');
-    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    turn('previous');
 
     expect(await screen.findByText('No foods logged this day')).toBeTruthy();
   });
@@ -849,7 +869,7 @@ describe('NutritionTodayScreen -- any day', () => {
   it('logs to the day shown, every way there is to log', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
-    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    turn('previous');
     await screen.findByTestId('food-log-row-log-tuesday');
 
     fireEvent.press(screen.getByTestId('log-food-button'));
@@ -879,12 +899,12 @@ describe('NutritionTodayScreen -- any day', () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
 
-    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    turn('previous');
     await screen.findByTestId('food-log-row-log-tuesday');
-    fireEvent.press(screen.getByTestId('nutrition-day-next'));
+    turn('next');
     expect(dayLabelText()).toHaveTextContent('Today');
 
-    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    turn('previous');
     await screen.findByTestId('food-log-row-log-tuesday');
     fireEvent.press(screen.getByTestId('nutrition-day-today'));
     expect(dayLabelText()).toHaveTextContent('Today');
@@ -895,7 +915,7 @@ describe('NutritionTodayScreen -- any day', () => {
     mockDeleteFoodLog.mockResolvedValue(undefined);
     renderScreen();
     await screen.findByTestId('food-log-empty');
-    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    turn('previous');
     await screen.findByTestId('food-log-row-log-tuesday');
 
     await act(async () => {
@@ -920,7 +940,7 @@ describe('NutritionTodayScreen -- any day', () => {
   it('opens the calendar from the date, on the day shown', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
-    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    turn('previous');
     await screen.findByTestId('food-log-row-log-tuesday');
 
     fireEvent.press(screen.getByTestId('nutrition-day-label'));
