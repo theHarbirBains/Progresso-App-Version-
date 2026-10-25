@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Text } from './Text';
 import { colors, fonts, minTouchTarget, radii, spacing, typeScale } from './theme';
@@ -29,6 +35,9 @@ interface Props {
   disabled?: boolean;
   /** Defaults to "title, subtitle". */
   accessibilityLabel?: string;
+  /** Extra actions for assistive tech -- a swipe's Delete, say, which VoiceOver can't swipe for. */
+  accessibilityActions?: AccessibilityActionInfo[];
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
   testID?: string;
 }
 
@@ -52,6 +61,8 @@ export function ListRow({
   destructive,
   disabled,
   accessibilityLabel,
+  accessibilityActions,
+  onAccessibilityAction,
   testID,
 }: Props) {
   const showChevron = chevron ?? Boolean(onPress);
@@ -120,6 +131,8 @@ export function ListRow({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? (subtitle ? `${title}, ${subtitle}` : title)}
       accessibilityState={{ disabled: Boolean(disabled) }}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
     >
       {body}
     </TouchableOpacity>

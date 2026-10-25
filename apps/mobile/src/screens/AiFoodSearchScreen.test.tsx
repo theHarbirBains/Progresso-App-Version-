@@ -230,17 +230,16 @@ describe('AiFoodSearchScreen', () => {
     expect(mockInterpret).not.toHaveBeenCalled();
   });
 
-  it('shows the accuracy guidance and a secondary example near the input', async () => {
+  it('says when the preparation matters, under the three fields', async () => {
     renderScreen();
 
     expect(await screen.findByTestId('ai-food-search-accuracy')).toHaveTextContent(
-      'include the amount, serving unit, preparation method',
+      'Oils, sauces and anything cooked with it change the figures most',
       { exact: false },
     );
-    expect(screen.getByTestId('ai-food-search-example')).toHaveTextContent(
-      '150 g chicken breast, air fried with 1 tsp olive oil.',
-      { exact: false },
-    );
+    expect(screen.getByTestId('ai-food-search-amount')).toBeTruthy();
+    expect(screen.getByTestId('ai-food-search-unit')).toBeTruthy();
+    expect(screen.getByTestId('ai-food-search-preparation')).toBeTruthy();
   });
 
   it('shows a complete review with its totals and source, and saves nothing', async () => {
@@ -501,6 +500,80 @@ describe('AiFoodSearchScreen', () => {
     await screen.findByTestId('ai-food-search-input');
 
     expectNoBareText();
+  });
+});
+
+describe('AiFoodSearchScreen -- how much, what, and how it was made', () => {
+  async function estimate() {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('ai-food-search-submit'));
+    });
+  }
+
+  it('makes one description of the three fields for the estimate', async () => {
+    renderScreen();
+    await screen.findByTestId('ai-food-search-input');
+
+    fireEvent.changeText(screen.getByTestId('ai-food-search-amount'), '150');
+    fireEvent.changeText(screen.getByTestId('ai-food-search-input'), 'chicken breast');
+    fireEvent.changeText(
+      screen.getByTestId('ai-food-search-preparation'),
+      'air fried with 1 tsp olive oil',
+    );
+    await estimate();
+
+    expect(mockInterpret).toHaveBeenCalledWith(
+      'token-123',
+      '150 g of chicken breast, air fried with 1 tsp olive oil',
+    );
+  });
+
+  it('starts a drink in millilitres, and takes the unit picked from the list', async () => {
+    renderScreen();
+    await screen.findByTestId('ai-food-search-input');
+
+    fireEvent.changeText(screen.getByTestId('ai-food-search-input'), 'Fairlife 2% milk');
+    expect(screen.getByTestId('ai-food-search-unit')).toHaveTextContent(/millilitres/);
+
+    fireEvent.press(screen.getByTestId('ai-food-search-unit'));
+    fireEvent.press(screen.getByTestId('ai-food-search-unit-cup'));
+    fireEvent.changeText(screen.getByTestId('ai-food-search-amount'), '1');
+    await estimate();
+
+    expect(screen.getByTestId('ai-food-search-unit')).toHaveTextContent(/cups/);
+    expect(mockInterpret).toHaveBeenCalledWith('token-123', '1 cup of Fairlife 2% milk');
+  });
+
+  it('leaves the amount to the review when none is given, and a blank preparation out', async () => {
+    renderScreen();
+    await screen.findByTestId('ai-food-search-input');
+
+    fireEvent.changeText(screen.getByTestId('ai-food-search-input'), "McDonald's Big Mac");
+    await estimate();
+
+    expect(mockInterpret).toHaveBeenCalledWith('token-123', "McDonald's Big Mac");
+  });
+
+  it('asks for a real amount, and estimates nothing until there is one', async () => {
+    renderScreen();
+    await screen.findByTestId('ai-food-search-input');
+
+    fireEvent.changeText(screen.getByTestId('ai-food-search-input'), 'Gala apple');
+    fireEvent.changeText(screen.getByTestId('ai-food-search-amount'), '0');
+
+    expect(screen.getByTestId('ai-food-search-amount-error')).toHaveTextContent('A number above 0');
+    await estimate();
+    expect(mockInterpret).not.toHaveBeenCalled();
+  });
+
+  it('needs the food itself -- an amount alone estimates nothing', async () => {
+    renderScreen();
+    await screen.findByTestId('ai-food-search-input');
+
+    fireEvent.changeText(screen.getByTestId('ai-food-search-amount'), '2');
+    const submit = screen.getByTestId('ai-food-search-submit');
+
+    expect(submit.props.accessibilityState?.disabled ?? submit.props.disabled).toBeTruthy();
   });
 });
 

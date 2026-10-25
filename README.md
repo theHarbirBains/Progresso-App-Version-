@@ -67,8 +67,10 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Any past day on the Nutrition screen: swipe or step back through the days (never past today), see that day's full breakdown in the same layout, and log, edit or delete foods there; Nutrition History opens any day in full
 - Quick Macro Entry logs a name and its calories, protein, carbs and fat as typed, kept in your Food Library only if you tick Save to Food Library
 - A food you log from search, a barcode or the catalog is kept in your own Food Library (once -- never a duplicate), so it's there to re-log, edit or remove
+- The Food Library is A to Z ignoring case; swipe a food, recipe or saved meal left to delete it (it asks first, and what you've logged keeps its figures)
+- Tap a food's photo to see it full screen, and pinch to zoom in
 - Search Food covers Progresso's food catalog and Open Food Facts; Scan Barcode looks products up on Open Food Facts, with Enter Manually when one isn't found
-- AI Food Search (from the Nutrition dashboard or the Food Library) turns a description into its parts and takes their figures from Progresso's catalog, USDA data and Open Food Facts; Claude's own estimate is used only as a labelled last resort. Review & Log lets you check and change the name and figures before setting the amount and logging it, without adding a duplicate to your library. Each user has an hourly and a daily limit
+- AI Food Search (from the Nutrition dashboard or the Food Library) takes how much (an amount and a unit), what food and, optionally, how it was prepared, turns them into the food's parts and takes their figures from Progresso's catalog, USDA data and Open Food Facts; Claude's own estimate is used only as a labelled last resort. Review & Log lets you check and change the name and figures before setting the amount and logging it, without adding a duplicate to your library. Each user has an hourly and a daily limit
 - A food can be logged in servings, in the pieces its serving names (cookies, slices), in grams or ounces when its serving is a weight, or in millilitres when it's a drink; a log keeps the amount as typed and is edited that way, and logging the same food twice within seconds asks first
 - Every log keeps the figures it was logged with, even if the food (or recipe) changes later
 

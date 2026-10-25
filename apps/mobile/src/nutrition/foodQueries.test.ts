@@ -183,6 +183,44 @@ describe('fetchAllFoods', () => {
     expect(calls.order).toEqual([['name', { ascending: false }]]);
   });
 
+  it('sorts A to Z ignoring case, and Z to A when descending', async () => {
+    const named = (id: string, name: string) => ({ ...dbRow, id, name });
+    const rows = [
+      named('1', 'Banana'),
+      named('2', 'apple'),
+      named('3', 'Zucchini'),
+      named('4', 'Apple Pie'),
+      named('5', 'cherry'),
+      named('6', '7 Layer Dip'),
+      named('7', '(Homemade) Granola'),
+    ];
+
+    mockTable({ data: rows, error: null });
+    const ascending = await fetchAllFoods({ userId: 'user-1', search: '', ascending: true });
+    // Numbers and symbols together first -- the "#" section -- then the letters.
+    expect(ascending.map((f) => f.name)).toEqual([
+      '(Homemade) Granola',
+      '7 Layer Dip',
+      'apple',
+      'Apple Pie',
+      'Banana',
+      'cherry',
+      'Zucchini',
+    ]);
+
+    mockTable({ data: rows, error: null });
+    const descending = await fetchAllFoods({ userId: 'user-1', search: '', ascending: false });
+    expect(descending.map((f) => f.name)).toEqual([
+      'Zucchini',
+      'cherry',
+      'Banana',
+      'Apple Pie',
+      'apple',
+      '7 Layer Dip',
+      '(Homemade) Granola',
+    ]);
+  });
+
   it('applies a case-insensitive search filter when provided', async () => {
     const { calls } = mockTable({ data: [], error: null });
 

@@ -97,7 +97,7 @@ export function FoodFacts({
     <View style={styles.stack}>
       <AppCard hero testID={testIDs.summary}>
         <View style={styles.summaryRow}>
-          <FoodImage uri={imageUrl} name={name} size={88} />
+          <FoodImage testID="food-facts-image" uri={imageUrl} name={name} size={88} zoomable />
           <View style={styles.summaryBody}>
             <Text testID={testIDs.serving} style={styles.serving}>
               Serving: {servingSize} {servingUnit}

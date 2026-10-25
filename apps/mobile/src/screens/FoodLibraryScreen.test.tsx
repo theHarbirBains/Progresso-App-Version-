@@ -1233,3 +1233,110 @@ describe('FoodLibraryScreen -- building a meal or a recipe', () => {
     expect(await screen.findByTestId('food-item-food-apple')).toBeTruthy();
   });
 });
+
+describe('FoodLibraryScreen -- deleting from the list', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  // Answers the confirmation with the button named, and returns what it asked.
+  function answer(button: 'Delete' | 'Cancel') {
+    return jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === button)?.onPress?.();
+    });
+  }
+
+  function deleteAction(testID: string) {
+    fireEvent(screen.getByTestId(testID), 'accessibilityAction', {
+      nativeEvent: { actionName: 'delete' },
+    });
+  }
+
+  it('offers Delete on each of their foods, by swipe or as an action for assistive tech', async () => {
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    expect(screen.getByTestId('food-swipe-food-apple')).toBeTruthy();
+    expect(screen.getByTestId('food-item-food-apple').props.accessibilityActions).toEqual([
+      { name: 'delete', label: 'Delete' },
+    ]);
+  });
+
+  it('asks first, then takes the food out of the library without touching what was logged', async () => {
+    const alert = answer('Delete');
+    mockUpdateFood.mockResolvedValue({ ...apple, isActive: false });
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    await act(async () => {
+      deleteAction('food-item-food-apple');
+    });
+
+    expect(alert).toHaveBeenCalledWith(
+      'Delete Apple?',
+      "It leaves your Food Library. Anything you've logged keeps its figures.",
+      expect.any(Array),
+    );
+    // Deactivated, as the form's Deactivate does -- never removed.
+    expect(mockUpdateFood).toHaveBeenCalledWith('food-apple', { isActive: false });
+    await waitFor(() => expect(screen.queryByTestId('food-item-food-apple')).toBeNull());
+    expect(screen.getByTestId('food-item-food-banana')).toBeTruthy();
+    expect(mockLogFood).not.toHaveBeenCalled();
+  });
+
+  it('deletes nothing when they cancel', async () => {
+    answer('Cancel');
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    await act(async () => {
+      deleteAction('food-item-food-apple');
+    });
+
+    expect(mockUpdateFood).not.toHaveBeenCalled();
+    expect(screen.getByTestId('food-item-food-apple')).toBeTruthy();
+  });
+
+  it('keeps the food and says why when it cannot be deleted', async () => {
+    const alert = answer('Delete');
+    mockUpdateFood.mockRejectedValue(new Error('network down'));
+    renderScreen();
+    await screen.findByTestId('food-item-food-apple');
+
+    await act(async () => {
+      deleteAction('food-item-food-apple');
+    });
+
+    expect(alert).toHaveBeenCalledWith("Couldn't delete Apple", 'network down');
+    expect(screen.getByTestId('food-item-food-apple')).toBeTruthy();
+  });
+
+  it('deletes a saved meal, leaving its foods', async () => {
+    answer('Delete');
+    mockFetchSavedMeals.mockResolvedValue([
+      { id: 'meal-1', name: 'Breakfast', items: [{ food: apple, quantity: 1, entered: null }] },
+    ]);
+    renderScreen();
+    await screen.findByTestId('food-meal-meal-1');
+
+    await act(async () => {
+      deleteAction('food-meal-meal-1');
+    });
+
+    expect(mockDeleteSavedMeal).toHaveBeenCalledWith('meal-1');
+    await waitFor(() => expect(screen.queryByTestId('food-meal-meal-1')).toBeNull());
+    expect(screen.getByTestId('food-item-food-apple')).toBeTruthy();
+    expect(mockUpdateFood).not.toHaveBeenCalled();
+  });
+
+  it('offers no Delete on a Usual or Recent shortcut -- a food is deleted from its own letter', async () => {
+    mockFetchRecentFoods.mockResolvedValue([{ food: banana, quantity: 1 }]);
+    renderScreen();
+    await screen.findByTestId('food-recent-food-banana');
+
+    expect(
+      screen.getByTestId('food-recent-food-banana').props.accessibilityActions,
+    ).toBeUndefined();
+    expect(screen.getByTestId('food-swipe-food-banana')).toBeTruthy();
+  });
+});

@@ -1,4 +1,9 @@
-import { ALPHABET_INDEX_LETTERS, groupByFirstLetter, OTHER_LETTER } from './alphabeticalGrouping';
+import {
+  ALPHABET_INDEX_LETTERS,
+  compareByName,
+  groupByFirstLetter,
+  OTHER_LETTER,
+} from './alphabeticalGrouping';
 
 describe('ALPHABET_INDEX_LETTERS', () => {
   it('is "#" followed by A-Z, 27 entries total', () => {
@@ -46,5 +51,31 @@ describe('groupByFirstLetter', () => {
 
   it('returns no sections for an empty list', () => {
     expect(groupByFirstLetter([], nameOf)).toEqual([]);
+  });
+});
+
+describe('compareByName', () => {
+  it('sorts A to Z ignoring case, with numbers, symbols and accented initials together first', () => {
+    const names = [
+      'banana',
+      'Éclair',
+      'Apple',
+      '10 Grain Bread',
+      'apple pie',
+      'Cherry',
+      '#1 Combo',
+    ];
+
+    const sorted = [...names].sort(compareByName);
+
+    expect(sorted.slice(3)).toEqual(['Apple', 'apple pie', 'banana', 'Cherry']);
+    expect(new Set(sorted.slice(0, 3))).toEqual(new Set(['Éclair', '10 Grain Bread', '#1 Combo']));
+    // So the "#" section is always one block.
+    const sections = groupByFirstLetter(sorted, (name) => name).map((s) => s.letter);
+    expect(sections).toEqual([OTHER_LETTER, 'A', 'B', 'C']);
+  });
+
+  it('ignores leading spaces', () => {
+    expect(compareByName('  apple', 'Banana')).toBeLessThan(0);
   });
 });

@@ -26,6 +26,18 @@ function firstLetterOf(name: string): string {
   return /^[A-Z]$/.test(first) ? first : OTHER_LETTER;
 }
 
+/**
+ * A to Z ignoring case ("apple" beside "Apple", never after "Zucchini"), with every name that
+ * groups under OTHER_LETTER -- a number, a symbol -- together ahead of the letters: the order
+ * groupByFirstLetter's sections read in, so its "#" section is always one block.
+ */
+export function compareByName(a: string, b: string): number {
+  const otherA = firstLetterOf(a) === OTHER_LETTER;
+  const otherB = firstLetterOf(b) === OTHER_LETTER;
+  if (otherA !== otherB) return otherA ? -1 : 1;
+  return a.trim().localeCompare(b.trim(), undefined, { sensitivity: 'base' });
+}
+
 export interface LetterSection<T> {
   letter: string;
   data: T[];

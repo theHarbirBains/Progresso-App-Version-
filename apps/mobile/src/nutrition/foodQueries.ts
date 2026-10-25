@@ -1,3 +1,4 @@
+import { compareByName } from '../lib/alphabeticalGrouping';
 import { fetchAllRows } from '../lib/fetchAllRows';
 import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
@@ -216,7 +217,12 @@ export async function fetchAllFoods(params: FetchAllFoodsParams): Promise<FoodRo
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  return ((data ?? []) as FoodDbRow[]).map(toFoodRow);
+  // A to Z ignoring case, numbers and symbols first (compareByName) -- whatever the database's
+  // collation orders capitals by.
+  const direction = ascending ? 1 : -1;
+  return ((data ?? []) as FoodDbRow[])
+    .map(toFoodRow)
+    .sort((a, b) => direction * compareByName(a.name, b.name));
 }
 
 export interface RecentFood {

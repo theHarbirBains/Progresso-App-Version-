@@ -196,7 +196,13 @@ export function NutritionHistoryScreen({ navigation, route }: Props) {
                 testID={`nutrition-history-log-row-${log.id}`}
                 style={[styles.logRow, index > 0 && styles.logRowDivider]}
               >
-                <FoodImage uri={log.imageUrl} name={log.foodNameSnapshot} size={44} />
+                <FoodImage
+                  testID={`nutrition-history-log-image-${log.id}`}
+                  uri={log.imageUrl}
+                  name={log.foodNameSnapshot}
+                  size={44}
+                  zoomable
+                />
                 <View style={styles.logInfo}>
                   <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
                   <Text style={styles.logMeta}>

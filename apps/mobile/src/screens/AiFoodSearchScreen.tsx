@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { BottomSheet } from '../design/BottomSheet';
 import { PrimaryButton } from '../design/Button';
 import { RiseIn } from '../design/RiseIn';
 import { Screen } from '../design/Screen';
 import { TextInput } from '../design/TextInput';
+import { colors } from '../design/theme';
 import {
   interpretFoodDescription,
   resolveFoodComponent,
@@ -16,6 +19,14 @@ import {
   type FoodInterpretation,
 } from '../lib/api';
 import { AiFoodAdjustStep } from '../nutrition/AiFoodAdjustStep';
+import {
+  AI_FOOD_DESCRIPTION_MAX,
+  aiFoodDescription,
+  defaultUnitFor,
+  parseAmount,
+  unitLabel,
+  unitsFor,
+} from '../nutrition/aiFoodFields';
 import {
   createFood,
   findOwnFoodByName,
@@ -34,12 +45,15 @@ import {
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { goToSection } from '../navigation/sectionNavigation';
 import type { RootStackScreenProps } from '../navigation/types';
+import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { aiFoodSearchStyles as styles } from './aiFoodSearchStyles';
 
 type Props = RootStackScreenProps<'AiFoodSearch'>;
 
-// AI Food Search: the user describes what they ate in their own words. Claude only works out
+// AI Food Search: the user says what they ate in three fields -- how much (an amount and a unit),
+// what food (generic, a brand, a restaurant item), and, optionally, how it was made -- which make
+// one description for the interpret request (nutrition/aiFoodFields.ts). Claude only works out
 // what the words mean. Progresso's own food data and other sources supply every figure, each
 // scaled to the amount given. Parts that need an amount or a choice are resolved on the review,
 // and nothing is saved until the person says so:
@@ -56,7 +70,12 @@ export function AiFoodSearchScreen({ navigation, route }: Props) {
   const userId = user?.id;
   const { nutritionTheme: theme } = useProgressTheme();
 
-  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  // Null until the person picks a unit: it follows the food until then (a drink starts in ml).
+  const [chosenUnit, setChosenUnit] = useState<string | null>(null);
+  const [foodName, setFoodName] = useState('');
+  const [preparation, setPreparation] = useState('');
+  const [unitSheetOpen, setUnitSheetOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clarification, setClarification] = useState<string | null>(null);
@@ -68,7 +87,12 @@ export function AiFoodSearchScreen({ navigation, route }: Props) {
   const [preparing, setPreparing] = useState(false);
   const [adjustError, setAdjustError] = useState<string | null>(null);
 
-  const trimmed = description.trim();
+  const unit = chosenUnit ?? defaultUnitFor(foodName);
+  const amountValue = parseAmount(amount);
+  const amountInvalid = amountValue !== null && Number.isNaN(amountValue);
+  const trimmed = aiFoodDescription({ amount, unit, food: foodName, preparation });
+  const tooLong = trimmed.length > AI_FOOD_DESCRIPTION_MAX;
+  const canEstimate = foodName.trim().length > 0 && !amountInvalid && !tooLong;
 
   // Warns early when a complete food already has a library entry with its name. Adding checks again.
   async function checkDuplicate(next: FoodInterpretation) {
@@ -81,7 +105,7 @@ export function AiFoodSearchScreen({ navigation, route }: Props) {
   }
 
   async function handleInterpret() {
-    if (!accessToken || trimmed.length === 0 || loading) return;
+    if (!accessToken || !canEstimate || loading) return;
     setLoading(true);
     setError(null);
     setClarification(null);
@@ -245,26 +269,64 @@ export function AiFoodSearchScreen({ navigation, route }: Props) {
         <AppCard testID="ai-food-search-card">
           <View style={styles.group}>
             <Text style={styles.description}>
-              Describe what you ate. Progresso works out the amount and ingredients, and takes the
-              calories and macros from its food data. Review the result before anything is saved.
+              Say how much you had, what it was and how it was made. Progresso works out the
+              ingredients and takes the calories and macros from its food data. Review the result
+              before anything is saved.
             </Text>
-            <Text testID="ai-food-search-accuracy" style={styles.guidance}>
-              For the most accurate estimate, include the amount, serving unit, preparation method,
-              and any oils, sauces, or other ingredients used.
-            </Text>
-            <Text testID="ai-food-search-example" style={styles.example}>
-              {'Example: "150 g chicken breast, air fried with 1 tsp olive oil."'}
-            </Text>
+            <View style={styles.servingRow}>
+              <View style={styles.amountCell}>
+                <TextInput
+                  testID="ai-food-search-amount"
+                  label="Serving size"
+                  placeholder="e.g. 150"
+                  keyboardType="decimal-pad"
+                  value={amount}
+                  onChangeText={setAmount}
+                  error={amountInvalid ? 'A number above 0' : undefined}
+                />
+              </View>
+              <View style={styles.unitCell}>
+                <Text style={styles.fieldLabel}>Unit</Text>
+                <Pressable
+                  testID="ai-food-search-unit"
+                  style={styles.unitButton}
+                  onPress={() => setUnitSheetOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Unit, ${unitLabel(unit)}`}
+                >
+                  <Text style={styles.unitValue} numberOfLines={1}>
+                    {unitLabel(unit)}
+                  </Text>
+                  <Feather name="chevron-down" size={16} color={colors.textMuted} />
+                </Pressable>
+              </View>
+            </View>
             <TextInput
               testID="ai-food-search-input"
-              label="What did you eat?"
-              placeholder="e.g. 100 grams of air fried potatoes with no oil"
-              value={description}
-              onChangeText={setDescription}
-              autoCapitalize="none"
+              label="What food did you eat?"
+              placeholder="e.g. Gala apple, Fairlife 2% milk, McDonald's Big Mac"
+              value={foodName}
+              onChangeText={setFoodName}
               returnKeyType="done"
               onSubmitEditing={handleInterpret}
             />
+            <TextInput
+              testID="ai-food-search-preparation"
+              label="How was it prepared? (optional)"
+              placeholder="e.g. Air-fried with garlic powder and no oil"
+              value={preparation}
+              onChangeText={setPreparation}
+              autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handleInterpret}
+              error={
+                tooLong ? `Keep it under ${AI_FOOD_DESCRIPTION_MAX} characters in all` : undefined
+              }
+            />
+            <Text testID="ai-food-search-accuracy" style={styles.guidance}>
+              Leave the preparation blank when it makes no difference. Oils, sauces and anything
+              cooked with it change the figures most, so include them when they&apos;re there.
+            </Text>
             {clarification ? (
               <Text testID="ai-food-search-clarification" style={styles.clarificationText}>
                 {clarification}
@@ -280,7 +342,7 @@ export function AiFoodSearchScreen({ navigation, route }: Props) {
                 testID="ai-food-search-submit"
                 label={loading ? 'Reading…' : 'Get Estimate'}
                 loading={loading}
-                disabled={trimmed.length === 0}
+                disabled={!canEstimate}
                 onPress={handleInterpret}
                 accentColor={theme.accent}
                 onAccentColor={theme.onAccent}
@@ -289,6 +351,31 @@ export function AiFoodSearchScreen({ navigation, route }: Props) {
           </View>
         </AppCard>
       </RiseIn>
+
+      <BottomSheet
+        visible={unitSheetOpen}
+        onClose={() => setUnitSheetOpen(false)}
+        testID="ai-food-search-unit-sheet"
+      >
+        <View style={styles.sheetContent}>
+          <Text style={styles.sheetTitle}>Unit</Text>
+          <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
+            {unitsFor(foodName).map((option) => (
+              <OnboardingOptionCard
+                key={option.value}
+                testID={`ai-food-search-unit-${option.value}`}
+                label={option.label}
+                selected={unit === option.value}
+                onPress={() => {
+                  setChosenUnit(option.value);
+                  setUnitSheetOpen(false);
+                }}
+                accentColor={theme.accent}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      </BottomSheet>
 
       {interpretation ? (
         <InterpretedFoodReview

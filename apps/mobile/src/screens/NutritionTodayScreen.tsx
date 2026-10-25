@@ -541,7 +541,13 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                     testID={`food-log-row-${log.id}`}
                     style={[styles.logRow, index > 0 && styles.divider]}
                   >
-                    <FoodImage uri={log.imageUrl} name={log.foodNameSnapshot} size={44} />
+                    <FoodImage
+                      testID={`food-log-image-${log.id}`}
+                      uri={log.imageUrl}
+                      name={log.foodNameSnapshot}
+                      size={44}
+                      zoomable
+                    />
                     <View style={styles.logInfo}>
                       <Text style={styles.logName}>{log.foodNameSnapshot}</Text>
                       <Text style={styles.logMeta}>

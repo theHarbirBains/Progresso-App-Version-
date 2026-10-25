@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   SectionList,
   View,
@@ -20,6 +21,7 @@ import { IconButton } from '../design/IconButton';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
+import { SwipeToDelete } from '../design/SwipeToDelete';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import { useAppMenu } from '../navigation/AppMenuContext';
@@ -36,10 +38,11 @@ import {
   fetchAllFoods,
   fetchRecentFoods,
   fetchUsualFoods,
+  updateFood,
   type FoodRow,
   type RecentFood,
 } from '../nutrition/foodQueries';
-import { fetchSavedMeals, type SavedMeal } from '../nutrition/savedMealQueries';
+import { deleteSavedMeal, fetchSavedMeals, type SavedMeal } from '../nutrition/savedMealQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { foodLibraryStyles as styles } from './foodLibraryStyles';
 import { FoodFormScreen } from './FoodFormScreen';
@@ -99,7 +102,9 @@ function foodSubtitle(food: FoodRow): string {
 // category glyph), name, serving and calories as a mono value -- under
 // a small letter heading for each letter that has any (no A-Z rail -- a
 // letter with no foods has no heading at all). Tapping a row logs it;
-// the pencil edits it (a recipe opens its recipe form). Above the letters:
+// the pencil edits it (a recipe opens its recipe form); swiping it left shows
+// Delete, which asks first -- a food or recipe is deactivated, never removed,
+// so everything logged from it keeps its figures. Above the letters:
 // Saved Meals (tap one to see its foods and log them all, or edit it); then,
 // while nothing is searched for, Usual -- the foods logged on the most
 // different days lately -- and Recent, the foods logged most recently that
@@ -223,6 +228,48 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
     }
   }
 
+  // The one row showing Delete, if any.
+  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
+  const loadShortcutsRef = useRef(loadShortcuts);
+  loadShortcutsRef.current = loadShortcuts;
+
+  // Deleting from the list asks first. A food or recipe is deactivated (as the form's
+  // Deactivate does), so it leaves the library but every log keeps its figures; a saved meal is
+  // removed, and its foods stay.
+  const requestDelete = useCallback((item: LibraryItem) => {
+    const isMeal = item.kind === 'meal';
+    const name = isMeal ? item.meal.name : item.food.name;
+    async function remove() {
+      try {
+        if (item.kind === 'meal') {
+          await deleteSavedMeal(item.meal.id);
+          setMeals((prev) => prev.filter((meal) => meal.id !== item.meal.id));
+        } else {
+          await updateFood(item.food.id, { isActive: false });
+          setRows((prev) => prev.filter((food) => food.id !== item.food.id));
+          // A deleted food mustn't stay in Usual or Recent.
+          void loadShortcutsRef.current();
+        }
+        setSwipeOpenId(null);
+      } catch (err) {
+        Alert.alert(
+          `Couldn't delete ${name}`,
+          err instanceof Error ? err.message : 'Please try again.',
+        );
+      }
+    }
+    Alert.alert(
+      `Delete ${name}?`,
+      isMeal
+        ? "It leaves your Food Library. Its foods stay, and anything you've logged keeps its figures."
+        : "It leaves your Food Library. Anything you've logged keeps its figures.",
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => setSwipeOpenId(null) },
+        { text: 'Delete', style: 'destructive', onPress: () => void remove() },
+      ],
+    );
+  }, []);
+
   // Only letters that have foods -- groupFoodsByLetter makes no empty sections.
   const sections = useMemo(() => groupFoodsByLetter(rows), [rows]);
   const listSections = useMemo(() => {
@@ -301,28 +348,41 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
           groupTotals(meal.items.filter((entry) => entry.food.isActive)).calories,
         );
         return (
-          <View style={[styles.row, index > 0 && styles.rowDivider]}>
-            <View style={styles.flex}>
-              <ListRow
-                testID={`food-meal-${meal.id}`}
-                leading={<FoodImage uri={null} name={meal.name} size={44} />}
-                title={meal.name}
-                subtitle={`${count} ${count === 1 ? 'food' : 'foods'}`}
-                value={`${calories} cal`}
-                chevron={false}
-                onPress={() => {
-                  setMealError(null);
-                  setOpenMeal(meal);
-                }}
-              />
+          <SwipeToDelete
+            testID={`food-meal-swipe-${meal.id}`}
+            style={index > 0 && styles.rowDivider}
+            name={meal.name}
+            open={swipeOpenId === `meal-${meal.id}`}
+            onOpenChange={(open) => setSwipeOpenId(open ? `meal-${meal.id}` : null)}
+            onDelete={() => requestDelete(item)}
+          >
+            <View style={styles.row}>
+              <View style={styles.flex}>
+                <ListRow
+                  testID={`food-meal-${meal.id}`}
+                  leading={<FoodImage uri={null} name={meal.name} size={44} />}
+                  title={meal.name}
+                  subtitle={`${count} ${count === 1 ? 'food' : 'foods'}`}
+                  value={`${calories} cal`}
+                  chevron={false}
+                  onPress={() => {
+                    setMealError(null);
+                    setOpenMeal(meal);
+                  }}
+                  accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
+                  onAccessibilityAction={(event) => {
+                    if (event.nativeEvent.actionName === 'delete') requestDelete(item);
+                  }}
+                />
+              </View>
             </View>
-          </View>
+          </SwipeToDelete>
         );
       }
       const { food, last } = item;
       const shortcut = section.key === 'usual' || section.key === 'recent';
-      return (
-        <View style={[styles.row, index > 0 && styles.rowDivider]}>
+      const row = (
+        <View style={[styles.row, shortcut && index > 0 && styles.rowDivider]}>
           <View style={styles.flex}>
             <ListRow
               testID={shortcut ? `food-${section.key}-${food.id}` : `food-item-${food.id}`}
@@ -339,6 +399,10 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
                   entered: last?.entered ?? null,
                 })
               }
+              accessibilityActions={shortcut ? undefined : [{ name: 'delete', label: 'Delete' }]}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === 'delete') requestDelete(item);
+              }}
             />
           </View>
           {/* A usual or recent food can come from Search, which isn't the user's to edit. */}
@@ -359,8 +423,23 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
           )}
         </View>
       );
+      // A usual or recent food is only a shortcut (and may be from Search): it's deleted from
+      // its own letter.
+      if (shortcut) return row;
+      return (
+        <SwipeToDelete
+          testID={`food-swipe-${food.id}`}
+          style={index > 0 && styles.rowDivider}
+          name={food.name}
+          open={swipeOpenId === `food-${food.id}`}
+          onOpenChange={(open) => setSwipeOpenId(open ? `food-${food.id}` : null)}
+          onDelete={() => requestDelete(item)}
+        >
+          {row}
+        </SwipeToDelete>
+      );
     },
-    [],
+    [swipeOpenId, requestDelete],
   );
 
   if (mode.type === 'meal-form' || mode.type === 'recipe-form') {

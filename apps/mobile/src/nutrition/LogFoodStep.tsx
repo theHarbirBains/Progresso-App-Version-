@@ -221,7 +221,13 @@ export function LogFoodStep({
     >
       <AppCard hero testID="log-food-summary">
         <View style={styles.foodRow}>
-          <FoodImage uri={food.imageUrl} name={food.name} size={72} />
+          <FoodImage
+            testID="log-food-step-image"
+            uri={food.imageUrl}
+            name={food.name}
+            size={72}
+            zoomable
+          />
           <View style={styles.summaryBody}>
             <Text testID="log-food-amount" style={styles.amount}>
               {amountText()}
