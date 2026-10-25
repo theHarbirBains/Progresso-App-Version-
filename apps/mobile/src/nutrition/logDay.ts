@@ -38,6 +38,17 @@ export function dayLabel(key: string, now: Date = new Date()): string {
   });
 }
 
+/** A week by its Sunday's key: "Week of October 18" -- with the year when it isn't this year's. */
+export function weekOfLabel(sundayKey: string, now: Date = new Date()): string {
+  const sunday = dayFromKey(sundayKey);
+  const date = sunday.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    ...(sunday.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+  });
+  return `Week of ${date}`;
+}
+
 /**
  * When a food logged to `key` is logged: undefined (now) for today; for any other day -- before
  * today, or ahead of it -- that day at the current time of day, so its foods keep the order they

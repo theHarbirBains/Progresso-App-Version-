@@ -727,8 +727,10 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     mockFetchNutritionGoals.mockResolvedValue(goals);
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     mockFetchFoodLogsForRange.mockResolvedValue([
-      { ...sampleLog, id: 'mon', calories: 1800 },
-      { ...sampleLog, id: 'tue', calories: 1200 },
+      { ...sampleLog, id: 'mon', calories: 1800, loggedAt: new Date(2026, 9, 19, 9).toISOString() },
+      { ...sampleLog, id: 'tue', calories: 1200, loggedAt: new Date(2026, 9, 20, 9).toISOString() },
+      // Today's own are counted from the shared cache, never twice.
+      { ...sampleLog, id: 'log-1', loggedAt: new Date(2026, 9, 21, 9).toISOString() },
     ]);
     renderScreen();
 
@@ -737,11 +739,12 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     );
     expect(screen.getByTestId('weekly-budget-consumed')).toHaveTextContent('3,330');
     expect(screen.getByTestId('weekly-budget-target')).toHaveTextContent('/ 14,000 cal');
-    // Sunday 00:00 up to today 00:00 -- today's own come from the shared cache.
+    expect(screen.getByText('This Week')).toBeTruthy();
+    // The whole week, Sunday 00:00 to the next Sunday.
     expect(mockFetchFoodLogsForRange).toHaveBeenCalledWith(
       'user-1',
       new Date(2026, 9, 18),
-      new Date(2026, 9, 21),
+      new Date(2026, 9, 25),
     );
   });
 
@@ -760,7 +763,7 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     expect(mockFetchFoodLogsForRange).toHaveBeenCalledWith(
       'user-1',
       new Date(2026, 9, 18),
-      new Date(2026, 9, 24),
+      new Date(2026, 9, 25),
     );
   });
 
@@ -780,16 +783,23 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     expect(screen.getByTestId('weekly-budget-consumed')).toHaveTextContent('1,000');
   });
 
-  it('starts again from 0 on a Sunday, with no earlier days to read', async () => {
+  it('starts again from 0 on a Sunday: nothing before today counts', async () => {
     setToday(new Date(2026, 9, 25, 12, 0));
     mockFetchNutritionGoals.mockResolvedValue(goals);
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    mockFetchFoodLogsForRange.mockResolvedValue([
+      { ...sampleLog, id: 'log-1', loggedAt: new Date(2026, 9, 25, 9).toISOString() },
+    ]);
     renderScreen();
 
     expect(await screen.findByTestId('weekly-budget-remaining')).toHaveTextContent(
       '13,670 cal left · 7 days to go, today included',
     );
-    expect(mockFetchFoodLogsForRange).not.toHaveBeenCalled();
+    expect(mockFetchFoodLogsForRange).toHaveBeenCalledWith(
+      'user-1',
+      new Date(2026, 9, 25),
+      new Date(2026, 9, 32),
+    );
   });
 
   it('offers to set a target when there is none', async () => {
@@ -951,8 +961,8 @@ describe('NutritionTodayScreen -- any day', () => {
     // Named by its date at the top; the list is just its foods.
     expect(screen.getByText('Foods')).toBeTruthy();
     expect(screen.queryByText(/Yesterday/)).toBeNull();
-    // Today's own shortcuts -- the week's budget and Copy Yesterday -- are today's only.
-    expect(screen.queryByTestId('nutrition-today-week')).toBeNull();
+    // The week's budget shows on every day; Copy Yesterday is today's only.
+    expect(screen.getByTestId('nutrition-today-week')).toBeTruthy();
     expect(screen.queryByTestId('nutrition-today-copy-yesterday')).toBeNull();
   });
 
@@ -1062,6 +1072,67 @@ describe('NutritionTodayScreen -- any day', () => {
 
     expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
     expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
+  });
+
+  it("shows the week's budget on any day, through that day, and another week by its Sunday", async () => {
+    mockFetchNutritionGoals.mockResolvedValue({
+      calories: 2000,
+      proteinG: null,
+      carbsG: null,
+      fatG: null,
+    });
+    mockFetchFoodLogsForRange.mockImplementation(async (_userId: string, start: Date) =>
+      dayKey(start) === '2026-10-18'
+        ? [
+            {
+              ...sampleLog,
+              id: 'sun',
+              calories: 1000,
+              loggedAt: new Date(2026, 9, 18, 9).toISOString(),
+            },
+            {
+              ...sampleLog,
+              id: 'mon',
+              calories: 1500,
+              loggedAt: new Date(2026, 9, 19, 9).toISOString(),
+            },
+            { ...sampleLog, id: 'log-tuesday', loggedAt: new Date(2026, 9, 20, 9).toISOString() },
+          ]
+        : [
+            {
+              ...sampleLog,
+              id: 'prev',
+              calories: 2000,
+              loggedAt: new Date(2026, 9, 12, 9).toISOString(),
+            },
+          ],
+    );
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    // Tuesday: Sunday and Monday, and Tuesday's own 330.
+    turn('previous');
+    await screen.findByTestId('food-log-row-log-tuesday');
+    expect(screen.getByText('This Week')).toBeTruthy();
+    expect(await screen.findByTestId('weekly-budget-consumed')).toHaveTextContent('2,830');
+    expect(screen.getByTestId('weekly-budget-remaining')).toHaveTextContent(
+      '11,170 cal left · 5 days to go, this day included',
+    );
+
+    // Saturday the 17th is in the week before.
+    turn('previous');
+    turn('previous');
+    turn('previous');
+    expect(dayLabelText()).toHaveTextContent('Saturday, October 17');
+    expect(await screen.findByText('Week of October 11')).toBeTruthy();
+    expect(mockFetchFoodLogsForRange).toHaveBeenCalledWith(
+      'user-1',
+      new Date(2026, 9, 11),
+      new Date(2026, 9, 18),
+    );
+    expect(await screen.findByTestId('weekly-budget-remaining')).toHaveTextContent(
+      '12,000 cal left · 1 day to go, this day included',
+    );
   });
 
   it("deletes a past day's food there", async () => {

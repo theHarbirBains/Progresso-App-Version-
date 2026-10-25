@@ -7,11 +7,18 @@ import { colors, spacing, typeScale } from '../design/theme';
 import { computeWeeklyCalorieSummary } from './nutritionCalculations';
 
 interface Props {
-  /** Calories eaten this week so far, Sunday to now; null while the earlier days are read. */
+  /** "This Week", or another week's name ("Week of October 18"). */
+  title?: string;
+  /** Whether the figures run through today (the default) or through another day shown. */
+  today?: boolean;
+  /**
+   * Calories in the week so far, from its Sunday through the day shown; null while the week is
+   * read.
+   */
   consumed: number | null;
   /** The daily calorie target; the week's budget is 7 times it. Null when none is set. */
   dailyTarget: number | null;
-  /** Days left in the week, today included. */
+  /** Days left in the week, the day shown included. */
   daysLeft: number;
   /** The week's earlier days couldn't be read. */
   failed?: boolean;
@@ -24,13 +31,16 @@ function calories(value: number): string {
 }
 
 /**
- * Nutrition Today's "This Week" widget: the week's calorie budget -- 7 times the daily target,
- * Sunday to Saturday -- against what's been eaten so far, as a bar in the accent, with what's
- * left and the days left to spread it over. Eating under the target one day leaves more for
+ * Nutrition's week widget, on every day: the week's calorie budget -- 7 times the daily target,
+ * Sunday to Saturday -- against what's been logged from its Sunday through the day shown, as a bar
+ * in the accent, with what's left and the days left to spread it over. On today it's "This Week";
+ * on a day in another week, that week by its Sunday. Eating under the target one day leaves more for
  * another, and this is where that shows. Over budget is said plainly, never as an error. With
  * no daily target there's no budget to show, only a way to set one.
  */
 export function WeeklyCalorieBudget({
+  title = 'This Week',
+  today = true,
   consumed,
   dailyTarget,
   daysLeft,
@@ -39,16 +49,16 @@ export function WeeklyCalorieBudget({
   onSetTarget,
 }: Props) {
   const summary = consumed === null ? null : computeWeeklyCalorieSummary(consumed, dailyTarget);
-  const days = `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} to go, today included`;
+  const days = `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} to go, ${today ? 'today' : 'this day'} included`;
   const remainingText = summary
     ? summary.remaining >= 0
       ? `${calories(summary.remaining)} cal left · ${days}`
-      : `${calories(-summary.remaining)} cal over this week's budget`
+      : `${calories(-summary.remaining)} cal over ${today ? "this week's" : "the week's"} budget`
     : null;
 
   return (
     <AppCard testID="nutrition-today-week">
-      <Section title="This Week">
+      <Section title={title}>
         {dailyTarget === null ? (
           <View style={styles.noTarget}>
             <Text testID="weekly-budget-no-target" style={styles.caption}>
@@ -62,15 +72,15 @@ export function WeeklyCalorieBudget({
           </View>
         ) : failed ? (
           <Text testID="weekly-budget-error" style={styles.caption}>
-            This week&apos;s total couldn&apos;t be loaded.
+            {today ? 'This' : 'The'} week&apos;s total couldn&apos;t be loaded.
           </Text>
         ) : (
           <View
             accessible
             accessibilityLabel={
               summary
-                ? `This week, ${calories(summary.consumed)} of ${calories(summary.target)} calories. ${remainingText}`
-                : 'This week, loading'
+                ? `${title}, ${calories(summary.consumed)} of ${calories(summary.target)} calories. ${remainingText}`
+                : `${title}, loading`
             }
           >
             <View style={styles.figures}>

@@ -7,6 +7,7 @@ import {
   loggedAtFor,
   shiftDay,
   todayKey,
+  weekOfLabel,
 } from './logDay';
 
 // A fixed local "now": Saturday, October 24, 2026, 3:45:10 pm.
@@ -42,6 +43,13 @@ describe('dayLabel', () => {
     expect(thisYear).toContain('20');
     expect(thisYear).not.toContain('2026');
     expect(dayLabel('2025-12-31', now)).toContain('2025');
+  });
+});
+
+describe('weekOfLabel', () => {
+  it("names a week by its Sunday, with the year only when it isn't this year", () => {
+    expect(weekOfLabel('2026-10-18', now)).toBe('Week of October 18');
+    expect(weekOfLabel('2025-12-28', now)).toContain('2025');
   });
 });
 

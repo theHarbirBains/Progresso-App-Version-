@@ -23,7 +23,8 @@ import { FoodImage } from '../nutrition/FoodImage';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
 import { fetchFoodLogsForRange, type FoodLogRow } from '../nutrition/foodLogQueries';
-import { isTodayKey, shiftDay, todayKey } from '../nutrition/logDay';
+import { isTodayKey, shiftDay, todayKey, weekOfLabel } from '../nutrition/logDay';
+import { dayFromKey, dayKey } from '../lib/dayKey';
 import { servingMeasures, servingsFor, unitWord } from '../nutrition/logQuantity';
 import {
   calculateRemaining,
@@ -64,7 +65,7 @@ function grams(value: number): string {
 // Nutrition History's calendar (route.params.day). Today is the shared, live
 // food log (FoodLogProvider); any other day is read for itself (useDayLogs).
 // Logging from another day logs to it -- the day goes with each way to log as a route param
-// -- and only today shows the week's budget and Copy Yesterday.
+// -- and every day shows its week's calorie budget; only today shows Copy Yesterday.
 //
 // Layout: the shared Screen with a hamburger menu, the day bar, then five
 // widgets `widgetGap` apart, rising in like every other page's:
@@ -173,9 +174,8 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [yesterdayLogs, setYesterdayLogs] = useState<FoodLogRow[]>([]);
-  // Calories from this week's days before today; today's own come from the shared cache, so
-  // logging a food moves the week's bar at once. Null while being read.
-  const [earlierThisWeek, setEarlierThisWeek] = useState<number | null>(null);
+  // The foods of the week the day shown is in (Sunday to Saturday), for its calorie budget.
+  const [weekLogs, setWeekLogs] = useState<{ start: number; rows: FoodLogRow[] } | null>(null);
   const [weekFailed, setWeekFailed] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [saveMealOpen, setSaveMealOpen] = useState(false);
@@ -205,21 +205,17 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     }
   }, [userId, day]);
 
-  // This week's days before today, for the week's calorie budget -- read each time Today opens,
-  // like yesterday's. On a Sunday there are none.
+  // The week of the day shown, for the week's calorie budget on any day -- read as the page opens
+  // and again each time the day changes; within the same week the last read counts meanwhile,
+  // so a swipe never blanks the bar. Only the latest read is kept.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    const now = new Date();
-    const { start: weekStart } = getCurrentWeekRange(now);
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (weekStart.getTime() >= todayStart.getTime()) {
-      setEarlierThisWeek(0);
-      return;
-    }
-    fetchFoodLogsForRange(userId, weekStart, todayStart)
+    const { start, end } = getCurrentWeekRange(dayFromKey(day));
+    setWeekFailed(false);
+    fetchFoodLogsForRange(userId, start, end)
       .then((rows) => {
-        if (!cancelled) setEarlierThisWeek(sumDailyTotals(rows).calories);
+        if (!cancelled) setWeekLogs({ start: start.getTime(), rows });
       })
       .catch(() => {
         if (!cancelled) setWeekFailed(true);
@@ -227,7 +223,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, day]);
 
   // Seeds a draft input for any log not already tracked (a fresh load, or a
   // food logged elsewhere while this screen is mounted) without touching an
@@ -247,6 +243,22 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   }, [logs]);
 
   const consumed = useMemo(() => sumDailyTotals(logs), [logs]);
+  // The week through the day shown: its days before that day from the week's read, and the day's
+  // own from its foods above, so a food logged, edited or deleted here moves the bar at once.
+  const week = useMemo(() => {
+    const shown = dayFromKey(day);
+    const start = getCurrentWeekRange(shown).start;
+    const earlier =
+      weekLogs?.start === start.getTime()
+        ? sumDailyTotals(weekLogs.rows.filter((row) => new Date(row.loggedAt) < shown)).calories
+        : null;
+    const thisWeek = start.getTime() === getCurrentWeekRange().start.getTime();
+    return {
+      earlier,
+      title: thisWeek ? 'This Week' : weekOfLabel(dayKey(start)),
+      daysLeft: daysLeftInWeek(shown),
+    };
+  }, [day, weekLogs]);
   const remaining = useMemo(() => calculateRemaining(consumed, goals), [consumed, goals]);
   const displayError = error ?? goalsError ?? logsError;
   const accent = nutritionTheme.accent;
@@ -418,16 +430,16 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
             </View>
           </AppCard>
 
-          {isToday ? (
-            <WeeklyCalorieBudget
-              consumed={earlierThisWeek === null ? null : earlierThisWeek + consumed.calories}
-              dailyTarget={goals.calories}
-              daysLeft={daysLeftInWeek()}
-              failed={weekFailed}
-              accentColor={accent}
-              onSetTarget={() => navigation.navigate('NutritionGoals')}
-            />
-          ) : null}
+          <WeeklyCalorieBudget
+            title={week.title}
+            today={isToday}
+            consumed={week.earlier === null ? null : week.earlier + consumed.calories}
+            dailyTarget={goals.calories}
+            daysLeft={week.daysLeft}
+            failed={weekFailed}
+            accentColor={accent}
+            onSetTarget={() => navigation.navigate('NutritionGoals')}
+          />
 
           <AppCard testID="nutrition-today-actions" style={styles.actions}>
             <PrimaryButton

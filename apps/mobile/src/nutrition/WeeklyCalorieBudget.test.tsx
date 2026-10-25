@@ -43,6 +43,24 @@ describe('WeeklyCalorieBudget', () => {
     expect(bar.backgroundColor).toBe('#E8A33D');
   });
 
+  it('names another week, and counts from the day shown rather than today', () => {
+    renderBudget({ title: 'Week of October 11', today: false, consumed: 9450, daysLeft: 3 });
+
+    expect(screen.getByText('Week of October 11')).toBeTruthy();
+    expect(screen.getByTestId('weekly-budget-remaining')).toHaveTextContent(
+      '4,550 cal left · 3 days to go, this day included',
+    );
+    expect(screen.getByLabelText(/Week of October 11, 9,450 of 14,000 calories/)).toBeTruthy();
+  });
+
+  it("says another week's over plainly too", () => {
+    renderBudget({ title: 'Week of October 11', today: false, consumed: 14350, daysLeft: 1 });
+
+    expect(screen.getByTestId('weekly-budget-remaining')).toHaveTextContent(
+      "350 cal over the week's budget",
+    );
+  });
+
   it('counts one day as a day', () => {
     renderBudget({ consumed: 12000, daysLeft: 1 });
 
@@ -80,7 +98,7 @@ describe('WeeklyCalorieBudget', () => {
   it('reads as one figure to assistive tech, and renders no bare text', () => {
     renderBudget();
 
-    expect(screen.getByLabelText(/This week, 9,450 of 14,000 calories/)).toBeTruthy();
+    expect(screen.getByLabelText(/This Week, 9,450 of 14,000 calories/)).toBeTruthy();
     expectNoBareText();
   });
 });
