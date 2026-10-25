@@ -4308,6 +4308,259 @@ async function main() {
     );
   }
 
+  console.log('\nRunning feedback board tests...\n');
+  {
+    const [sender, other] = [randomUUID(), randomUUID()];
+    await admin.query('insert into auth.users (id, email) values ($1,$2),($3,$4)', [
+      sender,
+      `sender-${sender}@test.local`,
+      other,
+      `other-${other}@test.local`,
+    ]);
+    // Written as the API writes them: with the service role's own access.
+    const send = async (userId, extra = {}) =>
+      (
+        await admin.query(
+          `insert into public.feedback_submissions (user_id, category, title, description, screenshot_path)
+           values ($1, $2, $3, $4, $5) returning id`,
+          [
+            userId,
+            extra.category ?? 'bug',
+            extra.title ?? 'Swipe skips a day',
+            extra.description ?? 'Swiping left on Nutrition went two days ahead.',
+            extra.screenshotPath ?? null,
+          ],
+        )
+      ).rows[0].id;
+    const mine = await send(sender, { screenshotPath: `${sender}/shot.png` });
+    const theirs = await send(other, { category: 'feature', title: 'Dark mode widget' });
+
+    record(
+      'The feedback-screenshots bucket is private, 5 MB, JPEG or PNG',
+      await admin
+        .query(
+          "select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'feedback-screenshots'",
+        )
+        .then(({ rows: [b] }) => b && b.public === false && Number(b.file_size_limit) === 5242880 && b.allowed_mime_types.join() === 'image/jpeg,image/png'),
+    );
+
+    await asUser(sender, async (c) => {
+      const res = await c.query('select id from public.feedback_submissions');
+      record(
+        "A person reads their own feedback, and nobody else's",
+        res.rowCount === 1 && res.rows[0].id === mine,
+        `rows=${JSON.stringify(res.rows)}`,
+      );
+    });
+    await asUser(other, async (c) => {
+      const res = await c.query('select id from public.feedback_submissions where id = $1', [mine]);
+      expectRowCount(res, 0, "Someone else's feedback can't be read, even by its id");
+    });
+
+    await expectThrows(
+      asUser(sender, (c) =>
+        c.query(
+          "insert into public.feedback_submissions (user_id, category, title, description) values ($1, 'bug', 'x', 'y')",
+          [sender],
+        ),
+      ),
+      'Feedback is never written from the app directly -- only through the API',
+      /permission denied/,
+    );
+    await expectThrows(
+      asUser(sender, (c) =>
+        c.query("update public.feedback_submissions set status = 'completed' where id = $1", [mine]),
+      ),
+      "A person can't set their own feedback's status",
+      /permission denied/,
+    );
+    await expectThrows(
+      asUser(sender, (c) => c.query('delete from public.feedback_submissions where id = $1', [mine])),
+      "A person can't delete or withdraw their feedback once it's sent",
+      /permission denied/,
+    );
+    await expectThrows(
+      admin.query("update public.feedback_submissions set status = 'done' where id = $1", [mine]),
+      'A status is one of the six',
+      /check constraint/,
+    );
+    await expectThrows(
+      send(sender, { screenshotPath: `${other}/shot.png` }),
+      "A screenshot is always in the sender's own folder",
+      /check constraint/,
+    );
+    await expectThrows(
+      send(sender, { title: '   ' }),
+      'A title is needed',
+      /check constraint/,
+    );
+
+    await admin.query("update public.feedback_submissions set status = 'reviewing' where id = $1", [mine]);
+    await admin.query("update public.feedback_submissions set status = 'reviewing' where id = $1", [mine]);
+    await admin.query("update public.feedback_submissions set status = 'planned' where id = $1", [mine]);
+    await asUser(sender, async (c) => {
+      const res = await c.query(
+        'select status from public.feedback_status_events where submission_id = $1 order by created_at, id',
+        [mine],
+      );
+      const statuses = res.rows.map((r) => r.status);
+      record(
+        'Every status is kept as it happens -- sent, then each change, never a repeat',
+        statuses.length === 3 &&
+          statuses[0] === 'new' &&
+          statuses.includes('reviewing') &&
+          statuses.includes('planned'),
+        JSON.stringify(statuses),
+      );
+      const changed = await c.query(
+        'select status, status_changed_at > created_at as moved from public.feedback_submissions where id = $1',
+        [mine],
+      );
+      record(
+        'The status shows when it last changed',
+        changed.rows[0].status === 'planned' && changed.rows[0].moved === true,
+      );
+    });
+    await asUser(other, async (c) => {
+      const res = await c.query('select id from public.feedback_status_events where submission_id = $1', [
+        mine,
+      ]);
+      expectRowCount(res, 0, "Someone else's status history can't be read");
+    });
+    await expectThrows(
+      asUser(sender, (c) =>
+        c.query("insert into public.feedback_status_events (submission_id, status) values ($1, 'completed')", [
+          mine,
+        ]),
+      ),
+      "A person can't add to their feedback's history",
+      /permission denied/,
+    );
+
+    const adminId = randomUUID();
+    await admin.query('insert into auth.users (id, email) values ($1, $2)', [
+      adminId,
+      `admin-${adminId}@test.local`,
+    ]);
+    await admin.query(
+      'insert into public.feedback_notes (submission_id, author_id, body) values ($1, $2, $3)',
+      [mine, adminId, 'Repro on iOS 18; likely the swipe threshold.'],
+    );
+    await expectThrows(
+      asUser(sender, (c) => c.query('select body from public.feedback_notes')),
+      'Internal notes are never readable from the app, not even on your own feedback',
+      /permission denied/,
+    );
+    await expectThrows(
+      asUser(adminId, (c) =>
+        c.query('insert into public.feedback_notes (submission_id, body) values ($1, $2)', [mine, 'x']),
+      ),
+      'Notes are only written through the API, by an admin',
+      /permission denied/,
+    );
+
+    await admin.query(
+      `insert into public.admin_actions (admin_id, action, target_table, target_id, details)
+       values ($1, 'feedback.status_changed', 'feedback_submissions', $2, '{"from":"reviewing","to":"planned"}')`,
+      [adminId, mine],
+    );
+    await expectThrows(
+      asUser(adminId, (c) => c.query('select id from public.admin_actions')),
+      'The admin log is never readable from the app',
+      /permission denied/,
+    );
+    await expectThrows(
+      admin.query("update public.admin_actions set action = 'nothing' where target_id = $1", [mine]),
+      'The admin log is append-only, even for the service role',
+      /append-only/,
+    );
+    await expectThrows(
+      admin.query('delete from public.admin_actions where target_id = $1', [mine]),
+      'Nothing is ever deleted from the admin log',
+      /append-only/,
+    );
+
+    // Screenshots
+    const senderShot = `${sender}/shot.png`;
+    await asUser(sender, async (c) => {
+      const res = await c.query(
+        "insert into storage.objects (bucket_id, name, owner) values ('feedback-screenshots', $1, $2)",
+        [`${sender}/new.png`, sender],
+      );
+      record('A person can upload a screenshot into their own folder', res.rowCount === 1);
+    });
+    await expectThrows(
+      asUser(other, (c) =>
+        c.query(
+          "insert into storage.objects (bucket_id, name, owner) values ('feedback-screenshots', $1, $2)",
+          [`${sender}/planted.png`, other],
+        ),
+      ),
+      "Nobody can upload into someone else's screenshot folder",
+      RLS_ERROR,
+    );
+    await admin.query(
+      "insert into storage.objects (bucket_id, name, owner) values ('feedback-screenshots', $1, $2), ('feedback-screenshots', $3, $2)",
+      [senderShot, sender, `${sender}/unsent.png`],
+    );
+    await asUser(sender, async (c) => {
+      const res = await c.query(
+        "select name from storage.objects where bucket_id = 'feedback-screenshots' and name = $1",
+        [senderShot],
+      );
+      expectRowCount(res, 1, 'A person can see their own screenshot');
+    });
+    await asUser(other, async (c) => {
+      const res = await c.query(
+        "select name from storage.objects where bucket_id = 'feedback-screenshots' and name = $1",
+        [senderShot],
+      );
+      expectRowCount(res, 0, "Someone else's screenshot can't be seen");
+    });
+    await asUser(sender, async (c) => {
+      const sent = await c.query(
+        "delete from storage.objects where bucket_id = 'feedback-screenshots' and name = $1",
+        [senderShot],
+      );
+      const unsent = await c.query(
+        "delete from storage.objects where bucket_id = 'feedback-screenshots' and name = $1",
+        [`${sender}/unsent.png`],
+      );
+      record(
+        "A person can take back a screenshot that wasn't sent, never one their feedback points at",
+        sent.rowCount === 0 && unsent.rowCount === 1,
+        `sent=${sent.rowCount} unsent=${unsent.rowCount}`,
+      );
+      const moved = await c.query(
+        "update storage.objects set name = $2 where bucket_id = 'feedback-screenshots' and name = $1",
+        [senderShot, `${sender}/renamed.png`],
+      );
+      record('A sent screenshot can\'t be replaced', moved.rowCount === 0);
+    });
+
+    // Account deletion: their feedback, its history and the notes on it go with them.
+    await admin.query('delete from auth.users where id = $1', [sender]);
+    const left = async (sql) => Number((await admin.query(sql, [mine])).rows[0].n);
+    record(
+      "Deleting an account deletes the person's feedback, its history and the notes on it",
+      (await left('select count(*) as n from public.feedback_submissions where id = $1')) === 0 &&
+        (await left('select count(*) as n from public.feedback_status_events where submission_id = $1')) === 0 &&
+        (await left('select count(*) as n from public.feedback_notes where submission_id = $1')) === 0,
+    );
+    record(
+      'The admin log keeps its record of what was done',
+      (await left('select count(*) as n from public.admin_actions where target_id = $1')) === 1,
+    );
+    record(
+      "Someone else's feedback is untouched by it",
+      Number(
+        (await admin.query('select count(*) as n from public.feedback_submissions where id = $1', [theirs]))
+          .rows[0].n,
+      ) === 1,
+    );
+    await admin.query('delete from auth.users where id = $1', [adminId]);
+  }
+
   await admin.end();
 }
 
