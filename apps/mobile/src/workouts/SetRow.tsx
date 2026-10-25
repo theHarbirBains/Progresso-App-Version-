@@ -4,7 +4,9 @@ import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../design/theme';
 import type { MeasurementType } from '../exercises/movementTypes';
+import { formatDuration } from '../lib/duration';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { stopSetTimer, useSetTimer } from './setTimers';
 import { SetValueFields } from './SetValueFields';
 
 interface Props {
@@ -28,9 +30,15 @@ interface Props {
   onChangeWeight: (setId: string, text: string) => void;
   onChangeReps: (setId: string, text: string) => void;
   onChangeDuration?: (setId: string, text: string) => void;
-  onToggleComplete: (setId: string) => void;
+  /**
+   * Completes or un-completes the set. When its timer was going, `timed` carries the time it
+   * stopped at (by set id), since that time isn't in the typed drafts yet.
+   */
+  onToggleComplete: (setId: string, timed?: Record<string, string>) => void;
   /** Omitted where removing a set mid-workout isn't offered (see each caller). */
   onRemove?: (setId: string) => void;
+  /** A timed set gets a timer (the live workout only); its check then finishes the timer too. */
+  timer?: boolean;
   accentColor: string;
   onAccentColor: string;
   testID?: string;
@@ -58,11 +66,21 @@ function SetRowComponent({
   onChangeDuration,
   onToggleComplete,
   onRemove,
+  timer = false,
   accentColor,
   onAccentColor,
   testID,
 }: Props) {
-  const canToggle = completed || canComplete;
+  const timing = useSetTimer(setId);
+  const timed = timer && measurementType === 'timed';
+  const canToggle = completed || canComplete || (timed && timing !== undefined);
+
+  function handleComplete() {
+    // Finishing a timed set: its timer stops, and the set is completed at that time.
+    const seconds = timed && !completed ? stopSetTimer(setId) : null;
+    if (seconds !== null) onToggleComplete(setId, { [setId]: formatDuration(seconds) });
+    else onToggleComplete(setId);
+  }
 
   return (
     <View testID={testID} style={styles.setRow}>
@@ -78,6 +96,8 @@ function SetRowComponent({
         onChangeWeight={onChangeWeight}
         onChangeReps={onChangeReps}
         onChangeDuration={onChangeDuration}
+        timer={timed}
+        accentColor={accentColor}
         testID={testID}
       />
       <TouchableOpacity
@@ -89,7 +109,7 @@ function SetRowComponent({
             backgroundColor: completed ? accentColor : 'transparent',
           },
         ]}
-        onPress={() => onToggleComplete(setId)}
+        onPress={handleComplete}
         disabled={!canToggle}
         accessibilityRole="button"
         accessibilityState={{ selected: completed, disabled: !canToggle }}

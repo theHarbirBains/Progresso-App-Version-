@@ -3,6 +3,7 @@ import { Text } from '../design/Text';
 import { colors } from '../design/theme';
 import type { MeasurementType } from '../exercises/movementTypes';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { TimedSetField } from './TimedSetField';
 
 interface Props {
   setId: string;
@@ -17,7 +18,10 @@ interface Props {
   onChangeWeight: (setId: string, text: string) => void;
   onChangeReps: (setId: string, text: string) => void;
   onChangeDuration?: (setId: string, text: string) => void;
-  /** Prefix for the fields' test ids: `${testID}-weight`, `-reps`, `-time`. */
+  /** A timed set gets a timer beside its time (the live workout only -- TimedSetField). */
+  timer?: boolean;
+  accentColor?: string;
+  /** Prefix for the fields' test ids: `${testID}-weight`, `-reps`, `-time`, `-timer`. */
   testID?: string;
 }
 
@@ -25,7 +29,8 @@ interface Props {
  * A set's input fields, for what its exercise measures, in the two columns every set row
  * shares: weight and reps; "BW" and reps for a bodyweight exercise (reps only, so its reps
  * line up with a weighted exercise's); or one time field across both columns for a timed
- * one, typed as seconds or minutes:seconds. Shared by every set row, live or past.
+ * one, typed as seconds or minutes:seconds -- in the live workout, the time and a timer side by
+ * side. Shared by every set row, live or past.
  */
 export function SetValueFields({
   setId,
@@ -38,22 +43,24 @@ export function SetValueFields({
   onChangeWeight,
   onChangeReps,
   onChangeDuration,
+  timer,
+  accentColor,
   testID,
 }: Props) {
   const fieldStyle = [styles.setInput, completed && styles.setInputCompleted];
 
   if (measurementType === 'timed') {
     return (
-      <TextInput
-        testID={testID ? `${testID}-time` : undefined}
-        style={[...fieldStyle, styles.setInputWide]}
-        accessibilityLabel={`${label} time, in seconds or minutes and seconds`}
-        keyboardType="numbers-and-punctuation"
-        value={duration}
-        onChangeText={(text) => onChangeDuration?.(setId, text)}
-        editable={!completed}
-        placeholder="0:00"
-        placeholderTextColor={colors.textMuted}
+      <TimedSetField
+        setId={setId}
+        label={label}
+        duration={duration}
+        completed={completed}
+        onChangeDuration={onChangeDuration}
+        timer={timer}
+        accentColor={accentColor}
+        fieldStyle={fieldStyle}
+        testID={testID}
       />
     );
   }

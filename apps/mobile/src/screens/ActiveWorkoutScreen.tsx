@@ -63,6 +63,7 @@ import {
   pendingDraftsFor,
   saveLiveWorkoutDraft,
 } from '../workouts/liveWorkoutDraft';
+import { clearSetTimers, discardSetTimer, openSetTimers } from '../workouts/setTimers';
 import { useSetInputDrafts } from '../workouts/useSetInputDrafts';
 import { computeTotalSets } from '../workouts/workoutSummary';
 import { WorkoutStats } from '../workouts/WorkoutStats';
@@ -70,6 +71,16 @@ import { ExerciseFormScreen } from './ExerciseFormScreen';
 import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
 
 type Props = RootStackScreenProps<'ActiveWorkout'>;
+
+/** A set's draft with a stopped timer's time as its duration, when there is one. */
+function withTimedDuration(draft: SetInputDraft, timedDuration: string | undefined): SetInputDraft {
+  if (timedDuration === undefined) return draft;
+  // A set never typed into has no draft yet.
+  return {
+    ...((draft as SetInputDraft | undefined) ?? { weight: '', reps: '' }),
+    duration: timedDuration,
+  };
+}
 
 // The live-tracking half of the Start Workout experience (see
 // NewWorkoutScreen.tsx for the pre-start planning half), sharing the same
@@ -115,6 +126,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     changeReps: changeSetReps,
     changeDuration: changeSetDuration,
   } = useSetInputDrafts();
+  // A timed set's timer carries on across a remount or an app close (workouts/setTimers.ts).
+  const timersWorkoutId = workout?.id;
+  useEffect(() => {
+    if (timersWorkoutId) void openSetTimers(timersWorkoutId);
+  }, [timersWorkoutId]);
   // Mirrors what is typed into open sets to the device, so an app close or reset mid-set doesn't
   // lose it. Debounced so typing never waits on storage. Completed sets are saved on the server
   // instead, so only open sets are kept here.
@@ -332,6 +348,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     exerciseId: string,
     set: SetRecord,
     type: MeasurementType,
+    timedDuration?: string,
   ): Promise<{ ok: true } | { ok: false; error: string }> {
     if (set.completedAt) {
       const updated = await updateSet(set.id, { completedAt: null });
@@ -342,7 +359,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       return { ok: true };
     }
 
-    const draft = setInputs[set.id];
+    const draft = withTimedDuration(setInputs[set.id], timedDuration);
     if (!isValidDraft(draft, type)) {
       return { ok: false, error: invalidDraftMessage(type) };
     }
@@ -360,10 +377,16 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   async function handleToggleComplete(
     exercise: WorkoutExerciseWithSets,
     set: WorkoutExerciseWithSets['sets'][number],
+    timed?: Record<string, string>,
   ) {
     setError(null);
     try {
-      const result = await completeOrUncompleteSet(exercise.id, set, measurementTypeOf(exercise));
+      const result = await completeOrUncompleteSet(
+        exercise.id,
+        set,
+        measurementTypeOf(exercise),
+        timed?.[set.id],
+      );
       if (!result.ok) setError(result.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update set');
@@ -376,6 +399,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   async function handleToggleUnilateralComplete(
     exercise: WorkoutExerciseWithSets,
     setIndex: number,
+    timed?: Record<string, string>,
   ) {
     const left = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'left');
     const right = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'right');
@@ -384,8 +408,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     setError(null);
     const type = measurementTypeOf(exercise);
     if (!left.completedAt || !right.completedAt) {
-      const leftDraft = setInputs[left.id];
-      const rightDraft = setInputs[right.id];
+      const leftDraft = withTimedDuration(setInputs[left.id], timed?.[left.id]);
+      const rightDraft = withTimedDuration(setInputs[right.id], timed?.[right.id]);
       if (!isValidDraft(leftDraft, type) || !isValidDraft(rightDraft, type)) {
         setError(invalidDraftMessage(type, true));
         return;
@@ -394,8 +418,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
 
     try {
       const [leftResult, rightResult] = await Promise.all([
-        completeOrUncompleteSet(exercise.id, left, type),
-        completeOrUncompleteSet(exercise.id, right, type),
+        completeOrUncompleteSet(exercise.id, left, type, timed?.[left.id]),
+        completeOrUncompleteSet(exercise.id, right, type, timed?.[right.id]),
       ]);
       if (!leftResult.ok) setError(leftResult.error);
       else if (!rightResult.ok) setError(rightResult.error);
@@ -433,6 +457,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         sets: ex.sets.filter((s) => s.id !== set.id),
       }));
       dropSetInputs(set.id);
+      discardSetTimer(set.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove set');
     }
@@ -452,6 +477,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         sets: ex.sets.filter((s) => s.id !== left.id && s.id !== right.id),
       }));
       dropSetInputs(left.id, right.id);
+      discardSetTimer(left.id);
+      discardSetTimer(right.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove set');
     }
@@ -504,17 +531,23 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   toggleCompleteRef.current = handleToggleComplete;
   const toggleUnilateralRef = useRef(handleToggleUnilateralComplete);
   toggleUnilateralRef.current = handleToggleUnilateralComplete;
-  const toggleSetComplete = useCallback((setId: string) => {
+  const changeSetDurationRef = useRef(changeSetDuration);
+  changeSetDurationRef.current = changeSetDuration;
+  const toggleSetComplete = useCallback((setId: string, timed?: Record<string, string>) => {
     const current = workoutRef.current;
     if (!current) return;
+    // A stopped timer's time goes into its field too, so it stays shown if completing fails.
+    for (const [timedSetId, text] of Object.entries(timed ?? {})) {
+      changeSetDurationRef.current(timedSetId, text);
+    }
     for (const exercise of current.exercises) {
       const set = exercise.sets.find((candidate) => candidate.id === setId);
       if (set) {
         // A unilateral set completes as one unit, through its own path.
         if (exercise.movementType === 'unilateral') {
-          void toggleUnilateralRef.current(exercise, set.setIndex);
+          void toggleUnilateralRef.current(exercise, set.setIndex, timed);
         } else {
-          void toggleCompleteRef.current(exercise, set);
+          void toggleCompleteRef.current(exercise, set, timed);
         }
         return;
       }
@@ -648,6 +681,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     try {
       await completeWorkout(workout.id);
       void clearLiveWorkoutDraft(workout.id);
+      void clearSetTimers(workout.id);
       rememberLiveWorkout(userId, null);
       void endWorkoutActivities();
       void refreshNextWorkout(userId, activeWorkoutSplitId);
@@ -682,6 +716,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       // affects PR/1RM data. See cancelWorkout's own comment.
       await cancelWorkout(workout.id);
       void clearLiveWorkoutDraft(workout.id);
+      void clearSetTimers(workout.id);
       rememberLiveWorkout(userId, null);
       void endWorkoutActivities();
       void refreshNextWorkout(userId, activeWorkoutSplitId);
@@ -844,6 +879,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 onChangeReps={changeSetReps}
                 onChangeDuration={changeSetDuration}
                 onToggleComplete={toggleSetComplete}
+                setTimers
                 onAddSet={() => handleAddSet(exercise)}
                 onRemoveSet={removeSet}
                 onRemoveExercise={() => handleRemoveExercise(exercise.id)}

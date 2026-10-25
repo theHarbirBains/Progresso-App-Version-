@@ -286,6 +286,23 @@ export const liveWorkoutStyles = StyleSheet.create({
   setInputWide: {
     flex: 2,
   },
+  // In the live workout, a timed set's second column is its timer: Start / Pause / Resume.
+  setTimerButton: {
+    flex: 1,
+    marginHorizontal: spacing.xs,
+    height: minTouchTarget + spacing.xs,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  setTimerLabel: {
+    ...typeScale.label,
+    color: colors.textSecondary,
+  },
   // A bodyweight set's weight column: "BW", no field -- the exercise records reps only.
   setBodyweightCell: {
     flex: 1,

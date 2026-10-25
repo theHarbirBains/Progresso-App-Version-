@@ -28,6 +28,7 @@ import {
   fetchNextExerciseOrderIndex,
 } from '../workouts/workoutQueries';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
+import { clearSetTimers, stopSetTimer } from '../workouts/setTimers';
 import { recallLiveWorkout } from '../feed/liveWorkoutMemory';
 import { forgetShown } from '../lib/lastShown';
 import { homeWidgets } from '../widgets/homeWidgets';
@@ -1917,5 +1918,127 @@ describe("ActiveWorkoutScreen -- the person's rep range, at the top", () => {
     await waitFor(() =>
       expect(screen.getByTestId('active-workout-rep-range-value')).toHaveTextContent('10–14'),
     );
+  });
+});
+
+describe('ActiveWorkoutScreen -- timing a timed set', () => {
+  let now = 1_000_000;
+
+  beforeEach(async () => {
+    await clearSetTimers('w1');
+    now = 1_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [
+        {
+          ...baseWorkout.exercises[0],
+          exerciseName: 'Plank',
+          muscleGroup: 'abs' as const,
+          measurementType: 'timed' as const,
+          sets: [{ id: 's2', setIndex: 1, weightKg: null, reps: null, completedAt: null }],
+        },
+      ],
+    });
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await clearSetTimers('w1');
+  });
+
+  function renderLive() {
+    return render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+  }
+
+  const timer = () => screen.getByTestId('exercise-card-we1-set-s2-timer');
+  const time = () => screen.getByTestId('exercise-card-we1-set-s2-time');
+  const complete = () => screen.getByTestId('exercise-card-we1-set-s2-complete');
+
+  it('starts, pauses with the time in the field, and resumes', async () => {
+    renderLive();
+    await screen.findByTestId('exercise-card-we1');
+
+    expect(timer()).toHaveTextContent(/Start/);
+    expect(complete().props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.press(timer());
+    expect(timer()).toHaveTextContent(/Pause/);
+    // Running, the time can be finished with the check; the field isn't typed into.
+    expect(complete().props.accessibilityState.disabled).toBe(false);
+    expect(time().props.editable).toBe(false);
+
+    now += 42_000;
+    fireEvent.press(timer());
+    expect(time().props.value).toBe('0:42');
+    expect(timer()).toHaveTextContent(/Resume/);
+
+    fireEvent.press(timer());
+    now += 18_000;
+    fireEvent.press(timer());
+    expect(time().props.value).toBe('1:00');
+  });
+
+  it("finishes with the set's check, saving the time as the set's duration", async () => {
+    renderLive();
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(timer());
+    now += 75_400;
+    fireEvent.press(complete());
+
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        's2',
+        expect.objectContaining({ durationSeconds: 75, completedAt: expect.any(String) }),
+      ),
+    );
+    // A finished set has no timer left.
+    await waitFor(() => expect(screen.queryByTestId('exercise-card-we1-set-s2-timer')).toBeNull());
+  });
+
+  it('keeps time while the page is away: a remount finds it still running', async () => {
+    const { unmount } = renderLive();
+    await screen.findByTestId('exercise-card-we1');
+    fireEvent.press(timer());
+    unmount();
+
+    now += 30_000;
+    renderLive();
+    await screen.findByTestId('exercise-card-we1');
+
+    expect(timer()).toHaveTextContent(/Pause/);
+    fireEvent.press(timer());
+    expect(time().props.value).toBe('0:30');
+  });
+
+  it('drops the timer when the time is typed instead', async () => {
+    renderLive();
+    await screen.findByTestId('exercise-card-we1');
+    fireEvent.press(timer());
+    now += 10_000;
+    fireEvent.press(timer());
+
+    fireEvent.changeText(time(), '1:30');
+
+    expect(timer()).toHaveTextContent(/Start/);
+    expect(time().props.value).toBe('1:30');
+  });
+
+  it('forgets a running timer when the workout is cancelled', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.text === 'Cancel Workout')?.onPress?.();
+    });
+    renderLive();
+    await screen.findByTestId('exercise-card-we1');
+    fireEvent.press(timer());
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('cancel-workout'));
+    });
+
+    expect(stopSetTimer('s2')).toBeNull();
   });
 });

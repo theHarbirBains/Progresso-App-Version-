@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { discardSetTimer } from './setTimers';
 import { UnilateralSetRow } from './UnilateralSetRow';
 
 const baseProps = {
@@ -96,5 +97,53 @@ describe('UnilateralSetRow', () => {
     fireEvent.press(screen.getByTestId('unilateral-set-remove'));
 
     expect(onRemove).toHaveBeenCalledWith('left-set');
+  });
+});
+
+describe('UnilateralSetRow -- timing each side', () => {
+  let now = 0;
+
+  beforeEach(() => {
+    now = 0;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    discardSetTimer('left-set');
+    discardSetTimer('right-set');
+  });
+
+  it('times each side, and finishes both with the one check', () => {
+    const onToggleComplete = jest.fn();
+    render(
+      <UnilateralSetRow
+        {...baseProps}
+        measurementType="timed"
+        timer
+        onChangeDuration={jest.fn()}
+        onToggleComplete={onToggleComplete}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('unilateral-set-left-timer'));
+    now += 40_000;
+    fireEvent.press(screen.getByTestId('unilateral-set-left-timer'));
+    fireEvent.press(screen.getByTestId('unilateral-set-right-timer'));
+    now += 35_000;
+    fireEvent.press(screen.getByTestId('unilateral-set-complete'));
+
+    expect(onToggleComplete).toHaveBeenCalledWith('left-set', {
+      'left-set': '0:40',
+      'right-set': '0:35',
+    });
+  });
+
+  it('offers no timer where the row is not given one -- a past workout, say', () => {
+    render(
+      <UnilateralSetRow {...baseProps} measurementType="timed" onChangeDuration={jest.fn()} />,
+    );
+
+    expect(screen.queryByTestId('unilateral-set-left-timer')).toBeNull();
   });
 });

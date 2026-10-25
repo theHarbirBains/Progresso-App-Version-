@@ -4,7 +4,9 @@ import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../design/theme';
 import type { MeasurementType } from '../exercises/movementTypes';
+import { formatDuration } from '../lib/duration';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { stopSetTimer, useSetTimer } from './setTimers';
 import { SetValueFields } from './SetValueFields';
 
 export interface UnilateralSideInput {
@@ -35,8 +37,13 @@ interface Props {
   onChangeDuration?: (setId: string, text: string) => void;
   /** What the exercise measures -- decides which fields show. Defaults to weight and reps. */
   measurementType?: MeasurementType;
-  /** Completes or un-completes the whole logical set. Receives the left side's id. */
-  onToggleComplete: (setId: string) => void;
+  /**
+   * Completes or un-completes the whole logical set. Receives the left side's id -- and, when a
+   * side's timer was going, the times they stopped at, by set id (SetRow's `timed`).
+   */
+  onToggleComplete: (setId: string, timed?: Record<string, string>) => void;
+  /** Each side of a timed set gets a timer (the live workout only). */
+  timer?: boolean;
   /** Removes both sides together -- a unilateral logical set is one unit, same as completion.
    * Receives the left side's id. Omitted where removing a set mid-workout isn't offered. */
   onRemove?: (setId: string) => void;
@@ -73,12 +80,31 @@ function UnilateralSetRowComponent({
   measurementType = 'weight_reps',
   onToggleComplete,
   onRemove,
+  timer = false,
   accentColor,
   onAccentColor,
   testID,
 }: Props) {
-  const canToggle = completed || canComplete;
+  const timed = timer && measurementType === 'timed';
+  const leftTiming = useSetTimer(left.id);
+  const rightTiming = useSetTimer(right.id);
+  const canToggle =
+    completed || canComplete || (timed && (leftTiming !== undefined || rightTiming !== undefined));
   const values = { left, right };
+
+  function handleComplete() {
+    if (!timed || completed) {
+      onToggleComplete(left.id);
+      return;
+    }
+    // Finishing: each side's timer stops, and both sides complete at their times.
+    const stopped: Record<string, string> = {};
+    for (const side of [left, right]) {
+      const seconds = stopSetTimer(side.id);
+      if (seconds !== null) stopped[side.id] = formatDuration(seconds);
+    }
+    onToggleComplete(left.id, Object.keys(stopped).length > 0 ? stopped : undefined);
+  }
 
   return (
     <View testID={testID} style={styles.unilateralSetRow}>
@@ -99,6 +125,8 @@ function UnilateralSetRowComponent({
               onChangeWeight={onChangeWeight}
               onChangeReps={onChangeReps}
               onChangeDuration={onChangeDuration}
+              timer={timed}
+              accentColor={accentColor}
               testID={testID ? `${testID}-${key}` : undefined}
             />
           </View>
@@ -114,7 +142,7 @@ function UnilateralSetRowComponent({
             backgroundColor: completed ? accentColor : 'transparent',
           },
         ]}
-        onPress={() => onToggleComplete(left.id)}
+        onPress={handleComplete}
         disabled={!canToggle}
         accessibilityRole="button"
         accessibilityState={{ selected: completed, disabled: !canToggle }}

@@ -99,7 +99,10 @@ interface Props {
   onChangeWeight: (setId: string, text: string) => void;
   onChangeReps: (setId: string, text: string) => void;
   onChangeDuration?: (setId: string, text: string) => void;
-  onToggleComplete: (setId: string) => void;
+  /** `timed`: the time a set's timer stopped at, by set id, when its check finished it. */
+  onToggleComplete: (setId: string, timed?: Record<string, string>) => void;
+  /** Gives a timed exercise's sets a timer -- the live workout only (workouts/setTimers.ts). */
+  setTimers?: boolean;
   /** Only used for a unilateral exercise -- completes/uncompletes both sides of one logical set together, since a unilateral set is one unit, not two independent ones. */
   onAddSet: () => void;
   /** Omitted where removing a set mid-workout isn't offered (see each caller). */
@@ -214,6 +217,7 @@ function ExerciseCardComponent({
   onChangeReps,
   onChangeDuration,
   onToggleComplete,
+  setTimers = false,
   onAddSet,
   onRemoveSet,
   onRemoveExercise,
@@ -421,6 +425,7 @@ function ExerciseCardComponent({
                 onChangeDuration={onChangeDuration}
                 onToggleComplete={onToggleComplete}
                 onRemove={onRemoveSet}
+                timer={setTimers}
                 accentColor={accentColor}
                 onAccentColor={onAccentColor}
               />
@@ -442,6 +447,7 @@ function ExerciseCardComponent({
                 onChangeDuration={onChangeDuration}
                 onToggleComplete={onToggleComplete}
                 onRemove={onRemoveSet}
+                timer={setTimers}
                 accentColor={accentColor}
                 onAccentColor={onAccentColor}
               />
@@ -585,6 +591,7 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     prev.muscleGroup === next.muscleGroup &&
     prev.movementType === next.movementType &&
     prev.measurementType === next.measurementType &&
+    Boolean(prev.setTimers) === Boolean(next.setTimers) &&
     (prev.photoUrl ?? null) === (next.photoUrl ?? null) &&
     prev.weightUnit === next.weightUnit &&
     prev.accentColor === next.accentColor &&
