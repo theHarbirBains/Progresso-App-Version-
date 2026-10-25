@@ -92,7 +92,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Social**
 
 - A one-directional, accept-gated follow graph (Instagram-style follow requests) — send/accept/reject a request, unfollow, search for people by name/username
-- A Friends tab on Feed showing accepted followees' own completed workouts and logged foods, reverse-chronological, reusing the same activity-card visual language as your own feed
+- A Friends tab on Feed showing accepted followees' own completed workouts (never their nutrition), reverse-chronological, reusing the same activity-card visual language as your own feed
 - A Notifications screen with follow requests and recent follows, plus suggestions from your own data
 - Report or block someone: tap a person in Find People, or the "…" on a friend's workout in Feed. A block ends following each other, and keeps them from finding, following or inviting you; reports are kept for review in the Supabase dashboard (`user_reports`)
 - No likes, comments, or leaderboards yet
