@@ -44,12 +44,22 @@ describe('SettingsSupportScreen', () => {
     expect(mockGoBack).toHaveBeenCalled();
   });
 
-  it('shows every help row as Coming Soon rather than a fabricated link', () => {
+  it('shows the help rows not built yet as Coming Soon rather than a fabricated link', () => {
     renderScreen();
 
-    for (const testID of ['help-faq', 'help-contact-support', 'help-report-problem']) {
+    for (const testID of ['help-faq', 'help-contact-support']) {
       expect(screen.getByTestId(testID)).toHaveTextContent(/Coming Soon/);
     }
+    // Report a Problem is Feedback & Suggestions now.
+    expect(screen.queryByTestId('help-report-problem')).toBeNull();
+  });
+
+  it('opens Feedback & Suggestions', () => {
+    renderScreen();
+
+    fireEvent.press(screen.getByTestId('help-feedback'));
+
+    expect(navigation.navigate).toHaveBeenCalledWith('Feedback');
   });
 
   it("shows the app's real version and build from build metadata, not fabricated numbers", () => {

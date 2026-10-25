@@ -34,6 +34,10 @@ interface Props {
   /** testID for the error text. Defaults to `${testID}-error`. */
   errorTestID?: string;
   accessibilityLabel?: string;
+  /** Several lines of text (a description, a note): taller, and the text starts at the top. */
+  multiline?: boolean;
+  /** The most characters the field takes. */
+  maxLength?: number;
   /** Ref to the native input, for moving focus to the next field on submit. */
   inputRef?: Ref<TextInputInstance>;
 }
@@ -63,6 +67,8 @@ export function TextInput({
   testID,
   errorTestID,
   accessibilityLabel,
+  multiline,
+  maxLength,
   inputRef,
 }: Props) {
   const [focused, setFocused] = useState(false);
@@ -72,12 +78,19 @@ export function TextInput({
   return (
     <View>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <View style={[styles.row, { borderColor }, disabled && styles.rowDisabled]}>
+      <View
+        style={[
+          styles.row,
+          multiline && styles.rowMultiline,
+          { borderColor },
+          disabled && styles.rowDisabled,
+        ]}
+      >
         {leftAccessory}
         <RNTextInput
           ref={inputRef}
           testID={testID}
-          style={styles.input}
+          style={[styles.input, multiline && styles.inputMultiline]}
           placeholder={placeholder}
           placeholderTextColor={colors.textMuted}
           value={value}
@@ -89,6 +102,9 @@ export function TextInput({
           returnKeyType={returnKeyType}
           onSubmitEditing={onSubmitEditing}
           editable={!disabled}
+          multiline={multiline}
+          maxLength={maxLength}
+          textAlignVertical={multiline ? 'top' : undefined}
           onFocus={() => setFocused(true)}
           onBlur={() => {
             setFocused(false);
@@ -126,8 +142,14 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
   },
+  rowMultiline: {
+    alignItems: 'flex-start',
+  },
   rowDisabled: {
     opacity: 0.5,
+  },
+  inputMultiline: {
+    minHeight: 120,
   },
   input: {
     flex: 1,

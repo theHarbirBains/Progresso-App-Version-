@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { View } from 'react-native';
 import { AppHeader } from '../design/AppHeader';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
@@ -10,12 +11,11 @@ import { settingsStyles as styles } from '../settings/settingsStyles';
 type Props = RootStackScreenProps<'SettingsSupport'>;
 
 /**
- * Support & About: help/contact links (same "Coming Soon" precedent
- * HelpCategory already used -- nothing here pretends to work yet) plus the
- * app's own version/build, informational only (not a setting -- there's
- * nothing to save), read from the app's build metadata. Omits a version/build
- * line entirely rather than showing "undefined" when either isn't available
- * (e.g. inside Expo Go).
+ * Support & About: Feedback & Suggestions (sending a bug, an idea or anything else, and seeing
+ * what happens to it), help and contact links still "Coming Soon" (nothing here pretends to
+ * work yet), plus the app's own version/build, informational only (not a setting -- there's
+ * nothing to save), read from the app's build metadata. Omits a version/build line entirely
+ * rather than showing "undefined" when either isn't available (e.g. inside Expo Go).
  */
 export function SettingsSupportScreen({ navigation }: Props) {
   const version = Constants.expoConfig?.version;
@@ -38,19 +38,22 @@ export function SettingsSupportScreen({ navigation }: Props) {
       }
     >
       <Section title="Help">
-        <ComingSoonRow testID="help-faq" icon="help-circle" title="Help & FAQ" />
-        <ComingSoonRow
-          testID="help-contact-support"
-          icon="message-circle"
-          title="Contact Support"
-          showDivider
-        />
-        <ComingSoonRow
-          testID="help-report-problem"
-          icon="flag"
-          title="Report a Problem"
-          showDivider
-        />
+        <View>
+          <ListRow
+            testID="help-feedback"
+            icon="message-square"
+            title="Feedback & Suggestions"
+            subtitle="Report a bug, suggest a feature, see what's happening with it"
+            onPress={() => navigation.navigate('Feedback')}
+          />
+          <ComingSoonRow testID="help-faq" icon="help-circle" title="Help & FAQ" showDivider />
+          <ComingSoonRow
+            testID="help-contact-support"
+            icon="message-circle"
+            title="Contact Support"
+            showDivider
+          />
+        </View>
       </Section>
 
       <Section title="About">

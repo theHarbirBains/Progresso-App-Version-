@@ -73,4 +73,28 @@ describe('TextInput -- onBlur', () => {
 
     expect(() => fireEvent(screen.getByTestId('field'), 'blur')).not.toThrow();
   });
+
+  it('takes several lines, from the top, up to a most', () => {
+    render(
+      <TextInput
+        testID="field"
+        label="Description"
+        value=""
+        onChangeText={jest.fn()}
+        multiline
+        maxLength={4000}
+      />,
+    );
+
+    const field = screen.getByTestId('field');
+    expect(field.props.multiline).toBe(true);
+    expect(field.props.maxLength).toBe(4000);
+    expect(field.props.textAlignVertical).toBe('top');
+  });
+
+  it('stays one line by default', () => {
+    render(<TextInput testID="field" label="Name" value="" onChangeText={jest.fn()} />);
+
+    expect(screen.getByTestId('field').props.multiline).toBeFalsy();
+  });
 });

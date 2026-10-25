@@ -22,6 +22,13 @@ export type RootStackParamList = {
   SettingsChangePassword: undefined;
   SettingsBlockedPeople: undefined;
   SettingsSupport: undefined;
+  /** Feedback & Suggestions: what the person has sent, each with its status, and sending more. */
+  Feedback: undefined;
+  FeedbackForm: undefined;
+  FeedbackDetail: { id: string };
+  /** The feedback inbox, for support and full admins (the API refuses anyone else). */
+  AdminFeedbackInbox: undefined;
+  AdminFeedbackReview: { id: string };
   ExerciseLibrary: undefined;
   WorkoutHistory: undefined;
   /** clientId is set when a trainer opens one of a client’s workouts. */

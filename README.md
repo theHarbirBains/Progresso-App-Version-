@@ -86,6 +86,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Appearance: eight curated themes, each a photo behind the top of every screen and one accent -- Golden Hour Gym (the original, default look), Forest, Alpine, Coast, Spring, Summer, Autumn and Winter -- and an optional Change with the seasons that follows the season where you live. Everything else stays the same warm dark, so every theme reads as well as the default; there are no free colour pickers
 - Notification preferences: push and email opt-in toggles are real and saved; more granular categories (workout reminders, PR alerts, weekly summaries) are shown as explicit "Coming Soon" rows rather than toggles that wouldn't do anything
 - Account & Security: Blocked People (each with Unblock), Terms of Service and Privacy Policy (the pages the API serves at `/legal/terms` and `/legal/privacy`), and Delete Account, which asks twice and then deletes the account and everything it owns
+- Feedback & Suggestions (Support & About): send a bug report, feature request, usability issue or general feedback, with an optional screenshot and the app version and platform it came from, then see each one's status as it's looked at. Support and full admins get a Feedback Inbox (Settings › Admin) to filter, search, move each on and keep internal notes, every change recorded
 - Change Email and the help and contact rows are visible but not yet implemented ("Coming Soon")
 - Apple Health is connected from Feed's Steps card (iPhone only), not from onboarding or Settings; it's turned off in the Health app
 
@@ -101,6 +102,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 - JWT authorization validating Supabase-issued tokens on every route except the health check and two endpoints called by machines (the RevenueCat webhook and the reminder job's trigger), which check their own secrets
 - Role-based authorization (`user` / `support_admin` / `full_admin`) backed by an `admin_users` table, proven end-to-end by a minimal `GET /api/v1/admin/ping` route
+- Feedback: `POST /api/v1/feedback` (rate-limited; a screenshot only from the sender's own folder) and the support and full admins' inbox under `/api/v1/admin/feedback` (list with filters, search and pages; one with its history, notes and a short-lived screenshot link; status changes and internal notes, each recorded in `admin_actions`)
 - User profile read/update endpoints (`GET/PATCH /api/v1/users/me`) and username-availability check
 - Exercise library and equipment profile endpoints
 - Food search, barcode lookup and AI food search, with per-user usage limits; AI food search answers within 30 seconds

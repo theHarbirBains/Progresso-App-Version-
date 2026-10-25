@@ -4,6 +4,7 @@ import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import type { RootStackScreenProps } from '../navigation/types';
 import { settingsStyles as styles } from '../settings/settingsStyles';
+import { useIsAdmin } from '../feedback/useIsAdmin';
 
 type Props = RootStackScreenProps<'AccountSettings'>;
 
@@ -27,6 +28,8 @@ type Props = RootStackScreenProps<'AccountSettings'>;
  * would be inventing a feature, not reorganizing an existing one.
  */
 export function AccountSettingsScreen({ navigation }: Props) {
+  // Only offered to support and full admins; the API enforces it whatever is shown.
+  const isAdmin = useIsAdmin();
   return (
     <Screen
       testID="settings-screen"
@@ -98,6 +101,18 @@ export function AccountSettingsScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('SettingsSupport')}
         />
       </Section>
+
+      {isAdmin ? (
+        <Section title="Admin">
+          <ListRow
+            testID="settings-admin-feedback-inbox"
+            icon="inbox"
+            title="Feedback Inbox"
+            subtitle="Review what people have sent"
+            onPress={() => navigation.navigate('AdminFeedbackInbox')}
+          />
+        </Section>
+      ) : null}
     </Screen>
   );
 }

@@ -46,6 +46,11 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   SettingsChangePassword: 'you',
   SettingsBlockedPeople: 'you',
   SettingsSupport: 'you',
+  Feedback: 'you',
+  FeedbackForm: 'you',
+  FeedbackDetail: 'you',
+  AdminFeedbackInbox: 'you',
+  AdminFeedbackReview: 'you',
   Profile: 'you',
   // The Trainer Workspace's pages, under its own three tabs.
   TrainerClients: 'clients',

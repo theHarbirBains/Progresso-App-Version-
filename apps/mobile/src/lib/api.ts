@@ -15,3 +15,4 @@ export * from './feedApi';
 export * from './trainerApi';
 export * from './groupsApi';
 export * from './safetyApi';
+export * from './feedbackApi';

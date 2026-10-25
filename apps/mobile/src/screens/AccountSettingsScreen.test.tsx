@@ -1,6 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { useAuth } from '../auth/AuthProvider';
+import { forgetAdminRoles } from '../feedback/useIsAdmin';
+import { fetchMyRole } from '../lib/feedbackApi';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { AccountSettingsScreen } from './AccountSettingsScreen';
+
+jest.mock('../auth/AuthProvider', () => ({ useAuth: jest.fn() }));
+jest.mock('../lib/feedbackApi', () => ({ fetchMyRole: jest.fn() }));
+
+const mockFetchMyRole = fetchMyRole as jest.Mock;
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
@@ -10,6 +18,12 @@ const navigation: any = { navigate: mockNavigate, goBack: mockGoBack };
 beforeEach(() => {
   mockNavigate.mockClear();
   mockGoBack.mockClear();
+  forgetAdminRoles();
+  (useAuth as jest.Mock).mockReturnValue({
+    user: { id: 'user-1' },
+    session: { access_token: 'token-1' },
+  });
+  mockFetchMyRole.mockReset().mockResolvedValue('user');
 });
 
 function renderScreen() {
@@ -63,5 +77,37 @@ describe('AccountSettingsScreen', () => {
   it('renders no bare text outside <Text>', () => {
     renderScreen();
     expectNoBareText();
+  });
+});
+
+describe("AccountSettingsScreen -- the admins' Feedback Inbox", () => {
+  it('offers it to a support or full admin', async () => {
+    for (const role of ['support_admin', 'full_admin']) {
+      forgetAdminRoles();
+      mockFetchMyRole.mockResolvedValue(role);
+      const view = renderScreen();
+
+      fireEvent.press(await screen.findByTestId('settings-admin-feedback-inbox'));
+
+      expect(mockNavigate).toHaveBeenLastCalledWith('AdminFeedbackInbox');
+      expect(mockFetchMyRole).toHaveBeenLastCalledWith('token-1');
+      view.unmount();
+    }
+  });
+
+  it('never offers it to anyone else, nor while their role is unknown', async () => {
+    renderScreen();
+    await screen.findByText('Settings');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByTestId('settings-admin-feedback-inbox')).toBeNull();
+  });
+
+  it("doesn't offer it when the role can't be read", async () => {
+    mockFetchMyRole.mockRejectedValue(new Error('offline'));
+    renderScreen();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByTestId('settings-admin-feedback-inbox')).toBeNull();
   });
 });

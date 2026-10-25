@@ -96,6 +96,11 @@ import { SettingsAppearanceScreen } from './src/screens/SettingsAppearanceScreen
 import { SettingsNutritionScreen } from './src/screens/SettingsNutritionScreen';
 import { SettingsPersonalInfoScreen } from './src/screens/SettingsPersonalInfoScreen';
 import { SettingsSupportScreen } from './src/screens/SettingsSupportScreen';
+import { FeedbackScreen } from './src/screens/FeedbackScreen';
+import { FeedbackFormScreen } from './src/screens/FeedbackFormScreen';
+import { FeedbackDetailScreen } from './src/screens/FeedbackDetailScreen';
+import { AdminFeedbackInboxScreen } from './src/screens/AdminFeedbackInboxScreen';
+import { AdminFeedbackReviewScreen } from './src/screens/AdminFeedbackReviewScreen';
 import { SettingsWorkoutPreferencesScreen } from './src/screens/SettingsWorkoutPreferencesScreen';
 import { RepRangeExceptionsScreen } from './src/screens/RepRangeExceptionsScreen';
 import { TrainerClientRepRangesScreen } from './src/screens/TrainerClientRepRangesScreen';
@@ -390,6 +395,11 @@ function Root() {
                     component={SettingsBlockedPeopleScreen}
                   />
                   <Stack.Screen name="SettingsSupport" component={SettingsSupportScreen} />
+                  <Stack.Screen name="Feedback" component={FeedbackScreen} />
+                  <Stack.Screen name="FeedbackForm" component={FeedbackFormScreen} />
+                  <Stack.Screen name="FeedbackDetail" component={FeedbackDetailScreen} />
+                  <Stack.Screen name="AdminFeedbackInbox" component={AdminFeedbackInboxScreen} />
+                  <Stack.Screen name="AdminFeedbackReview" component={AdminFeedbackReviewScreen} />
                   <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
                   <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
                   <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
