@@ -41,7 +41,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 // one widget as rows (the food's picture, name, "brand · serving", calories as
 // a mono value) separated by hairlines; the detail is the shared FoodFacts
 // widgets with one filled Log Food button.
-export function FoodSearchScreen({ navigation }: Props) {
+export function FoodSearchScreen({ navigation, route }: Props) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   const [logging, setLogging] = useState(false);
@@ -109,6 +109,7 @@ export function FoodSearchScreen({ navigation }: Props) {
         }}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
+        day={route.params?.day}
         onDone={() => goToSection(navigation, 'Nutrition')}
         onCancel={() => setLogging(false)}
       />

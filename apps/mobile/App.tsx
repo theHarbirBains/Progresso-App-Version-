@@ -48,6 +48,7 @@ import { useProgressTheme } from './src/progress/useProgressTheme';
 import { AccountSettingsScreen } from './src/screens/AccountSettingsScreen';
 import { ActiveWorkoutScreen } from './src/screens/ActiveWorkoutScreen';
 import { AiFoodSearchScreen } from './src/screens/AiFoodSearchScreen';
+import { QuickFoodEntryScreen } from './src/screens/QuickFoodEntryScreen';
 import { CalorieEstimationScreen } from './src/screens/CalorieEstimationScreen';
 import { ChooseWorkoutSplitScreen } from './src/screens/ChooseWorkoutSplitScreen';
 import { BarcodeScannerScreen } from './src/screens/BarcodeScannerScreen';
@@ -400,6 +401,7 @@ function Root() {
                   <Stack.Screen name="FoodLibrary" component={FoodLibraryScreen} />
                   <Stack.Screen name="FoodSearch" component={FoodSearchScreen} />
                   <Stack.Screen name="AiFoodSearch" component={AiFoodSearchScreen} />
+                  <Stack.Screen name="QuickFoodEntry" component={QuickFoodEntryScreen} />
                   <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
                   <Stack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
                   <Stack.Screen name="NutritionHistory" component={NutritionHistoryScreen} />

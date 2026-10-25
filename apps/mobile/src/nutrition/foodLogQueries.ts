@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { calculateLogTotals, recalculateForQuantity } from './nutritionCalculations';
 import type { QuantityUnit } from './logQuantity';
 import type { MealType } from './mealTypes';
-import { PROVENANCE_COLUMNS, provenanceToColumns, type FoodRow } from './foodQueries';
+import { PROVENANCE_COLUMNS, provenanceToColumns, USER_ENTERED, type FoodRow } from './foodQueries';
 
 // Direct-to-Supabase, same reasoning as foodQueries.ts: food_logs is
 // entirely own-row RLS with a real delete policy (no PR-style derived
@@ -169,6 +169,8 @@ export async function logFood(
   quantity: number,
   mealType: MealType,
   entered?: EnteredAmount | null,
+  /** When it was eaten, for a past day (nutrition/logDay.ts); now when omitted. */
+  loggedAt?: Date,
 ): Promise<FoodLogRow> {
   const totals = calculateLogTotals(food, quantity);
 
@@ -189,8 +191,52 @@ export async function logFood(
       entered_amount: entered?.amount ?? null,
       entered_unit: entered?.unit ?? null,
       serving_label: food.servingLabel ?? null,
+      ...(loggedAt ? { logged_at: loggedAt.toISOString() } : {}),
       // The log keeps the figures' provenance as it was at logging time, even if the library food changes later.
       ...provenanceToColumns(food.provenance),
+    })
+    .select(FOOD_LOG_COLUMNS)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return toFoodLogRow(data as FoodLogDbRow);
+}
+
+/** A quick entry: a name and the figures the person typed, with no food behind it. */
+export interface QuickEntry {
+  name: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+/**
+ * Logs a quick entry as one serving of itself: no food in the library (food_id stays null), its
+ * figures marked as the person's own, not checked against any food data.
+ */
+export async function logQuickEntry(
+  userId: string,
+  entry: QuickEntry,
+  mealType: MealType,
+  loggedAt?: Date,
+): Promise<FoodLogRow> {
+  const { data, error } = await supabase
+    .from('food_logs')
+    .insert({
+      user_id: userId,
+      food_id: null,
+      food_name_snapshot: entry.name,
+      serving_size: 1,
+      serving_unit: 'serving',
+      quantity: 1,
+      calories: entry.calories,
+      protein_g: entry.proteinG,
+      carbs_g: entry.carbsG,
+      fat_g: entry.fatG,
+      meal_type: mealType,
+      ...(loggedAt ? { logged_at: loggedAt.toISOString() } : {}),
+      ...provenanceToColumns(USER_ENTERED),
     })
     .select(FOOD_LOG_COLUMNS)
     .single();

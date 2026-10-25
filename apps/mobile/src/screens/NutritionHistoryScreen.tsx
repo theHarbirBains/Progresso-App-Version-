@@ -4,6 +4,7 @@ import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { SecondaryButton } from '../design/Button';
 import { addMonths, isoToLocalDateKey, toLocalDateKey } from '../design/calendarGrid';
 import { EmptyState } from '../design/EmptyState';
 import { MonthCalendar } from '../design/MonthCalendar';
@@ -11,6 +12,7 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
+import { dayFromKey, dayKey } from '../lib/dayKey';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { FoodImage } from '../nutrition/FoodImage';
@@ -24,9 +26,9 @@ type Props = RootStackScreenProps<'NutritionHistory'>;
 // The Nutrition menu's history screen: a month calendar (a dot on every day
 // with at least one food log, the same MonthCalendar Workout History's own
 // calendar uses -- see design/MonthCalendar.tsx) and, once a day is
-// selected, that day's logged foods. Unlike NutritionTodayScreen this is
-// read-only browsing of the past, not the live "today" cache (FoodLogProvider
-// only ever holds today's logs) -- there is no quantity edit or delete here.
+// selected, that day's logged foods -- a glance; Open Full Day shows the day on
+// the Nutrition screen itself, with its totals against the targets, and its
+// foods to edit, delete or add to. This screen only reads.
 export function NutritionHistoryScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
@@ -181,7 +183,7 @@ export function NutritionHistoryScreen({ navigation, route }: Props) {
       {selectedDateKey ? (
         <AppCard testID="nutrition-history-selected-day">
           <SectionHeader
-            label={new Date(selectedDateKey).toLocaleDateString(undefined, {
+            label={dayFromKey(selectedDateKey).toLocaleDateString(undefined, {
               weekday: 'long',
               month: 'long',
               day: 'numeric',
@@ -207,6 +209,18 @@ export function NutritionHistoryScreen({ navigation, route }: Props) {
           ) : (
             <EmptyState testID="nutrition-history-day-empty" title="No food logged on this day" />
           )}
+          {/* Nutrition shows no day after today, so there's no full day to open for one. */}
+          {selectedDateKey <= dayKey(new Date()) ? (
+            <View style={styles.openDay}>
+              <SecondaryButton
+                testID="nutrition-history-open-day"
+                label="Open Full Day"
+                icon="maximize-2"
+                size="md"
+                onPress={() => navigation.navigate('Nutrition', { day: selectedDateKey })}
+              />
+            </View>
+          ) : null}
         </AppCard>
       ) : null}
     </Screen>

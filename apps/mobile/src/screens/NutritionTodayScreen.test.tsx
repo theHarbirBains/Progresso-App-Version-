@@ -4,6 +4,8 @@ import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
+import { dayKey } from '../lib/dayKey';
+import * as navigationTransitions from '../navigation/navigationTransitions';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import {
   copyFoodLogs,
@@ -86,13 +88,13 @@ const mockOpenMenu = jest.fn();
 // NutritionTodayScreen opens the app-level side menu (via AppMenuContext)
 // from its own header, same as every other tab-root screen -- this stands in
 // for that root-level provider.
-function renderScreen() {
+function renderScreen(screenRoute: never = route) {
   return render(
     <ProfileProvider>
       <NutritionGoalsProvider>
         <FoodLogProvider>
           <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode: 'nutrition' }}>
-            <NutritionTodayScreen navigation={navigation} route={route} />
+            <NutritionTodayScreen navigation={navigation} route={screenRoute} />
           </AppMenuContext.Provider>
         </FoodLogProvider>
       </NutritionGoalsProvider>
@@ -353,7 +355,7 @@ describe('NutritionTodayScreen', () => {
 
     fireEvent.press(screen.getByTestId('log-food-button'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
+    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary', undefined);
   });
 
   it('opens AI Food Search straight from the Nutrition dashboard', async () => {
@@ -364,7 +366,7 @@ describe('NutritionTodayScreen', () => {
     expect(button).toHaveTextContent(/Describe a Food/);
     expect(button.props.accessibilityLabel).toBe('AI Food Search');
     fireEvent.press(button);
-    expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch');
+    expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch', undefined);
   });
 
   it('opens Nutrition History from View All, and Nutrition Goals from Edit Targets', async () => {
@@ -383,7 +385,7 @@ describe('NutritionTodayScreen', () => {
     expect(await screen.findByTestId('food-log-empty')).toHaveTextContent('No foods logged today');
     expect(screen.queryByText(/Start by logging/)).toBeNull();
     fireEvent.press(screen.getByTestId('food-log-empty-log'));
-    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
+    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary', undefined);
   });
 
   it('navigates to the barcode scanner when Scan Barcode is pressed', async () => {
@@ -392,7 +394,7 @@ describe('NutritionTodayScreen', () => {
 
     fireEvent.press(screen.getByTestId('scan-barcode-button'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('BarcodeScanner');
+    expect(mockNavigate).toHaveBeenCalledWith('BarcodeScanner', undefined);
   });
 
   it('navigates to FoodSearch when Search Food is pressed', async () => {
@@ -401,7 +403,7 @@ describe('NutritionTodayScreen', () => {
 
     fireEvent.press(screen.getByTestId('search-food-button'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('FoodSearch');
+    expect(mockNavigate).toHaveBeenCalledWith('FoodSearch', undefined);
   });
 
   it('opens the app-level side menu when the header button is pressed', async () => {
@@ -770,5 +772,159 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     renderScreen();
 
     expect(await screen.findByTestId('weekly-budget-error')).toBeTruthy();
+  });
+});
+
+describe('NutritionTodayScreen -- any day', () => {
+  // A Wednesday. Only the clock is faked, so the screen's own reads still resolve normally.
+  beforeEach(() => {
+    jest.useFakeTimers({
+      now: new Date(2026, 9, 21, 12, 0),
+      doNotFake: [
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'setImmediate',
+        'clearImmediate',
+        'nextTick',
+        'queueMicrotask',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'requestIdleCallback',
+        'cancelIdleCallback',
+        'hrtime',
+        'performance',
+      ],
+    });
+    // Moves between days are instant, as under Reduce Motion.
+    jest.spyOn(navigationTransitions, 'useReduceMotionPreference').mockReturnValue(true);
+    mockFetchFoodLogsForDay.mockImplementation(async (_userId: string, date: Date) =>
+      dayKey(date) === '2026-10-20' ? [{ ...sampleLog, id: 'log-tuesday' }] : [],
+    );
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  const dayLabelText = () => screen.getByTestId('nutrition-day-label');
+
+  it('starts on today, with no day after it and no way back to today', async () => {
+    renderScreen();
+
+    await screen.findByTestId('food-log-empty');
+    expect(dayLabelText()).toHaveTextContent('Today');
+    expect(screen.getByTestId('nutrition-day-next')).toBeDisabled();
+    expect(screen.queryByTestId('nutrition-day-today')).toBeNull();
+  });
+
+  it("moves to the day before and shows that day's foods, with its own wording", async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+
+    expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
+    expect(dayLabelText()).toHaveTextContent('Yesterday');
+    expect(screen.getByText("Yesterday's Foods")).toBeTruthy();
+    expect(screen.getByTestId('nutrition-day-next')).not.toBeDisabled();
+    // Today's own shortcuts -- the week's budget and Copy Yesterday -- are today's only.
+    expect(screen.queryByTestId('nutrition-today-week')).toBeNull();
+    expect(screen.queryByTestId('nutrition-today-copy-yesterday')).toBeNull();
+  });
+
+  it('says when nothing was logged that day', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    await screen.findByTestId('food-log-row-log-tuesday');
+    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+
+    expect(await screen.findByText('No foods logged this day')).toBeTruthy();
+  });
+
+  it('logs to the day shown, every way there is to log', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    await screen.findByTestId('food-log-row-log-tuesday');
+
+    fireEvent.press(screen.getByTestId('log-food-button'));
+    fireEvent.press(screen.getByTestId('search-food-button'));
+    fireEvent.press(screen.getByTestId('scan-barcode-button'));
+    fireEvent.press(screen.getByTestId('ai-food-search-button'));
+    fireEvent.press(screen.getByTestId('quick-food-entry-button'));
+
+    const day = { day: '2026-10-20' };
+    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary', day);
+    expect(mockNavigate).toHaveBeenCalledWith('FoodSearch', day);
+    expect(mockNavigate).toHaveBeenCalledWith('BarcodeScanner', day);
+    expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch', day);
+    expect(mockNavigate).toHaveBeenCalledWith('QuickFoodEntry', day);
+  });
+
+  it('logs to today, with no day handed on, from today', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    fireEvent.press(screen.getByTestId('quick-food-entry-button'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('QuickFoodEntry', undefined);
+  });
+
+  it('comes back to today, by the next day or straight back', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    await screen.findByTestId('food-log-row-log-tuesday');
+    fireEvent.press(screen.getByTestId('nutrition-day-next'));
+    expect(dayLabelText()).toHaveTextContent('Today');
+
+    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    await screen.findByTestId('food-log-row-log-tuesday');
+    fireEvent.press(screen.getByTestId('nutrition-day-today'));
+    expect(dayLabelText()).toHaveTextContent('Today');
+    expect(screen.getByTestId('nutrition-today-week')).toBeTruthy();
+  });
+
+  it("deletes a past day's food there", async () => {
+    mockDeleteFoodLog.mockResolvedValue(undefined);
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    await screen.findByTestId('food-log-row-log-tuesday');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('food-log-delete-log-tuesday'));
+    });
+
+    expect(mockDeleteFoodLog).toHaveBeenCalledWith('log-tuesday');
+    await waitFor(() => expect(screen.queryByTestId('food-log-row-log-tuesday')).toBeNull());
+  });
+
+  it('opens on a day handed to it, and never on one after today', async () => {
+    const { unmount } = renderScreen({ params: { day: '2026-10-20' } } as never);
+    expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
+    expect(dayLabelText()).toHaveTextContent('Yesterday');
+    unmount();
+
+    renderScreen({ params: { day: '2026-10-22' } } as never);
+    await screen.findByTestId('food-log-empty');
+    expect(dayLabelText()).toHaveTextContent('Today');
+  });
+
+  it('opens the calendar from the date, on the day shown', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+    fireEvent.press(screen.getByTestId('nutrition-day-previous'));
+    await screen.findByTestId('food-log-row-log-tuesday');
+
+    fireEvent.press(screen.getByTestId('nutrition-day-label'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('NutritionHistory', { date: '2026-10-20' });
   });
 });

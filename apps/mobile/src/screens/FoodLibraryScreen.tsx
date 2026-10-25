@@ -212,6 +212,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
       await logFoodEntries(
         items.map((item) => ({ food: item.food, quantity: item.quantity, entered: item.entered })),
         defaultMealTypeForTime(),
+        route.params?.day,
       );
       setOpenMeal(null);
       goToSection(navigation, 'Nutrition');
@@ -410,6 +411,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         initialEntry={mode.entered}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
+        day={route.params?.day}
         onDone={() => (mode.fromScan ? goToSection(navigation, 'Nutrition') : navigation.goBack())}
         onCancel={() => setMode({ type: 'list' })}
       />
@@ -439,7 +441,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
           }}
           rightAction2={{
             icon: 'zap',
-            onPress: () => navigation.navigate('AiFoodSearch'),
+            onPress: () => navigation.navigate('AiFoodSearch', { day: route.params?.day }),
             accessibilityLabel: 'AI Food Search',
             testID: 'food-library-ai-search',
           }}

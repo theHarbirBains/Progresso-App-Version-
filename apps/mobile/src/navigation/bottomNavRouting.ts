@@ -28,6 +28,7 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   FoodLibrary: 'nutrition',
   FoodSearch: 'nutrition',
   BarcodeScanner: 'nutrition',
+  QuickFoodEntry: 'nutrition',
   NutritionGoals: 'nutrition',
   CalorieEstimation: 'nutrition',
   PRHistory: 'progress',

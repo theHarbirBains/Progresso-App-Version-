@@ -70,12 +70,16 @@ export type RootStackParamList = {
   TrainerClaim: undefined;
   PRHistory: { exerciseId: string; exerciseName: string };
   ExerciseProgress: { exerciseId: string; exerciseName: string };
-  Nutrition: undefined;
+  /** The day to show ("YYYY-MM-DD"); today when absent. */
+  Nutrition: { day?: string } | undefined;
   /** `openCreate`/`barcode`: set by the Scan Barcode "Product not found" fallback so Food Library opens straight into creating a custom food, prefilled with the scanned barcode -- see BarcodeScannerScreen. */
-  FoodLibrary: { openCreate?: boolean; barcode?: string } | undefined;
-  FoodSearch: undefined;
-  AiFoodSearch: undefined;
-  BarcodeScanner: undefined;
+  /** `day` (here and in the other ways to log) logs to that past day; today when absent. */
+  FoodLibrary: { openCreate?: boolean; barcode?: string; day?: string } | undefined;
+  FoodSearch: { day?: string } | undefined;
+  AiFoodSearch: { day?: string } | undefined;
+  BarcodeScanner: { day?: string } | undefined;
+  /** Logging figures the person knows, without a food behind them. */
+  QuickFoodEntry: { day?: string } | undefined;
   NutritionGoals: undefined;
   /** `date` ("YYYY-MM-DD"): opens on that day, from a day in Progress. */
   NutritionHistory: { date?: string } | undefined;

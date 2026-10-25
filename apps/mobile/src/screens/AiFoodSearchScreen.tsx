@@ -49,7 +49,8 @@ type Props = RootStackScreenProps<'AiFoodSearch'>;
 //   of that name with other figures is used or updated only on the person's choice.
 // - Add to Food Library: save it for later without logging.
 type Step = { type: 'search' } | { type: 'adjust' } | { type: 'log'; food: FoodRow };
-export function AiFoodSearchScreen({ navigation }: Props) {
+export function AiFoodSearchScreen({ navigation, route }: Props) {
+  const day = route.params?.day;
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
   const userId = user?.id;
@@ -139,7 +140,7 @@ export function AiFoodSearchScreen({ navigation }: Props) {
         return;
       }
       await createFood(userId, input);
-      navigation.navigate('FoodLibrary');
+      navigation.navigate('FoodLibrary', { day });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add to your Food Library');
     } finally {
@@ -205,6 +206,7 @@ export function AiFoodSearchScreen({ navigation }: Props) {
         food={step.food}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
+        day={day}
         onDone={() => goToSection(navigation, 'Nutrition')}
         onCancel={() => setStep({ type: 'adjust' })}
       />

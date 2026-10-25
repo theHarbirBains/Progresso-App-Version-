@@ -402,6 +402,8 @@ export interface FoodInput {
   fatG: number;
   /** A photo of the food (its uploaded URL). Omit to leave it alone; null clears it. */
   imageUrl?: string | null;
+  /** The serving as a provider words it ("3 cookies (34 g)") -- kept by a logged food's copy. */
+  servingLabel?: string | null;
   /** Where the figures came from. Omit for a food the user entered by hand. */
   provenance?: FoodProvenance | null;
   /** For a recipe: how many servings it makes. */
@@ -409,7 +411,7 @@ export interface FoodInput {
 }
 
 /** A food the user typed in: its figures are the user's own, not from any data source. */
-const USER_ENTERED: FoodProvenance = {
+export const USER_ENTERED: FoodProvenance = {
   confidence: 'user_entered',
   sourceKind: 'user_entered',
   sourceId: null,
@@ -437,6 +439,7 @@ export async function createFood(userId: string, input: FoodInput): Promise<Food
       carbs_g: input.carbsG,
       fat_g: input.fatG,
       ...(input.imageUrl !== undefined ? { image_url: input.imageUrl } : {}),
+      ...(input.servingLabel !== undefined ? { serving_label: input.servingLabel } : {}),
       ...(input.recipeServings !== undefined ? { recipe_servings: input.recipeServings } : {}),
       ...provenanceToColumns(input.provenance === undefined ? USER_ENTERED : input.provenance),
     })
@@ -445,6 +448,65 @@ export async function createFood(userId: string, input: FoodInput): Promise<Food
 
   if (error) throw new Error(error.message);
   return toFoodRow(data as FoodDbRow);
+}
+
+function sameText(a: string | null | undefined, b: string | null | undefined): boolean {
+  return (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase();
+}
+
+/**
+ * The food a log should point at, kept in the user's Food Library: a food that is already theirs
+ * is used as it is; any other -- a built-in, a searched or scanned product -- is copied into their
+ * library the first time it's logged, keeping where its figures came from. A copy of theirs with
+ * the same name, brand, serving and calories (or the same barcode) is used again, so logging the
+ * same food twice never adds it twice. Null when the food can't be found to copy.
+ */
+export async function keepInLibrary(userId: string, foodId: string): Promise<FoodRow | null> {
+  const { data: sourceData, error: sourceError } = await supabase
+    .from('foods')
+    .select(`created_by, ${FOOD_COLUMNS}`)
+    .eq('id', foodId)
+    .maybeSingle();
+  if (sourceError) throw new Error(sourceError.message);
+  if (!sourceData) return null;
+  const sourceRow = sourceData as FoodDbRow & { created_by: string | null };
+  const source = toFoodRow(sourceRow);
+  if (sourceRow.created_by === userId) return source;
+
+  const { data: ownData, error: ownError } = await supabase
+    .from('foods')
+    .select(FOOD_COLUMNS)
+    .eq('created_by', userId)
+    .eq('is_active', true)
+    .ilike('name', escapeIlike(source.name.trim()));
+  if (ownError) throw new Error(ownError.message);
+  const copy = ((ownData ?? []) as FoodDbRow[])
+    .map(toFoodRow)
+    .find(
+      (own) =>
+        (source.barcode !== null && own.barcode === source.barcode) ||
+        (sameText(own.name, source.name) &&
+          sameText(own.brand, source.brand) &&
+          own.servingSize === source.servingSize &&
+          sameText(own.servingUnit, source.servingUnit) &&
+          Math.round(own.calories) === Math.round(source.calories)),
+    );
+  if (copy) return copy;
+
+  return createFood(userId, {
+    name: source.name,
+    brand: source.brand,
+    barcode: source.barcode,
+    servingSize: source.servingSize,
+    servingUnit: source.servingUnit,
+    servingLabel: source.servingLabel ?? null,
+    calories: source.calories,
+    proteinG: source.proteinG,
+    carbsG: source.carbsG,
+    fatG: source.fatG,
+    imageUrl: source.imageUrl,
+    provenance: source.provenance ?? null,
+  });
 }
 
 export type UpdateFoodInput = Partial<FoodInput> & { isActive?: boolean };

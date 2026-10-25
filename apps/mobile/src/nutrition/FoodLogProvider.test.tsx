@@ -1,30 +1,47 @@
 import { act, render, renderHook, waitFor } from '@testing-library/react-native';
 import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { recordQuietFailure } from '../lib/sentry';
+import { dayKey } from '../lib/dayKey';
 import {
   deleteFoodLog,
   fetchTodaysFoodLogs,
   logFood,
+  logQuickEntry,
   updateFoodLogQuantity,
 } from './foodLogQueries';
+import { createFood, keepInLibrary } from './foodQueries';
 import { FoodLogProvider, useFoodLog } from './FoodLogProvider';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
+// The shared food log keeps a logged food in the library first (foodQueries.keepInLibrary);
+// here there's nothing to copy, so each food is logged as it is.
+jest.mock('./foodQueries', () => ({
+  keepInLibrary: jest.fn().mockResolvedValue(null),
+  createFood: jest.fn(),
+  USER_ENTERED: { confidence: 'user_entered' },
+}));
 jest.mock('./foodLogQueries', () => ({
   fetchTodaysFoodLogs: jest.fn(),
   logFood: jest.fn(),
+  logQuickEntry: jest.fn(),
   updateFoodLogQuantity: jest.fn(),
   deleteFoodLog: jest.fn(),
 }));
+jest.mock('../lib/sentry', () => ({ recordQuietFailure: jest.fn() }));
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchTodaysFoodLogs = fetchTodaysFoodLogs as jest.Mock;
 const mockLogFood = logFood as jest.Mock;
 const mockUpdateFoodLogQuantity = updateFoodLogQuantity as jest.Mock;
 const mockDeleteFoodLog = deleteFoodLog as jest.Mock;
+const mockLogQuickEntry = logQuickEntry as jest.Mock;
+const mockKeepInLibrary = keepInLibrary as jest.Mock;
+const mockCreateFood = createFood as jest.Mock;
+const mockRecordQuietFailure = recordQuietFailure as jest.Mock;
 
 const sampleLog = {
   id: 'log-1',
@@ -59,6 +76,10 @@ beforeEach(() => {
   mockLogFood.mockReset();
   mockUpdateFoodLogQuantity.mockReset();
   mockDeleteFoodLog.mockReset();
+  mockLogQuickEntry.mockReset();
+  mockKeepInLibrary.mockReset().mockResolvedValue(null);
+  mockCreateFood.mockReset();
+  mockRecordQuietFailure.mockReset();
 });
 
 describe('FoodLogProvider', () => {
@@ -140,10 +161,173 @@ describe('FoodLogProvider', () => {
       await result.current.logFoodEntry(sampleFood, 1, 'lunch');
     });
 
-    expect(mockLogFood).toHaveBeenCalledWith('user-1', sampleFood, 1, 'lunch', undefined);
+    expect(mockLogFood).toHaveBeenCalledWith(
+      'user-1',
+      sampleFood,
+      1,
+      'lunch',
+      undefined,
+      undefined,
+    );
     expect(result.current.logs).toHaveLength(2);
     expect(result.current.logs[1].imageUrl).toBe('https://images.example/rice.jpg');
     expect(mockFetchTodaysFoodLogs).not.toHaveBeenCalled();
+  });
+
+  describe('keeping logged foods in the Food Library', () => {
+    it("logs the person's own copy of a food that isn't theirs, keeping the photo", async () => {
+      const copy = { ...sampleFood, id: 'food-copy', imageUrl: null };
+      mockKeepInLibrary.mockResolvedValue(copy);
+      mockLogFood.mockResolvedValue({ ...sampleLog, id: 'log-2', foodId: 'food-copy' });
+
+      const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        await result.current.logFoodEntry(sampleFood, 1, 'lunch');
+      });
+
+      expect(mockKeepInLibrary).toHaveBeenCalledWith('user-1', 'food-2');
+      expect(mockLogFood).toHaveBeenCalledWith(
+        'user-1',
+        { ...copy, imageUrl: 'https://images.example/rice.jpg' },
+        1,
+        'lunch',
+        undefined,
+        undefined,
+      );
+      expect(result.current.logs[1].imageUrl).toBe('https://images.example/rice.jpg');
+    });
+
+    it("still logs the food as it is when it can't be kept, and records why", async () => {
+      mockKeepInLibrary.mockRejectedValue(new Error('offline'));
+      mockLogFood.mockResolvedValue({ ...sampleLog, id: 'log-2' });
+
+      const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        await result.current.logFoodEntry(sampleFood, 1, 'lunch');
+      });
+
+      expect(mockLogFood).toHaveBeenCalledWith(
+        'user-1',
+        sampleFood,
+        1,
+        'lunch',
+        undefined,
+        undefined,
+      );
+      expect(mockRecordQuietFailure).toHaveBeenCalledWith(
+        'nutrition.keepInLibrary',
+        expect.any(Error),
+      );
+    });
+  });
+
+  describe('logging to a past day', () => {
+    it("logs to that day, at this time of day, and leaves today's foods alone", async () => {
+      mockLogFood.mockResolvedValue({ ...sampleLog, id: 'log-past' });
+      const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.logFoodEntry(sampleFood, 1, 'dinner', null, '2020-01-15');
+      });
+
+      expect(dayKey(mockLogFood.mock.calls[0][5] as Date)).toBe('2020-01-15');
+      expect(result.current.logs).toEqual([sampleLog]);
+    });
+
+    it('logs to today as now, and adds it to today', async () => {
+      mockLogFood.mockResolvedValue({ ...sampleLog, id: 'log-2' });
+      const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.logFoodEntry(sampleFood, 1, 'dinner', null, dayKey(new Date()));
+      });
+
+      expect(mockLogFood.mock.calls[0][5]).toBeUndefined();
+      expect(result.current.logs).toHaveLength(2);
+    });
+
+    it('logs each food of a saved meal to that day', async () => {
+      mockLogFood.mockResolvedValue({ ...sampleLog, id: 'log-past' });
+      const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.logFoodEntries(
+          [
+            { food: sampleFood, quantity: 1 },
+            { food: { ...sampleFood, id: 'food-3' }, quantity: 2 },
+          ],
+          'lunch',
+          '2020-01-15',
+        );
+      });
+
+      expect(mockLogFood).toHaveBeenCalledTimes(2);
+      for (const call of mockLogFood.mock.calls) {
+        expect(dayKey(call[5] as Date)).toBe('2020-01-15');
+      }
+      expect(result.current.logs).toEqual([sampleLog]);
+    });
+  });
+
+  describe('Quick Macro Entry', () => {
+    const entry = { name: 'Team lunch', calories: 650, proteinG: 30, carbsG: 70, fatG: 25 };
+
+    it('logs the figures with no food behind them, and adds them to today', async () => {
+      mockLogQuickEntry.mockResolvedValue({ ...sampleLog, id: 'log-quick', foodId: null });
+      const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.logQuickEntry(entry, 'lunch');
+      });
+
+      expect(mockLogQuickEntry).toHaveBeenCalledWith('user-1', entry, 'lunch', undefined);
+      expect(mockCreateFood).not.toHaveBeenCalled();
+      expect(result.current.logs.map((l) => l.id)).toEqual(['log-1', 'log-quick']);
+    });
+
+    it('keeps it as one of their foods, marked as entered by them, when they ask', async () => {
+      const food = { ...sampleFood, id: 'food-quick', name: 'Team lunch' };
+      mockCreateFood.mockResolvedValue(food);
+      mockLogFood.mockResolvedValue({ ...sampleLog, id: 'log-quick', foodId: 'food-quick' });
+      const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.logQuickEntry(entry, 'lunch', { saveToLibrary: true });
+      });
+
+      expect(mockCreateFood).toHaveBeenCalledWith('user-1', {
+        name: 'Team lunch',
+        servingSize: 1,
+        servingUnit: 'serving',
+        calories: 650,
+        proteinG: 30,
+        carbsG: 70,
+        fatG: 25,
+        provenance: { confidence: 'user_entered' },
+      });
+      expect(mockLogFood).toHaveBeenCalledWith('user-1', food, 1, 'lunch', null, undefined);
+      expect(mockLogQuickEntry).not.toHaveBeenCalled();
+    });
+
+    it("logs to a past day without adding it to today's foods", async () => {
+      mockLogQuickEntry.mockResolvedValue({ ...sampleLog, id: 'log-quick' });
+      const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.logQuickEntry(entry, 'lunch', { day: '2020-01-15' });
+      });
+
+      expect(dayKey(mockLogQuickEntry.mock.calls[0][3] as Date)).toBe('2020-01-15');
+      expect(result.current.logs).toEqual([sampleLog]);
+    });
   });
 
   it('updateQuantity saves via updateFoodLogQuantity, keeps the existing photo, and never re-fetches', async () => {

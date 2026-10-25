@@ -63,4 +63,8 @@ export const nutritionHistoryStyles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  // Open Full Day, under the chosen day's foods.
+  openDay: {
+    marginTop: spacing.md,
+  },
 });

@@ -23,7 +23,9 @@ jest.mock('../nutrition/foodLogQueries', () => ({
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchFoodLogsForMonth = fetchFoodLogsForMonth as jest.Mock;
 
+const mockNavigate = jest.fn();
 const navigation = {
+  navigate: mockNavigate,
   addListener: jest.fn((event: string, cb: () => void) => {
     if (event === 'focus') cb();
     return jest.fn();
@@ -230,5 +232,40 @@ describe('NutritionHistoryScreen -- opened on a day', () => {
 
     expect(await screen.findByTestId('nutrition-history-selected-day')).toBeTruthy();
     expect(await screen.findByTestId('nutrition-history-log-row-log-1')).toBeTruthy();
+  });
+
+  it('names the day chosen, never the day before it', async () => {
+    mockFetchFoodLogsForMonth.mockResolvedValue([log()]);
+    renderScreen({ date: FIXTURE_DATE_KEY });
+
+    const heading = fixtureDate.toLocaleDateString(undefined, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    });
+    expect(await screen.findByTestId('nutrition-history-selected-day')).toHaveTextContent(
+      new RegExp(heading),
+    );
+  });
+
+  it("opens that day's full breakdown on the Nutrition screen", async () => {
+    mockNavigate.mockClear();
+    mockFetchFoodLogsForMonth.mockResolvedValue([log()]);
+    renderScreen({ date: FIXTURE_DATE_KEY });
+    await screen.findByTestId('nutrition-history-log-row-log-1');
+
+    fireEvent.press(screen.getByTestId('nutrition-history-open-day'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('Nutrition', { day: FIXTURE_DATE_KEY });
+  });
+
+  it('offers no full day for a day after today', async () => {
+    mockFetchFoodLogsForMonth.mockResolvedValue([]);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    renderScreen({ date: toLocalDateKey(tomorrow) });
+
+    expect(await screen.findByTestId('nutrition-history-selected-day')).toBeTruthy();
+    expect(screen.queryByTestId('nutrition-history-open-day')).toBeNull();
   });
 });

@@ -48,7 +48,8 @@ type ScanState =
 // carrying the scanned barcode, then goes straight on to logging it (see
 // FoodLibraryScreen), and the next scan of that code finds the user's own entry.
 // Scan Again and Search Food are outlined.
-export function BarcodeScannerScreen({ navigation }: Props) {
+export function BarcodeScannerScreen({ navigation, route }: Props) {
+  const day = route.params?.day;
   const { session } = useAuth();
   const accessToken = session?.access_token;
 
@@ -145,7 +146,7 @@ export function BarcodeScannerScreen({ navigation }: Props) {
           <SecondaryButton
             testID="barcode-scanner-search-instead"
             label="Search Food Instead"
-            onPress={() => navigation.navigate('FoodSearch')}
+            onPress={() => navigation.navigate('FoodSearch', { day })}
           />
         </AppCard>
       </Screen>
@@ -174,6 +175,7 @@ export function BarcodeScannerScreen({ navigation }: Props) {
         showAttribution={product.provider === 'open_food_facts'}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
+        day={day}
         onDone={() => goToSection(navigation, 'Nutrition')}
         onCancel={resetToScanning}
       />
@@ -201,7 +203,7 @@ export function BarcodeScannerScreen({ navigation }: Props) {
             testID="barcode-scanner-create-custom"
             label="Enter Manually"
             onPress={() =>
-              navigation.navigate('FoodLibrary', { openCreate: true, barcode: state.barcode })
+              navigation.navigate('FoodLibrary', { openCreate: true, barcode: state.barcode, day })
             }
             accentColor={theme.accent}
             onAccentColor={theme.onAccent}
@@ -214,7 +216,7 @@ export function BarcodeScannerScreen({ navigation }: Props) {
           <SecondaryButton
             testID="barcode-scanner-search-food"
             label="Search Food"
-            onPress={() => navigation.navigate('FoodSearch')}
+            onPress={() => navigation.navigate('FoodSearch', { day })}
           />
         </AppCard>
       </Screen>
@@ -235,7 +237,7 @@ export function BarcodeScannerScreen({ navigation }: Props) {
           <SecondaryButton
             testID="barcode-scanner-search-food"
             label="Search Food"
-            onPress={() => navigation.navigate('FoodSearch')}
+            onPress={() => navigation.navigate('FoodSearch', { day })}
           />
         </AppCard>
       </Screen>

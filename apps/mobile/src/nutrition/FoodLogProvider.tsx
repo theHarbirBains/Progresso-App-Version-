@@ -8,16 +8,21 @@ import {
 } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { recordQuietFailure } from '../lib/sentry';
 import { useSignedInResource } from '../lib/useSignedInResource';
 import {
   deleteFoodLog,
   fetchTodaysFoodLogs,
   copyFoodLogs,
   logFood,
+  logQuickEntry,
   updateFoodLogQuantity,
   type EnteredAmount,
   type FoodLogRow,
+  type QuickEntry,
 } from './foodLogQueries';
+import { createFood, keepInLibrary, USER_ENTERED } from './foodQueries';
+import { loggedAtFor } from './logDay';
 import type { MealType } from './mealTypes';
 import type { LoggableFood } from './LogFoodStep';
 
@@ -26,17 +31,33 @@ export interface FoodLogContextValue {
   loading: boolean;
   error: string | null;
   refetch: () => Promise<boolean>;
+  /**
+   * Logs a food, kept in the Food Library first (a food that isn't the person's own is copied
+   * there once -- foodQueries.keepInLibrary). `day` ("YYYY-MM-DD") logs it to a past day instead
+   * of now; only today's logs are held here, so a past day's log is returned, not added.
+   */
   logFoodEntry: (
     food: LoggableFood,
     quantity: number,
     mealType: MealType,
     entered?: EnteredAmount | null,
+    day?: string,
   ) => Promise<FoodLogRow>;
-  /** Logs several foods now, one entry each, in order -- a saved meal. */
+  /** Logs several foods, one entry each, in order -- a saved meal -- each kept in the library. */
   logFoodEntries: (
     entries: { food: LoggableFood; quantity: number; entered?: EnteredAmount | null }[],
     mealType: MealType,
+    day?: string,
   ) => Promise<FoodLogRow[]>;
+  /**
+   * Logs figures the person typed, with no food behind them. With `saveToLibrary`, it's also
+   * kept as one of their foods, marked as figures they entered, and the log points at it.
+   */
+  logQuickEntry: (
+    entry: QuickEntry,
+    mealType: MealType,
+    options?: { day?: string; saveToLibrary?: boolean },
+  ) => Promise<FoodLogRow>;
   /** Logs past logs again, now, exactly as they were logged -- Copy Yesterday. */
   copyLogs: (logIds: string[]) => Promise<FoodLogRow[]>;
   updateQuantity: (
@@ -113,35 +134,81 @@ export function FoodLogProvider({ children }: PropsWithChildren) {
     return () => subscription.remove();
   }, [refetch]);
 
-  const value = useMemo<FoodLogContextValue>(
-    () => ({
+  const value = useMemo<FoodLogContextValue>(() => {
+    // The food a log points at, kept in the library. Keeping it is never a reason not to log:
+    // if the copy can't be made, the food is logged as it was, and the failure recorded.
+    async function kept(food: LoggableFood): Promise<LoggableFood> {
+      if (!userId || !food.id) return food;
+      try {
+        const own = await keepInLibrary(userId, food.id);
+        return own ? { ...own, imageUrl: own.imageUrl ?? food.imageUrl ?? null } : food;
+      } catch (err) {
+        recordQuietFailure('nutrition.keepInLibrary', err);
+        return food;
+      }
+    }
+
+    return {
       logs,
       loading,
       error,
       refetch,
-      logFoodEntry: async (food, quantity, mealType, entered) => {
+      logFoodEntry: async (food, quantity, mealType, entered, day) => {
         if (!userId) throw new Error('Not signed in');
-        const created = await logFood(userId, food, quantity, mealType, entered);
+        const loggedAt = loggedAtFor(day);
+        const target = await kept(food);
+        const created = await logFood(userId, target, quantity, mealType, entered, loggedAt);
         // logFood's own return never carries a photo (only the dedicated
         // today's-list select embeds one) -- carried over here from the food
         // that was just logged, same as the merge NutritionTodayScreen's own
         // quantity update already did before this provider existed.
-        const withImage: FoodLogRow = { ...created, imageUrl: food.imageUrl ?? null };
-        setLogs((prev) => [...prev, withImage]);
+        const withImage: FoodLogRow = { ...created, imageUrl: target.imageUrl ?? null };
+        if (!loggedAt) setLogs((prev) => [...prev, withImage]);
         return withImage;
       },
-      logFoodEntries: async (entries, mealType) => {
+      logFoodEntries: async (entries, mealType, day) => {
         if (!userId) throw new Error('Not signed in');
+        const loggedAt = loggedAtFor(day);
         const created: FoodLogRow[] = [];
         // One at a time, so a failure part way leaves the ones logged so far in Today.
         try {
           for (const entry of entries) {
-            const row = await logFood(userId, entry.food, entry.quantity, mealType, entry.entered);
-            created.push({ ...row, imageUrl: entry.food.imageUrl ?? null });
+            const target = await kept(entry.food);
+            const row = await logFood(
+              userId,
+              target,
+              entry.quantity,
+              mealType,
+              entry.entered,
+              loggedAt,
+            );
+            created.push({ ...row, imageUrl: target.imageUrl ?? null });
           }
         } finally {
-          if (created.length > 0) setLogs((prev) => [...prev, ...created]);
+          if (!loggedAt && created.length > 0) setLogs((prev) => [...prev, ...created]);
         }
+        return created;
+      },
+      logQuickEntry: async (entry, mealType, options = {}) => {
+        if (!userId) throw new Error('Not signed in');
+        const loggedAt = loggedAtFor(options.day);
+        let created: FoodLogRow;
+        if (options.saveToLibrary) {
+          const food = await createFood(userId, {
+            name: entry.name,
+            servingSize: 1,
+            servingUnit: 'serving',
+            calories: entry.calories,
+            proteinG: entry.proteinG,
+            carbsG: entry.carbsG,
+            fatG: entry.fatG,
+            provenance: USER_ENTERED,
+          });
+          created = await logFood(userId, food, 1, mealType, null, loggedAt);
+        } else {
+          created = await logQuickEntry(userId, entry, mealType, loggedAt);
+        }
+        if (!loggedAt) setLogs((prev) => [...prev, created]);
         return created;
       },
       copyLogs: async (logIds) => {
@@ -160,9 +227,8 @@ export function FoodLogProvider({ children }: PropsWithChildren) {
         await deleteFoodLog(logId);
         setLogs((prev) => prev.filter((l) => l.id !== logId));
       },
-    }),
-    [logs, loading, error, refetch, setLogs, userId],
-  );
+    };
+  }, [logs, loading, error, refetch, setLogs, userId]);
 
   return <FoodLogContext.Provider value={value}>{children}</FoodLogContext.Provider>;
 }

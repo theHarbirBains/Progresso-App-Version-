@@ -10,6 +10,7 @@ import {
   copyFoodLogs,
   fetchFoodLogsForDay,
   fetchFoodLogsForRange,
+  logQuickEntry,
 } from './foodLogQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
@@ -294,6 +295,79 @@ describe('logFood', () => {
     expect(builder.insert).toHaveBeenCalledWith(
       expect.objectContaining({ quantity: 2, calories: 330, protein_g: 62 }),
     );
+  });
+
+  it('logs to the time given -- a past day -- and leaves logged_at to the database otherwise', async () => {
+    const food = {
+      id: 'food-1',
+      name: 'Chicken Breast',
+      servingSize: 100,
+      servingUnit: 'g',
+      calories: 165,
+      proteinG: 31,
+      carbsG: 0,
+      fatG: 3.6,
+    };
+    const past = new Date('2026-10-20T18:30:00Z');
+
+    const { builder } = mockTable({ data: dbRow, error: null });
+    await logFood('user-1', food, 1, 'dinner', null, past);
+    expect(builder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ logged_at: '2026-10-20T18:30:00.000Z' }),
+    );
+
+    const now = mockTable({ data: dbRow, error: null });
+    await logFood('user-1', food, 1, 'dinner');
+    expect(now.builder.insert).toHaveBeenCalledWith(
+      expect.not.objectContaining({ logged_at: expect.anything() }),
+    );
+  });
+});
+
+describe('logQuickEntry', () => {
+  const entry = { name: 'Team lunch', calories: 650, proteinG: 30, carbsG: 70, fatG: 25 };
+
+  it('logs the figures as typed, as one serving with no food behind it, marked as user-entered', async () => {
+    const { builder } = mockTable({ data: dbRow, error: null });
+
+    await logQuickEntry('user-1', entry, 'lunch');
+
+    expect(builder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'user-1',
+        food_id: null,
+        food_name_snapshot: 'Team lunch',
+        serving_size: 1,
+        serving_unit: 'serving',
+        quantity: 1,
+        calories: 650,
+        protein_g: 30,
+        carbs_g: 70,
+        fat_g: 25,
+        meal_type: 'lunch',
+        nutrition_confidence: 'user_entered',
+        nutrition_source_kind: 'user_entered',
+      }),
+    );
+    expect(builder.insert).toHaveBeenCalledWith(
+      expect.not.objectContaining({ logged_at: expect.anything() }),
+    );
+  });
+
+  it('logs to a past day when given its time', async () => {
+    const { builder } = mockTable({ data: dbRow, error: null });
+
+    await logQuickEntry('user-1', entry, 'lunch', new Date('2026-10-20T12:00:00Z'));
+
+    expect(builder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ logged_at: '2026-10-20T12:00:00.000Z' }),
+    );
+  });
+
+  it('throws on a query error', async () => {
+    mockTable({ data: null, error: { message: 'boom' } });
+
+    await expect(logQuickEntry('user-1', entry, 'lunch')).rejects.toThrow('boom');
   });
 });
 

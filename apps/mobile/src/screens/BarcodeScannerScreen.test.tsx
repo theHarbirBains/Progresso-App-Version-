@@ -25,6 +25,13 @@ jest.mock('../profile/profileQueries', () => ({
   fetchMyProfile: jest.fn(),
 }));
 
+// The shared food log keeps a logged food in the library first (foodQueries.keepInLibrary);
+// here there's nothing to copy, so each food is logged as it is.
+jest.mock('../nutrition/foodQueries', () => ({
+  keepInLibrary: jest.fn().mockResolvedValue(null),
+  createFood: jest.fn(),
+  USER_ENTERED: { confidence: 'user_entered' },
+}));
 jest.mock('../nutrition/foodLogQueries', () => ({
   logFood: jest.fn(),
   fetchTodaysFoodLogs: jest.fn(),
@@ -201,7 +208,7 @@ describe('BarcodeScannerScreen permission states', () => {
 
     fireEvent.press(screen.getByTestId('barcode-scanner-search-instead'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('FoodSearch');
+    expect(mockNavigate).toHaveBeenCalledWith('FoodSearch', { day: undefined });
   });
 });
 
@@ -354,6 +361,7 @@ describe('BarcodeScannerScreen logging', () => {
       // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
       { amount: 2, unit: 'pieces' },
+      undefined,
     );
     expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
     expect(mockNavigate).not.toHaveBeenCalledWith('Nutrition');

@@ -296,7 +296,7 @@ describe('FoodLibraryScreen', () => {
 
     fireEvent.press(screen.getByTestId('food-library-ai-search'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch');
+    expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch', { day: undefined });
   });
 
   it('creates a food and returns to the list', async () => {
@@ -377,6 +377,7 @@ describe('FoodLibraryScreen', () => {
       1,
       expect.anything(),
       { amount: 1, unit: 'servings' },
+      undefined,
     );
     // Done returns to Nutrition, not back to the scanner's not-found screen.
     expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
@@ -569,6 +570,7 @@ describe('FoodLibraryScreen', () => {
       // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
       { amount: 1, unit: 'servings' },
+      undefined,
     );
     expect(mockGoBack).toHaveBeenCalled();
   });
@@ -650,6 +652,7 @@ describe('FoodLibraryScreen -- Recent', () => {
       2,
       expect.stringMatching(/^(breakfast|lunch|dinner|snack)$/),
       { amount: 2, unit: 'servings' },
+      undefined,
     );
     expect(mockGoBack).toHaveBeenCalled();
   });
@@ -678,10 +681,17 @@ describe('FoodLibraryScreen -- Recent', () => {
       fireEvent.press(screen.getByTestId('log-food-submit'));
     });
 
-    expect(mockLogFood).toHaveBeenCalledWith('user-1', edited, 1, expect.any(String), {
-      amount: 1,
-      unit: 'servings',
-    });
+    expect(mockLogFood).toHaveBeenCalledWith(
+      'user-1',
+      edited,
+      1,
+      expect.any(String),
+      {
+        amount: 1,
+        unit: 'servings',
+      },
+      undefined,
+    );
   });
 
   it('hides Recent while searching', async () => {
@@ -874,10 +884,17 @@ describe('FoodLibraryScreen -- Usual', () => {
       fireEvent.press(screen.getByTestId('log-food-submit'));
     });
 
-    expect(mockLogFood).toHaveBeenCalledWith('user-1', eggs, 1.5, expect.any(String), {
-      amount: 150,
-      unit: 'g',
-    });
+    expect(mockLogFood).toHaveBeenCalledWith(
+      'user-1',
+      eggs,
+      1.5,
+      expect.any(String),
+      {
+        amount: 150,
+        unit: 'g',
+      },
+      undefined,
+    );
   });
 
   it('still lists the library when Usual cannot load', async () => {
@@ -982,11 +999,24 @@ describe('FoodLibraryScreen -- Saved Meals', () => {
     });
 
     expect(mockLogFood).toHaveBeenCalledTimes(2);
-    expect(mockLogFood).toHaveBeenNthCalledWith(1, 'user-1', apple, 2, expect.any(String), null);
-    expect(mockLogFood).toHaveBeenNthCalledWith(2, 'user-1', banana, 1, expect.any(String), {
-      amount: 118,
-      unit: 'g',
-    });
+    expect(mockLogFood).toHaveBeenNthCalledWith(
+      1,
+      'user-1',
+      apple,
+      2,
+      expect.any(String),
+      null,
+      undefined,
+    );
+    expect(mockLogFood).toHaveBeenNthCalledWith(
+      2,
+      'user-1',
+      banana,
+      1,
+      expect.any(String),
+      { amount: 118, unit: 'g' },
+      undefined,
+    );
     // On to Today, where they now are.
     expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
   });

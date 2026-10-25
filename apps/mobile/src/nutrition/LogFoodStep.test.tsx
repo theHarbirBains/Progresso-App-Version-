@@ -65,7 +65,13 @@ describe('LogFoodStep', () => {
     expect(screen.getByTestId('log-food-calories')).toHaveTextContent(/260/);
     await submit();
 
-    expect(mockLogFoodEntry).toHaveBeenCalledWith(rice, 2, MEAL, { amount: 2, unit: 'servings' });
+    expect(mockLogFoodEntry).toHaveBeenCalledWith(
+      rice,
+      2,
+      MEAL,
+      { amount: 2, unit: 'servings' },
+      undefined,
+    );
     expect(onDone).toHaveBeenCalled();
   });
 
@@ -99,7 +105,13 @@ describe('LogFoodStep', () => {
     expect(screen.getByTestId('log-food-calories')).toHaveTextContent(/325/);
     await submit();
 
-    expect(mockLogFoodEntry).toHaveBeenCalledWith(rice, 2.5, MEAL, { amount: 250, unit: 'g' });
+    expect(mockLogFoodEntry).toHaveBeenCalledWith(
+      rice,
+      2.5,
+      MEAL,
+      { amount: 250, unit: 'g' },
+      undefined,
+    );
   });
 
   it('logs ounces as servings too, and switching back keeps the amount', async () => {
@@ -114,7 +126,13 @@ describe('LogFoodStep', () => {
     expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '2');
     await submit();
 
-    expect(mockLogFoodEntry).toHaveBeenCalledWith(rice, 2, MEAL, { amount: 2, unit: 'servings' });
+    expect(mockLogFoodEntry).toHaveBeenCalledWith(
+      rice,
+      2,
+      MEAL,
+      { amount: 2, unit: 'servings' },
+      undefined,
+    );
   });
 
   it('will not log an amount that comes to no servings', async () => {
@@ -188,10 +206,16 @@ describe('LogFoodStep', () => {
       await submit();
 
       // Kept as typed, so Today shows 2 cookies.
-      expect(mockLogFoodEntry).toHaveBeenCalledWith(oreo, 0.67, MEAL, {
-        amount: 2,
-        unit: 'pieces',
-      });
+      expect(mockLogFoodEntry).toHaveBeenCalledWith(
+        oreo,
+        0.67,
+        MEAL,
+        {
+          amount: 2,
+          unit: 'pieces',
+        },
+        undefined,
+      );
     });
 
     it('says one cookie in the singular, and can still be switched to grams', () => {
@@ -241,7 +265,13 @@ describe('LogFoodStep -- drinks, last time and double taps', () => {
     expect(screen.getByTestId('log-food-amount')).toHaveTextContent('165 ml · 0.5 servings');
     await submit();
 
-    expect(mockLogFoodEntry).toHaveBeenCalledWith(cola, 0.5, MEAL, { amount: 165, unit: 'ml' });
+    expect(mockLogFoodEntry).toHaveBeenCalledWith(
+      cola,
+      0.5,
+      MEAL,
+      { amount: 165, unit: 'ml' },
+      undefined,
+    );
   });
 
   it('starts in the amount and unit typed last time', () => {

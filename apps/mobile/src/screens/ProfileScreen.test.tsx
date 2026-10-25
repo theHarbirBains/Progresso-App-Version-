@@ -43,6 +43,13 @@ jest.mock('../progress/progressStatsQueries', () => ({
   fetchAllCompletedWorkouts: jest.fn(),
 }));
 
+// The shared food log keeps a logged food in the library first (foodQueries.keepInLibrary);
+// here there's nothing to copy, so each food is logged as it is.
+jest.mock('../nutrition/foodQueries', () => ({
+  keepInLibrary: jest.fn().mockResolvedValue(null),
+  createFood: jest.fn(),
+  USER_ENTERED: { confidence: 'user_entered' },
+}));
 jest.mock('../nutrition/foodLogQueries', () => ({
   fetchTodaysFoodLogs: jest.fn(),
 }));

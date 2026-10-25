@@ -433,7 +433,7 @@ describe('AiFoodSearchScreen', () => {
         }),
       ),
     );
-    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary');
+    expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary', { day: undefined });
   });
 
   it('does not add a food the library already has by name, and says so', async () => {
@@ -569,6 +569,7 @@ describe('AiFoodSearchScreen -- Review & Log', () => {
       2,
       expect.any(String),
       { amount: 2, unit: 'servings' },
+      undefined,
     );
     expect(mockDispatch).toHaveBeenCalled();
   });

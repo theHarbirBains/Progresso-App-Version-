@@ -7,6 +7,7 @@ import {
   fetchRecentFoods,
   fetchUsualFoods,
   findOwnFoodByName,
+  keepInLibrary,
   updateFood,
 } from './foodQueries';
 
@@ -679,5 +680,106 @@ describe('findOwnFoodByName', () => {
     mockTable({ data: null, error: { message: 'boom' } });
 
     await expect(findOwnFoodByName('user-1', 'Chicken Breast')).rejects.toThrow('boom');
+  });
+});
+
+describe('keepInLibrary', () => {
+  // One builder per query, in the order keepInLibrary makes them: the food itself, the person's
+  // own foods of that name, and -- when there's no copy yet -- the insert.
+  function mockQueries(...results: Result[]) {
+    const all = results.map((result) => {
+      const made = createQueryBuilder(result);
+      made.builder.maybeSingle = jest.fn().mockResolvedValue(result);
+      return made;
+    });
+    for (const { builder } of all) mockFrom.mockImplementationOnce(() => builder);
+    return all;
+  }
+
+  const builtIn = { ...dbRow, id: 'food-built-in', created_by: null };
+
+  it("keeps the person's own food as it is, with nothing copied", async () => {
+    const [source] = mockQueries({ data: { ...dbRow, created_by: 'user-1' }, error: null });
+
+    const result = await keepInLibrary('user-1', 'food-1');
+
+    expect(source.calls.eq).toEqual([['id', 'food-1']]);
+    expect(result?.id).toBe('food-1');
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+  });
+
+  it("copies a food that isn't theirs into their library once, as it is", async () => {
+    const [, own, insert] = mockQueries(
+      { data: builtIn, error: null },
+      { data: [], error: null },
+      { data: { ...dbRow, id: 'food-copy' }, error: null },
+    );
+
+    const result = await keepInLibrary('user-1', 'food-built-in');
+
+    expect(own.calls.eq).toEqual([
+      ['created_by', 'user-1'],
+      ['is_active', true],
+    ]);
+    expect(own.calls.ilike).toEqual([['name', 'Chicken Breast']]);
+    expect(insert.builder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        created_by: 'user-1',
+        name: 'Chicken Breast',
+        serving_size: 100,
+        serving_unit: 'g',
+        calories: 165,
+        protein_g: 31,
+      }),
+    );
+    expect(result?.id).toBe('food-copy');
+  });
+
+  it('uses the copy already in their library instead of making another', async () => {
+    mockQueries(
+      { data: builtIn, error: null },
+      { data: [{ ...dbRow, id: 'food-copy', name: 'chicken breast' }], error: null },
+    );
+
+    const result = await keepInLibrary('user-1', 'food-built-in');
+
+    expect(result?.id).toBe('food-copy');
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+  });
+
+  it('matches a copy by its barcode', async () => {
+    mockQueries(
+      { data: { ...builtIn, barcode: '0123' }, error: null },
+      { data: [{ ...dbRow, id: 'food-copy', barcode: '0123', calories: '170.00' }], error: null },
+    );
+
+    await expect(keepInLibrary('user-1', 'food-built-in')).resolves.toMatchObject({
+      id: 'food-copy',
+    });
+  });
+
+  it('makes a new copy when their food of that name is a different one', async () => {
+    const [, , insert] = mockQueries(
+      { data: builtIn, error: null },
+      { data: [{ ...dbRow, id: 'food-mine', calories: '200.00' }], error: null },
+      { data: { ...dbRow, id: 'food-copy' }, error: null },
+    );
+
+    const result = await keepInLibrary('user-1', 'food-built-in');
+
+    expect(insert.builder.insert).toHaveBeenCalled();
+    expect(result?.id).toBe('food-copy');
+  });
+
+  it('returns null for a food that is gone', async () => {
+    mockQueries({ data: null, error: null });
+
+    await expect(keepInLibrary('user-1', 'food-gone')).resolves.toBeNull();
+  });
+
+  it('throws the database error', async () => {
+    mockQueries({ data: null, error: { message: 'boom' } });
+
+    await expect(keepInLibrary('user-1', 'food-1')).rejects.toThrow('boom');
   });
 });

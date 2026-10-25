@@ -64,6 +64,9 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Saved meals: foods you eat together, logged in one go, each as its own entry; build one in the Food Library or save today's foods as one
 - Recipes: a drink or a meal always made the same way -- its ingredients and how many servings it makes -- logged as a single food, with its figures per serving worked out from the ingredients
 - Copy Yesterday logs any of yesterday's foods again, exactly as they were logged
+- Any past day on the Nutrition screen: swipe or step back through the days (never past today), see that day's full breakdown in the same layout, and log, edit or delete foods there; Nutrition History opens any day in full
+- Quick Macro Entry logs a name and its calories, protein, carbs and fat as typed, kept in your Food Library only if you tick Save to Food Library
+- A food you log from search, a barcode or the catalog is kept in your own Food Library (once -- never a duplicate), so it's there to re-log, edit or remove
 - Search Food covers Progresso's food catalog and Open Food Facts; Scan Barcode looks products up on Open Food Facts, with Enter Manually when one isn't found
 - AI Food Search (from the Nutrition dashboard or the Food Library) turns a description into its parts and takes their figures from Progresso's catalog, USDA data and Open Food Facts; Claude's own estimate is used only as a labelled last resort. Review & Log lets you check and change the name and figures before setting the amount and logging it, without adding a duplicate to your library. Each user has an hourly and a daily limit
 - A food can be logged in servings, in the pieces its serving names (cookies, slices), in grams or ounces when its serving is a weight, or in millilitres when it's a drink; a log keeps the amount as typed and is edited that way, and logging the same food twice within seconds asks first

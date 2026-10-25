@@ -13,6 +13,7 @@ const NUTRITION_ROUTE_NAMES = new Set([
   'FoodLibrary',
   'FoodSearch',
   'BarcodeScanner',
+  'QuickFoodEntry',
   'NutritionGoals',
   'NutritionHistory',
   'CalorieEstimation',

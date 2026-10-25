@@ -52,6 +52,8 @@ interface LogFoodStepProps {
    */
   onChoose?: (choice: { quantity: number; entered: EnteredAmount }) => void;
   chooseLabel?: string;
+  /** The day to log to ("YYYY-MM-DD"), when it's a past day the Nutrition screen was showing. */
+  day?: string;
 }
 
 function capitalize(text: string): string {
@@ -92,6 +94,7 @@ export function LogFoodStep({
   onCancel,
   onChoose,
   chooseLabel = 'Add',
+  day,
 }: LogFoodStepProps) {
   const { logs, logFoodEntry } = useFoodLog();
   const measures = servingMeasures(food);
@@ -177,7 +180,7 @@ export function LogFoodStep({
       return;
     }
     // A second tap seconds after the first is almost always a mistake: ask first.
-    if (loggedJustNow(logs, food.id)) {
+    if (!day && loggedJustNow(logs, food.id, Date.now(), food.name)) {
       Alert.alert('Log it again?', `You logged ${food.name} a few seconds ago.`, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Log Again', onPress: () => void log() },
@@ -195,7 +198,7 @@ export function LogFoodStep({
       // ProfileScreen, wherever they're mounted, see this the instant it
       // resolves, with no re-fetch of their own.
       // Kept as typed too, so Today shows "2 cookies" rather than 0.67 servings.
-      await logFoodEntry(food, servings, defaultMealTypeForTime(), { amount, unit });
+      await logFoodEntry(food, servings, defaultMealTypeForTime(), { amount, unit }, day);
       onDone?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to log food');
