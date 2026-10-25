@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { dayKey } from '../lib/dayKey';
+import { fakeTouch } from '../testUtils/fakeTouch';
 import { shiftDay } from './logDay';
 import { useDaySwipe } from './useDaySwipe';
 
@@ -74,5 +75,57 @@ describe('useDaySwipe', () => {
     await act(async () => {});
 
     expect(await AsyncStorage.getItem('@progresso/nutritionSwipeHint')).toBeNull();
+  });
+
+  describe('the gesture, inside a scrolling page', () => {
+    it('claims a sideways drag on the way down, before the page scroll can', () => {
+      const { result } = renderTurn(yesterday, true);
+      const capture = result.current.panHandlers.onMoveShouldSetResponderCapture!;
+
+      expect(capture(fakeTouch(8, 1, 16))).toBe(true);
+    });
+
+    it('leaves an up-and-down drag to the page', () => {
+      const { result } = renderTurn(yesterday, true);
+      const capture = result.current.panHandlers.onMoveShouldSetResponderCapture!;
+
+      expect(capture(fakeTouch(2, 30, 16))).toBe(false);
+    });
+
+    it("never gives the swipe up to the page's scroll once it has it", () => {
+      const { result } = renderTurn(yesterday, true);
+
+      expect(result.current.panHandlers.onResponderTerminationRequest!(fakeTouch(0, 0, 1))).toBe(
+        false,
+      );
+    });
+
+    it('says a swipe is under way from the moment it is claimed until it ends', () => {
+      const { result } = renderTurn(yesterday, true);
+      expect(result.current.swiping).toBe(false);
+
+      act(() => {
+        result.current.panHandlers.onResponderGrant!(fakeTouch(8, 0, 16));
+      });
+      expect(result.current.swiping).toBe(true);
+
+      act(() => {
+        result.current.panHandlers.onResponderRelease!(fakeTouch(8, 0, 32));
+      });
+      expect(result.current.swiping).toBe(false);
+    });
+
+    it('turns the day when a swipe goes far enough', () => {
+      const { result, onDay } = renderTurn(yesterday, true);
+      const handlers = result.current.panHandlers;
+
+      act(() => {
+        handlers.onResponderGrant!(fakeTouch(0, 0, 1));
+        handlers.onResponderMove!(fakeTouch(-120, 4, 120, { x: 0, y: 0, time: 1 }));
+        handlers.onResponderRelease!(fakeTouch(-120, 4, 130, { x: -120, y: 4, time: 120 }));
+      });
+
+      expect(onDay).toHaveBeenCalledWith(shiftDay(yesterday, -1));
+    });
   });
 });

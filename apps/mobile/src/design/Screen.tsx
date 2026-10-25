@@ -19,6 +19,8 @@ interface Props {
   header?: ReactNode;
   /** Default true: the body scrolls. false renders a plain View -- for a screen that manages its own scrolling (a FlatList) or has none. */
   scroll?: boolean;
+  /** Default true. False holds the scrolling body still for a moment -- while a sideways swipe on the page is under way, so the page can't drift (or take the touch) mid-swipe. */
+  scrollEnabled?: boolean;
   /** Default false. Wraps the body so the on-screen keyboard pushes content up instead of covering an input. */
   keyboardAvoiding?: boolean;
   /** Default true: the standard horizontal screen padding -- 0, so every widget runs edge-to-edge with no gap to the screen's own left/right edge (see DESIGN.md's Feed section). Set false for content that also wants to skip the vertical/other defaults this applies, such as a full-bleed list managing its own layout. */
@@ -53,6 +55,7 @@ export function Screen({
   children,
   header,
   scroll = true,
+  scrollEnabled = true,
   keyboardAvoiding = false,
   padded = true,
   contentContainerStyle,
@@ -72,6 +75,7 @@ export function Screen({
       style={styles.flex}
       contentContainerStyle={[horizontal, styles.scrollContent, contentContainerStyle]}
       keyboardShouldPersistTaps="handled"
+      scrollEnabled={scrollEnabled}
       showsVerticalScrollIndicator={false}
       refreshControl={refreshControl}
     >

@@ -588,7 +588,12 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   );
 
   return (
-    <Screen contentContainerStyle={styles.content} header={header} rollout={false}>
+    <Screen
+      contentContainerStyle={styles.content}
+      header={header}
+      rollout={false}
+      scrollEnabled={!dayTurn.swiping}
+    >
       <RiseIn>{dayBar}</RiseIn>
       <Animated.View
         testID="nutrition-day-content"

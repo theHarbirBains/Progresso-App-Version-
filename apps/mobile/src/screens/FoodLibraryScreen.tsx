@@ -222,8 +222,10 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
     }
   }
 
-  // The one row showing Delete, if any.
+  // The one row showing Delete, if any; and whether a row is being swiped, when the list holds
+  // its scroll still.
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
+  const [rowSwiping, setRowSwiping] = useState(false);
   const loadShortcutsRef = useRef(loadShortcuts);
   loadShortcutsRef.current = loadShortcuts;
 
@@ -348,6 +350,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
             name={meal.name}
             open={swipeOpenId === `meal-${meal.id}`}
             onOpenChange={(open) => setSwipeOpenId(open ? `meal-${meal.id}` : null)}
+            onSwipingChange={setRowSwiping}
             onDelete={() => requestDelete(item)}
           >
             <View style={styles.row}>
@@ -427,6 +430,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
           name={food.name}
           open={swipeOpenId === `food-${food.id}`}
           onOpenChange={(open) => setSwipeOpenId(open ? `food-${food.id}` : null)}
+          onSwipingChange={setRowSwiping}
           onDelete={() => requestDelete(item)}
         >
           {row}
@@ -678,6 +682,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
                 sections={listSections}
                 keyExtractor={(item) => `${item.kind}-${item.id}`}
                 keyboardShouldPersistTaps="handled"
+                scrollEnabled={!rowSwiping}
                 showsVerticalScrollIndicator={false}
                 renderSectionHeader={renderSectionHeader}
                 renderItem={renderItem}

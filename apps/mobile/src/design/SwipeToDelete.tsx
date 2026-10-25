@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
+import { isSidewaysDrag } from './sidewaysDrag';
 import { Text } from './Text';
 import { colors, spacing, typeScale } from './theme';
 
@@ -25,6 +26,8 @@ interface Props {
   onDelete: () => void;
   /** What's deleted, for the action's spoken label ("Delete Chicken Breast"). */
   name: string;
+  /** A swipe started or ended: the list holds its scroll still meanwhile (see sidewaysDrag.ts). */
+  onSwipingChange?: (swiping: boolean) => void;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
@@ -43,6 +46,7 @@ export function SwipeToDelete({
   onOpenChange,
   onDelete,
   name,
+  onSwipingChange,
   style,
   testID,
 }: Props) {
@@ -54,6 +58,8 @@ export function SwipeToDelete({
   reduceMotionRef.current = reduceMotion;
   const onOpenChangeRef = useRef(onOpenChange);
   onOpenChangeRef.current = onOpenChange;
+  const onSwipingChangeRef = useRef(onSwipingChange);
+  onSwipingChangeRef.current = onSwipingChange;
 
   useEffect(() => {
     const toValue = open ? -SWIPE_ACTION_WIDTH : 0;
@@ -77,11 +83,14 @@ export function SwipeToDelete({
         }).start();
     };
     const from = () => (openRef.current ? -SWIPE_ACTION_WIDTH : 0);
+    const claims = (gesture: { dx: number; dy: number }) => isSidewaysDrag(gesture.dx, gesture.dy);
     return PanResponder.create({
-      // A clearly sideways drag -- never a scroll, nor a tap.
-      onMoveShouldSetPanResponder: (_event, gesture) =>
-        Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+      // A clearly sideways drag, claimed on the way down (capture) and early, before the list's
+      // own scroll can take it -- never a scroll, nor a tap.
+      onMoveShouldSetPanResponderCapture: (_event, gesture) => claims(gesture),
+      onMoveShouldSetPanResponder: (_event, gesture) => claims(gesture),
       onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => onSwipingChangeRef.current?.(true),
       onPanResponderMove: (_event, gesture) => {
         const x = Math.min(0, from() + gesture.dx);
         offset.setValue(
@@ -89,12 +98,16 @@ export function SwipeToDelete({
         );
       },
       onPanResponderRelease: (_event, gesture) => {
+        onSwipingChangeRef.current?.(false);
         const x = from() + gesture.dx;
         const shouldOpen = gesture.vx < -0.3 || (gesture.vx <= 0.3 && x < -SWIPE_ACTION_WIDTH / 2);
         if (shouldOpen === openRef.current) settle(shouldOpen);
         else onOpenChangeRef.current(shouldOpen);
       },
-      onPanResponderTerminate: () => settle(openRef.current),
+      onPanResponderTerminate: () => {
+        onSwipingChangeRef.current?.(false);
+        settle(openRef.current);
+      },
     });
   }, [offset]);
 

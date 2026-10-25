@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, PanResponder } from 'react-native';
+import { isSidewaysDrag } from '../design/sidewaysDrag';
 import { daySwipe, isPastKey, shiftDay } from './logDay';
 
 // How the Nutrition screen turns from one day to the next. The day's widgets follow the finger
@@ -34,6 +35,8 @@ interface Options {
 /**
  * - `slide`: the widgets' movement, in points, negative while they go left (DayBar's date follows
  *   it);
+ * - `swiping`: a swipe is under way -- the screen holds its scroll still meanwhile
+ *   (`Screen`'s `scrollEnabled`), so the page neither drifts nor takes the touch;
  * - `panHandlers`: for the widgets and the day bar -- a sideways drag on either turns the day;
  * - `contentStyle`: the widgets' turn -- depth, tilt, shrink and fade, all from `slide`;
  * - `turnTo`: turns to the day before or after, or to any day (Back to Today), with the same turn.
@@ -42,6 +45,7 @@ export type DaySwipe = ReturnType<typeof useDaySwipe>;
 
 export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
   const slide = useRef(new Animated.Value(0)).current;
+  const [swiping, setSwiping] = useState(false);
   // Where the widgets are, as far as a drag has taken them (slide's own value isn't readable).
   const position = useRef(0);
   const turning = useRef(false);
@@ -123,12 +127,16 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
         mass: 1,
       }).start();
     };
+    const claims = (gesture: { dx: number; dy: number }) =>
+      !turning.current && isSidewaysDrag(gesture.dx, gesture.dy);
     return PanResponder.create({
-      // A clearly sideways drag -- never a scroll, nor a tap on a field.
-      onMoveShouldSetPanResponder: (_event, gesture) =>
-        !turning.current &&
-        Math.abs(gesture.dx) > 14 &&
-        Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.7,
+      // Asked on the way down (capture), so the day takes a sideways drag before anything inside
+      // it -- or the page's scroll -- can; never a scroll, nor a tap on a field.
+      onMoveShouldSetPanResponderCapture: (_event, gesture) => claims(gesture),
+      onMoveShouldSetPanResponder: (_event, gesture) => claims(gesture),
+      // Once it's the day's, the page's ScrollView can't take it back mid-swipe.
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => setSwiping(true),
       onPanResponderMove: (_event, gesture) => {
         if (turning.current) return;
         const pastToday = gesture.dx > 0 && !isPastKey(dayRef.current);
@@ -136,11 +144,15 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
         slide.setValue(position.current);
       },
       onPanResponderRelease: (_event, gesture) => {
+        setSwiping(false);
         const direction = daySwipe(gesture.dx, gesture.vx, isPastKey(dayRef.current));
         if (direction) turnTo(direction, undefined, gesture.vx);
         else springBack();
       },
-      onPanResponderTerminate: springBack,
+      onPanResponderTerminate: () => {
+        setSwiping(false);
+        springBack();
+      },
     }).panHandlers;
   }, [slide, turnTo]);
 
@@ -208,5 +220,5 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
     // Re-run only when Reduce Motion is learned to be on, which cancels a hint not yet shown.
   }, [reduceMotion, slide]);
 
-  return { slide, panHandlers, contentStyle, turnTo };
+  return { slide, swiping, panHandlers, contentStyle, turnTo };
 }

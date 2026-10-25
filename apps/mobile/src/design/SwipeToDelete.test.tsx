@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fakeTouch } from '../testUtils/fakeTouch';
 import { Text } from './Text';
 import { SwipeToDelete } from './SwipeToDelete';
 
@@ -45,5 +46,31 @@ describe('SwipeToDelete', () => {
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it('claims a sideways drag early and holds on to it, telling the list to stay still meanwhile', () => {
+    const onSwipingChange = jest.fn();
+    render(
+      <SwipeToDelete
+        testID="row"
+        name="Chicken Breast"
+        open={false}
+        onOpenChange={jest.fn()}
+        onDelete={jest.fn()}
+        onSwipingChange={onSwipingChange}
+      >
+        <Text>Chicken Breast</Text>
+      </SwipeToDelete>,
+    );
+    const row = screen.getByTestId('row').children[1] as unknown as {
+      props: Record<string, (event: unknown) => boolean>;
+    };
+
+    expect(row.props.onMoveShouldSetResponderCapture(fakeTouch(-8, 1, 16))).toBe(true);
+    row.props.onResponderGrant(fakeTouch(-8, 1, 16));
+    expect(onSwipingChange).toHaveBeenLastCalledWith(true);
+    expect(row.props.onResponderTerminationRequest(fakeTouch(-8, 1, 20))).toBe(false);
+    row.props.onResponderRelease(fakeTouch(-8, 1, 40));
+    expect(onSwipingChange).toHaveBeenLastCalledWith(false);
   });
 });

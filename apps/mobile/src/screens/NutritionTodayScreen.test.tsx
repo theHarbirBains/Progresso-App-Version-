@@ -1,8 +1,9 @@
-import { Image, StyleSheet } from 'react-native';
+import { Image, ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AppCard } from '../design/AppCard';
 import { PrimaryButton } from '../design/Button';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
+import { fakeTouch } from '../testUtils/fakeTouch';
 import { useAuth } from '../auth/AuthProvider';
 import { dayKey } from '../lib/dayKey';
 import * as navigationTransitions from '../navigation/navigationTransitions';
@@ -825,6 +826,42 @@ describe('NutritionTodayScreen -- any day', () => {
     turn('next');
     expect(dayLabelText()).toHaveTextContent('Today');
     expect(screen.queryByTestId('nutrition-day-today')).toBeNull();
+  });
+
+  it('holds the page still while a day is swiped, so its scroll cannot take the swipe', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+    const content = screen.getByTestId('nutrition-day-content');
+    const page = () => screen.UNSAFE_getByType(ScrollView);
+    expect(page().props.scrollEnabled).toBe(true);
+
+    // Claimed on the way down, at a few points sideways.
+    expect(content.props.onMoveShouldSetResponderCapture(fakeTouch(8, 1, 16))).toBe(true);
+    act(() => {
+      content.props.onResponderGrant(fakeTouch(8, 1, 16));
+    });
+    expect(page().props.scrollEnabled).toBe(false);
+    expect(content.props.onResponderTerminationRequest(fakeTouch(8, 1, 20))).toBe(false);
+
+    act(() => {
+      content.props.onResponderRelease(fakeTouch(8, 1, 40));
+    });
+    expect(page().props.scrollEnabled).toBe(true);
+  });
+
+  it('turns to the day before on a swipe left across the page', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+    const content = screen.getByTestId('nutrition-day-content');
+
+    act(() => {
+      content.props.onResponderGrant(fakeTouch(0, 0, 1));
+      content.props.onResponderMove(fakeTouch(-140, 6, 140, { x: 0, y: 0, time: 1 }));
+      content.props.onResponderRelease(fakeTouch(-140, 6, 150, { x: -140, y: 6, time: 140 }));
+    });
+
+    expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
+    expect(dayLabelText()).toHaveTextContent('Yesterday');
   });
 
   it('has no arrows: the day is swiped, and the date is adjustable for VoiceOver', async () => {
