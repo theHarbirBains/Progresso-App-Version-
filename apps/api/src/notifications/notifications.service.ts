@@ -168,11 +168,13 @@ export class NotificationsService {
   }
 
   private async fetchLastFoodLogByUser(userIds: string[]): Promise<Map<string, string>> {
+    // Up to now only: food logged to a day ahead (planned on the Nutrition screen) isn't eaten yet.
     const { data, error } = await this.supabaseService
       .getClient()
       .from('food_logs')
       .select('user_id, logged_at')
       .in('user_id', userIds)
+      .lte('logged_at', new Date().toISOString())
       .order('logged_at', { ascending: false });
     if (error) throw new InternalServerErrorException('Failed to load food logs');
 

@@ -33,8 +33,9 @@ export interface FoodLogContextValue {
   refetch: () => Promise<boolean>;
   /**
    * Logs a food, kept in the Food Library first (a food that isn't the person's own is copied
-   * there once -- foodQueries.keepInLibrary). `day` ("YYYY-MM-DD") logs it to a past day instead
-   * of now; only today's logs are held here, so a past day's log is returned, not added.
+   * there once -- foodQueries.keepInLibrary). `day` ("YYYY-MM-DD") logs it to another day -- before
+   * today or ahead of it -- instead of now; only today's logs are held here, so another day's log
+   * is returned, not added.
    */
   logFoodEntry: (
     food: LoggableFood,

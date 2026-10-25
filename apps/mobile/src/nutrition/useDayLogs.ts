@@ -53,7 +53,8 @@ export interface DayLogs {
 }
 
 /**
- * A past day's food logs, for the Nutrition screen (today's are the shared FoodLogProvider's).
+ * Another day's food logs -- before today or ahead of it -- for the Nutrition screen (today's are
+ * the shared FoodLogProvider's).
  * Read when the day is chosen and each time the screen is shown again -- a food logged to that day
  * from the logging screens lands there -- with no staleness gate, like a section page opened
  * fresh. A day already seen (or read ahead) this session shows at once while it's read again.

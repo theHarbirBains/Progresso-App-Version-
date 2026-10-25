@@ -32,12 +32,12 @@ describe('useDaySwipe', () => {
     expect(onDay).toHaveBeenLastCalledWith(today);
   });
 
-  it('never turns past today', () => {
+  it('turns from today to tomorrow', () => {
     const { result, onDay } = renderTurn(today, true);
 
     act(() => result.current.turnTo('next'));
 
-    expect(onDay).not.toHaveBeenCalled();
+    expect(onDay).toHaveBeenCalledWith(shiftDay(today, 1));
   });
 
   it('turns straight back to today from any day', () => {
@@ -141,7 +141,7 @@ describe('useDaySwipe', () => {
       expect(onDay).toHaveBeenCalledWith(today);
     });
 
-    it('goes nowhere on a swipe from right to left on today', () => {
+    it('turns from today to tomorrow on a swipe from right to left', () => {
       const { result, onDay } = renderTurn(today, true);
       const handlers = result.current.panHandlers;
 
@@ -151,7 +151,7 @@ describe('useDaySwipe', () => {
         handlers.onResponderRelease!(fakeTouch(-160, 4, 130, { x: -160, y: 4, time: 120 }));
       });
 
-      expect(onDay).not.toHaveBeenCalled();
+      expect(onDay).toHaveBeenCalledWith(shiftDay(today, 1));
     });
   });
 });

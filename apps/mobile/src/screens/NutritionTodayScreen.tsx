@@ -40,7 +40,7 @@ import { WeeklyCalorieBudget } from '../nutrition/WeeklyCalorieBudget';
 type Props = RootStackScreenProps<'Nutrition'>;
 
 const EMPTY_GOALS: NutritionGoals = { calories: null, proteinG: null, carbsG: null, fatG: null };
-// A past day's foods before they've been read: one array, so what depends on the foods stays put.
+// Another day's foods before they've been read: one array, so what depends on the foods stays put.
 const NO_LOGS: FoodLogRow[] = [];
 
 type MacroKey = 'protein' | 'carbs' | 'fat';
@@ -59,11 +59,11 @@ function grams(value: number): string {
 
 // The Nutrition tab's own root screen (see App.tsx's bottom nav) -- a day's
 // intake against the user's targets, with the day's logged foods. Today by
-// default; any past day by the day bar, by swiping (left for the day before,
-// right for the day after, never past today), or from Nutrition History's
-// calendar (route.params.day). Today is the shared, live food log
-// (FoodLogProvider); a past day is read for itself (useDayLogs). Logging from
-// a past day logs to it -- the day goes with each way to log as a route param
+// default; any other day -- before today, or ahead of it to plan -- by
+// swiping (right for the day before, left for the day after), or from
+// Nutrition History's calendar (route.params.day). Today is the shared, live
+// food log (FoodLogProvider); any other day is read for itself (useDayLogs).
+// Logging from another day logs to it -- the day goes with each way to log as a route param
 // -- and only today shows the week's budget and Copy Yesterday.
 //
 // Layout: the shared Screen with a hamburger menu, the day bar, then five
@@ -89,7 +89,7 @@ function grams(value: number): string {
 //   stat blocks, "—" for one not set.
 /** A day key worth showing: a real day, not ahead of today; today otherwise. */
 function shownDayFrom(key: string | undefined): string {
-  if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(key) || key > todayKey()) return todayKey();
+  if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return todayKey();
   return key;
 }
 
@@ -116,18 +116,18 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
   const isToday = isTodayKey(day);
   const todayLog = useFoodLog();
   const pastLog = useDayLogs(userId, isToday ? null : day, navigation);
-  // A past day's foods are shown only once they're that day's -- never the last day's in its place.
+  // Another day's foods are shown only once they're that day's -- never the last day's in its place.
   const pastReady = pastLog.day === day;
   const logs = isToday ? todayLog.logs : pastReady ? pastLog.logs : NO_LOGS;
   const logsLoading = isToday ? todayLog.loading : !pastReady || pastLog.loading;
   const logsError = isToday ? todayLog.error : pastLog.error;
   const updateQuantity = isToday ? todayLog.updateQuantity : pastLog.updateQuantity;
   const removeLog = isToday ? todayLog.removeLog : pastLog.removeLog;
-  // Each way to log logs to the day shown: nothing for today, the day for a past one.
+  // Each way to log logs to the day shown: nothing for today, the day for any other.
   const logParams = isToday ? undefined : { day };
 
-  // Moving between days: a swipe turns the day (useDaySwipe) -- no arrows. Swiping left goes
-  // back a day, right forward, never past today.
+  // Moving between days: a swipe turns the day (useDaySwipe) -- no arrows. Swiping right goes
+  // back a day, left forward -- tomorrow and on too.
   const reduceMotion = useReduceMotionPreference();
   const { width } = useWindowDimensions();
   // The widgets rise in as the page opens, like every page's; once the day has been moved,
@@ -166,10 +166,14 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     };
   }, [userId]);
 
-  // On a past day, the day before it is read ahead: the next swipe's.
+  // The days either side of the one shown are read ahead -- the next swipe's, either way. Today's
+  // own foods are the shared log's, and yesterday's come with Copy Yesterday's read.
   useEffect(() => {
-    if (userId && !isToday) readAheadDayLogs(userId, shiftDay(day, -1));
-  }, [userId, day, isToday]);
+    if (!userId) return;
+    for (const neighbour of [shiftDay(day, -1), shiftDay(day, 1)]) {
+      if (!isTodayKey(neighbour)) readAheadDayLogs(userId, neighbour);
+    }
+  }, [userId, day]);
 
   // This week's days before today, for the week's calorie budget -- read each time Today opens,
   // like yesterday's. On a Monday there are none.

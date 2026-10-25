@@ -11,7 +11,7 @@ import { Toggle } from '../design/Toggle';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
-import { dayLabel, isPastKey } from '../nutrition/logDay';
+import { dayLabel, isTodayKey } from '../nutrition/logDay';
 import { defaultMealTypeForTime } from '../nutrition/mealTypes';
 import { useProgressTheme } from '../progress/useProgressTheme';
 
@@ -97,7 +97,7 @@ export function QuickFoodEntryScreen({ navigation, route }: Props) {
         <AppHeader
           testID="quick-entry-header"
           title="Quick Macro Entry"
-          subtitle={day && isPastKey(day) ? `For ${dayLabel(day)}` : undefined}
+          subtitle={day && !isTodayKey(day) ? `For ${dayLabel(day)}` : undefined}
           onBack={() => navigation.goBack()}
         />
       }

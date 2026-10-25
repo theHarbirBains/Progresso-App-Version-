@@ -818,14 +818,41 @@ describe('NutritionTodayScreen -- any day', () => {
     });
   }
 
-  it('starts on today, with no day after it and no way back to today', async () => {
+  it('starts on today, with no way back to today needed', async () => {
     renderScreen();
 
     await screen.findByTestId('food-log-empty');
     expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
-    turn('next');
-    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
     expect(screen.queryByTestId('nutrition-day-today')).toBeNull();
+  });
+
+  it('turns from today to tomorrow, logs to tomorrow there, and comes back', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    turn('next');
+
+    expect(dayLabelText()).toHaveTextContent('Thursday, October 22');
+    expect(await screen.findByText('No foods logged this day')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('quick-food-entry-button'));
+    expect(mockNavigate).toHaveBeenCalledWith('QuickFoodEntry', { day: '2026-10-22' });
+
+    fireEvent.press(screen.getByTestId('nutrition-day-today'));
+    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
+  });
+
+  it('turns to tomorrow on a swipe from right to left across the page', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+    const content = screen.getByTestId('nutrition-day-content');
+
+    act(() => {
+      content.props.onResponderGrant(fakeTouch(0, 0, 1));
+      content.props.onResponderMove(fakeTouch(-140, 6, 140, { x: 0, y: 0, time: 1 }));
+      content.props.onResponderRelease(fakeTouch(-140, 6, 150, { x: -140, y: 6, time: 140 }));
+    });
+
+    expect(dayLabelText()).toHaveTextContent('Thursday, October 22');
   });
 
   it('holds the page still while a day is swiped, so its scroll cannot take the swipe', async () => {
@@ -967,7 +994,7 @@ describe('NutritionTodayScreen -- any day', () => {
     await waitFor(() => expect(screen.queryByTestId('food-log-row-log-tuesday')).toBeNull());
   });
 
-  it('opens on a day handed to it, and never on one after today', async () => {
+  it('opens on any day handed to it, tomorrow included', async () => {
     const { unmount } = renderScreen({ params: { day: '2026-10-20' } } as never);
     expect(await screen.findByTestId('food-log-row-log-tuesday')).toBeTruthy();
     expect(dayLabelText()).toHaveTextContent('Tuesday, October 20');
@@ -975,7 +1002,7 @@ describe('NutritionTodayScreen -- any day', () => {
 
     renderScreen({ params: { day: '2026-10-22' } } as never);
     await screen.findByTestId('food-log-empty');
-    expect(dayLabelText()).toHaveTextContent(/^Today\s*Wednesday, October 21$/);
+    expect(dayLabelText()).toHaveTextContent('Thursday, October 22');
   });
 
   it('opens the calendar from the date, on the day shown', async () => {

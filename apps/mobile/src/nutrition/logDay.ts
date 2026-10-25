@@ -2,7 +2,7 @@ import { dayFromKey, dayKey } from '../lib/dayKey';
 
 // The day the Nutrition screen shows, and the day a food is logged to. Days are local
 // "YYYY-MM-DD" keys (lib/dayKey.ts). Today is the shared, live food log (FoodLogProvider); any
-// other day is read for itself. Nothing ahead of today is shown or logged to.
+// other day -- before today, or ahead of it, to plan -- is read for itself.
 
 export function todayKey(now: Date = new Date()): string {
   return dayKey(now);
@@ -39,12 +39,12 @@ export function dayLabel(key: string, now: Date = new Date()): string {
 }
 
 /**
- * When a food logged to `key` is logged: undefined (now) for today, or for anything that isn't a
- * past day; for a past day, that day at the current time of day, so its foods keep the order
- * they were added in.
+ * When a food logged to `key` is logged: undefined (now) for today; for any other day -- before
+ * today, or ahead of it -- that day at the current time of day, so its foods keep the order they
+ * were added in.
  */
 export function loggedAtFor(key: string | undefined, now: Date = new Date()): Date | undefined {
-  if (key === undefined || !isPastKey(key, now)) return undefined;
+  if (key === undefined || isTodayKey(key, now)) return undefined;
   const day = dayFromKey(key);
   day.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
   return day;
@@ -54,12 +54,11 @@ export type DaySwipe = 'previous' | 'next' | null;
 
 /**
  * Which way a horizontal swipe on the Nutrition screen moves, as pages turn: right to left (the
- * finger moving left) to the day after -- never past today -- and left to right to the day before.
- * A short or slow drag moves nowhere.
+ * finger moving left) to the day after -- tomorrow and on, too -- and left to right to the day
+ * before. A short or slow drag moves nowhere.
  */
-export function daySwipe(dx: number, vx: number, canGoNext: boolean): DaySwipe {
+export function daySwipe(dx: number, vx: number): DaySwipe {
   const far = Math.abs(dx) > 72 || (Math.abs(dx) > 24 && Math.abs(vx) > 0.5);
   if (!far) return null;
-  if (dx > 0) return 'previous';
-  return canGoNext ? 'next' : null;
+  return dx > 0 ? 'previous' : 'next';
 }

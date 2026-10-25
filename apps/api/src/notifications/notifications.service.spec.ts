@@ -22,6 +22,7 @@ function createQueryBuilder(result: Result) {
     'is',
     'order',
     'gte',
+    'lte',
     'limit',
     'insert',
     'upsert',
@@ -200,6 +201,32 @@ describe('NotificationsService.sendDailyNotifications', () => {
 
     expect(result).toEqual({ workoutRemindersSent: 0, foodRemindersSent: 0 });
     expect(expoPush.sendAll).not.toHaveBeenCalled();
+  });
+
+  it('counts only food logged up to now, not food planned for a day ahead', async () => {
+    const { supabaseService, from } = mockTables({
+      device_push_tokens: {
+        data: [{ user_id: 'user-1', expo_push_token: 'ExponentPushToken[a]' }],
+        error: null,
+      },
+      users: {
+        data: [{ id: 'user-1', display_name: 'Harbir', active_workout_split_id: null }],
+        error: null,
+      },
+      notification_log: { data: [], error: null },
+      food_logs: { data: [], error: null },
+    });
+    const service = new NotificationsService(supabaseService, mockExpoPush());
+
+    const before = Date.now();
+    await service.sendDailyNotifications();
+
+    const index = from.mock.calls.findIndex(([table]) => table === 'food_logs');
+    const foodLogs = from.mock.results[index]!.value as { lte: jest.Mock };
+    expect(foodLogs.lte).toHaveBeenCalledWith('logged_at', expect.any(String));
+    const bound = new Date(foodLogs.lte.mock.calls[0][1] as string).getTime();
+    expect(bound).toBeGreaterThanOrEqual(before);
+    expect(bound).toBeLessThanOrEqual(Date.now());
   });
 
   it('never sends the same reminder type twice in one day', async () => {

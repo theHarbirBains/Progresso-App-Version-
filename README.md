@@ -65,7 +65,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Saved meals: foods you eat together, logged in one go, each as its own entry; build one in the Food Library or save today's foods as one
 - Recipes: a drink or a meal always made the same way -- its ingredients and how many servings it makes -- logged as a single food, with its figures per serving worked out from the ingredients
 - Copy Yesterday logs any of yesterday's foods again, exactly as they were logged
-- Any past day on the Nutrition screen: swipe or step back through the days (never past today), see that day's full breakdown in the same layout, and log, edit or delete foods there; Nutrition History opens any day in full
+- Any day on the Nutrition screen: swipe back through past days or on to tomorrow and beyond to plan ahead, see that day's full breakdown in the same layout, and log, edit or delete foods there; Nutrition History opens any day in full
 - Quick Macro Entry logs a name and its calories, protein, carbs and fat as typed, kept in your Food Library only if you tick Save to Food Library
 - A food you log from search, a barcode or the catalog is kept in your own Food Library (once -- never a duplicate), so it's there to re-log, edit or remove
 - The Food Library is A to Z ignoring case; swipe a food, recipe or saved meal left to delete it (it asks first, and what you've logged keeps its figures)

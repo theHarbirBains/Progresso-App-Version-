@@ -26,6 +26,15 @@ interface Loaded {
   foodLogs: SummaryFoodLog[];
 }
 
+function startOfTomorrow(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+}
+
+function earlierOf(a: Date, b: Date): Date {
+  return a.getTime() <= b.getTime() ? a : b;
+}
+
 /**
  * This week's and last week's summaries for Progress. Read once when Progress opens -- it opens
  * fresh on every visit, so a workout or a food logged elsewhere shows the next time -- in two
@@ -62,7 +71,8 @@ export function useWeeklySummaries(now: Date = new Date()): {
     );
     Promise.all([
       fetchSummaryTraining(userId, since, thisWeek.end),
-      fetchFoodLogsForRange(userId, lastWeek.start, thisWeek.end),
+      // Only what's been eaten: food planned for a day ahead of today isn't counted yet.
+      fetchFoodLogsForRange(userId, lastWeek.start, earlierOf(thisWeek.end, startOfTomorrow())),
     ])
       .then(([training, logs]) => {
         if (cancelled) return;

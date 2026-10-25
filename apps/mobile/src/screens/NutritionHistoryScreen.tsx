@@ -12,7 +12,7 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
-import { dayFromKey, dayKey } from '../lib/dayKey';
+import { dayFromKey } from '../lib/dayKey';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { FoodImage } from '../nutrition/FoodImage';
@@ -210,18 +210,15 @@ export function NutritionHistoryScreen({ navigation, route }: Props) {
           ) : (
             <EmptyState testID="nutrition-history-day-empty" title="No food logged on this day" />
           )}
-          {/* Nutrition shows no day after today, so there's no full day to open for one. */}
-          {selectedDateKey <= dayKey(new Date()) ? (
-            <View style={styles.openDay}>
-              <SecondaryButton
-                testID="nutrition-history-open-day"
-                label="Open Full Day"
-                icon="maximize-2"
-                size="md"
-                onPress={() => navigation.navigate('Nutrition', { day: selectedDateKey })}
-              />
-            </View>
-          ) : null}
+          <View style={styles.openDay}>
+            <SecondaryButton
+              testID="nutrition-history-open-day"
+              label="Open Full Day"
+              icon="maximize-2"
+              size="md"
+              onPress={() => navigation.navigate('Nutrition', { day: selectedDateKey })}
+            />
+          </View>
         </AppCard>
       ) : null}
     </Screen>

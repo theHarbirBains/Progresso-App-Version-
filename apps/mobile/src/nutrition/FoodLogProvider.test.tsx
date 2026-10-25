@@ -250,6 +250,21 @@ describe('FoodLogProvider', () => {
       expect(result.current.logs).toHaveLength(2);
     });
 
+    it("logs to a day ahead on that day, and leaves today's foods alone", async () => {
+      mockLogFood.mockResolvedValue({ ...sampleLog, id: 'log-ahead' });
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.logFoodEntry(sampleFood, 1, 'dinner', null, dayKey(tomorrow));
+      });
+
+      expect(dayKey(mockLogFood.mock.calls[0][5] as Date)).toBe(dayKey(tomorrow));
+      expect(result.current.logs).toEqual([sampleLog]);
+    });
+
     it('logs each food of a saved meal to that day', async () => {
       mockLogFood.mockResolvedValue({ ...sampleLog, id: 'log-past' });
       const { result } = renderHook(() => useFoodLog(), { wrapper: FoodLogProvider });

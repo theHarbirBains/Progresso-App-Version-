@@ -259,13 +259,15 @@ describe('NutritionHistoryScreen -- opened on a day', () => {
     expect(mockNavigate).toHaveBeenCalledWith('Nutrition', { day: FIXTURE_DATE_KEY });
   });
 
-  it('offers no full day for a day after today', async () => {
+  it('opens a day ahead in full too, to plan it', async () => {
+    mockNavigate.mockClear();
     mockFetchFoodLogsForMonth.mockResolvedValue([]);
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     renderScreen({ date: toLocalDateKey(tomorrow) });
 
-    expect(await screen.findByTestId('nutrition-history-selected-day')).toBeTruthy();
-    expect(screen.queryByTestId('nutrition-history-open-day')).toBeNull();
+    fireEvent.press(await screen.findByTestId('nutrition-history-open-day'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('Nutrition', { day: toLocalDateKey(tomorrow) });
   });
 });

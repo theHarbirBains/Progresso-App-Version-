@@ -2,22 +2,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, PanResponder } from 'react-native';
 import { isSidewaysDrag } from '../design/sidewaysDrag';
-import { daySwipe, isPastKey, shiftDay } from './logDay';
+import { daySwipe, shiftDay } from './logDay';
 
 // How the Nutrition screen turns from one day to the next. The day's widgets follow the finger
 // and turn back in depth as they go -- a slight tilt and shrink, fading -- like a card turned on a
 // spindle; let go past the line (or flick) and the day turns away, the new day swings in from the
-// other side and settles with a small overshoot. Short of the line it springs back. Toward a day
-// after today it only gives a little: nothing is ahead of today. The date above glides along at
-// a slower pace (DayBar). Under Reduce Motion the day just changes.
+// other side and settles with a small overshoot. Short of the line it springs back. Any day turns
+// to the next, today to tomorrow too. The date above glides along at a slower pace (DayBar).
+// Under Reduce Motion the day just changes.
 
 /** How far the new day starts, as a share of the screen's width. */
 const ENTER_FROM = 0.7;
 /** The most the widgets tilt and shrink, at a full screen's width. */
 const MAX_TILT_DEG = 9;
 const MIN_SCALE = 0.92;
-/** Toward a day after today, a drag moves the widgets this share of the way. */
-const PAST_TODAY_GIVE = 0.22;
 const ENTER_SPRING = { stiffness: 210, damping: 21, mass: 1 } as const;
 
 const HINT_KEY = '@progresso/nutritionSwipeHint';
@@ -64,7 +62,7 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
     const from = dayRef.current;
     const target = to ?? shiftDay(from, direction === 'previous' ? -1 : 1);
     if (turning.current) return;
-    if (target === from || (direction === 'next' && !isPastKey(from))) {
+    if (target === from) {
       position.current = 0;
       Animated.spring(slide, { toValue: 0, useNativeDriver: true, bounciness: 8 }).start();
       return;
@@ -139,14 +137,12 @@ export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
       onPanResponderGrant: () => setSwiping(true),
       onPanResponderMove: (_event, gesture) => {
         if (turning.current) return;
-        // Swiping left is forward in time: from today it only gives a little.
-        const pastToday = gesture.dx < 0 && !isPastKey(dayRef.current);
-        position.current = pastToday ? gesture.dx * PAST_TODAY_GIVE : gesture.dx;
+        position.current = gesture.dx;
         slide.setValue(position.current);
       },
       onPanResponderRelease: (_event, gesture) => {
         setSwiping(false);
-        const direction = daySwipe(gesture.dx, gesture.vx, isPastKey(dayRef.current));
+        const direction = daySwipe(gesture.dx, gesture.vx);
         if (direction) turnTo(direction, undefined, gesture.vx);
         else springBack();
       },
