@@ -37,8 +37,10 @@ type Mode = { type: 'list' } | { type: 'create' } | { type: 'edit'; exercise: Ex
 // rows under letter headings -- each with its machine photo (or a plain
 // initial, "like a contact photo" -- see ExercisePhoto), name,
 // "Muscle · Movement", and a quiet Built-in/Mine marker. New Exercise is the
-// header's "+". Your own exercises open for editing, and swipe left to
-// delete; built-ins are read-only.
+// header's "+". Every exercise opens its page (ProgressExerciseDetail) --
+// its top sets, best performances and journey; your own also have a pencil
+// that opens them for editing, and swipe left to delete. Built-ins are
+// otherwise read-only.
 export function ExerciseLibraryScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -189,6 +191,12 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         onRetry={load}
         accent={{ color: theme.accent, background: theme.accentBg, onColor: theme.onAccent }}
         onOpenMine={(exercise) => setMode({ type: 'edit', exercise })}
+        onOpenExercise={(exercise) =>
+          navigation.navigate('ProgressExerciseDetail', {
+            exerciseId: exercise.id,
+            exerciseName: exercise.name,
+          })
+        }
         onDeleteMine={deleteMine}
         testID="exercise-library"
       />

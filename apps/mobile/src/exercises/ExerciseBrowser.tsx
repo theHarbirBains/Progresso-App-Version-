@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
+import { IconButton } from '../design/IconButton';
 import { ListRow } from '../design/ListRow';
 import { SectionHeader } from '../design/SectionHeader';
 import { SwipeToDelete } from '../design/SwipeToDelete';
@@ -46,8 +47,13 @@ interface Props {
   isRowDisabled?: (exercise: ExerciseRow) => boolean;
   /** Text added after the name, e.g. " (added)". */
   rowSuffix?: (exercise: ExerciseRow) => string;
-  /** The library's way into a person's own exercise: the row, and its photo, open the editor. */
+  /**
+   * The library's way into a person's own exercise: its editor. With `onOpenExercise` it's the
+   * row's pencil (and its photo); without, the row itself.
+   */
   onOpenMine?: (exercise: ExerciseRow) => void;
+  /** The library's tap on any exercise: its page -- its top sets, best performances, journey. */
+  onOpenExercise?: (exercise: ExerciseRow) => void;
   /** When given, a photo tap calls this instead of opening the photo itself (the picker shows it). */
   onPhotoPress?: (exercise: ExerciseRow) => void;
   /**
@@ -84,6 +90,7 @@ export function ExerciseBrowser({
   isRowDisabled,
   rowSuffix,
   onOpenMine,
+  onOpenExercise,
   onPhotoPress,
   onDeleteMine,
   listHeader,
@@ -142,9 +149,14 @@ export function ExerciseBrowser({
       const disabled = isRowDisabled?.(item) ?? false;
       const onRowPress = onSelectRow
         ? () => onSelectRow(item)
-        : isMine && onOpenMine
-          ? () => onOpenMine(item)
-          : undefined;
+        : onOpenExercise
+          ? () => onOpenExercise(item)
+          : isMine && onOpenMine
+            ? () => onOpenMine(item)
+            : undefined;
+      // With the row opening the exercise's page, one of their own is edited from its pencil.
+      const editButton = !onSelectRow && onOpenExercise && isMine && onOpenMine;
+      const showsChevron = !onSelectRow && (onOpenExercise || (isMine && onOpenMine));
       const photo =
         onPhotoPress !== undefined ? (
           <TouchableOpacity
@@ -166,30 +178,44 @@ export function ExerciseBrowser({
         );
       const row = (
         <View style={[styles.row, !deletable && index > 0 && styles.rowDivider]}>
-          <ListRow
-            testID={`exercise-item-${item.id}`}
-            leading={photo}
-            title={`${item.name}${rowSuffix?.(item) ?? ''}`}
-            subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
-            onPress={disabled ? undefined : onRowPress}
-            disabled={disabled}
-            accessibilityActions={deletable ? [{ name: 'delete', label: 'Delete' }] : undefined}
-            onAccessibilityAction={(event) => {
-              if (deletable && event.nativeEvent.actionName === 'delete') requestDelete(item);
-            }}
-            trailing={
-              <>
-                <Text
-                  style={[styles.sourceLabel, { color: isMine ? accent.color : colors.textMuted }]}
-                >
-                  {isMine ? 'Mine' : 'Built-in'}
-                </Text>
-                {isMine && onOpenMine && !onSelectRow ? (
-                  <Feather name="chevron-right" size={18} color={colors.textMuted} />
-                ) : null}
-              </>
-            }
-          />
+          <View style={styles.flex}>
+            <ListRow
+              testID={`exercise-item-${item.id}`}
+              leading={photo}
+              title={`${item.name}${rowSuffix?.(item) ?? ''}`}
+              subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
+              onPress={disabled ? undefined : onRowPress}
+              disabled={disabled}
+              accessibilityActions={deletable ? [{ name: 'delete', label: 'Delete' }] : undefined}
+              onAccessibilityAction={(event) => {
+                if (deletable && event.nativeEvent.actionName === 'delete') requestDelete(item);
+              }}
+              trailing={
+                <>
+                  <Text
+                    style={[
+                      styles.sourceLabel,
+                      { color: isMine ? accent.color : colors.textMuted },
+                    ]}
+                  >
+                    {isMine ? 'Mine' : 'Built-in'}
+                  </Text>
+                  {showsChevron ? (
+                    <Feather name="chevron-right" size={18} color={colors.textMuted} />
+                  ) : null}
+                </>
+              }
+            />
+          </View>
+          {editButton ? (
+            <IconButton
+              testID={`exercise-edit-${item.id}`}
+              icon="edit-2"
+              onPress={() => onOpenMine(item)}
+              accessibilityLabel={`Edit ${item.name}`}
+              color={colors.textSecondary}
+            />
+          ) : null}
         </View>
       );
       if (!deletable) return row;
@@ -211,6 +237,7 @@ export function ExerciseBrowser({
       accent.color,
       isRowDisabled,
       onDeleteMine,
+      onOpenExercise,
       onOpenMine,
       onPhotoPress,
       onSelectRow,

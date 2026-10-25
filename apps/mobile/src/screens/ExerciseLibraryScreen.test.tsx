@@ -73,8 +73,9 @@ const mockFetchExerciseSourceCounts = fetchExerciseSourceCounts as jest.Mock;
 const mockInvalidateExerciseCache = invalidateExerciseCache as jest.Mock;
 const mockUpdateExercise = updateExercise as jest.Mock;
 const mockGoBack = jest.fn();
+const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation = { goBack: mockGoBack } as any;
+const navigation = { goBack: mockGoBack, navigate: mockNavigate } as any;
 
 const mockOpenMenu = jest.fn();
 
@@ -123,6 +124,7 @@ beforeEach(() => {
   mockFetchExerciseSourceCounts.mockReset();
   mockFetchExerciseSourceCounts.mockResolvedValue({ all: 328, builtin: 245, mine: 12 });
   mockGoBack.mockClear();
+  mockNavigate.mockClear();
   mockOpenMenu.mockClear();
 });
 
@@ -265,23 +267,33 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
-  it("opens the edit form for the user's own exercise", async () => {
+  it("opens the edit form for the user's own exercise from its pencil", async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
-    fireEvent.press(screen.getByTestId('exercise-item-ex-mine'));
+    expect(screen.queryByTestId('exercise-edit-ex-builtin')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-edit-ex-mine'));
 
     expect(await screen.findByTestId('mock-exercise-form-mode')).toHaveTextContent('edit');
     expect(screen.getByTestId('mock-exercise-form-name')).toHaveTextContent('My Curl Variation');
     await settle();
   });
 
-  it('does not open a form when a built-in exercise is pressed', async () => {
+  it("opens any exercise's own page -- its top sets -- built-in or their own", async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
     fireEvent.press(screen.getByTestId('exercise-item-ex-builtin'));
-
+    expect(mockNavigate).toHaveBeenLastCalledWith('ProgressExerciseDetail', {
+      exerciseId: 'ex-builtin',
+      exerciseName: 'Barbell Bench Press',
+    });
+    fireEvent.press(screen.getByTestId('exercise-item-ex-mine'));
+    expect(mockNavigate).toHaveBeenLastCalledWith('ProgressExerciseDetail', {
+      exerciseId: 'ex-mine',
+      exerciseName: 'My Curl Variation',
+    });
+    // A tap on the row is never the editor.
     expect(screen.queryByTestId('mock-exercise-form-mode')).toBeNull();
     await settle();
   });
@@ -410,14 +422,14 @@ describe('ExerciseLibraryScreen -- two widgets, source blocks, New Exercise in t
     await settle();
   });
 
-  it('only shows a chevron on rows that open (the built-in is read-only)', async () => {
+  it('shows a chevron on every row, since every exercise opens its page', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
 
     const chevrons = screen
       .UNSAFE_queryAllByType(Feather)
       .filter((icon) => icon.props.name === 'chevron-right');
-    expect(chevrons).toHaveLength(1);
+    expect(chevrons).toHaveLength(2);
     await settle();
   });
 

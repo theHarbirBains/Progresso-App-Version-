@@ -21,10 +21,14 @@ import { deriveMilestones } from '../workouts/progressMilestones';
 
 type Props = RootStackScreenProps<'ProgressExerciseDetail'>;
 
+/** How many of the latest workouts' top sets Top Sets lists. */
+const TOP_SETS_SHOWN = 10;
+
 // The shared "how has this one exercise progressed" destination, reached
-// from Overview's milestones, Top Sets, All Time and the live workout -- one
-// implementation for every entry point: the latest top set and how far it has
-// come, the best performances, and the progression journey. No line graph.
+// from Overview's milestones, Top Sets, All Time, the live workout and the
+// Exercise Library -- one implementation for every entry point: the latest top
+// set and how far it has come, each recent workout's top set, the best
+// performances, and the progression journey. No line graph.
 export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
   const { exerciseId, exerciseName } = route.params;
   const { user } = useAuth();
@@ -79,6 +83,11 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
   const milestones = useMemo(
     () => deriveMilestones(allTimePoints, weightUnit),
     [allTimePoints, weightUnit],
+  );
+  // Each workout's top set, newest first -- the latest TOP_SETS_SHOWN of them.
+  const recentTopSets = useMemo(
+    () => [...allTimePoints].reverse().slice(0, TOP_SETS_SHOWN),
+    [allTimePoints],
   );
 
   if (loading || themeLoading) {
@@ -138,6 +147,28 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
               ) : null}
             </Card>
           ) : null}
+
+          <Section title="Top Sets">
+            {recentTopSets.map((point, index) => (
+              <View
+                key={point.workoutExerciseId}
+                testID={`progress-exercise-detail-top-set-${index}`}
+                style={[styles.workoutTopSetRow, index > 0 && styles.workoutTopSetDivider]}
+              >
+                <Text style={styles.workoutTopSetDate}>
+                  {new Date(point.performedAt).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </Text>
+                <Text style={styles.workoutTopSetValue}>
+                  {formatWeight(roundWeight(fromKg(point.weightKg, weightUnit)))}
+                  {weightUnit} × {point.reps}
+                </Text>
+              </View>
+            ))}
+          </Section>
 
           <Section title="Best Performances">
             <View style={styles.metricsGrid}>

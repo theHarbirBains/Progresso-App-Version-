@@ -261,6 +261,28 @@ export const progressStyles = StyleSheet.create({
     color: colors.textMuted,
   },
 
+  // ProgressExerciseDetailScreen's Top Sets: each workout's heaviest set, newest first, as divided
+  // rows -- the date, and the set as a mono readout.
+  workoutTopSetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  workoutTopSetDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  workoutTopSetDate: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
+  },
+  workoutTopSetValue: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+  },
+
   // Milestones (Progression Journey)
   milestoneRow: {
     flexDirection: 'row',

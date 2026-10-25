@@ -98,6 +98,44 @@ describe('ProgressExerciseDetailScreen', () => {
     );
   });
 
+  it("lists each workout's top set, newest first", async () => {
+    mockFetchExerciseSetHistory.mockResolvedValue([
+      ...twoSessionHistory,
+      // A lighter set in the same workout as the 110kg one isn't its top set.
+      { weightKg: 90, reps: 10, performedAt: '2026-02-01T12:00:00Z', workoutExerciseId: 'we2' },
+    ]);
+
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByText('Top Sets')).toBeTruthy();
+    expect(screen.getByTestId('progress-exercise-detail-top-set-0')).toHaveTextContent(/110kg × 8/);
+    expect(screen.getByTestId('progress-exercise-detail-top-set-1')).toHaveTextContent(/100kg × 8/);
+    expect(screen.queryByTestId('progress-exercise-detail-top-set-2')).toBeNull();
+  });
+
+  it("lists only the latest ten workouts' top sets", async () => {
+    mockFetchExerciseSetHistory.mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => ({
+        weightKg: 60 + i,
+        reps: 5,
+        performedAt: new Date(Date.UTC(2026, 0, 1 + i, 12)).toISOString(),
+        workoutExerciseId: `we-${i}`,
+      })),
+    );
+
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('progress-exercise-detail-top-set-0')).toHaveTextContent(
+      /71kg × 5/,
+    );
+    expect(screen.getByTestId('progress-exercise-detail-top-set-9')).toHaveTextContent(/62kg × 5/);
+    expect(screen.queryByTestId('progress-exercise-detail-top-set-10')).toBeNull();
+  });
+
   it('draws no line graph and no time range', async () => {
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
 
