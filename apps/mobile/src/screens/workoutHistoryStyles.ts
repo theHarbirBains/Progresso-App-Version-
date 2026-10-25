@@ -3,8 +3,9 @@ import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 
 // WorkoutHistoryScreen ("Workouts"). Token-only. The frame (safe area, fixed
 // header, scrolling body) is the shared `Screen`; the page is a stack of
-// widgets -- the start/resume action, the calendar with its month summary, the
-// selected day and the recent workouts -- `widgetGap` apart, the same rhythm
+// widgets -- what's next (resume, the next day, or a start) over the calendar
+// with its month summary, as one widget; the selected day; and the recent
+// workouts -- `widgetGap` apart, the same rhythm
 // as the dashboards. Workouts themselves are `ListRow`s inside a widget.
 export const workoutHistoryStyles = StyleSheet.create({
   content: {
@@ -19,23 +20,22 @@ export const workoutHistoryStyles = StyleSheet.create({
   },
 
   // The line above the one primary button ("Ready to train?", "You have a
-  // workout in progress") -- layout-only: color comes from `theme.onAccent`
-  // at render time (WorkoutHistoryScreen), since this card is now filled
-  // solid with the mode accent (the redesign's one hero treatment, see
-  // design/Card.tsx) and has to invert for a light vs. dark accent.
+  // workout in progress") -- layout-only: its colour comes at render time
+  // (WorkoutHistoryScreen), at the top of the calendar widget.
   actionLine: {
     ...typeScale.callout,
     marginBottom: spacing.sm,
   },
-  // A quiet secondary link, independent of whether there's an active
-  // workout in progress above it -- logging something that already
-  // happened is unrelated to resuming/starting a live one.
-  logPastWorkoutWrap: {
+  // Choose a Workout Split, under Start New Workout when there's no split.
+  chooseSplitWrap: {
     alignItems: 'center',
+    marginTop: spacing.sm,
   },
-  startError: {
-    ...typeScale.callout,
-    color: colors.destructive,
+  // Between what's next and the month's calendar, in their one widget.
+  planDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.divider,
+    marginVertical: spacing.lg,
   },
 
   // Calendar legend

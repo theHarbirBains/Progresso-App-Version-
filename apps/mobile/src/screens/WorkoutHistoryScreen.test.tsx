@@ -11,7 +11,6 @@ import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchMyProfile } from '../profile/profileQueries';
 import { addMonths, MONTH_LABELS, toLocalDateKey } from '../design/calendarGrid';
 import { enrichWorkoutSummaries } from '../workouts/workoutHistoryEnrichment';
-import { applyPlanToWorkout, fetchDayPlan } from '../workouts/splitPlanQueries';
 import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
@@ -40,11 +39,6 @@ jest.mock('../workouts/workoutSplitQueries', () => ({
   fetchLastWorkoutSplitDayId: jest.fn(),
 }));
 
-jest.mock('../workouts/splitPlanQueries', () => ({
-  fetchDayPlan: jest.fn(),
-  applyPlanToWorkout: jest.fn(),
-}));
-
 jest.mock('../workouts/workoutQueries', () => ({
   completeWorkout: jest.fn(),
   createWorkout: jest.fn(),
@@ -70,8 +64,6 @@ const mockUseAuth = useAuth as jest.Mock;
 const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchWorkoutSplitDetail = fetchWorkoutSplitDetail as jest.Mock;
 const mockFetchLastWorkoutSplitDayId = fetchLastWorkoutSplitDayId as jest.Mock;
-const mockFetchDayPlan = fetchDayPlan as jest.Mock;
-const mockApplyPlanToWorkout = applyPlanToWorkout as jest.Mock;
 const mockCreateWorkout = createWorkout as jest.Mock;
 const mockFetchActiveWorkout = fetchActiveWorkout as jest.Mock;
 const mockFetchWorkoutHistory = fetchWorkoutHistory as jest.Mock;
@@ -149,8 +141,6 @@ beforeEach(() => {
   mockFetchMyProfile.mockReset().mockResolvedValue(profile);
   mockFetchWorkoutSplitDetail.mockReset();
   mockFetchLastWorkoutSplitDayId.mockReset();
-  mockFetchDayPlan.mockReset().mockResolvedValue([]);
-  mockApplyPlanToWorkout.mockReset().mockResolvedValue(undefined);
   mockCreateWorkout.mockReset();
   mockFetchActiveWorkout.mockReset().mockResolvedValue(null);
   mockFetchWorkoutsForMonth.mockReset().mockResolvedValue([]);
@@ -361,13 +351,12 @@ describe('WorkoutHistoryScreen', () => {
     await settle();
   });
 
-  it('navigates to Log a Past Workout, independent of whether a workout is in progress', async () => {
+  it("has no Log a Past Workout of its own -- it's on Start Workout's page", async () => {
     renderScreen();
-    await screen.findByTestId('workout-history-log-past');
+    await screen.findByTestId('start-new-workout');
 
-    fireEvent.press(screen.getByTestId('workout-history-log-past'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('LogPastWorkout');
+    expect(screen.queryByText('Log a Past Workout')).toBeNull();
+    expect(screen.queryByTestId('workout-history-log-past')).toBeNull();
     await settle();
   });
 
@@ -492,31 +481,33 @@ describe('WorkoutHistoryScreen -- a stack of widgets', () => {
     enrichedFixture({ id: 'w2', splitDayName: 'Pull', name: 'Pull Day', completedSetCount: 12 }),
   ];
 
-  it('is a stack of widgets: action, calendar and recent workouts', async () => {
+  it("is a stack of widgets: what's next with the calendar, and recent workouts", async () => {
     mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: false });
     renderScreen();
     await screen.findByTestId('workout-item-w1');
 
-    expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(3);
-    expect(screen.getByTestId('workout-history-start')).toBeTruthy();
-    expect(screen.getByTestId('workout-history-calendar-card')).toBeTruthy();
+    expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(2);
+    const calendarCard = screen.getByTestId('workout-history-calendar-card');
+    expect(within(calendarCard).getByTestId('workout-history-start')).toBeTruthy();
+    expect(within(calendarCard).getByTestId('workout-calendar')).toBeTruthy();
     expect(
       within(screen.getByTestId('workout-history-recent')).getByTestId('workout-item-w1'),
     ).toBeTruthy();
     await settle();
   });
 
-  it('makes the start-workout action card the one hero, see-through over the background photo', async () => {
+  it('puts the start at the top of the calendar widget, a filled card, with the button in the accent', async () => {
     mockFetchWorkoutHistory.mockResolvedValue({ rows: twoWorkouts, hasMore: false });
     renderScreen();
     await screen.findByTestId('workout-item-w1');
 
     expect(
-      StyleSheet.flatten(screen.getByTestId('workout-history-start').props.style).backgroundColor,
-    ).toBeUndefined();
+      StyleSheet.flatten(screen.getByTestId('workout-history-calendar-card').props.style)
+        .backgroundColor,
+    ).toBeDefined();
     expect(
       StyleSheet.flatten(screen.getByTestId('start-new-workout').props.style).backgroundColor,
-    ).toBe(colors.heroAction);
+    ).not.toBe(colors.heroAction);
     await settle();
   });
 
@@ -529,8 +520,13 @@ describe('WorkoutHistoryScreen -- a stack of widgets', () => {
     fireEvent.press(await screen.findByTestId(`calendar-day-${FIXTURE_DATE_KEY}`));
     await screen.findByTestId('selected-day-section');
 
-    // resume + calendar + selected day + recent
-    expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(4);
+    // resume and calendar + selected day + recent
+    expect(screen.UNSAFE_queryAllByType(Card)).toHaveLength(3);
+    expect(
+      within(screen.getByTestId('workout-history-calendar-card')).getByTestId(
+        'active-workout-banner',
+      ),
+    ).toBeTruthy();
     expect(screen.queryByTestId('workout-history-start')).toBeNull();
     await settle();
   });
@@ -835,59 +831,36 @@ describe('WorkoutHistoryScreen -- Next Workout', () => {
     await settle();
   });
 
-  it('starts that day straight from here, its plan copied in, and opens the live workout', async () => {
-    mockFetchDayPlan.mockResolvedValue([{ exerciseId: 'ex-1' }]);
-    mockCreateWorkout.mockResolvedValue({ type: 'created', workout: { id: 'w-new' } });
+  it("opens Start Workout's page from Start Workout, as Feed's does -- never starts the day itself", async () => {
     renderScreen();
+    await screen.findByTestId('workout-history-next');
 
-    const hero = await screen.findByTestId('workout-history-next');
-    await act(async () => {
-      fireEvent.press(hero);
-    });
+    fireEvent.press(screen.getByTestId('workout-history-start-workout'));
 
-    expect(mockFetchDayPlan).toHaveBeenCalledWith('day-pull');
-    expect(mockCreateWorkout).toHaveBeenCalledWith('user-1', 'Pull', 'day-pull');
-    expect(mockApplyPlanToWorkout).toHaveBeenCalledWith('w-new', [{ exerciseId: 'ex-1' }]);
-    expect(mockNavigate).toHaveBeenCalledWith('ActiveWorkout', {
-      workoutId: 'w-new',
-      planned: true,
-    });
-    await settle();
-  });
-
-  it('says so, and shows the workout already going, when one is open', async () => {
-    const open = {
-      id: 'w-open',
-      name: 'Legs',
-      performedAt: fixtureDate.toISOString(),
-      completedAt: null,
-      workoutSplitDayId: null,
-    };
-    mockCreateWorkout.mockResolvedValue({ type: 'conflict', existingWorkout: open });
-    mockFetchWorkoutDetail.mockResolvedValue({ ...open, exercises: [] });
-    renderScreen();
-
-    const hero = await screen.findByTestId('workout-history-next');
-    mockFetchActiveWorkout.mockResolvedValue(open);
-    await act(async () => {
-      fireEvent.press(hero);
-    });
-
-    expect(screen.getByTestId('workout-history-start-error')).toHaveTextContent(
-      /already have a workout going/,
-    );
-    expect(await screen.findByTestId('resume-active-workout')).toBeTruthy();
+    expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
+    expect(mockCreateWorkout).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalledWith('ActiveWorkout', expect.anything());
     await settle();
   });
 
-  it("still offers the split's other days and other workouts", async () => {
+  it("has no Choose a Different Workout -- Start Workout's page has the other days", async () => {
     renderScreen();
     await screen.findByTestId('workout-history-next');
 
-    fireEvent.press(screen.getByTestId('workout-history-other-workout'));
+    expect(screen.queryByText('Choose a Different Workout')).toBeNull();
+    expect(screen.queryByTestId('workout-history-other-workout')).toBeNull();
+    await settle();
+  });
 
-    expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
+  it('blends the next day into the top of the calendar widget', async () => {
+    renderScreen();
+    const next = await screen.findByTestId('workout-history-next');
+
+    expect(
+      within(screen.getByTestId('workout-history-calendar-card')).getByTestId(
+        'workout-history-next',
+      ),
+    ).toBe(next);
     await settle();
   });
 
