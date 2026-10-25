@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
@@ -36,6 +36,7 @@ import {
   updateSavedMeal,
   type SavedMeal,
 } from '../nutrition/savedMealQueries';
+import { SkeletonRows } from '../design/Skeleton';
 
 const MAX_NAME_LENGTH = 80;
 // recipe_servings is numeric(6, 2).
@@ -267,7 +268,7 @@ export function FoodGroupFormScreen(props: Props) {
       <AppCard testID="food-group-items">
         <Section title={itemsTitle}>
           {loading ? (
-            <ActivityIndicator testID="food-group-loading" color={colors.textMuted} />
+            <SkeletonRows testID="food-group-loading" count={3} />
           ) : (
             <View>
               {items.map((item, index) => {

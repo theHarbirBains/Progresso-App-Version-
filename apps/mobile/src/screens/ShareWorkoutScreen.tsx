@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, View, type LayoutChangeEvent } from 'react-native';
+import { View, type LayoutChangeEvent } from 'react-native';
 import { Text } from '../design/Text';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
@@ -7,12 +7,13 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { Screen } from '../design/Screen';
-import { colors, radii } from '../design/theme';
+import { radii } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { STORY_CANVAS, STORY_CAPTURE, ShareStory } from '../sharing/ShareCard';
 import { fetchShareCardData, type ShareCardData } from '../sharing/shareCardData';
 import { shareCardStyles as styles } from '../sharing/shareCardStyles';
+import { SkeletonCards } from '../design/Skeleton';
 
 type Props = RootStackScreenProps<'ShareWorkout'>;
 
@@ -107,13 +108,7 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <Screen scroll={false} header={header}>
-        <View style={styles.loading}>
-          <ActivityIndicator
-            testID="share-workout-loading"
-            size="large"
-            color={colors.textPrimary}
-          />
-        </View>
+        <SkeletonCards testID="share-workout-loading" heights={[480]} />
       </Screen>
     );
   }

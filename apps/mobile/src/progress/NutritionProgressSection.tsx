@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { ListRow } from '../design/ListRow';
 import { SegmentedControl } from '../design/SegmentedControl';
@@ -10,6 +10,7 @@ import { fetchIntakeForRange } from '../nutrition/foodLogQueries';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { dayFromKey, dayKey } from '../lib/dayKey';
 import { progressStyles } from './progressStyles';
+import { SkeletonRows } from '../design/Skeleton';
 
 type Range = 'week' | 'month' | 'quarter';
 
@@ -133,7 +134,7 @@ export function NutritionProgressSection({ accentColor, onAccentColor, onOpenDay
           {error}
         </Text>
       ) : logs === null ? (
-        <ActivityIndicator testID="progress-nutrition-loading" color={colors.textMuted} />
+        <SkeletonRows testID="progress-nutrition-loading" count={4} />
       ) : days.length === 0 ? (
         <Text testID="progress-nutrition-empty" style={styles.empty}>
           No food logged in this time.

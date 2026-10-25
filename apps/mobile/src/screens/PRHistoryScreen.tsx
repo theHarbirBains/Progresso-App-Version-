@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -7,13 +7,13 @@ import { AppHeader } from '../design/AppHeader';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
-import { colors } from '../design/theme';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import { formatShortDate } from '../workouts/workoutFormat';
 import { exerciseProgressStyles as styles } from './exerciseProgressStyles';
+import { SkeletonCards } from '../design/Skeleton';
 
 type Props = RootStackScreenProps<'PRHistory'>;
 
@@ -87,9 +87,7 @@ export function PRHistoryScreen({ route, navigation }: Props) {
       ) : null}
 
       {loading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator testID="pr-history-loading" size="large" color={colors.textPrimary} />
-        </View>
+        <SkeletonCards testID="pr-history-loading" heights={[64, 176, 240]} />
       ) : (
         <>
           <AppCard>

@@ -20,6 +20,7 @@ import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 import { searchFoods } from '../lib/foodsApi';
 import { FoodImage } from './FoodImage';
 import { fetchAllFoods, fetchRecentFoods, type FoodRow } from './foodQueries';
+import { SkeletonRows } from '../design/Skeleton';
 
 const SEARCH_DEBOUNCE_MS = 300;
 // Recent here is a wider net than the Food Library's: it's where foods from Search live.
@@ -202,11 +203,7 @@ export function FoodPickerStep({ title, excludeId, onPick, onCancel }: Props) {
 
         <AppCard style={styles.listCard}>
           {own === null ? (
-            <ActivityIndicator
-              testID="food-picker-loading"
-              size="large"
-              color={colors.textPrimary}
-            />
+            <SkeletonRows testID="food-picker-loading" count={5} />
           ) : sections.length === 0 && !searching ? (
             <EmptyState
               testID="food-picker-empty"

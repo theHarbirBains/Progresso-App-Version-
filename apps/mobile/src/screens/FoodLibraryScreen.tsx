@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  SectionList,
-  View,
-  type SectionListData,
-} from 'react-native';
+import { Alert, ScrollView, SectionList, View, type SectionListData } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
@@ -47,6 +40,7 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { foodLibraryStyles as styles } from './foodLibraryStyles';
 import { FoodFormScreen } from './FoodFormScreen';
 import { FoodGroupFormScreen } from './FoodGroupFormScreen';
+import { SkeletonRows } from '../design/Skeleton';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const RECENT_LIMIT = 8;
@@ -660,13 +654,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
               />
             </View>
           ) : loading || shortcuts === null ? (
-            <View style={styles.loading}>
-              <ActivityIndicator
-                testID="food-library-loading"
-                size="large"
-                color={colors.textPrimary}
-              />
-            </View>
+            <SkeletonRows testID="food-library-loading" count={8} />
           ) : listSections.length === 0 ? (
             <View>
               <EmptyState

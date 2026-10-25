@@ -13,9 +13,6 @@ export const workoutDetailStyles = StyleSheet.create({
     ...typeScale.callout,
     color: colors.destructive,
   },
-  loading: {
-    paddingVertical: spacing.xxl,
-  },
 
   // ---- Summary widget -------------------------------------------------------
   eyebrow: {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -20,6 +20,7 @@ import { fetchFoodLogsForMonth, type FoodLogRow } from '../nutrition/foodLogQuer
 import { computeNutritionMonthSummary } from '../nutrition/nutritionMonthSummary';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { nutritionHistoryStyles as styles } from './nutritionHistoryStyles';
+import { SkeletonRows } from '../design/Skeleton';
 
 type Props = RootStackScreenProps<'NutritionHistory'>;
 
@@ -152,13 +153,7 @@ export function NutritionHistoryScreen({ navigation, route }: Props) {
             {monthError}
           </Text>
         ) : monthLoading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator
-              testID="nutrition-history-month-loading"
-              size="large"
-              color={colors.textPrimary}
-            />
-          </View>
+          <SkeletonRows testID="nutrition-history-month-loading" count={1} />
         ) : (
           <View testID="nutrition-history-month-summary" style={styles.summaryRow}>
             <StatBlock

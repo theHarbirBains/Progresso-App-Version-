@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -28,6 +28,7 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { formatCardDate } from '../workouts/workoutFormat';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { notificationsStyles as styles } from './notificationsStyles';
+import { SkeletonRows } from '../design/Skeleton';
 
 type Props = RootStackScreenProps<'Notifications'>;
 
@@ -173,13 +174,7 @@ export function NotificationsScreen({ navigation }: Props) {
       ) : (
         <>
           {insightsLoading || themeLoading ? (
-            <View style={styles.loading}>
-              <ActivityIndicator
-                testID="notifications-insights-loading"
-                size="large"
-                color={colors.textPrimary}
-              />
-            </View>
+            <SkeletonRows testID="notifications-insights-loading" count={3} />
           ) : insightsError ? (
             <ErrorState
               testID="notifications-insights-error"
@@ -252,13 +247,7 @@ export function NotificationsScreen({ navigation }: Props) {
           ) : null}
 
           {activityLoading ? (
-            <View style={styles.loading}>
-              <ActivityIndicator
-                testID="notifications-activity-loading"
-                size="large"
-                color={colors.textPrimary}
-              />
-            </View>
+            <SkeletonRows testID="notifications-activity-loading" count={5} />
           ) : activityError ? (
             <ErrorState
               testID="notifications-activity-error"

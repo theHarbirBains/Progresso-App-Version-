@@ -37,10 +37,6 @@ export const nutritionHistoryStyles = StyleSheet.create({
     ...typeScale.callout,
     color: colors.destructive,
   },
-  loading: {
-    paddingVertical: spacing.xl,
-    alignItems: 'center',
-  },
   logRow: {
     flexDirection: 'row',
     alignItems: 'center',

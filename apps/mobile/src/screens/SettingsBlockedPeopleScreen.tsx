@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
@@ -14,6 +13,7 @@ import { listBlockedUsers, unblockUser, type FollowUser } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { settingsStyles as styles } from '../settings/settingsStyles';
 import { personName } from '../social/PersonActionsSheet';
+import { SkeletonRows } from '../design/Skeleton';
 
 type Props = RootStackScreenProps<'SettingsBlockedPeople'>;
 
@@ -73,9 +73,7 @@ export function SettingsBlockedPeopleScreen({ navigation }: Props) {
       }
     >
       {loading ? (
-        <View testID="blocked-people-loading">
-          <ActivityIndicator size="large" color={colors.textPrimary} />
-        </View>
+        <SkeletonRows testID="blocked-people-loading" count={3} />
       ) : error && blocked.length === 0 ? (
         <ErrorState testID="blocked-people-error" message={error} onRetry={load} />
       ) : blocked.length === 0 ? (

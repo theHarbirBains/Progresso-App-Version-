@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -20,6 +20,7 @@ import { FoodImage } from '../nutrition/FoodImage';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { foodSearchStyles as styles } from './foodSearchStyles';
+import { SkeletonRows } from '../design/Skeleton';
 
 type Props = RootStackScreenProps<'FoodSearch'>;
 
@@ -205,13 +206,7 @@ export function FoodSearchScreen({ navigation, route }: Props) {
             }}
           />
         ) : loading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator
-              testID="food-search-loading"
-              size="large"
-              color={colors.textPrimary}
-            />
-          </View>
+          <SkeletonRows testID="food-search-loading" count={6} />
         ) : search === '' ? (
           <EmptyState
             testID="food-search-empty-initial"

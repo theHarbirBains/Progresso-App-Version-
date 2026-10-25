@@ -1,11 +1,5 @@
 import { useCallback, useMemo, type ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  SectionList,
-  TouchableOpacity,
-  View,
-  type SectionListData,
-} from 'react-native';
+import { SectionList, TouchableOpacity, View, type SectionListData } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { EmptyState } from '../design/EmptyState';
@@ -23,6 +17,7 @@ import type { ExerciseRow, ExerciseSource, ExerciseSourceCounts } from './exerci
 import { MuscleGroupChips } from './MuscleGroupChips';
 import { MOVEMENT_TYPE_LABELS } from './movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
+import { SkeletonRows } from '../design/Skeleton';
 
 const SOURCE_OPTIONS: { value: ExerciseSource; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -231,13 +226,7 @@ export function ExerciseBrowser({
         {error ? (
           <ErrorState testID="exercise-library-error" message={error} onRetry={onRetry} />
         ) : loading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator
-              testID="exercise-library-loading"
-              size="large"
-              color={colors.textPrimary}
-            />
-          </View>
+          <SkeletonRows testID="exercise-library-loading" count={6} />
         ) : (
           <View style={styles.flex}>
             <SectionList

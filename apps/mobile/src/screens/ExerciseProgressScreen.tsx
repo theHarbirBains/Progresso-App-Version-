@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { LineChart } from '../charts/LineChart';
 import { useAuth } from '../auth/AuthProvider';
@@ -9,7 +9,6 @@ import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { Section } from '../design/Section';
-import { colors } from '../design/theme';
 import { fromKg, formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -27,6 +26,7 @@ import {
 } from '../workouts/exerciseProgress';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import { exerciseProgressStyles as styles } from './exerciseProgressStyles';
+import { SkeletonCards } from '../design/Skeleton';
 
 type Props = RootStackScreenProps<'ExerciseProgress'>;
 
@@ -147,13 +147,7 @@ export function ExerciseProgressScreen({ route, navigation }: Props) {
       ) : null}
 
       {loading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator
-            testID="exercise-progress-loading"
-            size="large"
-            color={colors.textPrimary}
-          />
-        </View>
+        <SkeletonCards testID="exercise-progress-loading" heights={[72, 240, 160]} />
       ) : (
         <>
           <SegmentedControl

@@ -38,9 +38,6 @@ export const foodLibraryStyles = StyleSheet.create({
   padded: {
     paddingHorizontal: 0,
   },
-  loading: {
-    paddingVertical: spacing.xxl,
-  },
 
   // A letter heading after the first: room above it, so the groups read apart.
   laterSection: {

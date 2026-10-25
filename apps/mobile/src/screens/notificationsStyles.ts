@@ -10,9 +10,6 @@ export const notificationsStyles = StyleSheet.create({
   content: {
     gap: widgetGap,
   },
-  loading: {
-    paddingVertical: spacing.xxl,
-  },
   // "Insights"/"Activity" sit directly on the screen (not inside a card),
   // so unlike a card -- whose own padding creates its inset from the
   // edge-to-edge frame -- they need an explicit gutter of their own. A

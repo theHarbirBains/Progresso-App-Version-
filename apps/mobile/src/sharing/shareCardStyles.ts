@@ -26,9 +26,6 @@ export const shareCardStyles = StyleSheet.create({
     color: colors.destructive,
     textAlign: 'center',
   },
-  loading: {
-    paddingVertical: spacing.xxl,
-  },
   actions: {
     gap: spacing.md,
   },

@@ -9,9 +9,6 @@ export const foodSearchStyles = StyleSheet.create({
     paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.md,
   },
-  loading: {
-    paddingVertical: spacing.xxl,
-  },
   logButtonWrap: {
     marginTop: spacing.xxl,
   },

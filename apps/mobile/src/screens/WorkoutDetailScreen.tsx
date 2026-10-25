@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, TouchableOpacity, View } from 'react-native';
+import { Alert, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
@@ -37,6 +37,7 @@ import {
 import { formatCardDuration } from '../workouts/workoutFormat';
 import { formatVolume, volumeInUnit } from '../workouts/workoutSummary';
 import { workoutDetailStyles as styles } from './workoutDetailStyles';
+import { SkeletonCards } from '../design/Skeleton';
 
 type Props = RootStackScreenProps<'WorkoutDetail'>;
 
@@ -175,13 +176,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
             {error}
           </Text>
         ) : (
-          <View style={styles.loading}>
-            <ActivityIndicator
-              testID="workout-detail-loading"
-              size="large"
-              color={colors.textPrimary}
-            />
-          </View>
+          <SkeletonCards testID="workout-detail-loading" heights={[160, 200, 200]} />
         )}
       </Screen>
     );

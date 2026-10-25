@@ -95,7 +95,4 @@ export const exerciseLibraryStyles = StyleSheet.create({
     color: colors.destructive,
     marginBottom: spacing.md,
   },
-  loading: {
-    paddingVertical: spacing.lg,
-  },
 });

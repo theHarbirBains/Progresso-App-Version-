@@ -15,9 +15,6 @@ export const exerciseProgressStyles = StyleSheet.create({
     ...typeScale.callout,
     color: colors.destructive,
   },
-  loading: {
-    paddingVertical: spacing.xxl,
-  },
   emptyText: {
     ...typeScale.secondary,
     color: colors.textMuted,

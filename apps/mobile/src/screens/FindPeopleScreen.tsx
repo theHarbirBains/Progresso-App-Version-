@@ -36,6 +36,7 @@ import {
 import type { RootStackScreenProps } from '../navigation/types';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { findPeopleStyles as styles } from './findPeopleStyles';
+import { SkeletonRows } from '../design/Skeleton';
 
 type Props = RootStackScreenProps<'FindPeople'>;
 type FindPeopleTab = 'friends' | 'requests';
@@ -354,13 +355,7 @@ export function FindPeopleScreen({ navigation }: Props) {
     >
       {tab === 'requests' ? (
         requestsLoading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator
-              testID="find-people-requests-loading"
-              size="large"
-              color={colors.textPrimary}
-            />
-          </View>
+          <SkeletonRows testID="find-people-requests-loading" count={4} />
         ) : requestsError ? (
           <ErrorState
             testID="find-people-requests-error"
@@ -430,13 +425,7 @@ export function FindPeopleScreen({ navigation }: Props) {
               }}
             />
           ) : searchLoading ? (
-            <View style={styles.loading}>
-              <ActivityIndicator
-                testID="find-people-search-loading"
-                size="large"
-                color={colors.textPrimary}
-              />
-            </View>
+            <SkeletonRows testID="find-people-search-loading" count={4} />
           ) : results.length === 0 ? (
             <EmptyState testID="find-people-empty-results" title={`No one found for "${search}"`} />
           ) : (
