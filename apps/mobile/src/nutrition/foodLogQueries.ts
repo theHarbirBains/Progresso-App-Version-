@@ -312,23 +312,34 @@ export async function fetchFoodLogsForRange(
   return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
 }
 
+/** A food log's time and figures, for Progress's nutrition. */
+export interface Intake {
+  loggedAt: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
 /**
- * Each food log's time and calories from `start` up to (not including) `end` -- up to three
- * months of them -- read a page at a time, so a long range is read in full.
+ * Each food log's time and figures from `start` up to (not including) `end` -- a week, or every
+ * log there is -- read a page at a time, so a long range is read in full.
  */
 export async function fetchIntakeForRange(
   userId: string,
   start: Date,
   end: Date,
-): Promise<{ loggedAt: string; calories: number; proteinG: number }[]> {
+): Promise<Intake[]> {
   const rows = await fetchAllRows<{
     logged_at: string;
     calories: string | number;
     protein_g: string | number;
+    carbs_g: string | number;
+    fat_g: string | number;
   }>((from, to) =>
     supabase
       .from('food_logs')
-      .select('logged_at, calories, protein_g', { count: 'exact' })
+      .select('logged_at, calories, protein_g, carbs_g, fat_g', { count: 'exact' })
       .eq('user_id', userId)
       .gte('logged_at', start.toISOString())
       .lt('logged_at', end.toISOString())
@@ -340,6 +351,8 @@ export async function fetchIntakeForRange(
     loggedAt: row.logged_at,
     calories: Number(row.calories),
     proteinG: Number(row.protein_g),
+    carbsG: Number(row.carbs_g),
+    fatG: Number(row.fat_g),
   }));
 }
 

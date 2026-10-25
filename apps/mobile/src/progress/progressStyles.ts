@@ -21,6 +21,11 @@ export const progressStyles = StyleSheet.create({
   sectionFill: {
     flex: 1,
   },
+  // All Time: its Workouts / Nutrition switch over whichever is chosen.
+  allTimeTabs: {
+    flex: 1,
+    gap: spacing.md,
+  },
   scrollContent: {
     paddingHorizontal: 0,
     paddingBottom: spacing.xxxl,

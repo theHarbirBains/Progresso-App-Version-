@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
@@ -19,6 +19,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { CalorieRing } from '../nutrition/CalorieRing';
 import { DayBar } from '../nutrition/DayBar';
+import { MacroRows, type MacroFigure } from '../nutrition/MacroRows';
 import { FoodImage } from '../nutrition/FoodImage';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { getCurrentWeekRange } from '../dashboard/weeklyProgress';
@@ -44,20 +45,6 @@ type Props = RootStackScreenProps<'Nutrition'>;
 const EMPTY_GOALS: NutritionGoals = { calories: null, proteinG: null, carbsG: null, fatG: null };
 // Another day's foods before they've been read: one array, so what depends on the foods stays put.
 const NO_LOGS: FoodLogRow[] = [];
-
-type MacroKey = 'protein' | 'carbs' | 'fat';
-
-// Each macro's glyph -- the same food-category glyph set as a food's picture
-// (nutrition/foodGlyph.ts), in its quiet raised tile.
-const MACRO_GLYPHS: Record<MacroKey, keyof typeof MaterialCommunityIcons.glyphMap> = {
-  protein: 'food-drumstick-outline',
-  carbs: 'barley',
-  fat: 'water-outline',
-};
-
-function grams(value: number): string {
-  return `${wholeFigure(value)}g`;
-}
 
 // The Nutrition tab's own root screen (see App.tsx's bottom nav) -- a day's
 // intake against the user's targets, with the day's logged foods. Today by
@@ -332,7 +319,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     );
   }
 
-  const macros: { key: MacroKey; label: string; consumed: number; goal: number | null }[] = [
+  const macros: MacroFigure[] = [
     { key: 'protein', label: 'Protein', consumed: consumed.proteinG, goal: goals.proteinG },
     { key: 'carbs', label: 'Carbs', consumed: consumed.carbsG, goal: goals.carbsG },
     { key: 'fat', label: 'Fat', consumed: consumed.fatG, goal: goals.fatG },
@@ -378,59 +365,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                   ) : null}
                 </View>
 
-                <View style={styles.macroColumn}>
-                  {macros.map((macro, index) => {
-                    const fraction =
-                      macro.goal !== null && macro.goal > 0
-                        ? Math.min(macro.consumed / macro.goal, 1)
-                        : 0;
-                    return (
-                      <View
-                        key={macro.key}
-                        testID={`${macro.key}-row`}
-                        style={[styles.macroRow, index > 0 && styles.divider]}
-                        accessible
-                        accessibilityLabel={
-                          macro.goal !== null
-                            ? `${macro.label}, ${wholeFigure(macro.consumed)} of ${wholeFigure(macro.goal)} grams`
-                            : `${macro.label}, ${wholeFigure(macro.consumed)} grams`
-                        }
-                      >
-                        <View style={styles.macroGlyph}>
-                          <MaterialCommunityIcons
-                            name={MACRO_GLYPHS[macro.key]}
-                            size={18}
-                            color={accent}
-                          />
-                        </View>
-                        <View style={styles.macroBody}>
-                          <Text style={styles.macroLabel}>{macro.label}</Text>
-                          <View style={styles.macroFigures}>
-                            <Text testID={`${macro.key}-consumed`} style={styles.macroValue}>
-                              {grams(macro.consumed)}
-                            </Text>
-                            {macro.goal !== null ? (
-                              <Text testID={`${macro.key}-goal`} style={styles.macroGoal}>
-                                / {grams(macro.goal)}
-                              </Text>
-                            ) : null}
-                          </View>
-                          {macro.goal !== null ? (
-                            <View style={styles.barTrack}>
-                              <View
-                                testID={`${macro.key}-bar`}
-                                style={[
-                                  styles.barFill,
-                                  { width: `${fraction * 100}%`, backgroundColor: accent },
-                                ]}
-                              />
-                            </View>
-                          ) : null}
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
+                <MacroRows macros={macros} accentColor={accent} />
               </View>
             </AppCard>
           </Animated.View>
@@ -700,57 +635,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: RING_SIZE,
   },
-  macroColumn: {
-    flex: 1,
-  },
-  macroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-  },
   divider: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.divider,
-  },
-  macroGlyph: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceLift,
-  },
-  macroBody: {
-    flex: 1,
-  },
-  macroLabel: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-  },
-  macroFigures: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-  },
-  macroValue: {
-    ...typeScale.statSmall,
-    color: colors.textPrimary,
-  },
-  macroGoal: {
-    ...typeScale.secondary,
-    color: colors.textMuted,
-  },
-  barTrack: {
-    height: 4,
-    borderRadius: 2,
-    marginTop: spacing.xs,
-    backgroundColor: colors.surfaceRaised,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 2,
   },
 
   actions: {

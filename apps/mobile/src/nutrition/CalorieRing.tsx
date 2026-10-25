@@ -19,6 +19,8 @@ interface Props {
   accentColor: string;
   size?: number;
   strokeWidth?: number;
+  /** Read out after the figure: "logged today" (the default), or "a day on average". */
+  spokenPeriod?: string;
   testID?: string;
 }
 
@@ -41,6 +43,7 @@ export function CalorieRing({
   accentColor,
   size = DEFAULT_SIZE,
   strokeWidth = DEFAULT_STROKE_WIDTH,
+  spokenPeriod = 'logged today',
   testID,
 }: Props) {
   const radius = (size - strokeWidth) / 2;
@@ -77,8 +80,8 @@ export function CalorieRing({
       accessible
       accessibilityLabel={
         goal !== null
-          ? `${wholeFigure(consumed)} of ${wholeFigure(goal)} calories logged today`
-          : `${wholeFigure(consumed)} calories logged today, no goal set`
+          ? `${wholeFigure(consumed)} of ${wholeFigure(goal)} calories ${spokenPeriod}`
+          : `${wholeFigure(consumed)} calories ${spokenPeriod}, no goal set`
       }
     >
       {arrived ? (

@@ -51,7 +51,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Progress & analytics**
 
-- A Progress tab with Overview (the Weekly Summary and 12 weeks of consistency), Top Sets, Nutrition (a week, month or three months of logged food against the targets in force each day, each day opening its foods) and All Time sections -- figures and rows, no line graphs
+- A Progress tab with Overview (the Weekly Summary and 12 weeks of consistency), Top Sets and All Time sections -- figures and rows, no line graphs. All Time has two tabs: Workouts, and Nutrition -- the average logged day (calories, protein, carbs and fat against the targets) and the days logged, for all time or the last week, month or three months, each day of a range opening its foods
 - A Weekly Summary at the top of Overview, for this week or last: workout days against your weekly goal, average calories and protein and the days on target, sets per muscle group against the 4 weeks before, and your main lifts' top sets against their best in the 4 weeks before
 - Per-exercise and lifetime top sets, rep-count PRs, and true 1RM tracking (1RM is only ever recorded from an actual 1-rep set), plus most reps and longest time for bodyweight and timed exercises
 - Progress metrics per exercise: the latest top set and how far it has come, best performances and its progression journey

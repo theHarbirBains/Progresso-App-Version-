@@ -5,6 +5,7 @@ import { AppCard } from '../design/AppCard';
 import { LoadingState } from '../design/LoadingState';
 import { SkeletonCards } from '../design/Skeleton';
 import { Screen } from '../design/Screen';
+import { SegmentedControl } from '../design/SegmentedControl';
 import { UnderlineTabs } from '../design/UnderlineTabs';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -81,6 +82,8 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   const error = statsError ?? prsError;
 
   const [activeSection, setActiveSection] = useState<ProgressSection>('Overview');
+  // All Time's tab -- its workouts or its nutrition -- kept while other sections are visited.
+  const [allTimeView, setAllTimeView] = useState<'workouts' | 'nutrition'>('workouts');
   const { profile } = useProfile();
   // This week's and last week's summaries, read once as Progress opens.
   const { summaries: weekSummaries, error: weekError } = useWeeklySummaries();
@@ -160,7 +163,10 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 weightUnit={weightUnit}
                 accentColor={theme.accent}
                 navigation={navigation}
-                onViewAllMilestones={() => setActiveSection('AllTime')}
+                onViewAllMilestones={() => {
+                  setAllTimeView('workouts');
+                  setActiveSection('AllTime');
+                }}
                 top={
                   <>
                     <WeeklySummaryBlock
@@ -191,28 +197,43 @@ export function ProgressOverviewScreen({ navigation }: Props) {
               />
             ) : null}
 
-            {contentReady && activeSection === 'Nutrition' ? (
-              <NutritionProgressSection
-                accentColor={theme.accent}
-                onAccentColor={theme.onAccent}
-                onOpenDay={(date) => navigation.navigate('NutritionHistory', { date })}
-              />
-            ) : null}
-
+            {/* All Time: the workouts' all-time figures, or nutrition's -- two tabs of one section. */}
             {contentReady && activeSection === 'AllTime' ? (
-              <AllTimeSection
-                groups={groups}
-                history={history}
-                completedWorkouts={completedWorkouts}
-                lifetimeStats={lifetimeStats}
-                totalCompletedSets={history.length}
-                totalPRs={totalPRs}
-                repPRs={repPRs}
-                oneRepMaxes={oneRepMaxes}
-                weightUnit={weightUnit}
-                accentColor={theme.accent}
-                navigation={navigation}
-              />
+              <View style={styles.allTimeTabs}>
+                <SegmentedControl
+                  testID="progress-all-time-view"
+                  options={[
+                    { label: 'Workouts', value: 'workouts' },
+                    { label: 'Nutrition', value: 'nutrition' },
+                  ]}
+                  value={allTimeView}
+                  onChange={setAllTimeView}
+                  accentColor={theme.accent}
+                  onAccentColor={theme.onAccent}
+                />
+                {allTimeView === 'workouts' ? (
+                  <AllTimeSection
+                    groups={groups}
+                    history={history}
+                    completedWorkouts={completedWorkouts}
+                    lifetimeStats={lifetimeStats}
+                    totalCompletedSets={history.length}
+                    totalPRs={totalPRs}
+                    repPRs={repPRs}
+                    oneRepMaxes={oneRepMaxes}
+                    weightUnit={weightUnit}
+                    accentColor={theme.accent}
+                    navigation={navigation}
+                  />
+                ) : (
+                  <NutritionProgressSection
+                    accentColor={theme.accent}
+                    onAccentColor={theme.onAccent}
+                    onOpenDay={(date) => navigation.navigate('NutritionHistory', { date })}
+                    onOpenHistory={() => navigation.navigate('NutritionHistory')}
+                  />
+                )}
+              </View>
             ) : null}
           </AppCard>
         </RiseIn>

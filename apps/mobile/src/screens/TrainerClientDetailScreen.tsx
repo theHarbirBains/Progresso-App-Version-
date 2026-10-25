@@ -64,8 +64,8 @@ type Props = RootStackScreenProps<'TrainerClientDetail'>;
 /** A client's page always shows pounds, whatever the trainer's own unit setting is. */
 const CLIENT_WEIGHT_UNIT = 'lb';
 
-/** Progress's tabs, less Nutrition: a trainer doesn't see a client's food. */
-const CLIENT_PROGRESS_SECTIONS = PROGRESS_SECTIONS.filter((section) => section.key !== 'Nutrition');
+/** Progress's tabs. All Time is its workouts alone here: a trainer doesn't see a client's food. */
+const CLIENT_PROGRESS_SECTIONS = [...PROGRESS_SECTIONS];
 
 type Tab = 'workouts' | 'records' | 'progress';
 
