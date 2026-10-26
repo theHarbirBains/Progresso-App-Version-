@@ -21,7 +21,7 @@ import {
   type MovementType,
 } from '../exercises/movementTypes';
 import { logWorkoutForClient } from '../lib/api';
-import { draftValues, isValidDraft } from '../workouts/setInputDrafts';
+import { draftValues, groupUnilateralSets, isValidDraft } from '../workouts/setInputDrafts';
 import { PER_SIDE_NOTE, SetColumnHeader } from '../workouts/SetColumnHeader';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -71,38 +71,13 @@ interface DraftExercise {
   sets: DraftSet[];
 }
 
-function isValidSet(set: DraftSet, type: MeasurementType): boolean {
-  return isValidDraft(set, type);
-}
-
-/** Pairs a unilateral exercise's flat sets into one row per logical set (left
- * + right sharing a setIndex) -- only pairs where both sides are present
- * render, same convention ActiveWorkoutScreen's own grouping uses. */
-function groupUnilateralSets(
-  sets: DraftSet[],
-): { setIndex: number; left: DraftSet; right: DraftSet }[] {
-  const bySetIndex = new Map<number, { left?: DraftSet; right?: DraftSet }>();
-  for (const set of sets) {
-    if (set.side !== 'left' && set.side !== 'right') continue;
-    const entry = bySetIndex.get(set.setIndex) ?? {};
-    entry[set.side] = set;
-    bySetIndex.set(set.setIndex, entry);
-  }
-  const rows: { setIndex: number; left: DraftSet; right: DraftSet }[] = [];
-  for (const [setIndex, { left, right }] of bySetIndex) {
-    if (!left || !right) continue;
-    rows.push({ setIndex, left, right });
-  }
-  return rows.sort((a, b) => a.setIndex - b.setIndex);
-}
-
 /** Drops any set that was never actually filled in, and any exercise left
  * with none -- a manual log is filled in one sitting, so a stray blank "Set
  * 3" row is just something the user didn't get to, not an error. */
 function exercisesToSave(source: DraftExercise[]): DraftExercise[] {
   return source
     .map((ex) => {
-      const valid = ex.sets.filter((set) => isValidSet(set, ex.measurementType));
+      const valid = ex.sets.filter((set) => isValidDraft(set, ex.measurementType));
       if (ex.movementType === 'unilateral') {
         const pairs = groupUnilateralSets(valid);
         return { ...ex, sets: pairs.flatMap((p) => [p.left, p.right]) };

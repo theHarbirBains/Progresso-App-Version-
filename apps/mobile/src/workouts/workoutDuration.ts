@@ -1,5 +1,5 @@
 // Live-elapsed-time formula, extending the existing completedAt-performedAt
-// duration definition (dashboard/recentWorkoutInfo.ts) to the "still
+// duration definition (topSetSummary's computeDurationMinutes) to the "still
 // running" case: now - performedAt instead of completedAt - performedAt.
 // Same underlying performed_at field, no new backend concept.
 

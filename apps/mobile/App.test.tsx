@@ -66,9 +66,6 @@ jest.mock('./src/progress/progressStatsQueries', () => ({
 jest.mock('./src/workouts/allExerciseHistoryQueries', () => ({
   fetchAllExerciseHistory: jest.fn().mockResolvedValue([]),
 }));
-jest.mock('./src/dashboard/recentWorkoutInfo', () => ({
-  fetchRecentWorkoutInfo: jest.fn().mockResolvedValue(null),
-}));
 jest.mock('./src/nutrition/foodLogQueries', () => ({
   fetchTodaysFoodLogs: jest.fn().mockResolvedValue([]),
   fetchWeeklyFoodLogs: jest.fn().mockResolvedValue([]),

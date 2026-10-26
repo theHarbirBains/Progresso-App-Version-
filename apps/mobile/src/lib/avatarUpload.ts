@@ -1,4 +1,4 @@
-import { resizeForUpload } from './imageResize';
+import { publicPhotoUrl, uploadPhoto } from './photoUpload';
 import { supabase } from './supabase';
 
 const AVATAR_BUCKET = 'avatars';
@@ -22,18 +22,9 @@ function avatarPath(userId: string): string {
  * picture would keep showing it after a change.
  */
 export async function uploadAvatar(userId: string, localUri: string): Promise<string> {
-  const response = await fetch(await resizeForUpload(localUri));
-  const blob = await response.blob();
-
   const path = avatarPath(userId);
-  const { error: uploadError } = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
-
-  if (uploadError) throw new Error(uploadError.message);
-
-  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
-  return `${data.publicUrl}?v=${Date.now()}`;
+  await uploadPhoto(AVATAR_BUCKET, path, localUri, { upsert: true });
+  return `${publicPhotoUrl(AVATAR_BUCKET, path)}?v=${Date.now()}`;
 }
 
 /** Deletes this user's uploaded avatar file from storage. */

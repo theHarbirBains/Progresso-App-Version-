@@ -10,12 +10,13 @@ import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { SkeletonRows } from '../design/Skeleton';
 import { FeedbackStatusBadge } from '../feedback/FeedbackStatusBadge';
-import { CATEGORY_LABELS, feedbackDate } from '../feedback/feedbackLabels';
+import { CATEGORY_LABELS } from '../feedback/feedbackLabels';
 import { fetchMyFeedback } from '../feedback/feedbackQueries';
 import type { FeedbackSubmission } from '../lib/feedbackApi';
 import type { RootStackScreenProps } from '../navigation/types';
 import { settingsStyles } from '../settings/settingsStyles';
 import { useAppTheme } from '../theme/appThemeContext';
+import { formatShortDate } from '../workouts/workoutFormat';
 
 type Props = RootStackScreenProps<'Feedback'>;
 
@@ -86,11 +87,11 @@ export function FeedbackScreen({ navigation }: Props) {
                 key={item.id}
                 testID={`feedback-item-${item.id}`}
                 title={item.title}
-                subtitle={`${CATEGORY_LABELS[item.category]} · ${feedbackDate(item.createdAt)}`}
+                subtitle={`${CATEGORY_LABELS[item.category]} · ${formatShortDate(item.createdAt)}`}
                 trailing={<FeedbackStatusBadge status={item.status} />}
                 divider={index > 0}
                 onPress={() => navigation.navigate('FeedbackDetail', { id: item.id })}
-                accessibilityLabel={`${item.title}, ${CATEGORY_LABELS[item.category]}, sent ${feedbackDate(item.createdAt)}`}
+                accessibilityLabel={`${item.title}, ${CATEGORY_LABELS[item.category]}, sent ${formatShortDate(item.createdAt)}`}
               />
             ))}
           </View>

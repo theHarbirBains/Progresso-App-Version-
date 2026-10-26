@@ -55,9 +55,13 @@ let mockPermission: { granted: boolean; canAskAgain: boolean } | null = {
 };
 const mockRequestPermission = jest.fn();
 
+// babel-plugin-jest-hoist moves jest.mock() above the file's imports, so its factory requires
+// react-native and react itself (as ExerciseLibraryScreen.test.tsx's form stand-in does).
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('expo-camera', () => {
   const { View } = require('react-native');
   const ReactActual = require('react');
+  /* eslint-enable @typescript-eslint/no-require-imports */
   return {
     CameraView: (props: Record<string, unknown>) => {
       capturedCameraProps = props;

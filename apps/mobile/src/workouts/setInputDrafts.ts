@@ -63,6 +63,28 @@ function isValidReps(text: string): boolean {
   return text.trim() !== '' && Number.isInteger(reps) && reps > 0;
 }
 
+/**
+ * Pairs a unilateral exercise's flat sets into one row per logical set (left + right sharing a
+ * setIndex) -- only pairs where both sides are present, in set order.
+ */
+export function groupUnilateralSets<T extends { setIndex: number; side: 'left' | 'right' | null }>(
+  sets: T[],
+): { setIndex: number; left: T; right: T }[] {
+  const bySetIndex = new Map<number, { left?: T; right?: T }>();
+  for (const set of sets) {
+    if (set.side !== 'left' && set.side !== 'right') continue;
+    const entry = bySetIndex.get(set.setIndex) ?? {};
+    entry[set.side] = set;
+    bySetIndex.set(set.setIndex, entry);
+  }
+  const rows: { setIndex: number; left: T; right: T }[] = [];
+  for (const [setIndex, { left, right }] of bySetIndex) {
+    if (!left || !right) continue;
+    rows.push({ setIndex, left, right });
+  }
+  return rows.sort((a, b) => a.setIndex - b.setIndex);
+}
+
 export function isValidDraft(
   draft: SetInputDraft | undefined,
   type: MeasurementType = 'weight_reps',

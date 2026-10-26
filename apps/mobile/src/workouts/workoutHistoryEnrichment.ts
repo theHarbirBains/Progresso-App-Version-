@@ -7,6 +7,7 @@ import {
   type WorkoutTopSet,
 } from './recentWorkoutTopSets';
 import type { SplitMuscleGroup } from './splitMuscleGroups';
+import { computeDurationMinutes } from './topSetSummary';
 import type { SetRecord, WorkoutSummary } from './workoutQueries';
 
 export interface EnrichedWorkoutSummary extends WorkoutSummary {
@@ -25,16 +26,6 @@ export interface EnrichedWorkoutSummary extends WorkoutSummary {
   completedExerciseCount: number;
   /** One per exercise with a real top set (see computeWorkoutTopSets), in the workout's own exercise order. */
   topSets: WorkoutTopSet[];
-}
-
-function computeCompletedDurationMinutes(
-  performedAt: string,
-  completedAt: string | null,
-): number | null {
-  if (!completedAt) return null;
-  const ms = new Date(completedAt).getTime() - new Date(performedAt).getTime();
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-  return Math.round(ms / 60000);
 }
 
 /**
@@ -190,7 +181,7 @@ export async function enrichWorkoutSummaries(
       muscleGroups: day?.muscleGroups ?? [],
       completedSetCount: completedSetCountByWorkoutId.get(workout.id) ?? 0,
       totalVolumeKg: totalVolumeKgByWorkoutId.get(workout.id) ?? 0,
-      durationMinutes: computeCompletedDurationMinutes(workout.performedAt, workout.completedAt),
+      durationMinutes: computeDurationMinutes(workout.performedAt, workout.completedAt),
       exerciseCount: exerciseCountByWorkoutId.get(workout.id) ?? 0,
       completedExerciseCount: countCompletedExercises(exerciseRows),
       topSets: computeWorkoutTopSets(exerciseRows),

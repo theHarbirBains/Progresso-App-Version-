@@ -1,14 +1,6 @@
-import { resizeForUpload } from './imageResize';
-import { supabase } from './supabase';
+import { publicPhotoUrl, uploadPhoto, uniquePhotoPath } from './photoUpload';
 
 const FOOD_PHOTO_BUCKET = 'food-photos';
-
-function foodPhotoPath(userId: string): string {
-  // A user can have many custom foods, so each upload gets its own unique file
-  // name (random, so the URL is unguessable) rather than a fixed path.
-  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  return `${userId}/${unique}.jpg`;
-}
 
 /**
  * Uploads a locally-picked photo of a custom food (a file:// URI from
@@ -18,16 +10,8 @@ function foodPhotoPath(userId: string): string {
  * user's folder. Returns the URL to store on the food row.
  */
 export async function uploadFoodPhoto(userId: string, localUri: string): Promise<string> {
-  const response = await fetch(await resizeForUpload(localUri));
-  const blob = await response.blob();
-
-  const path = foodPhotoPath(userId);
-  const { error: uploadError } = await supabase.storage
-    .from(FOOD_PHOTO_BUCKET)
-    .upload(path, blob, { contentType: 'image/jpeg' });
-
-  if (uploadError) throw new Error(uploadError.message);
-
-  const { data } = supabase.storage.from(FOOD_PHOTO_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  // Many to a person -- one per food -- so each upload gets its own unguessable file.
+  const path = uniquePhotoPath(userId);
+  await uploadPhoto(FOOD_PHOTO_BUCKET, path, localUri);
+  return publicPhotoUrl(FOOD_PHOTO_BUCKET, path);
 }

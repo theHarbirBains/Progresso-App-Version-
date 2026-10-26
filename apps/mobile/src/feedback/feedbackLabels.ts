@@ -42,12 +42,3 @@ export const STATUS_LABELS: Record<FeedbackStatus, string> = {
 export function isActiveStatus(status: FeedbackStatus): boolean {
   return status === 'reviewing' || status === 'planned' || status === 'in_progress';
 }
-
-/** "Oct 25, 2026". */
-export function feedbackDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}

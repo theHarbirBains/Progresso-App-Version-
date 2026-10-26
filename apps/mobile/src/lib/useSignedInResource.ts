@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 
 export interface SignedInResource<T> {
   data: T;
@@ -24,10 +31,10 @@ export interface SignedInResource<T> {
  * refetchable on demand.
  *
  * `fetcher`/`emptyValue`/`errorFallback` are expected to be stable across
- * renders -- a module-level query function, a literal/constant -- so
- * they're deliberately left out of the dependency arrays below, the same
- * way every provider this replaces already only ever depended on its own
- * auth key.
+ * renders -- a module-level query function, a literal/constant -- and are
+ * read through a ref, so a fetch only ever runs again when the auth key
+ * changes, the same way every provider this replaces only ever depended on
+ * its own auth key.
  */
 export function useSignedInResource<TKey extends string, TData>(
   key: TKey | undefined,
@@ -38,15 +45,17 @@ export function useSignedInResource<TKey extends string, TData>(
   const [data, setData] = useState<TData>(emptyValue);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const inputs = useRef({ fetcher, emptyValue, errorFallback });
+  inputs.current = { fetcher, emptyValue, errorFallback };
 
   const load = useCallback(async (): Promise<boolean> => {
     if (!key) return false;
     setError(null);
     try {
-      setData(await fetcher(key));
+      setData(await inputs.current.fetcher(key));
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : errorFallback);
+      setError(err instanceof Error ? err.message : inputs.current.errorFallback);
       return false;
     } finally {
       setLoading(false);
@@ -55,7 +64,7 @@ export function useSignedInResource<TKey extends string, TData>(
 
   useEffect(() => {
     if (!key) {
-      setData(emptyValue);
+      setData(inputs.current.emptyValue);
       setError(null);
       setLoading(true);
       return;

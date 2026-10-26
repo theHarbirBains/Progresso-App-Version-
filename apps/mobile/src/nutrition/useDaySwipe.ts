@@ -54,8 +54,6 @@ interface Options {
  * - `rowSwipeZone`: for a part of the page whose rows swipe for themselves (Today's Foods' swipe to
  *   delete) -- a drag that starts there is left to them, never taken for a turn of the day.
  */
-export type DaySwipe = ReturnType<typeof useDaySwipe>;
-
 export function useDaySwipe({ day, onDay, width, reduceMotion }: Options) {
   const slide = useRef(new Animated.Value(0)).current;
   const [swiping, setSwiping] = useState(false);

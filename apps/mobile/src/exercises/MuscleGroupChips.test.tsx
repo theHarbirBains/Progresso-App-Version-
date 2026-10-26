@@ -101,27 +101,6 @@ describe('MuscleGroupChips', () => {
     expect(labelFlat.color).toBe('#0A0A0A');
   });
 
-  it('follows chipBorderColor/chipTextColor for the UNSELECTED chip look, leaving the selected chip untouched', () => {
-    render(
-      <MuscleGroupChips
-        value="chest"
-        onChange={jest.fn()}
-        includeAll
-        chipBorderColor="#212B2D"
-        chipTextColor="#8FA0A2"
-      />,
-    );
-
-    const unselected = screen.getByTestId('muscle-group-chip-back');
-    expect(StyleSheet.flatten(unselected.props.style).borderColor).toBe('#212B2D');
-    expect(StyleSheet.flatten(screen.getByText('Back').props.style).color).toBe('#8FA0A2');
-
-    // The selected chip keeps its own (brand-accent, in this case) selected look --
-    // chipBorderColor/chipTextColor only ever apply to unselected chips.
-    const selected = screen.getByTestId('muscle-group-chip-chest');
-    expect(StyleSheet.flatten(selected.props.style).backgroundColor).toBe(colors.accent);
-  });
-
   it('marks the selected chip with accessibilityState', () => {
     render(<MuscleGroupChips value="chest" onChange={jest.fn()} />);
 

@@ -20,7 +20,7 @@ interface Props {
 // the white P (and its soft shadow) centred on them. Full-bleed on purpose: the logo is centred
 // in the entire screen, not the safe area -- a splash has nothing pinned near an edge, so
 // there's no hardcoded offset to replace with useSafeAreaInsets here (unlike every real
-// screen's ScreenContainer).
+// screen's Screen).
 //
 // The wood is there from the first frame (it takes over from the native splash, which is the
 // wood's own colour with the same P); only the P eases in, growing slightly. Under Reduce Motion

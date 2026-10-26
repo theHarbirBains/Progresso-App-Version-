@@ -30,7 +30,7 @@ import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
+import { computeNextWorkout, musclesLabel, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import { fetchActiveWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
 import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
@@ -43,7 +43,6 @@ import { endClosedWorkoutActivities } from '../widgets/workoutActivity';
 import { recallLiveWorkout, rememberLiveWorkout } from '../feed/liveWorkoutMemory';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
-import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
@@ -55,10 +54,6 @@ type Props = RootStackScreenProps<'Feed'>;
 /** "6:42 PM": when a live workout started, today. */
 function startedTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-}
-
-function musclesLabel(day: NextWorkoutPlan['day']): string {
-  return day.muscleGroups.map((g) => SPLIT_MUSCLE_GROUP_LABELS[g]).join(' • ');
 }
 
 // A normalized shape both "You" (feedQueries.ts, self-only) and "Friends"

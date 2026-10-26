@@ -18,8 +18,8 @@ import { computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 // Pure data assembly for the workout share card. Every value here comes from
 // an existing query/definition (workoutQueries.ts, prQueries.ts,
 // muscleGroups.ts) -- the same top-set (heaviest weightKg) and PR
-// (source_set_id match) definitions already used by WorkoutDetailScreen and
-// the Dashboard's recentWorkoutInfo.ts. No new PR logic, no estimated 1RM,
+// (source_set_id match) definitions already used by WorkoutDetailScreen
+// (workouts/topSetSummary.ts). No new PR logic, no estimated 1RM,
 // no invented metrics. Rendering (ShareWorkoutScreen.tsx) and native
 // capture/share are deliberately kept out of this file.
 

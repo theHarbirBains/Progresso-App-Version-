@@ -7,12 +7,13 @@ import { SkeletonRows } from '../design/Skeleton';
 import { Text } from '../design/Text';
 import { sentFromText } from '../feedback/deviceInfo';
 import { FeedbackStatusBadge } from '../feedback/FeedbackStatusBadge';
-import { CATEGORY_LABELS, feedbackDate } from '../feedback/feedbackLabels';
+import { CATEGORY_LABELS } from '../feedback/feedbackLabels';
 import { fetchMyFeedbackDetail, type MyFeedbackDetail } from '../feedback/feedbackQueries';
 import { feedbackStyles as styles } from '../feedback/feedbackStyles';
 import { StatusHistory } from '../feedback/StatusHistory';
 import type { RootStackScreenProps } from '../navigation/types';
 import { settingsStyles } from '../settings/settingsStyles';
+import { formatShortDate } from '../workouts/workoutFormat';
 
 type Props = RootStackScreenProps<'FeedbackDetail'>;
 
@@ -72,7 +73,7 @@ export function FeedbackDetailScreen({ navigation, route }: Props) {
               <View style={styles.headText}>
                 <Text style={styles.title}>{submission.title}</Text>
                 <Text style={styles.meta}>
-                  {CATEGORY_LABELS[submission.category]} · {feedbackDate(submission.createdAt)}
+                  {CATEGORY_LABELS[submission.category]} · {formatShortDate(submission.createdAt)}
                 </Text>
               </View>
               <FeedbackStatusBadge testID="feedback-detail-status" status={submission.status} />

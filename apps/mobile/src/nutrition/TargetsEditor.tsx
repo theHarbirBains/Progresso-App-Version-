@@ -24,10 +24,6 @@ const GLYPHS = {
   fat: 'water-outline',
 } as const satisfies Record<string, keyof typeof MaterialCommunityIcons.glyphMap>;
 
-function cal(value: number): string {
-  return wholeFigureText(value);
-}
-
 function shareOf(macroCalories: number, calories: number | null): number | null {
   return calories !== null && calories > 0 ? macroCalories / calories : null;
 }
@@ -113,7 +109,7 @@ export function MacroTargets({
       kcal: KCAL_PER_GRAM.carbs,
       rule:
         carbs?.kind === 'carbs'
-          ? `${cal(carbs.remainingCalories)} cal left ÷ 4 = ${carbs.carbsG} g`
+          ? `${wholeFigureText(carbs.remainingCalories)} cal left ÷ 4 = ${carbs.carbsG} g`
           : carbs?.kind === 'conflict'
             ? 'No calories left after protein and fat'
             : 'The calories left after protein and fat',
@@ -175,7 +171,7 @@ export function MacroTargets({
               <Text testID={`${testIDPrefix}-${row.key}-source`} style={styles.caption}>
                 {[
                   grams === null ? 'No target' : typed ? 'Yours' : 'Recommended',
-                  grams !== null ? `${cal(grams * row.kcal)} cal` : null,
+                  grams !== null ? `${wholeFigureText(grams * row.kcal)} cal` : null,
                   share !== null ? `${Math.round(share * 100)}%` : null,
                 ]
                   .filter(Boolean)
@@ -196,16 +192,17 @@ export function MacroTargets({
 
       {carbs?.kind === 'conflict' ? (
         <Text testID={`${testIDPrefix}-conflict`} style={styles.conflict}>
-          Protein and fat come to {cal(carbs.proteinFatCalories)} cal, {cal(carbs.overBy)} more than
-          your {cal(values.calories ?? 0)} cal, so no carbs are recommended. Lower protein or fat,
-          or raise calories, if that isn&apos;t what you meant.
+          Protein and fat come to {wholeFigureText(carbs.proteinFatCalories)} cal,{' '}
+          {wholeFigureText(carbs.overBy)} more than your {wholeFigureText(values.calories ?? 0)}{' '}
+          cal, so no carbs are recommended. Lower protein or fat, or raise calories, if that
+          isn&apos;t what you meant.
         </Text>
       ) : null}
       {total ? (
         <Text testID={`${testIDPrefix}-total`} style={styles.total}>
           {total.matches
-            ? `Your macros come to ${cal(total.total)} cal, matching your calorie target.`
-            : `Your macros come to ${cal(total.total)} cal, ${cal(Math.abs(total.difference))} ${total.difference > 0 ? 'over' : 'under'} your ${cal(values.calories ?? 0)} cal target.`}
+            ? `Your macros come to ${wholeFigureText(total.total)} cal, matching your calorie target.`
+            : `Your macros come to ${wholeFigureText(total.total)} cal, ${wholeFigureText(Math.abs(total.difference))} ${total.difference > 0 ? 'over' : 'under'} your ${wholeFigureText(values.calories ?? 0)} cal target.`}
         </Text>
       ) : null}
     </View>

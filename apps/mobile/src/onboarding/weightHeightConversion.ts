@@ -6,6 +6,12 @@ const CM_PER_INCH = 2.54;
 // one place that constant/formula lives; these are just its lb-specific
 // callers, kept for this file's own onboarding-specific callers (wheel
 // picker ranges, feet/inches math) that only ever work in one direction.
+/** A body weight to show, to a tenth: "78.5 kg", "173.1 lb". */
+export function formatBodyWeight(weightKg: number, unit: 'kg' | 'lb'): string {
+  const value = unit === 'kg' ? weightKg : kgToLb(weightKg);
+  return `${Math.round(value * 10) / 10} ${unit}`;
+}
+
 export function kgToLb(kg: number): number {
   return fromKg(kg, 'lb');
 }

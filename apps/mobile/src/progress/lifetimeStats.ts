@@ -1,12 +1,13 @@
 import type { ExerciseHistoryGroup } from '../workouts/exerciseHistoryGrouping';
+import { computeDurationMinutes } from '../workouts/topSetSummary';
 import { setVolumeKg } from '../workouts/workoutSummary';
 import type { WorkoutSummary } from '../workouts/workoutQueries';
 
 // Pure aggregation over already-fetched, real workout history -- no query of
 // its own, mirroring the same pattern as exerciseProgress.ts/
 // muscleGroupProgress.ts. Duration is workouts.completed_at minus
-// performed_at, the same formula workoutHistoryEnrichment.ts/
-// recentWorkoutInfo.ts/shareCardData.ts each already compute privately.
+// performed_at (topSetSummary's computeDurationMinutes), none for a workout
+// still going.
 
 export interface LifetimeStats {
   totalWorkouts: number;
@@ -19,20 +20,13 @@ export interface LifetimeStats {
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
-function computeDurationMinutes(performedAt: string, completedAt: string | null): number {
-  if (!completedAt) return 0;
-  const ms = new Date(completedAt).getTime() - new Date(performedAt).getTime();
-  if (!Number.isFinite(ms) || ms <= 0) return 0;
-  return Math.round(ms / 60000);
-}
-
 export function computeLifetimeStats(
   workouts: WorkoutSummary[],
   now: Date = new Date(),
 ): LifetimeStats {
   const totalWorkouts = workouts.length;
   const totalMinutes = workouts.reduce(
-    (sum, w) => sum + computeDurationMinutes(w.performedAt, w.completedAt),
+    (sum, w) => sum + (computeDurationMinutes(w.performedAt, w.completedAt) ?? 0),
     0,
   );
   const firstWorkoutAt = workouts[0]?.performedAt ?? null;

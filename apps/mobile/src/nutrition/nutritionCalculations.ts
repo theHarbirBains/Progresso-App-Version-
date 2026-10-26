@@ -26,8 +26,8 @@ export interface RemainingTotals {
   fatG: number | null;
 }
 
-/** Rounds to 2 decimal places, matching the numeric(_, 2) columns this feeds into. */
-function round2(value: number): number {
+/** Rounds to the 2 decimal places food_logs and foods store. */
+export function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 

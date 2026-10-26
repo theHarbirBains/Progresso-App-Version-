@@ -16,6 +16,7 @@ import { UsdaNutritionSource } from './sources/usda.source';
 import {
   buildInterpretation,
   requestsFromParsed,
+  roundTo,
   statusFromOutcome,
   type ComponentPick,
   type ComponentRequest,
@@ -24,11 +25,6 @@ import {
 } from './interpretation';
 
 /** Rounds to a fixed number of decimal places, for figures shown to the user. */
-function roundTo(value: number, decimals: number): number {
-  const factor = 10 ** decimals;
-  return Math.round(value * factor) / factor;
-}
-
 export interface FoodRecord {
   id: string;
   name: string;

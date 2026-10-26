@@ -1,7 +1,7 @@
 import type { EnteredAmount } from './foodLogQueries';
 import type { FoodProvenance, FoodRow } from './foodQueries';
 import { amountText, servingMeasures } from './logQuantity';
-import { calculateLogTotals, type NutritionTotals } from './nutritionCalculations';
+import { calculateLogTotals, round2, type NutritionTotals } from './nutritionCalculations';
 
 // Saved meals and recipes are both a list of foods, each with an amount. A saved meal is
 // logged as each of its foods; a recipe is one food whose figures per serving are its
@@ -14,11 +14,6 @@ export interface FoodGroupItem {
   quantity: number;
   /** The amount as typed ("150" g), when it was kept. */
   entered: EnteredAmount | null;
-}
-
-/** Rounds to 2 decimal places, matching the numeric(_, 2) columns this feeds into. */
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 /** An item's amount as typed, or in servings: "150 g", "2 cookies", "1.5 servings". */

@@ -27,7 +27,7 @@ import { formatMonthDayYear, toDateStringUTC } from '../onboarding/dateWheelValu
 import { HeightWheelPicker } from '../onboarding/HeightWheelPicker';
 import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
 import { WeightWheelPicker } from '../onboarding/WeightWheelPicker';
-import { feetAndInchesFromCm, kgToLb } from '../onboarding/weightHeightConversion';
+import { feetAndInchesFromCm, formatBodyWeight } from '../onboarding/weightHeightConversion';
 import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { calorieEstimationStyles as styles } from './calorieEstimationStyles';
@@ -52,11 +52,6 @@ function formatHeight(heightCm: number, unit: HeightUnit): string {
   if (unit === 'cm') return `${Math.round(heightCm)} cm`;
   const { feet, inches } = feetAndInchesFromCm(heightCm);
   return `${feet}' ${inches}"`;
-}
-
-function formatWeight(weightKg: number, unit: 'kg' | 'lb'): string {
-  const value = unit === 'kg' ? weightKg : kgToLb(weightKg);
-  return `${Math.round(value * 10) / 10} ${unit}`;
 }
 
 const SEXES = [
@@ -348,7 +343,7 @@ export function CalorieEstimationScreen({ navigation }: Props) {
                   <MeasureContent
                     icon="scale-bathroom"
                     label="Weight"
-                    value={formatWeight(weightKg, weightUnit)}
+                    value={formatBodyWeight(weightKg, weightUnit)}
                     valueTestID="calorie-estimation-weight-value"
                     accentColor={theme.accent}
                     accentBg={theme.accentBg}

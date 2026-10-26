@@ -80,10 +80,6 @@ export const SIGNED_OUT_STEPS: StepsWidgetProps = { signedIn: false, caption: ''
 
 const NOTHING_EATEN: NutritionTotals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
 
-function whole(value: number): string {
-  return wholeFigureText(value);
-}
-
 /** How far along, 0-1, as a prop: `{ progress }`, or nothing at all without a target. */
 function share(eaten: number, target: number | null): { progress?: number } {
   if (target === null || target <= 0) return {};
@@ -93,7 +89,10 @@ function share(eaten: number, target: number | null): { progress?: number } {
 function macro(label: string, eaten: number, target: number | null): WidgetMacro {
   return {
     label,
-    amount: target === null ? `${whole(eaten)} g` : `${whole(eaten)} / ${whole(target)} g`,
+    amount:
+      target === null
+        ? `${wholeFigureText(eaten)} g`
+        : `${wholeFigureText(eaten)} / ${wholeFigureText(target)} g`,
     ...share(eaten, target),
   };
 }
@@ -106,7 +105,7 @@ export function nutritionWidgetProps(
   const left = targets.calories === null ? null : targets.calories - eaten.calories;
   return {
     signedIn: true,
-    calories: whole(left === null ? eaten.calories : Math.abs(left)),
+    calories: wholeFigureText(left === null ? eaten.calories : Math.abs(left)),
     caption: left === null ? 'cal eaten' : wholeFigure(left) < 0 ? 'cal over' : 'cal left',
     ...share(eaten.calories, targets.calories),
     macros: [
@@ -147,7 +146,7 @@ export function stepsTimeline(
   const today: StepsWidgetProps =
     steps === null
       ? { signedIn: true, caption: 'Connect Apple Health in Progresso' }
-      : { signedIn: true, steps: whole(steps), caption: `As of ${clockTime(now)}` };
+      : { signedIn: true, steps: wholeFigureText(steps), caption: `As of ${clockTime(now)}` };
   return [
     { date: now, props: today },
     { date: nextMidnight(now), props: { signedIn: true, caption: 'Open Progresso to update' } },

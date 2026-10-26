@@ -507,10 +507,17 @@ describe('ProgressOverviewScreen -- Weekly Summary', () => {
     // From four weeks before last Monday, to next Monday.
     const [, since, until] = mockFetchSummaryTraining.mock.calls[0]!;
     expect(Math.round(((until as Date).getTime() - (since as Date).getTime()) / 86400000)).toBe(42);
+    // Both weeks' food -- from last Monday, up to the end of today at the latest, since food
+    // planned for a day ahead isn't eaten yet (so on a Monday, just last week and today).
     const [, foodSince, foodUntil] = mockFetchFoodLogsForRange.mock.calls[0]!;
-    expect(
-      Math.round(((foodUntil as Date).getTime() - (foodSince as Date).getTime()) / 86400000),
-    ).toBe(14);
+    expect(Math.round(((until as Date).getTime() - (foodSince as Date).getTime()) / 86400000)).toBe(
+      14,
+    );
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    expect((foodUntil as Date).getTime()).toBe(
+      Math.min(tomorrow.getTime(), (until as Date).getTime()),
+    );
   });
 
   it('shows the week even before any weighted lift is logged', async () => {

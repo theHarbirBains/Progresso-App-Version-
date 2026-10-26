@@ -20,7 +20,6 @@ import {
   FEEDBACK_CATEGORIES,
   FEEDBACK_STATUSES,
   STATUS_LABELS,
-  feedbackDate,
   type FeedbackCategory,
   type FeedbackStatus,
 } from '../feedback/feedbackLabels';
@@ -30,6 +29,7 @@ import { fetchFeedbackInbox, type FeedbackInbox } from '../lib/feedbackApi';
 import type { RootStackScreenProps } from '../navigation/types';
 import { settingsStyles } from '../settings/settingsStyles';
 import { useAppTheme } from '../theme/appThemeContext';
+import { formatShortDate } from '../workouts/workoutFormat';
 
 type Props = RootStackScreenProps<'AdminFeedbackInbox'>;
 
@@ -178,7 +178,7 @@ export function AdminFeedbackInboxScreen({ navigation }: Props) {
                 key={item.id}
                 testID={`admin-feedback-item-${item.id}`}
                 title={item.title}
-                subtitle={`${CATEGORY_SHORT_LABELS[item.category]} · ${senderName(item.sender)} · ${feedbackDate(item.createdAt)}`}
+                subtitle={`${CATEGORY_SHORT_LABELS[item.category]} · ${senderName(item.sender)} · ${formatShortDate(item.createdAt)}`}
                 trailing={<FeedbackStatusBadge status={item.status} />}
                 divider={index > 0}
                 onPress={() => navigation.navigate('AdminFeedbackReview', { id: item.id })}

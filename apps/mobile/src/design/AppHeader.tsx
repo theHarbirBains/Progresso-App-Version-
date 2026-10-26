@@ -30,7 +30,7 @@ interface Props {
   rightAction2?: HeaderAction;
   /** Replaces `rightAction` with a spinner -- e.g. a header-level save in progress. */
   loading?: boolean;
-  /** Default true: pads for the device's top safe area, matching ScreenContainer's own inset handling. */
+  /** Default true: pads for the device's top safe area, matching Screen's own inset handling. */
   safeArea?: boolean;
   /** Something other than text in the title's place (e.g. Feed's workspace switcher); replaces title/subtitle when given. */
   titleContent?: ReactNode;

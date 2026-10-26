@@ -1,3 +1,5 @@
+import { dayKey } from '../lib/dayKey';
+
 // Pure date-grid/local-date-key helpers behind MonthCalendar -- no supabase
 // import, fully unit-testable without mocking anything. Shared by Workout
 // History and Nutrition History; nothing here is domain-specific.
@@ -9,14 +11,8 @@ export interface CalendarDay {
   inCurrentMonth: boolean;
 }
 
-function pad(n: number): string {
-  return String(n).padStart(2, '0');
-}
-
 /** "YYYY-MM-DD" in the device's own local time, matching how the calendar's own grid is built -- never toISOString(), which is UTC. */
-export function toLocalDateKey(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
+export const toLocalDateKey = dayKey;
 
 export function isoToLocalDateKey(iso: string): string {
   return toLocalDateKey(new Date(iso));

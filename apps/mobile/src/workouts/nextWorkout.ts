@@ -1,3 +1,4 @@
+import { SPLIT_MUSCLE_GROUP_LABELS } from './splitMuscleGroups';
 import type { WorkoutSplitDay, WorkoutSplitDetail } from './workoutSplitQueries';
 
 // Pure derivation, no data fetching -- deterministic given the active
@@ -47,4 +48,9 @@ export function computeNextWorkout(
     day: ordered[nextIndex],
     previousDayName: ordered[lastIndex].name,
   };
+}
+
+/** A split day's muscles as one line: "Chest • Shoulders • Triceps". */
+export function musclesLabel(day: { muscleGroups: WorkoutSplitDay['muscleGroups'] }): string {
+  return day.muscleGroups.map((g) => SPLIT_MUSCLE_GROUP_LABELS[g]).join(' • ');
 }

@@ -37,10 +37,6 @@ interface Props {
   onSetTarget: () => void;
 }
 
-function calories(value: number): string {
-  return wholeFigureText(value);
-}
-
 /**
  * Nutrition's week widget, on every day: the week's calorie budget -- 7 times the daily target,
  * Sunday to Saturday -- against what's been logged from its Sunday through the day shown, as a bar
@@ -64,8 +60,8 @@ export function WeeklyCalorieBudget({
   const days = `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} to go, ${today ? 'today' : 'this day'} included`;
   const remainingText = summary
     ? summary.remaining >= 0
-      ? `${calories(summary.remaining)} cal left · ${days}`
-      : `${calories(-summary.remaining)} cal over ${today ? "this week's" : "the week's"} budget`
+      ? `${wholeFigureText(summary.remaining)} cal left · ${days}`
+      : `${wholeFigureText(-summary.remaining)} cal over ${today ? "this week's" : "the week's"} budget`
     : null;
   // The week so far, read for the goal: its days up to the day shown, that day included.
   const goalNote =
@@ -98,7 +94,7 @@ export function WeeklyCalorieBudget({
             accessibilityLabel={
               summary
                 ? [
-                    `${title}, ${calories(summary.consumed)} of ${calories(summary.target)} calories.`,
+                    `${title}, ${wholeFigureText(summary.consumed)} of ${wholeFigureText(summary.target)} calories.`,
                     remainingText,
                     goalLabel,
                     goalNote,
@@ -110,10 +106,10 @@ export function WeeklyCalorieBudget({
           >
             <View style={styles.figures}>
               <Text testID="weekly-budget-consumed" style={styles.value}>
-                {summary ? calories(summary.consumed) : '—'}
+                {summary ? wholeFigureText(summary.consumed) : '—'}
               </Text>
               <Text testID="weekly-budget-target" style={styles.target}>
-                / {calories(dailyTarget * 7)} cal
+                / {wholeFigureText(dailyTarget * 7)} cal
               </Text>
             </View>
             <View style={styles.track}>

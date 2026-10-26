@@ -1,15 +1,6 @@
-import { resizeForUpload } from './imageResize';
-import { supabase } from './supabase';
+import { publicPhotoUrl, uploadPhoto, uniquePhotoPath } from './photoUpload';
 
 const EQUIPMENT_PHOTO_BUCKET = 'equipment-photos';
-
-function equipmentPhotoPath(userId: string): string {
-  // Unlike the one-file-per-user avatar path, a user can have many machine
-  // photos (one per equipment profile they create), so each upload gets its
-  // own unique filename rather than upserting a fixed path.
-  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  return `${userId}/${unique}.jpg`;
-}
 
 /**
  * Uploads a locally-picked machine/equipment photo (a file:// URI from
@@ -20,16 +11,8 @@ function equipmentPhotoPath(userId: string): string {
  * user's folder.
  */
 export async function uploadEquipmentPhoto(userId: string, localUri: string): Promise<string> {
-  const response = await fetch(await resizeForUpload(localUri));
-  const blob = await response.blob();
-
-  const path = equipmentPhotoPath(userId);
-  const { error: uploadError } = await supabase.storage
-    .from(EQUIPMENT_PHOTO_BUCKET)
-    .upload(path, blob, { contentType: 'image/jpeg' });
-
-  if (uploadError) throw new Error(uploadError.message);
-
-  const { data } = supabase.storage.from(EQUIPMENT_PHOTO_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  // Many to a person -- one per machine -- so each upload gets its own unguessable file.
+  const path = uniquePhotoPath(userId);
+  await uploadPhoto(EQUIPMENT_PHOTO_BUCKET, path, localUri);
+  return publicPhotoUrl(EQUIPMENT_PHOTO_BUCKET, path);
 }

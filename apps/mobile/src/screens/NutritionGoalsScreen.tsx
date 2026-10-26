@@ -28,7 +28,7 @@ import {
   type TargetDraft,
 } from '../nutrition/targetMath';
 import { CalorieTargetField, MacroTargets } from '../nutrition/TargetsEditor';
-import { feetAndInchesFromCm, kgToLb } from '../onboarding/weightHeightConversion';
+import { feetAndInchesFromCm, formatBodyWeight } from '../onboarding/weightHeightConversion';
 import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { nutritionGoalsStyles as styles } from './nutritionGoalsStyles';
@@ -48,11 +48,6 @@ function formatHeight(heightCm: number, unit: 'cm' | 'ft_in'): string {
   if (unit === 'cm') return `${Math.round(heightCm)} cm`;
   const { feet, inches } = feetAndInchesFromCm(heightCm);
   return `${feet}' ${inches}"`;
-}
-
-function formatWeight(weightKg: number, unit: 'kg' | 'lb'): string {
-  const value = unit === 'kg' ? weightKg : kgToLb(weightKg);
-  return `${Math.round(value * 10) / 10} ${unit}`;
 }
 
 // The four estimates, from the most loss to gain, as a 2 x 2 grid of tiles.
@@ -204,7 +199,7 @@ export function NutritionGoalsScreen({ navigation }: Props) {
     },
     {
       label: 'Weight',
-      value: weightKg !== null ? formatWeight(weightKg, profile?.weightUnit ?? 'lb') : null,
+      value: weightKg !== null ? formatBodyWeight(weightKg, profile?.weightUnit ?? 'lb') : null,
     },
   ];
   const anyDetails = details.some((detail) => detail.value !== null);

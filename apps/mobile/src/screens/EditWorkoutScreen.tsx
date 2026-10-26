@@ -22,7 +22,12 @@ import {
   type MeasurementType,
   type MovementType,
 } from '../exercises/movementTypes';
-import { draftFromSet, draftValues, isValidDraft } from '../workouts/setInputDrafts';
+import {
+  draftFromSet,
+  draftValues,
+  groupUnilateralSets,
+  isValidDraft,
+} from '../workouts/setInputDrafts';
 import { PER_SIDE_NOTE, SetColumnHeader } from '../workouts/SetColumnHeader';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
@@ -79,31 +84,6 @@ interface DraftExercise {
   /** What the exercise is logged as: weight and reps, reps only, or a time. */
   measurementType: MeasurementType;
   sets: DraftSet[];
-}
-
-function isValidSet(set: DraftSet, type: MeasurementType): boolean {
-  return isValidDraft(set, type);
-}
-
-/** Pairs a unilateral exercise's flat sets into one row per logical set (left
- * + right sharing a setIndex) -- only pairs where both sides are present
- * render, same convention LogPastWorkoutScreen/ActiveWorkoutScreen use. */
-function groupUnilateralSets(
-  sets: DraftSet[],
-): { setIndex: number; left: DraftSet; right: DraftSet }[] {
-  const bySetIndex = new Map<number, { left?: DraftSet; right?: DraftSet }>();
-  for (const set of sets) {
-    if (set.side !== 'left' && set.side !== 'right') continue;
-    const entry = bySetIndex.get(set.setIndex) ?? {};
-    entry[set.side] = set;
-    bySetIndex.set(set.setIndex, entry);
-  }
-  const rows: { setIndex: number; left: DraftSet; right: DraftSet }[] = [];
-  for (const [setIndex, { left, right }] of bySetIndex) {
-    if (!left || !right) continue;
-    rows.push({ setIndex, left, right });
-  }
-  return rows.sort((a, b) => a.setIndex - b.setIndex);
 }
 
 function dateKeyToLocalDate(dateKey: string): Date {
@@ -421,7 +401,7 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
 
       for (const exercise of exercises) {
         const type = exercise.measurementType;
-        const valid = exercise.sets.filter((set) => isValidSet(set, type));
+        const valid = exercise.sets.filter((set) => isValidDraft(set, type));
         const validSets =
           exercise.movementType === 'unilateral'
             ? groupUnilateralSets(valid).flatMap((p) => [p.left, p.right])

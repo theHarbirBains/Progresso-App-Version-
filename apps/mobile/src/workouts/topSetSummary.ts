@@ -1,22 +1,13 @@
 import type { OneRepMax, RepPR } from './prQueries';
 import type { CompletedSetRecord } from './workoutQueries';
 
-// The single authoritative place for three small pieces of logic that were
-// previously copy-pasted, verbatim, between dashboard/recentWorkoutInfo.ts
-// and sharing/shareCardData.ts: which set was heaviest, how long a workout
-// took, and whether a given set is CURRENTLY a live PR/1RM. No new PR
+// The single authoritative place for two small pieces of logic shared by the
+// workout pages, history and the share card: how long a workout took, and
+// whether a given set is CURRENTLY a live PR/1RM. No new PR
 // definition -- resolveTopSetPrLabel is the exact same
 // read-back-and-compare-source_set_id pattern used everywhere else a set's
 // PR status is checked (see prQueries.ts's own comment on why that's the
 // only way a PR is ever determined).
-
-/** The heaviest set among already-completed sets, or null if there are none. */
-export function heaviestSet(sets: CompletedSetRecord[]): CompletedSetRecord | null {
-  return sets.reduce<CompletedSetRecord | null>(
-    (max, s) => (!max || s.weightKg > max.weightKg ? s : max),
-    null,
-  );
-}
 
 /** Minutes between performed_at and completed_at, or null while still in progress (or if the timestamps are somehow non-positive/invalid). */
 export function computeDurationMinutes(

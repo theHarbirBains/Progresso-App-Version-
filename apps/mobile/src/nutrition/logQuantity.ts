@@ -7,6 +7,8 @@
 // cookies is 2/3 of a serving. A log keeps the amount as typed too
 // (food_logs.entered_amount/entered_unit), so it's shown and edited that way afterwards.
 
+import { round2 } from './nutritionCalculations';
+
 /** What the log step's amount is typed in. */
 export type QuantityUnit = 'servings' | 'pieces' | 'g' | 'oz' | 'ml';
 
@@ -156,11 +158,6 @@ export function servingPieces(label: string | null | undefined): ServingPieces |
   const text = label?.trim().toLowerCase();
   if (!text) return null;
   return piecesFrom(text.match(LEADING_PIECES)) ?? piecesFrom(text.match(BRACKETED_PIECES));
-}
-
-/** Rounds to the 2 decimal places food_logs.quantity stores. */
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 /** The servings an amount typed in `unit` comes to, rounded the way a log stores them. */

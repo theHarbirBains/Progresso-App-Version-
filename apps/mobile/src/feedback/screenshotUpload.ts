@@ -1,14 +1,8 @@
-import * as ImageManipulator from 'expo-image-manipulator';
-import { resizeForUpload } from '../lib/imageResize';
+import { uniquePhotoPath, uploadPhoto } from '../lib/photoUpload';
 import { supabase } from '../lib/supabase';
 
 /** Private: read through signed links only (20261026100000_feedback_board.sql). */
 export const FEEDBACK_SCREENSHOT_BUCKET = 'feedback-screenshots';
-
-function screenshotPath(userId: string): string {
-  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  return `${userId}/${unique}.jpg`;
-}
 
 /**
  * Uploads a picked screenshot (a file:// URI from expo-image-picker) into the sender's own folder
@@ -17,17 +11,8 @@ function screenshotPath(userId: string): string {
  * from the library can be HEIC.
  */
 export async function uploadFeedbackScreenshot(userId: string, localUri: string): Promise<string> {
-  const resized = await resizeForUpload(localUri);
-  const jpeg = await ImageManipulator.manipulateAsync(resized, [], {
-    compress: 0.85,
-    format: ImageManipulator.SaveFormat.JPEG,
-  });
-  const blob = await (await fetch(jpeg.uri)).blob();
-  const path = screenshotPath(userId);
-  const { error } = await supabase.storage
-    .from(FEEDBACK_SCREENSHOT_BUCKET)
-    .upload(path, blob, { contentType: 'image/jpeg' });
-  if (error) throw new Error(error.message);
+  const path = uniquePhotoPath(userId);
+  await uploadPhoto(FEEDBACK_SCREENSHOT_BUCKET, path, localUri, { asJpeg: true });
   return path;
 }
 

@@ -20,8 +20,7 @@ import { Skeleton, SkeletonRows } from '../design/Skeleton';
 import { recallShown, rememberShown } from '../lib/lastShown';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { computeNextWorkout, type NextWorkoutPlan } from '../workouts/nextWorkout';
-import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
+import { computeNextWorkout, musclesLabel, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import { UnfinishedWorkoutSheet } from '../workouts/UnfinishedWorkoutSheet';
 import {
   assessUnfinishedWorkout,
@@ -62,10 +61,6 @@ function formatIdleMinutes(minutes: number): string {
 
 type Props = RootStackScreenProps<'WorkoutHistory'>;
 
-function musclesLabel(day: NextWorkoutPlan['day']): string {
-  return day.muscleGroups.map((g) => SPLIT_MUSCLE_GROUP_LABELS[g]).join(' • ');
-}
-
 export interface WorkoutRowProps {
   workout: EnrichedWorkoutSummary;
   /** A hairline above the row -- every row but the first in a list. */
@@ -76,7 +71,7 @@ export interface WorkoutRowProps {
 // One completed workout as a row (sat inside a widget): the split day (or the workout's own
 // name), the muscles trained, and one muted line of date, duration and sets.
 export function WorkoutRow({ workout, divider, onPress }: WorkoutRowProps) {
-  const muscles = workout.muscleGroups.map((g) => SPLIT_MUSCLE_GROUP_LABELS[g]).join(' • ');
+  const muscles = musclesLabel(workout);
   return (
     <ListRow
       testID={`workout-item-${workout.id}`}

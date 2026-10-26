@@ -18,7 +18,6 @@ import {
   CATEGORY_LABELS,
   FEEDBACK_STATUSES,
   STATUS_LABELS,
-  feedbackDate,
   type FeedbackStatus,
 } from '../feedback/feedbackLabels';
 import { feedbackStyles as styles } from '../feedback/feedbackStyles';
@@ -33,6 +32,7 @@ import {
 import type { RootStackScreenProps } from '../navigation/types';
 import { settingsStyles } from '../settings/settingsStyles';
 import { useAppTheme } from '../theme/appThemeContext';
+import { formatShortDate } from '../workouts/workoutFormat';
 
 type Props = RootStackScreenProps<'AdminFeedbackReview'>;
 
@@ -141,7 +141,7 @@ export function AdminFeedbackReviewScreen({ navigation, route }: Props) {
                 <Text style={styles.title}>{review.title}</Text>
                 <Text style={styles.meta}>
                   {CATEGORY_LABELS[review.category]} · {senderName(review.sender)} ·{' '}
-                  {feedbackDate(review.createdAt)}
+                  {formatShortDate(review.createdAt)}
                 </Text>
               </View>
               <FeedbackStatusBadge testID="admin-feedback-review-status" status={review.status} />
@@ -185,7 +185,7 @@ export function AdminFeedbackReviewScreen({ navigation, route }: Props) {
               {review.notes.map((entry) => (
                 <View key={entry.id} testID={`admin-feedback-note-${entry.id}`}>
                   <Text style={styles.historyDate}>
-                    {entry.author?.displayName ?? 'An admin'} · {feedbackDate(entry.createdAt)}
+                    {entry.author?.displayName ?? 'An admin'} · {formatShortDate(entry.createdAt)}
                   </Text>
                   <Text style={styles.historyStatus}>{entry.body}</Text>
                 </View>
