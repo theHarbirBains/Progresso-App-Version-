@@ -17,6 +17,7 @@ import {
   font,
   foregroundStyle,
   frame,
+  layoutPriority,
   lineLimit,
   minimumScaleFactor,
   monospacedDigit,
@@ -54,8 +55,9 @@ import type {
 // Each widget fills its whole face (contentMarginsDisabled in app.json): the theme's photo, a
 // darkening of the app's fill over it (65% at the top to 88% at the bottom, so text and captions
 // keep AA contrast over even a white pixel of snow or sky), then the content inset by its own
-// padding. Where iOS draws
-// widgets tinted or clear, there's no photo -- the system draws their background.
+// padding -- a heading row along the top (the date on the left, the widget's name centred on a
+// wide one), and its body stretched to fill the rest, whatever size iPhone it's on. Where iOS
+// draws widgets tinted or clear, there's no photo -- the system draws their background.
 //
 // Loading this file does nothing but define the layouts: it's loaded after the app starts
 // (loadWidgets.ts), and Metro treats any failure while a file loads then as fatal, whatever
@@ -103,7 +105,7 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
       </Text>
     </HStack>
   ) : null;
-  const face = (content: ReactNode) => (
+  const face = (...content: ReactNode[]) => (
     <ZStack
       modifiers={[
         containerBackground(
@@ -126,7 +128,7 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
       ) : null}
       <VStack
         alignment="leading"
-        spacing={0}
+        spacing={8}
         modifiers={[
           padding({ all: 12 }),
           frame({ ...FULL, alignment: 'topLeading' }),
@@ -142,55 +144,67 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
       </VStack>
     </ZStack>
   );
-  const heading = (
+  // Wide: the date on the left, "Nutrition" centred across the top. Small: the date and the glyph.
+  const heading = wide ? (
+    <ZStack>
+      <HStack spacing={0}>
+        {day}
+        <Spacer />
+      </HStack>
+      <HStack spacing={5}>
+        <Image systemName="fork.knife" size={13} color={ACCENT} />
+        <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(INK)]}>
+          Nutrition
+        </Text>
+      </HStack>
+    </ZStack>
+  ) : (
     <HStack spacing={5}>
       {day}
       <Spacer />
       <Image systemName="fork.knife" size={13} color={ACCENT} />
-      {wide ? (
-        <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(INK)]}>
-          Nutrition
-        </Text>
-      ) : null}
     </HStack>
   );
   if (!props.signedIn) {
     return face(
-      <VStack alignment="leading" spacing={8}>
-        {heading}
-        <Spacer />
-        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(INK)]}>
-          {props.signedIn === false
-            ? 'Sign in to Progresso to see today.'
-            : 'Open Progresso to see today.'}
-        </Text>
-      </VStack>,
+      heading,
+      <Spacer />,
+      <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(INK)]}>
+        {props.signedIn === false
+          ? 'Sign in to Progresso to see today.'
+          : 'Open Progresso to see today.'}
+      </Text>,
     );
   }
-  // Calories as a ring: the day's target all the way round, filled in the accent as it's eaten.
-  const SIZE = wide ? 92 : 90;
+  // Calories as a ring as tall as the space below the heading: the day's target all the way
+  // round as a faint track, the share eaten filled in the accent from the top, clockwise. The
+  // share is drawn as a sweep of the accent (one colour per 5 degrees, then clear), so it's right
+  // at any size.
   const LINE = 7;
-  const around = Math.PI * (SIZE - LINE);
+  const SWEEP = 72;
   const eaten =
     typeof props.progress === 'number' ? Math.min(1, Math.max(0, props.progress)) : null;
+  const lit = eaten === null ? 0 : Math.round(eaten * SWEEP);
+  const sweep: string[] = [];
+  for (let i = 0; i < SWEEP; i += 1) sweep.push(i < lit ? ACCENT : CLEAR);
   const ring = (
-    <ZStack modifiers={[frame({ width: SIZE, height: SIZE })]}>
+    <ZStack modifiers={[aspectRatio({ ratio: 1, contentMode: 'fit' }), layoutPriority(1)]}>
       <Circle
         modifiers={[
           foregroundStyle(`${FILL}8C`),
           strokeBorder({ content: `${ACCENT}38`, style: { lineWidth: LINE }, shape: 'circle' }),
         ]}
       />
-      {eaten === null || eaten <= 0.002 ? null : (
+      {lit === 0 ? null : (
         <Circle
           modifiers={[
             foregroundStyle(CLEAR),
             strokeBorder({
-              content: ACCENT,
-              style:
-                eaten >= 0.998
-                  ? { lineWidth: LINE }
-                  : { lineWidth: LINE, lineCap: 'round', dash: [eaten * around, around] },
+              content:
+                lit >= SWEEP
+                  ? ACCENT
+                  : { type: 'angularGradient', colors: sweep, center: { x: 0.5, y: 0.5 } },
+              style: { lineWidth: LINE },
               shape: 'circle',
             }),
             rotationEffect(-90),
@@ -198,12 +212,12 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
           ]}
         />
       )}
-      <VStack spacing={0} modifiers={[frame({ width: SIZE - LINE * 2 - 8 })]}>
+      <VStack spacing={0} modifiers={[padding({ all: LINE + 9 })]}>
         <Text
           modifiers={[
-            font({ size: 26, weight: 'bold' }),
+            font({ size: 34, weight: 'bold' }),
             foregroundStyle(INK),
-            minimumScaleFactor(0.5),
+            minimumScaleFactor(0.4),
             lineLimit(1),
           ]}
         >
@@ -211,9 +225,9 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
         </Text>
         <Text
           modifiers={[
-            font({ size: 10 }),
+            font({ size: 11 }),
             foregroundStyle(QUIET),
-            minimumScaleFactor(0.7),
+            minimumScaleFactor(0.6),
             lineLimit(1),
           ]}
         >
@@ -224,16 +238,12 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
   );
   if (!wide) {
     return face(
-      <VStack spacing={0}>
-        {heading}
+      heading,
+      <HStack spacing={0} modifiers={[frame(FULL)]}>
         <Spacer />
-        <HStack spacing={0}>
-          <Spacer />
-          {ring}
-          <Spacer />
-        </HStack>
+        {ring}
         <Spacer />
-      </VStack>,
+      </HStack>,
     );
   }
   const ICONS: Record<string, 'figure.strengthtraining.traditional' | 'leaf.fill' | 'drop.fill'> = {
@@ -241,52 +251,55 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
     Carbs: 'leaf.fill',
     Fat: 'drop.fill',
   };
+  // Protein, carbs and fat share the height beside the ring, a glass row each.
   return face(
-    <VStack alignment="leading" spacing={6}>
-      {heading}
-      <HStack spacing={12}>
-        {ring}
-        <VStack spacing={4}>
-          {(props.macros ?? []).map((item) => (
-            <HStack
-              key={item.label}
-              spacing={8}
-              modifiers={[padding({ horizontal: 10, vertical: 4 }), ...glass(10)]}
-            >
-              {ICONS[item.label] ? (
-                <Image
-                  systemName={ICONS[item.label]}
-                  size={12}
-                  color={ACCENT}
-                  modifiers={[frame({ width: 16 })]}
-                />
-              ) : null}
-              <VStack alignment="leading" spacing={2}>
-                <HStack spacing={0}>
-                  <Text modifiers={[font({ size: 12, weight: 'semibold' }), foregroundStyle(INK)]}>
-                    {item.label}
-                  </Text>
-                  <Spacer />
-                  <Text
-                    modifiers={[
-                      font({ size: 11, weight: 'semibold', design: 'monospaced' }),
-                      foregroundStyle(INK),
-                      minimumScaleFactor(0.7),
-                      lineLimit(1),
-                    ]}
-                  >
-                    {item.amount}
-                  </Text>
-                </HStack>
-                {typeof item.progress !== 'number' ? null : (
-                  <ProgressView value={item.progress} modifiers={[tint(ACCENT)]} />
-                )}
-              </VStack>
-            </HStack>
-          ))}
-        </VStack>
-      </HStack>
-    </VStack>,
+    heading,
+    <HStack spacing={12} modifiers={[frame(FULL)]}>
+      {ring}
+      <VStack spacing={5} modifiers={[frame(FULL)]}>
+        {(props.macros ?? []).map((item) => (
+          <HStack
+            key={item.label}
+            spacing={8}
+            modifiers={[
+              padding({ horizontal: 10, vertical: 4 }),
+              frame({ ...FULL, alignment: 'leading' }),
+              ...glass(10),
+            ]}
+          >
+            {ICONS[item.label] ? (
+              <Image
+                systemName={ICONS[item.label]}
+                size={12}
+                color={ACCENT}
+                modifiers={[frame({ width: 16 })]}
+              />
+            ) : null}
+            <VStack alignment="leading" spacing={3}>
+              <HStack spacing={0}>
+                <Text modifiers={[font({ size: 12, weight: 'semibold' }), foregroundStyle(INK)]}>
+                  {item.label}
+                </Text>
+                <Spacer />
+                <Text
+                  modifiers={[
+                    font({ size: 11, weight: 'semibold', design: 'monospaced' }),
+                    foregroundStyle(INK),
+                    minimumScaleFactor(0.7),
+                    lineLimit(1),
+                  ]}
+                >
+                  {item.amount}
+                </Text>
+              </HStack>
+              {typeof item.progress !== 'number' ? null : (
+                <ProgressView value={item.progress} modifiers={[tint(ACCENT)]} />
+              )}
+            </VStack>
+          </HStack>
+        ))}
+      </VStack>
+    </HStack>,
   );
 };
 
@@ -323,7 +336,7 @@ const NextWorkout = (props: NextWorkoutWidgetProps, environment: WidgetEnvironme
       </Text>
     </HStack>
   ) : null;
-  const face = (url: string, content: ReactNode) => (
+  const face = (url: string, ...content: ReactNode[]) => (
     <ZStack
       modifiers={[
         containerBackground(
@@ -346,7 +359,7 @@ const NextWorkout = (props: NextWorkoutWidgetProps, environment: WidgetEnvironme
       ) : null}
       <VStack
         alignment="leading"
-        spacing={0}
+        spacing={wide ? 8 : 2}
         modifiers={[
           padding({ all: 12 }),
           frame({ ...FULL, alignment: 'topLeading' }),
@@ -362,38 +375,47 @@ const NextWorkout = (props: NextWorkoutWidgetProps, environment: WidgetEnvironme
       </VStack>
     </ZStack>
   );
-  const heading = (title: string | null) => (
-    <HStack spacing={5}>
-      {day}
-      <Spacer />
-      <Image systemName="dumbbell.fill" size={13} color={ACCENT} />
-      {title ? (
-        <Text
-          modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(INK), lineLimit(1)]}
-        >
-          {title}
-        </Text>
-      ) : null}
-    </HStack>
-  );
+  // Wide: the date on the left, what it is (Next Workout, Workout in Progress) centred across the
+  // top. Small: the date and the glyph.
+  const heading = (title: string) =>
+    wide ? (
+      <ZStack>
+        <HStack spacing={0}>
+          {day}
+          <Spacer />
+        </HStack>
+        <HStack spacing={5}>
+          <Image systemName="dumbbell.fill" size={13} color={ACCENT} />
+          <Text
+            modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(INK), lineLimit(1)]}
+          >
+            {title}
+          </Text>
+        </HStack>
+      </ZStack>
+    ) : (
+      <HStack spacing={5}>
+        {day}
+        <Spacer />
+        <Image systemName="dumbbell.fill" size={13} color={ACCENT} />
+      </HStack>
+    );
   if (!props.signedIn) {
     return face(
       'progresso://feed',
-      <VStack alignment="leading" spacing={8}>
-        {heading(wide ? 'Next Workout' : null)}
-        <Spacer />
-        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(INK)]}>
-          {props.signedIn === false
-            ? 'Sign in to Progresso to see your next workout.'
-            : 'Open Progresso to see your next workout.'}
-        </Text>
-      </VStack>,
+      heading('Next Workout'),
+      <Spacer />,
+      <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(INK)]}>
+        {props.signedIn === false
+          ? 'Sign in to Progresso to see your next workout.'
+          : 'Open Progresso to see your next workout.'}
+      </Text>,
     );
   }
   const title = (
     <Text
       modifiers={[
-        font({ size: wide ? 22 : 20, weight: 'heavy' }),
+        font({ size: wide ? 24 : 20, weight: 'heavy' }),
         foregroundStyle(INK),
         minimumScaleFactor(0.6),
         lineLimit(1),
@@ -420,47 +442,45 @@ const NextWorkout = (props: NextWorkoutWidgetProps, environment: WidgetEnvironme
     </Text>
   );
   if (!wide) {
+    // The date at the top, the day in the middle, its button at the bottom.
     return face(
       props.url,
-      <VStack alignment="leading" spacing={2}>
-        {heading(null)}
-        <Spacer />
-        <Text modifiers={[font({ size: 11, weight: 'semibold' }), foregroundStyle(ACCENT)]}>
-          {props.eyebrow}
-        </Text>
-        {title}
-        {detail}
-        <Spacer />
-        {action}
-      </VStack>,
+      heading(props.eyebrow),
+      <Spacer />,
+      <Text modifiers={[font({ size: 11, weight: 'semibold' }), foregroundStyle(ACCENT)]}>
+        {props.eyebrow}
+      </Text>,
+      title,
+      detail,
+      <Spacer />,
+      action,
     );
   }
+  // The day in a glass card filling everything below the heading, its button beside it.
   return face(
     props.url,
-    <VStack alignment="leading" spacing={0}>
-      {heading(props.eyebrow)}
+    heading(props.eyebrow),
+    <HStack
+      spacing={12}
+      modifiers={[
+        padding({ horizontal: 14, vertical: 10 }),
+        frame({ ...FULL, alignment: 'leading' }),
+        background(`${FILL}A6`, shapes.roundedRectangle({ cornerRadius: 16 })),
+        strokeBorder({
+          content: `${ACCENT}38`,
+          style: { lineWidth: 1 },
+          shape: 'roundedRectangle',
+          cornerRadius: 16,
+        }),
+      ]}
+    >
+      <VStack alignment="leading" spacing={4}>
+        {title}
+        {detail}
+      </VStack>
       <Spacer />
-      <HStack
-        spacing={12}
-        modifiers={[
-          padding({ all: 12 }),
-          background(`${FILL}A6`, shapes.roundedRectangle({ cornerRadius: 14 })),
-          strokeBorder({
-            content: `${ACCENT}38`,
-            style: { lineWidth: 1 },
-            shape: 'roundedRectangle',
-            cornerRadius: 14,
-          }),
-        ]}
-      >
-        <VStack alignment="leading" spacing={3}>
-          {title}
-          {detail}
-        </VStack>
-        <Spacer />
-        {action}
-      </HStack>
-    </VStack>,
+      {action}
+    </HStack>,
   );
 };
 
@@ -477,6 +497,7 @@ const StepsToday = (props: StepsWidgetProps, environment: WidgetEnvironment) => 
   // Tinted or clear (accented), or on the Lock Screen or in StandBy at night (vibrant): no photo.
   const fullColor = !/accented|vibrant/i.test(String(environment.widgetRenderingMode ?? ''));
   const photo = fullColor ? props.photoSmall : undefined;
+  // The date and the glyph along the top; the count, large, in a glass card filling the rest.
   return (
     <ZStack
       modifiers={[
@@ -500,7 +521,7 @@ const StepsToday = (props: StepsWidgetProps, environment: WidgetEnvironment) => 
       ) : null}
       <VStack
         alignment="leading"
-        spacing={2}
+        spacing={8}
         modifiers={[
           padding({ all: 12 }),
           frame({ ...FULL, alignment: 'topLeading' }),
@@ -541,27 +562,49 @@ const StepsToday = (props: StepsWidgetProps, environment: WidgetEnvironment) => 
           <Spacer />
           <Image systemName="figure.walk" size={13} color={ACCENT} />
         </HStack>
-        <Spacer />
-        <Text
+        <VStack
+          alignment="leading"
+          spacing={1}
           modifiers={[
-            font({ size: 32, weight: 'bold' }),
-            foregroundStyle(INK),
-            minimumScaleFactor(0.6),
-            lineLimit(1),
+            padding({ horizontal: 12, vertical: 8 }),
+            frame({ ...FULL, alignment: 'bottomLeading' }),
+            background(`${FILL}A6`, shapes.roundedRectangle({ cornerRadius: 14 })),
+            strokeBorder({
+              content: `${ACCENT}38`,
+              style: { lineWidth: 1 },
+              shape: 'roundedRectangle',
+              cornerRadius: 14,
+            }),
           ]}
         >
-          {props.signedIn && props.steps ? props.steps : '—'}
-        </Text>
-        <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(ACCENT)]}>
-          Steps
-        </Text>
-        <Text modifiers={[font({ size: 11 }), foregroundStyle(QUIET), lineLimit(2)]}>
-          {props.signedIn === false
-            ? 'Sign in to Progresso'
-            : props.caption
-              ? props.caption
-              : 'Open Progresso to see your steps'}
-        </Text>
+          <Text
+            modifiers={[
+              font({ size: 34, weight: 'bold' }),
+              foregroundStyle(INK),
+              minimumScaleFactor(0.5),
+              lineLimit(1),
+            ]}
+          >
+            {props.signedIn && props.steps ? props.steps : '—'}
+          </Text>
+          <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(ACCENT)]}>
+            Steps
+          </Text>
+          <Text
+            modifiers={[
+              font({ size: 11 }),
+              foregroundStyle(QUIET),
+              minimumScaleFactor(0.8),
+              lineLimit(1),
+            ]}
+          >
+            {props.signedIn === false
+              ? 'Sign in to Progresso'
+              : props.caption
+                ? props.caption
+                : 'Open Progresso to see your steps'}
+          </Text>
+        </VStack>
       </VStack>
     </ZStack>
   );

@@ -10,6 +10,7 @@ import { keepWidgetPhotos } from './widgetPhotos';
 import {
   clockTime,
   dailyTimeline,
+  dayLabel,
   nutritionTimeline,
   plistSafeTimeline,
   SIGNED_OUT_NEXT_WORKOUT,
@@ -30,14 +31,26 @@ import { endWorkoutActivities } from './workoutActivity';
 // for itself, so it shows what it was last handed until the app hands it something newer -- each
 // time a week of days, so the date at its top turns over at midnight on its own. Everything is
 // handed over in the order it's asked for, one at a time: a change of theme reads what a widget
-// has and dresses it again, and nothing handed over meanwhile can be lost under it. Updating a
-// widget never gets in the way of what the person is doing (loadWidgets.ts): the returned promise
-// never rejects.
+// has and dresses it again, and nothing handed over meanwhile can be lost under it. One that takes
+// longer than TURN_LIMIT_MS is let go (and recorded), so nothing after it is ever held up.
+// Updating a widget never gets in the way of what the person is doing (loadWidgets.ts): the
+// returned promise never rejects.
+
+const TURN_LIMIT_MS = 8000;
 
 let queue: Promise<void> = Promise.resolve();
 
 function inTurn(area: string, run: (loaded: HomeWidgets) => unknown): Promise<void> {
-  const next = queue.then(() => withWidgets(area, run));
+  const next = queue.then(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<void>((resolve) => {
+      timer = setTimeout(() => {
+        recordQuietFailure(`widget.${area}`, new Error(`Still waiting after ${TURN_LIMIT_MS} ms`));
+        resolve();
+      }, TURN_LIMIT_MS);
+    });
+    return Promise.race([withWidgets(area, run), late]).finally(() => clearTimeout(timer));
+  });
   queue = next;
   return next;
 }
@@ -150,12 +163,20 @@ export function applyWidgetTheme(theme: AppTheme): Promise<void> {
   });
 }
 
-/** What `widget` is showing, redone in the widgets' look, unless it already wears it. */
+/** What `widget` is showing, redone in the widgets' look and dated, unless it already is. */
 async function redress<P extends WidgetLook>(widget: HomeWidget<P>): Promise<void> {
   const look = widgetLook();
   const entries = await widget.getTimeline();
-  if (entries.every(({ props }) => wearsLook(props, look))) return;
-  widget.updateTimeline(dressed(entries));
+  if (entries.every(({ props }) => props.day && wearsLook(props, look))) return;
+  // An entry from before the widgets were dated (an earlier version) is given its day too.
+  widget.updateTimeline(
+    dressed(
+      entries.map(({ date, props }) => ({
+        date,
+        props: props.day ? props : { ...props, day: dayLabel(date) },
+      })),
+    ),
+  );
 }
 
 /** Signed out: no one's figures stay on the home screen, and no workout card on the Lock Screen. */

@@ -29,6 +29,7 @@ const MODIFIERS = [
   'font',
   'foregroundStyle',
   'frame',
+  'layoutPriority',
   'lineLimit',
   'minimumScaleFactor',
   'monospacedDigit',
@@ -115,12 +116,16 @@ describe("Today's Nutrition", () => {
   it('shows the date, the calories left in a ring, and opens Nutrition', () => {
     const tree = run(layoutOf(nutritionWidget), props, SMALL);
     expect(textsIn(tree)).toEqual(['Sun, Nov 1', '1,240', 'calories left']);
-    // The ring: its track, then the share eaten (760 of 2,000) as a dash of the way round.
+    // The ring: its track, then the share eaten (760 of 2,000) swept round in the accent -- as
+    // tall as the space allows, so the same at any size.
     const rings = nodesIn(tree).filter((n) => n.type === 'Circle');
     expect(rings).toHaveLength(2);
-    const [{ style }] = modifierOf(rings[1], 'strokeBorder') as [{ style: { dash: number[] } }];
-    const around = style.dash[1];
-    expect(style.dash[0] / around).toBeCloseTo(0.38);
+    const [{ content }] = modifierOf(rings[1], 'strokeBorder') as [
+      { content: { type: string; colors: string[] } },
+    ];
+    expect(content.type).toBe('angularGradient');
+    const lit = content.colors.filter((colour) => colour === LOOK.accent).length;
+    expect(lit / content.colors.length).toBeCloseTo(0.38, 1);
     expect(urlOf(tree)).toBe('progresso://nutrition');
   });
 
@@ -155,6 +160,26 @@ describe("Today's Nutrition", () => {
     expect(
       nodesIn(run(layoutOf(nutritionWidget), fresh, SMALL)).filter((n) => n.type === 'Circle'),
     ).toHaveLength(1);
+    // Over the target, the whole way round in the accent.
+    const over = run(layoutOf(nutritionWidget), { ...props, progress: 1 }, SMALL);
+    const full = nodesIn(over).filter((n) => n.type === 'Circle')[1];
+    expect((modifierOf(full, 'strokeBorder') as [{ content: unknown }])[0].content).toBe(
+      LOOK.accent,
+    );
+  });
+
+  it('centres "Nutrition" across the top of the wide one, the date on the left', () => {
+    const tree = run(layoutOf(nutritionWidget), props, MEDIUM);
+    // The heading: the one stack holding just the date and the name.
+    const heading = nodesIn(tree).find(
+      (n) => n.type === 'ZStack' && textsIn(n).join('|') === 'Sun, Nov 1|Nutrition',
+    );
+    // A row with the date pushed left, and the name on top of it, centred.
+    expect(heading).toBeDefined();
+    const [left, centred] = [heading!.props.children].flat() as Node[];
+    expect(textsIn(left)).toEqual(['Sun, Nov 1']);
+    expect(nodesIn(left).some((n) => n.type === 'Spacer')).toBe(true);
+    expect(textsIn(centred)).toEqual(['Nutrition']);
   });
 
   it('asks to sign in once signed out, and to open the app before it has any figures', () => {

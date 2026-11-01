@@ -433,7 +433,7 @@ export function FeedScreen({ navigation }: Props) {
   const heroKind = liveHero?.kind;
   const heroStartedAt = liveHero?.startedAt ?? null;
   const heroUrl = liveHero?.url;
-  useEffect(() => {
+  const handNextWorkoutToWidget = useCallback(() => {
     if (!liveKnown || (heroTitle === undefined && !nextKnown)) return;
     void showNextWorkoutWidget(
       heroTitle !== undefined && heroKind !== undefined && heroUrl !== undefined
@@ -442,6 +442,11 @@ export function FeedScreen({ navigation }: Props) {
       nextPlan,
     );
   }, [liveKnown, nextKnown, heroTitle, heroKind, heroStartedAt, heroUrl, nextPlan]);
+  useEffect(handNextWorkoutToWidget, [handNextWorkoutToWidget]);
+  // Each time Feed is shown, the widget is handed what Feed knows at once -- before the checks
+  // below come back, which hand it over again if anything changed.
+  const handNextWorkoutToWidgetRef = useRef(handNextWorkoutToWidget);
+  handNextWorkoutToWidgetRef.current = handNextWorkoutToWidget;
   const loadLiveWorkoutRef = useRef(loadLiveWorkout);
   loadLiveWorkoutRef.current = loadLiveWorkout;
 
@@ -461,6 +466,7 @@ export function FeedScreen({ navigation }: Props) {
       if (isStale(lastNextWorkoutLoadAtRef.current)) void loadNextWorkoutRef.current();
       void loadLiveWorkoutRef.current();
       void refreshStepsRef.current();
+      handNextWorkoutToWidgetRef.current();
     });
     return unsubscribe;
   }, [navigation, load, loadFriends, loadNotificationBadgeCount]);

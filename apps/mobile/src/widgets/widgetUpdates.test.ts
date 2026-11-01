@@ -4,7 +4,7 @@ import { themeById } from '../theme/appThemes';
 import { homeWidgets } from './homeWidgets';
 import { themeLook } from './widgetLook';
 import { keepWidgetPhotos } from './widgetPhotos';
-import { WIDGET_DAYS_AHEAD } from './widgetProps';
+import { dayLabel, WIDGET_DAYS_AHEAD } from './widgetProps';
 import {
   applyWidgetTheme,
   clearWidgets,
@@ -192,6 +192,18 @@ describe('the theme', () => {
     await applyWidgetTheme(alpine);
 
     expect(stepsWidget.updateTimeline).not.toHaveBeenCalled();
+  });
+
+  it('dates an entry from before the widgets were dated', async () => {
+    (keepWidgetPhotos as jest.Mock).mockResolvedValueOnce({});
+    const { day: _day, ...undated } = shown;
+    (stepsWidget.getTimeline as jest.Mock).mockResolvedValueOnce([
+      { date: MONDAY, props: { ...undated, ...themeLook(themeById('coast')) } },
+    ]);
+
+    await applyWidgetTheme(themeById('coast'));
+
+    expect(widgetShown(stepsWidget)).toMatchObject({ steps: '8,412', day: dayLabel(MONDAY) });
   });
 
   it("still wears the theme's accent when its photo can't be kept, and says why", async () => {

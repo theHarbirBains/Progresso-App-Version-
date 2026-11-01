@@ -37,9 +37,10 @@ export function WidgetSync() {
 
   useEffect(() => {
     // Only once both are really known: never a half-loaded day, nor a failed read's empty one.
+    // Handed over afresh in a new theme too, not just redressed.
     if (status !== 'signedIn' || logsLoading || goalsLoading || logsError || goalsError) return;
     void showNutritionWidget(sumDailyTotals(logs), goals ?? NO_TARGETS);
-  }, [status, logs, goals, logsLoading, goalsLoading, logsError, goalsError]);
+  }, [status, logs, goals, logsLoading, goalsLoading, logsError, goalsError, theme]);
 
   return null;
 }

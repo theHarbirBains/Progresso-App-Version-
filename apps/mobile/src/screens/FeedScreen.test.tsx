@@ -1083,6 +1083,23 @@ describe('FeedScreen -- the home-screen widgets', () => {
     );
   });
 
+  it('hands it what Feed knows again each time Feed is shown, at once', async () => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
+    renderScreen();
+    await waitFor(() => expect(widgetShown(nextWorkoutWidget)).toMatchObject({ title: 'Push' }));
+
+    jest.mocked(nextWorkoutWidget.updateTimeline).mockClear();
+    // The checks a focus starts never come back, so only the hand-over at once can reach it.
+    mockFetchActiveWorkout.mockReturnValue(new Promise(() => undefined));
+    const calls = navigation.addListener.mock.calls;
+    const [, focusCallback] = calls[calls.length - 1];
+    await act(async () => {
+      focusCallback();
+    });
+
+    await waitFor(() => expect(widgetShown(nextWorkoutWidget)).toMatchObject({ title: 'Push' }));
+  });
+
   it('never tells it "no split" while the split is still being read', async () => {
     mockFetchWorkoutSplitDetail.mockReturnValue(new Promise(() => undefined));
     renderScreen();
