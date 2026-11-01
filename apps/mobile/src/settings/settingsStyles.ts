@@ -18,6 +18,15 @@ export const settingsStyles = StyleSheet.create({
     gap: spacing.xxl,
     paddingHorizontal: spacing.xxl,
   },
+  // Settings' Feedback & Suggestions card: a line on what it's for, then Send Feedback.
+  feedback: {
+    gap: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  feedbackIntro: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+  },
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,

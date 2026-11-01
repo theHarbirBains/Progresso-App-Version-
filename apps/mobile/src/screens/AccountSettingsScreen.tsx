@@ -1,10 +1,14 @@
+import { View } from 'react-native';
 import { AppHeader } from '../design/AppHeader';
+import { PrimaryButton } from '../design/Button';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
+import { Text } from '../design/Text';
 import type { RootStackScreenProps } from '../navigation/types';
 import { settingsStyles as styles } from '../settings/settingsStyles';
 import { useIsAdmin } from '../feedback/useIsAdmin';
+import { useAppTheme } from '../theme/appThemeContext';
 
 type Props = RootStackScreenProps<'AccountSettings'>;
 
@@ -30,6 +34,7 @@ type Props = RootStackScreenProps<'AccountSettings'>;
 export function AccountSettingsScreen({ navigation }: Props) {
   // Only offered to support and full admins; the API enforces it whatever is shown.
   const isAdmin = useIsAdmin();
+  const { accent } = useAppTheme();
   return (
     <Screen
       testID="settings-screen"
@@ -44,6 +49,31 @@ export function AccountSettingsScreen({ navigation }: Props) {
         />
       }
     >
+      {/* First, so everyone sees it: sending feedback, and what's happened to what they sent. */}
+      <Section title="Feedback & Suggestions" testID="settings-feedback-section">
+        <View style={styles.feedback}>
+          <Text style={styles.feedbackIntro}>
+            Found a bug, or have an idea? Tell us, and follow what happens to it.
+          </Text>
+          <PrimaryButton
+            testID="settings-feedback-send"
+            label="Send Feedback"
+            icon="edit-3"
+            onPress={() => navigation.navigate('FeedbackForm')}
+            accentColor={accent.accent}
+            onAccentColor={accent.onAccent}
+          />
+        </View>
+        <ListRow
+          testID="settings-feedback"
+          icon="message-square"
+          title="Your Feedback"
+          subtitle="What you've sent, and what's happening with it"
+          divider
+          onPress={() => navigation.navigate('Feedback')}
+        />
+      </Section>
+
       <Section title="Categories">
         <ListRow
           testID="settings-category-personal-info"
@@ -99,14 +129,6 @@ export function AccountSettingsScreen({ navigation }: Props) {
           subtitle="Help, contact, app version"
           divider
           onPress={() => navigation.navigate('SettingsSupport')}
-        />
-        <ListRow
-          testID="settings-feedback"
-          icon="message-square"
-          title="Feedback & Suggestions"
-          subtitle="Report a bug, suggest a feature, see what's happening with it"
-          divider
-          onPress={() => navigation.navigate('Feedback')}
         />
       </Section>
 

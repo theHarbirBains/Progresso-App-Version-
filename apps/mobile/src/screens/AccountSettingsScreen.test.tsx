@@ -53,8 +53,9 @@ describe('AccountSettingsScreen', () => {
     ['settings-category-notifications', 'SettingsNotifications'],
     ['settings-category-account-security', 'SettingsAccountSecurity'],
     ['settings-category-support', 'SettingsSupport'],
-    // Feedback & Suggestions straight from Settings, as well as under Support & About.
+    // Feedback & Suggestions first in Settings: what you've sent, and sending more.
     ['settings-feedback', 'Feedback'],
+    ['settings-feedback-send', 'FeedbackForm'],
   ])('navigates to %s when its row is pressed', (testID, route) => {
     renderScreen();
 
