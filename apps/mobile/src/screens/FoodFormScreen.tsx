@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -13,6 +12,7 @@ import { TextInput } from '../design/TextInput';
 import { BottomSheet } from '../design/BottomSheet';
 import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
 import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
+import { usePhotoField } from '../lib/usePhotoField';
 import { uploadFoodPhoto } from '../lib/foodPhotoUpload';
 import { FoodImage } from '../nutrition/FoodImage';
 import {
@@ -126,10 +126,11 @@ export function FoodFormScreen(props: Props) {
   // A freshly picked photo (a local file, uploaded on Save), or the photo the
   // food already has -- which "Remove Photo" clears on Save.
   const existingImageUrl = props.mode === 'edit' ? props.food.imageUrl : null;
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [photoRemoved, setPhotoRemoved] = useState(false);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const shownPhoto = photoUri ?? (photoRemoved ? null : existingImageUrl);
+  const photo = usePhotoField({
+    title: 'Food Photo',
+    aspect: [1, 1],
+    existingUrl: existingImageUrl,
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -154,48 +155,6 @@ export function FoodFormScreen(props: Props) {
     fatNum >= 0 &&
     !saving;
 
-  function handlePickPhoto() {
-    setPhotoError(null);
-    Alert.alert('Food Photo', undefined, [
-      { text: 'Take Photo', onPress: () => void pickPhoto('camera') },
-      { text: 'Choose from Library', onPress: () => void pickPhoto('library') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }
-
-  async function pickPhoto(source: 'camera' | 'library') {
-    const permission =
-      source === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setPhotoError(
-        source === 'camera'
-          ? 'Camera permission is required to take a photo.'
-          : 'Photo library permission is required to choose a photo.',
-      );
-      return;
-    }
-    const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    };
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
-    if (result.canceled || !result.assets[0]) return;
-    setPhotoUri(result.assets[0].uri);
-    setPhotoRemoved(false);
-  }
-
-  function handleRemovePhoto() {
-    setPhotoUri(null);
-    setPhotoRemoved(true);
-  }
-
   async function handleSave() {
     if (!canSave) return;
     setError(null);
@@ -203,9 +162,9 @@ export function FoodFormScreen(props: Props) {
     try {
       // undefined leaves the stored photo alone; null clears it.
       let imageUrl: string | null | undefined;
-      if (photoUri) {
-        imageUrl = await uploadFoodPhoto(userId, photoUri);
-      } else if (photoRemoved) {
+      if (photo.picked) {
+        imageUrl = await uploadFoodPhoto(userId, photo.picked);
+      } else if (photo.removed) {
         imageUrl = null;
       }
       const input = {
@@ -271,29 +230,29 @@ export function FoodFormScreen(props: Props) {
         <Section title="Details">
           <View style={styles.group}>
             <View style={styles.photoRow}>
-              <FoodImage testID="food-form-photo-preview" uri={shownPhoto} name={name} size={72} />
+              <FoodImage testID="food-form-photo-preview" uri={photo.shown} name={name} size={72} />
               <View style={styles.photoActions}>
                 <SecondaryButton
                   testID="food-form-photo-add"
                   size="sm"
-                  label={shownPhoto ? 'Change Photo' : 'Add Photo'}
-                  accessibilityLabel={shownPhoto ? 'Change food photo' : 'Add a food photo'}
-                  onPress={handlePickPhoto}
+                  label={photo.shown ? 'Change Photo' : 'Add Photo'}
+                  accessibilityLabel={photo.shown ? 'Change food photo' : 'Add a food photo'}
+                  onPress={photo.pick}
                 />
-                {shownPhoto ? (
+                {photo.shown ? (
                   <TextButton
                     testID="food-form-photo-remove"
                     label="Remove Photo"
                     accessibilityLabel="Remove food photo"
                     destructive
-                    onPress={handleRemovePhoto}
+                    onPress={photo.remove}
                   />
                 ) : null}
               </View>
             </View>
-            {photoError ? (
+            {photo.error ? (
               <Text testID="food-form-photo-error" style={styles.errorText}>
-                {photoError}
+                {photo.error}
               </Text>
             ) : null}
             <TextInput

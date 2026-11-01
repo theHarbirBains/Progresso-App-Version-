@@ -9,26 +9,6 @@ export const nutritionHistoryStyles = StyleSheet.create({
   content: {
     gap: widgetGap,
   },
-  legendRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.lg,
-    marginVertical: spacing.md,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendLabel: {
-    ...typeScale.secondary,
-    color: colors.textMuted,
-  },
   summaryRow: {
     flexDirection: 'row',
     gap: widgetGap,

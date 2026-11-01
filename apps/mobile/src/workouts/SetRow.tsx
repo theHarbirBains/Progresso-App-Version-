@@ -1,11 +1,10 @@
 import { memo } from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { colors } from '../design/theme';
 import type { MeasurementType } from '../exercises/movementTypes';
 import { formatDuration } from '../lib/duration';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { LiveSetActions } from './SetRowActions';
 import { stopSetTimer, useSetTimer } from './setTimers';
 import { SetValueFields } from './SetValueFields';
 
@@ -100,38 +99,16 @@ function SetRowComponent({
         accentColor={accentColor}
         testID={testID}
       />
-      <TouchableOpacity
-        testID={testID ? `${testID}-complete` : undefined}
-        style={[
-          styles.setCompleteButton,
-          {
-            borderColor: completed ? accentColor : colors.border,
-            backgroundColor: completed ? accentColor : 'transparent',
-          },
-        ]}
-        onPress={handleComplete}
-        disabled={!canToggle}
-        accessibilityRole="button"
-        accessibilityState={{ selected: completed, disabled: !canToggle }}
-        accessibilityLabel={completed ? 'Mark set incomplete' : 'Mark set complete'}
-      >
-        <Feather
-          name="check"
-          size={18}
-          color={completed ? onAccentColor : canToggle ? colors.textSecondary : colors.textMuted}
-        />
-      </TouchableOpacity>
-      {onRemove ? (
-        <TouchableOpacity
-          testID={testID ? `${testID}-remove` : undefined}
-          style={styles.setRemoveButton}
-          onPress={() => onRemove(setId)}
-          accessibilityRole="button"
-          accessibilityLabel={`Remove set ${setIndex}`}
-        >
-          <Feather name="trash-2" size={18} color={colors.textMuted} />
-        </TouchableOpacity>
-      ) : null}
+      <LiveSetActions
+        testID={testID}
+        setIndex={setIndex}
+        completed={completed}
+        canToggle={canToggle}
+        onComplete={handleComplete}
+        onRemove={onRemove ? () => onRemove(setId) : undefined}
+        accentColor={accentColor}
+        onAccentColor={onAccentColor}
+      />
     </View>
   );
 }

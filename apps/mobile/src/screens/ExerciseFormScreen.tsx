@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { DestructiveButton, PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
@@ -21,6 +20,7 @@ import {
   type MeasurementType,
   type MovementType,
 } from '../exercises/movementTypes';
+import { usePhotoField } from '../lib/usePhotoField';
 import { createExercise, updateExercise } from '../lib/api';
 import { uploadEquipmentPhoto } from '../lib/equipmentPhotoUpload';
 import { useAppTheme } from '../theme/appThemeContext';
@@ -75,57 +75,14 @@ export function ExerciseFormScreen(props: Props) {
   // this exercise already has -- which "Remove Photo" clears on Save. Same
   // three-state convention FoodFormScreen's own photo field uses.
   const existingPhotoUrl = props.mode === 'edit' ? props.exercise.photoUrl : null;
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [photoRemoved, setPhotoRemoved] = useState(false);
-  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photo = usePhotoField({
+    title: 'Machine Photo',
+    aspect: [4, 3],
+    existingUrl: existingPhotoUrl,
+  });
   const [photoLightboxOpen, setPhotoLightboxOpen] = useState(false);
-  const shownPhoto = photoUri ?? (photoRemoved ? null : existingPhotoUrl);
 
   const canSave = name.trim().length > 0 && muscleGroup !== null && !saving;
-
-  async function handlePickPhoto() {
-    setPhotoError(null);
-    Alert.alert('Machine Photo', undefined, [
-      { text: 'Take Photo', onPress: () => void pickPhoto('camera') },
-      { text: 'Choose from Library', onPress: () => void pickPhoto('library') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }
-
-  async function pickPhoto(source: 'camera' | 'library') {
-    const permission =
-      source === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setPhotoError(
-        source === 'camera'
-          ? 'Camera permission is required to take a photo.'
-          : 'Photo library permission is required to choose a photo.',
-      );
-      return;
-    }
-
-    const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
-    };
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
-    if (result.canceled || !result.assets[0]) return;
-
-    setPhotoUri(result.assets[0].uri);
-    setPhotoRemoved(false);
-  }
-
-  function handleRemovePhoto() {
-    setPhotoUri(null);
-    setPhotoRemoved(true);
-  }
 
   async function handleSave() {
     if (!accessToken || !muscleGroup || !canSave) return;
@@ -134,9 +91,9 @@ export function ExerciseFormScreen(props: Props) {
     try {
       // undefined leaves the stored photo alone; null clears it.
       let photoUrl: string | null | undefined;
-      if (photoUri && userId) {
-        photoUrl = await uploadEquipmentPhoto(userId, photoUri);
-      } else if (photoRemoved) {
+      if (photo.picked && userId) {
+        photoUrl = await uploadEquipmentPhoto(userId, photo.picked);
+      } else if (photo.removed) {
         photoUrl = null;
       }
 
@@ -283,7 +240,7 @@ export function ExerciseFormScreen(props: Props) {
         <View style={styles.photo}>
           <Text style={styles.helperText}>Shown next to this exercise in your library.</Text>
 
-          {shownPhoto ? (
+          {photo.shown ? (
             <View style={styles.photoPreviewRow}>
               <TouchableOpacity
                 onPress={() => setPhotoLightboxOpen(true)}
@@ -292,7 +249,7 @@ export function ExerciseFormScreen(props: Props) {
               >
                 <Image
                   testID="exercise-form-photo-preview"
-                  source={{ uri: shownPhoto }}
+                  source={{ uri: photo.shown }}
                   style={styles.photoPreviewImage}
                 />
               </TouchableOpacity>
@@ -302,14 +259,14 @@ export function ExerciseFormScreen(props: Props) {
                   size="sm"
                   label="Change Photo"
                   accessibilityLabel="Change machine photo"
-                  onPress={handlePickPhoto}
+                  onPress={photo.pick}
                 />
                 <TextButton
                   testID="exercise-form-photo-remove"
                   label="Remove Photo"
                   accessibilityLabel="Remove machine photo"
                   destructive
-                  onPress={handleRemovePhoto}
+                  onPress={photo.remove}
                 />
               </View>
             </View>
@@ -318,12 +275,12 @@ export function ExerciseFormScreen(props: Props) {
               testID="exercise-form-photo-add"
               label="Add Photo"
               accessibilityLabel="Add machine photo"
-              onPress={handlePickPhoto}
+              onPress={photo.pick}
             />
           )}
-          {photoError ? (
+          {photo.error ? (
             <Text testID="exercise-form-photo-error" style={styles.errorText}>
-              {photoError}
+              {photo.error}
             </Text>
           ) : null}
         </View>
@@ -359,7 +316,7 @@ export function ExerciseFormScreen(props: Props) {
       <PhotoLightbox
         testID="exercise-form-photo-lightbox"
         visible={photoLightboxOpen}
-        uri={shownPhoto}
+        uri={photo.shown}
         onClose={() => setPhotoLightboxOpen(false)}
       />
     </Screen>

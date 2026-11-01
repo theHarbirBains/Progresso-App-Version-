@@ -5,7 +5,9 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { SecondaryButton } from '../design/Button';
-import { addMonths, isoToLocalDateKey, toLocalDateKey } from '../design/calendarGrid';
+import { CalendarLegend } from '../design/CalendarLegend';
+import { isoToLocalDateKey, toLocalDateKey } from '../design/calendarGrid';
+import { useCalendarMonth } from '../design/useCalendarMonth';
 import { EmptyState } from '../design/EmptyState';
 import { MonthCalendar } from '../design/MonthCalendar';
 import { Screen } from '../design/Screen';
@@ -40,9 +42,15 @@ export function NutritionHistoryScreen({ navigation, route }: Props) {
   const now = new Date();
   // Opened on a day from Progress: that day's month, with the day chosen.
   const openedOn = route.params?.date ?? null;
-  const [year, setYear] = useState(openedOn ? Number(openedOn.slice(0, 4)) : now.getFullYear());
-  const [month, setMonth] = useState(openedOn ? Number(openedOn.slice(5, 7)) : now.getMonth() + 1);
-  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(openedOn);
+  const calendar = useCalendarMonth(
+    {
+      year: openedOn ? Number(openedOn.slice(0, 4)) : now.getFullYear(),
+      month: openedOn ? Number(openedOn.slice(5, 7)) : now.getMonth() + 1,
+      selectedDateKey: openedOn,
+    },
+    (year, month) => loadMonth(year, month),
+  );
+  const { year, month, selectedDateKey } = calendar;
   const todayKey = toLocalDateKey(now);
 
   const [monthLogs, setMonthLogs] = useState<FoodLogRow[]>([]);
@@ -80,26 +88,6 @@ export function NutritionHistoryScreen({ navigation, route }: Props) {
     return unsubscribe;
   }, [navigation, loadMonth, year, month]);
 
-  function handlePrevMonth() {
-    const next = addMonths(year, month, -1);
-    setYear(next.year);
-    setMonth(next.month);
-    setSelectedDateKey(null);
-    loadMonth(next.year, next.month);
-  }
-
-  function handleNextMonth() {
-    const next = addMonths(year, month, 1);
-    setYear(next.year);
-    setMonth(next.month);
-    setSelectedDateKey(null);
-    loadMonth(next.year, next.month);
-  }
-
-  function handleSelectDate(dateKey: string) {
-    setSelectedDateKey((prev) => (prev === dateKey ? null : dateKey));
-  }
-
   const markedDateKeys = new Set(monthLogs.map((log) => isoToLocalDateKey(log.loggedAt)));
   const monthSummary = computeNutritionMonthSummary(monthLogs);
   const selectedDayLogs = selectedDateKey
@@ -133,21 +121,17 @@ export function NutritionHistoryScreen({ navigation, route }: Props) {
           todayKey={todayKey}
           accentColor={nutritionTheme.accent}
           onAccentColor={nutritionTheme.onAccent}
-          onSelectDate={handleSelectDate}
-          onPrevMonth={handlePrevMonth}
-          onNextMonth={handleNextMonth}
+          onSelectDate={calendar.selectDate}
+          onPrevMonth={calendar.prevMonth}
+          onNextMonth={calendar.nextMonth}
         />
 
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: nutritionTheme.accent }]} />
-            <Text style={styles.legendLabel}>Food logged</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.border }]} />
-            <Text style={styles.legendLabel}>Nothing logged</Text>
-          </View>
-        </View>
+        <CalendarLegend
+          items={[
+            { color: nutritionTheme.accent, label: 'Food logged' },
+            { color: colors.border, label: 'Nothing logged' },
+          ]}
+        />
 
         {monthError ? (
           <Text testID="nutrition-history-month-error" style={styles.errorText}>

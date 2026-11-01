@@ -31,28 +31,6 @@ export const workoutHistoryStyles = StyleSheet.create({
     marginVertical: spacing.lg,
   },
 
-  // Calendar legend
-  legendRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.lg,
-    marginVertical: spacing.md,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendLabel: {
-    ...typeScale.secondary,
-    color: colors.textMuted,
-  },
-
   // Monthly summary: three raised stat blocks, `widgetGap` apart.
   summaryRow: {
     flexDirection: 'row',

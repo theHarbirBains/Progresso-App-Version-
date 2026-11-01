@@ -3,7 +3,9 @@ import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
-import { addMonths, isoToLocalDateKey, toLocalDateKey } from '../design/calendarGrid';
+import { CalendarLegend } from '../design/CalendarLegend';
+import { isoToLocalDateKey, toLocalDateKey } from '../design/calendarGrid';
+import { useCalendarMonth } from '../design/useCalendarMonth';
 import { Card } from '../design/Card';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
@@ -92,9 +94,11 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  const calendar = useCalendarMonth(
+    { year: now.getFullYear(), month: now.getMonth() + 1 },
+    (year, month) => loadMonth(year, month),
+  );
+  const { year, month, selectedDateKey } = calendar;
   const todayKey = toLocalDateKey(now);
 
   const [activeWorkout, setActiveWorkout] = useState<WorkoutSummary | null>(null);
@@ -288,26 +292,6 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
     return unsubscribe;
   }, [navigation, loadActive, loadMonth, loadRecent, year, month]);
 
-  function handlePrevMonth() {
-    const next = addMonths(year, month, -1);
-    setYear(next.year);
-    setMonth(next.month);
-    setSelectedDateKey(null);
-    loadMonth(next.year, next.month);
-  }
-
-  function handleNextMonth() {
-    const next = addMonths(year, month, 1);
-    setYear(next.year);
-    setMonth(next.month);
-    setSelectedDateKey(null);
-    loadMonth(next.year, next.month);
-  }
-
-  function handleSelectDate(dateKey: string) {
-    setSelectedDateKey((prev) => (prev === dateKey ? null : dateKey));
-  }
-
   async function handleLoadMoreRecent() {
     if (!userId || recentLoadingMore || !recentHasMore) return;
     setRecentLoadingMore(true);
@@ -447,25 +431,18 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
           todayKey={todayKey}
           accentColor={theme.accent}
           onAccentColor={theme.onAccent}
-          onSelectDate={handleSelectDate}
-          onPrevMonth={handlePrevMonth}
-          onNextMonth={handleNextMonth}
+          onSelectDate={calendar.selectDate}
+          onPrevMonth={calendar.prevMonth}
+          onNextMonth={calendar.nextMonth}
         />
 
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
-            <Text style={styles.legendLabel}>Completed</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
-            <Text style={styles.legendLabel}>Today</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.border }]} />
-            <Text style={styles.legendLabel}>No workout</Text>
-          </View>
-        </View>
+        <CalendarLegend
+          items={[
+            { color: theme.accent, label: 'Completed' },
+            { color: theme.accent, label: 'Today' },
+            { color: colors.border, label: 'No workout' },
+          ]}
+        />
 
         {monthError ? (
           <Text testID="workout-month-error" style={styles.errorText}>

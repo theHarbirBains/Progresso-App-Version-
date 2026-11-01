@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { Text } from '../design/Text';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
@@ -13,11 +12,11 @@ import { Section } from '../design/Section';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { TextInput } from '../design/TextInput';
 import { colors, radii, spacing, typeScale } from '../design/theme';
-import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import type { HeightUnit } from '../lib/api';
 import { useAuth } from '../auth/AuthProvider';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProfile } from '../profile/ProfileProvider';
+import { useAvatarPhoto } from '../profile/useAvatarPhoto';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { settingsStyles as styles } from '../settings/settingsStyles';
 
@@ -48,9 +47,7 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
-  const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
-  const [avatarSaving, setAvatarSaving] = useState(false);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const avatar = useAvatarPhoto(userId);
 
   // Seeds the editable fields from the shared profile cache exactly once,
   // the first time it resolves -- not on every later change to `profile`
@@ -88,51 +85,6 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
     }
   }
 
-  async function handleChoosePhoto() {
-    setAvatarSheetOpen(false);
-    if (!userId) return;
-    setAvatarError(null);
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setAvatarError('Photo library permission is required to choose a profile picture.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
-    setAvatarSaving(true);
-    try {
-      const publicUrl = await uploadAvatar(userId, result.assets[0].uri);
-      await updateProfile({ avatarUrl: publicUrl });
-    } catch (err) {
-      setAvatarError(err instanceof Error ? err.message : 'Failed to update profile picture');
-    } finally {
-      setAvatarSaving(false);
-    }
-  }
-
-  async function handleRemovePhoto() {
-    setAvatarSheetOpen(false);
-    if (!userId) return;
-    setAvatarError(null);
-    setAvatarSaving(true);
-    try {
-      await removeAvatarFile(userId);
-      await updateProfile({ avatarUrl: null });
-    } catch (err) {
-      setAvatarError(err instanceof Error ? err.message : 'Failed to remove profile picture');
-    } finally {
-      setAvatarSaving(false);
-    }
-  }
-
   if (loading || themeLoading) {
     return <LoadingState testID="settings-personal-info-loading" />;
   }
@@ -164,13 +116,13 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
             <TouchableOpacity
               testID="settings-personal-info-avatar"
               style={localStyles.identity}
-              onPress={() => setAvatarSheetOpen(true)}
-              disabled={avatarSaving}
+              onPress={avatar.openSheet}
+              disabled={avatar.saving}
               accessibilityRole="button"
               accessibilityLabel="Change profile picture"
             >
               <View style={[localStyles.avatar, { backgroundColor: theme.accentBg }]}>
-                {avatarSaving ? (
+                {avatar.saving ? (
                   <ActivityIndicator
                     testID="settings-personal-info-avatar-saving"
                     color={theme.accent}
@@ -194,9 +146,9 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
               </View>
             </TouchableOpacity>
 
-            {avatarError ? (
+            {avatar.error ? (
               <Text testID="settings-personal-info-avatar-error" style={styles.errorText}>
-                {avatarError}
+                {avatar.error}
               </Text>
             ) : null}
 
@@ -284,8 +236,8 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
       </Screen>
 
       <BottomSheet
-        visible={avatarSheetOpen}
-        onClose={() => setAvatarSheetOpen(false)}
+        visible={avatar.sheetOpen}
+        onClose={avatar.closeSheet}
         testID="settings-personal-info-avatar-sheet"
       >
         <Text style={localStyles.avatarSheetTitle}>Profile Picture</Text>
@@ -293,7 +245,7 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
           testID="settings-personal-info-choose-photo"
           icon="image"
           title="Choose Photo"
-          onPress={handleChoosePhoto}
+          onPress={avatar.choosePhoto}
         />
         {profile?.avatarUrl ? (
           <ListRow
@@ -302,7 +254,7 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
             title="Remove Photo"
             destructive
             divider
-            onPress={handleRemovePhoto}
+            onPress={avatar.removePhoto}
           />
         ) : null}
       </BottomSheet>

@@ -1,11 +1,10 @@
 import { memo } from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { colors } from '../design/theme';
 import type { MeasurementType } from '../exercises/movementTypes';
 import { formatDuration } from '../lib/duration';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { LiveSetActions, SIDES } from './SetRowActions';
 import { stopSetTimer, useSetTimer } from './setTimers';
 import { SetValueFields } from './SetValueFields';
 
@@ -51,11 +50,6 @@ interface Props {
   onAccentColor: string;
   testID?: string;
 }
-
-const SIDES = [
-  { key: 'left', tag: 'L', name: 'left' },
-  { key: 'right', tag: 'R', name: 'right' },
-] as const;
 
 /**
  * One logical set of a unilateral exercise -- e.g. "Set 1" of Bulgarian
@@ -133,38 +127,16 @@ function UnilateralSetRowComponent({
         ))}
       </View>
 
-      <TouchableOpacity
-        testID={testID ? `${testID}-complete` : undefined}
-        style={[
-          styles.setCompleteButton,
-          {
-            borderColor: completed ? accentColor : colors.border,
-            backgroundColor: completed ? accentColor : 'transparent',
-          },
-        ]}
-        onPress={handleComplete}
-        disabled={!canToggle}
-        accessibilityRole="button"
-        accessibilityState={{ selected: completed, disabled: !canToggle }}
-        accessibilityLabel={completed ? 'Mark set incomplete' : 'Mark set complete'}
-      >
-        <Feather
-          name="check"
-          size={18}
-          color={completed ? onAccentColor : canToggle ? colors.textSecondary : colors.textMuted}
-        />
-      </TouchableOpacity>
-      {onRemove ? (
-        <TouchableOpacity
-          testID={testID ? `${testID}-remove` : undefined}
-          style={styles.setRemoveButton}
-          onPress={() => onRemove(left.id)}
-          accessibilityRole="button"
-          accessibilityLabel={`Remove set ${setIndex}`}
-        >
-          <Feather name="trash-2" size={18} color={colors.textMuted} />
-        </TouchableOpacity>
-      ) : null}
+      <LiveSetActions
+        testID={testID}
+        setIndex={setIndex}
+        completed={completed}
+        canToggle={canToggle}
+        onComplete={handleComplete}
+        onRemove={onRemove ? () => onRemove(left.id) : undefined}
+        accentColor={accentColor}
+        onAccentColor={onAccentColor}
+      />
     </View>
   );
 }

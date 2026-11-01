@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
@@ -16,7 +15,6 @@ import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
 import { UnderlineTabs } from '../design/UnderlineTabs';
 import { greetingName } from '../dashboard/greeting';
-import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
 import { fromKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { recallShown, rememberShown } from '../lib/lastShown';
@@ -24,6 +22,7 @@ import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { useProfile } from '../profile/ProfileProvider';
+import { useAvatarPhoto } from '../profile/useAvatarPhoto';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { computeLifetimeStats, computeLifetimeVolumeKg } from '../progress/lifetimeStats';
 import { computeMuscleGroupSetCounts } from '../progress/muscleGroupProgress';
@@ -125,7 +124,7 @@ export function ProfileScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, nutritionTheme, weightUnit, themeLoading } = useProgressTheme();
-  const { profile, error: profileError, updateProfile } = useProfile();
+  const { profile, error: profileError } = useProfile();
   const {
     goals: nutritionGoals,
     loading: nutritionGoalsLoading,
@@ -161,9 +160,7 @@ export function ProfileScreen({ navigation }: Props) {
   );
   const [workoutsError, setWorkoutsError] = useState<string | null>(null);
 
-  const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
-  const [avatarSaving, setAvatarSaving] = useState(false);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const avatar = useAvatarPhoto(userId);
 
   const [loading, setLoading] = useState(!shownWorkouts);
   const hasLoadedOnce = useRef(Boolean(shownWorkouts));
@@ -191,53 +188,8 @@ export function ProfileScreen({ navigation }: Props) {
     return unsubscribe;
   }, [navigation, load]);
 
-  async function handleChoosePhoto() {
-    setAvatarSheetOpen(false);
-    if (!userId) return;
-    setAvatarError(null);
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setAvatarError('Photo library permission is required to choose a profile picture.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
-    setAvatarSaving(true);
-    try {
-      const publicUrl = await uploadAvatar(userId, result.assets[0].uri);
-      await updateProfile({ avatarUrl: publicUrl });
-    } catch (err) {
-      setAvatarError(err instanceof Error ? err.message : 'Failed to update profile picture');
-    } finally {
-      setAvatarSaving(false);
-    }
-  }
-
-  async function handleRemovePhoto() {
-    setAvatarSheetOpen(false);
-    if (!userId) return;
-    setAvatarError(null);
-    setAvatarSaving(true);
-    try {
-      await removeAvatarFile(userId);
-      await updateProfile({ avatarUrl: null });
-    } catch (err) {
-      setAvatarError(err instanceof Error ? err.message : 'Failed to remove profile picture');
-    } finally {
-      setAvatarSaving(false);
-    }
-  }
-
   // Shown in the summary card regardless of which tab is active, so always
-  // computed -- but memoized so toggling avatarSheetOpen, switching tabs, or
+  // computed -- but memoized so opening the photo sheet, switching tabs, or
   // any other unrelated re-render doesn't re-run this over the user's whole
   // history every time.
   const { lifetimeStats, totalVolumeKg, totalSets } = useMemo(
@@ -338,9 +290,9 @@ export function ProfileScreen({ navigation }: Props) {
           </Text>
         ) : null}
 
-        {avatarError ? (
+        {avatar.error ? (
           <Text testID="profile-avatar-error" style={styles.errorText}>
-            {avatarError}
+            {avatar.error}
           </Text>
         ) : null}
 
@@ -349,13 +301,13 @@ export function ProfileScreen({ navigation }: Props) {
             <TouchableOpacity
               testID="profile-avatar"
               style={styles.avatarWrap}
-              onPress={() => setAvatarSheetOpen(true)}
-              disabled={avatarSaving}
+              onPress={avatar.openSheet}
+              disabled={avatar.saving}
               accessibilityRole="button"
               accessibilityLabel="Change profile picture"
             >
               <View style={[styles.avatar, { backgroundColor: theme.accentBg }]}>
-                {avatarSaving ? (
+                {avatar.saving ? (
                   <ActivityIndicator testID="profile-avatar-saving" color={theme.accent} />
                 ) : (
                   <Avatar
@@ -643,8 +595,8 @@ export function ProfileScreen({ navigation }: Props) {
       </Screen>
 
       <BottomSheet
-        visible={avatarSheetOpen}
-        onClose={() => setAvatarSheetOpen(false)}
+        visible={avatar.sheetOpen}
+        onClose={avatar.closeSheet}
         testID="profile-avatar-sheet"
       >
         <Text style={styles.avatarSheetTitle}>Profile Picture</Text>
@@ -652,7 +604,7 @@ export function ProfileScreen({ navigation }: Props) {
           testID="profile-avatar-choose-photo"
           icon="image"
           title="Choose Photo"
-          onPress={handleChoosePhoto}
+          onPress={avatar.choosePhoto}
         />
         {profile?.avatarUrl ? (
           <ListRow
@@ -661,7 +613,7 @@ export function ProfileScreen({ navigation }: Props) {
             title="Remove Photo"
             destructive
             divider
-            onPress={handleRemovePhoto}
+            onPress={avatar.removePhoto}
           />
         ) : null}
       </BottomSheet>

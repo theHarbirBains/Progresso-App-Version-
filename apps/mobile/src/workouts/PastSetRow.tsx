@@ -1,10 +1,9 @@
 import { memo } from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { colors } from '../design/theme';
 import type { MeasurementType } from '../exercises/movementTypes';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { PastSetRemoveButton } from './SetRowActions';
 import { SetValueFields } from './SetValueFields';
 
 interface Props {
@@ -58,15 +57,7 @@ function PastSetRowComponent({
         onChangeDuration={(_, text) => onChangeDuration?.(text)}
         testID={testID}
       />
-      <TouchableOpacity
-        testID={testID ? `${testID}-remove` : undefined}
-        style={styles.setCompleteButton}
-        onPress={onRemove}
-        accessibilityRole="button"
-        accessibilityLabel={`Remove set ${setIndex}`}
-      >
-        <Feather name="trash-2" size={18} color={colors.textMuted} />
-      </TouchableOpacity>
+      <PastSetRemoveButton testID={testID} setIndex={setIndex} onRemove={onRemove} />
     </View>
   );
 }

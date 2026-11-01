@@ -1,7 +1,7 @@
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 import { WheelPicker } from '../design/WheelPicker';
+import { UnitToggle, wheelPickerStyles as styles } from './UnitToggle';
 import {
   decimalRange,
   kgToLb,
@@ -10,10 +10,13 @@ import {
   WEIGHT_KG_RANGE,
   WEIGHT_LB_RANGE,
 } from './weightHeightConversion';
-import { useAppTheme } from '../theme/appThemeContext';
 
 const KG_VALUES = decimalRange(WEIGHT_KG_RANGE.min, WEIGHT_KG_RANGE.max, WEIGHT_KG_RANGE.step);
 const LB_VALUES = decimalRange(WEIGHT_LB_RANGE.min, WEIGHT_LB_RANGE.max, WEIGHT_LB_RANGE.step);
+const UNITS = [
+  { value: 'kg', label: 'kg' },
+  { value: 'lb', label: 'lb' },
+] as const;
 
 interface Props {
   testID: string;
@@ -33,7 +36,6 @@ export function WeightWheelPicker({
   onChangeUnit,
   onChangeWeightKg,
 }: Props) {
-  const { accent } = useAppTheme();
   const values = unit === 'kg' ? KG_VALUES : LB_VALUES;
   const displayValue = unit === 'kg' ? weightKg : kgToLb(weightKg);
   const selected = nearestValue(values, displayValue);
@@ -45,22 +47,7 @@ export function WeightWheelPicker({
 
   return (
     <View testID={testID} style={styles.container}>
-      <View style={styles.unitToggle}>
-        <TouchableOpacity
-          testID={`${testID}-unit-kg`}
-          style={[styles.unitOption, unit === 'kg' && { backgroundColor: accent.accent }]}
-          onPress={() => onChangeUnit('kg')}
-        >
-          <Text style={[styles.unitText, unit === 'kg' && { color: accent.onAccent }]}>kg</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          testID={`${testID}-unit-lb`}
-          style={[styles.unitOption, unit === 'lb' && { backgroundColor: accent.accent }]}
-          onPress={() => onChangeUnit('lb')}
-        >
-          <Text style={[styles.unitText, unit === 'lb' && { color: accent.onAccent }]}>lb</Text>
-        </TouchableOpacity>
-      </View>
+      <UnitToggle testID={testID} options={UNITS} value={unit} onChange={onChangeUnit} />
       <WheelPicker
         testID={`${testID}-wheel`}
         values={values}
@@ -73,34 +60,3 @@ export function WeightWheelPicker({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-  },
-  unitToggle: {
-    flexDirection: 'row',
-    marginBottom: spacing.lg,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 4,
-  },
-  unitOption: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radii.pill,
-  },
-  unitText: {
-    ...typeScale.callout,
-    color: colors.textSecondary,
-    fontFamily: fonts.display,
-  },
-  preview: {
-    ...typeScale.secondary,
-    marginTop: spacing.md,
-    color: colors.textSecondary,
-    fontFamily: fonts.displayMedium,
-  },
-});

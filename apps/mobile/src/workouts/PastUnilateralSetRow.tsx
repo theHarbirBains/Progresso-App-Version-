@@ -1,10 +1,9 @@
 import { memo } from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
-import { colors } from '../design/theme';
 import type { MeasurementType } from '../exercises/movementTypes';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { PastSetRemoveButton, SIDES } from './SetRowActions';
 import { SetValueFields } from './SetValueFields';
 
 export interface PastUnilateralSideInput {
@@ -27,11 +26,6 @@ interface Props {
   onRemove: () => void;
   testID?: string;
 }
-
-const SIDES = [
-  { key: 'left', tag: 'L', name: 'left' },
-  { key: 'right', tag: 'R', name: 'right' },
-] as const;
 
 /** UnilateralSetRow's shape for LogPastWorkoutScreen -- see PastSetRow's own comment on why there's a remove button instead of a complete toggle here. */
 function PastUnilateralSetRowComponent({
@@ -72,15 +66,7 @@ function PastUnilateralSetRowComponent({
         ))}
       </View>
 
-      <TouchableOpacity
-        testID={testID ? `${testID}-remove` : undefined}
-        style={styles.setCompleteButton}
-        onPress={onRemove}
-        accessibilityRole="button"
-        accessibilityLabel={`Remove set ${setIndex}`}
-      >
-        <Feather name="trash-2" size={18} color={colors.textMuted} />
-      </TouchableOpacity>
+      <PastSetRemoveButton testID={testID} setIndex={setIndex} onRemove={onRemove} />
     </View>
   );
 }
