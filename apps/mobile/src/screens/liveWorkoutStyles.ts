@@ -384,18 +384,4 @@ export const liveWorkoutStyles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.xxl,
   },
-  // Vertical breathing room around the muscle-group filter row, so it does
-  // not sit flush against the search field or the first row.
-  muscleGroupChipsWrap: {
-    marginVertical: spacing.sm,
-  },
-  pickerLoading: {
-    paddingVertical: spacing.lg,
-  },
-  pickerEmptyText: {
-    ...typeScale.callout,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.xl,
-  },
 });

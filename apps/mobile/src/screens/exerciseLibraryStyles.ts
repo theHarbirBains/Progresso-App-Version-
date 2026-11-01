@@ -89,10 +89,4 @@ export const exerciseLibraryStyles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
-
-  errorText: {
-    ...typeScale.callout,
-    color: colors.destructive,
-    marginBottom: spacing.md,
-  },
 });

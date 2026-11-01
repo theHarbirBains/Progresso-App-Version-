@@ -127,9 +127,6 @@ export const workoutSplitStyles = StyleSheet.create({
   },
 
   // ---- Split form ----------------------------------------------------------
-  formGap: {
-    gap: spacing.lg,
-  },
   formDayHeader: {
     flexDirection: 'row',
     alignItems: 'flex-end',

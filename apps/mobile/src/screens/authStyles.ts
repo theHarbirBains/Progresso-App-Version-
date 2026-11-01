@@ -65,15 +65,4 @@ export const authStyles = StyleSheet.create({
     ...typeScale.secondary,
     color: colors.textMuted,
   },
-  // "Already have an account? Sign In"
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  footerText: {
-    ...typeScale.callout,
-    color: colors.textSecondary,
-  },
 });

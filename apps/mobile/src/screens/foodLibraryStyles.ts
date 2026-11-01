@@ -17,9 +17,6 @@ export const foodLibraryStyles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingBottom: spacing.lg,
   },
-  modeToggleWrap: {
-    marginBottom: spacing.xs,
-  },
   listCard: {
     flex: 1,
   },
@@ -34,9 +31,6 @@ export const foodLibraryStyles = StyleSheet.create({
   countText: {
     ...typeScale.secondary,
     color: colors.textSecondary,
-  },
-  padded: {
-    paddingHorizontal: 0,
   },
 
   // A letter heading after the first: room above it, so the groups read apart.

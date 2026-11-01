@@ -51,21 +51,4 @@ export const onboardingStyles = StyleSheet.create({
   footer: {
     paddingTop: spacing.lg,
   },
-  completionContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  completionTitle: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  completionSubtitle: {
-    ...typeScale.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.xxxl,
-  },
 });

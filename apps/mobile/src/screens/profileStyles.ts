@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, fonts, radii, spacing, typeScale, widgetGap } from '../design/theme';
+import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
 // Profile-specific layout only -- everything reusable (cards, buttons,
 // section headers, stat blocks, segmented control) comes from src/design/
@@ -8,12 +8,6 @@ import { colors, fonts, radii, spacing, typeScale, widgetGap } from '../design/t
 // convention used throughout the app. The screen is a stack of widgets
 // (AppCards) `widgetGap` apart, same rhythm as the workout/nutrition tabs.
 export const profileStyles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    // Transparent -- the warm background (photo included) is painted once,
-    // behind every screen; screens never hardcode it.
-    backgroundColor: 'transparent',
-  },
   scrollContent: {
     paddingTop: spacing.sm,
     gap: widgetGap,
@@ -178,19 +172,5 @@ export const profileStyles = StyleSheet.create({
     ...typeScale.sectionHeading,
     color: colors.textMuted,
     marginBottom: spacing.md,
-  },
-  avatarSheetAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  avatarSheetActionLabel: {
-    ...typeScale.cardTitle,
-    fontFamily: fonts.semibold,
-    color: colors.textPrimary,
-  },
-  avatarSheetActionDestructive: {
-    color: colors.destructive,
   },
 });

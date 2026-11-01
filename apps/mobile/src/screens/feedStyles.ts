@@ -16,9 +16,6 @@ export const feedStyles = StyleSheet.create({
   content: {
     gap: widgetGap,
   },
-  loading: {
-    paddingVertical: spacing.xxl,
-  },
   // "Get Started" (the empty-state actions card's header) sits directly on
   // the screen, not inside a card -- same explicit 6px gutter call as
   // NotificationsScreen's own section headers.
@@ -106,10 +103,6 @@ export const feedStyles = StyleSheet.create({
   // Exercises, Sets/Volume) -- the same 2x2 grid WorkoutDetailScreen's own
   // hero summary uses, rather than a single cramped 3-across row, so a
   // fourth genuinely useful number (Exercises) fits without crowding.
-  statGrid: {
-    gap: widgetGap,
-    marginTop: spacing.md,
-  },
   statRow: {
     flexDirection: 'row',
     gap: widgetGap,

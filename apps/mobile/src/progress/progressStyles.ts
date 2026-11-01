@@ -7,12 +7,6 @@ import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
 // only the accent color varies, and it's always passed in as a prop
 // (the user's Workout Mode color), never hardcoded here.
 export const progressStyles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    // Transparent -- the warm background (photo included) is painted once,
-    // behind every screen; screens never hardcode it.
-    backgroundColor: 'transparent',
-  },
   // A section (PRs/Exercises/Top Sets/1RM) that owns a FlatList rather than
   // sharing Strength's own ScrollView -- this gives that FlatList a
   // properly flexed parent so it fills the remaining space below whatever
@@ -26,51 +20,7 @@ export const progressStyles = StyleSheet.create({
     flex: 1,
     gap: spacing.md,
   },
-  scrollContent: {
-    paddingHorizontal: 0,
-    paddingBottom: spacing.xxxl,
-  },
 
-  // ProgressHeader
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: spacing.lg,
-  },
-  headerTitle: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
-  },
-  // ProgressHeader's chrome row -- hamburger, centered "Progress" title, an
-  // empty same-width spacer on the right (no notification bell any more).
-  // Symmetric 36x36 side slots around a flexible, text-centered middle
-  // column -- the same pattern design/AppHeader.tsx uses for every other
-  // screen's title row, just hand-rolled here since this component owns
-  // its own mode-toggle/heading content below. Kept separate from `header`
-  // above, which ProgressExerciseDetailScreen still uses for its own
-  // back-button row.
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  // The page title itself now (no longer a small letter-spaced "PROGRESSO"
-  // wordmark) -- matches AppHeader's own `title` style exactly (screenTitle
-  // scale, textPrimary), the same treatment every other page's title
-  // (Workouts, Workout Splits, Exercise Library) gets from the shared
-  // AppHeader component.
-  wordmark: {
-    ...typeScale.screenTitle,
-    flex: 1,
-    textAlign: 'center',
-    color: colors.textPrimary,
-  },
-  topBarSpacer: {
-    width: 36,
-    height: 36,
-  },
   // ProgressHeader's eyebrow/heading/supporting-text block, below the
   // chrome row and the mode toggle -- "PROGRESS" (accent-colored eyebrow),
   // "Track Your Growth" (the screen's real title, large), then a two-line
@@ -95,16 +45,6 @@ export const progressStyles = StyleSheet.create({
     ...typeScale.body,
     color: colors.textSecondary,
     lineHeight: 20,
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   // Wraps the shared ModeToggle (design/ModeToggle.tsx) -- Progress is one
@@ -131,23 +71,6 @@ export const progressStyles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 
-  section: {
-    marginBottom: spacing.xxl,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-
-  // Overview hero
-  heroTitle: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-    marginBottom: spacing.xxl,
-  },
-
   // ProgressExerciseDetailScreen's scrolling body (the frame is `Screen`).
   detailContent: {
     paddingBottom: spacing.xxl,
@@ -163,77 +86,6 @@ export const progressStyles = StyleSheet.create({
   featuredDelta: {
     ...typeScale.secondary,
     marginTop: 2,
-  },
-
-  // TimeRangeSelector
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  chip: {
-    minHeight: 36,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  chipText: {
-    ...typeScale.secondary,
-    fontFamily: fonts.semibold,
-    color: colors.textSecondary,
-  },
-
-  // ChartPointDetail
-  pointDetail: {
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radii.md,
-    padding: spacing.lg,
-    marginTop: spacing.lg,
-  },
-  pointDetailHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  pointDetailHeadline: {
-    ...typeScale.statMedium,
-    fontFamily: fonts.monoBold,
-  },
-  pointDetailMeta: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  pointDetailDismiss: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pointDetailStatsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.lg,
-    marginTop: spacing.lg,
-  },
-  pointDetailStat: {
-    minWidth: 80,
-  },
-  pointDetailStatLabel: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  pointDetailStatValue: {
-    ...typeScale.statSmall,
-    fontFamily: fonts.monoBold,
-    color: colors.textPrimary,
   },
 
   // MetricCard
@@ -367,35 +219,6 @@ export const progressStyles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
-  // Strength Progress's two stacked filters (Muscle Group, Time Range) --
-  // each its own labeled block, `spacing.lg` apart, so the two chip rows
-  // read as two distinct controls rather than one dense, unlabeled block
-  // (the "bad spacing" this was built to fix -- MuscleGroupChips and
-  // TimeRangeSelector each carry no spacing of their own on this shared
-  // side, so nothing separated them before). TimeRangeSelector's own
-  // `chipRow` already carries its usual trailing `marginBottom` after the
-  // last block, so this group doesn't add a second one.
-  filterGroup: {
-    gap: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  filterLabel: {
-    ...typeScale.label,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  searchInput: {
-    ...typeScale.body,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-  },
-
   // TopSetRow -- a standalone glass card per exercise (not a divided list
   // like PRRow/ExerciseProgressRow), per the Top Sets page's own design
   // spec. Consistent AppCard spacing between cards comes from FlatList's
@@ -452,11 +275,6 @@ export const progressStyles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
   },
 
-  loadingWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,
@@ -510,13 +328,6 @@ export const progressStyles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  statTileIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   statTileValue: {
     ...typeScale.statMedium,
     color: colors.textPrimary,
@@ -559,104 +370,6 @@ export const progressStyles = StyleSheet.create({
   muscleGroupBarFill: {
     height: '100%',
     borderRadius: radii.pill,
-  },
-
-  // Strength Progress -- the featured exercise's card (name, muscle-group/
-  // movement-type tags, starting/latest performance, delta + progress
-  // level, chart) and the "other exercises with meaningful progress" list
-  // below it.
-  strengthCard: {
-    marginBottom: spacing.lg,
-  },
-  strengthCardName: {
-    ...typeScale.cardTitle,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  strengthTagsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  strengthTag: {
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  strengthTagText: {
-    ...typeScale.caption,
-    fontFamily: fonts.semibold,
-    color: colors.textSecondary,
-  },
-  strengthPerfGrid: {
-    flexDirection: 'row',
-    gap: spacing.xl,
-    marginBottom: spacing.lg,
-  },
-  strengthPerfLabel: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  strengthPerfValue: {
-    ...typeScale.statMedium,
-    fontFamily: fonts.monoBold,
-    color: colors.textPrimary,
-  },
-  strengthDeltaRow: {
-    marginBottom: spacing.lg,
-  },
-  strengthDeltaValue: {
-    ...typeScale.statMedium,
-    fontFamily: fonts.monoBold,
-  },
-  strengthLevelBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    marginTop: spacing.xs,
-  },
-  strengthLevelBadgeText: {
-    ...typeScale.secondary,
-    fontFamily: fonts.display,
-  },
-
-  strengthListRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  strengthListRowDivider: {
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-  },
-  strengthListRowBody: {
-    flex: 1,
-  },
-  strengthListRowName: {
-    ...typeScale.body,
-    fontFamily: fonts.semibold,
-    color: colors.textPrimary,
-  },
-  strengthListRowMeta: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  strengthListRowTrailing: {
-    alignItems: 'flex-end',
-  },
-  strengthListRowDelta: {
-    ...typeScale.statSmall,
-    fontFamily: fonts.monoBold,
-  },
-  strengthListRowLevel: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: 2,
   },
 
   // All Time tab -- see AllTimeSection.tsx. Its own tokens rather than

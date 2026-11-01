@@ -11,13 +11,6 @@ export const workoutHistoryStyles = StyleSheet.create({
   content: {
     gap: widgetGap,
   },
-  // Wraps the shared ModeToggle -- Workouts is one of the app's primary/root
-  // screens, so it keeps this the same way Dashboard does; deeper screens
-  // reached from here don't.
-  modeToggleWrap: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
-  },
 
   // The line above the one primary button ("Ready to train?", "You have a
   // workout in progress") -- layout-only: its colour comes at render time
@@ -68,9 +61,5 @@ export const workoutHistoryStyles = StyleSheet.create({
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,
-  },
-  loading: {
-    paddingVertical: spacing.xl,
-    alignItems: 'center',
   },
 });
