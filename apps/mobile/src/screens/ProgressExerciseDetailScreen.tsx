@@ -72,8 +72,8 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
     }
   }, [userId, exerciseId]);
 
+  // Loads each time the page comes into view -- including the first, so no separate mount load.
   useEffect(() => {
-    load();
     const unsubscribe = navigation.addListener('focus', load);
     return unsubscribe;
   }, [navigation, load]);

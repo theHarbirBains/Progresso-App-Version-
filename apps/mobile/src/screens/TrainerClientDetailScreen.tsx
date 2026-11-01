@@ -172,11 +172,8 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
     }
   }, [accessToken, clientId, user?.id]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  // Coming back from editing or logging a workout shows the change straight away.
+  // Loads each time the page comes into view -- including the first, so no separate mount load --
+  // and coming back from editing or logging a workout shows the change straight away.
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => void load());
     return unsubscribe;

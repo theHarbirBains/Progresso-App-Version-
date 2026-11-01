@@ -12,8 +12,10 @@ const listeners: Record<string, () => void> = {};
 const navigation = {
   navigate: jest.fn(),
   goBack: jest.fn(),
+  // The page's focus comes once as it opens, as in the app.
   addListener: jest.fn((event: string, cb: () => void) => {
     listeners[event] = cb;
+    if (event === 'focus') cb();
     return jest.fn();
   }),
 };
@@ -67,9 +69,12 @@ describe('AdminFeedbackInboxScreen', () => {
   it('filters by status and kind, and searches the words', async () => {
     renderScreen();
     await screen.findByTestId('admin-feedback-item-fb-1');
+    // Once as it opens, not twice.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
 
     fireEvent.press(screen.getByTestId('admin-feedback-status-new'));
     await waitFor(() => expect(mockFetch).toHaveBeenLastCalledWith('token-1', { status: 'new' }));
+    expect(mockFetch).toHaveBeenCalledTimes(2);
     fireEvent.press(screen.getByTestId('admin-feedback-category-feature'));
     await waitFor(() =>
       expect(mockFetch).toHaveBeenLastCalledWith('token-1', { status: 'new', category: 'feature' }),

@@ -84,10 +84,16 @@ export function AdminFeedbackInboxScreen({ navigation }: Props) {
     }
   }, [accessToken, filters]);
 
+  // Read on every visit -- the first included: it comes as the page opens -- and again whenever
+  // the filters change.
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => navigation.addListener('focus', () => void loadRef.current()), [navigation]);
+  const filtered = useRef(false);
   useEffect(() => {
-    void load();
+    if (filtered.current) void load();
+    filtered.current = true;
   }, [load]);
-  useEffect(() => navigation.addListener('focus', () => void load()), [navigation, load]);
 
   async function loadMore() {
     if (!accessToken || !inbox?.nextBefore || loadingMore) return;

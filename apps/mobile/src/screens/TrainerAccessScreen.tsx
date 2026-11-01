@@ -72,11 +72,8 @@ export function TrainerAccessScreen({ navigation }: Props) {
     }
   }, [accessToken]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  // Coming back from a client's page shows any change straight away.
+  // Loads each time the page comes into view -- including the first, so no separate mount load --
+  // and coming back from a client's page shows any change straight away.
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => void load());
     return unsubscribe;

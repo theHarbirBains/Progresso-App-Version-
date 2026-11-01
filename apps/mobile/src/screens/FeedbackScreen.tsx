@@ -42,10 +42,8 @@ export function FeedbackScreen({ navigation }: Props) {
     }
   }, [userId]);
 
+  // Read on every visit -- the first included: it comes as the page opens.
   useEffect(() => navigation.addListener('focus', () => void load()), [navigation, load]);
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   return (
     <Screen

@@ -44,7 +44,11 @@ const mockGoBack = jest.fn();
 const navigation: any = {
   navigate: mockNavigate,
   goBack: mockGoBack,
-  addListener: jest.fn(() => () => undefined),
+  // The page loads on focus -- which, as in the app, comes once as it opens.
+  addListener: jest.fn((event: string, cb: () => void) => {
+    if (event === 'focus') cb();
+    return () => undefined;
+  }),
 };
 
 const TRAINER_ID = 'trainer-1';

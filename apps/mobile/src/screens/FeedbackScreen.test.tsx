@@ -12,8 +12,10 @@ const listeners: Record<string, () => void> = {};
 const navigation = {
   navigate: jest.fn(),
   goBack: jest.fn(),
+  // The page's focus comes once as it opens, as in the app.
   addListener: jest.fn((event: string, cb: () => void) => {
     listeners[event] = cb;
+    if (event === 'focus') cb();
     return jest.fn();
   }),
 };
@@ -80,6 +82,8 @@ describe('FeedbackScreen', () => {
     mockFetch.mockResolvedValue([]);
     renderScreen();
     await screen.findByTestId('feedback-empty');
+    // Once as it opens, not twice.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
 
     mockFetch.mockResolvedValue([submission]);
     await act(async () => {
