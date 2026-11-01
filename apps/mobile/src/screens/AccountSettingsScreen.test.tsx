@@ -53,6 +53,8 @@ describe('AccountSettingsScreen', () => {
     ['settings-category-notifications', 'SettingsNotifications'],
     ['settings-category-account-security', 'SettingsAccountSecurity'],
     ['settings-category-support', 'SettingsSupport'],
+    // Feedback & Suggestions straight from Settings, as well as under Support & About.
+    ['settings-feedback', 'Feedback'],
   ])('navigates to %s when its row is pressed', (testID, route) => {
     renderScreen();
 

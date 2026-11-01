@@ -100,6 +100,14 @@ export function AccountSettingsScreen({ navigation }: Props) {
           divider
           onPress={() => navigation.navigate('SettingsSupport')}
         />
+        <ListRow
+          testID="settings-feedback"
+          icon="message-square"
+          title="Feedback & Suggestions"
+          subtitle="Report a bug, suggest a feature, see what's happening with it"
+          divider
+          onPress={() => navigation.navigate('Feedback')}
+        />
       </Section>
 
       {isAdmin ? (
