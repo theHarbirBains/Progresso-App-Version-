@@ -17,13 +17,13 @@ import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale, widgetGap } from '../design/theme';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { searchFoods } from '../lib/foodsApi';
 import { FoodImage } from './FoodImage';
 import { fetchAllFoods, fetchRecentFoods, type FoodRow } from './foodQueries';
 import { SkeletonRows } from '../design/Skeleton';
 import { wholeFigure } from './wholeFigures';
 
-const SEARCH_DEBOUNCE_MS = 300;
 // Recent here is a wider net than the Food Library's: it's where foods from Search live.
 const RECENT_LIMIT = 20;
 /** Searching every food starts at this many letters. */
@@ -59,15 +59,10 @@ export function FoodPickerStep({ title, excludeId, onPick, onCancel }: Props) {
   const [own, setOwn] = useState<FoodRow[] | null>(null);
   const [recent, setRecent] = useState<FoodRow[]>([]);
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const search = useDebouncedValue(searchInput.trim());
   const [results, setResults] = useState<FoodRow[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
 
   useEffect(() => {
     if (!userId) return;

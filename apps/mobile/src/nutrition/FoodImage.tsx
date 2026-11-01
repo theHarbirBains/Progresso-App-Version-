@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { PhotoLightbox } from '../design/PhotoLightbox';
+import { ZoomablePhoto } from '../design/PhotoLightbox';
 import { colors, radii } from '../design/theme';
 import { foodGlyph } from './foodGlyph';
 
@@ -31,7 +31,6 @@ interface Props {
 // it's a button ("View Oreo photo") that opens the photo full screen.
 export function FoodImage({ uri, name, size = 48, zoomable, testID }: Props) {
   const [failed, setFailed] = useState(false);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
   const frame = { width: size, height: size };
   const showPhoto = Boolean(uri) && !failed;
   const canZoom = Boolean(zoomable) && showPhoto;
@@ -66,22 +65,9 @@ export function FoodImage({ uri, name, size = 48, zoomable, testID }: Props) {
   if (!canZoom) return picture;
 
   return (
-    <>
-      <TouchableOpacity
-        testID={testID ? `${testID}-zoom` : undefined}
-        onPress={() => setLightboxOpen(true)}
-        accessibilityRole="imagebutton"
-        accessibilityLabel={`View ${name} photo`}
-      >
-        {picture}
-      </TouchableOpacity>
-      <PhotoLightbox
-        testID={testID ? `${testID}-lightbox` : undefined}
-        visible={lightboxOpen}
-        uri={uri as string}
-        onClose={() => setLightboxOpen(false)}
-      />
-    </>
+    <ZoomablePhoto uri={uri as string} name={name} testID={testID}>
+      {picture}
+    </ZoomablePhoto>
   );
 }
 

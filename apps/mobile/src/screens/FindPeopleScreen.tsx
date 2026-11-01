@@ -38,12 +38,12 @@ import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { findPeopleStyles as styles } from './findPeopleStyles';
 import { SkeletonRows } from '../design/Skeleton';
 import { useAppTheme } from '../theme/appThemeContext';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 
 type Props = RootStackScreenProps<'FindPeople'>;
 type FindPeopleTab = 'friends' | 'requests';
 type FriendsSubTab = 'suggested' | 'contacts';
 
-const SEARCH_DEBOUNCE_MS = 300;
 const INVITE_MESSAGE = 'Join me on Progresso — track your workouts and nutrition.';
 
 function rowLabel(user: FollowUser): { title: string; subtitle: string | undefined } {
@@ -94,7 +94,7 @@ export function FindPeopleScreen({ navigation }: Props) {
   const [suggestedError, setSuggestedError] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const search = useDebouncedValue(searchInput.trim());
   const [results, setResults] = useState<FollowSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -146,11 +146,6 @@ export function FindPeopleScreen({ navigation }: Props) {
     });
     return unsubscribe;
   }, [navigation, loadRequests, loadSuggested]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
 
   const runSearch = useCallback(async () => {
     if (!search) {

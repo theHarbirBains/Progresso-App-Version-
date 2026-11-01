@@ -30,7 +30,7 @@ import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { computeNextWorkout, musclesLabel, type NextWorkoutPlan } from '../workouts/nextWorkout';
+import { musclesLabel, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import { fetchActiveWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
 import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
@@ -43,10 +43,7 @@ import { endClosedWorkoutActivities } from '../widgets/workoutActivity';
 import { recallLiveWorkout, rememberLiveWorkout } from '../feed/liveWorkoutMemory';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
-import {
-  fetchLastWorkoutSplitDayId,
-  fetchWorkoutSplitDetail,
-} from '../workouts/workoutSplitQueries';
+import { fetchNextWorkout } from '../workouts/nextWorkoutQueries';
 import { feedStyles as styles } from './feedStyles';
 
 type Props = RootStackScreenProps<'Feed'>;
@@ -291,11 +288,7 @@ export function FeedScreen({ navigation }: Props) {
       return;
     }
     try {
-      const [detail, lastDayId] = await Promise.all([
-        fetchWorkoutSplitDetail(activeWorkoutSplitId),
-        fetchLastWorkoutSplitDayId(userId),
-      ]);
-      setNextPlan(computeNextWorkout(detail, lastDayId));
+      setNextPlan(await fetchNextWorkout(userId, activeWorkoutSplitId));
       setNextLoaded(true);
       lastNextWorkoutLoadAtRef.current = Date.now();
     } catch {

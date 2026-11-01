@@ -1,9 +1,5 @@
 import { recordQuietFailure } from '../lib/sentry';
-import { computeNextWorkout } from '../workouts/nextWorkout';
-import {
-  fetchLastWorkoutSplitDayId,
-  fetchWorkoutSplitDetail,
-} from '../workouts/workoutSplitQueries';
+import { fetchNextWorkout } from '../workouts/nextWorkoutQueries';
 import { showNextWorkoutWidget } from './widgetUpdates';
 
 /**
@@ -16,11 +12,7 @@ export async function refreshNextWorkout(userId: string, activeSplitId: string |
       await showNextWorkoutWidget(null, null);
       return;
     }
-    const [detail, lastDayId] = await Promise.all([
-      fetchWorkoutSplitDetail(activeSplitId),
-      fetchLastWorkoutSplitDayId(userId),
-    ]);
-    await showNextWorkoutWidget(null, computeNextWorkout(detail, lastDayId));
+    await showNextWorkoutWidget(null, await fetchNextWorkout(userId, activeSplitId));
   } catch (error) {
     recordQuietFailure('widget.nextWorkout', error);
   }

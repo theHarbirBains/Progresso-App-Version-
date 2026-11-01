@@ -22,7 +22,7 @@ import { Skeleton, SkeletonRows } from '../design/Skeleton';
 import { recallShown, rememberShown } from '../lib/lastShown';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { computeNextWorkout, musclesLabel, type NextWorkoutPlan } from '../workouts/nextWorkout';
+import { musclesLabel, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import { UnfinishedWorkoutSheet } from '../workouts/UnfinishedWorkoutSheet';
 import {
   assessUnfinishedWorkout,
@@ -43,10 +43,7 @@ import {
   fetchWorkoutsForMonth,
   type WorkoutSummary,
 } from '../workouts/workoutQueries';
-import {
-  fetchLastWorkoutSplitDayId,
-  fetchWorkoutSplitDetail,
-} from '../workouts/workoutSplitQueries';
+import { fetchNextWorkout } from '../workouts/nextWorkoutQueries';
 import { feedStyles } from './feedStyles';
 import { workoutHistoryStyles as styles } from './workoutHistoryStyles';
 
@@ -178,11 +175,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       return;
     }
     try {
-      const [detail, lastDayId] = await Promise.all([
-        fetchWorkoutSplitDetail(activeWorkoutSplitId),
-        fetchLastWorkoutSplitDayId(userId),
-      ]);
-      const plan = computeNextWorkout(detail, lastDayId);
+      const plan = await fetchNextWorkout(userId, activeWorkoutSplitId);
       setNextPlan(plan);
       rememberShown(userId, 'history.nextPlan', plan);
     } catch {

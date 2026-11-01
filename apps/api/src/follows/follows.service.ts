@@ -53,6 +53,11 @@ function toUserSummary(row: Record<string, unknown>): FollowUserSummary {
  * service-role client rather than relying on client-side RLS -- matching
  * CLAUDE.md's hybrid backend pattern.
  */
+/** Someone whose profile couldn't be read: their id, and nothing to show for them. */
+function unknownUser(id: string): FollowUserSummary {
+  return { id, username: null, displayName: null, avatarUrl: null };
+}
+
 @Injectable()
 export class FollowsService {
   constructor(private readonly supabaseService: SupabaseService) {}
@@ -184,12 +189,7 @@ export class FollowsService {
     return rows.map((r) => ({
       followId: r.id as string,
       createdAt: r.created_at as string,
-      user: users.get(r.follower_id as string) ?? {
-        id: r.follower_id as string,
-        username: null,
-        displayName: null,
-        avatarUrl: null,
-      },
+      user: users.get(r.follower_id as string) ?? unknownUser(r.follower_id as string),
     }));
   }
 
@@ -249,12 +249,7 @@ export class FollowsService {
     return rows.map((r) => ({
       followId: r.id as string,
       createdAt: r.responded_at as string,
-      user: users.get(r.followee_id as string) ?? {
-        id: r.followee_id as string,
-        username: null,
-        displayName: null,
-        avatarUrl: null,
-      },
+      user: users.get(r.followee_id as string) ?? unknownUser(r.followee_id as string),
     }));
   }
 

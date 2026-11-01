@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { addMonths } from '../design/calendarGrid';
+import { addMonths, toLocalDateKey } from '../design/calendarGrid';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import {
@@ -62,6 +62,26 @@ export function setsToSave(exercise: PastDraftExercise): PastDraftSet[] {
 export function dateKeyToLocalDate(dateKey: string): Date {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+/** Why the workout's name or date can't be saved, or null when they can. */
+export function detailsProblem(name: string, date: Date): string | null {
+  if (!name.trim()) return 'Enter a name for this workout';
+  if (toLocalDateKey(date) > toLocalDateKey(new Date()))
+    return "Pick a date that's already happened";
+  return null;
+}
+
+/**
+ * When the workout finished: its date plus the duration typed. With none typed, undefined -- a
+ * workout saved without one ends as it starts (completedAt = performedAt, createLoggedWorkout's
+ * default), which every duration readout shows as "--", never a made-up "0 min".
+ */
+export function completedAtFor(date: Date, hours: string, minutes: string): string | undefined {
+  const totalMinutes = (Number(hours) || 0) * 60 + (Number(minutes) || 0);
+  return totalMinutes > 0
+    ? new Date(date.getTime() + totalMinutes * 60000).toISOString()
+    : undefined;
 }
 
 /** The exercises and sets being typed in, and every change the page can make to them. */

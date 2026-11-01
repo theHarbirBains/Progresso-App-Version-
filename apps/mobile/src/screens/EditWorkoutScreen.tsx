@@ -5,10 +5,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { resolveClientExercise } from '../lib/api';
 import { AppHeader } from '../design/AppHeader';
 import { PrimaryButton, TextButton } from '../design/Button';
-import { toLocalDateKey } from '../design/calendarGrid';
 import { colors } from '../design/theme';
 import { Screen } from '../design/Screen';
-import { Card } from '../design/Card';
 import { RiseInStack } from '../design/RiseIn';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { measurementTypeOf } from '../exercises/movementTypes';
@@ -16,15 +14,20 @@ import { draftFromSet, draftValues } from '../workouts/setInputDrafts';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { AddExerciseButton } from '../workouts/AddExerciseButton';
-import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
 import {
   PastExerciseCard,
+  PastWorkoutAddCard,
   PastWorkoutDateSheet,
   PastWorkoutDetailsCard,
 } from '../workouts/PastWorkoutForm';
-import { setsToSave, usePastWorkoutDate, usePastWorkoutDraft } from '../workouts/pastWorkoutDraft';
+import {
+  completedAtFor,
+  detailsProblem,
+  setsToSave,
+  usePastWorkoutDate,
+  usePastWorkoutDraft,
+} from '../workouts/pastWorkoutDraft';
 import { computeDurationMinutes } from '../workouts/topSetSummary';
 import {
   addExerciseToWorkout,
@@ -175,12 +178,9 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
     setError(null);
 
     const trimmedName = name.trim();
-    if (!trimmedName) {
-      setError('Enter a name for this workout');
-      return;
-    }
-    if (toLocalDateKey(date) > toLocalDateKey(new Date())) {
-      setError("Pick a date that's already happened");
+    const problem = detailsProblem(name, date);
+    if (problem) {
+      setError(problem);
       return;
     }
 
@@ -192,12 +192,8 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
         // together, so moving the date never silently skews a duration.
         // With no duration entered it goes back to equal performedAt --
         // the same "unknown duration" marker createLoggedWorkout uses.
-        const totalDurationMinutes =
-          (Number(durationHours) || 0) * 60 + (Number(durationMinutes) || 0);
         const completedAtIso =
-          totalDurationMinutes > 0
-            ? new Date(date.getTime() + totalDurationMinutes * 60000).toISOString()
-            : performedAtIso;
+          completedAtFor(date, durationHours, durationMinutes) ?? performedAtIso;
         if (
           trimmedName !== original.name ||
           performedAtIso !== original.performedAt ||
@@ -397,16 +393,11 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
               />
             ))}
 
-            <Card testID="edit-workout-add-card" style={styles.cardBody}>
-              <AddExerciseButton
-                testID="edit-workout-add-exercise"
-                onPress={() => setPickerOpen(true)}
-              />
-              <CreateCustomExerciseButton
-                testID="edit-workout-create-custom"
-                onPress={() => setCustomExerciseOpen(true)}
-              />
-            </Card>
+            <PastWorkoutAddCard
+              testID="edit-workout"
+              onAddExercise={() => setPickerOpen(true)}
+              onCreateCustom={() => setCustomExerciseOpen(true)}
+            />
           </RiseInStack>
         </ScrollView>
 

@@ -12,14 +12,13 @@ import {
 } from '../exercises/exerciseQueries';
 import { ExerciseBrowser } from '../exercises/ExerciseBrowser';
 import { type MuscleGroup } from '../exercises/muscleGroups';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { updateExercise } from '../lib/api';
 import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
 import { exerciseLibraryStyles as styles } from './exerciseLibraryStyles';
-
-const SEARCH_DEBOUNCE_MS = 300;
 
 type Props = RootStackScreenProps<'ExerciseLibrary'>;
 
@@ -53,7 +52,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
 
   const [mode, setMode] = useState<Mode>({ type: 'list' });
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const search = useDebouncedValue(searchInput);
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(null);
   const [source, setSource] = useState<ExerciseSource>('all');
   const [rows, setRows] = useState<ExerciseRow[]>([]);
@@ -65,13 +64,6 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   // not each category's own stable total. Null until the first fetch
   // resolves, so the cards show no number rather than a wrong one meanwhile.
   const [sourceCounts, setSourceCounts] = useState<ExerciseSourceCounts | null>(null);
-
-  // Debounce free-text input before it drives a query, so every keystroke
-  // doesn't fire its own request.
-  useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
 
   const load = useCallback(async () => {
     if (!userId) return;

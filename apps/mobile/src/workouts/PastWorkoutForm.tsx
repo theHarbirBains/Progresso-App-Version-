@@ -11,6 +11,8 @@ import { TextInput } from '../design/TextInput';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { liveWorkoutStyles } from '../screens/liveWorkoutStyles';
 import { logPastWorkoutStyles as styles } from '../screens/logPastWorkoutStyles';
+import { AddExerciseButton } from './AddExerciseButton';
+import { CreateCustomExerciseButton } from './CreateCustomExerciseButton';
 import { DurationInput } from './DurationInput';
 import { PastSetRow } from './PastSetRow';
 import { PastUnilateralSetRow } from './PastUnilateralSetRow';
@@ -172,6 +174,34 @@ export function PastExerciseCard({ testID, exercise, draft }: ExerciseProps) {
           onPress={() => draft.addSet(exercise)}
         />
       </View>
+    </Card>
+  );
+}
+
+interface AddCardProps {
+  testID: string;
+  onAddExercise: () => void;
+  onCreateCustom: () => void;
+  /** A line above the buttons, while there's nothing yet. */
+  emptyHint?: string;
+}
+
+/** The card at the end of the exercises: Add Exercise, and Create Custom Exercise. */
+export function PastWorkoutAddCard({
+  testID,
+  onAddExercise,
+  onCreateCustom,
+  emptyHint,
+}: AddCardProps) {
+  return (
+    <Card testID={`${testID}-add-card`} style={styles.cardBody}>
+      {emptyHint ? (
+        <Text testID={`${testID}-empty`} style={styles.hint}>
+          {emptyHint}
+        </Text>
+      ) : null}
+      <AddExerciseButton testID={`${testID}-add-exercise`} onPress={onAddExercise} />
+      <CreateCustomExerciseButton testID={`${testID}-create-custom`} onPress={onCreateCustom} />
     </Card>
   );
 }

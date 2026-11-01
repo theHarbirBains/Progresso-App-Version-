@@ -1,4 +1,12 @@
-import { Modal, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import {
+  Modal,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton } from './IconButton';
@@ -9,6 +17,43 @@ interface Props {
   uri: string | null;
   onClose: () => void;
   testID?: string;
+}
+
+/**
+ * A small photo that opens full screen when tapped ("View Oreo photo") -- an exercise's machine
+ * photo, a food's. `children` is the photo as it shows small; `testID` names the button
+ * (`-zoom`) and the full-screen view (`-lightbox`).
+ */
+export function ZoomablePhoto({
+  uri,
+  name,
+  testID,
+  children,
+}: {
+  uri: string;
+  name: string;
+  testID?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <TouchableOpacity
+        testID={testID ? `${testID}-zoom` : undefined}
+        onPress={() => setOpen(true)}
+        accessibilityRole="imagebutton"
+        accessibilityLabel={`View ${name} photo`}
+      >
+        {children}
+      </TouchableOpacity>
+      <PhotoLightbox
+        testID={testID ? `${testID}-lightbox` : undefined}
+        visible={open}
+        uri={uri}
+        onClose={() => setOpen(false)}
+      />
+    </>
+  );
 }
 
 /** How far a photo can be pinched in. */

@@ -12,6 +12,7 @@ import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { searchFoods, type FoodSearchResult } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { goToSection } from '../navigation/sectionNavigation';
@@ -24,8 +25,6 @@ import { SkeletonRows } from '../design/Skeleton';
 import { wholeFigure } from '../nutrition/wholeFigures';
 
 type Props = RootStackScreenProps<'FoodSearch'>;
-
-const SEARCH_DEBOUNCE_MS = 300;
 
 // Searches Progresso's food database (generic foods plus real branded
 // grocery products cached from an external provider -- see
@@ -54,18 +53,11 @@ export function FoodSearchScreen({ navigation, route }: Props) {
   const { nutritionTheme: theme } = useProgressTheme();
 
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const search = useDebouncedValue(searchInput.trim());
   const [results, setResults] = useState<FoodSearchResult[]>([]);
   const [selected, setSelected] = useState<FoodSearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Debounce free-text input before it drives a query, so every keystroke
-  // doesn't fire its own request -- same pattern as FoodLibraryScreen.
-  useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
 
   const runSearch = useCallback(async () => {
     if (!search) {

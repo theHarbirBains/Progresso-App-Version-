@@ -25,6 +25,7 @@ import {
 } from '../feedback/feedbackLabels';
 import { feedbackStyles as styles } from '../feedback/feedbackStyles';
 import { senderName } from '../feedback/senderName';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { fetchFeedbackInbox, type FeedbackInbox } from '../lib/feedbackApi';
 import type { RootStackScreenProps } from '../navigation/types';
 import { settingsStyles } from '../settings/settingsStyles';
@@ -32,8 +33,6 @@ import { useAppTheme } from '../theme/appThemeContext';
 import { formatShortDate } from '../workouts/workoutFormat';
 
 type Props = RootStackScreenProps<'AdminFeedbackInbox'>;
-
-const SEARCH_DEBOUNCE_MS = 300;
 
 /**
  * The feedback inbox, for support and full admins (Settings > Admin): search, a status filter with
@@ -47,7 +46,7 @@ export function AdminFeedbackInboxScreen({ navigation }: Props) {
   const accessToken = session?.access_token;
   const { accent } = useAppTheme();
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const search = useDebouncedValue(searchInput.trim());
   const [status, setStatus] = useState<FeedbackStatus | 'all'>('all');
   const [category, setCategory] = useState<FeedbackCategory | 'all'>('all');
   const [inbox, setInbox] = useState<FeedbackInbox | null>(null);
@@ -55,11 +54,6 @@ export function AdminFeedbackInboxScreen({ navigation }: Props) {
   const [loadingMore, setLoadingMore] = useState(false);
   // Only the latest read is kept, so a quick change of filters never shows an older one's results.
   const latest = useRef(0);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
 
   const filters = useCallback(
     () => ({

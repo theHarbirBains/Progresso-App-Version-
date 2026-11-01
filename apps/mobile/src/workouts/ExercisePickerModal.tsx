@@ -17,8 +17,7 @@ import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
 import { withAlpha } from '../theme/accentColor';
 import { useAppTheme } from '../theme/appThemeContext';
-
-const SEARCH_DEBOUNCE_MS = 300;
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 
 interface Props {
   visible: boolean;
@@ -59,7 +58,7 @@ export function ExercisePickerModal({
   const onAccentColor = onAccentColorProp ?? themeAccent.onAccent;
   const reduceMotion = useReduceMotionPreference();
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const search = useDebouncedValue(searchInput);
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(null);
   const [source, setSource] = useState<ExerciseSource>('all');
   const [rows, setRows] = useState<ExerciseRow[]>([]);
@@ -69,12 +68,6 @@ export function ExercisePickerModal({
   const [photoOpen, setPhotoOpen] = useState<string | null>(null);
   // Bumped by Retry to load the exercises again.
   const [attempt, setAttempt] = useState(0);
-
-  // Debounce free-text search, as the Exercise Library does.
-  useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
 
   useEffect(() => {
     if (!visible || !userId) return;

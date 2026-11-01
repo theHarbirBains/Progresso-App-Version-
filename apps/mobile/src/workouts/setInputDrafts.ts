@@ -121,21 +121,29 @@ export function invalidDraftMessage(type: MeasurementType, bothSides = false): s
   }
 }
 
+/** One set as ExerciseCard shows it: what's typed, and whether it can be completed. */
+function cardSet(
+  set: SetRecord,
+  setInputs: Record<string, SetInputDraft>,
+  type: MeasurementType,
+): Omit<ExerciseCardSet, 'setIndex'> {
+  return {
+    id: set.id,
+    weight: setInputs[set.id]?.weight ?? '',
+    reps: setInputs[set.id]?.reps ?? '',
+    duration: setInputs[set.id]?.duration ?? '',
+    completed: set.completedAt !== null,
+    canComplete: isValidDraft(setInputs[set.id], type),
+  };
+}
+
 /** A bilateral exercise's sets as ExerciseCard shows them: what's typed, and whether each can be completed. */
 export function computeCardSets(
   sets: SetRecord[],
   setInputs: Record<string, SetInputDraft>,
   type: MeasurementType = 'weight_reps',
 ): ExerciseCardSet[] {
-  return sets.map((set) => ({
-    id: set.id,
-    setIndex: set.setIndex,
-    weight: setInputs[set.id]?.weight ?? '',
-    reps: setInputs[set.id]?.reps ?? '',
-    duration: setInputs[set.id]?.duration ?? '',
-    completed: set.completedAt !== null,
-    canComplete: isValidDraft(setInputs[set.id], type),
-  }));
+  return sets.map((set) => ({ ...cardSet(set, setInputs, type), setIndex: set.setIndex }));
 }
 
 /** The values a valid draft saves as. Call only after isValidDraft. */
@@ -252,27 +260,9 @@ export function computeUnilateralSets(
   setInputs: Record<string, SetInputDraft>,
   type: MeasurementType = 'weight_reps',
 ): UnilateralExerciseCardSet[] {
-  const bySetIndex = new Map<number, { left?: SetRecord; right?: SetRecord }>();
-  for (const set of sets) {
-    if (set.side !== 'left' && set.side !== 'right') continue;
-    const entry = bySetIndex.get(set.setIndex) ?? {};
-    entry[set.side] = set;
-    bySetIndex.set(set.setIndex, entry);
-  }
-
-  const side = (set: SetRecord) => ({
-    id: set.id,
-    weight: setInputs[set.id]?.weight ?? '',
-    reps: setInputs[set.id]?.reps ?? '',
-    duration: setInputs[set.id]?.duration ?? '',
-    completed: set.completedAt !== null,
-    canComplete: isValidDraft(setInputs[set.id], type),
-  });
-
-  const rows: UnilateralExerciseCardSet[] = [];
-  for (const [setIndex, { left, right }] of bySetIndex) {
-    if (!left || !right) continue;
-    rows.push({ setIndex, left: side(left), right: side(right) });
-  }
-  return rows.sort((a, b) => a.setIndex - b.setIndex);
+  return groupUnilateralSets(sets).map(({ setIndex, left, right }) => ({
+    setIndex,
+    left: cardSet(left, setInputs, type),
+    right: cardSet(right, setInputs, type),
+  }));
 }

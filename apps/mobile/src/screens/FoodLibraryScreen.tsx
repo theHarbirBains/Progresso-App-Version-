@@ -42,8 +42,8 @@ import { FoodFormScreen } from './FoodFormScreen';
 import { FoodGroupFormScreen } from './FoodGroupFormScreen';
 import { SkeletonRows } from '../design/Skeleton';
 import { wholeFigure } from '../nutrition/wholeFigures';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 
-const SEARCH_DEBOUNCE_MS = 300;
 const RECENT_LIMIT = 8;
 const USUAL_LIMIT = 6;
 
@@ -130,7 +130,7 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
       : { type: 'list' },
   );
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const search = useDebouncedValue(searchInput);
   const [ascending, setAscending] = useState(true);
   const [rows, setRows] = useState<FoodRow[]>([]);
   const [meals, setMeals] = useState<SavedMeal[]>([]);
@@ -142,13 +142,6 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
   const [openMeal, setOpenMeal] = useState<SavedMeal | null>(null);
   const [loggingMeal, setLoggingMeal] = useState(false);
   const [mealError, setMealError] = useState<string | null>(null);
-
-  // Debounce free-text input before it drives a query, so every keystroke
-  // doesn't fire its own request -- same pattern as FoodSearchScreen.
-  useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
 
   const load = useCallback(async () => {
     if (!userId) return;

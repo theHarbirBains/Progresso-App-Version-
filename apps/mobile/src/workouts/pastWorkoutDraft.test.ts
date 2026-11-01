@@ -1,7 +1,9 @@
 import { act, renderHook } from '@testing-library/react-native';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import {
+  completedAtFor,
   dateKeyToLocalDate,
+  detailsProblem,
   setsToSave,
   usePastWorkoutDate,
   usePastWorkoutDraft,
@@ -73,6 +75,28 @@ describe('dateKeyToLocalDate', () => {
     expect([date.getFullYear(), date.getMonth(), date.getDate(), date.getHours()]).toEqual([
       2026, 9, 5, 12,
     ]);
+  });
+});
+
+describe('detailsProblem', () => {
+  it('needs a name and a day that has already happened', () => {
+    const today = new Date();
+    const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 12);
+
+    expect(detailsProblem('  ', today)).toBe('Enter a name for this workout');
+    expect(detailsProblem('Push', tomorrow)).toBe("Pick a date that's already happened");
+    expect(detailsProblem('Push', today)).toBeNull();
+  });
+});
+
+describe('completedAtFor', () => {
+  it('is the start plus the duration typed, and nothing with none', () => {
+    const start = new Date('2026-10-05T12:00:00.000Z');
+
+    expect(completedAtFor(start, '1', '30')).toBe('2026-10-05T13:30:00.000Z');
+    expect(completedAtFor(start, '', '45')).toBe('2026-10-05T12:45:00.000Z');
+    expect(completedAtFor(start, '', '')).toBeUndefined();
+    expect(completedAtFor(start, '0', '0')).toBeUndefined();
   });
 });
 

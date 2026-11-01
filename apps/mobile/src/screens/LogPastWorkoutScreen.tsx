@@ -3,9 +3,7 @@ import { ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
-import { Card } from '../design/Card';
 import { PrimaryButton } from '../design/Button';
-import { toLocalDateKey } from '../design/calendarGrid';
 import { RiseInStack } from '../design/RiseIn';
 import { Screen } from '../design/Screen';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
@@ -15,15 +13,20 @@ import { AppMenuContext } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { AddExerciseButton } from '../workouts/AddExerciseButton';
-import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
 import {
   PastExerciseCard,
+  PastWorkoutAddCard,
   PastWorkoutDateSheet,
   PastWorkoutDetailsCard,
 } from '../workouts/PastWorkoutForm';
-import { setsToSave, usePastWorkoutDate, usePastWorkoutDraft } from '../workouts/pastWorkoutDraft';
+import {
+  completedAtFor,
+  detailsProblem,
+  setsToSave,
+  usePastWorkoutDate,
+  usePastWorkoutDraft,
+} from '../workouts/pastWorkoutDraft';
 import {
   addExerciseToWorkout,
   createLoggedWorkout,
@@ -88,12 +91,9 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
     setError(null);
 
     const trimmedName = name.trim();
-    if (!trimmedName) {
-      setError('Enter a name for this workout');
-      return;
-    }
-    if (toLocalDateKey(date) > toLocalDateKey(new Date())) {
-      setError("Pick a date that's already happened");
+    const problem = detailsProblem(name, date);
+    if (problem) {
+      setError(problem);
       return;
     }
     // Only the sets filled in, and only the exercises left with any.
@@ -108,16 +108,8 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
     setSaving(true);
     try {
       const performedAtIso = date.toISOString();
-      const totalDurationMinutes =
-        (Number(durationHours) || 0) * 60 + (Number(durationMinutes) || 0);
-      // Omit entirely (rather than pass 0) when no duration was entered --
-      // createLoggedWorkout's own default (completedAt = performedAt) is
-      // what makes every existing duration readout show "--" instead of a
-      // fabricated "0 min".
-      const completedAtIso =
-        totalDurationMinutes > 0
-          ? new Date(date.getTime() + totalDurationMinutes * 60000).toISOString()
-          : undefined;
+      // None when no duration was entered (rather than 0) -- see completedAtFor.
+      const completedAtIso = completedAtFor(date, durationHours, durationMinutes);
       if (clientId) {
         if (!session?.access_token) throw new Error('You are signed out');
         await logWorkoutForClient(session.access_token, clientId, {
@@ -240,21 +232,16 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
               />
             ))}
 
-            <Card testID="log-past-workout-add-card" style={styles.cardBody}>
-              {exercises.length === 0 ? (
-                <Text testID="log-past-workout-empty" style={styles.hint}>
-                  Add the exercises you did, then fill in their sets.
-                </Text>
-              ) : null}
-              <AddExerciseButton
-                testID="log-past-workout-add-exercise"
-                onPress={() => setPickerOpen(true)}
-              />
-              <CreateCustomExerciseButton
-                testID="log-past-workout-create-custom"
-                onPress={() => setCustomExerciseOpen(true)}
-              />
-            </Card>
+            <PastWorkoutAddCard
+              testID="log-past-workout"
+              onAddExercise={() => setPickerOpen(true)}
+              onCreateCustom={() => setCustomExerciseOpen(true)}
+              emptyHint={
+                exercises.length === 0
+                  ? 'Add the exercises you did, then fill in their sets.'
+                  : undefined
+              }
+            />
           </RiseInStack>
         </ScrollView>
 
