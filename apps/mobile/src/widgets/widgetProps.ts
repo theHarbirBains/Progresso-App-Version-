@@ -11,6 +11,39 @@ import { wholeFigure, wholeFigureText } from '../nutrition/wholeFigures';
 // that kills the app outright -- builds 28 and 29 did exactly that. Something that isn't known is
 // left out instead, and plistSafe strips anything else unsafe on the way out.
 
+/**
+ * What every home-screen widget wears, beside what it shows: the app theme's accent and photo
+ * (widgetLook.ts), and the day the entry is for. Each may be missing -- before the app has handed
+ * a widget anything, or where the photo couldn't be kept -- and the widget has its own fallback.
+ */
+export interface WidgetLook {
+  /** The theme's accent, "#RRGGBB". */
+  accent?: string;
+  /** The accent worked into the app's fill, opaque: the widget's own background without a photo. */
+  glow?: string;
+  /** The theme's photo cut for each size, as file URLs in the App Group, where a widget can read them. */
+  photoSmall?: string;
+  photoMedium?: string;
+  /** The entry's day, "Sun, Nov 1". */
+  day?: string;
+}
+
+/** The theme's part of the look -- everything but the day. */
+const THEME_KEYS = ['accent', 'glow', 'photoSmall', 'photoMedium'] as const;
+
+/** `props` in `look`: its theme replaced outright, so nothing of a theme before stays behind. */
+export function withLook<P extends WidgetLook>(props: P, look: WidgetLook): P {
+  const dressed = { ...props };
+  for (const key of THEME_KEYS) delete dressed[key];
+  for (const key of THEME_KEYS) if (look[key] !== undefined) dressed[key] = look[key];
+  return dressed;
+}
+
+/** Whether `props` already wears `look`'s theme. */
+export function wearsLook(props: WidgetLook, look: WidgetLook): boolean {
+  return THEME_KEYS.every((key) => props[key] === look[key]);
+}
+
 /** One of Today's Nutrition's macros: "92 / 180 g", and how far along it is when it has a target. */
 export interface WidgetMacro {
   label: string;
@@ -19,18 +52,18 @@ export interface WidgetMacro {
   progress?: number;
 }
 
-export interface NutritionWidgetProps {
+export interface NutritionWidgetProps extends WidgetLook {
   signedIn: boolean;
   /** The big figure: calories left, over, or eaten when there's no calorie target. */
   calories: string;
-  /** "cal left", "cal over" or "cal eaten". */
+  /** "calories left", "calories over" or "calories eaten". */
   caption: string;
   /** Calories eaten against the target, 0-1; absent with no target. */
   progress?: number;
   macros: WidgetMacro[];
 }
 
-export interface NextWorkoutWidgetProps {
+export interface NextWorkoutWidgetProps extends WidgetLook {
   signedIn: boolean;
   /** "Next Workout" or "Workout in Progress". */
   eyebrow: string;
@@ -43,7 +76,7 @@ export interface NextWorkoutWidgetProps {
   url: string;
 }
 
-export interface StepsWidgetProps {
+export interface StepsWidgetProps extends WidgetLook {
   signedIn: boolean;
   /** Today's steps; absent when they aren't known for the day shown. */
   steps?: string;
@@ -58,6 +91,8 @@ export interface WorkoutActivityProps {
   kind: string;
   /** When it started, in ms: the card counts up from it on its own. */
   startedAt: number;
+  /** The app theme's accent, "#RRGGBB", when the card was started. */
+  accent?: string;
 }
 
 export const SIGNED_OUT_NUTRITION: NutritionWidgetProps = {
@@ -106,7 +141,8 @@ export function nutritionWidgetProps(
   return {
     signedIn: true,
     calories: wholeFigureText(left === null ? eaten.calories : Math.abs(left)),
-    caption: left === null ? 'cal eaten' : wholeFigure(left) < 0 ? 'cal over' : 'cal left',
+    caption:
+      left === null ? 'calories eaten' : wholeFigure(left) < 0 ? 'calories over' : 'calories left',
     ...share(eaten.calories, targets.calories),
     macros: [
       macro('Protein', eaten.proteinG, targets.proteinG),
@@ -121,16 +157,45 @@ export function nextMidnight(now: Date): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 }
 
-/** Today's Nutrition now, then a fresh day at midnight -- nothing eaten yet, the targets kept. */
+/** "Sun, Nov 1": the date at the top of every widget. */
+export function dayLabel(date: Date): string {
+  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+/** How many days ahead a widget's date is written: it stays right for a week without the app. */
+export const WIDGET_DAYS_AHEAD = 7;
+
+export type WidgetTimeline<P> = { date: Date; props: P }[];
+
+/**
+ * A widget's timeline: `today` now, then `later` from each of the next midnights, each entry
+ * dated with its own day -- so the date on the widget turns over at midnight by itself.
+ */
+export function dailyTimeline<P extends WidgetLook>(
+  now: Date,
+  today: P,
+  later: P,
+): WidgetTimeline<P> {
+  const entries: WidgetTimeline<P> = [{ date: now, props: { ...today, day: dayLabel(now) } }];
+  let midnight = now;
+  for (let i = 0; i < WIDGET_DAYS_AHEAD; i += 1) {
+    midnight = nextMidnight(midnight);
+    entries.push({ date: midnight, props: { ...later, day: dayLabel(midnight) } });
+  }
+  return entries;
+}
+
+/** Today's Nutrition now, then a fresh day each midnight -- nothing eaten yet, the targets kept. */
 export function nutritionTimeline(
   eaten: NutritionTotals,
   targets: NutritionGoalValues,
   now: Date,
-): { date: Date; props: NutritionWidgetProps }[] {
-  return [
-    { date: now, props: nutritionWidgetProps(eaten, targets) },
-    { date: nextMidnight(now), props: nutritionWidgetProps(NOTHING_EATEN, targets) },
-  ];
+): WidgetTimeline<NutritionWidgetProps> {
+  return dailyTimeline(
+    now,
+    nutritionWidgetProps(eaten, targets),
+    nutritionWidgetProps(NOTHING_EATEN, targets),
+  );
 }
 
 /** "6:42 PM". */
@@ -139,18 +204,12 @@ export function clockTime(date: Date): string {
 }
 
 /** Today's steps now, then, from midnight, a reminder that they need the app to update. */
-export function stepsTimeline(
-  steps: number | null,
-  now: Date,
-): { date: Date; props: StepsWidgetProps }[] {
+export function stepsTimeline(steps: number | null, now: Date): WidgetTimeline<StepsWidgetProps> {
   const today: StepsWidgetProps =
     steps === null
       ? { signedIn: true, caption: 'Connect Apple Health in Progresso' }
       : { signedIn: true, steps: wholeFigureText(steps), caption: `As of ${clockTime(now)}` };
-  return [
-    { date: now, props: today },
-    { date: nextMidnight(now), props: { signedIn: true, caption: 'Open Progresso to update' } },
-  ];
+  return dailyTimeline(now, today, { signedIn: true, caption: 'Open Progresso to update' });
 }
 
 /**

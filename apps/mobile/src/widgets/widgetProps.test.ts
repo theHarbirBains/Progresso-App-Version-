@@ -1,4 +1,6 @@
 import {
+  dailyTimeline,
+  dayLabel,
   nextMidnight,
   nutritionTimeline,
   nutritionWidgetProps,
@@ -8,6 +10,9 @@ import {
   SIGNED_OUT_NUTRITION,
   SIGNED_OUT_STEPS,
   stepsTimeline,
+  wearsLook,
+  WIDGET_DAYS_AHEAD,
+  withLook,
 } from './widgetProps';
 import { nextWorkoutProps } from './widgetUpdates';
 
@@ -42,7 +47,7 @@ describe('nutritionWidgetProps', () => {
       signedIn: true,
       // 1,239.6 left, rounded down.
       calories: '1,239',
-      caption: 'cal left',
+      caption: 'calories left',
       progress: 0.3802,
       macros: [
         { label: 'Protein', amount: '92 / 150 g', progress: 92.3 / 150 },
@@ -57,7 +62,7 @@ describe('nutritionWidgetProps', () => {
       { calories: 2150, proteinG: 160, carbsG: 0, fatG: 0 },
       TARGETS,
     );
-    expect(props).toMatchObject({ calories: '150', caption: 'cal over', progress: 1 });
+    expect(props).toMatchObject({ calories: '150', caption: 'calories over', progress: 1 });
     expect(props.macros[0].progress).toBe(1);
   });
 
@@ -69,7 +74,7 @@ describe('nutritionWidgetProps', () => {
     expect(props).toEqual({
       signedIn: true,
       calories: '500',
-      caption: 'cal eaten',
+      caption: 'calories eaten',
       macros: [
         { label: 'Protein', amount: '30 g' },
         { label: 'Carbs', amount: '50 g' },
@@ -87,8 +92,28 @@ describe('the timelines', () => {
     expect(nextMidnight(new Date(2026, 11, 31, 23, 59))).toEqual(new Date(2027, 0, 1));
   });
 
-  it("start Today's Nutrition again at midnight with nothing eaten and the targets kept", () => {
-    const [today, tomorrow] = nutritionTimeline(
+  it('date each entry with its own day, for a week ahead', () => {
+    const entries = dailyTimeline<{ signedIn: boolean; day?: string }>(
+      now,
+      { signedIn: true },
+      { signedIn: false },
+    );
+    expect(entries).toHaveLength(1 + WIDGET_DAYS_AHEAD);
+    expect(entries[0]).toEqual({ date: now, props: { signedIn: true, day: dayLabel(now) } });
+    expect(entries.slice(1).map((entry) => entry.date)).toEqual(
+      [23, 24, 25, 26, 27, 28, 29].map((day) => new Date(2026, 9, day)),
+    );
+    expect(entries[7].props).toEqual({ signedIn: false, day: dayLabel(new Date(2026, 9, 29)) });
+  });
+
+  it('name the day the way the widgets show it', () => {
+    expect(dayLabel(now)).toBe(
+      now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
+    );
+  });
+
+  it("start Today's Nutrition again each midnight with nothing eaten and the targets kept", () => {
+    const [today, tomorrow, ...after] = nutritionTimeline(
       { calories: 760, proteinG: 92, carbsG: 80, fatG: 21 },
       TARGETS,
       now,
@@ -96,8 +121,9 @@ describe('the timelines', () => {
     expect(today).toMatchObject({ date: now, props: { calories: '1,240' } });
     expect(tomorrow).toMatchObject({
       date: new Date(2026, 9, 23),
-      props: { calories: '2,000', caption: 'cal left', progress: 0 },
+      props: { calories: '2,000', caption: 'calories left', progress: 0 },
     });
+    expect(after.every((entry) => entry.props.calories === '2,000')).toBe(true);
   });
 
   it("show today's steps until midnight, then ask for the app to update them", () => {
@@ -106,18 +132,45 @@ describe('the timelines', () => {
       signedIn: true,
       steps: '8,412',
       caption: expect.stringMatching(/^As of 3:42/),
+      day: dayLabel(now),
     });
     expect(tomorrow).toEqual({
       date: new Date(2026, 9, 23),
-      props: { signedIn: true, caption: 'Open Progresso to update' },
+      props: {
+        signedIn: true,
+        caption: 'Open Progresso to update',
+        day: dayLabel(new Date(2026, 9, 23)),
+      },
     });
   });
 
   it('ask to connect Apple Health when steps are not read yet', () => {
-    expect(stepsTimeline(null, now)[0].props).toEqual({
+    expect(stepsTimeline(null, now)[0].props).toMatchObject({
       signedIn: true,
       caption: 'Connect Apple Health in Progresso',
     });
+    expect(stepsTimeline(null, now)[0].props.steps).toBeUndefined();
+  });
+});
+
+describe('the look', () => {
+  const FOREST = { accent: '#9DBF7A', glow: '#2E3226', photoSmall: 'file:///s.jpg' };
+
+  it('dresses props in a theme, leaving nothing of the one before -- and keeps the day', () => {
+    const before = {
+      signedIn: true,
+      day: 'Sun, Nov 1',
+      accent: '#D99A50',
+      photoSmall: 'file:///old-s.jpg',
+      photoMedium: 'file:///old-m.jpg',
+    };
+    expect(withLook(before, FOREST)).toEqual({ signedIn: true, day: 'Sun, Nov 1', ...FOREST });
+  });
+
+  it('knows when props already wear a theme', () => {
+    expect(wearsLook({ ...FOREST, day: 'Sun, Nov 1' }, FOREST)).toBe(true);
+    expect(wearsLook({ ...FOREST, photoMedium: 'file:///m.jpg' }, FOREST)).toBe(false);
+    expect(wearsLook({ accent: '#D99A50' }, FOREST)).toBe(false);
   });
 });
 

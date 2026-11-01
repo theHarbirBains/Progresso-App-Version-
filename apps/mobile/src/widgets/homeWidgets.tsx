@@ -20,11 +20,12 @@ const noCard = {
 } as unknown as LiveActivity<WorkoutActivityProps>;
 
 const nothing = () => undefined;
+const noEntries = async () => [];
 
 const none: HomeWidgets = {
-  nutritionWidget: { updateTimeline: nothing, updateSnapshot: nothing },
-  nextWorkoutWidget: { updateTimeline: nothing, updateSnapshot: nothing },
-  stepsWidget: { updateTimeline: nothing, updateSnapshot: nothing },
+  nutritionWidget: { updateTimeline: nothing, getTimeline: noEntries },
+  nextWorkoutWidget: { updateTimeline: nothing, getTimeline: noEntries },
+  stepsWidget: { updateTimeline: nothing, getTimeline: noEntries },
   workoutActivity: { start: () => noCard, getInstances: () => [] },
 };
 

@@ -1,4 +1,5 @@
 import { recordQuietFailure } from '../lib/sentry';
+import { widgetShown } from '../testUtils/widgetShown';
 import {
   fetchLastWorkoutSplitDayId,
   fetchWorkoutSplitDetail,
@@ -34,18 +35,18 @@ it('moves Next Workout on to the day after the one just finished', async () => {
   await refreshNextWorkout('user-1', 's1');
 
   expect(fetchLastWorkoutSplitDayId).toHaveBeenCalledWith('user-1');
-  expect(nextWorkoutWidget.updateSnapshot).toHaveBeenCalledWith(
-    expect.objectContaining({ eyebrow: 'Next Workout', title: 'Pull', action: 'Start' }),
-  );
+  expect(widgetShown(nextWorkoutWidget)).toMatchObject({
+    eyebrow: 'Next Workout',
+    title: 'Pull',
+    action: 'Start',
+  });
 });
 
 it('says there is no split yet without one, reading nothing', async () => {
   await refreshNextWorkout('user-1', null);
 
   expect(fetchWorkoutSplitDetail).not.toHaveBeenCalled();
-  expect(nextWorkoutWidget.updateSnapshot).toHaveBeenCalledWith(
-    expect.objectContaining({ title: 'No split yet' }),
-  );
+  expect(widgetShown(nextWorkoutWidget)).toMatchObject({ title: 'No split yet' });
 });
 
 it('leaves the widget as it was, and records why, when the split cannot be read', async () => {
@@ -55,6 +56,6 @@ it('leaves the widget as it was, and records why, when the split cannot be read'
 
   await refreshNextWorkout('user-1', 's1');
 
-  expect(nextWorkoutWidget.updateSnapshot).not.toHaveBeenCalled();
+  expect(nextWorkoutWidget.updateTimeline).not.toHaveBeenCalled();
   expect(recordQuietFailure).toHaveBeenCalledWith('widget.nextWorkout', failure);
 });

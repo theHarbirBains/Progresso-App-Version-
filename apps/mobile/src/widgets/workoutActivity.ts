@@ -1,6 +1,7 @@
 import type { LiveActivity } from 'expo-widgets';
 import { recordQuietFailure } from '../lib/sentry';
 import { withWidgets } from './loadWidgets';
+import { widgetLook } from './widgetLook';
 import type { WorkoutActivityProps } from './widgetProps';
 
 // The Lock Screen card (an iOS Live Activity) while a workout is going: its name, whose it is,
@@ -37,7 +38,8 @@ export async function showWorkoutActivity(
     // Started before the others end, so two calls close together never leave two cards.
     const others = workoutActivity.getInstances();
     try {
-      workoutActivity.start(props, url);
+      // In the app theme's accent, as the widgets are.
+      workoutActivity.start({ ...props, accent: widgetLook().accent }, url);
     } catch (error) {
       // Live Activities turned off for the app, or the system refusing one: the workout goes on.
       recordQuietFailure('widget.workoutActivity', error);

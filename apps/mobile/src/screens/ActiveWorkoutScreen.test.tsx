@@ -28,6 +28,7 @@ import {
   fetchNextExerciseOrderIndex,
 } from '../workouts/workoutQueries';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
+import { widgetShown } from '../testUtils/widgetShown';
 import { clearSetTimers, stopSetTimer } from '../workouts/setTimers';
 import { recallLiveWorkout } from '../feed/liveWorkoutMemory';
 import { forgetShown } from '../lib/lastShown';
@@ -627,11 +628,19 @@ describe('ActiveWorkoutScreen', () => {
     await screen.findByTestId('exercise-card-we1');
 
     expect(start).toHaveBeenCalledWith(
-      { title: 'Push Day', kind: 'Your workout', startedAt: Date.parse('2026-01-01T00:00:00Z') },
+      {
+        title: 'Push Day',
+        kind: 'Your workout',
+        startedAt: Date.parse('2026-01-01T00:00:00Z'),
+        accent: '#D99A50',
+      },
       'progresso://workouts/w1/live',
     );
-    expect(nextWorkoutWidget.updateSnapshot).toHaveBeenLastCalledWith(
-      expect.objectContaining({ eyebrow: 'Workout in Progress', title: 'Push Day' }),
+    await waitFor(() =>
+      expect(widgetShown(nextWorkoutWidget)).toMatchObject({
+        eyebrow: 'Workout in Progress',
+        title: 'Push Day',
+      }),
     );
 
     const card = start.mock.results[0].value;

@@ -231,6 +231,16 @@ jest.mock('expo-widgets', () => ({
   })),
 }));
 
+// The widgets' theme photos are copied from the app into the App Group (widgets/widgetPhotos.ts)
+// with expo-file-system and expo-asset, both native. A test has no App Group, so by default there
+// is nowhere to keep a photo and the widgets go without; widgetPhotos.test.ts fakes one.
+jest.mock('expo-file-system', () => ({
+  Paths: { appleSharedContainers: {} },
+  Directory: jest.fn(),
+  File: jest.fn(),
+}));
+jest.mock('expo-asset', () => ({ Asset: { fromModule: jest.fn() } }));
+
 // Tests stand for a real build, which has the widgets' and Apple Health's native sides (Expo Go
 // has neither); lib/nativeModules.test.ts and the tests that cover going without them say so.
 jest.mock('./src/lib/nativeModules', () => ({

@@ -33,7 +33,7 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 **Home Screen widgets (iPhone)**
 
-- Today's Nutrition (calories left, and protein, carbs and fat against your targets on the wide size), Next Workout (the next day of your split with Start, or the workout going with Resume) and Today's Steps; add them from the Home Screen's Edit > Add Widget. They show what the app last knew and turn over to a new day at midnight
+- Today's Nutrition (calories left, and protein, carbs and fat against your targets on the wide size), Next Workout (the next day of your split with Start, or the workout going with Resume) and Today's Steps; add them from the Home Screen's Edit > Add Widget. Each shows the date at the top and wears your app theme -- its photo and colour -- changing when you change it. They show what the app last knew and turn over to a new day at midnight
 - While a workout or group workout is going, it's on the Lock Screen and in the Dynamic Island with its name and a running timer, until it's finished or cancelled
 - Signing out clears every widget
 

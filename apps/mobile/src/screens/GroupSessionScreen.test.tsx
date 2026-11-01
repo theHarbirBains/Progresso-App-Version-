@@ -2,6 +2,7 @@ import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { finishGroup, getGroup } from '../lib/api';
+import { widgetShown } from '../testUtils/widgetShown';
 import { homeWidgets } from '../widgets/homeWidgets';
 import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
 import { endWorkoutActivities } from '../widgets/workoutActivity';
@@ -106,7 +107,7 @@ const mockStartActivity = workoutActivity.start as jest.Mock;
 beforeEach(async () => {
   await endWorkoutActivities();
   mockStartActivity.mockClear();
-  (nextWorkoutWidget.updateSnapshot as jest.Mock).mockClear();
+  (nextWorkoutWidget.updateTimeline as jest.Mock).mockClear();
   (refreshNextWorkout as jest.Mock).mockClear();
   mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' }, user: { id: 'me' } });
   mockGetGroup.mockReset().mockResolvedValue(group());
@@ -165,11 +166,12 @@ describe('GroupSessionScreen', () => {
         title: 'Thursday legs',
         kind: 'Group workout',
         startedAt: Date.parse('2026-10-06T09:00:00.000Z'),
+        accent: '#D99A50',
       },
       'progresso://groups/g1',
     );
-    expect(nextWorkoutWidget.updateSnapshot).toHaveBeenCalledWith(
-      expect.objectContaining({
+    await waitFor(() =>
+      expect(widgetShown(nextWorkoutWidget)).toMatchObject({
         eyebrow: 'Workout in Progress',
         title: 'Thursday legs',
         action: 'Resume',

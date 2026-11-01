@@ -572,8 +572,8 @@ function App() {
               <AllTimeStatsProvider>
                 <AppThemeProvider>
                   <AppShell fontsLoaded={fontsLoaded} />
+                  <WidgetSync />
                 </AppThemeProvider>
-                <WidgetSync />
                 <StatusBar style="light" />
               </AllTimeStatsProvider>
             </FoodLogProvider>

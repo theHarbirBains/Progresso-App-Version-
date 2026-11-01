@@ -3,7 +3,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { sumDailyTotals, type NutritionGoalValues } from '../nutrition/nutritionCalculations';
-import { clearWidgets, showNutritionWidget } from './widgetUpdates';
+import { useAppTheme } from '../theme/appThemeContext';
+import { applyWidgetTheme, clearWidgets, showNutritionWidget } from './widgetUpdates';
 
 const NO_TARGETS: NutritionGoalValues = {
   calories: null,
@@ -15,12 +16,20 @@ const NO_TARGETS: NutritionGoalValues = {
 /**
  * Keeps Today's Nutrition in step with the app, from the same shared food log and daily targets
  * Nutrition shows -- every log, edit, delete and target save reaches it with no fetch of its own
- * -- and clears every widget on sign-out. Mounted once, inside the providers (App.tsx).
+ * -- dresses every widget in the app's theme whenever it changes (Settings > Appearance, or the
+ * season turning), and clears every widget on sign-out. Mounted once, inside the providers
+ * (App.tsx).
  */
 export function WidgetSync() {
   const { status } = useAuth();
   const { logs, loading: logsLoading, error: logsError } = useFoodLog();
   const { goals, loading: goalsLoading, error: goalsError } = useNutritionGoals();
+  const { theme, loaded: themeLoaded } = useAppTheme();
+
+  useEffect(() => {
+    // Once the saved choice is read, so the widgets never wear the original look by mistake.
+    if (themeLoaded) void applyWidgetTheme(theme);
+  }, [theme, themeLoaded]);
 
   useEffect(() => {
     if (status === 'signedOut') void clearWidgets();

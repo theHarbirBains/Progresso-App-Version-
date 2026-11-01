@@ -25,6 +25,7 @@ import {
   queryStatisticsForQuantity,
   requestAuthorization,
 } from '@kingstinct/react-native-healthkit';
+import { widgetShown } from '../testUtils/widgetShown';
 import { homeWidgets } from '../widgets/homeWidgets';
 import { endWorkoutActivities, showWorkoutActivity } from '../widgets/workoutActivity';
 import { FeedScreen } from './FeedScreen';
@@ -1043,7 +1044,7 @@ describe('FeedScreen -- the home-screen widgets', () => {
   beforeEach(async () => {
     await endWorkoutActivities();
     mockFetchActiveWorkout.mockResolvedValue(null);
-    jest.mocked(nextWorkoutWidget.updateSnapshot).mockClear();
+    jest.mocked(nextWorkoutWidget.updateTimeline).mockClear();
   });
 
   it('tells the Next Workout widget the next day once it is known', async () => {
@@ -1052,14 +1053,12 @@ describe('FeedScreen -- the home-screen widgets', () => {
 
     await screen.findByTestId('feed-next-workout');
     await waitFor(() =>
-      expect(nextWorkoutWidget.updateSnapshot).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          eyebrow: 'Next Workout',
-          title: 'Push',
-          action: 'Start',
-          url: 'progresso://workouts/new',
-        }),
-      ),
+      expect(widgetShown(nextWorkoutWidget)).toMatchObject({
+        eyebrow: 'Next Workout',
+        title: 'Push',
+        action: 'Start',
+        url: 'progresso://workouts/new',
+      }),
     );
   });
 
@@ -1075,14 +1074,12 @@ describe('FeedScreen -- the home-screen widgets', () => {
 
     await screen.findByTestId('feed-live-workout');
     await waitFor(() =>
-      expect(nextWorkoutWidget.updateSnapshot).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          eyebrow: 'Workout in Progress',
-          title: 'Leg Day',
-          action: 'Resume',
-          url: 'progresso://workouts/live-1/live',
-        }),
-      ),
+      expect(widgetShown(nextWorkoutWidget)).toMatchObject({
+        eyebrow: 'Workout in Progress',
+        title: 'Leg Day',
+        action: 'Resume',
+        url: 'progresso://workouts/live-1/live',
+      }),
     );
   });
 
@@ -1092,7 +1089,7 @@ describe('FeedScreen -- the home-screen widgets', () => {
 
     await waitFor(() => expect(mockFetchActiveWorkout).toHaveBeenCalled());
     await waitFor(() => expect(mockFetchWorkoutSplitDetail).toHaveBeenCalled());
-    expect(nextWorkoutWidget.updateSnapshot).not.toHaveBeenCalled();
+    expect(nextWorkoutWidget.updateTimeline).not.toHaveBeenCalled();
   });
 
   it('takes a Lock Screen card off once its workout is no longer open', async () => {

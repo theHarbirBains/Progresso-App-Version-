@@ -19,14 +19,14 @@ function loadModule(homeWidgetsFile: () => unknown, builtWithWidgets = true) {
 }
 
 it('hands over the widgets once loaded', async () => {
-  const nutritionWidget = { updateSnapshot: jest.fn() };
+  const nutritionWidget = { updateTimeline: jest.fn() };
   const { withWidgets } = loadWith(() => ({ nutritionWidget }));
 
   await withWidgets('nutrition', (loaded) =>
-    (loaded.nutritionWidget.updateSnapshot as jest.Mock)({ signedIn: true }),
+    (loaded.nutritionWidget.updateTimeline as jest.Mock)([]),
   );
 
-  expect(nutritionWidget.updateSnapshot).toHaveBeenCalledWith({ signedIn: true });
+  expect(nutritionWidget.updateTimeline).toHaveBeenCalledWith([]);
 });
 
 it("carries on when iOS won't take the widgets -- recorded, said once, and not tried again", async () => {

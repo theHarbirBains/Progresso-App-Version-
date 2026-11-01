@@ -78,7 +78,8 @@
               "displayName": "Today's Nutrition",
               "description": "Calories left today, with your protein, carbs and fat.",
               "ios": {
-                "supportedFamilies": ["systemSmall", "systemMedium"]
+                "supportedFamilies": ["systemSmall", "systemMedium"],
+                "contentMarginsDisabled": true
               }
             },
             {
@@ -86,7 +87,8 @@
               "displayName": "Next Workout",
               "description": "The next day of your split, or the workout you're doing.",
               "ios": {
-                "supportedFamilies": ["systemSmall", "systemMedium"]
+                "supportedFamilies": ["systemSmall", "systemMedium"],
+                "contentMarginsDisabled": true
               }
             },
             {
@@ -94,7 +96,8 @@
               "displayName": "Today's Steps",
               "description": "Today's steps from Apple Health.",
               "ios": {
-                "supportedFamilies": ["systemSmall"]
+                "supportedFamilies": ["systemSmall"],
+                "contentMarginsDisabled": true
               }
             }
           ]
