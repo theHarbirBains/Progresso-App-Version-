@@ -1,6 +1,7 @@
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import { fetchAllRows, fetchAllRowsForIds } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
+import { fetchCompletedSetValues } from '../workouts/exerciseHistoryQueries';
 import type { SummarySet, SummaryWorkout } from './weeklySummary';
 
 /**
@@ -53,22 +54,7 @@ export async function fetchSummaryTraining(
   if (exerciseRows.length === 0) return { workouts, sets: [] };
   const exercises = new Map(exerciseRows.map((row) => [row.id, row]));
 
-  const setRows = await fetchAllRowsForIds<{
-    workout_exercise_id: string;
-    weight_kg: string | number | null;
-    reps: number | null;
-  }>(
-    exerciseRows.map((row) => row.id),
-    (ids, from, to) =>
-      supabase
-        .from('sets')
-        .select('workout_exercise_id, weight_kg, reps', { count: 'exact' })
-        .in('workout_exercise_id', ids)
-        .is('deleted_at', null)
-        .not('completed_at', 'is', null)
-        .order('id')
-        .range(from, to),
-  );
+  const setRows = await fetchCompletedSetValues(exerciseRows.map((row) => row.id));
 
   const sets = setRows.flatMap((row): SummarySet[] => {
     const exercise = exercises.get(row.workout_exercise_id);

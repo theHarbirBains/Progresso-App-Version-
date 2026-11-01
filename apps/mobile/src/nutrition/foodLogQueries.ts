@@ -87,6 +87,25 @@ const FOOD_LOG_COLUMNS =
 // rather than copied into the log.
 const TODAYS_FOOD_LOG_COLUMNS = `${FOOD_LOG_COLUMNS}, foods(image_url)`;
 
+/** The person's food logs from `start` up to (not including) `end`, oldest first. */
+async function readLogs(
+  userId: string,
+  start: Date,
+  end: Date,
+  columns: string = TODAYS_FOOD_LOG_COLUMNS,
+): Promise<FoodLogRow[]> {
+  const { data, error } = await supabase
+    .from('food_logs')
+    .select(columns)
+    .eq('user_id', userId)
+    .gte('logged_at', start.toISOString())
+    .lt('logged_at', end.toISOString())
+    .order('logged_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  // Either column list reads a FoodLogDbRow; chosen at run time, the client can't type it itself.
+  return ((data ?? []) as unknown as FoodLogDbRow[]).map(toFoodLogRow);
+}
+
 /**
  * The current device's local calendar day as an absolute [start, end)
  * instant range -- "today" means the user's own day, not a UTC day. Date's
@@ -99,22 +118,8 @@ export function getLocalDayRange(now: Date = new Date()): { start: Date; end: Da
   return { start, end };
 }
 
-export async function fetchTodaysFoodLogs(
-  userId: string,
-  now: Date = new Date(),
-): Promise<FoodLogRow[]> {
-  const { start, end } = getLocalDayRange(now);
-
-  const { data, error } = await supabase
-    .from('food_logs')
-    .select(TODAYS_FOOD_LOG_COLUMNS)
-    .eq('user_id', userId)
-    .gte('logged_at', start.toISOString())
-    .lt('logged_at', end.toISOString())
-    .order('logged_at', { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
+export function fetchTodaysFoodLogs(userId: string, now: Date = new Date()): Promise<FoodLogRow[]> {
+  return fetchFoodLogsForDay(userId, now);
 }
 
 /**
@@ -130,19 +135,7 @@ export async function fetchFoodLogsForMonth(
   year: number,
   month: number,
 ): Promise<FoodLogRow[]> {
-  const startOfMonth = new Date(year, month - 1, 1).toISOString();
-  const startOfNextMonth = new Date(year, month, 1).toISOString();
-
-  const { data, error } = await supabase
-    .from('food_logs')
-    .select(TODAYS_FOOD_LOG_COLUMNS)
-    .eq('user_id', userId)
-    .gte('logged_at', startOfMonth)
-    .lt('logged_at', startOfNextMonth)
-    .order('logged_at', { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
+  return readLogs(userId, new Date(year, month - 1, 1), new Date(year, month, 1));
 }
 
 /** An amount as typed, beside the servings it comes to. */
@@ -279,37 +272,21 @@ export async function deleteFoodLog(logId: string): Promise<void> {
 }
 
 /** Every food log on the local calendar day that `day` falls on, oldest first. */
-export async function fetchFoodLogsForDay(userId: string, day: Date): Promise<FoodLogRow[]> {
+export function fetchFoodLogsForDay(userId: string, day: Date): Promise<FoodLogRow[]> {
   const { start, end } = getLocalDayRange(day);
-  const { data, error } = await supabase
-    .from('food_logs')
-    .select(TODAYS_FOOD_LOG_COLUMNS)
-    .eq('user_id', userId)
-    .gte('logged_at', start.toISOString())
-    .lt('logged_at', end.toISOString())
-    .order('logged_at', { ascending: true });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
+  return readLogs(userId, start, end);
 }
 
 /**
  * Every food log from `start` up to (not including) `end`, oldest first -- a week's, for its
  * calorie budget and its summary. A week's logs are a few dozen rows, well inside one read.
  */
-export async function fetchFoodLogsForRange(
+export function fetchFoodLogsForRange(
   userId: string,
   start: Date,
   end: Date,
 ): Promise<FoodLogRow[]> {
-  const { data, error } = await supabase
-    .from('food_logs')
-    .select(FOOD_LOG_COLUMNS)
-    .eq('user_id', userId)
-    .gte('logged_at', start.toISOString())
-    .lt('logged_at', end.toISOString())
-    .order('logged_at', { ascending: true });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as FoodLogDbRow[]).map(toFoodLogRow);
+  return readLogs(userId, start, end, FOOD_LOG_COLUMNS);
 }
 
 /** A food log's time and figures, for Progress's nutrition. */

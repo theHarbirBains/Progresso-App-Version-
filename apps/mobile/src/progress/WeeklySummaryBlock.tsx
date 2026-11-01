@@ -11,6 +11,7 @@ import { progressStyles } from './progressStyles';
 import { COMPARISON_WEEKS, type WeeklySummary } from './weeklySummary';
 import type { WeekSummaries } from './useWeeklySummaries';
 import { wholeFigureText } from '../nutrition/wholeFigures';
+import { ProgressCardHeader } from './ProgressCardHeader';
 
 type Week = 'thisWeek' | 'lastWeek';
 
@@ -229,16 +230,11 @@ export function WeeklySummaryBlock({
 
   return (
     <View testID="weekly-summary" style={progressStyles.overviewCard}>
-      <View style={progressStyles.overviewCardHeader}>
-        <View style={progressStyles.overviewCardTitleColumn}>
-          <Text style={progressStyles.overviewCardTitle}>Weekly Summary</Text>
-          {shown ? (
-            <Text testID="weekly-summary-dates" style={progressStyles.overviewCardSubtitle}>
-              {weekLabel(shown.range)}
-            </Text>
-          ) : null}
-        </View>
-      </View>
+      <ProgressCardHeader
+        title="Weekly Summary"
+        subtitleTestID="weekly-summary-dates"
+        subtitle={shown ? weekLabel(shown.range) : undefined}
+      />
 
       <View style={styles.switch}>
         <SegmentedControl

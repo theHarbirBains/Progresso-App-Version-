@@ -16,16 +16,16 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { RepRangeSheet } from '../settings/RepRangeSheet';
 import type { RepRange } from '../workouts/progression';
-import { RepRangeExceptions } from '../workouts/RepRangeExceptions';
+import {
+  byExerciseName,
+  RepRangeExceptions,
+  withSavedException,
+} from '../workouts/RepRangeExceptions';
 
 type Props = RootStackScreenProps<'TrainerClientRepRanges'>;
 
 /** A client with none set follows the app's starting range. */
 const DEFAULT_RANGE: RepRange = { min: 8, max: 12 };
-
-function byName(a: ClientRangeException, b: ClientRangeException): number {
-  return a.exerciseName.localeCompare(b.exerciseName);
-}
 
 /**
  * A trainer's view of a client's rep ranges: the client's own range and their exceptions -- the
@@ -50,7 +50,7 @@ export function TrainerClientRepRangesScreen({ navigation, route }: Props) {
       .then((result) => {
         if (cancelled) return;
         setRange(result.range ?? DEFAULT_RANGE);
-        setExceptions([...result.exceptions].sort(byName));
+        setExceptions(byExerciseName(result.exceptions));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -111,16 +111,7 @@ export function TrainerClientRepRangesScreen({ navigation, route }: Props) {
                 exercise.exerciseId,
                 setting,
               );
-              setExceptions((prev) =>
-                [
-                  ...(prev ?? []).filter(
-                    (item) =>
-                      item.exerciseId !== exercise.exerciseId &&
-                      item.exerciseId !== saved?.exerciseId,
-                  ),
-                  ...(saved ? [saved] : []),
-                ].sort(byName),
-              );
+              setExceptions((prev) => withSavedException(prev, exercise.exerciseId, saved));
             }}
             accentColor={theme.accent}
             onAccentColor={theme.onAccent}

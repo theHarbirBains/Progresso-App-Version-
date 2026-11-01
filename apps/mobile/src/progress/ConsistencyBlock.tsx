@@ -4,6 +4,7 @@ import { Text } from '../design/Text';
 import { widgetGap } from '../design/theme';
 import { progressStyles as styles } from './progressStyles';
 import { computeWeeklyWorkoutCounts } from './trainingOverTime';
+import { ProgressCardHeader } from './ProgressCardHeader';
 
 const WEEKS = 12;
 
@@ -32,24 +33,25 @@ export function ConsistencyBlock({ workouts, weeklyGoal, accentColor, onOpenHist
 
   return (
     <View testID="progress-consistency" style={styles.overviewCard}>
-      <View style={styles.overviewCardHeader}>
-        <View style={styles.overviewCardTitleColumn}>
-          <Text style={styles.overviewCardTitle}>Consistency</Text>
-          <Text testID="progress-consistency-goal" style={styles.overviewCardSubtitle}>
-            {metGoal !== null
-              ? `${metGoal} of the last ${WEEKS} weeks reached your goal of ${weeklyGoal} a week`
-              : `Workouts a week, the last ${WEEKS} weeks`}
-          </Text>
-        </View>
-        <TouchableOpacity
-          testID="progress-consistency-history"
-          onPress={onOpenHistory}
-          accessibilityRole="button"
-          accessibilityLabel="See the workouts in Workout History"
-        >
-          <Text style={[styles.viewAllText, { color: accentColor }]}>Workouts</Text>
-        </TouchableOpacity>
-      </View>
+      <ProgressCardHeader
+        title="Consistency"
+        subtitleTestID="progress-consistency-goal"
+        subtitle={
+          metGoal !== null
+            ? `${metGoal} of the last ${WEEKS} weeks reached your goal of ${weeklyGoal} a week`
+            : `Workouts a week, the last ${WEEKS} weeks`
+        }
+        action={
+          <TouchableOpacity
+            testID="progress-consistency-history"
+            onPress={onOpenHistory}
+            accessibilityRole="button"
+            accessibilityLabel="See the workouts in Workout History"
+          >
+            <Text style={[styles.viewAllText, { color: accentColor }]}>Workouts</Text>
+          </TouchableOpacity>
+        }
+      />
       <View style={local.figures}>
         <StatBlock
           testID="progress-consistency-this-week"

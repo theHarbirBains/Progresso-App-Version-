@@ -2,7 +2,6 @@ import { useMemo, type ReactNode } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import type { ExerciseHistoryGroup } from '../workouts/allExerciseHistoryQueries';
 import type {
@@ -11,10 +10,11 @@ import type {
   RepPRWithExercise,
 } from '../workouts/prSummaryQueries';
 import type { LifetimeStats } from './lifetimeStats';
-import { mergeAndSortPRs, recordValueText } from './prFeed';
-import { PRRow } from './PRRow';
+import { mergeAndSortPRs } from './prFeed';
+import { PRFeedRecordRow } from './PRRow';
 import { ProgressEmptyState } from './ProgressEmptyState';
 import { progressStyles as styles } from './progressStyles';
+import { ProgressCardHeader } from './ProgressCardHeader';
 
 type Navigation = RootStackScreenProps<'ProgressOverview'>['navigation'];
 
@@ -123,14 +123,10 @@ export function OverviewSection({
     >
       {top}
       <View style={styles.overviewCard}>
-        <View style={styles.overviewCardHeader}>
-          <View style={styles.overviewCardTitleColumn}>
-            <Text style={styles.overviewCardTitle}>Your Progress</Text>
-            <Text style={styles.overviewCardSubtitle}>
-              A quick snapshot of your lifting journey.
-            </Text>
-          </View>
-        </View>
+        <ProgressCardHeader
+          title="Your Progress"
+          subtitle="A quick snapshot of your lifting journey."
+        />
 
         <View style={styles.statsRow}>
           <OverviewStat
@@ -166,41 +162,27 @@ export function OverviewSection({
 
       {recentMilestones.length > 0 ? (
         <View style={styles.overviewCard}>
-          <View style={styles.overviewCardHeader}>
-            <View style={styles.overviewCardTitleColumn}>
-              <Text style={styles.overviewCardTitle}>Recent Milestones</Text>
-              <Text style={styles.overviewCardSubtitle}>Your latest achievements.</Text>
-            </View>
-            <TouchableOpacity
-              testID="progress-overview-view-all-milestones"
-              onPress={onViewAllMilestones}
-            >
-              <Text style={[styles.viewAllText, { color: accentColor }]}>View All</Text>
-            </TouchableOpacity>
-          </View>
+          <ProgressCardHeader
+            title="Recent Milestones"
+            subtitle="Your latest achievements."
+            action={
+              <TouchableOpacity
+                testID="progress-overview-view-all-milestones"
+                onPress={onViewAllMilestones}
+              >
+                <Text style={[styles.viewAllText, { color: accentColor }]}>View All</Text>
+              </TouchableOpacity>
+            }
+          />
           {recentMilestones.map((item, index) => (
-            <PRRow
+            <PRFeedRecordRow
               key={item.key}
               testID={`progress-overview-milestone-${item.key}`}
-              exerciseName={item.exerciseName}
-              weightDisplay={roundWeight(fromKg(item.weightKg ?? 0, weightUnit))}
-              reps={item.reps}
-              unit={weightUnit}
-              value={recordValueText(item, weightUnit)}
-              achievedAt={item.achievedAt}
-              recordType={item.recordType}
+              item={item}
+              weightUnit={weightUnit}
               accentColor={accentColor}
               showDivider={index > 0}
-              // Exercise progress charts weights; a most-reps / longest record has none to open.
-              onPress={
-                item.measurementType === 'weight_reps'
-                  ? () =>
-                      navigation.navigate('ProgressExerciseDetail', {
-                        exerciseId: item.exerciseId,
-                        exerciseName: item.exerciseName,
-                      })
-                  : undefined
-              }
+              navigation={navigation}
             />
           ))}
         </View>

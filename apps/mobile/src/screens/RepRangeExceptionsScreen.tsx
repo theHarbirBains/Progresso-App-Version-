@@ -12,13 +12,14 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { RepRangeSheet } from '../settings/RepRangeSheet';
 import { fetchExerciseSettings, saveExerciseSetting } from '../workouts/exerciseSettingsQueries';
 import type { RepRange } from '../workouts/progression';
-import { RepRangeExceptions, type RangeException } from '../workouts/RepRangeExceptions';
+import {
+  byExerciseName,
+  RepRangeExceptions,
+  withSavedException,
+  type RangeException,
+} from '../workouts/RepRangeExceptions';
 
 type Props = RootStackScreenProps<'RepRangeExceptions'>;
-
-function byName(a: RangeException, b: RangeException): number {
-  return a.exerciseName.localeCompare(b.exerciseName);
-}
 
 /**
  * Settings > Workout Preferences > Rep Range Exceptions: the person's rep range and the
@@ -41,7 +42,7 @@ export function RepRangeExceptionsScreen({ navigation }: Props) {
     let cancelled = false;
     fetchExerciseSettings(userId)
       .then((settings) => {
-        if (!cancelled) setExceptions([...settings.values()].sort(byName));
+        if (!cancelled) setExceptions(byExerciseName(settings.values()));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -92,12 +93,7 @@ export function RepRangeExceptionsScreen({ navigation }: Props) {
             onEditRange={() => setRangeDraft(range)}
             onSave={async (exercise, setting) => {
               const saved = await saveExerciseSetting(userId, exercise.exerciseId, setting);
-              setExceptions((prev) =>
-                [
-                  ...(prev ?? []).filter((item) => item.exerciseId !== exercise.exerciseId),
-                  ...(saved ? [saved] : []),
-                ].sort(byName),
-              );
+              setExceptions((prev) => withSavedException(prev, exercise.exerciseId, saved));
             }}
             accentColor={theme.accent}
             onAccentColor={theme.onAccent}

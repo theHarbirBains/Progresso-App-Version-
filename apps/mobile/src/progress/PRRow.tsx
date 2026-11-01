@@ -3,8 +3,10 @@ import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import { withAlpha } from '../theme/accentColor';
+import { recordValueText, type PRFeedRow } from './prFeed';
 import { progressStyles as styles } from './progressStyles';
-import { formatWeight } from '../lib/units';
+import { formatWeight, fromKg, roundWeight } from '../lib/units';
+import type { RootStackParamList } from '../navigation/types';
 import { formatMonthDay } from '../workouts/workoutFormat';
 
 interface Props {
@@ -84,5 +86,64 @@ export function PRRow({
         )}
       </Text>
     </TouchableOpacity>
+  );
+}
+
+// Only the route a record opens -- any screen's navigation satisfies it (see PRsSection's own).
+type RecordNavigation = {
+  navigate<RouteName extends 'ProgressExerciseDetail'>(
+    screen: RouteName,
+    params: RootStackParamList[RouteName],
+  ): void;
+};
+
+interface FeedRowProps {
+  item: PRFeedRow;
+  weightUnit: 'kg' | 'lb';
+  accentColor: string;
+  showDivider: boolean;
+  /** The exercise's photo in place of the ribbon (the PRs page). */
+  showPhoto?: boolean;
+  navigation: RecordNavigation;
+  testID: string;
+}
+
+/**
+ * A record from the PR feed (prFeed's mergeAndSortPRs) as a row -- the PRs page's and Overview's
+ * Recent Milestones -- opening its exercise's progress. Exercise progress charts weights, so a
+ * most-reps or longest record has none to open.
+ */
+export function PRFeedRecordRow({
+  item,
+  weightUnit,
+  accentColor,
+  showDivider,
+  showPhoto = false,
+  navigation,
+  testID,
+}: FeedRowProps) {
+  return (
+    <PRRow
+      testID={testID}
+      exerciseName={item.exerciseName}
+      photoUrl={showPhoto ? item.photoUrl : undefined}
+      weightDisplay={roundWeight(fromKg(item.weightKg ?? 0, weightUnit))}
+      reps={item.reps}
+      unit={weightUnit}
+      value={recordValueText(item, weightUnit)}
+      achievedAt={item.achievedAt}
+      recordType={item.recordType}
+      accentColor={accentColor}
+      showDivider={showDivider}
+      onPress={
+        item.measurementType === 'weight_reps'
+          ? () =>
+              navigation.navigate('ProgressExerciseDetail', {
+                exerciseId: item.exerciseId,
+                exerciseName: item.exerciseName,
+              })
+          : undefined
+      }
+    />
   );
 }

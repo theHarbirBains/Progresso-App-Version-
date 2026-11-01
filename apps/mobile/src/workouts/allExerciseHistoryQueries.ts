@@ -1,8 +1,9 @@
-import { fetchAllRows, fetchAllRowsForIds } from '../lib/fetchAllRows';
+import { fetchAllRows } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
 import type { MovementType } from '../exercises/movementTypes';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import type { HistoricalSetWithExercise } from './exerciseHistoryGrouping';
+import { fetchCompletedSetValues } from './exerciseHistoryQueries';
 
 export type { HistoricalSetWithExercise, ExerciseHistoryGroup } from './exerciseHistoryGrouping';
 export { groupByExercise } from './exerciseHistoryGrouping';
@@ -66,24 +67,7 @@ export async function fetchAllExerciseHistory(
   );
   const workoutExerciseIds = qualifying.map((c) => c.id);
 
-  // Excludes any set row that was added but never filled in/marked complete
-  // (weight_kg/reps/completed_at all null -- a "planned but not yet
-  // performed" row, see 20260907100001_set_completion_state.sql) even if the
-  // workout it belongs to was otherwise completed.
-  const sets = await fetchAllRowsForIds<{
-    workout_exercise_id: string;
-    weight_kg: string | number | null;
-    reps: number;
-  }>(workoutExerciseIds, (ids, from, to) =>
-    supabase
-      .from('sets')
-      .select('workout_exercise_id, weight_kg, reps', { count: 'exact' })
-      .in('workout_exercise_id', ids)
-      .is('deleted_at', null)
-      .not('completed_at', 'is', null)
-      .order('id')
-      .range(from, to),
-  );
+  const sets = await fetchCompletedSetValues<number>(workoutExerciseIds);
 
   return sets
     .map((s) => {

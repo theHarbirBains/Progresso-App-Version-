@@ -1,6 +1,28 @@
 import { fetchAllRows, fetchAllRowsForIds } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
 
+/**
+ * The weight and reps of every completed set in these logged exercises, paged and chunked
+ * (lib/fetchAllRows.ts) so years of history are read in full. A set added but never filled in
+ * or marked complete (weight_kg/reps/completed_at all null -- a "planned but not yet performed"
+ * row, see 20260907100001_set_completion_state.sql) is left out, even in a completed workout.
+ * `Reps` is `number` where only weighted sets are read.
+ */
+export function fetchCompletedSetValues<Reps extends number | null = number | null>(
+  workoutExerciseIds: string[],
+): Promise<{ workout_exercise_id: string; weight_kg: string | number | null; reps: Reps }[]> {
+  return fetchAllRowsForIds(workoutExerciseIds, (ids, from, to) =>
+    supabase
+      .from('sets')
+      .select('workout_exercise_id, weight_kg, reps', { count: 'exact' })
+      .in('workout_exercise_id', ids)
+      .is('deleted_at', null)
+      .not('completed_at', 'is', null)
+      .order('id')
+      .range(from, to),
+  );
+}
+
 // Raw historical data for one (user, exercise) pair -- the authoritative
 // source for every Phase 5 analytics chart. Deliberately not rep_prs/
 // one_rep_maxes: those tables hold only the *current* best per rep count
@@ -61,20 +83,7 @@ export async function fetchExerciseSetHistory(
   );
   const workoutExerciseIds = qualifying.map((c) => c.id);
 
-  const sets = await fetchAllRowsForIds<{
-    workout_exercise_id: string;
-    weight_kg: string | number | null;
-    reps: number;
-  }>(workoutExerciseIds, (ids, from, to) =>
-    supabase
-      .from('sets')
-      .select('workout_exercise_id, weight_kg, reps', { count: 'exact' })
-      .in('workout_exercise_id', ids)
-      .is('deleted_at', null)
-      .not('completed_at', 'is', null)
-      .order('id')
-      .range(from, to),
-  );
+  const sets = await fetchCompletedSetValues<number>(workoutExerciseIds);
 
   return sets
     .map((s) => ({

@@ -20,6 +20,7 @@ import { computeMuscleGroupVolumeKg } from './muscleGroupProgress';
 import { ProgressEmptyState } from './ProgressEmptyState';
 import { progressStyles as styles } from './progressStyles';
 import { computeTopSets } from './topSets';
+import { ProgressCardHeader } from './ProgressCardHeader';
 
 type Navigation = RootStackScreenProps<'ProgressOverview'>['navigation'];
 
@@ -162,20 +163,12 @@ export function AllTimeSection({
 
       {topRecords.length > 0 ? (
         <AppCard testID="progress-all-time-prs" style={styles.overviewCard}>
-          <View style={styles.overviewCardHeader}>
-            <View
-              style={[
-                styles.overviewCardIconWrap,
-                { backgroundColor: withAlpha(accentColor, 0.14) },
-              ]}
-            >
-              <Feather name="award" size={18} color={accentColor} />
-            </View>
-            <View style={styles.overviewCardTitleColumn}>
-              <Text style={styles.overviewCardTitle}>All Time Personal Records</Text>
-              <Text style={styles.overviewCardSubtitle}>See your strongest lifts</Text>
-            </View>
-          </View>
+          <ProgressCardHeader
+            icon="award"
+            accentColor={accentColor}
+            title="All Time Personal Records"
+            subtitle="See your strongest lifts"
+          />
           <View style={styles.allTimePrGrid}>
             {topRecords.map((record) => (
               <TouchableOpacity
@@ -204,20 +197,12 @@ export function AllTimeSection({
 
       {muscleGroupVolume.length > 0 ? (
         <AppCard testID="progress-all-time-muscle-volume" style={styles.overviewCard}>
-          <View style={styles.overviewCardHeader}>
-            <View
-              style={[
-                styles.overviewCardIconWrap,
-                { backgroundColor: withAlpha(accentColor, 0.14) },
-              ]}
-            >
-              <Feather name="activity" size={18} color={accentColor} />
-            </View>
-            <View style={styles.overviewCardTitleColumn}>
-              <Text style={styles.overviewCardTitle}>Muscle Group Volume</Text>
-              <Text style={styles.overviewCardSubtitle}>All time total volume by muscle group</Text>
-            </View>
-          </View>
+          <ProgressCardHeader
+            icon="activity"
+            accentColor={accentColor}
+            title="Muscle Group Volume"
+            subtitle="All time total volume by muscle group"
+          />
           {muscleGroupVolume.map((mg) => {
             const percent = maxMuscleGroupVolumeKg > 0 ? mg.volumeKg / maxMuscleGroupVolumeKg : 0;
             return (
@@ -265,20 +250,12 @@ export function AllTimeSection({
 
       {topExercises.length > 0 ? (
         <AppCard testID="progress-all-time-top-exercises" style={styles.overviewCard}>
-          <View style={styles.overviewCardHeader}>
-            <View
-              style={[
-                styles.overviewCardIconWrap,
-                { backgroundColor: withAlpha(accentColor, 0.14) },
-              ]}
-            >
-              <Feather name="bar-chart-2" size={18} color={accentColor} />
-            </View>
-            <View style={styles.overviewCardTitleColumn}>
-              <Text style={styles.overviewCardTitle}>Top Exercises</Text>
-              <Text style={styles.overviewCardSubtitle}>By total volume</Text>
-            </View>
-          </View>
+          <ProgressCardHeader
+            icon="bar-chart-2"
+            accentColor={accentColor}
+            title="Top Exercises"
+            subtitle="By total volume"
+          />
           {topExercises.map((exercise, index) => (
             <View
               key={exercise.exerciseId}
@@ -301,20 +278,12 @@ export function AllTimeSection({
 
       {milestones.length > 0 ? (
         <AppCard testID="progress-all-time-milestones" style={styles.overviewCard}>
-          <View style={styles.overviewCardHeader}>
-            <View
-              style={[
-                styles.overviewCardIconWrap,
-                { backgroundColor: withAlpha(accentColor, 0.14) },
-              ]}
-            >
-              <Feather name="flag" size={18} color={accentColor} />
-            </View>
-            <View style={styles.overviewCardTitleColumn}>
-              <Text style={styles.overviewCardTitle}>Progress Highlights</Text>
-              <Text style={styles.overviewCardSubtitle}>All time milestones</Text>
-            </View>
-          </View>
+          <ProgressCardHeader
+            icon="flag"
+            accentColor={accentColor}
+            title="Progress Highlights"
+            subtitle="All time milestones"
+          />
           {milestones.map((milestone, index) => (
             <View
               key={milestone.key}

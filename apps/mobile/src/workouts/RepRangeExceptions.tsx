@@ -20,6 +20,31 @@ export interface RangeException {
   incrementKg: number | null;
 }
 
+type Named = { exerciseId: string; exerciseName: string };
+
+/** Exceptions in the order the page lists them: by exercise name. */
+export function byExerciseName<T extends Named>(list: Iterable<T>): T[] {
+  return [...list].sort((a, b) => a.exerciseName.localeCompare(b.exerciseName));
+}
+
+/**
+ * The list once an exception is saved for `exerciseId`: what was saved in its place, or nothing
+ * if the exercise is back on the range. A trainer's save lands on the client's copy of an
+ * exercise, so the copy's old exception goes too.
+ */
+export function withSavedException<T extends Named>(
+  list: T[] | null,
+  exerciseId: string,
+  saved: T | null,
+): T[] {
+  return byExerciseName([
+    ...(list ?? []).filter(
+      (item) => item.exerciseId !== exerciseId && item.exerciseId !== saved?.exerciseId,
+    ),
+    ...(saved ? [saved] : []),
+  ]);
+}
+
 export interface ExceptionSetting {
   range: RepRange | null;
   incrementKg: number | null;

@@ -3,15 +3,14 @@ import { FlatList, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors, typeScale } from '../design/theme';
-import { fromKg, roundWeight } from '../lib/units';
 import type { RootStackParamList } from '../navigation/types';
 import type {
   ExerciseRecordWithExercise,
   OneRepMaxWithExercise,
   RepPRWithExercise,
 } from '../workouts/prSummaryQueries';
-import { mergeAndSortPRs, recordValueText, type PRFeedRow } from './prFeed';
-import { PRRow } from './PRRow';
+import { mergeAndSortPRs, type PRFeedRow } from './prFeed';
+import { PRFeedRecordRow } from './PRRow';
 import { ProgressEmptyState } from './ProgressEmptyState';
 import { fetchWorkoutIdForSet } from './progressStatsQueries';
 import { progressStyles as styles } from './progressStyles';
@@ -98,29 +97,15 @@ export function PRsSection({
 
   function renderRow(item: PRFeedRow, index: number) {
     return (
-      <PRRow
+      <PRFeedRecordRow
         key={item.key}
         testID={`progress-pr-row-${item.key}`}
-        exerciseName={item.exerciseName}
-        photoUrl={item.photoUrl}
-        weightDisplay={roundWeight(fromKg(item.weightKg ?? 0, weightUnit))}
-        reps={item.reps}
-        unit={weightUnit}
-        value={recordValueText(item, weightUnit)}
-        achievedAt={item.achievedAt}
-        recordType={item.recordType}
+        item={item}
+        weightUnit={weightUnit}
         accentColor={accentColor}
         showDivider={index > 0}
-        // Exercise progress charts weights; a most-reps / longest record has none to open.
-        onPress={
-          item.measurementType === 'weight_reps'
-            ? () =>
-                navigation.navigate('ProgressExerciseDetail', {
-                  exerciseId: item.exerciseId,
-                  exerciseName: item.exerciseName,
-                })
-            : undefined
-        }
+        showPhoto
+        navigation={navigation}
       />
     );
   }
