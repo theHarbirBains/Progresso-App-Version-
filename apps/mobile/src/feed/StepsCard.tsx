@@ -29,7 +29,6 @@ export function StepsCard({ access, steps, connecting, failure, onConnect }: Pro
         <View style={styles.heading}>
           <Feather name="trending-up" size={13} color={colors.textMuted} />
           <Text style={styles.label}>Steps</Text>
-          <Text style={styles.source}>Apple Health</Text>
         </View>
         <Text style={styles.body}>Apple Health couldn’t be reached, so steps can’t show.</Text>
         <Text testID="feed-steps-failure" style={styles.failure}>
@@ -44,7 +43,6 @@ export function StepsCard({ access, steps, connecting, failure, onConnect }: Pro
     <View style={styles.heading}>
       <Feather name="trending-up" size={13} color={colors.textMuted} />
       <Text style={styles.label}>{access === 'asked' ? 'Steps Today' : 'Steps'}</Text>
-      <Text style={styles.source}>Apple Health</Text>
     </View>
   );
 
@@ -96,10 +94,6 @@ const styles = StyleSheet.create({
     ...typeScale.label,
     color: colors.textPrimary,
     flex: 1,
-  },
-  source: {
-    ...typeScale.caption,
-    color: colors.textMuted,
   },
   body: {
     ...typeScale.secondary,
