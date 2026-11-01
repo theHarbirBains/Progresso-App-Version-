@@ -35,6 +35,11 @@ interface UserForReminder {
  * queued for sending, so a job run that's triggered twice in one day never
  * double-sends either one to the same user.
  */
+interface SentNotification {
+  user_id: string;
+  notification_type: 'next_workout' | 'food_log_reminder';
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -83,6 +88,7 @@ export class NotificationsService {
     let workoutRemindersSent = 0;
     let foodRemindersSent = 0;
     const messages: ExpoPushMessage[] = [];
+    const sent: SentNotification[] = [];
 
     for (const user of users) {
       const tokens = tokensByUser.get(user.id) ?? [];
@@ -93,7 +99,7 @@ export class NotificationsService {
         if (day) {
           const body = buildNextWorkoutMessage(user.displayName, day);
           for (const token of tokens) messages.push({ to: token, title: 'Time to train', body });
-          await this.logSent(user.id, 'next_workout');
+          sent.push({ user_id: user.id, notification_type: 'next_workout' });
           workoutRemindersSent++;
         }
       }
@@ -109,11 +115,12 @@ export class NotificationsService {
         const body =
           "It's been a few days since you logged a meal -- keep your nutrition on track.";
         for (const token of tokens) messages.push({ to: token, title: 'Progresso', body });
-        await this.logSent(user.id, 'food_log_reminder');
+        sent.push({ user_id: user.id, notification_type: 'food_log_reminder' });
         foodRemindersSent++;
       }
     }
 
+    if (sent.length > 0) await this.logSent(sent);
     if (messages.length > 0) {
       await this.expoPush.sendAll(messages);
     }
@@ -258,11 +265,9 @@ export class NotificationsService {
     return (data?.workout_split_day_id as string | undefined) ?? null;
   }
 
-  private async logSent(userId: string, type: 'next_workout' | 'food_log_reminder'): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('notification_log')
-      .insert({ user_id: userId, notification_type: type });
+  /** Records today's reminders, all in one write. */
+  private async logSent(rows: SentNotification[]): Promise<void> {
+    const { error } = await this.supabaseService.getClient().from('notification_log').insert(rows);
     if (error) {
       // A logging failure shouldn't un-send a notification that already
       // went out -- worst case tomorrow's run (or a retried trigger later

@@ -30,8 +30,7 @@ import {
 import {
   addExerciseToWorkout,
   createLoggedWorkout,
-  createSet,
-  updateSet,
+  createCompletedSets,
 } from '../workouts/workoutQueries';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
 import { liveWorkoutStyles } from './liveWorkoutStyles';
@@ -140,13 +139,15 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
       for (const ex of toSave) {
         const workoutExerciseId = await addExerciseToWorkout(workout.id, ex.exerciseId, orderIndex);
         orderIndex += 1;
-        for (const set of ex.sets) {
-          const created = await createSet(workoutExerciseId, set.setIndex, set.side ?? undefined);
-          await updateSet(created.id, {
+        await createCompletedSets(
+          workoutExerciseId,
+          ex.sets.map((set) => ({
+            setIndex: set.setIndex,
+            side: set.side,
             ...draftValues(set, ex.measurementType, weightUnit),
-            completedAt: performedAtIso,
-          });
-        }
+          })),
+          performedAtIso,
+        );
       }
 
       void refetchAllTimeStats();

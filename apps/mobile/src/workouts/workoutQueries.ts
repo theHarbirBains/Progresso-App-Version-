@@ -532,6 +532,38 @@ export async function createSet(
 }
 
 /**
+ * Saves sets that already happened -- a past workout's, typed in -- in one write, each with its
+ * figures and completed at `completedAt`. The same rows a blank createSet and then an updateSet
+ * would leave: the PR and record triggers fire on the insert as they do on an update, as they do
+ * for a trainer's logged workout (trainer_log_workout).
+ */
+export async function createCompletedSets(
+  workoutExerciseId: string,
+  sets: {
+    setIndex: number;
+    side: 'left' | 'right' | null;
+    weightKg: number | null;
+    reps: number | null;
+    durationSeconds: number | null;
+  }[],
+  completedAt: string,
+): Promise<void> {
+  if (sets.length === 0) return;
+  const { error } = await supabase.from('sets').insert(
+    sets.map((set) => ({
+      workout_exercise_id: workoutExerciseId,
+      set_index: set.setIndex,
+      side: set.side ?? 'none',
+      weight_kg: set.weightKg,
+      reps: set.reps,
+      duration_seconds: set.durationSeconds,
+      completed_at: completedAt,
+    })),
+  );
+  if (error) throw new Error(error.message);
+}
+
+/**
  * What a set holds, by what its exercise measures: weight and reps, reps only (weight
  * null), or a duration (weight and reps null). Omitted fields are left as they are.
  */

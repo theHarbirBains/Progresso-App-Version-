@@ -32,7 +32,7 @@ import { computeDurationMinutes } from '../workouts/topSetSummary';
 import {
   addExerciseToWorkout,
   fetchNextExerciseOrderIndex,
-  createSet,
+  createCompletedSets,
   deleteSet,
   deleteWorkout,
   fetchWorkoutDetail,
@@ -257,11 +257,12 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
           if (!keptSetIds.has(originalSetId)) await deleteSet(originalSetId);
         }
 
+        // Sets added here are saved together, once the changed ones are.
+        const added: Parameters<typeof createCompletedSets>[1] = [];
         for (const set of validSets) {
           const values = draftValues(set, type, weightUnit);
           if (set.id === null) {
-            const created = await createSet(workoutExerciseId, set.setIndex, set.side ?? undefined);
-            await updateSet(created.id, { ...values, completedAt: performedAtIso });
+            added.push({ setIndex: set.setIndex, side: set.side, ...values });
             continue;
           }
           const originalSet = originalSetsById.get(set.id);
@@ -283,6 +284,7 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
             wasCompleted ? values : { ...values, completedAt: performedAtIso },
           );
         }
+        if (added.length > 0) await createCompletedSets(workoutExerciseId, added, performedAtIso);
       }
 
       void refetchAllTimeStats();

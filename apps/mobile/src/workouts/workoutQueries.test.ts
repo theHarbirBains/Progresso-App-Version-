@@ -4,6 +4,7 @@ import {
   cancelWorkout,
   completedSetsOnly,
   completeWorkout,
+  createCompletedSets,
   createLoggedWorkout,
   createSet,
   createWorkout,
@@ -704,6 +705,44 @@ describe('reorderExercises', () => {
       { id: 'we1', workout_id: 'w1', exercise_id: 'ex1', order_index: 2 },
       { id: 'we2', workout_id: 'w1', exercise_id: 'ex2', order_index: 1 },
     ]);
+  });
+});
+
+describe('createCompletedSets', () => {
+  it("writes a past exercise's sets in one insert, each filled in and completed", async () => {
+    const { sets } = mockTables({ sets: { data: null, error: null } });
+
+    await createCompletedSets(
+      'we1',
+      [
+        { setIndex: 1, side: 'left', weightKg: 20, reps: 10, durationSeconds: null },
+        { setIndex: 1, side: 'right', weightKg: 20, reps: 9, durationSeconds: null },
+        { setIndex: 2, side: null, weightKg: null, reps: null, durationSeconds: 90 },
+      ],
+      '2026-10-05T12:00:00.000Z',
+    );
+
+    expect(sets.builder.insert).toHaveBeenCalledTimes(1);
+    const row = { workout_exercise_id: 'we1', completed_at: '2026-10-05T12:00:00.000Z' };
+    expect(sets.builder.insert).toHaveBeenCalledWith([
+      { ...row, set_index: 1, side: 'left', weight_kg: 20, reps: 10, duration_seconds: null },
+      { ...row, set_index: 1, side: 'right', weight_kg: 20, reps: 9, duration_seconds: null },
+      { ...row, set_index: 2, side: 'none', weight_kg: null, reps: null, duration_seconds: 90 },
+    ]);
+  });
+
+  it('writes nothing for no sets, and says why a write failed', async () => {
+    mockTables({ sets: { data: null, error: { message: 'denied' } } });
+
+    await expect(createCompletedSets('we1', [], 'x')).resolves.toBeUndefined();
+    expect(mockFrom).not.toHaveBeenCalled();
+    await expect(
+      createCompletedSets(
+        'we1',
+        [{ setIndex: 1, side: null, weightKg: 1, reps: 1, durationSeconds: null }],
+        'x',
+      ),
+    ).rejects.toThrow('denied');
   });
 });
 

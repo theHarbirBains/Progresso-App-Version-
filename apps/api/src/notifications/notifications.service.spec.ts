@@ -154,6 +154,40 @@ describe('NotificationsService.sendDailyNotifications', () => {
     ]);
   });
 
+  it("records the day's reminders in one write, not one per person", async () => {
+    const { supabaseService, from } = mockTables({
+      device_push_tokens: {
+        data: [
+          { user_id: 'user-1', expo_push_token: 'ExponentPushToken[a]' },
+          { user_id: 'user-2', expo_push_token: 'ExponentPushToken[b]' },
+        ],
+        error: null,
+      },
+      users: {
+        data: [
+          { id: 'user-1', display_name: 'Sam', active_workout_split_id: null },
+          { id: 'user-2', display_name: 'Alex', active_workout_split_id: null },
+        ],
+        error: null,
+      },
+      notification_log: { data: [], error: null },
+      food_logs: { data: [], error: null },
+    });
+    const service = new NotificationsService(supabaseService, mockExpoPush());
+
+    await service.sendDailyNotifications();
+
+    const logWrites = from.mock.results
+      .filter((_, i) => from.mock.calls[i]?.[0] === 'notification_log')
+      .map((result) => (result.value as { insert: jest.Mock }).insert)
+      .filter((insert) => insert.mock.calls.length > 0);
+    expect(logWrites).toHaveLength(1);
+    expect(logWrites[0]).toHaveBeenCalledWith([
+      { user_id: 'user-1', notification_type: 'food_log_reminder' },
+      { user_id: 'user-2', notification_type: 'food_log_reminder' },
+    ]);
+  });
+
   it('sends a food-log reminder to a user with no logs at all', async () => {
     const { supabaseService } = mockTables({
       device_push_tokens: {

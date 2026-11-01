@@ -10,7 +10,7 @@ import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
 import {
   addExerciseToWorkout,
-  createSet,
+  createCompletedSets,
   deleteSet,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
@@ -85,7 +85,7 @@ jest.mock('../workouts/workoutQueries', () => ({
   updateWorkout: jest.fn(),
   addExerciseToWorkout: jest.fn(),
   removeExerciseFromWorkout: jest.fn(),
-  createSet: jest.fn(),
+  createCompletedSets: jest.fn(),
   updateSet: jest.fn(),
   deleteSet: jest.fn(),
 }));
@@ -102,7 +102,7 @@ const mockUpdateWorkout = updateWorkout as jest.Mock;
 const mockAddExerciseToWorkout = addExerciseToWorkout as jest.Mock;
 const mockFetchNextExerciseOrderIndex = fetchNextExerciseOrderIndex as jest.Mock;
 const mockRemoveExerciseFromWorkout = removeExerciseFromWorkout as jest.Mock;
-const mockCreateSet = createSet as jest.Mock;
+const mockCreateCompletedSets = createCompletedSets as jest.Mock;
 const mockUpdateSet = updateSet as jest.Mock;
 const mockDeleteSet = deleteSet as jest.Mock;
 
@@ -164,16 +164,7 @@ beforeEach(() => {
   mockAddExerciseToWorkout.mockReset().mockResolvedValue('we2');
   mockFetchNextExerciseOrderIndex.mockReset().mockResolvedValue(2);
   mockRemoveExerciseFromWorkout.mockReset().mockResolvedValue(undefined);
-  mockCreateSet
-    .mockReset()
-    .mockImplementation(async (_workoutExerciseId: string, setIndex: number, side?: string) => ({
-      id: `set-${setIndex}-${side ?? 'none'}`,
-      setIndex,
-      side: side ?? null,
-      weightKg: null,
-      reps: null,
-      completedAt: null,
-    }));
+  mockCreateCompletedSets.mockReset().mockResolvedValue(undefined);
   mockUpdateSet
     .mockReset()
     .mockImplementation(async (setId: string, updates: Record<string, unknown>) => ({
@@ -310,7 +301,7 @@ describe('EditWorkoutScreen -- saving changes', () => {
       reps: 5,
       durationSeconds: null,
     });
-    expect(mockCreateSet).not.toHaveBeenCalled();
+    expect(mockCreateCompletedSets).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' }),
     );
@@ -375,13 +366,13 @@ describe('EditWorkoutScreen -- saving changes', () => {
 
     fireEvent.press(screen.getByTestId('edit-workout-save'));
 
-    await waitFor(() => expect(mockCreateSet).toHaveBeenCalledWith('we1', 2, undefined));
-    expect(mockUpdateSet).toHaveBeenCalledWith('set-2-none', {
-      weightKg: 110,
-      reps: 3,
-      durationSeconds: null,
-      completedAt: expect.any(String),
-    });
+    await waitFor(() =>
+      expect(mockCreateCompletedSets).toHaveBeenCalledWith(
+        'we1',
+        [{ setIndex: 2, side: null, weightKg: 110, reps: 3, durationSeconds: null }],
+        expect.any(String),
+      ),
+    );
     // The pre-existing set was never touched.
     expect(mockUpdateSet).not.toHaveBeenCalledWith('s1', expect.anything());
   });
