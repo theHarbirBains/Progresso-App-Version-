@@ -1,44 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { resolveClientExercise } from '../lib/api';
 import { AppHeader } from '../design/AppHeader';
-import { BottomSheet } from '../design/BottomSheet';
-import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
-import { addMonths, toLocalDateKey } from '../design/calendarGrid';
+import { PrimaryButton, TextButton } from '../design/Button';
+import { toLocalDateKey } from '../design/calendarGrid';
 import { colors } from '../design/theme';
-import { ListRow } from '../design/ListRow';
-import { MonthCalendar } from '../design/MonthCalendar';
 import { Screen } from '../design/Screen';
-import { TextInput } from '../design/TextInput';
 import { Card } from '../design/Card';
 import { RiseInStack } from '../design/RiseIn';
-import { SectionHeader } from '../design/SectionHeader';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
-import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
-import {
-  measurementTypeOf,
-  type MeasurementType,
-  type MovementType,
-} from '../exercises/movementTypes';
-import {
-  draftFromSet,
-  draftValues,
-  groupUnilateralSets,
-  isValidDraft,
-} from '../workouts/setInputDrafts';
-import { PER_SIDE_NOTE, SetColumnHeader } from '../workouts/SetColumnHeader';
+import { measurementTypeOf } from '../exercises/movementTypes';
+import { draftFromSet, draftValues } from '../workouts/setInputDrafts';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
-import { DurationInput } from '../workouts/DurationInput';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
-import { PastSetRow } from '../workouts/PastSetRow';
-import { PastUnilateralSetRow } from '../workouts/PastUnilateralSetRow';
-import { formatCardDate } from '../workouts/workoutFormat';
+import {
+  PastExerciseCard,
+  PastWorkoutDateSheet,
+  PastWorkoutDetailsCard,
+} from '../workouts/PastWorkoutForm';
+import { setsToSave, usePastWorkoutDate, usePastWorkoutDraft } from '../workouts/pastWorkoutDraft';
 import { computeDurationMinutes } from '../workouts/topSetSummary';
 import {
   addExerciseToWorkout,
@@ -57,39 +43,6 @@ import { liveWorkoutStyles } from './liveWorkoutStyles';
 import { logPastWorkoutStyles as styles } from './logPastWorkoutStyles';
 
 type Props = RootStackScreenProps<'EditWorkout'>;
-
-// No per-day meaning to mark on the date picker here, same as LogPastWorkoutScreen.
-const NO_MARKED_DATES = new Set<string>();
-
-interface DraftSet {
-  localId: string;
-  /** The real set id, or null for a row added during this edit and not yet persisted. */
-  id: string | null;
-  setIndex: number;
-  side: 'left' | 'right' | null;
-  weight: string;
-  reps: string;
-  /** A timed set's duration as typed. */
-  duration: string;
-}
-
-interface DraftExercise {
-  localId: string;
-  /** The real workout_exercises id, or null for an exercise added during this edit. */
-  id: string | null;
-  exerciseId: string;
-  exerciseName: string;
-  muscleGroup: MuscleGroup;
-  movementType: MovementType;
-  /** What the exercise is logged as: weight and reps, reps only, or a time. */
-  measurementType: MeasurementType;
-  sets: DraftSet[];
-}
-
-function dateKeyToLocalDate(dateKey: string): Date {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(year, month - 1, day, 12, 0, 0);
-}
 
 /**
  * Edits every part of an already-logged workout: its name, its date, which
@@ -121,26 +74,18 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [original, setOriginal] = useState<WorkoutDetail | null>(null);
 
-  const [date, setDate] = useState(() => new Date());
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [calendarYear, setCalendarYear] = useState(() => date.getFullYear());
-  const [calendarMonth, setCalendarMonth] = useState(() => date.getMonth() + 1);
-
+  const when = usePastWorkoutDate();
+  const { date } = when;
   const [name, setName] = useState('');
   const [durationHours, setDurationHours] = useState('');
   const [durationMinutes, setDurationMinutes] = useState('');
-  const [exercises, setExercises] = useState<DraftExercise[]>([]);
+  const draft = usePastWorkoutDraft();
+  const { exercises, newLocalId } = draft;
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const nextLocalId = useRef(0);
-  function newLocalId(): string {
-    nextLocalId.current += 1;
-    return `local-${nextLocalId.current}`;
-  }
 
   useEffect(() => {
     // Wait for the weight unit to be known before seeding the editable text --
@@ -161,11 +106,8 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
           setDurationHours(String(Math.floor(loadedDuration / 60)));
           setDurationMinutes(String(loadedDuration % 60));
         }
-        const loadedDate = new Date(detail.performedAt);
-        setDate(loadedDate);
-        setCalendarYear(loadedDate.getFullYear());
-        setCalendarMonth(loadedDate.getMonth() + 1);
-        setExercises(
+        when.show(new Date(detail.performedAt));
+        draft.setExercises(
           detail.exercises.map((ex) => ({
             localId: newLocalId(),
             id: ex.id,
@@ -200,119 +142,10 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workoutId, themeLoading]);
 
-  function blankSets(movementType: MovementType, setIndex: number): DraftSet[] {
-    if (movementType === 'unilateral') {
-      return [
-        {
-          localId: newLocalId(),
-          id: null,
-          setIndex,
-          side: 'left',
-          weight: '',
-          reps: '',
-          duration: '',
-        },
-        {
-          localId: newLocalId(),
-          id: null,
-          setIndex,
-          side: 'right',
-          weight: '',
-          reps: '',
-          duration: '',
-        },
-      ];
-    }
-    return [
-      { localId: newLocalId(), id: null, setIndex, side: null, weight: '', reps: '', duration: '' },
-    ];
-  }
-
   function handleSelectExercise(exercise: ExerciseRow) {
     setPickerOpen(false);
     setError(null);
-    setExercises((prev) => [
-      ...prev,
-      {
-        localId: newLocalId(),
-        id: null,
-        exerciseId: exercise.id,
-        exerciseName: exercise.name,
-        muscleGroup: exercise.muscleGroup,
-        movementType: exercise.movementType,
-        measurementType: measurementTypeOf(exercise),
-        sets: blankSets(exercise.movementType, 1),
-      },
-    ]);
-  }
-
-  function handleAddSet(exercise: DraftExercise) {
-    const nextIndex = exercise.sets.reduce((max, s) => Math.max(max, s.setIndex), 0) + 1;
-    const newSets = blankSets(exercise.movementType, nextIndex);
-    setExercises((prev) =>
-      prev.map((ex) =>
-        ex.localId === exercise.localId ? { ...ex, sets: [...ex.sets, ...newSets] } : ex,
-      ),
-    );
-  }
-
-  function handleRemoveSet(exerciseLocalId: string, setLocalId: string) {
-    setExercises((prev) =>
-      prev.map((ex) =>
-        ex.localId === exerciseLocalId
-          ? { ...ex, sets: ex.sets.filter((s) => s.localId !== setLocalId) }
-          : ex,
-      ),
-    );
-  }
-
-  function handleRemoveUnilateralSet(exerciseLocalId: string, setIndex: number) {
-    setExercises((prev) =>
-      prev.map((ex) =>
-        ex.localId === exerciseLocalId
-          ? { ...ex, sets: ex.sets.filter((s) => s.setIndex !== setIndex) }
-          : ex,
-      ),
-    );
-  }
-
-  function handleChangeSetField(
-    exerciseLocalId: string,
-    setLocalId: string,
-    field: 'weight' | 'reps' | 'duration',
-    text: string,
-  ) {
-    setExercises((prev) =>
-      prev.map((ex) =>
-        ex.localId === exerciseLocalId
-          ? {
-              ...ex,
-              sets: ex.sets.map((s) => (s.localId === setLocalId ? { ...s, [field]: text } : s)),
-            }
-          : ex,
-      ),
-    );
-  }
-
-  function handleRemoveExercise(exerciseLocalId: string) {
-    setExercises((prev) => prev.filter((ex) => ex.localId !== exerciseLocalId));
-  }
-
-  function handlePrevMonth() {
-    const next = addMonths(calendarYear, calendarMonth, -1);
-    setCalendarYear(next.year);
-    setCalendarMonth(next.month);
-  }
-
-  function handleNextMonth() {
-    const next = addMonths(calendarYear, calendarMonth, 1);
-    setCalendarYear(next.year);
-    setCalendarMonth(next.month);
-  }
-
-  function handleSelectDate(dateKey: string) {
-    setDate(dateKeyToLocalDate(dateKey));
-    setDatePickerOpen(false);
+    draft.addExercise(exercise);
   }
 
   // A trainer removes a client's workout. It is cancelled, never logged, and the client's history drops it.
@@ -401,11 +234,7 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
 
       for (const exercise of exercises) {
         const type = exercise.measurementType;
-        const valid = exercise.sets.filter((set) => isValidDraft(set, type));
-        const validSets =
-          exercise.movementType === 'unilateral'
-            ? groupUnilateralSets(valid).flatMap((p) => [p.left, p.right])
-            : valid;
+        const validSets = setsToSave(exercise);
         if (validSets.length === 0) {
           if (exercise.id !== null) await removeExerciseFromWorkout(exercise.id);
           continue;
@@ -542,140 +371,31 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
               </Text>
             ) : null}
 
-            <Card testID="edit-workout-details" style={styles.cardBody}>
-              <SectionHeader label="Workout" />
-              <ListRow
-                testID="edit-workout-date"
-                title="Date"
-                value={formatCardDate(date.toISOString())}
-                onPress={() => setDatePickerOpen(true)}
-                accessibilityLabel={`Date, ${formatCardDate(date.toISOString())}`}
+            <PastWorkoutDetailsCard
+              testID="edit-workout"
+              when={when}
+              name={name}
+              onChangeName={setName}
+              duration={
+                original.completedAt !== null
+                  ? {
+                      hours: durationHours,
+                      minutes: durationMinutes,
+                      onChangeHours: setDurationHours,
+                      onChangeMinutes: setDurationMinutes,
+                    }
+                  : undefined
+              }
+            />
+
+            {exercises.map((exercise) => (
+              <PastExerciseCard
+                key={exercise.localId}
+                testID="edit-workout"
+                exercise={exercise}
+                draft={draft}
               />
-
-              <TextInput
-                testID="edit-workout-name"
-                label="Workout name"
-                placeholder="e.g. Push Day"
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-                returnKeyType="done"
-              />
-
-              {original.completedAt !== null ? (
-                <DurationInput
-                  testID="edit-workout-duration"
-                  hours={durationHours}
-                  minutes={durationMinutes}
-                  onChangeHours={setDurationHours}
-                  onChangeMinutes={setDurationMinutes}
-                />
-              ) : null}
-            </Card>
-
-            {exercises.map((exercise) => {
-              const isUnilateral = exercise.movementType === 'unilateral';
-              const unilateralRows = isUnilateral ? groupUnilateralSets(exercise.sets) : [];
-              const hasRows = isUnilateral ? unilateralRows.length > 0 : exercise.sets.length > 0;
-              return (
-                <Card key={exercise.localId} testID={`edit-workout-exercise-${exercise.localId}`}>
-                  <View style={liveWorkoutStyles.exerciseHeader}>
-                    <View style={liveWorkoutStyles.exerciseTitleBlock}>
-                      <Text style={liveWorkoutStyles.exerciseName}>{exercise.exerciseName}</Text>
-                      <Text style={liveWorkoutStyles.exerciseMuscle}>
-                        {MUSCLE_GROUP_LABELS[exercise.muscleGroup]}
-                      </Text>
-                      {isUnilateral ? (
-                        <Text style={liveWorkoutStyles.perSideNote}>
-                          {PER_SIDE_NOTE[exercise.measurementType]}
-                        </Text>
-                      ) : null}
-                    </View>
-                    <View style={liveWorkoutStyles.exerciseActions}>
-                      <TouchableOpacity
-                        testID={`edit-workout-exercise-${exercise.localId}-remove`}
-                        style={liveWorkoutStyles.exerciseAction}
-                        onPress={() => handleRemoveExercise(exercise.localId)}
-                        accessibilityRole="button"
-                        accessibilityLabel="Remove exercise"
-                      >
-                        <Text style={styles.removeExerciseGlyph}>×</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {hasRows ? <SetColumnHeader measurementType={exercise.measurementType} /> : null}
-
-                  {isUnilateral
-                    ? unilateralRows.map((row) => (
-                        <PastUnilateralSetRow
-                          key={row.setIndex}
-                          testID={`edit-workout-exercise-${exercise.localId}-set-${row.setIndex}`}
-                          setIndex={row.setIndex}
-                          left={row.left}
-                          right={row.right}
-                          onChangeWeight={(side, text) =>
-                            handleChangeSetField(
-                              exercise.localId,
-                              side === 'left' ? row.left.localId : row.right.localId,
-                              'weight',
-                              text,
-                            )
-                          }
-                          onChangeReps={(side, text) =>
-                            handleChangeSetField(
-                              exercise.localId,
-                              side === 'left' ? row.left.localId : row.right.localId,
-                              'reps',
-                              text,
-                            )
-                          }
-                          onChangeDuration={(side, text) =>
-                            handleChangeSetField(
-                              exercise.localId,
-                              side === 'left' ? row.left.localId : row.right.localId,
-                              'duration',
-                              text,
-                            )
-                          }
-                          measurementType={exercise.measurementType}
-                          onRemove={() => handleRemoveUnilateralSet(exercise.localId, row.setIndex)}
-                        />
-                      ))
-                    : exercise.sets.map((set) => (
-                        <PastSetRow
-                          key={set.localId}
-                          testID={`edit-workout-exercise-${exercise.localId}-set-${set.setIndex}`}
-                          setIndex={set.setIndex}
-                          weight={set.weight}
-                          reps={set.reps}
-                          duration={set.duration}
-                          measurementType={exercise.measurementType}
-                          onChangeDuration={(text) =>
-                            handleChangeSetField(exercise.localId, set.localId, 'duration', text)
-                          }
-                          onChangeWeight={(text) =>
-                            handleChangeSetField(exercise.localId, set.localId, 'weight', text)
-                          }
-                          onChangeReps={(text) =>
-                            handleChangeSetField(exercise.localId, set.localId, 'reps', text)
-                          }
-                          onRemove={() => handleRemoveSet(exercise.localId, set.localId)}
-                        />
-                      ))}
-
-                  <View style={liveWorkoutStyles.addSet}>
-                    <SecondaryButton
-                      testID={`edit-workout-exercise-${exercise.localId}-add-set`}
-                      size="md"
-                      label="+ Add Set"
-                      accessibilityLabel="Add Set"
-                      onPress={() => handleAddSet(exercise)}
-                    />
-                  </View>
-                </Card>
-              );
-            })}
+            ))}
 
             <Card testID="edit-workout-add-card" style={styles.cardBody}>
               <AddExerciseButton
@@ -724,26 +444,12 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
         onAccentColor={theme.onAccent}
       />
 
-      <BottomSheet
-        visible={datePickerOpen}
-        onClose={() => setDatePickerOpen(false)}
-        testID="edit-workout-date-sheet"
-      >
-        <MonthCalendar
-          testID="edit-workout-calendar"
-          year={calendarYear}
-          month={calendarMonth}
-          markedDateKeys={NO_MARKED_DATES}
-          markedDescription=""
-          selectedDateKey={toLocalDateKey(date)}
-          todayKey={toLocalDateKey(new Date())}
-          accentColor={theme.accent}
-          onAccentColor={theme.onAccent}
-          onSelectDate={handleSelectDate}
-          onPrevMonth={handlePrevMonth}
-          onNextMonth={handleNextMonth}
-        />
-      </BottomSheet>
+      <PastWorkoutDateSheet
+        testID="edit-workout"
+        when={when}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+      />
     </>
   );
 }
