@@ -12,8 +12,6 @@ export interface WeeklyPoint {
   value: number;
 }
 
-const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
-
 function mondayOf(date: Date): Date {
   const day = date.getDay(); // 0 = Sunday .. 6 = Saturday
   const offset = day === 0 ? -6 : 1 - day;
@@ -36,10 +34,15 @@ function bucketByWeek<T>(
   weeks: number,
   now: Date,
 ): WeeklyPoint[] {
-  const thisWeekStart = mondayOf(now).getTime();
-  const bucketStarts = Array.from(
-    { length: weeks },
-    (_, i) => thisWeekStart - (weeks - 1 - i) * MS_PER_WEEK,
+  // Each week's Monday by the calendar, not a fixed number of hours back: across a clock change
+  // a week is an hour longer or shorter, and every Monday must still be local midnight to match.
+  const thisMonday = mondayOf(now);
+  const bucketStarts = Array.from({ length: weeks }, (_, i) =>
+    new Date(
+      thisMonday.getFullYear(),
+      thisMonday.getMonth(),
+      thisMonday.getDate() - (weeks - 1 - i) * 7,
+    ).getTime(),
   );
   const sums = new Map<number, number>(bucketStarts.map((t) => [t, 0]));
 

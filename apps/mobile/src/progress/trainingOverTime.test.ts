@@ -10,6 +10,28 @@ import {
 const NOW = new Date('2026-09-09T12:00:00'); // Wednesday
 
 describe('computeWeeklyWorkoutCounts', () => {
+  // Regression: weeks were counted back in fixed 7-day steps of hours, so after the clocks went
+  // back (1 November 2026 in North America) every earlier Monday was an hour off local midnight
+  // and the workouts in those weeks went uncounted. Where the test runs without clock changes
+  // (UTC), this passes either way.
+  it('counts weeks from before a clock change', () => {
+    const now = new Date(2026, 10, 13, 12);
+    const points = computeWeeklyWorkoutCounts(
+      [
+        { performedAt: new Date(2026, 10, 13, 9).toISOString() },
+        { performedAt: new Date(2026, 9, 23, 12).toISOString() },
+        { performedAt: new Date(2026, 8, 1, 18).toISOString() },
+      ],
+      12,
+      now,
+    );
+    expect(points.reduce((sum, point) => sum + point.value, 0)).toBe(3);
+    for (const point of points) {
+      const monday = new Date(point.weekStart);
+      expect([monday.getDay(), monday.getHours(), monday.getMinutes()]).toEqual([1, 0, 0]);
+    }
+  });
+
   it('returns exactly `weeks` points, oldest first, including weeks with zero workouts', () => {
     const points = computeWeeklyWorkoutCounts([], 4, NOW);
 
