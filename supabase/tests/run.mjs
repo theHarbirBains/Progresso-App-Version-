@@ -432,6 +432,68 @@ async function main() {
     /violates check constraint/i,
   );
 
+  // ---- several fitness goals, kept in step with the single one ----
+  await admin.query(
+    "update public.users set fitness_goals = array['lose_fat', 'get_stronger'] where id = $1",
+    [userA],
+  );
+  const goals = await admin.query(
+    'select fitness_goal, fitness_goals from public.users where id = $1',
+    [userA],
+  );
+  record(
+    'Saving several fitness goals keeps the first as fitness_goal, for older app versions',
+    goals.rows[0].fitness_goal === 'lose_fat' &&
+      JSON.stringify(goals.rows[0].fitness_goals) === JSON.stringify(['lose_fat', 'get_stronger']),
+    JSON.stringify(goals.rows[0]),
+  );
+  await admin.query("update public.users set fitness_goal = 'general_health' where id = $1", [
+    userA,
+  ]);
+  const oneGoal = await admin.query('select fitness_goals from public.users where id = $1', [
+    userA,
+  ]);
+  record(
+    'An older app version saving one goal replaces the list with it',
+    JSON.stringify(oneGoal.rows[0].fitness_goals) === JSON.stringify(['general_health']),
+    JSON.stringify(oneGoal.rows[0]),
+  );
+  await admin.query("update public.users set fitness_goals = '{}' where id = $1", [userA]);
+  const noGoals = await admin.query('select fitness_goal from public.users where id = $1', [userA]);
+  record('Clearing the goals clears fitness_goal too', noGoals.rows[0].fitness_goal === null);
+  await expectThrows(
+    admin.query(
+      "update public.users set fitness_goals = array['lose_fat', 'get_stronger', 'build_muscle', 'other'] where id = $1",
+      [userA],
+    ),
+    'More than three fitness goals are rejected',
+    /violates check constraint/i,
+  );
+  await expectThrows(
+    admin.query("update public.users set fitness_goals = array['get_ripped'] where id = $1", [
+      userA,
+    ]),
+    'An unknown fitness goal in the list is rejected',
+    /violates check constraint/i,
+  );
+
+  // ---- membership tiers ----
+  const tier = await admin.query('select membership_tier from public.users where id = $1', [userA]);
+  record(
+    'An account starts on the everything tier',
+    tier.rows[0].membership_tier === 'everything',
+    JSON.stringify(tier.rows[0]),
+  );
+  await admin.query("update public.users set membership_tier = 'workouts' where id = $1", [userA]);
+  await expectThrows(
+    admin.query("update public.users set membership_tier = 'platinum' where id = $1", [userA]),
+    'An unknown membership tier is rejected',
+    /violates check constraint/i,
+  );
+  await admin.query("update public.users set membership_tier = 'everything' where id = $1", [
+    userA,
+  ]);
+
   await expectThrows(
     admin.query('update public.users set workout_frequency_days = 9 where id = $1', [userA]),
     'An out-of-range workout_frequency_days is rejected by the format constraint',
@@ -3201,6 +3263,21 @@ async function main() {
   const trackedLog = await logFor(T, placeholder, logPayload(trainerCustom, twoSets));
   const trackedWorkoutId = trackedLog.rows[0].id;
 
+  // Rep ranges the trainer set for the tracked client: on their copy of a custom
+  // exercise, and on a built-in one.
+  const placeholderCopy = await admin.query(
+    'select id from public.exercises where created_by = $1 limit 1',
+    [placeholder],
+  );
+  const builtInForClaim = await admin.query(
+    'select id from public.exercises where created_by is null limit 1',
+  );
+  await admin.query(
+    `insert into public.exercise_progression_settings (user_id, exercise_id, rep_range_min, rep_range_max)
+     values ($1, $2, 6, 8), ($1, $3, 10, 15)`,
+    [placeholder, placeholderCopy.rows[0].id, builtInForClaim.rows[0].id],
+  );
+
   const claimed = await admin.query('select public.claim_placeholder_history($1, $2) as moved', [
     placeholder,
     trackedClaimant,
@@ -3254,15 +3331,31 @@ async function main() {
   );
   record('PRs are rebuilt for the client from the moved sets', clientPrs.rows[0].count > 0);
 
+  const movedSettings = await admin.query(
+    `select s.exercise_id, s.rep_range_min, e.created_by
+     from public.exercise_progression_settings s join public.exercises e on e.id = s.exercise_id
+     where s.user_id = $1 order by s.rep_range_min`,
+    [trackedClaimant],
+  );
+  record(
+    "The trainer's rep ranges move to the client, on their own exercise and a built-in one",
+    movedSettings.rows.length === 2 &&
+      movedSettings.rows[0].rep_range_min === 6 &&
+      movedSettings.rows[0].created_by === trackedClaimant &&
+      movedSettings.rows[1].rep_range_min === 10 &&
+      movedSettings.rows[1].created_by === null,
+    JSON.stringify(movedSettings.rows),
+  );
+
   const links = await admin.query(
     'select client_id, status, source from public.trainer_clients where trainer_id = $1 and client_id in ($2, $3)',
     [T, trackedClaimant, placeholder],
   );
   record(
-    'The trainer link moves to the client as pending and linked, so the client chooses to keep the trainer',
+    'The trainer link moves to the client active and linked: entering the code keeps the trainer',
     links.rows.length === 1 &&
       links.rows[0].client_id === trackedClaimant &&
-      links.rows[0].status === 'pending' &&
+      links.rows[0].status === 'active' &&
       links.rows[0].source === 'linked',
     JSON.stringify(links.rows),
   );

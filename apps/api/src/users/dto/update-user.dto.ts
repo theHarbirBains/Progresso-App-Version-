@@ -1,5 +1,8 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsIn,
@@ -31,6 +34,8 @@ const FITNESS_GOALS = [
   'other',
 ] as const;
 const TRAINING_EXPERIENCES = ['beginner', 'intermediate', 'advanced'] as const;
+// Which parts of the app a person uses (users.membership_tier): free, and theirs to change.
+const MEMBERSHIP_TIERS = ['workouts', 'workouts_nutrition', 'everything'] as const;
 // Mirrors apps/mobile/src/nutrition/calorieEstimationInput.ts's ACTIVITY_LEVELS
 // (the 5 Mifflin-St Jeor activity-multiplier tiers) -- kept as an
 // independent literal list here the same way GENDERS/FITNESS_GOALS already
@@ -161,6 +166,18 @@ export class UpdateUserDto {
   @IsOptional()
   @IsIn(FITNESS_GOALS)
   fitnessGoal?: (typeof FITNESS_GOALS)[number];
+
+  /** Up to three goals, in the order picked. Replaces fitnessGoal, which older versions send. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @ArrayUnique()
+  @IsIn(FITNESS_GOALS, { each: true })
+  fitnessGoals?: (typeof FITNESS_GOALS)[number][];
+
+  @IsOptional()
+  @IsIn(MEMBERSHIP_TIERS)
+  membershipTier?: (typeof MEMBERSHIP_TIERS)[number];
 
   @IsOptional()
   @IsIn(TRAINING_EXPERIENCES)

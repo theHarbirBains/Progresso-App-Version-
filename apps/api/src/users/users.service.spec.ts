@@ -296,6 +296,31 @@ describe('UsersService', () => {
       expect(result.activityLevel).toBe('moderately_active');
     });
 
+    it('saves several fitness goals and the membership tier, and reads them back', async () => {
+      const client = createMockClient({
+        updateData: {
+          weight_unit: 'kg',
+          fitness_goal: 'lose_fat',
+          fitness_goals: ['lose_fat', 'get_stronger'],
+          membership_tier: 'workouts_nutrition',
+        },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.updateProfile('user-1', {
+        fitnessGoals: ['lose_fat', 'get_stronger'],
+        membershipTier: 'workouts_nutrition',
+      });
+
+      expect(client.update).toHaveBeenCalledWith({
+        fitness_goals: ['lose_fat', 'get_stronger'],
+        membership_tier: 'workouts_nutrition',
+      });
+      expect(result.fitnessGoals).toEqual(['lose_fat', 'get_stronger']);
+      expect(result.fitnessGoal).toBe('lose_fat');
+      expect(result.membershipTier).toBe('workouts_nutrition');
+    });
+
     it('marks onboarding complete as a server-set timestamp, not a client-supplied value', async () => {
       const client = createMockClient({
         updateData: {

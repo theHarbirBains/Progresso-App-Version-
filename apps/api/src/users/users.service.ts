@@ -24,6 +24,8 @@ export interface UserProfile {
   heightValue: number | null;
   heightUnit: 'cm' | 'ft_in';
   fitnessGoal: string | null;
+  fitnessGoals: string[];
+  membershipTier: 'workouts' | 'workouts_nutrition' | 'everything';
   trainingExperience: string | null;
   workoutFrequencyDays: number | null;
   activityLevel: string | null;
@@ -51,7 +53,7 @@ const PROFILE_COLUMNS =
   'training_style_preference, email_opt_in, push_notifications_opt_in, ' +
   'apple_health_preference, onboarding_completed_at, activity_level, ' +
   'referral_source, country, average_workout_length, training_comfort, rep_range_min, ' +
-  'rep_range_max, progression_cues_enabled';
+  'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
@@ -70,6 +72,8 @@ function toProfile(data: any): UserProfile {
     heightValue: data.height_value,
     heightUnit: data.height_unit,
     fitnessGoal: data.fitness_goal,
+    fitnessGoals: data.fitness_goals,
+    membershipTier: data.membership_tier,
     trainingExperience: data.training_experience,
     workoutFrequencyDays: data.workout_frequency_days,
     activityLevel: data.activity_level,
@@ -143,6 +147,9 @@ export class UsersService {
     if (dto.heightValue !== undefined) updatePayload.height_value = dto.heightValue;
     if (dto.heightUnit !== undefined) updatePayload.height_unit = dto.heightUnit;
     if (dto.fitnessGoal !== undefined) updatePayload.fitness_goal = dto.fitnessGoal;
+    // The database keeps fitness_goal as the first of these (users_sync_fitness_goals).
+    if (dto.fitnessGoals !== undefined) updatePayload.fitness_goals = dto.fitnessGoals;
+    if (dto.membershipTier !== undefined) updatePayload.membership_tier = dto.membershipTier;
     if (dto.trainingExperience !== undefined) {
       updatePayload.training_experience = dto.trainingExperience;
     }
