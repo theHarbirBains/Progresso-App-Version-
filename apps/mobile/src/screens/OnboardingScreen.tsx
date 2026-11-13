@@ -28,6 +28,7 @@ import {
   isStepAnswered,
   STEP_ORDER,
   submitOnboardingDraft,
+  MAX_FITNESS_GOALS,
   type OnboardingDraft,
   type OnboardingStep,
 } from '../onboarding/onboardingDraft';
@@ -36,6 +37,8 @@ import {
   loadOnboardingDraft,
   saveOnboardingDraft,
 } from '../onboarding/onboardingDraftStorage';
+import { MembershipChoices } from '../membership/MembershipChoices';
+import { TextInput } from '../design/TextInput';
 import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
 import { OnboardingProgress } from '../onboarding/OnboardingProgress';
 import { PermissionStep } from '../onboarding/PermissionStep';
@@ -54,7 +57,15 @@ interface Props {
 // box -- confirmed by the shared footer Continue button below. Every pick-one question moves on
 // by itself as an answer is tapped (choose, below); the rest have their own terminal controls
 // (Allow/Not Now, a preset card or Skip for now, the Create Account button).
-const CONTINUE_STEPS = new Set<OnboardingStep>(['birthday', 'weight', 'height']);
+const CONTINUE_STEPS = new Set<OnboardingStep>([
+  'birthday',
+  'weight',
+  'height',
+  // Several goals can be picked, so a tap can't be the answer.
+  'fitnessGoal',
+  // The trainer's code is typed.
+  'trainerCode',
+]);
 
 // How long a tapped answer shows as chosen before the next question takes its place.
 const CHOSEN_PAUSE_MS = 250;
@@ -393,11 +404,13 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
 
         {step === 'fitnessGoal' ? (
           <>
-            <Text style={styles.stepTitle}>What is your main fitness goal?</Text>
+            <Text style={styles.stepTitle}>What are your fitness goals?</Text>
+            <Text style={styles.stepExplanation}>Pick up to {MAX_FITNESS_GOALS}.</Text>
             <GoalSelector
               testID="onboarding-step-fitness-goal"
-              value={draft.fitnessGoal}
-              onChange={(fitnessGoal) => choose({ fitnessGoal })}
+              value={draft.fitnessGoals}
+              onChange={(fitnessGoals) => updateDraft({ fitnessGoals })}
+              max={MAX_FITNESS_GOALS}
             />
           </>
         ) : null}
@@ -446,6 +459,20 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 />
               ))}
             </View>
+          </>
+        ) : null}
+
+        {step === 'membership' ? (
+          <>
+            <Text style={styles.stepTitle}>Choose your membership</Text>
+            <Text style={styles.stepExplanation}>
+              All free for now. You can change it any time in Settings.
+            </Text>
+            <MembershipChoices
+              testID="onboarding-step-membership"
+              value={draft.membershipTier}
+              onChange={(membershipTier) => choose({ membershipTier })}
+            />
           </>
         ) : null}
 
@@ -547,6 +574,39 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
               advance();
             }}
           />
+        ) : null}
+
+        {step === 'trainerCode' ? (
+          <>
+            <Text style={styles.stepTitle}>Has a trainer been logging your workouts?</Text>
+            <Text style={styles.stepExplanation}>
+              If a trainer tracked your workouts in Progresso, they gave you a code. Enter it and
+              that history becomes yours -- your trainer keeps seeing it too.
+            </Text>
+            <View testID="onboarding-step-trainer-code">
+              <TextInput
+                testID="onboarding-trainer-code-input"
+                label="Trainer's code"
+                placeholder="e.g. ABCD-2345"
+                value={draft.trainerCode ?? ''}
+                onChangeText={(text) =>
+                  updateDraft({ trainerCode: text, hasTrainerCode: text.trim() ? true : null })
+                }
+                autoCapitalize="characters"
+                maxLength={12}
+              />
+              <View style={styles.footer}>
+                <TextButton
+                  testID="onboarding-no-trainer-code"
+                  label="No, I don't have one"
+                  onPress={() => {
+                    updateDraft({ hasTrainerCode: false, trainerCode: null });
+                    advance();
+                  }}
+                />
+              </View>
+            </View>
+          </>
         ) : null}
 
         {step === 'createAccount' ? (

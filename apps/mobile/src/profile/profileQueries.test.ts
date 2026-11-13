@@ -45,6 +45,8 @@ const row = {
   rep_range_min: 8,
   rep_range_max: 12,
   progression_cues_enabled: true,
+  fitness_goals: ['build_muscle', 'lose_fat'],
+  membership_tier: 'workouts_nutrition',
 };
 
 beforeEach(() => {
@@ -91,6 +93,8 @@ describe('fetchMyProfile', () => {
       repRangeMin: 8,
       repRangeMax: 12,
       progressionCuesEnabled: true,
+      fitnessGoals: ['build_muscle', 'lose_fat'],
+      membershipTier: 'workouts_nutrition',
     });
   });
 

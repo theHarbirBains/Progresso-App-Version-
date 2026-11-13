@@ -9,7 +9,7 @@ const PROFILE_COLUMNS =
   'training_style_preference, email_opt_in, push_notifications_opt_in, ' +
   'apple_health_preference, onboarding_completed_at, activity_level, ' +
   'referral_source, country, average_workout_length, training_comfort, rep_range_min, ' +
-  'rep_range_max, progression_cues_enabled';
+  'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier';
 
 interface ProfileRow {
   weight_unit: ProfileResponse['weightUnit'];
@@ -26,6 +26,8 @@ interface ProfileRow {
   height_value: number | null;
   height_unit: ProfileResponse['heightUnit'];
   fitness_goal: ProfileResponse['fitnessGoal'];
+  fitness_goals: ProfileResponse['fitnessGoals'] | null;
+  membership_tier: ProfileResponse['membershipTier'] | null;
   training_experience: ProfileResponse['trainingExperience'];
   workout_frequency_days: number | null;
   training_style_preference: ProfileResponse['trainingStylePreference'];
@@ -60,6 +62,9 @@ function toProfile(userId: string, row: ProfileRow): ProfileResponse {
     heightValue: row.height_value,
     heightUnit: row.height_unit,
     fitnessGoal: row.fitness_goal,
+    fitnessGoals: row.fitness_goals ?? [],
+    // Every account has one; a missing value reads as the tier with everything.
+    membershipTier: row.membership_tier ?? 'everything',
     trainingExperience: row.training_experience,
     workoutFrequencyDays: row.workout_frequency_days,
     trainingStylePreference: row.training_style_preference,

@@ -4,7 +4,13 @@ import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { sumDailyTotals, type NutritionGoalValues } from '../nutrition/nutritionCalculations';
 import { useAppTheme } from '../theme/appThemeContext';
-import { applyWidgetTheme, clearWidgets, showNutritionWidget } from './widgetUpdates';
+import { useMembership } from '../membership/useMembership';
+import {
+  applyWidgetTheme,
+  clearWidgets,
+  showNutritionLockedWidget,
+  showNutritionWidget,
+} from './widgetUpdates';
 
 const NO_TARGETS: NutritionGoalValues = {
   calories: null,
@@ -25,6 +31,7 @@ export function WidgetSync() {
   const { logs, loading: logsLoading, error: logsError } = useFoodLog();
   const { goals, loading: goalsLoading, error: goalsError } = useNutritionGoals();
   const { theme, loaded: themeLoaded } = useAppTheme();
+  const { nutrition } = useMembership();
 
   useEffect(() => {
     // Once the saved choice is read, so the widgets never wear the original look by mistake.
@@ -38,9 +45,15 @@ export function WidgetSync() {
   useEffect(() => {
     // Only once both are really known: never a half-loaded day, nor a failed read's empty one.
     // Handed over afresh in a new theme too, not just redressed.
-    if (status !== 'signedIn' || logsLoading || goalsLoading || logsError || goalsError) return;
+    // Without Nutrition in the membership, it says so instead.
+    if (status !== 'signedIn') return;
+    if (!nutrition) {
+      void showNutritionLockedWidget();
+      return;
+    }
+    if (logsLoading || goalsLoading || logsError || goalsError) return;
     void showNutritionWidget(sumDailyTotals(logs), goals ?? NO_TARGETS);
-  }, [status, logs, goals, logsLoading, goalsLoading, logsError, goalsError, theme]);
+  }, [status, logs, goals, logsLoading, goalsLoading, logsError, goalsError, theme, nutrition]);
 
   return null;
 }

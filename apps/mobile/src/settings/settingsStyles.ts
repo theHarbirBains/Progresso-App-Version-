@@ -23,7 +23,8 @@ export const settingsStyles = StyleSheet.create({
     gap: spacing.md,
     paddingBottom: spacing.md,
   },
-  feedbackIntro: {
+  // A plain line on what a card is for, above its rows or choices.
+  intro: {
     ...typeScale.secondary,
     color: colors.textSecondary,
   },

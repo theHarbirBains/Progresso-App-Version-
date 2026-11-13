@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { widgetShown } from '../testUtils/widgetShown';
+import { MembershipContext } from '../membership/useMembership';
 import { useAppTheme } from '../theme/appThemeContext';
 import { themeById } from '../theme/appThemes';
 import { homeWidgets } from './homeWidgets';
@@ -105,4 +106,18 @@ it('dresses what the widgets show in the theme once it is read, and again when i
   wearing('winter');
   rerender(<WidgetSync />);
   await waitFor(() => expect(widgetShown(stepsWidget)).toMatchObject({ accent: '#A9C4E0' }));
+});
+
+it("tells Today's Nutrition that Nutrition isn't in the membership, with no figures", async () => {
+  signedInWith([log(500, 30)]);
+  render(
+    <MembershipContext.Provider value="workouts">
+      <WidgetSync />
+    </MembershipContext.Provider>,
+  );
+
+  await waitFor(() =>
+    expect(widgetShown(nutritionWidget)).toMatchObject({ signedIn: true, locked: true }),
+  );
+  expect(widgetShown(nutritionWidget)).not.toHaveProperty('calories', '1,500');
 });

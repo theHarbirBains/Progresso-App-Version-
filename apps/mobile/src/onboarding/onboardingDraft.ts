@@ -1,10 +1,13 @@
+import { Alert } from 'react-native';
 import {
+  claimTrainerHistory,
   registerPushToken,
   updateMyProfile,
   type AverageWorkoutLength,
   type FitnessGoal,
   type Gender,
   type HeightUnit,
+  type MembershipTier,
   type ProfileResponse,
   type ReferralSource,
   type TrainingComfort,
@@ -34,7 +37,10 @@ export interface OnboardingDraft {
   weightUnit: 'kg' | 'lb';
   heightValue: number | null;
   heightUnit: HeightUnit;
-  fitnessGoal: FitnessGoal | null;
+  /** Up to MAX_FITNESS_GOALS, in the order picked. */
+  fitnessGoals: FitnessGoal[];
+  /** Which parts of the app they'll use (membership/membershipTiers.ts). */
+  membershipTier: MembershipTier | null;
   /** Also sets the starting rep range: see defaultRepRange. */
   trainingComfort: TrainingComfort | null;
   workoutFrequencyDays: number | null;
@@ -57,6 +63,10 @@ export interface OnboardingDraft {
   skippedSplit: boolean;
   emailOptIn: boolean | null;
   pushNotificationsOptIn: boolean | null;
+  /** Whether a trainer has been logging their workouts: true with the code the trainer gave
+   * them, which claims that history once the account exists; false if not. */
+  hasTrainerCode: boolean | null;
+  trainerCode: string | null;
   /** Set by CreateAccountStep's own form, right as it submits -- kept here
    * (not just local component state) so they survive the one gap this
    * whole draft exists for: a project that requires email confirmation, so
@@ -85,7 +95,8 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   weightUnit: 'lb',
   heightValue: 170,
   heightUnit: 'cm',
-  fitnessGoal: null,
+  fitnessGoals: [],
+  membershipTier: null,
   trainingComfort: null,
   workoutFrequencyDays: null,
   averageWorkoutLength: null,
@@ -94,6 +105,8 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   skippedSplit: false,
   emailOptIn: null,
   pushNotificationsOptIn: null,
+  hasTrainerCode: null,
+  trainerCode: null,
   pendingUsername: null,
   pendingDisplayName: null,
 };
@@ -115,11 +128,19 @@ export const STEP_ORDER = [
   'trainingComfort',
   'workoutFrequency',
   'averageWorkoutLength',
+  'membership',
   'workoutSplit',
   'emailPreference',
   'pushNotifications',
+  'trainerCode',
   'createAccount',
 ] as const;
+
+/** A trainer's claim code as the API takes it: 8 to 12 letters and numbers, dashes and spaces allowed. */
+const TRAINER_CODE_PATTERN = /^[A-Za-z0-9 -]{8,12}$/;
+
+/** The most fitness goals a person picks -- enough to say what matters, few enough to mean it. */
+export const MAX_FITNESS_GOALS = 3;
 
 export type OnboardingStep = (typeof STEP_ORDER)[number];
 
@@ -141,7 +162,9 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
     case 'height':
       return draft.heightValue != null;
     case 'fitnessGoal':
-      return draft.fitnessGoal != null;
+      return draft.fitnessGoals.length > 0;
+    case 'membership':
+      return draft.membershipTier != null;
     case 'trainingComfort':
       return draft.trainingComfort != null;
     case 'workoutFrequency':
@@ -154,6 +177,11 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
       return draft.emailOptIn != null;
     case 'pushNotifications':
       return draft.pushNotificationsOptIn != null;
+    case 'trainerCode':
+      return (
+        draft.hasTrainerCode === false ||
+        (draft.hasTrainerCode === true && TRAINER_CODE_PATTERN.test(draft.trainerCode ?? ''))
+      );
     case 'createAccount':
       return false;
   }
@@ -177,7 +205,8 @@ function draftToProfileInput(draft: OnboardingDraft): UpdateProfileInput {
   input.weightUnit = draft.weightUnit;
   if (draft.heightValue != null) input.heightValue = draft.heightValue;
   input.heightUnit = draft.heightUnit;
-  if (draft.fitnessGoal != null) input.fitnessGoal = draft.fitnessGoal;
+  if (draft.fitnessGoals.length > 0) input.fitnessGoals = draft.fitnessGoals;
+  if (draft.membershipTier != null) input.membershipTier = draft.membershipTier;
   if (draft.trainingComfort != null) {
     input.trainingComfort = draft.trainingComfort;
     const range = defaultRepRange(draft.trainingComfort);
@@ -231,7 +260,25 @@ export async function submitOnboardingDraft(
   input.onboardingCompleted = true;
   const profile = await updateMyProfile(accessToken, input);
   if (draft.pushNotificationsOptIn) await registerThisDevice(accessToken);
+  if (draft.hasTrainerCode && draft.trainerCode)
+    await claimTrainerCode(accessToken, draft.trainerCode);
   return profile;
+}
+
+/**
+ * The history a trainer logged, claimed with the code they gave -- it becomes the person's own,
+ * and the trainer keeps seeing it. A code that doesn't work never fails sign-up, which has
+ * already been saved: the person is told why, and where to try it again.
+ */
+async function claimTrainerCode(accessToken: string, code: string): Promise<void> {
+  try {
+    await claimTrainerHistory(accessToken, code);
+  } catch (error) {
+    Alert.alert(
+      "Your trainer's code didn't work",
+      `${error instanceof Error ? error.message : String(error)}\n\nYou can enter it again in Trainer Access.`,
+    );
+  }
 }
 
 async function registerThisDevice(accessToken: string): Promise<void> {

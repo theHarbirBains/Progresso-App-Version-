@@ -18,6 +18,9 @@ interface MockAuthHandles {
 // No native SDK involved in tests: wrapApp is the identity function, and
 // setUser/clearUser calls are asserted directly instead of going through
 // the real @sentry/react-native module.
+// Google and Apple are off for now (auth/socialSignIn.ts); the OAuth tests here turn them on.
+jest.mock('./src/auth/socialSignIn', () => ({ socialSignInEnabled: () => true }));
+
 jest.mock('./src/lib/sentry', () => ({
   initSentry: jest.fn(),
   wrapApp: (component: unknown) => component,
@@ -330,6 +333,7 @@ describe('Authentication flow', () => {
           heightValue: 180,
           heightUnit: 'cm',
           fitnessGoal: 'build_muscle',
+          membershipTier: 'everything',
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
@@ -337,6 +341,7 @@ describe('Authentication flow', () => {
           appleHealthPreference: 'not_now',
           emailOptIn: true,
           pushNotificationsOptIn: false,
+          hasTrainerCode: false,
         },
       }),
     );

@@ -8,6 +8,8 @@ import { Text } from '../design/Text';
 import type { RootStackScreenProps } from '../navigation/types';
 import { settingsStyles as styles } from '../settings/settingsStyles';
 import { useIsAdmin } from '../feedback/useIsAdmin';
+import { membershipOption } from '../membership/membershipTiers';
+import { useMembership } from '../membership/useMembership';
 import { useAppTheme } from '../theme/appThemeContext';
 
 type Props = RootStackScreenProps<'AccountSettings'>;
@@ -35,6 +37,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
   // Only offered to support and full admins; the API enforces it whatever is shown.
   const isAdmin = useIsAdmin();
   const { accent } = useAppTheme();
+  const { tier, nutrition } = useMembership();
   return (
     <Screen
       testID="settings-screen"
@@ -52,7 +55,7 @@ export function AccountSettingsScreen({ navigation }: Props) {
       {/* First, so everyone sees it: sending feedback, and what's happened to what they sent. */}
       <Section title="Feedback & Suggestions" testID="settings-feedback-section">
         <View style={styles.feedback}>
-          <Text style={styles.feedbackIntro}>
+          <Text style={styles.intro}>
             Found a bug, or have an idea? Tell us, and follow what happens to it.
           </Text>
           <PrimaryButton
@@ -76,10 +79,18 @@ export function AccountSettingsScreen({ navigation }: Props) {
 
       <Section title="Categories">
         <ListRow
+          testID="settings-category-membership"
+          icon="star"
+          title="Membership"
+          subtitle={membershipOption(tier).name}
+          onPress={() => navigation.navigate('SettingsMembership')}
+        />
+        <ListRow
           testID="settings-category-personal-info"
           icon="user"
           title="Profile & Personal Information"
           subtitle="Picture, name, username, body measurements"
+          divider
           onPress={() => navigation.navigate('SettingsPersonalInfo')}
         />
         <ListRow
@@ -90,14 +101,17 @@ export function AccountSettingsScreen({ navigation }: Props) {
           divider
           onPress={() => navigation.navigate('SettingsWorkoutPreferences')}
         />
-        <ListRow
-          testID="settings-category-nutrition"
-          icon="pie-chart"
-          title="Nutrition & Goals"
-          subtitle="Calorie and macro targets"
-          divider
-          onPress={() => navigation.navigate('SettingsNutrition')}
-        />
+        {/* Nutrition's settings only with a membership that includes it. */}
+        {nutrition ? (
+          <ListRow
+            testID="settings-category-nutrition"
+            icon="pie-chart"
+            title="Nutrition & Goals"
+            subtitle="Calorie and macro targets"
+            divider
+            onPress={() => navigation.navigate('SettingsNutrition')}
+          />
+        ) : null}
         <ListRow
           testID="settings-category-appearance"
           icon="image"

@@ -10,6 +10,8 @@ interface Props {
   description?: string;
   selected: boolean;
   onPress: () => void;
+  /** Can't be picked right now (a pick-several question already has its most): dimmed. */
+  disabled?: boolean;
   /** Defaults to the app theme's accent. */
   accentColor?: string;
 }
@@ -21,6 +23,7 @@ export function OnboardingOptionCard({
   description,
   selected,
   onPress,
+  disabled = false,
   accentColor: accentColorProp,
 }: Props) {
   // Unless told otherwise, the app theme's accent.
@@ -29,11 +32,12 @@ export function OnboardingOptionCard({
   return (
     <TouchableOpacity
       testID={testID}
-      style={[styles.card, selected && { borderColor: accentColor }]}
+      style={[styles.card, selected && { borderColor: accentColor }, disabled && styles.disabled]}
       onPress={onPress}
+      disabled={disabled}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled }}
     >
       <View style={styles.body}>
         <Text style={[styles.label, selected && { color: accentColor }]}>{label}</Text>
@@ -64,6 +68,9 @@ const styles = StyleSheet.create({
     ...typeScale.body,
     color: colors.textPrimary,
     fontFamily: fonts.display,
+  },
+  disabled: {
+    opacity: 0.45,
   },
   description: {
     ...typeScale.secondary,

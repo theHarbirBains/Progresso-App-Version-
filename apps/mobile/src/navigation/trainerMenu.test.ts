@@ -20,3 +20,13 @@ describe('appMenuSectionsFor', () => {
     expect(appMenuSectionsFor(true)).toEqual(appMenuSectionsFor(false));
   });
 });
+
+describe('appMenuSectionsFor -- membership', () => {
+  it('lists Nutrition only with a membership that includes it', () => {
+    const titles = (includesNutrition: boolean) =>
+      appMenuSectionsFor(false, includesNutrition).map((section) => section.title);
+    expect(titles(true)).toContain('NUTRITION');
+    expect(titles(false)).not.toContain('NUTRITION');
+    expect(titles(false)).toEqual(expect.arrayContaining(['TRAINING', 'SOCIAL']));
+  });
+});

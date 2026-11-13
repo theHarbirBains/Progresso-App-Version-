@@ -10,6 +10,7 @@ import { formatWeightKg } from '../lib/units';
 import { progressStyles } from './progressStyles';
 import { COMPARISON_WEEKS, type WeeklySummary } from './weeklySummary';
 import type { WeekSummaries } from './useWeeklySummaries';
+import { useMembership } from '../membership/useMembership';
 import { wholeFigureText } from '../nutrition/wholeFigures';
 import { ProgressCardHeader } from './ProgressCardHeader';
 
@@ -97,6 +98,8 @@ function SummaryBody({
   week: Week;
   weightUnit: 'kg' | 'lb';
 }) {
+  // Nutrition's part only with a membership that includes it.
+  const membership = useMembership();
   if (summary.isEmpty) {
     return (
       <Text testID="weekly-summary-empty" style={styles.empty}>
@@ -128,52 +131,54 @@ function SummaryBody({
         </View>
       </Part>
 
-      <Part title="Nutrition" testID="weekly-summary-nutrition">
-        {nutrition.loggedDays === 0 ? (
-          <Text testID="weekly-summary-no-food" style={styles.empty}>
-            No food logged.
-          </Text>
-        ) : (
-          <>
-            <View style={styles.blocks}>
-              <StatBlock
-                testID="weekly-summary-avg-calories"
-                value={nutrition.avgCalories!.toLocaleString()}
-                label="Avg Calories"
-              />
-              <StatBlock
-                testID="weekly-summary-avg-protein"
-                value={`${nutrition.avgProteinG}g`}
-                label="Avg Protein"
-              />
-            </View>
-            {nutrition.daysWithinCalories !== null || nutrition.daysProteinMet !== null ? (
-              <View style={[styles.blocks, styles.blocksSpaced]}>
-                {nutrition.daysWithinCalories !== null ? (
-                  <StatBlock
-                    testID="weekly-summary-calorie-days"
-                    value={`${nutrition.daysWithinCalories} of ${nutrition.loggedDays}`}
-                    label="Days on Calories"
-                  />
-                ) : null}
-                {nutrition.daysProteinMet !== null ? (
-                  <StatBlock
-                    testID="weekly-summary-protein-days"
-                    value={`${nutrition.daysProteinMet} of ${nutrition.loggedDays}`}
-                    label="Days on Protein"
-                  />
-                ) : null}
-              </View>
-            ) : null}
-            <Text testID="weekly-summary-logged-days" style={styles.note}>
-              Out of {count(nutrition.loggedDays, 'day', 'days')} with food logged
-              {nutrition.budget
-                ? ` · ${wholeFigureText(nutrition.budget.consumed)} of ${wholeFigureText(nutrition.budget.target)} cal for the week`
-                : ''}
+      {membership.nutrition ? (
+        <Part title="Nutrition" testID="weekly-summary-nutrition">
+          {nutrition.loggedDays === 0 ? (
+            <Text testID="weekly-summary-no-food" style={styles.empty}>
+              No food logged.
             </Text>
-          </>
-        )}
-      </Part>
+          ) : (
+            <>
+              <View style={styles.blocks}>
+                <StatBlock
+                  testID="weekly-summary-avg-calories"
+                  value={nutrition.avgCalories!.toLocaleString()}
+                  label="Avg Calories"
+                />
+                <StatBlock
+                  testID="weekly-summary-avg-protein"
+                  value={`${nutrition.avgProteinG}g`}
+                  label="Avg Protein"
+                />
+              </View>
+              {nutrition.daysWithinCalories !== null || nutrition.daysProteinMet !== null ? (
+                <View style={[styles.blocks, styles.blocksSpaced]}>
+                  {nutrition.daysWithinCalories !== null ? (
+                    <StatBlock
+                      testID="weekly-summary-calorie-days"
+                      value={`${nutrition.daysWithinCalories} of ${nutrition.loggedDays}`}
+                      label="Days on Calories"
+                    />
+                  ) : null}
+                  {nutrition.daysProteinMet !== null ? (
+                    <StatBlock
+                      testID="weekly-summary-protein-days"
+                      value={`${nutrition.daysProteinMet} of ${nutrition.loggedDays}`}
+                      label="Days on Protein"
+                    />
+                  ) : null}
+                </View>
+              ) : null}
+              <Text testID="weekly-summary-logged-days" style={styles.note}>
+                Out of {count(nutrition.loggedDays, 'day', 'days')} with food logged
+                {nutrition.budget
+                  ? ` · ${wholeFigureText(nutrition.budget.consumed)} of ${wholeFigureText(nutrition.budget.target)} cal for the week`
+                  : ''}
+              </Text>
+            </>
+          )}
+        </Part>
+      ) : null}
 
       {muscleGroups.length > 0 ? (
         <Part title="Muscle Groups" testID="weekly-summary-muscle-groups">

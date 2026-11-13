@@ -206,6 +206,73 @@ describe('OnboardingScreen', () => {
     expect(await screen.findByTestId('onboarding-step-height')).toBeTruthy();
   });
 
+  it('offers the three memberships, moving on once one is tapped', async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: STEP_ORDER.indexOf('membership'),
+        draft: {
+          referralSource: 'tiktok',
+          country: 'CA',
+          gender: 'male',
+          weightValue: 80,
+          fitnessGoals: ['build_muscle'],
+          trainingComfort: 'knows_basics',
+          workoutFrequencyDays: 4,
+          averageWorkoutLength: '45_60',
+        },
+      }),
+    );
+    renderScreen();
+    await screen.findByTestId('onboarding-step-membership');
+
+    expect(screen.getByText('Workouts')).toBeTruthy();
+    expect(screen.getByText('Workouts + Nutrition')).toBeTruthy();
+    expect(screen.getByText('Everything')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('onboarding-step-membership-workouts'));
+
+    expect(await screen.findByTestId('onboarding-step-workout-split')).toBeTruthy();
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
+      expect(stored.draft.membershipTier).toBe('workouts');
+    });
+  });
+
+  it("takes a trainer's code, with Continue once it looks like one", async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: STEP_ORDER.indexOf('trainerCode'),
+        draft: {
+          referralSource: 'tiktok',
+          country: 'CA',
+          gender: 'male',
+          weightValue: 80,
+          fitnessGoals: ['build_muscle'],
+          membershipTier: 'everything',
+          trainingComfort: 'knows_basics',
+          workoutFrequencyDays: 4,
+          averageWorkoutLength: '45_60',
+          selectedSplitPresetId: 'ppl',
+          emailOptIn: true,
+          pushNotificationsOptIn: false,
+        },
+      }),
+    );
+    renderScreen();
+    await screen.findByTestId('onboarding-step-trainer-code');
+    const continueButton = () => screen.getByTestId('onboarding-continue');
+
+    expect(continueButton().props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.changeText(screen.getByTestId('onboarding-trainer-code-input'), 'ABC');
+    expect(continueButton().props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.changeText(screen.getByTestId('onboarding-trainer-code-input'), 'ABCD-2345');
+    expect(continueButton().props.accessibilityState).toMatchObject({ disabled: false });
+
+    fireEvent.press(continueButton());
+    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+  });
+
   it('lets the workout split be skipped for now, setting up no split', async () => {
     await AsyncStorage.setItem(
       '@progresso/onboardingDraft',
@@ -216,7 +283,9 @@ describe('OnboardingScreen', () => {
           country: 'CA',
           gender: 'male',
           weightValue: 80,
-          fitnessGoal: 'build_muscle',
+          fitnessGoals: ['build_muscle'],
+          membershipTier: 'everything',
+          hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
@@ -264,7 +333,10 @@ describe('OnboardingScreen', () => {
     fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-fitness-goal');
+    // Several goals can be picked, so this one takes Continue.
     fireEvent.press(screen.getByTestId('onboarding-step-fitness-goal-build_muscle'));
+    fireEvent.press(screen.getByTestId('onboarding-step-fitness-goal-get_stronger'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-training-comfort');
     expect(
@@ -278,6 +350,9 @@ describe('OnboardingScreen', () => {
     await screen.findByTestId('onboarding-step-average-workout-length');
     fireEvent.press(screen.getByTestId('onboarding-workout-length-45_60'));
 
+    await screen.findByTestId('onboarding-step-membership');
+    fireEvent.press(screen.getByTestId('onboarding-step-membership-workouts_nutrition'));
+
     await screen.findByTestId('onboarding-step-workout-split');
     fireEvent.press(screen.getByTestId('onboarding-step-workout-split-preset-ppl'));
 
@@ -286,6 +361,9 @@ describe('OnboardingScreen', () => {
 
     await screen.findByTestId('onboarding-step-push-notifications');
     fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
+
+    await screen.findByTestId('onboarding-step-trainer-code');
+    fireEvent.press(screen.getByTestId('onboarding-no-trainer-code'));
 
     await screen.findByTestId('onboarding-step-create-account');
     fireEvent.changeText(
@@ -316,7 +394,8 @@ describe('OnboardingScreen', () => {
           referralSource: 'tiktok',
           country: 'CA',
           gender: 'male',
-          fitnessGoal: 'build_muscle',
+          fitnessGoals: ['build_muscle', 'get_stronger'],
+          membershipTier: 'workouts_nutrition',
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
           repRangeMax: 12,
@@ -352,7 +431,9 @@ describe('OnboardingScreen', () => {
           weightUnit: 'kg',
           heightValue: 180,
           heightUnit: 'cm',
-          fitnessGoal: 'build_muscle',
+          fitnessGoals: ['build_muscle'],
+          membershipTier: 'everything',
+          hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
           repRangeMax: 12,
@@ -397,7 +478,9 @@ describe('OnboardingScreen', () => {
           weightUnit: 'kg',
           heightValue: 180,
           heightUnit: 'cm',
-          fitnessGoal: 'build_muscle',
+          fitnessGoals: ['build_muscle'],
+          membershipTier: 'everything',
+          hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
           repRangeMax: 12,
@@ -461,7 +544,9 @@ describe('OnboardingScreen', () => {
           weightUnit: 'kg',
           heightValue: 180,
           heightUnit: 'cm',
-          fitnessGoal: 'build_muscle',
+          fitnessGoals: ['build_muscle'],
+          membershipTier: 'everything',
+          hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
           repRangeMax: 12,
@@ -485,6 +570,9 @@ describe('OnboardingScreen', () => {
     fireEvent.press(screen.getByTestId('onboarding-email-yes'));
     await screen.findByTestId('onboarding-step-push-notifications');
     fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
+
+    await screen.findByTestId('onboarding-step-trainer-code');
+    fireEvent.press(screen.getByTestId('onboarding-no-trainer-code'));
 
     await screen.findByTestId('onboarding-step-create-account');
     fireEvent.changeText(
@@ -535,7 +623,9 @@ describe('OnboardingScreen', () => {
           weightUnit: 'kg',
           heightValue: 180,
           heightUnit: 'cm',
-          fitnessGoal: 'build_muscle',
+          fitnessGoals: ['build_muscle'],
+          membershipTier: 'everything',
+          hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
           repRangeMax: 12,
@@ -583,7 +673,9 @@ describe('OnboardingScreen', () => {
     weightUnit: 'kg',
     heightValue: 180,
     heightUnit: 'cm',
-    fitnessGoal: 'build_muscle',
+    fitnessGoals: ['build_muscle'],
+    membershipTier: 'everything',
+    hasTrainerCode: false,
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
     averageWorkoutLength: '45_60',
@@ -653,7 +745,9 @@ describe('OnboardingScreen -- notifications step', () => {
     country: 'CA',
     gender: 'male',
     weightValue: 80,
-    fitnessGoal: 'build_muscle',
+    fitnessGoals: ['build_muscle'],
+    membershipTier: 'everything',
+    hasTrainerCode: false,
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
     averageWorkoutLength: '45_60',
@@ -684,7 +778,7 @@ describe('OnboardingScreen -- notifications step', () => {
 
     fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-connect'));
 
-    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+    expect(await screen.findByTestId('onboarding-step-trainer-code')).toBeTruthy();
     expect(mockRequestNotificationPermission).toHaveBeenCalledTimes(1);
     expect(await savedChoice()).toBe(true);
   });
@@ -695,7 +789,7 @@ describe('OnboardingScreen -- notifications step', () => {
 
     fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-connect'));
 
-    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+    expect(await screen.findByTestId('onboarding-step-trainer-code')).toBeTruthy();
     expect(await savedChoice()).toBe(false);
   });
 
@@ -705,7 +799,7 @@ describe('OnboardingScreen -- notifications step', () => {
 
     fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-connect'));
 
-    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+    expect(await screen.findByTestId('onboarding-step-trainer-code')).toBeTruthy();
     expect(await savedChoice()).toBe(false);
   });
 
@@ -714,7 +808,7 @@ describe('OnboardingScreen -- notifications step', () => {
 
     fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
 
-    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+    expect(await screen.findByTestId('onboarding-step-trainer-code')).toBeTruthy();
     expect(mockRequestNotificationPermission).not.toHaveBeenCalled();
     expect(await savedChoice()).toBe(false);
   });

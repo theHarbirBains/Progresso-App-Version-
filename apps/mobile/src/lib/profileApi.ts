@@ -28,6 +28,8 @@ export type ActivityLevel =
 export type ReferralSource =
   'tiktok' | 'instagram' | 'friend' | 'app_store' | 'google_search' | 'creator' | 'other';
 export type AverageWorkoutLength = '20_30' | '30_45' | '45_60' | '60_plus';
+/** Which parts of the app a person uses -- see membership/membershipTiers.ts. Free, theirs to change. */
+export type MembershipTier = 'workouts' | 'workouts_nutrition' | 'everything';
 
 export interface ProfileResponse {
   id: string;
@@ -45,6 +47,9 @@ export interface ProfileResponse {
   heightValue: number | null;
   heightUnit: HeightUnit;
   fitnessGoal: FitnessGoal | null;
+  /** Up to three, in the order picked; fitnessGoal is the first of them. */
+  fitnessGoals: FitnessGoal[];
+  membershipTier: MembershipTier;
   trainingExperience: TrainingExperience | null;
   workoutFrequencyDays: number | null;
   trainingStylePreference: TrainingStylePreference | null;
@@ -82,6 +87,8 @@ export interface UpdateProfileInput {
   heightValue?: number;
   heightUnit?: HeightUnit;
   fitnessGoal?: FitnessGoal;
+  fitnessGoals?: FitnessGoal[];
+  membershipTier?: MembershipTier;
   trainingExperience?: TrainingExperience;
   workoutFrequencyDays?: number;
   trainingStylePreference?: TrainingStylePreference;

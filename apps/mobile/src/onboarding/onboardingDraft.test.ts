@@ -1,4 +1,5 @@
-import { registerPushToken, updateMyProfile } from '../lib/api';
+import { Alert } from 'react-native';
+import { claimTrainerHistory, registerPushToken, updateMyProfile } from '../lib/api';
 import { requestPushToken } from '../lib/pushNotifications';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import {
@@ -13,6 +14,7 @@ import {
 jest.mock('../lib/api', () => ({
   updateMyProfile: jest.fn(),
   registerPushToken: jest.fn(),
+  claimTrainerHistory: jest.fn(),
 }));
 
 jest.mock('../lib/pushNotifications', () => ({
@@ -43,13 +45,15 @@ const FULL_DRAFT: OnboardingDraft = {
   birthday: '2000-06-15',
   weightValue: 80,
   heightValue: 180,
-  fitnessGoal: 'build_muscle',
+  fitnessGoals: ['build_muscle'],
+  membershipTier: 'everything',
   trainingComfort: 'knows_basics',
   workoutFrequencyDays: 4,
   averageWorkoutLength: '45_60',
   selectedSplitPresetId: 'ppl',
   emailOptIn: true,
   pushNotificationsOptIn: false,
+  hasTrainerCode: false,
   pendingUsername: 'harbirb',
   pendingDisplayName: 'Harbir Bains',
 };
@@ -105,6 +109,56 @@ describe('isStepAnswered / computeStartStepIndex', () => {
   });
 });
 
+describe("submitOnboardingDraft -- a trainer's code", () => {
+  it('claims the history the trainer logged once the account exists', async () => {
+    jest.mocked(claimTrainerHistory).mockResolvedValue({ workouts: 12 });
+
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...FULL_DRAFT,
+      hasTrainerCode: true,
+      trainerCode: 'ABCD-2345',
+    });
+
+    expect(mockUpdateMyProfile).toHaveBeenCalled();
+    expect(claimTrainerHistory).toHaveBeenCalledWith('token-123', 'ABCD-2345');
+  });
+
+  it("doesn't fail sign-up when the code doesn't work, and says where to try again", async () => {
+    jest.mocked(claimTrainerHistory).mockRejectedValue(new Error('That code has expired.'));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+
+    await expect(
+      submitOnboardingDraft('token-123', 'user-1', {
+        ...FULL_DRAFT,
+        hasTrainerCode: true,
+        trainerCode: 'ABCD-2345',
+      }),
+    ).resolves.toEqual({ id: 'user-1' });
+
+    expect(alert).toHaveBeenCalledWith(
+      "Your trainer's code didn't work",
+      expect.stringContaining('That code has expired.'),
+    );
+    expect(alert.mock.calls[0][1]).toContain('Trainer Access');
+    alert.mockRestore();
+  });
+
+  it('claims nothing without a code', async () => {
+    jest.mocked(claimTrainerHistory).mockClear();
+    await submitOnboardingDraft('token-123', 'user-1', FULL_DRAFT);
+    expect(claimTrainerHistory).not.toHaveBeenCalled();
+  });
+
+  it('only takes a code that looks like one', () => {
+    const withCode = (trainerCode: string) =>
+      isStepAnswered('trainerCode', { ...EMPTY_DRAFT, hasTrainerCode: true, trainerCode });
+    expect(withCode('ABCD-2345')).toBe(true);
+    expect(withCode('ABC')).toBe(false);
+    expect(isStepAnswered('trainerCode', { ...EMPTY_DRAFT, hasTrainerCode: false })).toBe(true);
+    expect(isStepAnswered('trainerCode', EMPTY_DRAFT)).toBe(false);
+  });
+});
+
 describe('submitOnboardingDraft', () => {
   it('materializes the chosen split preset, then patches everything in one call including onboardingCompleted', async () => {
     await submitOnboardingDraft('token-123', 'user-1', FULL_DRAFT);
@@ -119,7 +173,8 @@ describe('submitOnboardingDraft', () => {
         birthday: '2000-06-15',
         weightValue: 80,
         heightValue: 180,
-        fitnessGoal: 'build_muscle',
+        fitnessGoals: ['build_muscle'],
+        membershipTier: 'everything',
         trainingComfort: 'knows_basics',
         repRangeMin: 8,
         repRangeMax: 12,

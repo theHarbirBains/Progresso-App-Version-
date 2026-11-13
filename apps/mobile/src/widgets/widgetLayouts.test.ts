@@ -1,7 +1,12 @@
 import { colors } from '../design/theme';
 import { APP_THEMES } from '../theme/appThemes';
 import { homeWidgets } from './homeWidgets';
-import { nutritionWidgetProps, SIGNED_OUT_NUTRITION, SIGNED_OUT_STEPS } from './widgetProps';
+import {
+  NUTRITION_LOCKED,
+  nutritionWidgetProps,
+  SIGNED_OUT_NUTRITION,
+  SIGNED_OUT_STEPS,
+} from './widgetProps';
 import { nextWorkoutProps } from './widgetUpdates';
 
 const { nextWorkoutWidget, nutritionWidget, stepsWidget, workoutActivity } = homeWidgets();
@@ -180,6 +185,16 @@ describe("Today's Nutrition", () => {
     expect(textsIn(left)).toEqual(['Sun, Nov 1']);
     expect(nodesIn(left).some((n) => n.type === 'Spacer')).toBe(true);
     expect(textsIn(centred)).toEqual(['Nutrition']);
+  });
+
+  it("says Nutrition isn't in the membership, with no figures, when it isn't", () => {
+    const tree = run(layoutOf(nutritionWidget), { ...NUTRITION_LOCKED, ...LOOK }, MEDIUM);
+    expect(textsIn(tree)).toEqual([
+      'Sun, Nov 1',
+      'Nutrition',
+      "Nutrition isn't in your membership.",
+      'Change it in Progresso: Settings, then Membership.',
+    ]);
   });
 
   it('asks to sign in once signed out, and to open the app before it has any figures', () => {

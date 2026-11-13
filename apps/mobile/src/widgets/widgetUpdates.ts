@@ -11,6 +11,7 @@ import {
   clockTime,
   dailyTimeline,
   dayLabel,
+  NUTRITION_LOCKED,
   nutritionTimeline,
   plistSafeTimeline,
   SIGNED_OUT_NEXT_WORKOUT,
@@ -71,6 +72,13 @@ export function showNutritionWidget(
 ): Promise<void> {
   return inTurn('nutrition', ({ nutritionWidget }) =>
     nutritionWidget.updateTimeline(dressed(nutritionTimeline(eaten, targets, now))),
+  );
+}
+
+/** Today's Nutrition when the person's membership leaves Nutrition out: it says so, no figures. */
+export function showNutritionLockedWidget(now = new Date()): Promise<void> {
+  return inTurn('nutrition', ({ nutritionWidget }) =>
+    nutritionWidget.updateTimeline(dressed(dailyTimeline(now, NUTRITION_LOCKED, NUTRITION_LOCKED))),
   );
 }
 

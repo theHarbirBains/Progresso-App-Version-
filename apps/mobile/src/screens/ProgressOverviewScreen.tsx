@@ -22,6 +22,7 @@ import { useProfile } from '../profile/ProfileProvider';
 import { ProgressHeader } from '../progress/ProgressHeader';
 import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
 import { progressStyles as styles } from '../progress/progressStyles';
+import { useMembership } from '../membership/useMembership';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { groupByExercise } from '../workouts/allExerciseHistoryQueries';
@@ -84,6 +85,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   const [activeSection, setActiveSection] = useState<ProgressSection>('Overview');
   // All Time's tab -- its workouts or its nutrition -- kept while other sections are visited.
   const [allTimeView, setAllTimeView] = useState<'workouts' | 'nutrition'>('workouts');
+  const membership = useMembership();
   const { profile } = useProfile();
   // This week's and last week's summaries, read once as Progress opens.
   const { summaries: weekSummaries, error: weekError } = useWeeklySummaries();
@@ -200,18 +202,21 @@ export function ProgressOverviewScreen({ navigation }: Props) {
             {/* All Time: the workouts' all-time figures, or nutrition's -- two tabs of one section. */}
             {contentReady && activeSection === 'AllTime' ? (
               <View style={styles.allTimeTabs}>
-                <SegmentedControl
-                  testID="progress-all-time-view"
-                  options={[
-                    { label: 'Workouts', value: 'workouts' },
-                    { label: 'Nutrition', value: 'nutrition' },
-                  ]}
-                  value={allTimeView}
-                  onChange={setAllTimeView}
-                  accentColor={theme.accent}
-                  onAccentColor={theme.onAccent}
-                />
-                {allTimeView === 'workouts' ? (
+                {/* Nutrition's tab only with a membership that includes it. */}
+                {membership.nutrition ? (
+                  <SegmentedControl
+                    testID="progress-all-time-view"
+                    options={[
+                      { label: 'Workouts', value: 'workouts' },
+                      { label: 'Nutrition', value: 'nutrition' },
+                    ]}
+                    value={allTimeView}
+                    onChange={setAllTimeView}
+                    accentColor={theme.accent}
+                    onAccentColor={theme.onAccent}
+                  />
+                ) : null}
+                {allTimeView === 'workouts' || !membership.nutrition ? (
                   <AllTimeSection
                     groups={groups}
                     history={history}

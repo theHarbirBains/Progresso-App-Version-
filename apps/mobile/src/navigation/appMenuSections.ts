@@ -84,10 +84,16 @@ export const APP_MENU_SECTIONS: AppMenuSection[] = [
 
 /**
  * The menu for this person. Clients is not listed; trainers reach their client list
- * from Trainer Access.
+ * from Trainer Access. Nutrition is listed only when their membership includes it -- without
+ * it, the Nutrition tab says what it's part of and how to change membership.
  */
-export function appMenuSectionsFor(_isTrainer: boolean): AppMenuSection[] {
-  return APP_MENU_SECTIONS;
+export function appMenuSectionsFor(
+  _isTrainer: boolean,
+  includesNutrition = true,
+): AppMenuSection[] {
+  return includesNutrition
+    ? APP_MENU_SECTIONS
+    : APP_MENU_SECTIONS.filter((section) => section.title !== 'NUTRITION');
 }
 
 /** Rendered by AppSideMenu as a standalone row below every section, with no

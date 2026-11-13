@@ -165,6 +165,18 @@ const NutritionToday = (props: NutritionWidgetProps, environment: WidgetEnvironm
       <Image systemName="fork.knife" size={13} color={ACCENT} />
     </HStack>
   );
+  if (props.locked) {
+    return face(
+      heading,
+      <Spacer />,
+      <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(INK)]}>
+        Nutrition isn&apos;t in your membership.
+      </Text>,
+      <Text modifiers={[font({ size: 12 }), foregroundStyle(QUIET)]}>
+        Change it in Progresso: Settings, then Membership.
+      </Text>,
+    );
+  }
   if (!props.signedIn) {
     return face(
       heading,

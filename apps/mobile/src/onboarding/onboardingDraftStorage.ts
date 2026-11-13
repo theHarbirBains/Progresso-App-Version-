@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { FitnessGoal } from '../lib/api';
 import { EMPTY_DRAFT, type OnboardingDraft } from './onboardingDraft';
 
 const STORAGE_KEY = '@progresso/onboardingDraft';
@@ -34,7 +35,12 @@ export async function loadOnboardingDraft(): Promise<StoredDraft | null> {
     // Spread over EMPTY_DRAFT so a draft saved before a future field was
     // added (a new onboarding step ships) still loads with that field
     // sensibly defaulted, rather than crashing or leaving it as `undefined`.
-    return { draft: { ...EMPTY_DRAFT, ...parsed.draft }, stepIndex: parsed.stepIndex };
+    const stored = parsed.draft as Partial<OnboardingDraft> & { fitnessGoal?: FitnessGoal | null };
+    const draft = { ...EMPTY_DRAFT, ...stored };
+    // A draft from before several goals could be picked kept its one goal on its own.
+    if (stored.fitnessGoal && !stored.fitnessGoals) draft.fitnessGoals = [stored.fitnessGoal];
+    delete (draft as { fitnessGoal?: unknown }).fitnessGoal;
+    return { draft, stepIndex: parsed.stepIndex };
   } catch {
     return null;
   }

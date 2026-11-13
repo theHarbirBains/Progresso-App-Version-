@@ -93,6 +93,10 @@ import { SettingsChangePasswordScreen } from './src/screens/SettingsChangePasswo
 import { SettingsBlockedPeopleScreen } from './src/screens/SettingsBlockedPeopleScreen';
 import { SettingsNotificationsScreen } from './src/screens/SettingsNotificationsScreen';
 import { SettingsAppearanceScreen } from './src/screens/SettingsAppearanceScreen';
+import { SettingsMembershipScreen } from './src/screens/SettingsMembershipScreen';
+import { MembershipProvider } from './src/membership/MembershipProvider';
+import { useMembership } from './src/membership/useMembership';
+import { withNutrition } from './src/membership/withNutrition';
 import { SettingsNutritionScreen } from './src/screens/SettingsNutritionScreen';
 import { SettingsPersonalInfoScreen } from './src/screens/SettingsPersonalInfoScreen';
 import { SettingsSupportScreen } from './src/screens/SettingsSupportScreen';
@@ -137,11 +141,25 @@ const MODE_AGNOSTIC_ROUTES = new Set(['Feed', 'ProgressOverview', 'Profile']);
 // construction already fully onboarded (there is no other way to get one).
 // So unlike before, a signed-in session never needs to be routed to a
 // separate Onboarding screen or shown a one-time Welcome screen here.
+// Nutrition's screens, each shown only with a membership that includes Nutrition (withNutrition).
+const NUTRITION_SCREENS = {
+  Nutrition: withNutrition(NutritionTodayScreen),
+  FoodLibrary: withNutrition(FoodLibraryScreen),
+  FoodSearch: withNutrition(FoodSearchScreen),
+  AiFoodSearch: withNutrition(AiFoodSearchScreen),
+  QuickFoodEntry: withNutrition(QuickFoodEntryScreen),
+  BarcodeScanner: withNutrition(BarcodeScannerScreen),
+  NutritionGoals: withNutrition(NutritionGoalsScreen),
+  NutritionHistory: withNutrition(NutritionHistoryScreen),
+  CalorieEstimation: withNutrition(CalorieEstimationScreen),
+};
+
 function Root() {
   const { status, session, user } = useAuth();
-  // Trainer status decides whether the side menu lists the trainer's clients.
-  const isTrainer = useTrainerStatus();
   const { profile, loading: profileLoading } = useProfile();
+  // Trainer Mode: a trainer, with a membership that includes it.
+  const membership = useMembership();
+  const isTrainer = useTrainerStatus() && membership.trainerMode;
   const [mode, setMode] = useState<AuthMode>('signIn');
   // Feed, Progress, and You (Profile) are the app's mode-agnostic root
   // screens -- reachable directly from the bottom nav, not by switching a
@@ -382,6 +400,7 @@ function Root() {
                     component={SettingsNotificationsScreen}
                   />
                   <Stack.Screen name="SettingsAppearance" component={SettingsAppearanceScreen} />
+                  <Stack.Screen name="SettingsMembership" component={SettingsMembershipScreen} />
                   <Stack.Screen
                     name="SettingsAccountSecurity"
                     component={SettingsAccountSecurityScreen}
@@ -411,15 +430,30 @@ function Root() {
                   <Stack.Screen name="TrainerLogWorkout" component={LogPastWorkoutScreen} />
                   <Stack.Screen name="PRHistory" component={PRHistoryScreen} />
                   <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
-                  <Stack.Screen name="Nutrition" component={NutritionTodayScreen} />
-                  <Stack.Screen name="FoodLibrary" component={FoodLibraryScreen} />
-                  <Stack.Screen name="FoodSearch" component={FoodSearchScreen} />
-                  <Stack.Screen name="AiFoodSearch" component={AiFoodSearchScreen} />
-                  <Stack.Screen name="QuickFoodEntry" component={QuickFoodEntryScreen} />
-                  <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
-                  <Stack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
-                  <Stack.Screen name="NutritionHistory" component={NutritionHistoryScreen} />
-                  <Stack.Screen name="CalorieEstimation" component={CalorieEstimationScreen} />
+                  <Stack.Screen name="Nutrition" component={NUTRITION_SCREENS.Nutrition} />
+                  <Stack.Screen name="FoodLibrary" component={NUTRITION_SCREENS.FoodLibrary} />
+                  <Stack.Screen name="FoodSearch" component={NUTRITION_SCREENS.FoodSearch} />
+                  <Stack.Screen name="AiFoodSearch" component={NUTRITION_SCREENS.AiFoodSearch} />
+                  <Stack.Screen
+                    name="QuickFoodEntry"
+                    component={NUTRITION_SCREENS.QuickFoodEntry}
+                  />
+                  <Stack.Screen
+                    name="BarcodeScanner"
+                    component={NUTRITION_SCREENS.BarcodeScanner}
+                  />
+                  <Stack.Screen
+                    name="NutritionGoals"
+                    component={NUTRITION_SCREENS.NutritionGoals}
+                  />
+                  <Stack.Screen
+                    name="NutritionHistory"
+                    component={NUTRITION_SCREENS.NutritionHistory}
+                  />
+                  <Stack.Screen
+                    name="CalorieEstimation"
+                    component={NUTRITION_SCREENS.CalorieEstimation}
+                  />
                   <Stack.Screen name="ProgressOverview" component={ProgressOverviewScreen} />
                   <Stack.Screen
                     name="ProgressExerciseDetail"
@@ -481,7 +515,9 @@ function Root() {
             <AppSideMenu
               visible={menuOpen}
               sections={
-                workspace === 'trainer' ? TRAINER_MENU_SECTIONS : appMenuSectionsFor(isTrainer)
+                workspace === 'trainer'
+                  ? TRAINER_MENU_SECTIONS
+                  : appMenuSectionsFor(isTrainer, membership.nutrition)
               }
               activeRoute={
                 (navigationRef.current?.getCurrentRoute()?.name as AppMenuRoute | undefined) ??
@@ -567,17 +603,19 @@ function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <ProfileProvider>
-          <NutritionGoalsProvider>
-            <FoodLogProvider>
-              <AllTimeStatsProvider>
-                <AppThemeProvider>
-                  <AppShell fontsLoaded={fontsLoaded} />
-                  <WidgetSync />
-                </AppThemeProvider>
-                <StatusBar style="light" />
-              </AllTimeStatsProvider>
-            </FoodLogProvider>
-          </NutritionGoalsProvider>
+          <MembershipProvider>
+            <NutritionGoalsProvider>
+              <FoodLogProvider>
+                <AllTimeStatsProvider>
+                  <AppThemeProvider>
+                    <AppShell fontsLoaded={fontsLoaded} />
+                    <WidgetSync />
+                  </AppThemeProvider>
+                  <StatusBar style="light" />
+                </AllTimeStatsProvider>
+              </FoodLogProvider>
+            </NutritionGoalsProvider>
+          </MembershipProvider>
         </ProfileProvider>
       </AuthProvider>
     </SafeAreaProvider>

@@ -54,6 +54,8 @@ export interface WidgetMacro {
 
 export interface NutritionWidgetProps extends WidgetLook {
   signedIn: boolean;
+  /** The person's membership leaves Nutrition out: the widget says so, with no figures. */
+  locked?: boolean;
   /** The big figure: calories left, over, or eaten when there's no calorie target. */
   calories: string;
   /** "calories left", "calories over" or "calories eaten". */
@@ -97,6 +99,15 @@ export interface WorkoutActivityProps {
 
 export const SIGNED_OUT_NUTRITION: NutritionWidgetProps = {
   signedIn: false,
+  calories: '',
+  caption: '',
+  macros: [],
+};
+
+/** Today's Nutrition for someone whose membership leaves Nutrition out. */
+export const NUTRITION_LOCKED: NutritionWidgetProps = {
+  signedIn: true,
+  locked: true,
   calories: '',
   caption: '',
   macros: [],
