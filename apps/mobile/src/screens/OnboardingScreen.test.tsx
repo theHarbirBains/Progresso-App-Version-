@@ -78,7 +78,6 @@ describe('OnboardingScreen', () => {
     expect(mockSwitchToSignIn).toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('onboarding-referral-source-tiktok'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     expect(await screen.findByTestId('onboarding-step-country')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-switch-to-sign-in')).toBeNull();
@@ -103,7 +102,6 @@ describe('OnboardingScreen', () => {
     await screen.findByTestId('onboarding-step-referral-source');
 
     fireEvent.press(screen.getByTestId('onboarding-referral-source-tiktok'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
     expect(await screen.findByTestId('onboarding-step-country')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-scroll')).toBeNull();
   });
@@ -129,7 +127,6 @@ describe('OnboardingScreen', () => {
     renderScreen();
     await screen.findByTestId('onboarding-step-referral-source');
     fireEvent.press(screen.getByTestId('onboarding-referral-source-tiktok'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
     await screen.findByTestId('onboarding-step-country');
 
     fireEvent.press(screen.getByTestId('onboarding-back'));
@@ -137,26 +134,125 @@ describe('OnboardingScreen', () => {
     expect(await screen.findByTestId('onboarding-step-referral-source')).toBeTruthy();
   });
 
+  it('moves on by itself once an answer is tapped, showing it as chosen first', async () => {
+    renderScreen();
+    await screen.findByTestId('onboarding-step-referral-source');
+
+    fireEvent.press(screen.getByTestId('onboarding-referral-source-tiktok'));
+
+    // Still here a moment, the answer ticked...
+    expect(screen.getByTestId('onboarding-step-referral-source')).toBeTruthy();
+    expect(
+      screen.getByTestId('onboarding-referral-source-tiktok').props.accessibilityState,
+    ).toMatchObject({ selected: true });
+    expect(screen.queryByTestId('onboarding-continue')).toBeNull();
+    // ...then the next question.
+    expect(await screen.findByTestId('onboarding-step-country')).toBeTruthy();
+  });
+
+  it('stays back when Back is pressed straight after an answer is tapped', async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({ stepIndex: 1, draft: { referralSource: 'tiktok' } }),
+    );
+    renderScreen();
+    await screen.findByTestId('onboarding-step-country');
+
+    fireEvent.changeText(screen.getByTestId('onboarding-step-country-search'), 'Canada');
+    fireEvent.press(await screen.findByTestId('onboarding-step-country-option-CA'));
+    fireEvent.press(screen.getByTestId('onboarding-back'));
+
+    expect(await screen.findByTestId('onboarding-step-referral-source')).toBeTruthy();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+    expect(screen.getByTestId('onboarding-step-referral-source')).toBeTruthy();
+  });
+
+  it('takes a typed weight, waiting for one in range before Continue', async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: STEP_ORDER.indexOf('weight'),
+        draft: { referralSource: 'tiktok', country: 'CA', gender: 'male', weightUnit: 'lb' },
+      }),
+    );
+    renderScreen();
+    await screen.findByTestId('onboarding-step-weight');
+    const continueButton = () => screen.getByTestId('onboarding-continue');
+    const field = () => screen.getByTestId('onboarding-step-weight-input');
+
+    // Empty to begin with.
+    expect(field().props.value).toBe('');
+    expect(continueButton().props.accessibilityState).toMatchObject({ disabled: true });
+
+    fireEvent.changeText(field(), '20');
+    expect(continueButton().props.accessibilityState).toMatchObject({ disabled: true });
+
+    fireEvent.changeText(field(), '165');
+    expect(continueButton().props.accessibilityState).toMatchObject({ disabled: false });
+
+    // In kg it's shown converted, and the weight is unchanged.
+    fireEvent.press(screen.getByTestId('onboarding-step-weight-unit-kg'));
+    expect(field().props.value).toBe('74.8');
+    expect(continueButton().props.accessibilityState).toMatchObject({ disabled: false });
+
+    fireEvent.press(continueButton());
+    expect(await screen.findByTestId('onboarding-step-height')).toBeTruthy();
+  });
+
+  it('lets the workout split be skipped for now, setting up no split', async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: STEP_ORDER.indexOf('workoutSplit'),
+        draft: {
+          referralSource: 'tiktok',
+          country: 'CA',
+          gender: 'male',
+          weightValue: 80,
+          fitnessGoal: 'build_muscle',
+          trainingComfort: 'knows_basics',
+          workoutFrequencyDays: 4,
+          averageWorkoutLength: '45_60',
+        },
+      }),
+    );
+    renderScreen();
+    await screen.findByTestId('onboarding-step-workout-split');
+
+    fireEvent.press(screen.getByTestId('onboarding-skip-workout-split'));
+
+    expect(await screen.findByTestId('onboarding-step-email-preference')).toBeTruthy();
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
+      expect(stored.draft).toMatchObject({
+        skippedSplit: true,
+        selectedSplitPresetId: null,
+        wantsCustomSplit: false,
+      });
+    });
+    expect(mockMaterialize).not.toHaveBeenCalled();
+  });
+
   it('walks through the entire onboarding flow end-to-end, creating the account only at the very end', async () => {
     renderScreen();
 
     await screen.findByTestId('onboarding-step-referral-source');
     fireEvent.press(screen.getByTestId('onboarding-referral-source-tiktok'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-country');
     fireEvent.changeText(screen.getByTestId('onboarding-step-country-search'), 'Canada');
     fireEvent.press(await screen.findByTestId('onboarding-step-country-option-CA'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-gender');
     fireEvent.press(screen.getByTestId('onboarding-gender-male'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-birthday');
     fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-weight');
+    fireEvent.changeText(screen.getByTestId('onboarding-step-weight-input'), '176');
     fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-height');
@@ -164,29 +260,24 @@ describe('OnboardingScreen', () => {
 
     await screen.findByTestId('onboarding-step-fitness-goal');
     fireEvent.press(screen.getByTestId('onboarding-step-fitness-goal-build_muscle'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-training-comfort');
     expect(
       screen.getByText('How comfortable are you with planning and progressing your workouts?'),
     ).toBeTruthy();
     fireEvent.press(screen.getByTestId('onboarding-step-training-comfort-knows_basics'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-workout-frequency');
     fireEvent.press(screen.getByTestId('onboarding-frequency-4'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-average-workout-length');
     fireEvent.press(screen.getByTestId('onboarding-workout-length-45_60'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-workout-split');
     fireEvent.press(screen.getByTestId('onboarding-step-workout-split-preset-ppl'));
 
     await screen.findByTestId('onboarding-step-email-preference');
     fireEvent.press(screen.getByTestId('onboarding-email-yes'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-push-notifications');
     fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
@@ -226,6 +317,9 @@ describe('OnboardingScreen', () => {
           repRangeMax: 12,
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
+          // 176 lb, typed.
+          weightValue: expect.closeTo(79.83, 2),
+          weightUnit: 'lb',
           activeWorkoutSplitId: 'split-new',
           emailOptIn: true,
           pushNotificationsOptIn: false,
@@ -384,7 +478,6 @@ describe('OnboardingScreen', () => {
     expect(draft.selectedSplitPresetId).toBeNull();
 
     fireEvent.press(screen.getByTestId('onboarding-email-yes'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
     await screen.findByTestId('onboarding-step-push-notifications');
     fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
 
@@ -540,6 +633,7 @@ describe('OnboardingScreen -- notifications step', () => {
     referralSource: 'tiktok',
     country: 'CA',
     gender: 'male',
+    weightValue: 80,
     fitnessGoal: 'build_muscle',
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,

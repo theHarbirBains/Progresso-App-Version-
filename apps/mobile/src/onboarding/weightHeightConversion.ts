@@ -35,6 +35,30 @@ export const HEIGHT_CM_RANGE = { min: 90, max: 250, step: 1 };
 export const HEIGHT_FT_RANGE = { min: 3, max: 8 };
 export const HEIGHT_IN_RANGE = { min: 0, max: 11 };
 
+/** The weights a body weight may be, in each unit (the same as the weight wheel's). */
+export function bodyWeightRange(unit: 'kg' | 'lb'): { min: number; max: number } {
+  return unit === 'kg' ? WEIGHT_KG_RANGE : WEIGHT_LB_RANGE;
+}
+
+/**
+ * A typed body weight, in kg: null while the box is blank, or holds something that isn't a weight
+ * in `unit`'s range. "75", "75.5" and "75,5" all count.
+ */
+export function typedBodyWeightKg(text: string, unit: 'kg' | 'lb'): number | null {
+  const trimmed = text.trim();
+  if (!/^\d+([.,]\d+)?$/.test(trimmed)) return null;
+  const value = Number(trimmed.replace(',', '.'));
+  const { min, max } = bodyWeightRange(unit);
+  if (value < min || value > max) return null;
+  return unit === 'kg' ? value : lbToKg(value);
+}
+
+/** A body weight as the box shows it: to a tenth, without a trailing ".0" -- "75", "154.3". */
+export function bodyWeightText(weightKg: number, unit: 'kg' | 'lb'): string {
+  const value = unit === 'kg' ? weightKg : kgToLb(weightKg);
+  return String(Math.round(value * 10) / 10);
+}
+
 export function decimalRange(min: number, max: number, step: number): string[] {
   const values: string[] = [];
   const decimals = step < 1 ? 1 : 0;

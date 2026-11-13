@@ -1,4 +1,6 @@
 import {
+  bodyWeightRange,
+  bodyWeightText,
   cmFromFeetAndInches,
   cmToInches,
   decimalRange,
@@ -8,6 +10,7 @@ import {
   kgToLb,
   lbToKg,
   nearestValue,
+  typedBodyWeightKg,
 } from './weightHeightConversion';
 
 describe('weight conversion', () => {
@@ -52,5 +55,31 @@ describe('nearestValue', () => {
     const values = decimalRange(30, 32, 0.1);
     expect(nearestValue(values, 31.04)).toBe('31.0');
     expect(nearestValue(values, 31.06)).toBe('31.1');
+  });
+});
+
+describe('a typed body weight', () => {
+  it('reads a weight in its unit, in kg, a comma counting as a point', () => {
+    expect(typedBodyWeightKg('75', 'kg')).toBe(75);
+    expect(typedBodyWeightKg(' 75,5 ', 'kg')).toBe(75.5);
+    expect(typedBodyWeightKg('165', 'lb')).toBeCloseTo(74.84, 2);
+  });
+
+  it("isn't a weight while blank, unfinished, or out of the unit's range", () => {
+    for (const text of ['', '7.', '.5', '1.2.3', 'abc', '-70']) {
+      expect(typedBodyWeightKg(text, 'kg')).toBeNull();
+    }
+    expect(typedBodyWeightKg('29.9', 'kg')).toBeNull();
+    expect(typedBodyWeightKg('251', 'kg')).toBeNull();
+    // 60 is a weight in kg, but too light in lb.
+    expect(typedBodyWeightKg('60', 'kg')).toBe(60);
+    expect(typedBodyWeightKg('60', 'lb')).toBeNull();
+    expect(bodyWeightRange('lb')).toEqual({ min: 66, max: 550, step: 0.1 });
+  });
+
+  it('is shown to a tenth, without a trailing .0', () => {
+    expect(bodyWeightText(75, 'kg')).toBe('75');
+    expect(bodyWeightText(lbToKg(165), 'lb')).toBe('165');
+    expect(bodyWeightText(75, 'lb')).toBe('165.3');
   });
 });

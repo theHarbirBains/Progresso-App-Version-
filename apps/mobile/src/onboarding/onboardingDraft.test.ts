@@ -55,11 +55,11 @@ const FULL_DRAFT: OnboardingDraft = {
 };
 
 describe('isStepAnswered / computeStartStepIndex', () => {
-  // weight/height/birthday are wheel pickers -- they always show *some*
-  // value, so EMPTY_DRAFT pre-fills them with that same default rather
-  // than null (see EMPTY_DRAFT's own comment); every other step genuinely
-  // starts unanswered.
-  const PREFILLED_STEPS = new Set(['weight', 'height', 'birthday']);
+  // height/birthday are wheel pickers -- they always show *some* value, so
+  // EMPTY_DRAFT pre-fills them with that same default rather than null (see
+  // EMPTY_DRAFT's own comment); every other step, the typed weight included,
+  // genuinely starts unanswered.
+  const PREFILLED_STEPS = new Set(['height', 'birthday']);
 
   it('is unanswered for every step but the pre-filled wheel steps on a brand-new draft', () => {
     for (const step of STEP_ORDER) {
@@ -79,8 +79,8 @@ describe('isStepAnswered / computeStartStepIndex', () => {
     expect(isStepAnswered('referralSource', draft)).toBe(true);
     expect(isStepAnswered('country', draft)).toBe(true);
     expect(isStepAnswered('gender', draft)).toBe(true);
-    expect(isStepAnswered('fitnessGoal', draft)).toBe(false);
-    expect(computeStartStepIndex(draft)).toBe(STEP_ORDER.indexOf('fitnessGoal'));
+    expect(isStepAnswered('weight', draft)).toBe(false);
+    expect(computeStartStepIndex(draft)).toBe(STEP_ORDER.indexOf('weight'));
   });
 
   it('treats workoutSplit as answered when the user chose to create their own instead of a preset', () => {
@@ -91,6 +91,11 @@ describe('isStepAnswered / computeStartStepIndex', () => {
     };
 
     expect(isStepAnswered('workoutSplit', draft)).toBe(true);
+  });
+
+  it('treats workoutSplit as answered when the user skipped it for now', () => {
+    expect(isStepAnswered('workoutSplit', { ...EMPTY_DRAFT, skippedSplit: true })).toBe(true);
+    expect(isStepAnswered('workoutSplit', EMPTY_DRAFT)).toBe(false);
   });
 
   it('createAccount is never "answered" -- it is always the resume target once every question is done', () => {

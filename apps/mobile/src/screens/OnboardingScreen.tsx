@@ -39,7 +39,7 @@ import {
 import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
 import { OnboardingProgress } from '../onboarding/OnboardingProgress';
 import { PermissionStep } from '../onboarding/PermissionStep';
-import { WeightWheelPicker } from '../onboarding/WeightWheelPicker';
+import { WeightField } from '../onboarding/WeightField';
 import { TrainingComfortSelector } from '../onboarding/TrainingComfortSelector';
 import { requestNotificationPermission } from '../lib/pushNotifications';
 import { useAppTheme } from '../theme/appThemeContext';
@@ -50,23 +50,14 @@ interface Props {
   onSwitchToSignIn: () => void;
 }
 
-// Steps whose selection is just local draft state, confirmed by the shared
-// footer Continue button below. Steps not in this set have their own
-// terminal controls (Connect/Not Now, a preset card, the Create Account
-// button) and render no footer.
-const GENERIC_CONTINUE_STEPS = new Set<OnboardingStep>([
-  'referralSource',
-  'country',
-  'gender',
-  'birthday',
-  'weight',
-  'height',
-  'fitnessGoal',
-  'trainingComfort',
-  'workoutFrequency',
-  'averageWorkoutLength',
-  'emailPreference',
-]);
+// Steps with no single tap that answers them -- the birthday and height wheels, and the weight
+// box -- confirmed by the shared footer Continue button below. Every pick-one question moves on
+// by itself as an answer is tapped (choose, below); the rest have their own terminal controls
+// (Allow/Not Now, a preset card or Skip for now, the Create Account button).
+const CONTINUE_STEPS = new Set<OnboardingStep>(['birthday', 'weight', 'height']);
+
+// How long a tapped answer shows as chosen before the next question takes its place.
+const CHOSEN_PAUSE_MS = 250;
 
 // These steps each render either a WheelPicker or a FlatList (country's own
 // search results), both virtualized -- nesting either inside the outer
@@ -74,7 +65,7 @@ const GENERIC_CONTINUE_STEPS = new Set<OnboardingStep>([
 // never be nested inside plain ScrollViews with the same orientation"
 // warning (and its real windowing cost). Every other step keeps the
 // ScrollView since option lists can genuinely run long on a small device.
-const NO_OUTER_SCROLL_STEPS = new Set<OnboardingStep>(['country', 'birthday', 'weight', 'height']);
+const NO_OUTER_SCROLL_STEPS = new Set<OnboardingStep>(['country', 'birthday', 'height']);
 
 const DEFAULT_BIRTH_YEAR = new Date().getFullYear() - 25;
 
@@ -151,12 +142,38 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
     setStepIndex(Math.min(STEP_ORDER.length - 1, Math.max(0, index)));
   }
 
+  // A tapped answer's move to the next question, waiting out CHOSEN_PAUSE_MS.
+  const pendingAdvance = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function cancelPendingAdvance() {
+    if (pendingAdvance.current) clearTimeout(pendingAdvance.current);
+    pendingAdvance.current = null;
+  }
+  useEffect(() => cancelPendingAdvance, []);
+
   function goBackStep() {
+    cancelPendingAdvance();
     goToStep(stepIndex - 1);
   }
 
   function advance() {
+    cancelPendingAdvance();
     goToStep(stepIndex + 1);
+  }
+
+  /**
+   * Saves a tapped answer and moves on to the next question once it's shown as chosen. Tapping
+   * another answer first only changes the answer; going back first stays back.
+   */
+  function choose(patch: Partial<OnboardingDraft>) {
+    updateDraft(patch);
+    cancelPendingAdvance();
+    const from = stepIndex;
+    pendingAdvance.current = setTimeout(() => {
+      pendingAdvance.current = null;
+      setStepIndex((current) =>
+        current === from ? Math.min(STEP_ORDER.length - 1, from + 1) : current,
+      );
+    }, CHOSEN_PAUSE_MS);
   }
 
   function canContinue(step: OnboardingStep): boolean {
@@ -291,7 +308,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                   testID={`onboarding-referral-source-${option.value}`}
                   label={option.label}
                   selected={draft.referralSource === option.value}
-                  onPress={() => updateDraft({ referralSource: option.value })}
+                  onPress={() => choose({ referralSource: option.value })}
                 />
               ))}
             </View>
@@ -304,7 +321,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
             <CountryStep
               testID="onboarding-step-country"
               value={draft.country}
-              onChange={(code) => updateDraft({ country: code })}
+              onChange={(code) => choose({ country: code })}
             />
           </>
         ) : null}
@@ -319,7 +336,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                   testID={`onboarding-gender-${option.value}`}
                   label={option.label}
                   selected={draft.gender === option.value}
-                  onPress={() => updateDraft({ gender: option.value })}
+                  onPress={() => choose({ gender: option.value })}
                 />
               ))}
             </View>
@@ -349,15 +366,13 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
         {step === 'weight' ? (
           <>
             <Text style={styles.stepTitle}>What&apos;s your weight?</Text>
-            <View style={styles.wheelArea}>
-              <WeightWheelPicker
-                testID="onboarding-step-weight"
-                unit={draft.weightUnit}
-                weightKg={draft.weightValue ?? 70}
-                onChangeUnit={(weightUnit) => updateDraft({ weightUnit })}
-                onChangeWeightKg={(weightValue) => updateDraft({ weightValue })}
-              />
-            </View>
+            <WeightField
+              testID="onboarding-step-weight"
+              unit={draft.weightUnit}
+              weightKg={draft.weightValue}
+              onChangeUnit={(weightUnit) => updateDraft({ weightUnit })}
+              onChangeWeightKg={(weightValue) => updateDraft({ weightValue })}
+            />
           </>
         ) : null}
 
@@ -382,7 +397,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
             <GoalSelector
               testID="onboarding-step-fitness-goal"
               value={draft.fitnessGoal}
-              onChange={(fitnessGoal) => updateDraft({ fitnessGoal })}
+              onChange={(fitnessGoal) => choose({ fitnessGoal })}
             />
           </>
         ) : null}
@@ -395,7 +410,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
             <TrainingComfortSelector
               testID="onboarding-step-training-comfort"
               value={draft.trainingComfort}
-              onChange={(trainingComfort) => updateDraft({ trainingComfort })}
+              onChange={(trainingComfort) => choose({ trainingComfort })}
             />
           </>
         ) : null}
@@ -410,7 +425,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                   testID={`onboarding-frequency-${option.value}`}
                   label={option.label}
                   selected={draft.workoutFrequencyDays === option.value}
-                  onPress={() => updateDraft({ workoutFrequencyDays: option.value })}
+                  onPress={() => choose({ workoutFrequencyDays: option.value })}
                 />
               ))}
             </View>
@@ -427,7 +442,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                   testID={`onboarding-workout-length-${option.value}`}
                   label={option.label}
                   selected={draft.averageWorkoutLength === option.value}
-                  onPress={() => updateDraft({ averageWorkoutLength: option.value })}
+                  onPress={() => choose({ averageWorkoutLength: option.value })}
                 />
               ))}
             </View>
@@ -452,15 +467,38 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
               theme={accent}
               materializeImmediately={false}
               onPresetActivated={(presetId) => {
-                updateDraft({ selectedSplitPresetId: presetId, wantsCustomSplit: false });
+                updateDraft({
+                  selectedSplitPresetId: presetId,
+                  wantsCustomSplit: false,
+                  skippedSplit: false,
+                });
                 advance();
               }}
               onCreateOwn={() => {
-                updateDraft({ selectedSplitPresetId: null, wantsCustomSplit: true });
+                updateDraft({
+                  selectedSplitPresetId: null,
+                  wantsCustomSplit: true,
+                  skippedSplit: false,
+                });
                 advance();
               }}
               createOwnHelperText="You'll build this right after your account is created"
             />
+            {/* No split for now: Start Workout asks for one the first time it's needed. */}
+            <View style={styles.footer}>
+              <TextButton
+                testID="onboarding-skip-workout-split"
+                label="Skip for now"
+                onPress={() => {
+                  updateDraft({
+                    selectedSplitPresetId: null,
+                    wantsCustomSplit: false,
+                    skippedSplit: true,
+                  });
+                  advance();
+                }}
+              />
+            </View>
           </>
         ) : null}
 
@@ -472,13 +510,13 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 testID="onboarding-email-yes"
                 label="Yes"
                 selected={draft.emailOptIn === true}
-                onPress={() => updateDraft({ emailOptIn: true })}
+                onPress={() => choose({ emailOptIn: true })}
               />
               <OnboardingOptionCard
                 testID="onboarding-email-no"
                 label="No"
                 selected={draft.emailOptIn === false}
-                onPress={() => updateDraft({ emailOptIn: false })}
+                onPress={() => choose({ emailOptIn: false })}
               />
             </View>
           </>
@@ -545,7 +583,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
         ) : null}
       </View>
 
-      {GENERIC_CONTINUE_STEPS.has(step) ? (
+      {CONTINUE_STEPS.has(step) ? (
         <View style={styles.footer}>
           <PrimaryButton
             testID="onboarding-continue"

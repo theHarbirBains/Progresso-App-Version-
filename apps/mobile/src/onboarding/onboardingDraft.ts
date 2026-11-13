@@ -52,6 +52,9 @@ export interface OnboardingDraft {
    * split" gate sends a user to ChooseWorkoutSplitScreen's real, working
    * "Create Custom Split" from -- no separate post-signup routing needed. */
   wantsCustomSplit: boolean;
+  /** Skipped choosing a split for now: like Create Your Own, the account starts with no split --
+   * Start Workout asks for one the first time it's needed. */
+  skippedSplit: boolean;
   emailOptIn: boolean | null;
   pushNotificationsOptIn: boolean | null;
   /** Set by CreateAccountStep's own form, right as it submits -- kept here
@@ -64,12 +67,13 @@ export interface OnboardingDraft {
   pendingDisplayName: string | null;
 }
 
-// Weight/height/birthday are wheel pickers -- they always show *some*
-// value (there's no empty state for a wheel), so their draft fields start
+// Height and birthday are wheel pickers -- they always show *some* value
+// (there's no empty state for a wheel), so their draft fields start
 // pre-filled with that same displayed default rather than null, the same
 // way the old profile-backed onboarding's local wheel state always had a
 // real starting value ready to save even before the user touched it.
-// Matches WeightWheelPicker/HeightWheelPicker's own fallback defaults.
+// Matches HeightWheelPicker's own fallback default. Weight is typed into a
+// box (WeightField), so it starts empty: the step waits for a real weight.
 const DEFAULT_BIRTH_YEAR = new Date().getFullYear() - 25;
 
 export const EMPTY_DRAFT: OnboardingDraft = {
@@ -77,7 +81,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   country: null,
   gender: null,
   birthday: toDateStringUTC(0, 1, DEFAULT_BIRTH_YEAR),
-  weightValue: 70,
+  weightValue: null,
   weightUnit: 'lb',
   heightValue: 170,
   heightUnit: 'cm',
@@ -87,6 +91,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   averageWorkoutLength: null,
   selectedSplitPresetId: null,
   wantsCustomSplit: false,
+  skippedSplit: false,
   emailOptIn: null,
   pushNotificationsOptIn: null,
   pendingUsername: null,
@@ -144,7 +149,7 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
     case 'averageWorkoutLength':
       return draft.averageWorkoutLength != null;
     case 'workoutSplit':
-      return draft.selectedSplitPresetId != null || draft.wantsCustomSplit;
+      return draft.selectedSplitPresetId != null || draft.wantsCustomSplit || draft.skippedSplit;
     case 'emailPreference':
       return draft.emailOptIn != null;
     case 'pushNotifications':
