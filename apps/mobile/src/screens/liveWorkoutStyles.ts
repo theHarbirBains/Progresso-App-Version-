@@ -60,6 +60,11 @@ export const liveWorkoutStyles = StyleSheet.create({
     paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.sm,
   },
+  // The muscle tabs under the workout's widget, scrolling sideways when they don't fit.
+  muscleTabs: {
+    paddingLeft: spacing.xxl,
+    paddingBottom: spacing.sm,
+  },
   rangeRow: {
     flexDirection: 'row',
     alignItems: 'center',

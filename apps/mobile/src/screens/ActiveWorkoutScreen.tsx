@@ -15,6 +15,8 @@ import { RiseInStack } from '../design/RiseIn';
 import { Screen } from '../design/Screen';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
+import { FilterChips } from '../design/FilterChips';
+import { workoutMuscleTabs, type MuscleTab } from '../workouts/workoutMuscleTabs';
 import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
@@ -106,6 +108,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
+  // The muscle tab chosen along the top: every exercise, or one primary muscle group's.
+  const [muscleTab, setMuscleTab] = useState<MuscleTab>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Progressive overload: the person's rep range, each exercise's own, their records and the
@@ -484,10 +488,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     }
   }
 
-  async function handleMoveExercise(index: number, direction: -1 | 1) {
+  // Swaps the exercises at two places in the workout -- next to each other, or, on a muscle tab,
+  // the ones either side of each other there.
+  async function handleMoveExercise(index: number, target: number) {
     if (!workout) return;
-    const target = index + direction;
-    if (target < 0 || target >= workout.exercises.length) return;
+    if (target < 0 || target >= workout.exercises.length || target === index) return;
     const a = workout.exercises[index];
     const b = workout.exercises[target];
     setError(null);
@@ -605,11 +610,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   }, []);
 
   const moveHandlersRef = useRef(new Map<string, () => void>());
-  function getMoveHandler(index: number, direction: -1 | 1): () => void {
-    const cacheKey = `${index}:${direction}`;
+  function getMoveHandler(index: number, target: number): () => void {
+    const cacheKey = `${index}:${target}`;
     const cached = moveHandlersRef.current.get(cacheKey);
     if (cached) return cached;
-    const handler = () => handleMoveExerciseRef.current(index, direction);
+    const handler = () => handleMoveExerciseRef.current(index, target);
     moveHandlersRef.current.set(cacheKey, handler);
     return handler;
   }
@@ -657,6 +662,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
             }
           : prev,
       );
+      // On a muscle tab, the new exercise's own tab, so it's never added out of sight.
+      setMuscleTab((tab) => (tab === 'all' ? tab : exercise.muscleGroup));
       const lastSession = await lastSessionLoad;
       // Anything typed into the new set while last session loaded is kept.
       setSetInputs((prev) =>
@@ -776,6 +783,14 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const muscleGroupsLabel = Array.from(
     new Set(workout.exercises.map((ex) => MUSCLE_GROUP_LABELS[ex.muscleGroup])),
   ).join(', ');
+  // One tab per primary muscle group trained so far, in the order they were first added; a tab
+  // whose last exercise is removed goes, and All shows again.
+  const muscleTabs = workoutMuscleTabs(workout.exercises);
+  const activeTab: MuscleTab =
+    muscleTab !== 'all' && muscleTabs.includes(muscleTab) ? muscleTab : 'all';
+  const shownExercises = workout.exercises
+    .map((exercise, index) => ({ exercise, index }))
+    .filter(({ exercise }) => activeTab === 'all' || exercise.muscleGroup === activeTab);
   const totalSets = computeTotalSets(workout.exercises);
   return (
     <>
@@ -810,6 +825,24 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 />
               </Card>
             </View>
+            {muscleTabs.length > 0 ? (
+              <View style={styles.muscleTabs}>
+                <FilterChips<MuscleTab>
+                  testID="active-workout-muscle-tabs"
+                  options={[
+                    { value: 'all', label: 'All' },
+                    ...muscleTabs.map((muscle) => ({
+                      value: muscle,
+                      label: MUSCLE_GROUP_LABELS[muscle],
+                    })),
+                  ]}
+                  value={activeTab}
+                  onChange={setMuscleTab}
+                  accentColor={theme.accent}
+                  onAccentColor={theme.onAccent}
+                />
+              </View>
+            ) : null}
           </View>
         }
       >
@@ -835,7 +868,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               </View>
             ) : null}
 
-            {workout.exercises.map((exercise, index) => (
+            {shownExercises.map(({ exercise, index }, shownAt) => (
               <ExerciseCard
                 {...progression.cardPropsFor(
                   exercise,
@@ -883,9 +916,13 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 onAddSet={() => handleAddSet(exercise)}
                 onRemoveSet={removeSet}
                 onRemoveExercise={() => handleRemoveExercise(exercise.id)}
-                onMoveUp={index > 0 ? getMoveHandler(index, -1) : undefined}
+                onMoveUp={
+                  shownAt > 0 ? getMoveHandler(index, shownExercises[shownAt - 1].index) : undefined
+                }
                 onMoveDown={
-                  index < workout.exercises.length - 1 ? getMoveHandler(index, 1) : undefined
+                  shownAt < shownExercises.length - 1
+                    ? getMoveHandler(index, shownExercises[shownAt + 1].index)
+                    : undefined
                 }
                 accentColor={theme.accent}
                 onAccentColor={theme.onAccent}

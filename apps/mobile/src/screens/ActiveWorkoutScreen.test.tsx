@@ -216,6 +216,13 @@ beforeEach(() => {
   mockReplace.mockClear();
 });
 
+/** The scrolling list of exercises -- not the muscle tabs, which scroll sideways above it. */
+function exerciseList() {
+  const lists = screen.UNSAFE_getAllByType(ScrollView).filter((list) => !list.props.horizontal);
+  expect(lists).toHaveLength(1);
+  return lists[0];
+}
+
 describe('ActiveWorkoutScreen', () => {
   it('loads the workout for the given workoutId (resuming the correct session)', async () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
@@ -524,6 +531,101 @@ describe('ActiveWorkoutScreen', () => {
     const card = await screen.findByTestId('exercise-card-we2');
     expect(within(card).getByTestId('exercise-card-we2-set-s3')).toBeTruthy();
     expect(within(card).queryByTestId('exercise-card-we2-set-s3-2')).toBeNull();
+  });
+
+  describe('muscle tabs', () => {
+    const exercise = (id: string, name: string, muscleGroup: string, orderIndex: number) => ({
+      id,
+      exerciseId: `ex-${id}`,
+      exerciseName: name,
+      muscleGroup,
+      orderIndex,
+      sets: [],
+    });
+    const SHOULDERS_AND_CHEST = {
+      ...baseWorkout,
+      exercises: [
+        exercise('we1', 'Overhead Press', 'shoulders', 1),
+        exercise('we2', 'Bench Press', 'chest', 2),
+        exercise('we3', 'Lateral Raise', 'shoulders', 3),
+      ],
+    };
+
+    async function open(workout: unknown) {
+      mockFetchWorkoutDetail.mockResolvedValue(workout);
+      render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+        wrapper: TestProviders,
+      });
+      await screen.findByTestId('exercise-card-we1');
+    }
+
+    it('has a tab for each primary muscle trained, in the order first added, and All', async () => {
+      await open(SHOULDERS_AND_CHEST);
+
+      const tabs = screen.getByTestId('active-workout-muscle-tabs');
+      expect(within(tabs).getByTestId('active-workout-muscle-tabs-all')).toBeTruthy();
+      expect(within(tabs).getByTestId('active-workout-muscle-tabs-shoulders')).toBeTruthy();
+      expect(within(tabs).getByTestId('active-workout-muscle-tabs-chest')).toBeTruthy();
+      // Nothing for a muscle no exercise here trains.
+      expect(within(tabs).queryByTestId('active-workout-muscle-tabs-biceps')).toBeNull();
+    });
+
+    it("shows just one muscle's exercises on its tab, and every one on All", async () => {
+      await open(SHOULDERS_AND_CHEST);
+
+      fireEvent.press(screen.getByTestId('active-workout-muscle-tabs-shoulders'));
+      expect(screen.getByTestId('exercise-card-we1')).toBeTruthy();
+      expect(screen.getByTestId('exercise-card-we3')).toBeTruthy();
+      expect(screen.queryByTestId('exercise-card-we2')).toBeNull();
+
+      fireEvent.press(screen.getByTestId('active-workout-muscle-tabs-all'));
+      expect(screen.getByTestId('exercise-card-we2')).toBeTruthy();
+    });
+
+    it('has no tabs before an exercise is added', async () => {
+      mockFetchWorkoutDetail.mockResolvedValue({ ...baseWorkout, exercises: [] });
+      render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+        wrapper: TestProviders,
+      });
+      await screen.findByTestId('active-workout-empty');
+      expect(screen.queryByTestId('active-workout-muscle-tabs')).toBeNull();
+    });
+
+    it("adds a muscle's tab once an exercise for it is added, opening it from a muscle tab", async () => {
+      mockFetchExercises.mockResolvedValue([
+        { id: 'ex-curl', name: 'Barbell Curl', muscleGroup: 'biceps', isActive: true },
+      ]);
+      mockAddExerciseToWorkout.mockResolvedValue('we4');
+      await open(SHOULDERS_AND_CHEST);
+      fireEvent.press(screen.getByTestId('active-workout-muscle-tabs-shoulders'));
+
+      fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
+      fireEvent.press(await screen.findByTestId('exercise-item-ex-curl'));
+
+      expect(await screen.findByTestId('active-workout-muscle-tabs-biceps')).toBeTruthy();
+      // The new exercise's tab, so it isn't added out of sight.
+      expect(await screen.findByTestId('exercise-card-we4')).toBeTruthy();
+      expect(screen.queryByTestId('exercise-card-we1')).toBeNull();
+      expect(
+        screen.getByTestId('active-workout-muscle-tabs-biceps').props.accessibilityState,
+      ).toMatchObject({ selected: true });
+    });
+
+    it('moves an exercise past the one before it on its tab', async () => {
+      await open(SHOULDERS_AND_CHEST);
+      fireEvent.press(screen.getByTestId('active-workout-muscle-tabs-shoulders'));
+
+      // On Shoulders, Lateral Raise's neighbour is Overhead Press, not the Bench Press between.
+      fireEvent.press(screen.getByTestId('exercise-card-we3-menu'));
+      fireEvent.press(screen.getByTestId('exercise-card-we3-move-up'));
+
+      await waitFor(() =>
+        expect(mockReorderExercises).toHaveBeenCalledWith([
+          { id: 'we3', workoutId: 'w1', exerciseId: 'ex-we3', orderIndex: 1 },
+          { id: 'we1', workoutId: 'w1', exerciseId: 'ex-we1', orderIndex: 3 },
+        ]),
+      );
+    });
   });
 
   it('opens the existing custom-exercise creation flow', async () => {
@@ -1714,7 +1816,7 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
   it('pins duration, sets and exercise count outside the scrolling list so they stay in view', async () => {
     await renderReady();
 
-    const scroll = within(screen.UNSAFE_getByType(ScrollView));
+    const scroll = within(exerciseList());
     expect(scroll.queryByTestId('active-workout-summary')).toBeNull();
     expect(screen.getByTestId('workout-summary-duration')).toBeTruthy();
     expect(screen.getByTestId('workout-summary-total-sets')).toBeTruthy();
@@ -1732,7 +1834,7 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     await renderReady();
 
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    const scroll = within(screen.UNSAFE_getByType(ScrollView));
+    const scroll = within(exerciseList());
     expect(scroll.queryByTestId('complete-workout')).toBeNull();
     expect(screen.getByTestId('complete-workout')).toHaveTextContent('Finish Workout');
   });
@@ -1741,7 +1843,7 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     await renderReady();
 
     const cancel = screen.getByTestId('cancel-workout');
-    expect(within(screen.UNSAFE_getByType(ScrollView)).getByTestId('cancel-workout')).toBe(cancel);
+    expect(within(exerciseList()).getByTestId('cancel-workout')).toBe(cancel);
     expect(StyleSheet.flatten(cancel.props.style).borderWidth).toBeUndefined();
     expect(StyleSheet.flatten(within(cancel).getByText('Cancel Workout').props.style).color).toBe(
       colors.destructive,
@@ -1799,8 +1901,10 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     expect(lastSet1.getByText('100 kg × 5')).toBeTruthy();
     const lastSet2 = within(screen.getByTestId('exercise-card-we1-previous-set-2'));
     expect(lastSet2.getByText('97.5 kg × 5')).toBeTruthy();
-    // The carousel: one horizontal, paged strip of slides.
-    const strips = screen.UNSAFE_queryAllByType(ScrollView).filter((node) => node.props.horizontal);
+    // The carousel: one horizontal, paged strip of slides, in the exercise's card.
+    const strips = within(screen.getByTestId('exercise-card-we1'))
+      .UNSAFE_queryAllByType(ScrollView)
+      .filter((node) => node.props.horizontal);
     expect(strips).toHaveLength(1);
     expect(strips[0].props.pagingEnabled).toBe(true);
   });
@@ -1906,9 +2010,7 @@ describe("ActiveWorkoutScreen -- the person's rep range, at the top", () => {
     });
 
     const row = await screen.findByTestId('active-workout-rep-range');
-    expect(
-      within(screen.UNSAFE_getByType(ScrollView)).queryByTestId('active-workout-rep-range'),
-    ).toBeNull();
+    expect(within(exerciseList()).queryByTestId('active-workout-rep-range')).toBeNull();
     expect(screen.getByTestId('active-workout-rep-range-value')).toHaveTextContent('8–12');
     expect(row).not.toHaveTextContent(/have their own|has its own/);
 
