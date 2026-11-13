@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { StyleSheet, View, type TextInputInstance } from 'react-native';
+import { socialSignInEnabled } from '../auth/socialSignIn';
 import { Text } from '../design/Text';
 import { PasswordVisibilityToggle } from '../design/PasswordVisibilityToggle';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
@@ -223,19 +224,23 @@ export function CreateAccountStep({
         disabled={!canSubmit}
       />
 
-      <View style={dividerStyles.row}>
-        <View style={dividerStyles.line} />
-        <Text style={dividerStyles.text}>or</Text>
-        <View style={dividerStyles.line} />
-      </View>
+      {socialSignInEnabled() ? (
+        <>
+          <View style={dividerStyles.row}>
+            <View style={dividerStyles.line} />
+            <Text style={dividerStyles.text}>or</Text>
+            <View style={dividerStyles.line} />
+          </View>
 
-      <SecondaryButton
-        testID="onboarding-create-account-google"
-        label="Continue with Google"
-        onPress={handleGoogleSignUp}
-        loading={googleSubmitting}
-        disabled={!canSubmitGoogle}
-      />
+          <SecondaryButton
+            testID="onboarding-create-account-google"
+            label="Continue with Google"
+            onPress={handleGoogleSignUp}
+            loading={googleSubmitting}
+            disabled={!canSubmitGoogle}
+          />
+        </>
+      ) : null}
     </View>
   );
 }

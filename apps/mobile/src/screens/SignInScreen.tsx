@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
+import { socialSignInEnabled } from '../auth/socialSignIn';
 import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { PasswordVisibilityToggle } from '../design/PasswordVisibilityToggle';
 import { TextInput } from '../design/TextInput';
@@ -102,27 +103,33 @@ export function SignInScreen({ onSwitchToSignUp, onForgotPassword }: Props) {
         />
       </View>
 
-      <View style={styles.dividerRow}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>or</Text>
-        <View style={styles.dividerLine} />
-      </View>
+      {socialSignInEnabled() ? (
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+      ) : null}
 
       <View style={styles.actions}>
-        <SecondaryButton
-          testID="sign-in-google"
-          label="Continue with Google"
-          onPress={() => handleOAuth('google')}
-          loading={oauthSubmitting === 'google'}
-          disabled={oauthDisabled && oauthSubmitting !== 'google'}
-        />
-        <SecondaryButton
-          testID="sign-in-apple"
-          label="Continue with Apple"
-          onPress={() => handleOAuth('apple')}
-          loading={oauthSubmitting === 'apple'}
-          disabled={oauthDisabled && oauthSubmitting !== 'apple'}
-        />
+        {socialSignInEnabled() ? (
+          <>
+            <SecondaryButton
+              testID="sign-in-google"
+              label="Continue with Google"
+              onPress={() => handleOAuth('google')}
+              loading={oauthSubmitting === 'google'}
+              disabled={oauthDisabled && oauthSubmitting !== 'google'}
+            />
+            <SecondaryButton
+              testID="sign-in-apple"
+              label="Continue with Apple"
+              onPress={() => handleOAuth('apple')}
+              loading={oauthSubmitting === 'apple'}
+              disabled={oauthDisabled && oauthSubmitting !== 'apple'}
+            />
+          </>
+        ) : null}
         <TextButton
           testID="sign-in-switch"
           label="Don't have an account? Sign up"

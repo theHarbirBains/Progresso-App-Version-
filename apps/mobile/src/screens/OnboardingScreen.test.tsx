@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
+import { socialSignInEnabled } from '../auth/socialSignIn';
 import { updateMyProfile } from '../lib/api';
 import { requestNotificationPermission } from '../lib/pushNotifications';
 import { EMPTY_DRAFT, STEP_ORDER, type OnboardingDraft } from '../onboarding/onboardingDraft';
@@ -11,6 +12,9 @@ import { OnboardingScreen } from './OnboardingScreen';
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
+
+// Google is off for now (auth/socialSignIn.ts); its tests here turn it on.
+jest.mock('../auth/socialSignIn', () => ({ socialSignInEnabled: jest.fn() }));
 
 jest.mock('../lib/api', () => ({
   updateMyProfile: jest.fn(),
@@ -35,6 +39,7 @@ const mockSwitchToSignIn = jest.fn();
 
 beforeEach(async () => {
   await AsyncStorage.clear();
+  jest.mocked(socialSignInEnabled).mockReset().mockReturnValue(true);
   mockUseAuth.mockReturnValue({
     signUpWithPassword: mockSignUpWithPassword,
     signInWithProvider: mockSignInWithProvider,
@@ -586,6 +591,20 @@ describe('OnboardingScreen', () => {
     emailOptIn: true,
     pushNotificationsOptIn: false,
   };
+
+  it('offers email sign-up only while Google is off', async () => {
+    jest.mocked(socialSignInEnabled).mockReturnValue(false);
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({ stepIndex: STEP_ORDER.indexOf('createAccount'), draft: fullyAnsweredDraft }),
+    );
+    renderScreen();
+    await screen.findByTestId('onboarding-step-create-account');
+
+    expect(screen.getByTestId('onboarding-create-account-submit')).toBeTruthy();
+    expect(screen.queryByTestId('onboarding-create-account-google')).toBeNull();
+    expect(screen.queryByText('or')).toBeNull();
+  });
 
   it('requires Display Name and Username before Google sign-up, same as the email path', async () => {
     await AsyncStorage.setItem(

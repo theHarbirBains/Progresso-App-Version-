@@ -47,7 +47,7 @@ Social v1 (explicitly requested and implemented — a one-directional, accept-ga
 - **Mobile:** React Native + Expo + TypeScript
 - **Backend:** Node.js + TypeScript, NestJS on the Fastify adapter
 - **Database:** PostgreSQL via Supabase, version-controlled migrations, RLS, triggers where appropriate
-- **Auth:** Supabase Auth (email/password, Google, Apple, MFA)
+- **Auth:** Supabase Auth (email/password, Google, Apple, MFA) -- the app offers email only for now: Google and Apple are switched off in one place (`apps/mobile/src/auth/socialSignIn.ts`), their code kept
 - **Storage:** Supabase Storage
 - **Subscriptions:** RevenueCat is the authoritative source of entitlement; our subscription table is a projection/cache only
 - **Admin dashboard:** React web app

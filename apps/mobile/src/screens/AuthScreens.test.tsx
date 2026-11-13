@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { socialSignInEnabled } from '../auth/socialSignIn';
 import { PrimaryButton } from '../design/Button';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ForgotPasswordScreen } from './ForgotPasswordScreen';
@@ -17,8 +18,12 @@ jest.mock('../auth/AuthProvider', () => ({
   }),
 }));
 
+// Google and Apple are off for now (auth/socialSignIn.ts); these tests cover them turned on too.
+jest.mock('../auth/socialSignIn', () => ({ socialSignInEnabled: jest.fn() }));
+
 beforeEach(() => {
   mockSignIn.mockReset().mockResolvedValue(null);
+  jest.mocked(socialSignInEnabled).mockReset().mockReturnValue(true);
 });
 
 describe('Signed-out screens -- one frame, shared inputs, one filled button', () => {
@@ -34,6 +39,17 @@ describe('Signed-out screens -- one frame, shared inputs, one filled button', ()
       expect(style.borderWidth).toBe(1);
     }
     expectNoBareText();
+  });
+
+  it('Sign In: email only while Google and Apple are off', () => {
+    jest.mocked(socialSignInEnabled).mockReturnValue(false);
+    render(<SignInScreen onSwitchToSignUp={jest.fn()} onForgotPassword={jest.fn()} />);
+
+    expect(screen.getByTestId('sign-in-email')).toBeTruthy();
+    expect(screen.queryByTestId('sign-in-google')).toBeNull();
+    expect(screen.queryByTestId('sign-in-apple')).toBeNull();
+    expect(screen.queryByText('or')).toBeNull();
+    expect(screen.getByTestId('sign-in-switch')).toBeTruthy();
   });
 
   it('Sign In: the password field can be toggled visible/hidden', () => {
