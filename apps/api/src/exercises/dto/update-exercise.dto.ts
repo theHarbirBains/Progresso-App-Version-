@@ -9,6 +9,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
+import { trimmedOrNull } from './create-exercise.dto';
 import {
   LOGGING_STYLES,
   MEASUREMENT_TYPES,
@@ -57,4 +58,24 @@ export class UpdateExerciseDto {
   @IsString()
   @MaxLength(2048)
   photoUrl?: string | null;
+
+  // What sets this machine apart from others like it -- omit to leave one as it is, a blank
+  // one clears it (exercises.gym, feel_notes, attachment).
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => trimmedOrNull(value))
+  @IsString()
+  @MaxLength(60)
+  gym?: string | null;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => trimmedOrNull(value))
+  @IsString()
+  @MaxLength(300)
+  feelNotes?: string | null;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => trimmedOrNull(value))
+  @IsString()
+  @MaxLength(60)
+  attachment?: string | null;
 }

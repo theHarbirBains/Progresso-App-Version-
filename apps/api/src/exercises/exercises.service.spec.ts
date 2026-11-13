@@ -84,6 +84,9 @@ describe('ExercisesService', () => {
         logging_style: null,
         measurement_type: 'weight_reps',
         photo_url: null,
+        gym: null,
+        feel_notes: null,
+        attachment: null,
       });
       expect(result).toEqual({
         id: 'ex-mine',
@@ -93,6 +96,9 @@ describe('ExercisesService', () => {
         loggingStyle: null,
         measurementType: 'weight_reps',
         photoUrl: null,
+        gym: null,
+        feelNotes: null,
+        attachment: null,
         isActive: true,
         createdBy: 'user-1',
         createdAt: '2026-01-02T00:00:00.000Z',
@@ -125,6 +131,9 @@ describe('ExercisesService', () => {
         logging_style: 'single_side',
         measurement_type: 'weight_reps',
         photo_url: null,
+        gym: null,
+        feel_notes: null,
+        attachment: null,
       });
       expect(result.movementType).toBe('unilateral');
       expect(result.loggingStyle).toBe('single_side');
@@ -210,6 +219,46 @@ describe('ExercisesService', () => {
           movementType: 'bilateral',
         }),
       ).rejects.toThrow('Failed to create exercise');
+    });
+  });
+
+  describe('what sets a machine apart', () => {
+    it('saves its gym, how it feels and its handle with a new exercise', async () => {
+      const client = createMockClient({ insertData: { ...ownCustomRow, gym: 'Downtown' } });
+      const service = serviceWith(client);
+
+      const result = await service.createCustom('user-1', {
+        name: 'Seated Leg Extension',
+        muscleGroup: 'quadriceps',
+        movementType: 'bilateral',
+        gym: 'Downtown',
+        feelNotes: 'Heavier than the one at Gym B',
+        attachment: 'V-handle',
+      });
+
+      expect(client.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          gym: 'Downtown',
+          feel_notes: 'Heavier than the one at Gym B',
+          attachment: 'V-handle',
+        }),
+      );
+      expect(result.gym).toBe('Downtown');
+    });
+
+    it('changes one detail on its own, and clears one with null', async () => {
+      const client = createMockClient({ selectData: ownCustomRow, updateData: ownCustomRow });
+      const service = serviceWith(client);
+
+      await service.updateCustom('user-1', ownCustomRow.id as string, {
+        feelNotes: 'Lighter now the cable was fixed',
+        attachment: null,
+      });
+
+      expect(client.update).toHaveBeenCalledWith({
+        feel_notes: 'Lighter now the cable was fixed',
+        attachment: null,
+      });
     });
   });
 

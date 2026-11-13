@@ -19,6 +19,10 @@ export interface ExerciseRecord {
   loggingStyle: LoggingStyle | null;
   measurementType: MeasurementType;
   photoUrl: string | null;
+  /** Where the machine is, how it feels next to others like it, its bar or handle. */
+  gym: string | null;
+  feelNotes: string | null;
+  attachment: string | null;
   isActive: boolean;
   createdBy: string | null;
   createdAt: string;
@@ -36,6 +40,9 @@ function toExerciseRecord(row: Record<string, unknown>): ExerciseRecord {
     loggingStyle: (row.logging_style as LoggingStyle | null) ?? null,
     measurementType: (row.measurement_type as MeasurementType | undefined) ?? 'weight_reps',
     photoUrl: (row.photo_url as string | null) ?? null,
+    gym: (row.gym as string | null) ?? null,
+    feelNotes: (row.feel_notes as string | null) ?? null,
+    attachment: (row.attachment as string | null) ?? null,
     isActive: row.is_active as boolean,
     createdBy: (row.created_by as string | null) ?? null,
     createdAt: row.created_at as string,
@@ -66,13 +73,18 @@ export class ExercisesService {
         logging_style: dto.movementType === 'unilateral' ? dto.loggingStyle : null,
         measurement_type: dto.measurementType ?? 'weight_reps',
         photo_url: dto.photoUrl ?? null,
+        gym: dto.gym ?? null,
+        feel_notes: dto.feelNotes ?? null,
+        attachment: dto.attachment ?? null,
       })
       .select('*')
       .single();
 
     if (error) {
       if (error.code === UNIQUE_VIOLATION) {
-        throw new ConflictException('You already have a custom exercise with that name');
+        throw new ConflictException(
+          'You already have a custom exercise with that name at that gym',
+        );
       }
       throw new InternalServerErrorException('Failed to create exercise');
     }
@@ -103,6 +115,9 @@ export class ExercisesService {
       updatePayload.logging_style = dto.loggingStyle;
     }
     if (dto.photoUrl !== undefined) updatePayload.photo_url = dto.photoUrl;
+    if (dto.gym !== undefined) updatePayload.gym = dto.gym;
+    if (dto.feelNotes !== undefined) updatePayload.feel_notes = dto.feelNotes;
+    if (dto.attachment !== undefined) updatePayload.attachment = dto.attachment;
     if (dto.measurementType !== undefined) updatePayload.measurement_type = dto.measurementType;
 
     if (Object.keys(updatePayload).length === 0) {
@@ -119,7 +134,9 @@ export class ExercisesService {
 
     if (error) {
       if (error.code === UNIQUE_VIOLATION) {
-        throw new ConflictException('You already have a custom exercise with that name');
+        throw new ConflictException(
+          'You already have a custom exercise with that name at that gym',
+        );
       }
       throw new InternalServerErrorException('Failed to update exercise');
     }

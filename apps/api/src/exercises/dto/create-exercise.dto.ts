@@ -10,6 +10,13 @@ import {
   type MovementType,
 } from '../movement-type';
 
+/** A typed detail: trimmed, and null when nothing is left -- so a blank box clears it. */
+export function trimmedOrNull(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
 export class CreateExerciseDto {
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
@@ -45,4 +52,24 @@ export class CreateExerciseDto {
   @IsString()
   @MaxLength(2048)
   photoUrl?: string;
+
+  // What sets this machine apart from others like it -- all optional, each trimmed, a blank one
+  // left out (exercises.gym, feel_notes, attachment).
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => trimmedOrNull(value))
+  @IsString()
+  @MaxLength(60)
+  gym?: string | null;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => trimmedOrNull(value))
+  @IsString()
+  @MaxLength(300)
+  feelNotes?: string | null;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => trimmedOrNull(value))
+  @IsString()
+  @MaxLength(60)
+  attachment?: string | null;
 }

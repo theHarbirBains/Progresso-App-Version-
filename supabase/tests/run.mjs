@@ -574,6 +574,32 @@ async function main() {
   );
   console.log('[PASS] After a custom exercise is deleted, its name can be used again');
 
+  // ---- what sets a machine apart: gym, how it feels, its handle ----
+  // The same name at two gyms is two machines; at the same gym it's still one.
+  await admin.query(
+    `insert into public.exercises (name, muscle_group, created_by, gym, feel_notes, attachment)
+     values ('Leg Extension Gym Check', 'quadriceps', $1, 'Downtown', 'Feels heavier than Gym B', null),
+            ('Leg Extension Gym Check', 'quadriceps', $1, 'Gym B', null, null)`,
+    [userA],
+  );
+  record('The same exercise name can be used at two different gyms', true);
+  await expectThrows(
+    admin.query(
+      "insert into public.exercises (name, muscle_group, created_by, gym) values ('Leg Extension Gym Check', 'quadriceps', $1, 'downtown')",
+      [userA],
+    ),
+    'The same exercise name at the same gym is still refused',
+    /duplicate key|unique/i,
+  );
+  await expectThrows(
+    admin.query(
+      "insert into public.exercises (name, muscle_group, created_by, attachment) values ('Long Handle Check', 'back', $1, $2)",
+      [userA, 'x'.repeat(61)],
+    ),
+    "A machine's handle is kept short",
+    /violates check constraint/i,
+  );
+
   await asUser(userA, async (client) => {
     const res = await client.query(
       "update public.exercises set name = 'My Curl Variation v2' where id = $1",
@@ -2742,6 +2768,10 @@ async function main() {
        ($5, $2, 'Retired Machine', 'chest', 'bilateral', null)`,
     [trainerCustom, T, otherUsersCustom, CO, retiredCustom],
   );
+  await admin.query(
+    "update public.exercises set gym = 'Gym B', feel_notes = 'Lighter than the one downtown', attachment = 'Wide bar' where id = $1",
+    [trainerCustom],
+  );
   await admin.query('update public.exercises set is_active = false where id = $1', [retiredCustom]);
 
   const logPayload = (exerciseId, sets) =>
@@ -2775,7 +2805,7 @@ async function main() {
   );
 
   const clientCopy = await admin.query(
-    "select id, created_by, photo_url from public.exercises where created_by = $1 and name = 'Gym B Chest Machine'",
+    "select id, created_by, photo_url, gym, feel_notes, attachment from public.exercises where created_by = $1 and name = 'Gym B Chest Machine'",
     [C],
   );
   const workoutExerciseRows = (
@@ -2790,6 +2820,13 @@ async function main() {
       workoutExerciseRows[0].exercise_id === clientCopy.rows[0].id &&
       clientCopy.rows[0].photo_url === 'https://example.test/gym-b.jpg',
     JSON.stringify({ copies: clientCopy.rows.length, used: workoutExerciseRows }),
+  );
+  record(
+    "The client's copy keeps what sets the machine apart: its gym, how it feels, its handle",
+    clientCopy.rows[0].gym === 'Gym B' &&
+      clientCopy.rows[0].feel_notes === 'Lighter than the one downtown' &&
+      clientCopy.rows[0].attachment === 'Wide bar',
+    JSON.stringify(clientCopy.rows[0]),
   );
 
   await logFor(T, C, logPayload(trainerCustom, twoSets));
@@ -3375,7 +3412,7 @@ async function main() {
   );
   const ownCopy = randomUUID();
   await admin.query(
-    "insert into public.exercises (id, created_by, name, muscle_group, movement_type) values ($1, $2, 'Gym B Chest Machine', 'chest', 'bilateral')",
+    "insert into public.exercises (id, created_by, name, muscle_group, movement_type, gym) values ($1, $2, 'Gym B Chest Machine', 'chest', 'bilateral', 'Gym B')",
     [ownCopy, mergeClaimant],
   );
   await trackPlaceholder(mergePlaceholder, 'code-hash-3');
