@@ -80,7 +80,12 @@ describe('enrichWorkoutSummaries', () => {
             workout_id: 'w1',
             exercise_id: 'bench',
             order_index: 1,
-            exercises: { name: 'Bench Press', photo_url: 'https://example.com/bench.jpg' },
+            exercises: {
+              name: 'Bench Press',
+              photo_url: 'https://example.com/bench.jpg',
+              gym: 'Fit4Less Downtown',
+              attachment: 'Wide grip bar',
+            },
           },
           {
             id: 'we2',
@@ -149,6 +154,9 @@ describe('enrichWorkoutSummaries', () => {
             exerciseId: 'bench',
             exerciseName: 'Bench Press',
             photoUrl: 'https://example.com/bench.jpg',
+            // Which machine it was, for the card to say.
+            gym: 'Fit4Less Downtown',
+            attachment: 'Wide grip bar',
             measurementType: 'weight_reps',
             weightKg: 100,
             reps: 5,
@@ -158,6 +166,8 @@ describe('enrichWorkoutSummaries', () => {
             exerciseId: 'curl',
             exerciseName: 'Curl',
             photoUrl: null,
+            gym: null,
+            attachment: null,
             measurementType: 'weight_reps',
             weightKg: 60,
             reps: 10,

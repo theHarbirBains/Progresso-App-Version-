@@ -4,6 +4,7 @@ import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { ExerciseDetailsCard, useExerciseDetails } from '../exercises/ExerciseDetailsCard';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
@@ -32,6 +33,8 @@ export function PRHistoryScreen({ route, navigation }: Props) {
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
   const { theme, weightUnit } = useProgressTheme();
+  // Its photo, gym and handle at the top, as in the library: which machine these records are on.
+  const details = useExerciseDetails(exerciseId);
 
   const [repPRs, setRepPRs] = useState<RepPR[]>([]);
   const [oneRepMax, setOneRepMax] = useState<OneRepMax | null>(null);
@@ -90,6 +93,12 @@ export function PRHistoryScreen({ route, navigation }: Props) {
         <SkeletonCards testID="pr-history-loading" heights={[64, 176, 240]} />
       ) : (
         <>
+          <ExerciseDetailsCard
+            details={details}
+            exerciseName={exerciseName}
+            testID="pr-history-details"
+          />
+
           <AppCard>
             <ListRow
               testID="view-trend"

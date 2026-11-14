@@ -6,6 +6,8 @@ import { Skeleton } from '../design/Skeleton';
 import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
 import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
+import { ExercisePhoto } from '../exercises/ExercisePhoto';
+import { machineLine } from '../exercises/machineDetails';
 import { formatWeightKg } from '../lib/units';
 import { progressStyles } from './progressStyles';
 import { COMPARISON_WEEKS, type WeeklySummary } from './weeklySummary';
@@ -59,29 +61,43 @@ function Part({ title, testID, children }: { title: string; testID: string; chil
   );
 }
 
-/** A line of a part: what on the left, its figures on the right. */
+/**
+ * A line of a part: what on the left, its figures on the right. A lift's line leads with its
+ * exercise's photo and names its gym and handle (`subtitle`), as the Exercise Library does.
+ */
 function Line({
   label,
   value,
   detail,
+  leading,
+  subtitle,
   testID,
 }: {
   label: string;
   value: string;
   detail?: string;
+  leading?: ReactNode;
+  subtitle?: string | null;
   testID: string;
 }) {
   return (
     <View
       testID={testID}
       style={styles.line}
-      accessible
-      accessibilityLabel={[label, value, detail].filter(Boolean).join(', ')}
+      // A line holding a photo to open keeps it reachable on its own; otherwise it reads as one.
+      accessible={!leading}
+      accessibilityLabel={[label, subtitle, value, detail].filter(Boolean).join(', ')}
     >
+      {leading}
       <View style={styles.lineLabel}>
         <Text style={styles.lineTitle} numberOfLines={1}>
           {label}
         </Text>
+        {subtitle ? (
+          <Text testID={`${testID}-machine`} style={styles.lineDetail} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
         {detail ? <Text style={styles.lineDetail}>{detail}</Text> : null}
       </View>
       <Text style={styles.lineValue}>{value}</Text>
@@ -201,6 +217,15 @@ function SummaryBody({
               key={lift.exerciseId}
               testID={`weekly-summary-lift-${lift.exerciseId}`}
               label={lift.exerciseName}
+              leading={
+                <ExercisePhoto
+                  testID={`weekly-summary-lift-${lift.exerciseId}-photo`}
+                  uri={lift.photoUrl}
+                  name={lift.exerciseName}
+                  size={36}
+                />
+              }
+              subtitle={machineLine(lift)}
               value={liftText(lift.top, weightUnit)}
               detail={
                 lift.previousBest

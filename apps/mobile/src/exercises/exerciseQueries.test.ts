@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import {
   fetchAllExercises,
+  fetchExerciseDetails,
   fetchExerciseSourceCounts,
   fetchExercises,
   invalidateExerciseCache,
@@ -250,6 +251,66 @@ const builtinSquat = {
   is_active: true,
   created_by: null,
 };
+
+describe('fetchExerciseDetails', () => {
+  function mockOne(result: {
+    data: Record<string, unknown> | null;
+    error: { message: string } | null;
+  }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const builder: Record<string, jest.Mock<any>> = {
+      select: jest.fn(() => builder),
+      eq: jest.fn(() => builder),
+      maybeSingle: jest.fn(async () => result),
+    };
+    mockFrom.mockReturnValue(builder);
+    return builder;
+  }
+
+  it('reads one exercise by id, active or not, with its photo, gym and handle', async () => {
+    const builder = mockOne({
+      data: {
+        muscle_group: 'back',
+        movement_type: 'bilateral',
+        photo_url: 'https://example.com/row.jpg',
+        gym: 'Fit4Less Downtown',
+        attachment: 'V-handle',
+      },
+      error: null,
+    });
+
+    await expect(fetchExerciseDetails('user-1', 'ex-row')).resolves.toEqual({
+      muscleGroup: 'back',
+      movementType: 'bilateral',
+      photoUrl: 'https://example.com/row.jpg',
+      gym: 'Fit4Less Downtown',
+      attachment: 'V-handle',
+    });
+    expect(builder.eq).toHaveBeenCalledWith('id', 'ex-row');
+    expect(builder.eq).not.toHaveBeenCalledWith('is_active', true);
+  });
+
+  it("uses the library's list when it has already been read", async () => {
+    mockQueryBuilder({ data: [customBenchPress], error: null });
+    await fetchAllExercises({ userId: 'user-1', search: '', muscleGroup: null, source: 'all' });
+    mockFrom.mockClear();
+
+    const details = await fetchExerciseDetails('user-1', customBenchPress.id as string);
+
+    expect(details).toEqual(
+      expect.objectContaining({ muscleGroup: customBenchPress.muscle_group }),
+    );
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('is null for an exercise that cannot be seen, and throws on an error', async () => {
+    mockOne({ data: null, error: null });
+    await expect(fetchExerciseDetails('user-1', 'gone')).resolves.toBeNull();
+
+    mockOne({ data: null, error: { message: 'boom' } });
+    await expect(fetchExerciseDetails('user-1', 'gone')).rejects.toThrow('boom');
+  });
+});
 
 describe('fetchAllExercises', () => {
   const allParams = { userId: 'user-1', search: '', muscleGroup: null, source: 'all' as const };

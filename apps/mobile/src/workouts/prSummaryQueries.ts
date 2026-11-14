@@ -1,3 +1,4 @@
+import { MACHINE_COLUMNS } from '../exercises/machineDetails';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import { fetchAllRows } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
@@ -18,6 +19,9 @@ export interface RepPRWithExercise extends RepPR {
   muscleGroup: MuscleGroup;
   /** The exercise's machine photo (exercises.photo_url), when it has one. */
   exercisePhotoUrl?: string | null;
+  /** Its gym and handle, when it has them -- with the photo, which machine the record is on. */
+  exerciseGym?: string | null;
+  exerciseAttachment?: string | null;
 }
 
 export interface OneRepMaxWithExercise extends OneRepMax {
@@ -25,6 +29,9 @@ export interface OneRepMaxWithExercise extends OneRepMax {
   exerciseName: string;
   /** The exercise's machine photo (exercises.photo_url), when it has one. */
   exercisePhotoUrl?: string | null;
+  /** Its gym and handle, when it has them -- with the photo, which machine the record is on. */
+  exerciseGym?: string | null;
+  exerciseAttachment?: string | null;
 }
 
 interface RepPRRow {
@@ -33,7 +40,13 @@ interface RepPRRow {
   source_set_id: string;
   achieved_at: string;
   exercise_id: string;
-  exercises: { name: string; muscle_group: MuscleGroup; photo_url: string | null } | null;
+  exercises: {
+    name: string;
+    muscle_group: MuscleGroup;
+    photo_url: string | null;
+    gym: string | null;
+    attachment: string | null;
+  } | null;
 }
 
 /** Every rep-count PR across every exercise for this user, most recently achieved first. */
@@ -43,7 +56,7 @@ export async function fetchAllRepPRs(userId: string): Promise<RepPRWithExercise[
     supabase
       .from('rep_prs')
       .select(
-        'reps, best_weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, muscle_group, photo_url)',
+        `reps, best_weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, muscle_group, ${MACHINE_COLUMNS})`,
         { count: 'exact' },
       )
       .eq('user_id', userId)
@@ -60,6 +73,8 @@ export async function fetchAllRepPRs(userId: string): Promise<RepPRWithExercise[
     exerciseName: row.exercises?.name ?? 'Exercise',
     muscleGroup: row.exercises?.muscle_group ?? 'other',
     exercisePhotoUrl: row.exercises?.photo_url ?? null,
+    exerciseGym: row.exercises?.gym ?? null,
+    exerciseAttachment: row.exercises?.attachment ?? null,
   }));
 }
 
@@ -68,7 +83,12 @@ interface OneRepMaxRow {
   source_set_id: string;
   achieved_at: string;
   exercise_id: string;
-  exercises: { name: string; photo_url: string | null } | null;
+  exercises: {
+    name: string;
+    photo_url: string | null;
+    gym: string | null;
+    attachment: string | null;
+  } | null;
 }
 
 /** Every true 1RM across every exercise for this user, most recently achieved first. */
@@ -76,9 +96,12 @@ export async function fetchAllOneRepMaxes(userId: string): Promise<OneRepMaxWith
   const rows = await fetchAllRows<OneRepMaxRow>((from, to) =>
     supabase
       .from('one_rep_maxes')
-      .select('weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, photo_url)', {
-        count: 'exact',
-      })
+      .select(
+        `weight_kg, source_set_id, achieved_at, exercise_id, exercises(name, ${MACHINE_COLUMNS})`,
+        {
+          count: 'exact',
+        },
+      )
       .eq('user_id', userId)
       .order('achieved_at', { ascending: false })
       .order('id')
@@ -91,6 +114,8 @@ export async function fetchAllOneRepMaxes(userId: string): Promise<OneRepMaxWith
     exerciseId: row.exercise_id,
     exerciseName: row.exercises?.name ?? 'Exercise',
     exercisePhotoUrl: row.exercises?.photo_url ?? null,
+    exerciseGym: row.exercises?.gym ?? null,
+    exerciseAttachment: row.exercises?.attachment ?? null,
   }));
 }
 
@@ -105,13 +130,21 @@ export interface ExerciseRecordWithExercise extends ExerciseRecord {
   exerciseName: string;
   /** The exercise's machine photo (exercises.photo_url), when it has one. */
   exercisePhotoUrl?: string | null;
+  /** Its gym and handle, when it has them -- with the photo, which machine the record is on. */
+  exerciseGym?: string | null;
+  exerciseAttachment?: string | null;
 }
 
 interface RecordRow {
   source_set_id: string;
   achieved_at: string;
   exercise_id: string;
-  exercises: { name: string; photo_url: string | null } | null;
+  exercises: {
+    name: string;
+    photo_url: string | null;
+    gym: string | null;
+    attachment: string | null;
+  } | null;
 }
 
 function toExerciseRecord(
@@ -127,6 +160,8 @@ function toExerciseRecord(
     exerciseId: row.exercise_id,
     exerciseName: row.exercises?.name ?? 'Exercise',
     exercisePhotoUrl: row.exercises?.photo_url ?? null,
+    exerciseGym: row.exercises?.gym ?? null,
+    exerciseAttachment: row.exercises?.attachment ?? null,
   };
 }
 
@@ -141,9 +176,12 @@ export async function fetchAllExerciseRecords(
     fetchAllRows<RecordRow & { reps: number }>((from, to) =>
       supabase
         .from('rep_records')
-        .select('reps, source_set_id, achieved_at, exercise_id, exercises(name, photo_url)', {
-          count: 'exact',
-        })
+        .select(
+          `reps, source_set_id, achieved_at, exercise_id, exercises(name, ${MACHINE_COLUMNS})`,
+          {
+            count: 'exact',
+          },
+        )
         .eq('user_id', userId)
         .order('achieved_at', { ascending: false })
         .order('id')
@@ -153,7 +191,7 @@ export async function fetchAllExerciseRecords(
       supabase
         .from('duration_records')
         .select(
-          'duration_seconds, source_set_id, achieved_at, exercise_id, exercises(name, photo_url)',
+          `duration_seconds, source_set_id, achieved_at, exercise_id, exercises(name, ${MACHINE_COLUMNS})`,
           { count: 'exact' },
         )
         .eq('user_id', userId)

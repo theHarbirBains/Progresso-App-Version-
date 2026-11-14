@@ -41,6 +41,14 @@ describe('ExerciseCard', () => {
     expect(screen.getByText('Shoulders')).toBeTruthy();
   });
 
+  it('names its gym and handle after the muscle, as the library does', () => {
+    render(<ExerciseCard {...baseProps} gym="Fit4Less Downtown" attachment="Wide grip bar" />);
+
+    expect(screen.getByTestId('exercise-card-muscle-group')).toHaveTextContent(
+      'Chest · Fit4Less Downtown · Wide grip bar',
+    );
+  });
+
   it("shows the exercise's initial when it has no photo, with nothing to open", () => {
     render(<ExerciseCard {...baseProps} />);
 

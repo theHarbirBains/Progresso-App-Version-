@@ -5,6 +5,7 @@ import { PrimaryButton, TextButton } from '../design/Button';
 import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale } from '../design/theme';
+import { machineLine } from '../exercises/machineDetails';
 import { formatWeight, fromKg, roundWeight } from '../lib/units';
 import { draftValues, isValidDraft } from '../workouts/setInputDrafts';
 import { updateSet } from '../workouts/workoutQueries';
@@ -13,6 +14,9 @@ import { updateSet } from '../workouts/workoutQueries';
 export interface TopSetToEdit {
   setId: string;
   exerciseName: string;
+  /** Its exercise's gym and handle, when it has them: which machine the set was on. */
+  gym?: string | null;
+  attachment?: string | null;
   performedAt: string;
   weightKg: number;
   reps: number;
@@ -99,7 +103,7 @@ export function EditTopSetSheet({
       <View style={styles.content}>
         <Text style={styles.title}>Edit Top Set</Text>
         <Text testID="edit-top-set-summary" style={styles.summary}>
-          {target ? `${target.exerciseName}, ${date}` : ''}
+          {target ? `${machineLine(target, target.exerciseName)}, ${date}` : ''}
         </Text>
         <Text style={styles.summary}>
           Logged it wrong? Fix it here. It changes the set in that workout, and your records update

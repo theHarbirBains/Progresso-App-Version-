@@ -580,6 +580,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                   exerciseId: exercise.id,
                   exerciseName: exercise.name,
                   photoUrl: exercise.photoUrl,
+                  gym: exercise.gym ?? null,
+                  attachment: exercise.attachment ?? null,
                   muscleGroup: exercise.muscleGroup,
                   movementType: exercise.movementType,
                   loggingStyle: exercise.loggingStyle,
@@ -815,6 +817,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 movementType={exercise.movementType}
                 measurementType={measurementTypeOf(exercise)}
                 photoUrl={exercise.photoUrl}
+                gym={exercise.gym}
+                attachment={exercise.attachment}
                 weightUnit={weightUnit}
                 previousSession={buildPreviousSessionDisplay(
                   previousPerformance[exercise.exerciseId],

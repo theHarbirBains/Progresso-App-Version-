@@ -21,6 +21,7 @@ function exercise(
     id: `we-${id}`,
     exerciseId: id,
     exerciseName,
+    photoUrl: null,
     muscleGroup: 'chest',
     movementType: 'bilateral',
     loggingStyle: null,
@@ -32,7 +33,11 @@ function exercise(
 describe('computeWorkoutTopSets', () => {
   it("takes each exercise's heaviest completed set, in the workout's own order", () => {
     const topSets = computeWorkoutTopSets([
-      exercise('bench', 'Bench Press', [set('a', 200, 5), set('b', 225, 8), set('c', 215, 6)]),
+      {
+        ...exercise('bench', 'Bench Press', [set('a', 200, 5), set('b', 225, 8), set('c', 215, 6)]),
+        gym: 'Fit4Less Downtown',
+        attachment: 'Wide grip bar',
+      },
       exercise('pulldown', 'Lat Pulldown', [set('d', 150, 10), set('e', 160, 10)]),
     ]);
 
@@ -40,6 +45,10 @@ describe('computeWorkoutTopSets', () => {
       {
         exerciseId: 'bench',
         exerciseName: 'Bench Press',
+        // Which machine it was, for the card to say.
+        photoUrl: null,
+        gym: 'Fit4Less Downtown',
+        attachment: 'Wide grip bar',
         measurementType: 'weight_reps',
         weightKg: 225,
         reps: 8,
@@ -48,6 +57,9 @@ describe('computeWorkoutTopSets', () => {
       {
         exerciseId: 'pulldown',
         exerciseName: 'Lat Pulldown',
+        photoUrl: null,
+        gym: null,
+        attachment: null,
         measurementType: 'weight_reps',
         weightKg: 160,
         reps: 10,
@@ -65,6 +77,9 @@ describe('computeWorkoutTopSets', () => {
       {
         exerciseId: 'bench',
         exerciseName: 'Bench Press',
+        photoUrl: null,
+        gym: null,
+        attachment: null,
         measurementType: 'weight_reps',
         weightKg: 100,
         reps: 5,

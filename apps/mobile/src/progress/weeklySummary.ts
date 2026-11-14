@@ -1,3 +1,4 @@
+import type { MachineDetails } from '../exercises/machineDetails';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import {
   computeWeeklyCalorieSummary,
@@ -16,8 +17,8 @@ export const CALORIE_TOLERANCE = 0.1;
 /** How many lifts the Strength part shows. */
 export const MAIN_LIFTS = 3;
 
-/** A completed set, with the workout and exercise it belongs to. */
-export interface SummarySet {
+/** A completed set, with the workout and exercise it belongs to (and that exercise's machine). */
+export interface SummarySet extends MachineDetails {
   workoutId: string;
   performedAt: string;
   exerciseId: string;
@@ -65,7 +66,8 @@ export interface MuscleGroupWeek {
   averageSets: number;
 }
 
-export interface LiftWeek {
+/** Its exercise's photo, gym and handle (MachineDetails) come with it, for its line to show. */
+export interface LiftWeek extends MachineDetails {
   exerciseId: string;
   exerciseName: string;
   /** The week's heaviest completed set (most reps breaks a tie). */
@@ -217,10 +219,14 @@ export function computeWeeklySummary(input: WeeklySummaryInput): WeeklySummary {
   // Strength: the weighted lifts trained this week that have the most sets lately.
   const weighted = (set: SummarySet) =>
     set.measurementType === 'weight_reps' && set.weightKg !== null && set.reps !== null;
-  const liftSets = new Map<string, { name: string; count: number }>();
+  const liftSets = new Map<string, { name: string; machine: MachineDetails; count: number }>();
   for (const set of [...weekSets, ...earlierSets]) {
     if (!weighted(set)) continue;
-    const entry = liftSets.get(set.exerciseId) ?? { name: set.exerciseName, count: 0 };
+    const entry = liftSets.get(set.exerciseId) ?? {
+      name: set.exerciseName,
+      machine: { photoUrl: set.photoUrl, gym: set.gym, attachment: set.attachment },
+      count: 0,
+    };
     entry.count += 1;
     liftSets.set(set.exerciseId, entry);
   }
@@ -241,6 +247,9 @@ export function computeWeeklySummary(input: WeeklySummaryInput): WeeklySummary {
     .map(([exerciseId, entry]) => ({
       exerciseId,
       exerciseName: entry.name,
+      photoUrl: entry.machine.photoUrl ?? null,
+      gym: entry.machine.gym ?? null,
+      attachment: entry.machine.attachment ?? null,
       top: best(weekSets, exerciseId)!,
       previousBest: best(earlierSets, exerciseId),
     }));

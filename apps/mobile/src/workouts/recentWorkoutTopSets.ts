@@ -3,7 +3,7 @@ import { bestLoggedSet, loggedSets, setValuesOf } from './setValues';
 import type { WorkoutExerciseWithSets } from './workoutQueries';
 type ExerciseWithSets = Pick<
   WorkoutExerciseWithSets,
-  'exerciseId' | 'exerciseName' | 'photoUrl' | 'sets' | 'measurementType'
+  'exerciseId' | 'exerciseName' | 'photoUrl' | 'gym' | 'attachment' | 'sets' | 'measurementType'
 >;
 
 export interface WorkoutTopSet {
@@ -11,6 +11,9 @@ export interface WorkoutTopSet {
   exerciseName: string;
   /** The exercise's machine photo, or null when it has none -- shown beside the top set only when present. */
   photoUrl: string | null;
+  /** Its gym and handle, when it has them -- under its name, as the Exercise Library shows them. */
+  gym?: string | null;
+  attachment?: string | null;
   /** What the exercise was logged as. Absent means weight and reps (data from before measurement types). */
   measurementType?: MeasurementType;
   /** Weight and reps: the heaviest set. Null for a bodyweight or timed exercise. */
@@ -37,6 +40,8 @@ export function computeWorkoutTopSets(exercises: ExerciseWithSets[]): WorkoutTop
         exerciseId: exercise.exerciseId,
         exerciseName: exercise.exerciseName,
         photoUrl: exercise.photoUrl,
+        gym: exercise.gym ?? null,
+        attachment: exercise.attachment ?? null,
         ...setValuesOf(top, type),
       });
     }

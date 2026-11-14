@@ -10,6 +10,10 @@ import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import { PRHistoryScreen } from './PRHistoryScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
+jest.mock('../exercises/exerciseQueries', () => ({
+  fetchExerciseDetails: jest.fn(async () => null),
+}));
+
 jest.mock('../profile/profileQueries', () => ({
   fetchMyProfile: jest.fn(),
 }));

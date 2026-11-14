@@ -1,3 +1,4 @@
+import { MACHINE_COLUMNS, machineDetailsOf } from '../exercises/machineDetails';
 import { fetchAllRows } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
 import type { MovementType } from '../exercises/movementTypes';
@@ -29,7 +30,14 @@ export async function fetchAllExerciseHistory(
   type Candidate = {
     id: string;
     exercise_id: string;
-    exercises: { name: string; muscle_group: MuscleGroup; movement_type: MovementType } | null;
+    exercises: {
+      name: string;
+      muscle_group: MuscleGroup;
+      movement_type: MovementType;
+      photo_url: string | null;
+      gym: string | null;
+      attachment: string | null;
+    } | null;
     workouts: {
       performed_at: string;
       completed_at: string | null;
@@ -40,7 +48,7 @@ export async function fetchAllExerciseHistory(
     let query = supabase
       .from('workout_exercises')
       .select(
-        'id, exercise_id, exercises(name, muscle_group, movement_type), workouts(performed_at, completed_at, deleted_at)',
+        `id, exercise_id, exercises(name, muscle_group, movement_type, ${MACHINE_COLUMNS}), workouts(performed_at, completed_at, deleted_at)`,
         { count: 'exact' },
       )
       .eq('user_id', userId)
@@ -62,6 +70,8 @@ export async function fetchAllExerciseHistory(
         exerciseName: c.exercises?.name ?? 'Exercise',
         muscleGroup: c.exercises?.muscle_group ?? 'other',
         movementType: c.exercises?.movement_type ?? 'bilateral',
+        // Its photo, gym and handle, so a top set or record says which machine it was on.
+        ...machineDetailsOf(c.exercises),
       },
     ]),
   );
@@ -82,6 +92,9 @@ export async function fetchAllExerciseHistory(
         exerciseName: info.exerciseName,
         muscleGroup: info.muscleGroup,
         movementType: info.movementType,
+        photoUrl: info.photoUrl,
+        gym: info.gym,
+        attachment: info.attachment,
       };
     })
     .sort((a, b) => new Date(a.performedAt).getTime() - new Date(b.performedAt).getTime());

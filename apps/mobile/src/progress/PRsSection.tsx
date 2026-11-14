@@ -104,7 +104,6 @@ export function PRsSection({
         weightUnit={weightUnit}
         accentColor={accentColor}
         showDivider={index > 0}
-        showPhoto
         navigation={navigation}
       />
     );

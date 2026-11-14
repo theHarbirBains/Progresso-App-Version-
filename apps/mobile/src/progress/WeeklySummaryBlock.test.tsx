@@ -23,6 +23,9 @@ const busyWeek: WeeklySummary = {
     {
       exerciseId: 'bench',
       exerciseName: 'Bench Press',
+      photoUrl: 'https://example.com/bench.jpg',
+      gym: 'Fit4Less Downtown',
+      attachment: 'Wide grip bar',
       top: { weightKg: 85, reps: 6 },
       previousBest: { weightKg: 82.5, reps: 8 },
     },
@@ -105,6 +108,19 @@ describe('WeeklySummaryBlock', () => {
       /Best of the 4 weeks before: 181.9 lb × 8/,
     );
     expect(screen.getByTestId('weekly-summary-lift-squat')).toHaveTextContent(/First in 4 weeks/);
+  });
+
+  it("shows each lift's photo, gym and handle, as the library does", () => {
+    renderBlock();
+
+    expect(screen.getByTestId('weekly-summary-lift-bench-machine')).toHaveTextContent(
+      'Fit4Less Downtown · Wide grip bar',
+    );
+    fireEvent.press(screen.getByTestId('weekly-summary-lift-bench-photo-zoom'));
+    expect(screen.getByTestId('weekly-summary-lift-bench-photo-lightbox')).toBeTruthy();
+    // A built-in with neither: its first letter, and no machine line.
+    expect(screen.getByTestId('weekly-summary-lift-squat-photo')).toHaveTextContent('S');
+    expect(screen.queryByTestId('weekly-summary-lift-squat-machine')).toBeNull();
   });
 
   it('switches to last week, which says when nothing was logged', () => {

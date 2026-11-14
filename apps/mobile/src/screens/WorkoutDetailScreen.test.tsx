@@ -124,6 +124,31 @@ describe('WorkoutDetailScreen', () => {
     expect(screen.getByText(/110kg × 8/)).toBeTruthy();
   });
 
+  it("shows each exercise's photo, muscle, gym and handle, as the library does", async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...workout,
+      exercises: [
+        {
+          ...workout.exercises[0],
+          photoUrl: 'https://example.com/bench.jpg',
+          gym: 'Fit4Less Downtown',
+          attachment: 'Wide grip bar',
+        },
+      ],
+    });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('exercise-muscle-we1')).toHaveTextContent(
+      'Chest · Fit4Less Downtown · Wide grip bar',
+    );
+    // Its photo opens full size; the title row still opens PR History.
+    fireEvent.press(screen.getByTestId('exercise-photo-we1-zoom'));
+    expect(screen.getByTestId('exercise-photo-we1-lightbox')).toBeTruthy();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   it('shows a pound user volume as a whole number, never a decimal like 3149.9', async () => {
     // 225 lb x 8 and 135 lb x 10, stored in kg (rounded to 2dp, as the
     // database does) -- the true total is 3,150 lb.

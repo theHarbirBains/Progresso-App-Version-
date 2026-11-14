@@ -39,14 +39,21 @@ beforeEach(() => {
 });
 
 describe('fetchAllExerciseHistory', () => {
-  it('joins sets to their workout date and exercise name across multiple exercises, sorted chronologically', async () => {
+  it('joins sets to their workout date and exercise (and its machine) across multiple exercises, sorted chronologically', async () => {
     mockTables({
       workout_exercises: {
         data: [
           {
             id: 'we1',
             exercise_id: 'ex-bench',
-            exercises: { name: 'Bench Press', muscle_group: 'chest', movement_type: 'bilateral' },
+            exercises: {
+              name: 'Bench Press',
+              muscle_group: 'chest',
+              movement_type: 'bilateral',
+              photo_url: 'https://example.com/bench.jpg',
+              gym: 'Fit4Less Downtown',
+              attachment: 'Wide grip bar',
+            },
             workouts: {
               performed_at: '2026-02-01T00:00:00Z',
               completed_at: '2026-02-01T01:00:00Z',
@@ -92,6 +99,9 @@ describe('fetchAllExerciseHistory', () => {
         exerciseName: 'Squat',
         muscleGroup: 'quadriceps',
         movementType: 'bilateral',
+        photoUrl: null,
+        gym: null,
+        attachment: null,
       },
       {
         setId: 'set-a',
@@ -103,6 +113,9 @@ describe('fetchAllExerciseHistory', () => {
         exerciseName: 'Bench Press',
         muscleGroup: 'chest',
         movementType: 'bilateral',
+        photoUrl: 'https://example.com/bench.jpg',
+        gym: 'Fit4Less Downtown',
+        attachment: 'Wide grip bar',
       },
     ]);
   });

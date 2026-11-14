@@ -5,6 +5,7 @@ import { LineChart } from '../charts/LineChart';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { ExerciseDetailsCard, useExerciseDetails } from '../exercises/ExerciseDetailsCard';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
@@ -76,6 +77,8 @@ export function ExerciseProgressScreen({ route, navigation }: Props) {
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
   const { theme, weightUnit } = useProgressTheme();
+  // Its photo, gym and handle at the top, as in the library: which machine this trend is for.
+  const details = useExerciseDetails(exerciseId);
 
   const [history, setHistory] = useState<HistoricalSet[]>([]);
   const [repPRs, setRepPRs] = useState<RepPR[]>([]);
@@ -150,6 +153,12 @@ export function ExerciseProgressScreen({ route, navigation }: Props) {
         <SkeletonCards testID="exercise-progress-loading" heights={[72, 240, 160]} />
       ) : (
         <>
+          <ExerciseDetailsCard
+            details={details}
+            exerciseName={exerciseName}
+            testID="exercise-progress-details"
+          />
+
           <SegmentedControl
             testID="range"
             options={RANGE_OPTIONS}

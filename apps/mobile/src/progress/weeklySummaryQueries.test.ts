@@ -53,7 +53,13 @@ describe('fetchSummaryTraining', () => {
             workout_id: 'w1',
             exercise_id: 'bench',
             measurement_type: 'weight_reps',
-            exercises: { name: 'Bench Press', muscle_group: 'chest' },
+            exercises: {
+              name: 'Bench Press',
+              muscle_group: 'chest',
+              photo_url: 'https://example.com/bench.jpg',
+              gym: 'Fit4Less Downtown',
+              attachment: 'Wide grip bar',
+            },
           },
           {
             id: 'we2',
@@ -98,6 +104,10 @@ describe('fetchSummaryTraining', () => {
         exerciseId: 'bench',
         exerciseName: 'Bench Press',
         muscleGroup: 'chest',
+        // Which machine it was, for the Strength part to say.
+        photoUrl: 'https://example.com/bench.jpg',
+        gym: 'Fit4Less Downtown',
+        attachment: 'Wide grip bar',
         measurementType: 'weight_reps',
         weightKg: 80,
         reps: 8,

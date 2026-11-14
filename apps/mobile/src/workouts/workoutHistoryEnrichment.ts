@@ -1,3 +1,4 @@
+import { MACHINE_COLUMNS, machineDetailsOf } from '../exercises/machineDetails';
 import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import { supabase } from '../lib/supabase';
 import { holdsMeasurement } from './setValues';
@@ -68,7 +69,7 @@ export async function enrichWorkoutSummaries(
   const { data: workoutExercises, error: weError } = await supabase
     .from('workout_exercises')
     .select(
-      'id, workout_id, exercise_id, order_index, measurement_type, exercises(name, photo_url)',
+      `id, workout_id, exercise_id, order_index, measurement_type, exercises(name, ${MACHINE_COLUMNS})`,
     )
     .in('workout_id', workoutIds)
     .is('deleted_at', null);
@@ -82,17 +83,24 @@ export async function enrichWorkoutSummaries(
       exerciseId: string;
       exerciseName: string;
       photoUrl: string | null;
+      gym: string | null;
+      attachment: string | null;
       orderIndex: number;
       measurementType: MeasurementType;
     }
   >();
   for (const we of workoutExercises ?? []) {
     workoutIdByExerciseId.set(we.id, we.workout_id);
-    const embedded = we.exercises as unknown as { name: string; photo_url: string | null } | null;
+    const embedded = we.exercises as unknown as {
+      name: string;
+      photo_url: string | null;
+      gym: string | null;
+      attachment: string | null;
+    } | null;
     exerciseInfoById.set(we.id, {
       exerciseId: we.exercise_id,
       exerciseName: embedded?.name ?? '',
-      photoUrl: embedded?.photo_url ?? null,
+      ...machineDetailsOf(embedded),
       orderIndex: we.order_index,
       measurementType: measurementTypeOf({
         measurementType: we.measurement_type as MeasurementType | null,
@@ -157,6 +165,8 @@ export async function enrichWorkoutSummaries(
       exerciseId: string;
       exerciseName: string;
       photoUrl: string | null;
+      gym: string | null;
+      attachment: string | null;
       sets: SetRecord[];
       orderIndex: number;
       measurementType: MeasurementType;

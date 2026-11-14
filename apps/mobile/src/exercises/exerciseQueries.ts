@@ -1,5 +1,6 @@
 import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
+import { MACHINE_COLUMNS, machineDetailsOf, type MachineDetails } from './machineDetails';
 import type { LoggingStyle, MeasurementType, MovementType } from './movementTypes';
 import type { MuscleGroup } from './muscleGroups';
 
@@ -247,4 +248,51 @@ export async function fetchExerciseSourceCounts(userId: string): Promise<Exercis
     else if (row.createdBy === userId) mine += 1;
   }
   return { all: base.length, builtin, mine };
+}
+
+/** What an exercise's own pages show at their top, as its library row does. */
+export interface ExerciseDetails extends Required<MachineDetails> {
+  muscleGroup: MuscleGroup;
+  movementType: MovementType;
+}
+
+/**
+ * One exercise's muscle, movement, photo, gym and handle, for the top of its own pages
+ * (Progress's exercise page, PR History, its trend). From the library's cache when that's
+ * already been read; otherwise read -- an exercise since deleted (deactivated) keeps its pages,
+ * and its history, so it's read by id whether or not it's active. Null when it can't be seen.
+ */
+export async function fetchExerciseDetails(
+  userId: string,
+  exerciseId: string,
+): Promise<ExerciseDetails | null> {
+  const cached = fullExerciseListCache.get(userId)?.find((row) => row.id === exerciseId);
+  if (cached) {
+    return {
+      muscleGroup: cached.muscleGroup,
+      movementType: cached.movementType,
+      photoUrl: cached.photoUrl,
+      gym: cached.gym ?? null,
+      attachment: cached.attachment ?? null,
+    };
+  }
+  const { data, error } = await supabase
+    .from('exercises')
+    .select(`muscle_group, movement_type, ${MACHINE_COLUMNS}`)
+    .eq('id', exerciseId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const row = data as {
+    muscle_group: MuscleGroup;
+    movement_type: MovementType;
+    photo_url: string | null;
+    gym: string | null;
+    attachment: string | null;
+  };
+  return {
+    muscleGroup: row.muscle_group,
+    movementType: row.movement_type,
+    ...machineDetailsOf(row),
+  };
 }

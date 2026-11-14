@@ -1,3 +1,4 @@
+import { MACHINE_COLUMNS, machineDetailsOf } from '../exercises/machineDetails';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import { fetchAllRows, fetchAllRowsForIds } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
@@ -36,16 +37,23 @@ export async function fetchSummaryTraining(
     workout_id: string;
     exercise_id: string;
     measurement_type: SummarySet['measurementType'] | null;
-    exercises: { name: string; muscle_group: MuscleGroup } | null;
+    exercises: {
+      name: string;
+      muscle_group: MuscleGroup;
+      photo_url: string | null;
+      gym: string | null;
+      attachment: string | null;
+    } | null;
   };
   const exerciseRows = await fetchAllRowsForIds<ExerciseRow>(
     workouts.map((workout) => workout.id),
     (ids, from, to) =>
       supabase
         .from('workout_exercises')
-        .select('id, workout_id, exercise_id, measurement_type, exercises(name, muscle_group)', {
-          count: 'exact',
-        })
+        .select(
+          `id, workout_id, exercise_id, measurement_type, exercises(name, muscle_group, ${MACHINE_COLUMNS})`,
+          { count: 'exact' },
+        )
         .in('workout_id', ids)
         .is('deleted_at', null)
         .order('id')
@@ -66,6 +74,8 @@ export async function fetchSummaryTraining(
         exerciseId: exercise.exercise_id,
         exerciseName: exercise.exercises?.name ?? 'Exercise',
         muscleGroup: exercise.exercises?.muscle_group ?? 'other',
+        // Its photo, gym and handle, for the Strength part to say which machine a lift was on.
+        ...machineDetailsOf(exercise.exercises),
         measurementType: exercise.measurement_type ?? 'weight_reps',
         weightKg: row.weight_kg === null ? null : Number(row.weight_kg),
         reps: row.reps,

@@ -4,6 +4,46 @@ import { AppCard } from '../design/AppCard';
 import { TopSetRow } from './TopSetRow';
 
 describe('TopSetRow', () => {
+  it('shows which machine it was, as the library does: photo, muscle, gym and handle', () => {
+    render(
+      <TopSetRow
+        exerciseName="Seated Row"
+        muscleGroupLabel="Back"
+        photoUrl="https://example.com/row.jpg"
+        gym="Fit4Less Downtown"
+        attachment="V-handle"
+        weightDisplay={120}
+        reps={10}
+        unit="lb"
+        accentColor="#2F80FF"
+        testID="row"
+      />,
+    );
+
+    expect(screen.getByTestId('row-line')).toHaveTextContent('Back · Fit4Less Downtown · V-handle');
+    // The photo opens full size.
+    fireEvent.press(screen.getByTestId('row-photo-zoom'));
+    expect(screen.getByTestId('row-photo-lightbox')).toBeTruthy();
+  });
+
+  it('shows the first letter when it has no photo, with nothing to open', () => {
+    render(
+      <TopSetRow
+        exerciseName="Bench Press"
+        muscleGroupLabel="Chest"
+        weightDisplay={225}
+        reps={8}
+        unit="lb"
+        accentColor="#2F80FF"
+        testID="row"
+      />,
+    );
+
+    expect(screen.getByTestId('row-photo')).toHaveTextContent('B');
+    expect(screen.queryByTestId('row-photo-zoom')).toBeNull();
+    expect(screen.getByTestId('row-line')).toHaveTextContent('Chest');
+  });
+
   it('shows the exercise name, muscle group, weight x reps, and the "Top Set" label', () => {
     render(
       <TopSetRow

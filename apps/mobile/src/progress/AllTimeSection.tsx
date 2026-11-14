@@ -3,6 +3,8 @@ import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
+import { ExercisePhoto } from '../exercises/ExercisePhoto';
+import { machineLine } from '../exercises/machineDetails';
 import { formatWeightKg, fromKg } from '../lib/units';
 import { withAlpha } from '../theme/accentColor';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -170,27 +172,48 @@ export function AllTimeSection({
             subtitle="See your strongest lifts"
           />
           <View style={styles.allTimePrGrid}>
-            {topRecords.map((record) => (
-              <TouchableOpacity
-                key={record.exerciseId}
-                testID={`progress-all-time-pr-${record.exerciseId}`}
-                style={styles.allTimePrCell}
-                onPress={() =>
-                  navigation.navigate('ProgressExerciseDetail', {
-                    exerciseId: record.exerciseId,
-                    exerciseName: record.exerciseName,
-                  })
-                }
-              >
-                <Text style={styles.allTimePrName} numberOfLines={1}>
-                  {record.exerciseName}
-                </Text>
-                <Text style={styles.allTimePrValue}>
-                  {formatWeight(record.weightKg, weightUnit)} {weightUnit}
-                </Text>
-                <Text style={styles.allTimePrCaption}>x {record.reps} reps</Text>
-              </TouchableOpacity>
-            ))}
+            {topRecords.map((record) => {
+              // Which machine it was on, as the Exercise Library shows it: photo, gym, handle.
+              const machine = machineLine(record);
+              return (
+                <TouchableOpacity
+                  key={record.exerciseId}
+                  testID={`progress-all-time-pr-${record.exerciseId}`}
+                  style={[styles.allTimePrCell, styles.allTimePrCellRow]}
+                  onPress={() =>
+                    navigation.navigate('ProgressExerciseDetail', {
+                      exerciseId: record.exerciseId,
+                      exerciseName: record.exerciseName,
+                    })
+                  }
+                >
+                  <ExercisePhoto
+                    testID={`progress-all-time-pr-${record.exerciseId}-photo`}
+                    uri={record.photoUrl}
+                    name={record.exerciseName}
+                    size={36}
+                  />
+                  <View style={styles.allTimePrBody}>
+                    <Text style={styles.allTimePrName} numberOfLines={1}>
+                      {record.exerciseName}
+                    </Text>
+                    {machine ? (
+                      <Text
+                        testID={`progress-all-time-pr-${record.exerciseId}-machine`}
+                        style={styles.allTimePrMachine}
+                        numberOfLines={1}
+                      >
+                        {machine}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.allTimePrValue}>
+                      {formatWeight(record.weightKg, weightUnit)} {weightUnit}
+                    </Text>
+                    <Text style={styles.allTimePrCaption}>x {record.reps} reps</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </AppCard>
       ) : null}

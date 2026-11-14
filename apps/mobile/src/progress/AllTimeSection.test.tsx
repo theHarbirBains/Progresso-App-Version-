@@ -51,6 +51,9 @@ const history: HistoricalSetWithExercise[] = [
     reps: 5,
     setId: 'set-2',
     workoutExerciseId: 'we2',
+    photoUrl: 'https://example.com/squat.jpg',
+    gym: 'Fit4Less Downtown',
+    attachment: 'Safety squat bar',
   }),
 ];
 
@@ -139,6 +142,18 @@ describe('AllTimeSection', () => {
     expect(card).toHaveTextContent(/See your strongest lifts/);
     expect(screen.getByTestId('progress-all-time-pr-ex-2')).toHaveTextContent(/Barbell Squat/);
     expect(screen.getByTestId('progress-all-time-pr-ex-2')).toHaveTextContent(/140/);
+  });
+
+  it("shows each record's photo, gym and handle, as the library does", () => {
+    renderAllTime();
+
+    expect(screen.getByTestId('progress-all-time-pr-ex-2-machine')).toHaveTextContent(
+      'Fit4Less Downtown · Safety squat bar',
+    );
+    fireEvent.press(screen.getByTestId('progress-all-time-pr-ex-2-photo-zoom'));
+    expect(screen.getByTestId('progress-all-time-pr-ex-2-photo-lightbox')).toBeTruthy();
+    expect(screen.getByTestId('progress-all-time-pr-ex-1-photo')).toHaveTextContent('B');
+    expect(screen.queryByTestId('progress-all-time-pr-ex-1-machine')).toBeNull();
   });
 
   it('navigates to exercise detail when a personal record is pressed', () => {

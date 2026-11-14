@@ -419,9 +419,24 @@ export const progressStyles = StyleSheet.create({
   allTimePrCell: {
     flexBasis: '50%',
   },
+  // Its photo (or first letter) beside its figures, as in the Exercise Library.
+  allTimePrCellRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    paddingRight: spacing.sm,
+  },
+  allTimePrBody: {
+    flex: 1,
+  },
   allTimePrName: {
     ...typeScale.secondary,
     color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  allTimePrMachine: {
+    ...typeScale.caption,
+    color: colors.textMuted,
     marginBottom: 2,
   },
   allTimePrValue: {

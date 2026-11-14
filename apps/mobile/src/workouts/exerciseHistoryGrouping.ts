@@ -1,3 +1,4 @@
+import type { MachineDetails } from '../exercises/machineDetails';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import type { MovementType } from '../exercises/movementTypes';
 import type { HistoricalSet } from './exerciseHistoryQueries';
@@ -5,7 +6,7 @@ import type { HistoricalSet } from './exerciseHistoryQueries';
 // Pure grouping logic, deliberately kept dependency-free (no Supabase import)
 // so it can be used/tested independently of allExerciseHistoryQueries.ts's
 // data-fetching function.
-export interface HistoricalSetWithExercise extends HistoricalSet {
+export interface HistoricalSetWithExercise extends HistoricalSet, MachineDetails {
   exerciseId: string;
   exerciseName: string;
   /** The exercise's own muscle group (exercises.muscle_group) -- constant across every set of the same exercise, used to attribute real training exposure per muscle group (see muscleGroupProgress.ts). */

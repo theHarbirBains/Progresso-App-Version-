@@ -186,7 +186,14 @@ describe('computeWeeklySummary -- strength', () => {
     const summary = computeWeeklySummary(
       input({
         sets: [
-          set({ performedAt: at(19), weightKg: 85, reps: 5 }),
+          set({
+            performedAt: at(19),
+            weightKg: 85,
+            reps: 5,
+            photoUrl: 'https://example.com/bench.jpg',
+            gym: 'Fit4Less Downtown',
+            attachment: 'Wide grip bar',
+          }),
           set({ performedAt: at(21), weightKg: 85, reps: 6 }),
           set({ performedAt: at(21), weightKg: 80, reps: 10 }),
           set({ performedAt: at(12), weightKg: 82.5, reps: 6 }),
@@ -199,6 +206,10 @@ describe('computeWeeklySummary -- strength', () => {
       {
         exerciseId: 'bench',
         exerciseName: 'Bench Press',
+        // Which machine the lift was on, from its sets.
+        photoUrl: 'https://example.com/bench.jpg',
+        gym: 'Fit4Less Downtown',
+        attachment: 'Wide grip bar',
         top: { weightKg: 85, reps: 6 },
         previousBest: { weightKg: 82.5, reps: 8 },
       },

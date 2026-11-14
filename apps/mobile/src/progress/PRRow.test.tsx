@@ -2,6 +2,45 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { PRRow } from './PRRow';
 
 describe('PRRow', () => {
+  it('names the gym and handle under the exercise, beside its photo', () => {
+    render(
+      <PRRow
+        exerciseName="Seated Row"
+        photoUrl="https://example.com/row.jpg"
+        gym="Fit4Less Downtown"
+        attachment="V-handle"
+        weightDisplay={120}
+        reps={10}
+        unit="lb"
+        achievedAt="2026-10-03T00:00:00Z"
+        recordType="10-Rep PR"
+        accentColor="#2F80FF"
+        testID="row"
+      />,
+    );
+
+    expect(screen.getByTestId('row-machine')).toHaveTextContent('Fit4Less Downtown · V-handle');
+    fireEvent.press(screen.getByTestId('row-photo-zoom'));
+    expect(screen.getByTestId('row-photo-lightbox')).toBeTruthy();
+  });
+
+  it('has no machine line for an exercise with neither', () => {
+    render(
+      <PRRow
+        exerciseName="Bench Press"
+        weightDisplay={225}
+        reps={5}
+        unit="lb"
+        achievedAt="2026-10-03T00:00:00Z"
+        recordType="5-Rep PR"
+        accentColor="#2F80FF"
+        testID="row"
+      />,
+    );
+
+    expect(screen.queryByTestId('row-machine')).toBeNull();
+  });
+
   it('shows a rep-count PR with its record type and reps', () => {
     render(
       <PRRow

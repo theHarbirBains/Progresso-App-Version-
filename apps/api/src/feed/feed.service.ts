@@ -13,6 +13,9 @@ export interface FeedTopSet {
   exerciseId: string;
   exerciseName: string;
   photoUrl: string | null;
+  /** The gym it's at and its handle, when its owner gave them: with the photo, which machine. */
+  gym: string | null;
+  attachment: string | null;
   measurementType: MeasurementType;
   /** Weight and reps only. */
   weightKg: number | null;
@@ -190,7 +193,7 @@ export class FeedService {
       client
         .from('workout_exercises')
         .select(
-          'id, workout_id, exercise_id, order_index, measurement_type, exercises(name, photo_url)',
+          'id, workout_id, exercise_id, order_index, measurement_type, exercises(name, photo_url, gym, attachment)',
         )
         .in('workout_id', workoutIds)
         .is('deleted_at', null),
@@ -219,17 +222,26 @@ export class FeedService {
         exerciseId: string;
         exerciseName: string;
         photoUrl: string | null;
+        gym: string | null;
+        attachment: string | null;
         orderIndex: number;
         measurementType: MeasurementType;
       }
     >();
     for (const we of workoutExercises ?? []) {
       workoutIdByExerciseId.set(we.id as string, we.workout_id as string);
-      const embedded = we.exercises as unknown as { name: string; photo_url: string | null } | null;
+      const embedded = we.exercises as unknown as {
+        name: string;
+        photo_url: string | null;
+        gym: string | null;
+        attachment: string | null;
+      } | null;
       exerciseInfoById.set(we.id as string, {
         exerciseId: we.exercise_id as string,
         exerciseName: embedded?.name ?? '',
         photoUrl: embedded?.photo_url ?? null,
+        gym: embedded?.gym ?? null,
+        attachment: embedded?.attachment ?? null,
         orderIndex: we.order_index as number,
         // What the exercise was logged as (snapshotted per logged exercise).
         measurementType: (we.measurement_type as MeasurementType | null) ?? 'weight_reps',
@@ -314,6 +326,8 @@ export class FeedService {
           exerciseId: row.info.exerciseId,
           exerciseName: row.info.exerciseName,
           photoUrl: row.info.photoUrl,
+          gym: row.info.gym,
+          attachment: row.info.attachment,
           measurementType: type,
           weightKg: type === 'weight_reps' ? top.weightKg : null,
           reps: type === 'timed' ? null : top.reps,

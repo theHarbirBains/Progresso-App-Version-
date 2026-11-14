@@ -116,6 +116,9 @@ export function TopSetsSection({
               testID={`progress-topset-row-${item.exerciseId}`}
               exerciseName={item.exerciseName}
               muscleGroupLabel={MUSCLE_GROUP_LABELS[item.muscleGroup]}
+              photoUrl={item.photoUrl}
+              gym={item.gym}
+              attachment={item.attachment}
               weightDisplay={roundWeight(fromKg(item.weightKg, weightUnit))}
               reps={item.reps}
               unit={weightUnit}

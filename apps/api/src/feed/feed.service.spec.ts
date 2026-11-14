@@ -157,7 +157,12 @@ describe('FeedService', () => {
             workout_id: 'w1',
             exercise_id: 'bench',
             order_index: 1,
-            exercises: { name: 'Bench Press', photo_url: 'https://example.com/bench.jpg' },
+            exercises: {
+              name: 'Bench Press',
+              photo_url: 'https://example.com/bench.jpg',
+              gym: 'Fit4Less Downtown',
+              attachment: 'Wide grip bar',
+            },
           },
           {
             id: 'we-curl',
@@ -201,10 +206,21 @@ describe('FeedService', () => {
               exerciseId: 'bench',
               exerciseName: 'Bench Press',
               photoUrl: 'https://example.com/bench.jpg',
+              // Which machine it was: its gym and handle, as on the friend's own screens.
+              gym: 'Fit4Less Downtown',
+              attachment: 'Wide grip bar',
               weightKg: 225,
               reps: 8,
             },
-            { exerciseId: 'curl', exerciseName: 'Curl', photoUrl: null, weightKg: 30, reps: 10 },
+            {
+              exerciseId: 'curl',
+              exerciseName: 'Curl',
+              photoUrl: null,
+              gym: null,
+              attachment: null,
+              weightKg: 30,
+              reps: 10,
+            },
           ],
         },
       });

@@ -2,10 +2,12 @@ import { TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { colors, minTouchTarget } from '../design/theme';
+import { ExercisePhoto } from '../exercises/ExercisePhoto';
+import { machineLine, type MachineDetails } from '../exercises/machineDetails';
 import { progressStyles as styles } from './progressStyles';
 import { formatWeight } from '../lib/units';
 
-interface Props {
+interface Props extends MachineDetails {
   exerciseName: string;
   muscleGroupLabel: string;
   weightDisplay: number;
@@ -20,15 +22,19 @@ interface Props {
 
 /**
  * One row on the Top Sets page: an exercise's single best qualifying set
- * (see topSets.ts) as a plain row -- left side identifies the
- * exercise (name + muscle group), right side is the number that matters
- * (weight x reps) plus the "Top Set" label and a chevron. Deliberately no
- * icon, date, badge, or streak -- clean and data-focused, per the page's
- * own design spec.
+ * (see topSets.ts) as a plain row -- left side identifies the exercise as
+ * the Exercise Library does (its photo, which opens full size on a tap, or
+ * its first letter; its name; "Muscle · Gym · Handle"), right side is the
+ * number that matters (weight x reps) plus the "Top Set" label and a
+ * chevron. Deliberately no date, badge, or streak -- clean and data-focused,
+ * per the page's own design spec.
  */
 export function TopSetRow({
   exerciseName,
   muscleGroupLabel,
+  photoUrl,
+  gym,
+  attachment,
   weightDisplay,
   reps,
   unit,
@@ -37,6 +43,7 @@ export function TopSetRow({
   onEdit,
   testID,
 }: Props) {
+  const line = machineLine({ gym, attachment }, muscleGroupLabel);
   return (
     <TouchableOpacity
       testID={testID}
@@ -45,14 +52,22 @@ export function TopSetRow({
       disabled={!onPress}
       activeOpacity={0.7}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`${exerciseName}, ${muscleGroupLabel}, top set ${formatWeight(weightDisplay)}${unit} times ${reps}`}
+      accessibilityLabel={`${exerciseName}, ${line}, top set ${formatWeight(weightDisplay)}${unit} times ${reps}`}
     >
       <View style={styles.topSetRowContent}>
+        <ExercisePhoto
+          testID={testID ? `${testID}-photo` : undefined}
+          uri={photoUrl}
+          name={exerciseName}
+          size={40}
+        />
         <View style={styles.topSetRowLeft}>
           <Text style={styles.topSetExerciseName} numberOfLines={1}>
             {exerciseName}
           </Text>
-          <Text style={styles.topSetMuscleGroup}>{muscleGroupLabel}</Text>
+          <Text testID={testID ? `${testID}-line` : undefined} style={styles.topSetMuscleGroup}>
+            {line}
+          </Text>
         </View>
         <View style={styles.topSetRowRight}>
           <View style={styles.topSetValueColumn}>

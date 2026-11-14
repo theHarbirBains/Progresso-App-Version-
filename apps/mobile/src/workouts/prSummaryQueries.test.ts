@@ -45,6 +45,8 @@ describe('fetchAllRepPRs', () => {
             name: 'Bench Press',
             muscle_group: 'chest',
             photo_url: 'https://example.com/bench.jpg',
+            gym: 'Fit4Less Downtown',
+            attachment: 'Wide grip bar',
           },
         },
       ],
@@ -63,6 +65,9 @@ describe('fetchAllRepPRs', () => {
         exerciseName: 'Bench Press',
         muscleGroup: 'chest',
         exercisePhotoUrl: 'https://example.com/bench.jpg',
+        // Which machine the record is on.
+        exerciseGym: 'Fit4Less Downtown',
+        exerciseAttachment: 'Wide grip bar',
       },
     ]);
   });
@@ -125,6 +130,8 @@ describe('fetchAllOneRepMaxes', () => {
         exerciseId: 'ex-2',
         exerciseName: 'Squat',
         exercisePhotoUrl: null,
+        exerciseGym: null,
+        exerciseAttachment: null,
       },
     ]);
   });
@@ -183,6 +190,8 @@ describe('fetchAllExerciseRecords', () => {
         exerciseId: 'ex-plank',
         exerciseName: 'Exercise',
         exercisePhotoUrl: null,
+        exerciseGym: null,
+        exerciseAttachment: null,
       },
       {
         measurementType: 'bodyweight',
@@ -192,6 +201,8 @@ describe('fetchAllExerciseRecords', () => {
         exerciseId: 'ex-pushup',
         exerciseName: 'Push-Up',
         exercisePhotoUrl: null,
+        exerciseGym: null,
+        exerciseAttachment: null,
       },
     ]);
     expect(tables.rep_records.eq).toHaveBeenCalledWith('user_id', 'user-1');

@@ -2,6 +2,7 @@ import { TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
+import { machineLine } from '../exercises/machineDetails';
 import { withAlpha } from '../theme/accentColor';
 import { recordValueText, type PRFeedRow } from './prFeed';
 import { progressStyles as styles } from './progressStyles';
@@ -13,6 +14,9 @@ interface Props {
   exerciseName: string;
   /** The exercise's machine photo -- shown in place of the ribbon, and opens full-screen when tapped. */
   photoUrl?: string | null;
+  /** Its gym and handle, under its name as in the Exercise Library: which machine it's on. */
+  gym?: string | null;
+  attachment?: string | null;
   weightDisplay: number;
   /** null for a true-1RM record (a 1RM isn't described by a rep count the way a rep-count PR is). */
   reps: number | null;
@@ -32,6 +36,8 @@ interface Props {
 export function PRRow({
   exerciseName,
   photoUrl,
+  gym,
+  attachment,
   weightDisplay,
   reps,
   unit,
@@ -43,6 +49,7 @@ export function PRRow({
   showDivider,
   testID,
 }: Props) {
+  const machine = machineLine({ gym, attachment });
   return (
     <TouchableOpacity
       testID={testID}
@@ -72,6 +79,15 @@ export function PRRow({
       )}
       <View style={styles.recordRowBody}>
         <Text style={styles.recordRowTitle}>{exerciseName}</Text>
+        {machine ? (
+          <Text
+            testID={testID ? `${testID}-machine` : undefined}
+            style={styles.recordRowMeta}
+            numberOfLines={1}
+          >
+            {machine}
+          </Text>
+        ) : null}
         <Text style={styles.recordRowMeta}>
           {recordType} · {formatMonthDay(achievedAt)}
         </Text>
@@ -102,23 +118,20 @@ interface FeedRowProps {
   weightUnit: 'kg' | 'lb';
   accentColor: string;
   showDivider: boolean;
-  /** The exercise's photo in place of the ribbon (the PRs page). */
-  showPhoto?: boolean;
   navigation: RecordNavigation;
   testID: string;
 }
 
 /**
  * A record from the PR feed (prFeed's mergeAndSortPRs) as a row -- the PRs page's and Overview's
- * Recent Milestones -- opening its exercise's progress. Exercise progress charts weights, so a
- * most-reps or longest record has none to open.
+ * Recent Milestones -- with its exercise's photo, gym and handle, opening its exercise's
+ * progress. Exercise progress charts weights, so a most-reps or longest record has none to open.
  */
 export function PRFeedRecordRow({
   item,
   weightUnit,
   accentColor,
   showDivider,
-  showPhoto = false,
   navigation,
   testID,
 }: FeedRowProps) {
@@ -126,7 +139,9 @@ export function PRFeedRecordRow({
     <PRRow
       testID={testID}
       exerciseName={item.exerciseName}
-      photoUrl={showPhoto ? item.photoUrl : undefined}
+      photoUrl={item.photoUrl}
+      gym={item.gym}
+      attachment={item.attachment}
       weightDisplay={roundWeight(fromKg(item.weightKg ?? 0, weightUnit))}
       reps={item.reps}
       unit={weightUnit}

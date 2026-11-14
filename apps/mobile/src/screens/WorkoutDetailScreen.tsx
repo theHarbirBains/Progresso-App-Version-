@@ -11,6 +11,8 @@ import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
 import { UnderlineTabs } from '../design/UnderlineTabs';
+import { ExercisePhoto } from '../exercises/ExercisePhoto';
+import { machineLine } from '../exercises/machineDetails';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -364,10 +366,18 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                   : undefined
               }
             >
+              {/* Which machine it was, as the Exercise Library shows it: its photo (full size
+                  on a tap -- the row's own tap still opens PR History), then its muscle, gym
+                  and handle. */}
+              <ExercisePhoto
+                testID={`exercise-photo-${exercise.id}`}
+                uri={exercise.photoUrl}
+                name={exercise.exerciseName}
+              />
               <View style={styles.exerciseTitleBody}>
                 <Text style={styles.exerciseTitle}>{exercise.exerciseName}</Text>
-                <Text style={styles.exerciseMuscle}>
-                  {MUSCLE_GROUP_LABELS[exercise.muscleGroup]}
+                <Text testID={`exercise-muscle-${exercise.id}`} style={styles.exerciseMuscle}>
+                  {machineLine(exercise, MUSCLE_GROUP_LABELS[exercise.muscleGroup])}
                 </Text>
               </View>
               {type === 'weight_reps' && isOwn ? (

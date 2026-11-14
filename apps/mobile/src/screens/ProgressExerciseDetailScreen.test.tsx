@@ -6,6 +6,11 @@ import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import { ProgressExerciseDetailScreen } from './ProgressExerciseDetailScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 import { updateSet } from '../workouts/workoutQueries';
+import { fetchExerciseDetails } from '../exercises/exerciseQueries';
+
+jest.mock('../exercises/exerciseQueries', () => ({
+  fetchExerciseDetails: jest.fn(async () => null),
+}));
 
 jest.mock('../profile/profileQueries', () => ({
   fetchMyProfile: jest.fn(),
@@ -252,6 +257,62 @@ describe('ProgressExerciseDetailScreen background refresh on focus', () => {
       refresh.resolve([]);
       await refresh.promise;
     });
+  });
+});
+
+describe('ProgressExerciseDetailScreen -- which machine', () => {
+  it('shows its photo, muscle, movement, gym and handle at the top, as the library does', async () => {
+    jest.mocked(fetchExerciseDetails).mockResolvedValueOnce({
+      muscleGroup: 'back',
+      movementType: 'bilateral',
+      photoUrl: 'https://example.com/row.jpg',
+      gym: 'Fit4Less Downtown',
+      attachment: 'V-handle',
+    });
+    mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('progress-exercise-detail-details-line')).toHaveTextContent(
+      'Back · Bilateral · Fit4Less Downtown · V-handle',
+    );
+    expect(fetchExerciseDetails).toHaveBeenCalledWith('user-1', 'ex-1');
+    // The photo opens full size.
+    fireEvent.press(screen.getByTestId('progress-exercise-detail-details-photo-zoom'));
+    expect(screen.getByTestId('progress-exercise-detail-details-photo-lightbox')).toBeTruthy();
+  });
+
+  it('names the machine when a top set is opened to fix', async () => {
+    jest.mocked(fetchExerciseDetails).mockResolvedValueOnce({
+      muscleGroup: 'back',
+      movementType: 'bilateral',
+      photoUrl: null,
+      gym: 'Fit4Less Downtown',
+      attachment: null,
+    });
+    mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    await screen.findByTestId('progress-exercise-detail-details');
+    fireEvent.press(screen.getByTestId('progress-exercise-detail-top-set-0'));
+    expect(screen.getByTestId('edit-top-set-summary')).toHaveTextContent(
+      /^Bench Press · Fit4Less Downtown, /,
+    );
+  });
+
+  it('shows the page whole when its details cannot be read', async () => {
+    jest.mocked(fetchExerciseDetails).mockRejectedValueOnce(new Error('offline'));
+    mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('progress-exercise-detail-current')).toBeTruthy();
+    expect(screen.queryByTestId('progress-exercise-detail-details')).toBeNull();
+    expect(screen.queryByTestId('progress-exercise-detail-error')).toBeNull();
   });
 });
 

@@ -1,3 +1,4 @@
+import type { MachineDetails } from '../exercises/machineDetails';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import type { HistoricalSetWithExercise } from '../workouts/allExerciseHistoryQueries';
 
@@ -9,7 +10,8 @@ import type { HistoricalSetWithExercise } from '../workouts/allExerciseHistoryQu
  */
 export const TOP_SET_MIN_REPS = 5;
 
-export interface TopSetRow {
+/** Its exercise's photo, gym and handle (MachineDetails) come with it, for the row to show. */
+export interface TopSetRow extends MachineDetails {
   /** The set it is, in the workout it was logged in -- what editing it changes. */
   setId: string;
   exerciseId: string;
@@ -57,6 +59,9 @@ export function computeTopSets(history: HistoricalSetWithExercise[]): TopSetRow[
         weightKg: s.weightKg,
         reps: s.reps,
         performedAt: s.performedAt,
+        photoUrl: s.photoUrl ?? null,
+        gym: s.gym ?? null,
+        attachment: s.attachment ?? null,
       });
     }
   }

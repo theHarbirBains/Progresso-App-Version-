@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { MACHINE_COLUMNS, machineDetailsOf } from '../exercises/machineDetails';
 import type { LoggingStyle, MeasurementType, MovementType } from '../exercises/movementTypes';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 
@@ -79,6 +80,9 @@ export interface WorkoutExerciseWithSets {
   exerciseName: string;
   /** The exercise's machine photo (exercises.photo_url), or null when it has none. */
   photoUrl: string | null;
+  /** Its gym and handle, when it has them: with the photo, which machine it is. */
+  gym?: string | null;
+  attachment?: string | null;
   muscleGroup: MuscleGroup;
   movementType: MovementType;
   loggingStyle: LoggingStyle | null;
@@ -225,7 +229,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
   const { data: workoutExercises, error: weError } = await supabase
     .from('workout_exercises')
     .select(
-      'id, exercise_id, order_index, measurement_type, exercises(name, muscle_group, movement_type, logging_style, photo_url)',
+      `id, exercise_id, order_index, measurement_type, exercises(name, muscle_group, movement_type, logging_style, ${MACHINE_COLUMNS})`,
     )
     .eq('workout_id', workoutId)
     .is('deleted_at', null)
@@ -262,12 +266,14 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
       movement_type: MovementType;
       logging_style: LoggingStyle | null;
       photo_url: string | null;
+      gym: string | null;
+      attachment: string | null;
     } | null;
     return {
       id: we.id,
       exerciseId: we.exercise_id,
       exerciseName: embedded?.name ?? '',
-      photoUrl: embedded?.photo_url ?? null,
+      ...machineDetailsOf(embedded),
       muscleGroup: embedded?.muscle_group ?? 'other',
       movementType: embedded?.movement_type ?? 'bilateral',
       loggingStyle: embedded?.logging_style ?? null,

@@ -37,6 +37,24 @@ describe('RecentWorkoutTopSets', () => {
     expect(screen.getByText('Lat Pulldown')).toBeTruthy();
   });
 
+  it("names an exercise's gym and handle under its name", () => {
+    render(
+      <RecentWorkoutTopSets
+        testID="top"
+        topSets={[
+          { ...topSets[0], gym: 'Fit4Less Downtown', attachment: 'Wide grip bar' },
+          topSets[1],
+        ]}
+        weightUnit="kg"
+      />,
+    );
+
+    expect(screen.getByTestId('top-machine-bench')).toHaveTextContent(
+      'Fit4Less Downtown · Wide grip bar',
+    );
+    expect(screen.queryByTestId('top-machine-pulldown')).toBeNull();
+  });
+
   it('shows one pagination dot per top set, with the first selected', () => {
     render(<RecentWorkoutTopSets testID="top" topSets={topSets} weightUnit="kg" />);
 

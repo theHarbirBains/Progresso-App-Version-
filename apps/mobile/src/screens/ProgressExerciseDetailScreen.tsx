@@ -20,6 +20,7 @@ import { summarizeProgress, topSetProgressionDetailed } from '../workouts/exerci
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import { deriveMilestones } from '../workouts/progressMilestones';
 import { EditTopSetSheet, type TopSetToEdit } from '../progress/EditTopSetSheet';
+import { ExerciseDetailsCard, useExerciseDetails } from '../exercises/ExerciseDetailsCard';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 
 type Props = RootStackScreenProps<'ProgressExerciseDetail'>;
@@ -37,6 +38,8 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
+  // Its photo, gym and handle at the top, as in the library: which machine these figures are for.
+  const details = useExerciseDetails(exerciseId);
   // A fixed top set changes Progress's shared history and PRs too.
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
@@ -125,6 +128,12 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
         </Text>
       ) : null}
 
+      <ExerciseDetailsCard
+        details={details}
+        exerciseName={exerciseName}
+        testID="progress-exercise-detail-details"
+      />
+
       {allTimePoints.length === 0 ? (
         <ProgressEmptyState
           testID="progress-exercise-detail-empty"
@@ -173,6 +182,8 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
                     setEditing({
                       setId: point.setId,
                       exerciseName,
+                      gym: details?.gym,
+                      attachment: details?.attachment,
                       performedAt: point.performedAt,
                       weightKg: point.weightKg,
                       reps: point.reps,

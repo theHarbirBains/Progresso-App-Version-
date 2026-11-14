@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { AutoCarousel } from '../design/AutoCarousel';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
+import { machineLine } from '../exercises/machineDetails';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
 import type { WorkoutTopSet } from '../workouts/recentWorkoutTopSets';
@@ -21,7 +22,8 @@ interface Props {
 // Motion is on, with a quiet pagination indicator). Only the exercise name and
 // its top-set readout are the visual focus. When an exercise has a machine
 // photo it sits beside its readout, and tapping it opens the full-size picture
-// (ExercisePhoto's zoom) -- the same for everyone's cards.
+// (ExercisePhoto's zoom); its gym and handle, when it has them, sit quietly
+// under its name, as in the Exercise Library -- the same for everyone's cards.
 export function RecentWorkoutTopSets({ topSets, weightUnit, testID }: Props) {
   if (topSets.length === 0) {
     return (
@@ -41,24 +43,36 @@ export function RecentWorkoutTopSets({ topSets, weightUnit, testID }: Props) {
         testID={testID}
         items={topSets}
         keyOf={(topSet) => topSet.exerciseId}
-        renderSlide={(topSet) => (
-          <View style={styles.slide}>
-            {topSet.photoUrl ? (
-              <ExercisePhoto
-                testID={testID ? `${testID}-photo-${topSet.exerciseId}` : undefined}
-                uri={topSet.photoUrl}
-                name={topSet.exerciseName}
-                size={PHOTO_SIZE}
-              />
-            ) : null}
-            <View style={styles.slideText}>
-              <Text style={styles.exerciseName} numberOfLines={1}>
-                {topSet.exerciseName}
-              </Text>
-              <Text style={styles.topSetValue}>{formatSetValues(topSet, weightUnit)}</Text>
+        renderSlide={(topSet) => {
+          const machine = machineLine(topSet);
+          return (
+            <View style={styles.slide}>
+              {topSet.photoUrl ? (
+                <ExercisePhoto
+                  testID={testID ? `${testID}-photo-${topSet.exerciseId}` : undefined}
+                  uri={topSet.photoUrl}
+                  name={topSet.exerciseName}
+                  size={PHOTO_SIZE}
+                />
+              ) : null}
+              <View style={styles.slideText}>
+                <Text style={styles.exerciseName} numberOfLines={1}>
+                  {topSet.exerciseName}
+                </Text>
+                {machine ? (
+                  <Text
+                    testID={testID ? `${testID}-machine-${topSet.exerciseId}` : undefined}
+                    style={styles.machine}
+                    numberOfLines={1}
+                  >
+                    {machine}
+                  </Text>
+                ) : null}
+                <Text style={styles.topSetValue}>{formatSetValues(topSet, weightUnit)}</Text>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
       />
     </View>
   );
@@ -90,6 +104,10 @@ const styles = StyleSheet.create({
   exerciseName: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
+  },
+  machine: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
   },
   topSetValue: {
     ...typeScale.statMedium,
