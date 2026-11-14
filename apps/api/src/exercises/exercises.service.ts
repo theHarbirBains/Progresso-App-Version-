@@ -31,7 +31,7 @@ export interface ExerciseRecord {
 
 const UNIQUE_VIOLATION = '23505';
 
-function toExerciseRecord(row: Record<string, unknown>): ExerciseRecord {
+export function toExerciseRecord(row: Record<string, unknown>): ExerciseRecord {
   return {
     id: row.id as string,
     name: row.name as string,

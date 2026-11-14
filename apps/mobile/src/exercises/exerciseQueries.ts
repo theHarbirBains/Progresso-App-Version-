@@ -1,3 +1,4 @@
+import type { ExerciseResponse, SharedExerciseResponse, ShareSource } from '../lib/exercisesApi';
 import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
 import { MACHINE_COLUMNS, machineDetailsOf, type MachineDetails } from './machineDetails';
@@ -8,7 +9,9 @@ import type { MuscleGroup } from './muscleGroups';
 // backend -- the existing exercises_select RLS policy already restricts
 // rows to built-ins plus the caller's own custom exercises, so there's no
 // business logic here for a backend endpoint to add.
-export type ExerciseSource = 'all' | 'builtin' | 'mine';
+// 'friends' is the people you follow's own exercises, to add to yours; a trainer's or a client's
+// are in All, beside your own.
+export type ExerciseSource = 'all' | 'builtin' | 'mine' | 'friends';
 
 export interface ExerciseRow {
   id: string;
@@ -26,6 +29,42 @@ export interface ExerciseRow {
   attachment?: string | null;
   isActive: boolean;
   createdBy: string | null;
+  /**
+   * Someone else's exercise, shared with this person (lib/exercisesApi's fetchSharedExercises):
+   * whose, how, and whether they already have their own by that name at that gym. Using it makes
+   * it theirs first (copyExercise). Absent for a built-in or their own.
+   */
+  shared?: { source: ShareSource; ownerName: string; inLibrary: boolean };
+}
+
+/** An exercise as the API returns it, as a row. */
+export function exerciseRowFromResponse(exercise: ExerciseResponse): ExerciseRow {
+  return {
+    id: exercise.id,
+    name: exercise.name,
+    muscleGroup: exercise.muscleGroup,
+    movementType: exercise.movementType,
+    loggingStyle: exercise.loggingStyle,
+    measurementType: exercise.measurementType ?? 'weight_reps',
+    photoUrl: exercise.photoUrl,
+    gym: exercise.gym ?? null,
+    feelNotes: exercise.feelNotes ?? null,
+    attachment: exercise.attachment ?? null,
+    isActive: exercise.isActive,
+    createdBy: exercise.createdBy,
+  };
+}
+
+/** A shared exercise as a row, saying whose it is. */
+export function sharedExerciseRow(exercise: SharedExerciseResponse): ExerciseRow {
+  return {
+    ...exerciseRowFromResponse(exercise),
+    shared: {
+      source: exercise.source,
+      ownerName: exercise.owner.displayName ?? exercise.owner.username ?? 'Someone',
+      inLibrary: exercise.inLibrary,
+    },
+  };
 }
 
 export interface FetchExercisesParams {
@@ -142,6 +181,8 @@ export interface FetchAllExercisesParams {
   muscleGroup: MuscleGroup | null;
   source: ExerciseSource;
   ascending?: boolean;
+  /** The exercises shared with this person (sharedExerciseRow), for All and Friends. */
+  shared?: ExerciseRow[];
 }
 
 /**
@@ -217,17 +258,39 @@ function filterExerciseRows(
  * rather than a fresh Supabase query every time.
  */
 export async function fetchAllExercises(params: FetchAllExercisesParams): Promise<ExerciseRow[]> {
-  const { userId, search, muscleGroup, source, ascending = true } = params;
+  const { userId, search, muscleGroup, source, ascending = true, shared = [] } = params;
 
-  const base = await fetchFullExerciseList(userId);
-  const filtered = filterExerciseRows(base, { userId, search, muscleGroup, source });
+  const pool = libraryPool(await fetchFullExerciseList(userId), shared, userId, source);
+  const filtered = filterExerciseRows(pool, { userId, search, muscleGroup, source });
   return ascending ? filtered : [...filtered].reverse();
+}
+
+/**
+ * What a library tab is drawn from: Friends is the people you follow's exercises; every other
+ * tab, the built-ins and your own -- and in All, your trainer's and your clients' too, less any
+ * you already have your own of. The full list can hold others' exercises the database lets this
+ * person read (a client's, for their trainer; one used in a group they were in); those only show
+ * as shared, never as theirs.
+ */
+function libraryPool(
+  base: ExerciseRow[],
+  shared: ExerciseRow[],
+  userId: string,
+  source: ExerciseSource,
+): ExerciseRow[] {
+  if (source === 'friends') return shared.filter((row) => row.shared?.source === 'friend');
+  const own = base.filter((row) => row.createdBy === null || row.createdBy === userId);
+  if (source !== 'all') return own;
+  const linked = shared.filter((row) => row.shared?.source !== 'friend' && !row.shared?.inLibrary);
+  if (linked.length === 0) return own;
+  return [...own, ...linked].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export interface ExerciseSourceCounts {
   all: number;
   builtin: number;
   mine: number;
+  friends: number;
 }
 
 /**
@@ -239,7 +302,10 @@ export interface ExerciseSourceCounts {
  * on a cold cache is shared with whichever of fetchAllExercises/this one
  * asks first in the same session.
  */
-export async function fetchExerciseSourceCounts(userId: string): Promise<ExerciseSourceCounts> {
+export async function fetchExerciseSourceCounts(
+  userId: string,
+  shared: ExerciseRow[] = [],
+): Promise<ExerciseSourceCounts> {
   const base = await fetchFullExerciseList(userId);
   let builtin = 0;
   let mine = 0;
@@ -247,7 +313,12 @@ export async function fetchExerciseSourceCounts(userId: string): Promise<Exercis
     if (row.createdBy === null) builtin += 1;
     else if (row.createdBy === userId) mine += 1;
   }
-  return { all: base.length, builtin, mine };
+  const friends = shared.filter((row) => row.shared?.source === 'friend').length;
+  // A trainer's or client's, in All -- less any already theirs.
+  const linked = shared.filter(
+    (row) => row.shared?.source !== 'friend' && !row.shared?.inLibrary,
+  ).length;
+  return { all: builtin + mine + linked, builtin, mine, friends };
 }
 
 /** What an exercise's own pages show at their top, as its library row does. */

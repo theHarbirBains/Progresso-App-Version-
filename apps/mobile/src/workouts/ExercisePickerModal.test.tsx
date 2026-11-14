@@ -21,6 +21,12 @@ jest.mock('../navigation/navigationTransitions', () => ({
   useReduceMotionPreference: jest.fn(),
 }));
 
+const mockMakeOwn = jest.fn();
+const mockShared = { rows: [], error: null, reload: jest.fn(), makeOwn: mockMakeOwn };
+jest.mock('../exercises/useSharedExercises', () => ({
+  useSharedExercises: () => mockShared,
+}));
+
 const mockFetchExercises = fetchAllExercises as jest.Mock;
 const mockUseReduceMotionPreference = useReduceMotionPreference as jest.Mock;
 
@@ -44,6 +50,91 @@ beforeEach(() => {
       createdBy: null,
     },
   ]);
+});
+
+describe("ExercisePickerModal -- a trainer's, a client's or a friend's exercise", () => {
+  const friendsRow = {
+    id: 'ex-sams',
+    name: 'Seated Row',
+    muscleGroup: 'back',
+    movementType: 'bilateral',
+    measurementType: 'weight_reps',
+    photoUrl: null,
+    gym: 'Fit4Less Downtown',
+    attachment: 'V-handle',
+    isActive: true,
+    createdBy: 'sam',
+    shared: { source: 'friend', ownerName: 'Sam', inLibrary: false },
+  };
+  const ownCopy = { ...friendsRow, id: 'ex-my-copy', createdBy: 'user-1', shared: undefined };
+
+  it('makes it theirs first, then adds their own one', async () => {
+    mockFetchExercises.mockResolvedValue([friendsRow]);
+    mockMakeOwn.mockReset().mockResolvedValue(ownCopy);
+    const onSelect = jest.fn();
+    render(
+      <ExercisePickerModal
+        visible
+        onClose={jest.fn()}
+        onSelect={onSelect}
+        userId="user-1"
+        alreadyAddedIds={[]}
+      />,
+    );
+
+    // Whose it is, and its gym and handle.
+    expect(await screen.findByTestId('exercise-item-ex-sams')).toHaveTextContent(/From Sam/);
+    expect(screen.getByTestId('exercise-item-ex-sams')).toHaveTextContent(
+      /Fit4Less Downtown · V-handle/,
+    );
+    fireEvent.press(screen.getByTestId('exercise-item-ex-sams'));
+
+    await waitFor(() => expect(onSelect).toHaveBeenCalledWith(ownCopy));
+    expect(mockMakeOwn).toHaveBeenCalledWith(friendsRow);
+  });
+
+  it('says so when their own one is already in the workout', async () => {
+    mockFetchExercises.mockResolvedValue([friendsRow]);
+    mockMakeOwn.mockReset().mockResolvedValue(ownCopy);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const onSelect = jest.fn();
+    render(
+      <ExercisePickerModal
+        visible
+        onClose={jest.fn()}
+        onSelect={onSelect}
+        userId="user-1"
+        alreadyAddedIds={['ex-my-copy']}
+      />,
+    );
+
+    fireEvent.press(await screen.findByTestId('exercise-item-ex-sams'));
+
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith('Seated Row is already here', expect.any(String)),
+    );
+    expect(onSelect).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('adds a built-in or their own straight away, with nothing to copy', async () => {
+    mockMakeOwn.mockReset();
+    const onSelect = jest.fn();
+    render(
+      <ExercisePickerModal
+        visible
+        onClose={jest.fn()}
+        onSelect={onSelect}
+        userId="user-1"
+        alreadyAddedIds={[]}
+      />,
+    );
+
+    fireEvent.press(await screen.findByTestId('exercise-item-ex1'));
+
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'ex1' }));
+    expect(mockMakeOwn).not.toHaveBeenCalled();
+  });
 });
 
 describe('ExercisePickerModal -- deleting your own exercises', () => {

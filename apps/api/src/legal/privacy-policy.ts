@@ -35,7 +35,7 @@ const BODY = `
 
 <h2>Who can see your data</h2>
 <ul>
-  <li><strong>Other people on Progresso.</strong> Your name, username and photo can be found in search. People whose follow request you accept see your finished workouts in their Friends feed, with each exercise's machine photo, gym and handle if you added them (not your nutrition, and not workouts a trainer logged for you). People in a group workout with you see that group's workouts. A trainer you link with can see your workouts and log or edit them for you, and every change a trainer makes is recorded. People you block can't find you, follow you or invite you to a group.</li>
+  <li><strong>Other people on Progresso.</strong> Your name, username and photo can be found in search. People whose follow request you accept see your finished workouts in their Friends feed, with each exercise's machine photo, gym and handle if you added them (not your nutrition, and not workouts a trainer logged for you), and the custom exercises you make -- with their photos, gym, handle and how they feel -- which they can copy into their own library. People in a group workout with you see that group's workouts. A trainer you link with can see your workouts and log or edit them for you, and every change a trainer makes is recorded; while you're linked, you and your trainer see each other's custom exercises, and using one copies it into your own library. People you block can't find you, follow you or invite you to a group.</li>
   <li><strong>Companies that run parts of Progresso for us</strong>, each only for that purpose:
     <ul>
       <li>Supabase: our database, sign-in and photo storage, hosted in Canada.</li>

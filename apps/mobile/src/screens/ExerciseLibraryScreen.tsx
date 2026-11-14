@@ -11,6 +11,7 @@ import {
   type ExerciseSourceCounts,
 } from '../exercises/exerciseQueries';
 import { ExerciseBrowser } from '../exercises/ExerciseBrowser';
+import { useSharedExercises } from '../exercises/useSharedExercises';
 import { type MuscleGroup } from '../exercises/muscleGroups';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { updateExercise } from '../lib/api';
@@ -39,7 +40,9 @@ type Mode = { type: 'list' } | { type: 'create' } | { type: 'edit'; exercise: Ex
 // header's "+". Every exercise opens its page (ProgressExerciseDetail) --
 // its top sets, best performances and journey; your own also have a pencil
 // that opens them for editing, and swipe left to delete. Built-ins are
-// otherwise read-only.
+// otherwise read-only. Libraries are shared: a trainer's and their clients'
+// exercises show in All (marked Trainer or Client), and the people you
+// follow's in Friends, each with a plus that adds it to your own library.
 export function ExerciseLibraryScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -64,31 +67,40 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   // not each category's own stable total. Null until the first fetch
   // resolves, so the cards show no number rather than a wrong one meanwhile.
   const [sourceCounts, setSourceCounts] = useState<ExerciseSourceCounts | null>(null);
+  // What the user's trainer, clients and the people they follow share, read as the page opens.
+  const shared = useSharedExercises(true);
+  const sharedRows = shared.rows;
 
   const load = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchAllExercises({ userId, search, muscleGroup, source });
+      const result = await fetchAllExercises({
+        userId,
+        search,
+        muscleGroup,
+        source,
+        shared: sharedRows,
+      });
       setRows(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load exercises');
     } finally {
       setLoading(false);
     }
-  }, [userId, search, muscleGroup, source]);
+  }, [userId, search, muscleGroup, source, sharedRows]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   // The category cards' own totals -- independent of search/filter, so this
-  // only needs to run once per mount, not on every filter change above.
+  // only runs on mount and when what's shared changes, not on every filter change above.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    fetchExerciseSourceCounts(userId)
+    fetchExerciseSourceCounts(userId, sharedRows)
       .then((counts) => {
         if (!cancelled) setSourceCounts(counts);
       })
@@ -98,7 +110,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, sharedRows]);
 
   function handleDone() {
     setMode({ type: 'list' });
@@ -179,8 +191,9 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         sourceCounts={sourceCounts}
         rows={rows}
         loading={loading}
-        error={error}
-        onRetry={load}
+        // Friends is only what's shared, so a failure to read it is the tab's own.
+        error={source === 'friends' ? (shared.error ?? error) : error}
+        onRetry={source === 'friends' && shared.error ? shared.reload : load}
         accent={{ color: theme.accent, background: theme.accentBg, onColor: theme.onAccent }}
         onOpenMine={(exercise) => setMode({ type: 'edit', exercise })}
         onOpenExercise={(exercise) =>
@@ -190,6 +203,9 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
           })
         }
         onDeleteMine={deleteMine}
+        onAddShared={async (exercise) => {
+          await shared.makeOwn(exercise);
+        }}
         testID="exercise-library"
       />
     </Screen>

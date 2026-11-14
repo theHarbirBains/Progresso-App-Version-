@@ -37,6 +37,12 @@ function TestProviders({ children }: PropsWithChildren) {
   );
 }
 
+// Nothing shared with this person: their own library only (see useSharedExercises' own tests).
+jest.mock('../exercises/useSharedExercises', () => {
+  const none = { rows: [], error: null, reload: () => {}, makeOwn: async (e: unknown) => e };
+  return { useSharedExercises: () => none };
+});
+
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));

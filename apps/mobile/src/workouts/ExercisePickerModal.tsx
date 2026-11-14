@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { updateExercise } from '../lib/api';
-import { Modal, View } from 'react-native';
+import { Alert, Modal, View } from 'react-native';
 import { AppHeader } from '../design/AppHeader';
 import { ListRow } from '../design/ListRow';
 import { PhotoLightbox } from '../design/PhotoLightbox';
@@ -15,6 +15,7 @@ import {
   type ExerciseSourceCounts,
 } from '../exercises/exerciseQueries';
 import { ExerciseBrowser } from '../exercises/ExerciseBrowser';
+import { useSharedExercises } from '../exercises/useSharedExercises';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
@@ -69,6 +70,9 @@ export function ExercisePickerModal({
   const [error, setError] = useState<string | null>(null);
   const [sourceCounts, setSourceCounts] = useState<ExerciseSourceCounts | null>(null);
   const accessToken = useAuth().session?.access_token;
+  // A trainer's, a client's or a friend's exercise can be chosen too; it becomes theirs first.
+  const shared = useSharedExercises(visible);
+  const sharedRows = shared.rows;
 
   // Swiping one of your own exercises away deletes it from your library, here as in the library
   // itself: it leaves the list and the picker, and every workout it was logged in keeps it.
@@ -91,7 +95,7 @@ export function ExercisePickerModal({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchAllExercises({ userId, search, muscleGroup, source })
+    fetchAllExercises({ userId, search, muscleGroup, source, shared: sharedRows })
       .then((result) => {
         if (!cancelled) setRows(result);
       })
@@ -104,13 +108,13 @@ export function ExercisePickerModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, userId, search, muscleGroup, source, attempt]);
+  }, [visible, userId, search, muscleGroup, source, attempt, sharedRows]);
 
   // The tab counts are independent of the search and filter, so they load once per opening.
   useEffect(() => {
     if (!visible || !userId) return;
     let cancelled = false;
-    fetchExerciseSourceCounts(userId)
+    fetchExerciseSourceCounts(userId, sharedRows)
       .then((counts) => {
         if (!cancelled) setSourceCounts(counts);
       })
@@ -120,9 +124,36 @@ export function ExercisePickerModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, userId]);
+  }, [visible, userId, sharedRows]);
 
   const alreadyAddedIdSet = useMemo(() => new Set(alreadyAddedIds), [alreadyAddedIds]);
+
+  // Someone else's exercise is made theirs (a copy in their library, or their own by that name at
+  // that gym) before it's added, so what they log is always on an exercise of their own.
+  const [choosing, setChoosing] = useState(false);
+  async function choose(exercise: ExerciseRow) {
+    if (!exercise.shared) {
+      onSelect(exercise);
+      return;
+    }
+    if (choosing) return;
+    setChoosing(true);
+    try {
+      const own = await shared.makeOwn(exercise);
+      if (alreadyAddedIdSet.has(own.id)) {
+        Alert.alert(`${own.name} is already here`, 'Your own one is already in this workout.');
+        return;
+      }
+      onSelect(own);
+    } catch (err) {
+      Alert.alert(
+        `Couldn't add ${exercise.name}`,
+        err instanceof Error ? err.message : 'Please try again.',
+      );
+    } finally {
+      setChoosing(false);
+    }
+  }
 
   return (
     <Modal
@@ -157,8 +188,11 @@ export function ExercisePickerModal({
             sourceCounts={sourceCounts}
             rows={rows}
             loading={loading}
-            error={error}
-            onRetry={() => setAttempt((n) => n + 1)}
+            error={source === 'friends' ? (shared.error ?? error) : error}
+            onRetry={() => {
+              if (source === 'friends' && shared.error) shared.reload();
+              else setAttempt((n) => n + 1);
+            }}
             accent={{
               color: accentColor,
               background: withAlpha(accentColor, 0.14),
@@ -166,7 +200,7 @@ export function ExercisePickerModal({
             }}
             isRowDisabled={(exercise) => alreadyAddedIdSet.has(exercise.id)}
             rowSuffix={(exercise) => (alreadyAddedIdSet.has(exercise.id) ? ' (added)' : '')}
-            onSelectRow={onSelect}
+            onSelectRow={(exercise) => void choose(exercise)}
             onPhotoPress={(exercise) => setPhotoOpen(exercise.photoUrl)}
             onDeleteMine={deleteMine}
             listHeader={

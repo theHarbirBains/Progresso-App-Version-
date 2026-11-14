@@ -25,7 +25,11 @@ const SOURCE_OPTIONS: { value: ExerciseSource; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'builtin', label: 'Built-in' },
   { value: 'mine', label: 'Mine' },
+  { value: 'friends', label: 'Friends' },
 ];
+
+/** The word on a shared exercise's row: whose it is. */
+const SHARED_LABELS = { trainer: 'Trainer', client: 'Client', friend: 'Friend' } as const;
 
 interface Props {
   searchInput: string;
@@ -62,6 +66,11 @@ interface Props {
    * in the picker, no row can be deleted.
    */
   onDeleteMine?: (exercise: ExerciseRow) => Promise<void>;
+  /**
+   * The library's Add for a friend's exercise: a plus at the row's end that makes it theirs (a
+   * copy in their library). Without it, as in the picker, choosing the row does that instead.
+   */
+  onAddShared?: (exercise: ExerciseRow) => Promise<void>;
   /** A row shown first in the list, above the exercises (the picker's Create Custom). */
   listHeader?: ReactNode;
   testID?: string;
@@ -93,6 +102,7 @@ export function ExerciseBrowser({
   onOpenExercise,
   onPhotoPress,
   onDeleteMine,
+  onAddShared,
   listHeader,
   testID = 'exercise-browser',
 }: Props) {
@@ -127,6 +137,26 @@ export function ExerciseBrowser({
     [onDeleteMine],
   );
 
+  // A friend's exercise being added, so its plus can't be tapped twice.
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const addShared = useCallback(
+    async (exercise: ExerciseRow) => {
+      if (!onAddShared) return;
+      setAddingId(exercise.id);
+      try {
+        await onAddShared(exercise);
+      } catch (err) {
+        Alert.alert(
+          `Couldn't add ${exercise.name}`,
+          err instanceof Error ? err.message : 'Please try again.',
+        );
+      } finally {
+        setAddingId(null);
+      }
+    },
+    [onAddShared],
+  );
+
   const sections = useMemo(() => groupExercisesByLetter(rows), [rows]);
   const listSections = useMemo(
     () => sections.map((section) => ({ title: section.letter, data: section.data })),
@@ -144,19 +174,33 @@ export function ExerciseBrowser({
 
   const renderItem = useCallback(
     ({ item, index }: { item: ExerciseRow; index: number }) => {
-      const isMine = item.createdBy != null;
+      // Someone else's, shared: never edited or deleted here, and with no page of its own yet --
+      // the person's history with it starts once it's theirs.
+      const shared = item.shared;
+      const isMine = item.createdBy != null && !shared;
       const deletable = isMine && onDeleteMine !== undefined;
       const disabled = isRowDisabled?.(item) ?? false;
       const onRowPress = onSelectRow
         ? () => onSelectRow(item)
-        : onOpenExercise
+        : onOpenExercise && !shared
           ? () => onOpenExercise(item)
           : isMine && onOpenMine
             ? () => onOpenMine(item)
             : undefined;
       // With the row opening the exercise's page, one of their own is edited from its pencil.
       const editButton = !onSelectRow && onOpenExercise && isMine && onOpenMine;
-      const showsChevron = !onSelectRow && (onOpenExercise || (isMine && onOpenMine));
+      const showsChevron = !onSelectRow && !shared && (onOpenExercise || (isMine && onOpenMine));
+      const addButton =
+        !onSelectRow && onAddShared && shared?.source === 'friend' && !shared.inLibrary;
+      const marker = shared
+        ? shared.source === 'friend'
+          ? shared.inLibrary
+            ? 'Added'
+            : null
+          : SHARED_LABELS[shared.source]
+        : isMine
+          ? 'Mine'
+          : 'Built-in';
       const photo =
         onPhotoPress !== undefined ? (
           <TouchableOpacity
@@ -192,6 +236,7 @@ export function ExerciseBrowser({
               ]
                 .filter(Boolean)
                 .join(' · ')}
+              detail={shared ? `From ${shared.ownerName}` : undefined}
               onPress={disabled ? undefined : onRowPress}
               disabled={disabled}
               accessibilityActions={deletable ? [{ name: 'delete', label: 'Delete' }] : undefined}
@@ -200,14 +245,17 @@ export function ExerciseBrowser({
               }}
               trailing={
                 <>
-                  <Text
-                    style={[
-                      styles.sourceLabel,
-                      { color: isMine ? accent.color : colors.textMuted },
-                    ]}
-                  >
-                    {isMine ? 'Mine' : 'Built-in'}
-                  </Text>
+                  {marker ? (
+                    <Text
+                      testID={`exercise-item-${item.id}-marker`}
+                      style={[
+                        styles.sourceLabel,
+                        { color: isMine || shared ? accent.color : colors.textMuted },
+                      ]}
+                    >
+                      {marker}
+                    </Text>
+                  ) : null}
                   {showsChevron ? (
                     <Feather name="chevron-right" size={18} color={colors.textMuted} />
                   ) : null}
@@ -222,6 +270,16 @@ export function ExerciseBrowser({
               onPress={() => onOpenMine(item)}
               accessibilityLabel={`Edit ${item.name}`}
               color={colors.textSecondary}
+            />
+          ) : null}
+          {addButton ? (
+            <IconButton
+              testID={`exercise-add-${item.id}`}
+              icon="plus"
+              onPress={() => void addShared(item)}
+              disabled={addingId === item.id}
+              accessibilityLabel={`Add ${item.name} to My Library`}
+              color={accent.color}
             />
           ) : null}
         </View>
@@ -243,7 +301,10 @@ export function ExerciseBrowser({
     },
     [
       accent.color,
+      addShared,
+      addingId,
       isRowDisabled,
+      onAddShared,
       onDeleteMine,
       onOpenExercise,
       onOpenMine,
@@ -341,7 +402,15 @@ export function ExerciseBrowser({
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={listHeader ? <>{listHeader}</> : undefined}
               ListEmptyComponent={
-                <EmptyState testID="exercise-library-empty" title="No exercises found" />
+                source === 'friends' && !searchInput.trim() && muscleGroup === null ? (
+                  <EmptyState
+                    testID="exercise-library-empty"
+                    title="Nothing from friends yet"
+                    description="Exercises made by the people you follow show here, to add to your own library."
+                  />
+                ) : (
+                  <EmptyState testID="exercise-library-empty" title="No exercises found" />
+                )
               }
               renderSectionHeader={renderSectionHeader}
               renderItem={renderItem}

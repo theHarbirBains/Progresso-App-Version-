@@ -16,6 +16,14 @@ import { DEFAULT_WORKOUT_THEME } from '../theme/accentColor';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ExerciseLibraryScreen } from './ExerciseLibraryScreen';
 
+// What's shared with this person: nothing, unless a test says otherwise (see useSharedExercises'
+// own tests for how it's read).
+const mockShared: { rows: unknown[]; error: string | null; reload: jest.Mock; makeOwn: jest.Mock } =
+  { rows: [], error: null, reload: jest.fn(), makeOwn: jest.fn() };
+jest.mock('../exercises/useSharedExercises', () => ({
+  useSharedExercises: () => mockShared,
+}));
+
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
@@ -117,6 +125,9 @@ const mineRow = {
 };
 
 beforeEach(() => {
+  mockShared.rows = [];
+  mockShared.error = null;
+  mockShared.makeOwn.mockReset();
   mockUseAuth.mockReturnValue({ user: { id: 'user-1' }, session: { access_token: 'token-1' } });
   mockUpdateExercise.mockReset();
   mockInvalidateExerciseCache.mockClear();
@@ -562,5 +573,95 @@ describe('ExerciseLibraryScreen -- deleting your own exercises', () => {
     expect(alert).toHaveBeenCalledWith("Couldn't delete My Curl Variation", 'network down');
     expect(screen.getByTestId('exercise-item-ex-mine')).toBeTruthy();
     await settle();
+  });
+});
+
+describe('ExerciseLibraryScreen -- shared libraries', () => {
+  const friendsRow = {
+    id: 'ex-sams',
+    name: 'Seated Row',
+    muscleGroup: 'back',
+    movementType: 'bilateral',
+    loggingStyle: null,
+    photoUrl: null,
+    gym: 'Fit4Less Downtown',
+    attachment: 'V-handle',
+    isActive: true,
+    createdBy: 'sam',
+    shared: { source: 'friend', ownerName: 'Sam', inLibrary: false },
+  };
+  const coachRow = {
+    ...friendsRow,
+    id: 'ex-coach',
+    name: 'Hack Squat',
+    createdBy: 'coach',
+    shared: { source: 'trainer', ownerName: 'Coach', inLibrary: false },
+  };
+
+  it("passes what's shared to the list and the tab counts", async () => {
+    mockShared.rows = [coachRow, friendsRow];
+    renderScreen();
+
+    await screen.findByTestId('exercise-item-ex-builtin');
+    expect(mockFetchAllExercises).toHaveBeenCalledWith(
+      expect.objectContaining({ shared: [coachRow, friendsRow] }),
+    );
+    expect(mockFetchExerciseSourceCounts).toHaveBeenCalledWith('user-1', [coachRow, friendsRow]);
+  });
+
+  it("marks a trainer's exercise, which opens nothing and can't be edited or deleted", async () => {
+    mockFetchAllExercises.mockResolvedValue([coachRow]);
+    renderScreen();
+
+    const row = await screen.findByTestId('exercise-item-ex-coach');
+    expect(screen.getByTestId('exercise-item-ex-coach-marker')).toHaveTextContent('Trainer');
+    expect(row).toHaveTextContent(/From Coach/);
+    expect(screen.queryByTestId('exercise-edit-ex-coach')).toBeNull();
+    expect(screen.queryByTestId('exercise-swipe-ex-coach')).toBeNull();
+    fireEvent.press(row);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("adds a friend's exercise to their library from its plus", async () => {
+    mockFetchAllExercises.mockResolvedValue([friendsRow]);
+    mockShared.makeOwn.mockResolvedValue({ ...friendsRow, id: 'ex-copy', shared: undefined });
+    renderScreen();
+
+    fireEvent.press(screen.getByTestId('exercise-source-friends'));
+    fireEvent.press(await screen.findByTestId('exercise-add-ex-sams'));
+
+    await waitFor(() => expect(mockShared.makeOwn).toHaveBeenCalledWith(friendsRow));
+  });
+
+  it("shows Added, with no plus, for a friend's exercise already theirs", async () => {
+    mockFetchAllExercises.mockResolvedValue([
+      { ...friendsRow, shared: { ...friendsRow.shared, inLibrary: true } },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('exercise-item-ex-sams-marker')).toHaveTextContent('Added');
+    expect(screen.queryByTestId('exercise-add-ex-sams')).toBeNull();
+  });
+
+  it('says what the Friends tab is for while nothing is there', async () => {
+    mockFetchAllExercises.mockResolvedValue([]);
+    renderScreen();
+
+    fireEvent.press(screen.getByTestId('exercise-source-friends'));
+
+    expect(await screen.findByTestId('exercise-library-empty')).toHaveTextContent(
+      'Nothing from friends yet',
+    );
+  });
+
+  it("shows the Friends tab's own error when what's shared can't be read", async () => {
+    mockShared.error = 'Network request failed';
+    renderScreen();
+
+    fireEvent.press(screen.getByTestId('exercise-source-friends'));
+
+    expect(await screen.findByTestId('exercise-library-error')).toHaveTextContent(
+      /Network request failed/,
+    );
   });
 });

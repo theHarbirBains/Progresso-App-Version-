@@ -252,6 +252,73 @@ const builtinSquat = {
   created_by: null,
 };
 
+describe('shared exercises in the library', () => {
+  const allParams = { userId: 'user-1', search: '', muscleGroup: null, source: 'all' as const };
+  const shared = (
+    id: string,
+    name: string,
+    source: 'trainer' | 'client' | 'friend',
+    inLibrary = false,
+  ) => ({
+    id,
+    name,
+    muscleGroup: 'back' as const,
+    movementType: 'bilateral' as const,
+    loggingStyle: null,
+    measurementType: 'weight_reps' as const,
+    photoUrl: null,
+    isActive: true,
+    createdBy: `owner-${id}`,
+    shared: { source, ownerName: 'Sam', inLibrary },
+  });
+  const coachRow = shared('ex-coach', 'Cable Row', 'trainer');
+  const clientHad = shared('ex-client', 'Hack Squat', 'client', true);
+  const friendRow = shared('ex-friend', 'Arm Blaster Curl', 'friend');
+
+  it("puts a trainer's and a client's in All, A-Z among your own -- less any already yours", async () => {
+    mockQueryBuilder({ data: [builtinSquat, customBenchPress], error: null });
+
+    const rows = await fetchAllExercises({
+      ...allParams,
+      shared: [coachRow, clientHad, friendRow],
+    });
+
+    expect(rows.map((row) => row.id)).toEqual(['ex-builtin', 'ex-coach', 'ex-mine']);
+  });
+
+  it("keeps friends' to their own tab, and others' out of Mine and Built-in", async () => {
+    mockQueryBuilder({ data: [builtinSquat, customBenchPress], error: null });
+    const withShared = { shared: [coachRow, clientHad, friendRow] };
+
+    const friends = await fetchAllExercises({ ...allParams, ...withShared, source: 'friends' });
+    const mine = await fetchAllExercises({ ...allParams, ...withShared, source: 'mine' });
+    const builtin = await fetchAllExercises({ ...allParams, ...withShared, source: 'builtin' });
+
+    expect(friends.map((row) => row.id)).toEqual(['ex-friend']);
+    expect(mine.map((row) => row.id)).toEqual(['ex-mine']);
+    expect(builtin.map((row) => row.id)).toEqual(['ex-builtin']);
+  });
+
+  it('never shows an exercise only readable through a group or a client link as your own', async () => {
+    const clientsOwn = { ...customBenchPress, id: 'ex-clients', created_by: 'client-a' };
+    mockQueryBuilder({ data: [builtinSquat, customBenchPress, clientsOwn], error: null });
+
+    const rows = await fetchAllExercises(allParams);
+    const counts = await fetchExerciseSourceCounts('user-1');
+
+    expect(rows.map((row) => row.id)).toEqual(['ex-builtin', 'ex-mine']);
+    expect(counts).toEqual({ all: 2, builtin: 1, mine: 1, friends: 0 });
+  });
+
+  it("counts a trainer's or client's in All and friends' in Friends", async () => {
+    mockQueryBuilder({ data: [builtinSquat, customBenchPress], error: null });
+
+    const counts = await fetchExerciseSourceCounts('user-1', [coachRow, clientHad, friendRow]);
+
+    expect(counts).toEqual({ all: 3, builtin: 1, mine: 1, friends: 1 });
+  });
+});
+
 describe('fetchExerciseDetails', () => {
   function mockOne(result: {
     data: Record<string, unknown> | null;
@@ -417,7 +484,7 @@ describe('fetchExerciseSourceCounts', () => {
 
     const result = await fetchExerciseSourceCounts('user-1');
 
-    expect(result).toEqual({ all: 2, builtin: 1, mine: 1 });
+    expect(result).toEqual({ all: 2, builtin: 1, mine: 1, friends: 0 });
     expect(mockFrom).toHaveBeenCalledTimes(1);
   });
 
@@ -427,7 +494,7 @@ describe('fetchExerciseSourceCounts', () => {
     await fetchAllExercises({ userId: 'user-1', search: '', muscleGroup: null, source: 'all' });
     const counts = await fetchExerciseSourceCounts('user-1');
 
-    expect(counts).toEqual({ all: 2, builtin: 1, mine: 1 });
+    expect(counts).toEqual({ all: 2, builtin: 1, mine: 1, friends: 0 });
     expect(mockFrom).toHaveBeenCalledTimes(1);
   });
 

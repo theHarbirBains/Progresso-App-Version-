@@ -74,3 +74,38 @@ export function updateExercise(
     body: JSON.stringify(input),
   });
 }
+
+/** How someone's library is shared with you: your trainer's, a client's, or someone you follow. */
+export type ShareSource = 'trainer' | 'client' | 'friend';
+
+/** Someone else's custom exercise, shared with you (GET /exercises/shared). */
+export interface SharedExerciseResponse extends ExerciseResponse {
+  source: ShareSource;
+  owner: {
+    id: string;
+    username: string | null;
+    displayName: string | null;
+    avatarUrl: string | null;
+  };
+  /** You already have one of your own by that name at that gym. */
+  inLibrary: boolean;
+}
+
+/** The custom exercises your trainer, your clients and the people you follow share with you. */
+export async function fetchSharedExercises(accessToken: string): Promise<SharedExerciseResponse[]> {
+  const result = await request<{ exercises: SharedExerciseResponse[] }>(
+    '/api/v1/exercises/shared',
+    accessToken,
+  );
+  return result.exercises;
+}
+
+/**
+ * Makes a shared exercise yours -- your own by that name at that gym, or a copy in your library
+ * (with its photo, gym, how it feels and handle). A built-in or your own comes back as it is.
+ */
+export function copyExercise(accessToken: string, id: string): Promise<ExerciseResponse> {
+  return request<ExerciseResponse>(`/api/v1/exercises/${id}/copy`, accessToken, {
+    method: 'POST',
+  });
+}
