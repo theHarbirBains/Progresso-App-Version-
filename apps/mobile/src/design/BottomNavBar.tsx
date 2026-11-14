@@ -1,6 +1,8 @@
 import { StyleSheet, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useAppTheme } from '../theme/appThemeContext';
 import { GlassBackground } from './GlassBackground';
+import { HolidayLights } from './HolidayDecorations';
 import { Text } from './Text';
 import { colors, minTouchTarget, spacing, typeScale } from './theme';
 
@@ -119,6 +121,7 @@ export function BottomNavBar({
   onLayout,
   testID,
 }: Props) {
+  const { decorating } = useAppTheme();
   const personal: NavItem[] = [
     {
       destination: 'feed',
@@ -172,6 +175,8 @@ export function BottomNavBar({
       accessibilityRole="tablist"
     >
       <GlassBackground variant="chrome" bordered={false} />
+      {/* Through the holidays, lights along the top (Settings > Appearance > Holiday Decorations). */}
+      {decorating ? <HolidayLights /> : null}
       {items.map((item) => {
         const selected = item.destination === active;
         const color = selected ? (item.accentColor ?? neutralAccentColor) : colors.textSecondary;

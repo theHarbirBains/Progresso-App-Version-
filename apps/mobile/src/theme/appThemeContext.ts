@@ -19,13 +19,18 @@ export interface AppThemeValue {
   /** Picks a theme -- which also stops following the seasons, or the pick would never show. */
   choose: (id: AppThemeId) => void;
   setFollowSeasons: (on: boolean) => void;
-  /** Whether it's the holidays (theme/snowSeason.ts), when Snowfall can be switched on and off. */
+  /** Whether it's the holidays (theme/snowSeason.ts), when Snowfall and Decorations can be switched on and off. */
   snowSeason: boolean;
   /** The person's Snowfall switch -- on unless they turned it off. */
   snowfall: boolean;
   /** Whether snow is falling over the app now: in season, with the switch on. */
   snowing: boolean;
   setSnowfall: (on: boolean) => void;
+  /** The person's Holiday Decorations switch -- on unless they turned it off. */
+  decorations: boolean;
+  /** Whether the decorations show now (design/HolidayDecorations.tsx): in season, with the switch on. */
+  decorating: boolean;
+  setDecorations: (on: boolean) => void;
 }
 
 const defaultTheme = themeById(DEFAULT_THEME_ID);
@@ -43,6 +48,9 @@ export const AppThemeContext = createContext<AppThemeValue>({
   snowfall: true,
   snowing: false,
   setSnowfall: () => undefined,
+  decorations: true,
+  decorating: false,
+  setDecorations: () => undefined,
 });
 
 export function useAppTheme(): AppThemeValue {

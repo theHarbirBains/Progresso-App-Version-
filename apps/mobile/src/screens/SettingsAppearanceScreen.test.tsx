@@ -108,10 +108,26 @@ describe('SettingsAppearanceScreen', () => {
     expect(screen.getByTestId('appearance-snowfall').props.value).toBe(false);
   });
 
-  it('has no Snowfall switch the rest of the year', async () => {
+  it('turns the holiday decorations off and on, apart from the snow', async () => {
+    await renderScreen();
+
+    const decorations = screen.getByTestId('appearance-decorations');
+    expect(decorations.props.value).toBe(true);
+    expect(screen.getByTestId('appearance-decorations-row')).toHaveTextContent(
+      /Holiday Decorations.*Santa hat/,
+    );
+
+    fireEvent(decorations, 'valueChange', false);
+
+    expect(screen.getByTestId('appearance-decorations').props.value).toBe(false);
+    expect(screen.getByTestId('appearance-snowfall').props.value).toBe(true);
+  });
+
+  it('has no Snowfall or Decorations switch the rest of the year', async () => {
     mockIsSnowSeason.mockReturnValue(false);
     await renderScreen();
 
     expect(screen.queryByTestId('appearance-snowfall-row')).toBeNull();
+    expect(screen.queryByTestId('appearance-decorations-row')).toBeNull();
   });
 });

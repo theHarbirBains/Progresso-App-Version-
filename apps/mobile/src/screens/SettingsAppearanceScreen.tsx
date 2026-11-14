@@ -15,8 +15,8 @@ type Props = RootStackScreenProps<'SettingsAppearance'>;
  * top of every screen and one accent -- Golden Hour Gym, the default, first -- as tiles in a grid
  * (theme/ThemeChoices, which onboarding shows too); and Change with the seasons, off unless the
  * person turns it on, which shows Spring, Summer, Autumn or Winter by the date where they live. Picking a theme turns the seasons off,
- * so a pick always shows. Through the holidays, Snowfall too -- light snow over the app, on unless
- * turned off. Applied at once, and kept on the phone.
+ * so a pick always shows. Through the holidays, Snowfall too -- light snow over the app -- and
+ * Holiday Decorations, each on unless turned off. Applied at once, and kept on the phone.
  */
 export function SettingsAppearanceScreen({ navigation }: Props) {
   const {
@@ -28,6 +28,8 @@ export function SettingsAppearanceScreen({ navigation }: Props) {
     snowSeason,
     snowfall,
     setSnowfall,
+    decorations,
+    setDecorations,
   } = useAppTheme();
 
   return (
@@ -86,6 +88,22 @@ export function SettingsAppearanceScreen({ navigation }: Props) {
                 accentColor={accent.accent}
                 onAccentColor={accent.onAccent}
                 accessibilityLabel="Snowfall"
+              />
+            }
+          />
+          <ListRow
+            testID="appearance-decorations-row"
+            icon="gift"
+            title="Holiday Decorations"
+            subtitle="A Santa hat on each page's title, and lights along the tab bar."
+            trailing={
+              <Toggle
+                testID="appearance-decorations"
+                value={decorations}
+                onValueChange={setDecorations}
+                accentColor={accent.accent}
+                onAccentColor={accent.onAccent}
+                accessibilityLabel="Holiday Decorations"
               />
             }
           />

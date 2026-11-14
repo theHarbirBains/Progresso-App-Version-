@@ -3,6 +3,8 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppTheme } from '../theme/appThemeContext';
+import { SantaHat } from './HolidayDecorations';
 import { IconButton } from './IconButton';
 import { colors, spacing, typeScale } from './theme';
 
@@ -57,6 +59,7 @@ export function AppHeader({
   testID,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { decorating } = useAppTheme();
   const left =
     leftAction ??
     (onBack
@@ -109,7 +112,16 @@ export function AppHeader({
       <View style={styles.titleColumn}>
         {titleContent ?? (
           <>
-            {title ? <Text style={styles.title}>{title}</Text> : null}
+            {title && decorating ? (
+              // Through the holidays, a Santa hat on the title's first letter (Settings >
+              // Appearance > Holiday Decorations).
+              <View style={styles.hatted}>
+                <Text style={styles.title}>{title}</Text>
+                <SantaHat style={styles.hat} />
+              </View>
+            ) : title ? (
+              <Text style={styles.title}>{title}</Text>
+            ) : null}
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </>
         )}
@@ -174,6 +186,17 @@ const styles = StyleSheet.create({
     ...typeScale.screenTitle,
     color: colors.textPrimary,
     textAlign: 'center',
+  },
+  // Only as wide as the title, so the hat lands on its first letter.
+  hatted: {
+    alignSelf: 'center',
+  },
+  // Tilted on the first letter's top-left, its trim just resting on the letter.
+  hat: {
+    position: 'absolute',
+    left: -7,
+    top: -8,
+    transform: [{ rotate: '-18deg' }],
   },
   subtitle: {
     ...typeScale.body,

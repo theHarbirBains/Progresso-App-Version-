@@ -225,6 +225,9 @@ describe('ScreenBackdrop in a theme', () => {
           snowfall: true,
           snowing: false,
           setSnowfall: () => undefined,
+          decorations: true,
+          decorating: false,
+          setDecorations: () => undefined,
         }}
       >
         <ScreenBackdrop>{children}</ScreenBackdrop>

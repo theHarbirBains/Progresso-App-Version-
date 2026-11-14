@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { Decorated } from '../testUtils/decorated';
 import { BottomNavBar } from './BottomNavBar';
 
 const baseProps = {
@@ -23,6 +24,24 @@ describe('BottomNavBar', () => {
     expect(screen.getByTestId('bottom-nav-nutrition')).toBeTruthy();
     expect(screen.getByTestId('bottom-nav-progress')).toBeTruthy();
     expect(screen.getByTestId('bottom-nav-you')).toBeTruthy();
+  });
+
+  it('hangs lights along the top through the holidays, with the decorations on', () => {
+    const hidden = { includeHiddenElements: true };
+    const { unmount } = render(<BottomNavBar {...baseProps} active="feed" />);
+    expect(screen.queryByTestId('holiday-lights', hidden)).toBeNull();
+    unmount();
+
+    render(
+      <Decorated>
+        <BottomNavBar {...baseProps} active="feed" />
+      </Decorated>,
+    );
+
+    expect(screen.getByTestId('holiday-lights', hidden)).toBeTruthy();
+    // The tabs work as ever beneath them.
+    fireEvent.press(screen.getByTestId('bottom-nav-train'));
+    expect(baseProps.onNavigateTrain).toHaveBeenCalled();
   });
 
   it('marks the active destination as selected', () => {

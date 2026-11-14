@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
+import { Decorated } from '../testUtils/decorated';
 import { AppHeader } from './AppHeader';
 
 describe('AppHeader', () => {
@@ -22,6 +23,36 @@ describe('AppHeader', () => {
     expect(StyleSheet.flatten(screen.getByText('Your history').props.style).textAlign).toBe(
       'center',
     );
+  });
+
+  describe('holiday decorations', () => {
+    const hidden = { includeHiddenElements: true };
+
+    it('puts a Santa hat on the title through the holidays, with the switch on', () => {
+      render(
+        <Decorated>
+          <AppHeader title="Workouts" subtitle="Your history" />
+        </Decorated>,
+      );
+
+      expect(screen.getByTestId('santa-hat', hidden)).toBeTruthy();
+      // The title reads and centres as ever.
+      expect(StyleSheet.flatten(screen.getByText('Workouts').props.style).textAlign).toBe('center');
+      expect(screen.getByText('Your history')).toBeTruthy();
+    });
+
+    it('has no hat otherwise, or with no title to sit on', () => {
+      const { unmount } = render(<AppHeader title="Workouts" />);
+      expect(screen.queryByTestId('santa-hat', hidden)).toBeNull();
+      unmount();
+
+      render(
+        <Decorated>
+          <AppHeader titleContent={<Text>Switcher</Text>} />
+        </Decorated>,
+      );
+      expect(screen.queryByTestId('santa-hat', hidden)).toBeNull();
+    });
   });
 
   it('renders a Back button and calls onBack when pressed', () => {

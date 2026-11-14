@@ -13,6 +13,8 @@ interface Saved {
   followSeasons: boolean;
   /** Snow over the app through the holidays: on unless turned off. */
   snowfall: boolean;
+  /** The holiday decorations (a Santa hat on titles, lights on the tab bar): on unless turned off. */
+  decorations: boolean;
 }
 
 /**
@@ -28,6 +30,7 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
     themeId: DEFAULT_THEME_ID,
     followSeasons: false,
     snowfall: true,
+    decorations: true,
   });
   const [loaded, setLoaded] = useState(false);
 
@@ -38,11 +41,15 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         const parsed: unknown = raw ? JSON.parse(raw) : null;
         if (!cancelled && parsed && typeof parsed === 'object') {
-          const { themeId, followSeasons, snowfall } = parsed as Record<string, unknown>;
+          const { themeId, followSeasons, snowfall, decorations } = parsed as Record<
+            string,
+            unknown
+          >;
           setSaved({
             themeId: isAppThemeId(themeId) ? themeId : DEFAULT_THEME_ID,
             followSeasons: followSeasons === true,
             snowfall: snowfall !== false,
+            decorations: decorations !== false,
           });
         }
       } catch {
@@ -82,6 +89,9 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
       snowfall: saved.snowfall,
       snowing: snowSeason && saved.snowfall,
       setSnowfall: (on) => save({ ...saved, snowfall: on }),
+      decorations: saved.decorations,
+      decorating: snowSeason && saved.decorations,
+      setDecorations: (on) => save({ ...saved, decorations: on }),
     };
   }, [saved, country, loaded, save]);
 

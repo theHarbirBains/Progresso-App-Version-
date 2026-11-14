@@ -46,6 +46,7 @@ describe('AppThemeProvider', () => {
         themeId: 'forest',
         followSeasons: false,
         snowfall: true,
+        decorations: true,
       }),
     );
   });
@@ -167,6 +168,42 @@ describe('AppThemeProvider', () => {
       await waitFor(() => expect(result.current.loaded).toBe(true));
 
       expect(result.current).toMatchObject({ snowSeason: false, snowfall: true, snowing: false });
+    });
+
+    it('decorates through the holidays, on unless turned off, apart from the snow', async () => {
+      on(new Date(2026, 11, 20));
+      const { result } = renderHook(() => useAppTheme(), { wrapper });
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+
+      expect(result.current).toMatchObject({ decorations: true, decorating: true });
+
+      act(() => result.current.setDecorations(false));
+
+      expect(result.current).toMatchObject({ decorating: false, snowing: true });
+      await waitFor(async () =>
+        expect(JSON.parse((await AsyncStorage.getItem(KEY))!)).toMatchObject({
+          decorations: false,
+          snowfall: true,
+        }),
+      );
+    });
+
+    it('keeps the decorations off once turned off, and never decorates out of season', async () => {
+      on(new Date(2027, 0, 3));
+      await AsyncStorage.setItem(
+        KEY,
+        JSON.stringify({ themeId: 'winter', followSeasons: false, decorations: false }),
+      );
+      const first = renderHook(() => useAppTheme(), { wrapper });
+      await waitFor(() => expect(first.result.current.loaded).toBe(true));
+      expect(first.result.current).toMatchObject({ decorations: false, decorating: false });
+      first.unmount();
+
+      on(new Date(2027, 6, 1));
+      await AsyncStorage.clear();
+      const { result } = renderHook(() => useAppTheme(), { wrapper });
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+      expect(result.current).toMatchObject({ decorations: true, decorating: false });
     });
   });
 });
