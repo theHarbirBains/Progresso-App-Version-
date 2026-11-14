@@ -104,34 +104,79 @@ describe('ExerciseFormScreen (create mode)', () => {
   it("saves what sets the machine apart -- only what's filled in, trimmed", async () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Seated Leg Extension');
-    selectMuscleGroup('exercise-form-muscle-group', 'quadriceps');
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Seated Row');
+    selectMuscleGroup('exercise-form-muscle-group', 'back');
     fireEvent.changeText(screen.getByTestId('exercise-form-gym'), ' Downtown ');
-    fireEvent.changeText(
-      screen.getByTestId('exercise-form-feel'),
-      'Heavier than the other one in this gym',
-    );
+    fireEvent.changeText(screen.getByTestId('exercise-form-attachment'), ' Wide grip ');
     fireEvent.press(screen.getByTestId('exercise-form-save'));
 
     await waitFor(() =>
       expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
-        name: 'Seated Leg Extension',
-        muscleGroup: 'quadriceps',
+        name: 'Seated Row',
+        muscleGroup: 'back',
         movementType: 'bilateral',
         measurementType: 'weight_reps',
         gym: 'Downtown',
-        feelNotes: 'Heavier than the other one in this gym',
+        attachment: 'Wide grip',
       }),
     );
   });
 
-  it('explains each box plainly, and only the name is required', () => {
+  it('explains each box plainly, and only the name is required -- with no note on how it feels', () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
     expect(screen.getByText('The only thing you have to fill in.')).toBeTruthy();
-    expect(screen.getByText(/feel heavier or lighter than other machines like it/)).toBeTruthy();
-    expect(screen.getByText('Which bar or handle you use on it.')).toBeTruthy();
+    expect(screen.getByText('Tell This Machine Apart (Optional)')).toBeTruthy();
+    expect(
+      screen.getByText(/Two machines can do the same thing but feel heavier or lighter/),
+    ).toBeTruthy();
+    expect(screen.getByText(/The easiest way to tell it apart/)).toBeTruthy();
     expect(screen.getByTestId('exercise-form-attachment')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-form-feel')).toBeNull();
+    expect(screen.queryByText(/How It Feels/)).toBeNull();
+  });
+
+  it('offers common grips to tap -- and says why a grip matters, and what neutral means', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    selectMuscleGroup('exercise-form-muscle-group', 'back');
+
+    expect(screen.getByText('Grip or Handle')).toBeTruthy();
+    expect(screen.getByText(/a wide grip works your upper back more/)).toBeTruthy();
+    expect(screen.getByTestId('exercise-form-grip-glossary')).toHaveTextContent(
+      /Neutral: palms face each other/,
+    );
+
+    fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Neutral grip'));
+    expect(screen.getByTestId('exercise-form-attachment').props.value).toBe('Neutral grip');
+    expect(
+      screen.getByTestId('exercise-form-grip-choices-Neutral grip').props.accessibilityState
+        .selected,
+    ).toBe(true);
+
+    // Tapping it again clears it.
+    fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Neutral grip'));
+    expect(screen.getByTestId('exercise-form-attachment').props.value).toBe('');
+  });
+
+  it('asks where the feet go for a leg machine, with its own choices', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    selectMuscleGroup('exercise-form-muscle-group', 'quadriceps');
+
+    expect(screen.getByText('Foot Position')).toBeTruthy();
+    expect(screen.getByText(/feet high works your glutes and hamstrings more/)).toBeTruthy();
+    expect(screen.queryByTestId('exercise-form-grip-glossary')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Feet high'));
+    expect(screen.getByTestId('exercise-form-attachment').props.value).toBe('Feet high');
+  });
+
+  it('shows a typed grip that is one of the choices as chosen', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-attachment'), 'v-handle');
+
+    expect(
+      screen.getByTestId('exercise-form-grip-choices-V-handle').props.accessibilityState.selected,
+    ).toBe(true);
   });
 
   it('creates a unilateral exercise with logging_style set automatically -- never asked as its own question', async () => {
@@ -364,7 +409,6 @@ describe('ExerciseFormScreen (edit mode)', () => {
         measurementType: 'weight_reps',
         isActive: true,
         gym: null,
-        feelNotes: null,
         attachment: null,
       }),
     );

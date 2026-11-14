@@ -1483,10 +1483,10 @@ describe('Create Custom Exercise from Add Exercise', () => {
     fireEvent.press(await screen.findByTestId('exercise-picker-create-custom'));
 
     // The picker closes and the full New Exercise screen (with its own
-    // Machine Photo section) replaces the active workout in its place.
+    // Tell This Machine Apart section, photo and all) replaces the active workout in its place.
     expect(screen.queryByTestId('exercise-search')).toBeNull();
     expect(await screen.findByText('New Exercise')).toBeTruthy();
-    expect(screen.getByText('Machine Photo (Optional)')).toBeTruthy();
+    expect(screen.getByText('Tell This Machine Apart (Optional)')).toBeTruthy();
 
     mockCreateExercise.mockResolvedValue({ id: 'ex-new' });
     mockFetchExercises.mockResolvedValue([

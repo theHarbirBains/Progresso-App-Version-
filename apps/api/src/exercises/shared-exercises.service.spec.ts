@@ -147,8 +147,9 @@ describe('SharedExercisesService', () => {
         owner: { id: 'sam', displayName: 'Sam' },
         gym: 'Fit4Less Downtown',
         attachment: 'V-handle',
-        feelNotes: 'Heavier than the one at home',
       });
+      // An old note on how it feels stays with its owner.
+      expect(shared[2]).not.toHaveProperty('feelNotes');
       // A tracked client is no one to share with: its exercises aren't read.
       expect(sharedRead(client).in).toHaveBeenCalledWith('created_by', [
         'coach',
@@ -211,7 +212,6 @@ describe('SharedExercisesService', () => {
             measurement_type: 'weight_reps',
             photo_url: 'https://example.com/row.jpg',
             gym: 'Fit4Less Downtown',
-            feel_notes: 'Heavier than the one at home',
             attachment: 'V-handle',
           },
         },
@@ -230,6 +230,21 @@ describe('SharedExercisesService', () => {
 
       await expect(service.copy('user-1', 'ex-coach')).resolves.toMatchObject({ id: 'ex-mine' });
       expect(client.inserts).toEqual([]);
+    });
+
+    it('makes a copy when their same-named exercise is held another way', async () => {
+      const client = createMockClient();
+      client.queue('exercises', { data: exerciseRow('ex-coach', 'coach'), error: null });
+      queueSharers(client);
+      client.queue('exercises', {
+        data: [exerciseRow('ex-mine', 'user-1', { attachment: 'Wide grip' })],
+        error: null,
+      });
+      client.queue('exercises', { data: exerciseRow('ex-copy', 'user-1'), error: null });
+      const service = serviceWith(client);
+
+      await expect(service.copy('user-1', 'ex-coach')).resolves.toMatchObject({ id: 'ex-copy' });
+      expect(client.inserts).toHaveLength(1);
     });
 
     it('returns a built-in, or one of their own, as it is', async () => {

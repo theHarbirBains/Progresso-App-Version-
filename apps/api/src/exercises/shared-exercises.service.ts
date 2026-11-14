@@ -12,8 +12,8 @@ import { toExerciseRecord, type ExerciseRecord } from './exercises.service';
 /** How someone's library is shared with this person. */
 export type ShareSource = 'trainer' | 'client' | 'friend';
 
-/** Someone else's custom exercise, shared with this person. */
-export interface SharedExercise extends ExerciseRecord {
+/** Someone else's custom exercise, shared with this person -- never their old notes on it. */
+export interface SharedExercise extends Omit<ExerciseRecord, 'feelNotes'> {
   source: ShareSource;
   owner: FollowUserSummary;
   /** This person already has one of their own by that name at that gym. */
@@ -22,9 +22,26 @@ export interface SharedExercise extends ExerciseRecord {
 
 const UNIQUE_VIOLATION = '23505';
 
-/** A custom exercise's identity in a library: its name and gym, as the unique index has it. */
-function libraryKey(row: { name: string; gym: string | null }): string {
-  return `${row.name.trim().toLowerCase()}\u0000${(row.gym ?? '').trim().toLowerCase()}`;
+/**
+ * One machine in a library: its name, gym and grip (case and spaces aside) and its photo -- as
+ * the database's exercise_machine_key has it. Two of a person's exercises may share a name, told
+ * apart by these.
+ */
+function libraryKey(row: {
+  name: string;
+  gym: string | null;
+  attachment: string | null;
+  photoUrl: string | null;
+}): string {
+  const text = (value: string | null) => (value ?? '').trim().toLowerCase();
+  return [text(row.name), text(row.gym), text(row.attachment), row.photoUrl ?? ''].join('\u001f');
+}
+
+/** An exercise as it's shared: everything but an old note on how it feels. */
+function withoutNotes(record: ExerciseRecord): Omit<ExerciseRecord, 'feelNotes'> {
+  const shared: Partial<ExerciseRecord> = { ...record };
+  delete shared.feelNotes;
+  return shared as Omit<ExerciseRecord, 'feelNotes'>;
 }
 
 /**
@@ -120,7 +137,7 @@ export class SharedExercisesService {
 
     const mine = new Set(own.map(libraryKey));
     return ((exercisesResult.data ?? []) as Record<string, unknown>[]).map((row) => {
-      const exercise = toExerciseRecord(row);
+      const exercise = withoutNotes(toExerciseRecord(row));
       const ownerId = exercise.createdBy as string;
       return {
         ...exercise,
@@ -137,9 +154,10 @@ export class SharedExercisesService {
   }
 
   /**
-   * Makes a shared exercise this user's own: their exercise by that name at that gym if they have
-   * one, otherwise a copy of it in their library -- its name, muscle, movement, what it measures,
-   * photo, gym, how it feels and handle. A built-in, or one already theirs, is returned as it is.
+   * Makes a shared exercise this user's own: their own of the very same machine (its name, gym,
+   * grip and photo) if they have one, otherwise a copy of it in their library -- its name, muscle,
+   * movement, what it measures, photo, gym and grip. A built-in, or one already theirs, is
+   * returned as it is.
    */
   async copy(userId: string, exerciseId: string): Promise<ExerciseRecord> {
     const client = this.supabaseService.getClient();
@@ -173,7 +191,6 @@ export class SharedExercisesService {
         measurement_type: source.measurementType,
         photo_url: source.photoUrl,
         gym: source.gym,
-        feel_notes: source.feelNotes,
         attachment: source.attachment,
       })
       .select('*')

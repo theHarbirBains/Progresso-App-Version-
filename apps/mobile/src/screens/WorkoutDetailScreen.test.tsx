@@ -204,20 +204,6 @@ describe('WorkoutDetailScreen', () => {
     expect(screen.queryByTestId('exercise-card-we2')).toBeNull();
   });
 
-  it('says how an exercise feels next to others like it, when its owner said', async () => {
-    mockFetchWorkoutDetail.mockResolvedValue({
-      ...workout,
-      exercises: [{ ...workout.exercises[0], feelNotes: 'Heavier than the one at home' }],
-    });
-    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
-      wrapper: ProfileProvider,
-    });
-
-    expect(await screen.findByTestId('exercise-feel-we1')).toHaveTextContent(
-      'Heavier than the one at home',
-    );
-  });
-
   it('shows a pound user volume as a whole number, never a decimal like 3149.9', async () => {
     // 225 lb x 8 and 135 lb x 10, stored in kg (rounded to 2dp, as the
     // database does) -- the true total is 3,150 lb.

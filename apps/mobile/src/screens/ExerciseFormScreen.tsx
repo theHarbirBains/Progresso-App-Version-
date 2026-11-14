@@ -5,6 +5,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { DestructiveButton, PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { PhotoLightbox } from '../design/PhotoLightbox';
+import { FilterChips } from '../design/FilterChips';
+import { chosenGrip, gripFieldFor } from '../exercises/gripChoices';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { SegmentedControl } from '../design/SegmentedControl';
@@ -45,10 +47,10 @@ type Props = {
 // it's unilateral (one plain yes/no toggle -- logging_style, which only
 // distinguishes HOW a unilateral exercise's sets are entered and never
 // changes any actual behavior, is set to 'single_side' automatically rather
-// than asked as a second question), and an optional photo of the
-// machine/equipment, shown as a thumbnail in the Exercise Library. The photo
-// is editable at any time, not just at create -- unlike the rest of this
-// form, its own section renders identically for both modes.
+// than asked as a second question), and, optionally, what tells this
+// machine apart from look-alikes: its photo (shown beside it everywhere), its
+// gym, and how it's held -- a grip or handle, or for a leg machine where the
+// feet go (exercises/gripChoices.ts) -- with the common ones to tap.
 export function ExerciseFormScreen(props: Props) {
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
@@ -68,11 +70,9 @@ export function ExerciseFormScreen(props: Props) {
     props.mode === 'edit' ? props.exercise.measurementType : 'weight_reps',
   );
   const [isActive] = useState(props.mode === 'edit' ? props.exercise.isActive : true);
-  // What sets this machine apart from others like it -- all optional.
+  // What sets this machine apart from others like it -- all optional. A note on how it feels,
+  // saved by an older version, is left as it was: the photo does that job now.
   const [gym, setGym] = useState(props.mode === 'edit' ? (props.exercise.gym ?? '') : '');
-  const [feelNotes, setFeelNotes] = useState(
-    props.mode === 'edit' ? (props.exercise.feelNotes ?? '') : '',
-  );
   const [attachment, setAttachment] = useState(
     props.mode === 'edit' ? (props.exercise.attachment ?? '') : '',
   );
@@ -91,6 +91,8 @@ export function ExerciseFormScreen(props: Props) {
   const [photoLightboxOpen, setPhotoLightboxOpen] = useState(false);
 
   const canSave = name.trim().length > 0 && muscleGroup !== null && !saving;
+  // Hands for most exercises; feet for a leg machine.
+  const gripField = gripFieldFor(muscleGroup);
 
   async function handleSave() {
     if (!accessToken || !muscleGroup || !canSave) return;
@@ -109,7 +111,6 @@ export function ExerciseFormScreen(props: Props) {
       // A blank box is nothing: cleared on an edit, left out on a new exercise.
       const details = {
         gym: gym.trim() || null,
-        feelNotes: feelNotes.trim() || null,
         attachment: attachment.trim() || null,
       };
 
@@ -254,49 +255,21 @@ export function ExerciseFormScreen(props: Props) {
         </View>
       </View>
 
-      {/* The same exercise feels heavier or lighter on a different machine, so progress is only
-          comparable on the same one: these tell look-alike machines apart. */}
-      <Section title="About This Machine (Optional)">
+      {/* Two machines can do the same thing but be heavier or lighter, and a different grip
+          changes the muscles worked and the weight lifted -- so progress is only comparable on
+          the same machine, held the same way. These tell look-alikes apart; two can even share a
+          name. */}
+      <Section title="Tell This Machine Apart (Optional)">
         <View style={styles.photo}>
           <Text style={styles.helperText}>
-            The same exercise can feel heavier or lighter on a different machine. These help you
-            keep tracking on the same one.
+            Two machines can do the same thing but feel heavier or lighter. Add what makes this one
+            yours, so you always compare the same machine.
           </Text>
-          <TextInput
-            testID="exercise-form-gym"
-            label="Gym"
-            placeholder="e.g. Fit4Less Downtown"
-            helperText="Where this machine is. It shows under the name, so two machines with the same name are easy to tell apart."
-            value={gym}
-            onChangeText={setGym}
-            maxLength={60}
-          />
-          <TextInput
-            testID="exercise-form-feel"
-            label="How It Feels"
-            placeholder="e.g. Heavier than the one at my other gym"
-            helperText="Does it feel heavier or lighter than other machines like it -- here, or at other gyms?"
-            value={feelNotes}
-            onChangeText={setFeelNotes}
-            multiline
-            maxLength={300}
-          />
-          <TextInput
-            testID="exercise-form-attachment"
-            label="Handle or Attachment"
-            placeholder="e.g. Wide bar, V-handle, Rope"
-            helperText="Which bar or handle you use on it."
-            value={attachment}
-            onChangeText={setAttachment}
-            maxLength={60}
-          />
-        </View>
-      </Section>
 
-      <Section title="Machine Photo (Optional)">
-        <View style={styles.photo}>
-          <Text style={styles.helperText}>Shown next to this exercise in your library.</Text>
-
+          <Text style={styles.fieldLabel}>Photo</Text>
+          <Text style={styles.helperText}>
+            The easiest way to tell it apart. It shows next to this exercise everywhere.
+          </Text>
           {photo.shown ? (
             <View style={styles.photoPreviewRow}>
               <TouchableOpacity
@@ -340,6 +313,46 @@ export function ExerciseFormScreen(props: Props) {
               {photo.error}
             </Text>
           ) : null}
+
+          <TextInput
+            testID="exercise-form-gym"
+            label="Gym"
+            placeholder="e.g. Fit4Less Downtown"
+            helperText="Where this machine is. It shows under the name."
+            value={gym}
+            onChangeText={setGym}
+            maxLength={60}
+          />
+
+          <View style={styles.grip}>
+            <TextInput
+              testID="exercise-form-attachment"
+              label={gripField.label}
+              placeholder={gripField.placeholder}
+              helperText={gripField.helper}
+              value={attachment}
+              onChangeText={setAttachment}
+              maxLength={60}
+            />
+            {/* The common ones, to tap instead of typing; tapping the one chosen clears it. */}
+            <FilterChips
+              testID="exercise-form-grip-choices"
+              options={gripField.choices.map((choice) => ({ value: choice, label: choice }))}
+              value={chosenGrip(gripField, attachment)}
+              onChange={(choice) =>
+                setAttachment((current) =>
+                  chosenGrip(gripField, current) === choice ? '' : choice,
+                )
+              }
+              accentColor={accentColor}
+              onAccentColor={onAccentColor}
+            />
+            {gripField.glossary ? (
+              <Text testID="exercise-form-grip-glossary" style={styles.helperText}>
+                {gripField.glossary}
+              </Text>
+            ) : null}
+          </View>
         </View>
       </Section>
 
@@ -418,6 +431,9 @@ const styles = StyleSheet.create({
   },
   photo: {
     gap: spacing.md,
+  },
+  grip: {
+    gap: spacing.sm,
   },
   photoPreviewRow: {
     flexDirection: 'row',

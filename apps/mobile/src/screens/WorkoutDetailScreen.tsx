@@ -442,11 +442,6 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                 <Text testID={`exercise-muscle-${exercise.id}`} style={styles.exerciseMuscle}>
                   {machineLine(exercise, MUSCLE_GROUP_LABELS[exercise.muscleGroup])}
                 </Text>
-                {exercise.feelNotes ? (
-                  <Text testID={`exercise-feel-${exercise.id}`} style={styles.exerciseFeel}>
-                    {exercise.feelNotes}
-                  </Text>
-                ) : null}
               </View>
               {type === 'weight_reps' && isOwn ? (
                 <Feather name="chevron-right" size={18} color={colors.textMuted} />

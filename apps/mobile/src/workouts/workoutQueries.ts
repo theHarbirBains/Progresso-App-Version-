@@ -83,8 +83,6 @@ export interface WorkoutExerciseWithSets {
   /** Its gym and handle, when it has them: with the photo, which machine it is. */
   gym?: string | null;
   attachment?: string | null;
-  /** How it feels next to others like it, when its owner said (About This Machine). */
-  feelNotes?: string | null;
   muscleGroup: MuscleGroup;
   movementType: MovementType;
   loggingStyle: LoggingStyle | null;
@@ -231,7 +229,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
   const { data: workoutExercises, error: weError } = await supabase
     .from('workout_exercises')
     .select(
-      `id, exercise_id, order_index, measurement_type, exercises(name, muscle_group, movement_type, logging_style, feel_notes, ${MACHINE_COLUMNS})`,
+      `id, exercise_id, order_index, measurement_type, exercises(name, muscle_group, movement_type, logging_style, ${MACHINE_COLUMNS})`,
     )
     .eq('workout_id', workoutId)
     .is('deleted_at', null)
@@ -270,14 +268,12 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
       photo_url: string | null;
       gym: string | null;
       attachment: string | null;
-      feel_notes: string | null;
     } | null;
     return {
       id: we.id,
       exerciseId: we.exercise_id,
       exerciseName: embedded?.name ?? '',
       ...machineDetailsOf(embedded),
-      feelNotes: embedded?.feel_notes ?? null,
       muscleGroup: embedded?.muscle_group ?? 'other',
       movementType: embedded?.movement_type ?? 'bilateral',
       loggingStyle: embedded?.logging_style ?? null,

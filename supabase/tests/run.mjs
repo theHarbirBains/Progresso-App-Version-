@@ -546,7 +546,8 @@ async function main() {
     return res.rows[0].id;
   });
 
-  // A deleted custom exercise (deactivated) frees its name, but an active duplicate is still refused.
+  // Two machines may share a name -- told apart by their photo, gym and grip -- and a deleted
+  // one's name is free too.
   const reusable = await asUserCommitted(userA, async (client) => {
     const res = await client.query(
       "insert into public.exercises (name, muscle_group, created_by) values ('Reusable Name Check', 'biceps', $1) returning id",
@@ -554,16 +555,14 @@ async function main() {
     );
     return res.rows[0].id;
   });
-  await expectThrows(
-    asUserCommitted(userA, (client) =>
-      client.query(
-        "insert into public.exercises (name, muscle_group, created_by) values ('Reusable Name Check', 'biceps', $1)",
-        [userA],
-      ),
+  // Succeeds, or the insert throws and the run stops here.
+  await asUserCommitted(userA, (client) =>
+    client.query(
+      "insert into public.exercises (name, muscle_group, created_by) values ('Reusable Name Check', 'biceps', $1)",
+      [userA],
     ),
-    'A second active custom exercise with the same name is refused',
-    /duplicate key|unique/i,
   );
+  record('A second custom exercise may have the same name', true);
   await admin.query('update public.exercises set is_active = false where id = $1', [reusable]);
   // Succeeds, or the insert throws and the run stops here.
   await asUserCommitted(userA, (client) =>
@@ -575,7 +574,8 @@ async function main() {
   console.log('[PASS] After a custom exercise is deleted, its name can be used again');
 
   // ---- what sets a machine apart: gym, how it feels, its handle ----
-  // The same name at two gyms is two machines; at the same gym it's still one.
+  // The same name at two gyms is two machines -- and at the same gym too, told apart by their
+  // photo and grip.
   await admin.query(
     `insert into public.exercises (name, muscle_group, created_by, gym, feel_notes, attachment)
      values ('Leg Extension Gym Check', 'quadriceps', $1, 'Downtown', 'Feels heavier than Gym B', null),
@@ -583,13 +583,27 @@ async function main() {
     [userA],
   );
   record('The same exercise name can be used at two different gyms', true);
-  await expectThrows(
-    admin.query(
-      "insert into public.exercises (name, muscle_group, created_by, gym) values ('Leg Extension Gym Check', 'quadriceps', $1, 'downtown')",
-      [userA],
-    ),
-    'The same exercise name at the same gym is still refused',
-    /duplicate key|unique/i,
+  await admin.query(
+    "insert into public.exercises (name, muscle_group, created_by, gym, attachment) values ('Leg Extension Gym Check', 'quadriceps', $1, 'downtown', 'Toes in')",
+    [userA],
+  );
+  record('The same exercise name can be used twice at the same gym', true);
+  const machineKeys = (
+    await admin.query(
+      `select public.exercise_machine_key(' Lat Pulldown ', 'Downtown', 'Wide grip', 'a.jpg') =
+              public.exercise_machine_key('lat pulldown', 'downtown ', 'WIDE GRIP', 'a.jpg') as same,
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', 'Wide grip', 'a.jpg') =
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', 'Close grip', 'a.jpg') as other_grip,
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, 'a.jpg') =
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, 'b.jpg') as other_photo`,
+    )
+  ).rows[0];
+  record(
+    'One machine is its name, gym, grip and photo -- case and spaces aside',
+    machineKeys.same === true &&
+      machineKeys.other_grip === false &&
+      machineKeys.other_photo === false,
+    JSON.stringify(machineKeys),
   );
   await expectThrows(
     admin.query(
@@ -2840,6 +2854,31 @@ async function main() {
     JSON.stringify(copyCount.rows[0]),
   );
 
+  // Same name, same gym, another grip: another machine -- the client's own is left alone.
+  const trainerCloseGrip = randomUUID();
+  const clientsCloseGrip = randomUUID();
+  await admin.query(
+    `insert into public.exercises (id, created_by, name, muscle_group, movement_type, gym, attachment) values
+       ($1, $2, 'Grip Check Row', 'back', 'bilateral', 'Gym B', 'Wide grip'),
+       ($3, $4, 'Grip Check Row', 'back', 'bilateral', 'Gym B', 'Close grip')`,
+    [trainerCloseGrip, T, clientsCloseGrip, C],
+  );
+  const gripLogged = await logFor(T, C, logPayload(trainerCloseGrip, twoSets));
+  const gripUsed = (
+    await admin.query(
+      `select e.id, e.attachment from public.workout_exercises we
+       join public.exercises e on e.id = we.exercise_id where we.workout_id = $1`,
+      [gripLogged.rows[0].id],
+    )
+  ).rows;
+  record(
+    "A client's same-named machine with another grip is never used for the trainer's",
+    gripUsed.length === 1 &&
+      gripUsed[0].id !== clientsCloseGrip &&
+      gripUsed[0].attachment === 'Wide grip',
+    JSON.stringify(gripUsed),
+  );
+
   const attributedSets = await admin.query(
     `select count(*)::int as count, bool_and(s.logged_by = $2) as all_attributed
      from public.sets s join public.workout_exercises we on we.id = s.workout_exercise_id
@@ -3411,9 +3450,12 @@ async function main() {
     [mergeClaimant, mergePlaceholder],
   );
   const ownCopy = randomUUID();
+  const ownOtherGrip = randomUUID();
   await admin.query(
-    "insert into public.exercises (id, created_by, name, muscle_group, movement_type, gym) values ($1, $2, 'Gym B Chest Machine', 'chest', 'bilateral', 'Gym B')",
-    [ownCopy, mergeClaimant],
+    `insert into public.exercises (id, created_by, name, muscle_group, movement_type, gym, attachment, photo_url) values
+       ($1, $2, 'Gym B Chest Machine', 'chest', 'bilateral', 'Gym B', 'Wide bar', 'https://example.test/gym-b.jpg'),
+       ($3, $2, 'Gym B Chest Machine', 'chest', 'bilateral', 'Gym B', 'Close grip', null)`,
+    [ownCopy, mergeClaimant, ownOtherGrip],
   );
   await trackPlaceholder(mergePlaceholder, 'code-hash-3');
   await logFor(T, mergePlaceholder, logPayload(trainerCustom, twoSets));
@@ -3427,7 +3469,7 @@ async function main() {
     [mergeClaimant],
   );
   record(
-    'When the client already has the same exercise, the history uses their own copy',
+    'When the client already has the same machine, the history uses their own copy -- not a same-named one with another grip',
     mergedUse.rows.length === 1 && mergedUse.rows[0].exercise_id === ownCopy,
     JSON.stringify(mergedUse.rows),
   );
