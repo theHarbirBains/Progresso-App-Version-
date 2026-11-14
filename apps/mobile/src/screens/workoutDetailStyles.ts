@@ -48,6 +48,12 @@ export const workoutDetailStyles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  // How it feels next to others like it (About This Machine), quieter than the line above.
+  exerciseFeel: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
   // The heaviest logged set, called out on its own raised block above the list.
   topSetBlock: {
     marginTop: spacing.sm,

@@ -7,6 +7,7 @@ import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { TextButton } from '../design/Button';
 import { Badge } from '../design/Badge';
+import { FilterChips } from '../design/FilterChips';
 import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
@@ -38,6 +39,7 @@ import {
   type WorkoutDetail,
 } from '../workouts/workoutQueries';
 import { formatCardDuration } from '../workouts/workoutFormat';
+import { workoutMuscleTabs, type MuscleTab } from '../workouts/workoutMuscleTabs';
 import { formatVolume, volumeInUnit } from '../workouts/workoutSummary';
 import { workoutDetailStyles as styles } from './workoutDetailStyles';
 import { SkeletonCards } from '../design/Skeleton';
@@ -124,6 +126,8 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   // Everyone's workout in the group this one was part of; null when it wasn't one.
   const [people, setPeople] = useState<GroupWorkoutPerson[] | null>(null);
   const [selectedId, setSelectedId] = useState(workoutId);
+  // Which muscle group's exercises show, as in the live workout; All to start.
+  const [muscleTab, setMuscleTab] = useState<MuscleTab>('all');
   // Records belong to the workout's owner: a trainer looking at a client's reads the client's.
   const ownerId = clientId ?? userId;
 
@@ -248,6 +252,15 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const muscles = Array.from(
     new Set(shown.exercises.map((e) => MUSCLE_GROUP_LABELS[e.muscleGroup])),
   ).join(' • ');
+  // One tab per primary muscle group the workout trained, in the order they were first done --
+  // all of them from the start, since it's done. Another person's workout in a group has its own;
+  // a tab they didn't train shows All.
+  const muscleTabs = workoutMuscleTabs(shown.exercises);
+  const activeTab: MuscleTab =
+    muscleTab !== 'all' && muscleTabs.includes(muscleTab) ? muscleTab : 'all';
+  const shownExercises = loggedByExercise.filter(
+    ({ exercise }) => activeTab === 'all' || exercise.muscleGroup === activeTab,
+  );
 
   return (
     <Screen
@@ -340,7 +353,21 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         </View>
       </AppCard>
 
-      {loggedByExercise.map(({ exercise, type, sets: exerciseSets }) => {
+      {muscleTabs.length > 0 ? (
+        <FilterChips<MuscleTab>
+          testID="workout-detail-muscle-tabs"
+          options={[
+            { value: 'all', label: 'All' },
+            ...muscleTabs.map((muscle) => ({ value: muscle, label: MUSCLE_GROUP_LABELS[muscle] })),
+          ]}
+          value={activeTab}
+          onChange={setMuscleTab}
+          accentColor={theme.accent}
+          onAccentColor={theme.onAccent}
+        />
+      ) : null}
+
+      {shownExercises.map(({ exercise, type, sets: exerciseSets }) => {
         // A workout's history view only ever shows sets that were actually
         // logged -- a blank/incomplete set left over from a live session
         // that was completed anyway is not real performance data.
@@ -379,6 +406,11 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                 <Text testID={`exercise-muscle-${exercise.id}`} style={styles.exerciseMuscle}>
                   {machineLine(exercise, MUSCLE_GROUP_LABELS[exercise.muscleGroup])}
                 </Text>
+                {exercise.feelNotes ? (
+                  <Text testID={`exercise-feel-${exercise.id}`} style={styles.exerciseFeel}>
+                    {exercise.feelNotes}
+                  </Text>
+                ) : null}
               </View>
               {type === 'weight_reps' && isOwn ? (
                 <Feather name="chevron-right" size={18} color={colors.textMuted} />
