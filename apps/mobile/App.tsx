@@ -570,8 +570,9 @@ function Root() {
 // logo up for as long as it actually takes.
 function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { status } = useAuth();
-  // The chosen theme is read before anything shows, so the default never flashes first.
-  const { loaded: themeLoaded } = useAppTheme();
+  // The chosen theme is read before anything shows, so the default never flashes first -- and
+  // the launch screen wears it as soon as it's read.
+  const { loaded: themeLoaded, theme } = useAppTheme();
   const ready = fontsLoaded && status !== 'loading' && themeLoaded;
 
   return (
@@ -584,7 +585,7 @@ function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
           *seen* pre-sign-in -- a plain flat theme fill, no glow, no mode. */}
       <AppBackgroundLayer showAtmosphere={false} />
       {ready ? <Root /> : null}
-      <LaunchScreen ready={ready} />
+      <LaunchScreen ready={ready} theme={themeLoaded ? theme : null} />
     </View>
   );
 }

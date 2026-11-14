@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Image, StyleSheet } from 'react-native';
+import { Animated, Image, StyleSheet, View } from 'react-native';
 import { colors } from '../design/theme';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
+import { withAlpha } from '../theme/accentColor';
+import type { AppTheme } from '../theme/appThemes';
 
-const wood = require('../../assets/launch-wood.jpg');
 const logo = require('../../assets/progresso-mark-light.png');
 
 // The mark's own picture is 720 x 598 (the P with room for its shadow).
@@ -11,30 +12,34 @@ const LOGO_WIDTH = 260;
 const LOGO_HEIGHT = Math.round((LOGO_WIDTH * 598) / 720);
 
 interface Props {
-  /** True once fonts are loaded and the auth session check has resolved. */
+  /** True once fonts are loaded, the auth session check has resolved and the theme is read. */
   ready: boolean;
+  /** The theme on this phone, once it's read; null until then. */
+  theme: AppTheme | null;
 }
 
 // The branded launch state shown every time the app opens, while fonts load and the Supabase
-// session check resolves: the app icon, full screen -- the sunlit wood planks edge to edge, with
-// the white P (and its soft shadow) centred on them. Full-bleed on purpose: the logo is centred
-// in the entire screen, not the safe area -- a splash has nothing pinned near an edge, so
-// there's no hardcoded offset to replace with useSafeAreaInsets here (unlike every real
-// screen's Screen).
+// session check resolves: the white P (and its soft shadow) centred full screen, over the photo
+// of the theme chosen on this phone. Full-bleed on purpose: the logo is centred in the entire
+// screen, not the safe area -- a splash has nothing pinned near an edge, so there's no
+// hardcoded offset to replace with useSafeAreaInsets here (unlike every real screen's Screen).
 //
-// The wood is there from the first frame (it takes over from the native splash, which is the
-// wood's own colour with the same P); only the P eases in, growing slightly. Under Reduce Motion
-// the P simply appears.
+// It takes over from the native splash -- the same P on the flat warm brown, which can't know
+// the theme, since it shows before any of the app runs -- with that same brown, so the hand-over
+// can't be seen; the theme is read a moment later (AppThemeProvider), and its photo eases in
+// behind the P under a light shade that keeps the P clear. The P eases in too, growing
+// slightly. Under Reduce Motion both simply appear.
 //
 // Stays mounted for the app's whole lifetime rather than unmounting after its exit fade: once
 // `ready` is true it settles at opacity 0 with pointerEvents "none", so it's invisible and
 // inert -- cheaper and simpler than tearing it down, and avoids a state update racing the
 // animation's completion callback.
-export function LaunchScreen({ ready }: Props) {
+export function LaunchScreen({ ready, theme }: Props) {
   const reduceMotion = useReduceMotionPreference();
   const opacity = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.92)).current;
+  const photoOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (reduceMotion) {
@@ -47,6 +52,16 @@ export function LaunchScreen({ ready }: Props) {
       Animated.timing(scale, { toValue: 1, duration: 450, useNativeDriver: true }),
     ]).start();
   }, [reduceMotion, logoOpacity, scale]);
+
+  const hasTheme = theme !== null;
+  useEffect(() => {
+    if (!hasTheme) return;
+    if (reduceMotion) {
+      photoOpacity.setValue(1);
+      return;
+    }
+    Animated.timing(photoOpacity, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+  }, [hasTheme, reduceMotion, photoOpacity]);
 
   useEffect(() => {
     if (!ready) return;
@@ -62,7 +77,20 @@ export function LaunchScreen({ ready }: Props) {
       pointerEvents="none"
       style={[styles.container, { opacity }]}
     >
-      <Image testID="launch-wood" source={wood} resizeMode="cover" style={styles.wood} />
+      {theme ? (
+        <Animated.View
+          testID="launch-photo"
+          style={[StyleSheet.absoluteFill, { opacity: photoOpacity }]}
+        >
+          <Image
+            testID="launch-photo-image"
+            source={theme.photo}
+            resizeMode="cover"
+            style={styles.photo}
+          />
+          <View style={[StyleSheet.absoluteFill, styles.shade]} />
+        </Animated.View>
+      ) : null}
       <Animated.Image
         testID="launch-logo"
         source={logo}
@@ -84,14 +112,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  wood: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  photo: {
     width: '100%',
     height: '100%',
+  },
+  // Enough to keep the white P clear over a bright sky or snow; the P has its own shadow too.
+  shade: {
+    backgroundColor: withAlpha(colors.background, 0.35),
   },
   logo: {
     width: LOGO_WIDTH,
