@@ -25,6 +25,7 @@ import { progressStyles as styles } from '../progress/progressStyles';
 import { useMembership } from '../membership/useMembership';
 import { StepsSection } from '../progress/StepsSection';
 import { TopSetsSection } from '../progress/TopSetsSection';
+import { EditTopSetSheet, type TopSetToEdit } from '../progress/EditTopSetSheet';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { groupByExercise } from '../workouts/allExerciseHistoryQueries';
 
@@ -79,6 +80,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
     statsError,
     prsLoading,
     prsError,
+    refetch,
   } = useAllTimeStats();
   const loading = statsLoading || prsLoading;
   const error = statsError ?? prsError;
@@ -88,6 +90,8 @@ export function ProgressOverviewScreen({ navigation }: Props) {
   const [allTimeView, setAllTimeView] = useState<'workouts' | 'nutrition'>('workouts');
   const membership = useMembership();
   const { profile } = useProfile();
+  // A top set opened to fix it (Top Sets' pencil); saving reads the history and PRs again.
+  const [editing, setEditing] = useState<TopSetToEdit | null>(null);
   // This week's and last week's summaries, read once as Progress opens.
   const { summaries: weekSummaries, error: weekError } = useWeeklySummaries();
 
@@ -197,6 +201,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 accentColor={theme.accent}
                 onAccentColor={theme.onAccent}
                 navigation={navigation}
+                onEdit={setEditing}
               />
             ) : null}
 
@@ -249,6 +254,14 @@ export function ProgressOverviewScreen({ navigation }: Props) {
           </AppCard>
         </RiseIn>
       </RiseInGroup>
+      <EditTopSetSheet
+        target={editing}
+        weightUnit={weightUnit}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+        onClose={() => setEditing(null)}
+        onSaved={() => void refetch()}
+      />
     </Screen>
   );
 }

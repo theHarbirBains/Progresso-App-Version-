@@ -11,6 +11,7 @@ function set(
     weightKg: 100,
     reps: 5,
     performedAt,
+    setId: 'set-1',
     workoutExerciseId: 'we1',
     exerciseId: 'ex-1',
     exerciseName: 'Bench Press',

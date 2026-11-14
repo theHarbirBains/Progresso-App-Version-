@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
@@ -18,6 +19,8 @@ import { fetchExerciseSetHistory, type HistoricalSet } from '../workouts/exercis
 import { summarizeProgress, topSetProgressionDetailed } from '../workouts/exerciseProgress';
 import { fetchOneRepMax, fetchRepPRs, type OneRepMax, type RepPR } from '../workouts/prQueries';
 import { deriveMilestones } from '../workouts/progressMilestones';
+import { EditTopSetSheet, type TopSetToEdit } from '../progress/EditTopSetSheet';
+import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 
 type Props = RootStackScreenProps<'ProgressExerciseDetail'>;
 
@@ -34,12 +37,16 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
+  // A fixed top set changes Progress's shared history and PRs too.
+  const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoricalSet[]>([]);
   const [repPRs, setRepPRs] = useState<RepPR[]>([]);
   const [oneRepMax, setOneRepMax] = useState<OneRepMax | null>(null);
+  // A workout's top set opened to fix it; saving reads the page again.
+  const [editing, setEditing] = useState<TopSetToEdit | null>(null);
   // Only the very first load for this exerciseId should replace the whole
   // screen with a spinner -- every later call (the focus listener below) is
   // a background refresh, same pattern as DashboardScreen/ProfileScreen.
@@ -149,25 +156,41 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
           ) : null}
 
           <Section title="Top Sets">
-            {recentTopSets.map((point, index) => (
-              <View
-                key={point.workoutExerciseId}
-                testID={`progress-exercise-detail-top-set-${index}`}
-                style={[styles.workoutTopSetRow, index > 0 && styles.workoutTopSetDivider]}
-              >
-                <Text style={styles.workoutTopSetDate}>
-                  {new Date(point.performedAt).toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </Text>
-                <Text style={styles.workoutTopSetValue}>
-                  {formatWeight(roundWeight(fromKg(point.weightKg, weightUnit)))}
-                  {weightUnit} × {point.reps}
-                </Text>
-              </View>
-            ))}
+            {recentTopSets.map((point, index) => {
+              const date = new Date(point.performedAt).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              });
+              const value = `${formatWeight(roundWeight(fromKg(point.weightKg, weightUnit)))}${weightUnit} × ${point.reps}`;
+              return (
+                // Tapping a workout's top set opens it to fix, when it was logged wrong.
+                <TouchableOpacity
+                  key={point.workoutExerciseId}
+                  testID={`progress-exercise-detail-top-set-${index}`}
+                  style={[styles.workoutTopSetRow, index > 0 && styles.workoutTopSetDivider]}
+                  onPress={() =>
+                    setEditing({
+                      setId: point.setId,
+                      exerciseName,
+                      performedAt: point.performedAt,
+                      weightKg: point.weightKg,
+                      reps: point.reps,
+                    })
+                  }
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${date}, ${value}`}
+                  accessibilityHint="Opens it to edit"
+                >
+                  <Text style={styles.workoutTopSetDate}>{date}</Text>
+                  <View style={styles.workoutTopSetEnd}>
+                    <Text style={styles.workoutTopSetValue}>{value}</Text>
+                    <Feather name="edit-2" size={14} color={colors.textMuted} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </Section>
 
           <Section title="Best Performances">
@@ -208,6 +231,17 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
           ) : null}
         </>
       )}
+      <EditTopSetSheet
+        target={editing}
+        weightUnit={weightUnit}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          void load();
+          void refetchAllTimeStats();
+        }}
+      />
     </Screen>
   );
 }

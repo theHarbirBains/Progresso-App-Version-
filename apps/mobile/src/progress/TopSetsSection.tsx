@@ -10,7 +10,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import type { HistoricalSetWithExercise } from '../workouts/allExerciseHistoryQueries';
 import { ProgressEmptyState } from './ProgressEmptyState';
 import { progressStyles as styles } from './progressStyles';
-import { computeTopSets } from './topSets';
+import { computeTopSets, type TopSetRow as TopSet } from './topSets';
 import { TopSetRow } from './TopSetRow';
 
 type Navigation = RootStackScreenProps<'ProgressOverview'>['navigation'];
@@ -21,6 +21,13 @@ interface Props {
   accentColor: string;
   onAccentColor: string;
   navigation: Navigation;
+  /** Opens a top set to fix it (EditTopSetSheet); without it, top sets can't be edited here. */
+  onEdit?: (topSet: TopSet) => void;
+  /**
+   * Whether tapping a row opens the exercise's own Progress page -- the signed-in person's.
+   * A trainer's view of a client turns it off: that page would show the trainer's own sets.
+   */
+  opensExercise?: boolean;
 }
 
 const ItemSeparator = () => <View style={styles.separator} />;
@@ -36,6 +43,8 @@ export function TopSetsSection({
   accentColor,
   onAccentColor,
   navigation,
+  onEdit,
+  opensExercise = true,
 }: Props) {
   const [search, setSearch] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(null);
@@ -111,12 +120,16 @@ export function TopSetsSection({
               reps={item.reps}
               unit={weightUnit}
               accentColor={accentColor}
-              onPress={() =>
-                navigation.navigate('ProgressExerciseDetail', {
-                  exerciseId: item.exerciseId,
-                  exerciseName: item.exerciseName,
-                })
+              onPress={
+                opensExercise
+                  ? () =>
+                      navigation.navigate('ProgressExerciseDetail', {
+                        exerciseId: item.exerciseId,
+                        exerciseName: item.exerciseName,
+                      })
+                  : undefined
               }
+              onEdit={onEdit ? () => onEdit(item) : undefined}
             />
           )}
         />

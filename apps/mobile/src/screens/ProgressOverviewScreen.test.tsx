@@ -19,6 +19,7 @@ import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
 import { ProgressOverviewScreen } from './ProgressOverviewScreen';
+import { updateSet } from '../workouts/workoutQueries';
 import { fetchMyProfile } from '../profile/profileQueries';
 
 jest.mock('../profile/profileQueries', () => ({
@@ -38,6 +39,10 @@ jest.mock('../workouts/prSummaryQueries', () => ({
   fetchAllExerciseRecords: jest.fn().mockResolvedValue([]),
   fetchAllRepPRs: jest.fn(),
   fetchAllOneRepMaxes: jest.fn(),
+}));
+
+jest.mock('../workouts/workoutQueries', () => ({
+  updateSet: jest.fn(),
 }));
 
 jest.mock('../progress/weeklySummaryQueries', () => ({
@@ -114,6 +119,7 @@ const benchHistory = [
     movementType: 'bilateral',
   },
   {
+    setId: 'set-heavy',
     weightKg: 120,
     reps: 5,
     performedAt: '2026-02-15T12:00:00Z',
@@ -446,6 +452,27 @@ describe('ProgressOverviewScreen background refresh from the shared cache', () =
 
     expect(screen.queryByTestId('progress-overview-loading')).toBeNull();
     expect(screen.getByTestId('progress-overview-scroll')).toBeTruthy();
+  });
+});
+
+describe('ProgressOverviewScreen -- fixing a top set', () => {
+  it('opens a top set from its pencil, saves it to the set, and reads the history and PRs again', async () => {
+    mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
+    jest.mocked(updateSet).mockResolvedValue({} as never);
+    renderScreen();
+    await screen.findByTestId('progress-overview-scroll');
+    goToSection('TopSets');
+
+    fireEvent.press(await screen.findByTestId('progress-topset-row-ex-bench-edit'));
+    expect(screen.getByTestId('edit-top-set-summary')).toHaveTextContent(/Bench Press/);
+    fireEvent.changeText(screen.getByTestId('edit-top-set-weight'), '112.5');
+    mockFetchAllExerciseHistory.mockClear();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('edit-top-set-save'));
+    });
+
+    expect(updateSet).toHaveBeenCalledWith('set-heavy', { weightKg: 112.5, reps: 5 });
+    expect(mockFetchAllExerciseHistory).toHaveBeenCalled();
   });
 });
 

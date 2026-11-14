@@ -67,6 +67,8 @@ export function topSetProgression(sets: HistoricalSet[]): ChartPoint[] {
 export interface DetailedChartPoint extends ChartPoint {
   reps: number;
   workoutExerciseId: string;
+  /** The set it is -- what editing that workout's top set changes. */
+  setId: string;
 }
 
 export function topSetProgressionDetailed(sets: HistoricalSet[]): DetailedChartPoint[] {
@@ -75,6 +77,7 @@ export function topSetProgressionDetailed(sets: HistoricalSet[]): DetailedChartP
     weightKg: s.weightKg,
     reps: s.reps,
     workoutExerciseId: s.workoutExerciseId,
+    setId: s.setId,
   }));
 }
 

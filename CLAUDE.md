@@ -76,7 +76,7 @@ No caching library is used or needed — every rule below is built on plain Reac
 
 ## Key Domain Concepts (do not conflate these)
 
-- **Top set:** heaviest weight completed for an exercise within one specific workout.
+- **Top set:** heaviest weight completed for an exercise within one specific workout. It's never stored: editing one (`progress/EditTopSetSheet.tsx`, for a top set logged wrong -- from Progress's Top Sets, an exercise's own page, or a trainer's view of an active client) changes the set itself in that workout, so the PR triggers and every figure follow; a trainer's edit goes through their RLS and is recorded (`set.edited`) like any other.
 - **Rep-count PR:** heaviest weight ever logged for an exercise at a specific rep count.
 - **True 1RM:** only ever comes from a logged set of exactly 1 rep. Never estimated from higher-rep sets. Lives in a dedicated "Maxes" section.
 - **Progression cue:** a suggestion, never a record. Each person has one rep range (`users.rep_range_min`/`rep_range_max`). When a set reaches the top of it, the next time that exercise is done its slide in Last Time's Sets says to go up ("Hit 10! Go up to 77.5 lb today."); short of the top nothing is said -- never "bad" or "go lighter". Worked out in the app from logged sets (`workouts/progression.ts`); it never changes a weight, a PR or a Top Set.

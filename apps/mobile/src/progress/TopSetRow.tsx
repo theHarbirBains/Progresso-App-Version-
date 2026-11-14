@@ -1,7 +1,7 @@
 import { TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
-import { colors } from '../design/theme';
+import { colors, minTouchTarget } from '../design/theme';
 import { progressStyles as styles } from './progressStyles';
 import { formatWeight } from '../lib/units';
 
@@ -13,6 +13,8 @@ interface Props {
   unit: 'kg' | 'lb';
   accentColor: string;
   onPress?: () => void;
+  /** Opens the top set to fix it, when it was logged wrong: a pencil beside the figure. */
+  onEdit?: () => void;
   testID?: string;
 }
 
@@ -32,6 +34,7 @@ export function TopSetRow({
   unit,
   accentColor,
   onPress,
+  onEdit,
   testID,
 }: Props) {
   return (
@@ -59,7 +62,23 @@ export function TopSetRow({
             </Text>
             <Text style={styles.topSetCaption}>Top Set</Text>
           </View>
-          <Feather name="chevron-right" size={20} color={colors.textMuted} />
+          {onEdit ? (
+            <TouchableOpacity
+              testID={testID ? `${testID}-edit` : undefined}
+              onPress={onEdit}
+              style={{
+                minWidth: minTouchTarget,
+                minHeight: minTouchTarget,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${exerciseName}'s top set`}
+            >
+              <Feather name="edit-2" size={16} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
+          {onPress ? <Feather name="chevron-right" size={20} color={colors.textMuted} /> : null}
         </View>
       </View>
     </TouchableOpacity>

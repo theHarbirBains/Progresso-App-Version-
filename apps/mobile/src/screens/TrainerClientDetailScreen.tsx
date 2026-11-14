@@ -33,6 +33,7 @@ import { OverviewSection } from '../progress/OverviewSection';
 import { CLIENT_PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
 import { progressStyles } from '../progress/progressStyles';
 import { TopSetsSection } from '../progress/TopSetsSection';
+import { EditTopSetSheet, type TopSetToEdit } from '../progress/EditTopSetSheet';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import {
   fetchClientPersonalRecords,
@@ -106,6 +107,8 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
   const [tab, setTab] = useState<Tab>('workouts');
   const [progressSection, setProgressSection] = useState<ProgressSection>('Overview');
   const [manageOpen, setManageOpen] = useState(false);
+  // A client's top set opened to fix it -- only while the link is active, as RLS requires.
+  const [editing, setEditing] = useState<TopSetToEdit | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -513,6 +516,8 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                     accentColor={theme.accent}
                     onAccentColor={theme.onAccent}
                     navigation={progressNavigation}
+                    opensExercise={false}
+                    onEdit={canLog ? setEditing : undefined}
                   />
                 ) : null}
 
@@ -599,6 +604,14 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
           />
         </View>
       </BottomSheet>
+      <EditTopSetSheet
+        target={editing}
+        weightUnit={CLIENT_WEIGHT_UNIT}
+        accentColor={theme.accent}
+        onAccentColor={theme.onAccent}
+        onClose={() => setEditing(null)}
+        onSaved={() => void load()}
+      />
     </Screen>
   );
 }

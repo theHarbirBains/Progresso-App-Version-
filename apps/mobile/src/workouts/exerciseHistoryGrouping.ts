@@ -30,6 +30,7 @@ export function groupByExercise(sets: HistoricalSetWithExercise[]): ExerciseHist
       groups.set(s.exerciseId, group);
     }
     group.sets.push({
+      setId: s.setId,
       weightKg: s.weightKg,
       reps: s.reps,
       performedAt: s.performedAt,

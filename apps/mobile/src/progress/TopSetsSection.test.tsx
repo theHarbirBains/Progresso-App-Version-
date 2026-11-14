@@ -15,6 +15,7 @@ function set(overrides: Partial<HistoricalSetWithExercise> = {}): HistoricalSetW
     weightKg: 100,
     reps: 8,
     performedAt: '2026-01-01T12:00:00Z',
+    setId: 'set-1',
     workoutExerciseId: 'we1',
     ...overrides,
   };
@@ -195,5 +196,48 @@ describe('TopSetsSection', () => {
 
     expect(screen.getByTestId('progress-topsets-list').props.data).toHaveLength(1);
     expect(screen.getByTestId('progress-topset-row-ex-row')).toHaveTextContent(/45kg.*6/);
+  });
+
+  it('offers a pencil on each top set that opens the set behind it to edit', () => {
+    const onEdit = jest.fn();
+    render(
+      <TopSetsSection
+        history={[set({ setId: 'set-heavy', weightKg: 120 }), set({ setId: 'set-light' })]}
+        weightUnit="kg"
+        accentColor="#2F80FF"
+        onAccentColor="#FFFFFF"
+        navigation={navigation}
+        onEdit={onEdit}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('progress-topset-row-ex-bench-edit'));
+
+    expect(onEdit).toHaveBeenCalledWith(
+      expect.objectContaining({ setId: 'set-heavy', weightKg: 120, reps: 8 }),
+    );
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('has no pencil without a way to edit', () => {
+    renderTopSets();
+    expect(screen.queryByTestId('progress-topset-row-ex-bench-edit')).toBeNull();
+  });
+
+  it("doesn't open the signed-in person's own exercise page where it's turned off", () => {
+    render(
+      <TopSetsSection
+        history={history}
+        weightUnit="kg"
+        accentColor="#2F80FF"
+        onAccentColor="#FFFFFF"
+        navigation={navigation}
+        opensExercise={false}
+        onEdit={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('progress-topset-row-ex-bench'));
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

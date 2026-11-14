@@ -101,7 +101,13 @@ describe('rankExercisesByVolume', () => {
       exerciseId: 'ex-1',
       exerciseName: 'Barbell Squat',
       sets: [
-        { weightKg: 100, reps: 5, performedAt: '2026-01-01T00:00:00Z', workoutExerciseId: 'we1' },
+        {
+          setId: 'set-we1',
+          weightKg: 100,
+          reps: 5,
+          performedAt: '2026-01-01T00:00:00Z',
+          workoutExerciseId: 'we1',
+        },
       ],
       ...overrides,
     };
@@ -113,14 +119,26 @@ describe('rankExercisesByVolume', () => {
         exerciseId: 'ex-1',
         exerciseName: 'Barbell Squat',
         sets: [
-          { weightKg: 100, reps: 5, performedAt: '2026-01-01T00:00:00Z', workoutExerciseId: 'we1' },
+          {
+            setId: 'set-we1',
+            weightKg: 100,
+            reps: 5,
+            performedAt: '2026-01-01T00:00:00Z',
+            workoutExerciseId: 'we1',
+          },
         ],
       }),
       group({
         exerciseId: 'ex-2',
         exerciseName: 'Barbell Curl',
         sets: [
-          { weightKg: 20, reps: 10, performedAt: '2026-01-01T00:00:00Z', workoutExerciseId: 'we2' },
+          {
+            setId: 'set-we2',
+            weightKg: 20,
+            reps: 10,
+            performedAt: '2026-01-01T00:00:00Z',
+            workoutExerciseId: 'we2',
+          },
         ],
       }),
     ];

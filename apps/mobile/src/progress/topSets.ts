@@ -10,6 +10,8 @@ import type { HistoricalSetWithExercise } from '../workouts/allExerciseHistoryQu
 export const TOP_SET_MIN_REPS = 5;
 
 export interface TopSetRow {
+  /** The set it is, in the workout it was logged in -- what editing it changes. */
+  setId: string;
   exerciseId: string;
   exerciseName: string;
   muscleGroup: MuscleGroup;
@@ -48,6 +50,7 @@ export function computeTopSets(history: HistoricalSetWithExercise[]): TopSetRow[
         new Date(s.performedAt).getTime() > new Date(current.performedAt).getTime());
     if (isBetter) {
       bestByExercise.set(s.exerciseId, {
+        setId: s.setId,
         exerciseId: s.exerciseId,
         exerciseName: s.exerciseName,
         muscleGroup: s.muscleGroup,

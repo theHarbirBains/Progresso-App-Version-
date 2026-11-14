@@ -73,6 +73,7 @@ export async function fetchAllExerciseHistory(
     .map((s) => {
       const info = infoByWorkoutExercise.get(s.workout_exercise_id)!;
       return {
+        setId: s.id,
         weightKg: Number(s.weight_kg),
         reps: s.reps,
         performedAt: info.performedAt,

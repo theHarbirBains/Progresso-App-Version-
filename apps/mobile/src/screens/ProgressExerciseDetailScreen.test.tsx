@@ -5,6 +5,7 @@ import { fetchExerciseSetHistory } from '../workouts/exerciseHistoryQueries';
 import { fetchOneRepMax, fetchRepPRs } from '../workouts/prQueries';
 import { ProgressExerciseDetailScreen } from './ProgressExerciseDetailScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
+import { updateSet } from '../workouts/workoutQueries';
 
 jest.mock('../profile/profileQueries', () => ({
   fetchMyProfile: jest.fn(),
@@ -16,6 +17,15 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../workouts/exerciseHistoryQueries', () => ({
   fetchExerciseSetHistory: jest.fn(),
+}));
+
+jest.mock('../workouts/workoutQueries', () => ({
+  updateSet: jest.fn(),
+}));
+
+const mockRefetchAllTimeStats = jest.fn();
+jest.mock('../progress/AllTimeStatsProvider', () => ({
+  useAllTimeStats: () => ({ refetch: mockRefetchAllTimeStats }),
 }));
 
 jest.mock('../workouts/prQueries', () => ({
@@ -41,8 +51,20 @@ const navigation: any = {
 const route = { params: { exerciseId: 'ex-1', exerciseName: 'Bench Press' } } as never;
 
 const twoSessionHistory = [
-  { weightKg: 100, reps: 8, performedAt: '2026-01-01T12:00:00Z', workoutExerciseId: 'we1' },
-  { weightKg: 110, reps: 8, performedAt: '2026-02-01T12:00:00Z', workoutExerciseId: 'we2' },
+  {
+    setId: 'set-1',
+    weightKg: 100,
+    reps: 8,
+    performedAt: '2026-01-01T12:00:00Z',
+    workoutExerciseId: 'we1',
+  },
+  {
+    setId: 'set-2',
+    weightKg: 110,
+    reps: 8,
+    performedAt: '2026-02-01T12:00:00Z',
+    workoutExerciseId: 'we2',
+  },
 ];
 
 beforeEach(() => {
@@ -230,5 +252,48 @@ describe('ProgressExerciseDetailScreen background refresh on focus', () => {
       refresh.resolve([]);
       await refresh.promise;
     });
+  });
+});
+
+describe('ProgressExerciseDetailScreen -- editing a top set', () => {
+  it("opens a workout's top set, saves the fix to that set, and reads everything again", async () => {
+    mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
+    jest.mocked(updateSet).mockResolvedValue({} as never);
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    // Newest first: February's 110 kg x 8.
+    fireEvent.press(await screen.findByTestId('progress-exercise-detail-top-set-0'));
+    expect(screen.getByTestId('edit-top-set-weight').props.value).toBe('110');
+    expect(screen.getByTestId('edit-top-set-reps').props.value).toBe('8');
+
+    fireEvent.changeText(screen.getByTestId('edit-top-set-weight'), '100');
+    fireEvent.changeText(screen.getByTestId('edit-top-set-reps'), '6');
+    mockFetchExerciseSetHistory.mockClear();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('edit-top-set-save'));
+    });
+
+    expect(updateSet).toHaveBeenCalledWith('set-2', { weightKg: 100, reps: 6 });
+    expect(mockFetchExerciseSetHistory).toHaveBeenCalledWith('user-1', 'ex-1');
+    expect(mockRefetchAllTimeStats).toHaveBeenCalled();
+  });
+
+  it('keeps the sheet open with a message when the figures are not a set', async () => {
+    mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
+    jest.mocked(updateSet).mockClear();
+    render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    fireEvent.press(await screen.findByTestId('progress-exercise-detail-top-set-0'));
+    fireEvent.changeText(screen.getByTestId('edit-top-set-reps'), '');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('edit-top-set-save'));
+    });
+
+    expect(screen.getByTestId('edit-top-set-error')).toHaveTextContent(/rep count/);
+    expect(updateSet).not.toHaveBeenCalled();
   });
 });

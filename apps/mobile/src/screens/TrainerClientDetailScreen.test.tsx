@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { listTrainerClients, regenerateTrainerClaimCode } from '../lib/api';
 import { fetchClientPersonalRecords, fetchClientWorkoutFeed } from '../trainer/clientQueries';
@@ -23,6 +23,7 @@ jest.mock('../trainer/clientQueries', () => ({
 
 jest.mock('../workouts/workoutQueries', () => ({
   deleteWorkout: jest.fn().mockResolvedValue(undefined),
+  updateSet: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('../progress/useProgressTheme', () => ({
@@ -344,5 +345,65 @@ describe('TrainerClientDetailScreen -- Progress tab', () => {
     for (const missing of ['Strength', 'Nutrition', 'Steps']) {
       expect(screen.queryByTestId(`trainer-client-progress-tabs-${missing}`)).toBeNull();
     }
+  });
+});
+
+describe("TrainerClientDetailScreen -- fixing a client's top set", () => {
+  const { fetchAllExerciseHistory } = jest.requireMock('../workouts/allExerciseHistoryQueries') as {
+    fetchAllExerciseHistory: jest.Mock;
+  };
+  const { updateSet } = jest.requireMock('../workouts/workoutQueries') as {
+    updateSet: jest.Mock;
+  };
+  const squat = {
+    setId: 'client-set-1',
+    weightKg: 100,
+    reps: 5,
+    performedAt: '2026-09-01T09:00:00.000Z',
+    workoutExerciseId: 'we1',
+    exerciseId: 'squat',
+    exerciseName: 'Barbell Back Squat',
+    muscleGroup: 'quadriceps' as const,
+    movementType: 'bilateral' as const,
+  };
+
+  async function openTopSets() {
+    renderDetail();
+    await screen.findByTestId('trainer-client-workout-w1');
+    fireEvent.press(screen.getByText('Progress'));
+    fireEvent.press(await screen.findByTestId('trainer-client-progress-tabs-TopSets'));
+  }
+
+  it("saves the fix to the client's set and reads their page again", async () => {
+    fetchAllExerciseHistory.mockResolvedValue([squat]);
+    await openTopSets();
+
+    fireEvent.press(await screen.findByTestId('progress-topset-row-squat-edit'));
+    fireEvent.changeText(screen.getByTestId('edit-top-set-reps'), '3');
+    fetchAllExerciseHistory.mockClear();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('edit-top-set-save'));
+    });
+
+    // Lb on a client's page: 100 kg shows as 220.5 lb -- left as shown, it stays exactly 100 kg.
+    expect(updateSet).toHaveBeenCalledWith('client-set-1', { weightKg: 100, reps: 3 });
+    expect(fetchAllExerciseHistory).toHaveBeenCalledWith('client-1');
+  });
+
+  it("never opens the trainer's own exercise page from a client's top set", async () => {
+    fetchAllExerciseHistory.mockResolvedValue([squat]);
+    await openTopSets();
+
+    fireEvent.press(await screen.findByTestId('progress-topset-row-squat'));
+    expect(mockNavigate).not.toHaveBeenCalledWith('ProgressExerciseDetail', expect.anything());
+  });
+
+  it('offers no edit once the link has ended', async () => {
+    mockListTrainerClients.mockResolvedValue([{ ...client, status: 'ended' }]);
+    fetchAllExerciseHistory.mockResolvedValue([squat]);
+    await openTopSets();
+
+    expect(await screen.findByTestId('progress-topset-row-squat')).toBeTruthy();
+    expect(screen.queryByTestId('progress-topset-row-squat-edit')).toBeNull();
   });
 });

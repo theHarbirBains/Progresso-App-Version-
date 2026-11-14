@@ -17,7 +17,13 @@ function hs(
   performedAt: string,
   workoutExerciseId: string,
 ): HistoricalSet {
-  return { weightKg, reps, performedAt, workoutExerciseId };
+  return {
+    setId: `${workoutExerciseId}-${weightKg}x${reps}`,
+    weightKg,
+    reps,
+    performedAt,
+    workoutExerciseId,
+  };
 }
 
 describe('filterByTimeRange', () => {
@@ -158,7 +164,7 @@ describe('mostCommonRepCount', () => {
 });
 
 describe('topSetProgressionDetailed', () => {
-  it('matches topSetProgression but keeps reps and workoutExerciseId', () => {
+  it("matches topSetProgression but keeps reps, workoutExerciseId and the set's own id", () => {
     const sets = [
       hs(100, 10, '2026-01-01T00:00:00Z', 'we1'),
       hs(110, 8, '2026-01-01T00:00:00Z', 'we1'),
@@ -168,8 +174,21 @@ describe('topSetProgressionDetailed', () => {
     const result = topSetProgressionDetailed(sets);
 
     expect(result).toEqual([
-      { performedAt: '2025-12-01T00:00:00Z', weightKg: 120, reps: 5, workoutExerciseId: 'we0' },
-      { performedAt: '2026-01-01T00:00:00Z', weightKg: 110, reps: 8, workoutExerciseId: 'we1' },
+      {
+        performedAt: '2025-12-01T00:00:00Z',
+        weightKg: 120,
+        reps: 5,
+        workoutExerciseId: 'we0',
+        setId: 'we0-120x5',
+      },
+      // The heavier of we1's two sets -- the one an edit of that workout's top set changes.
+      {
+        performedAt: '2026-01-01T00:00:00Z',
+        weightKg: 110,
+        reps: 8,
+        workoutExerciseId: 'we1',
+        setId: 'we1-110x8',
+      },
     ]);
   });
 

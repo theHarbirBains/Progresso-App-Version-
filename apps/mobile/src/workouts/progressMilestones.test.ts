@@ -2,7 +2,13 @@ import type { DetailedChartPoint } from './exerciseProgress';
 import { deriveMilestones } from './progressMilestones';
 
 function point(weightKg: number, reps: number, performedAt: string): DetailedChartPoint {
-  return { weightKg, reps, performedAt, workoutExerciseId: `we-${performedAt}` };
+  return {
+    setId: `set-${performedAt}`,
+    weightKg,
+    reps,
+    performedAt,
+    workoutExerciseId: `we-${performedAt}`,
+  };
 }
 
 describe('deriveMilestones', () => {

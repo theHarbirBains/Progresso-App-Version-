@@ -18,6 +18,7 @@ function set(overrides: Partial<HistoricalSetWithExercise> = {}): HistoricalSetW
     weightKg: 100,
     reps: 5,
     performedAt: '2026-01-01T00:00:00Z',
+    setId: 'set-1',
     workoutExerciseId: 'we1',
     exerciseId: 'ex-1',
     exerciseName: 'Barbell Squat',

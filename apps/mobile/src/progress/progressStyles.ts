@@ -139,6 +139,12 @@ export const progressStyles = StyleSheet.create({
     ...typeScale.statSmall,
     color: colors.textPrimary,
   },
+  // The value and the pencil saying the row opens to edit.
+  workoutTopSetEnd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
 
   // Milestones (Progression Journey)
   milestoneRow: {

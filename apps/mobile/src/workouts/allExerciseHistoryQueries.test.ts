@@ -72,8 +72,8 @@ describe('fetchAllExerciseHistory', () => {
       },
       sets: {
         data: [
-          { workout_exercise_id: 'we1', weight_kg: '110.00', reps: 8 },
-          { workout_exercise_id: 'we2', weight_kg: '150.00', reps: 5 },
+          { id: 'set-a', workout_exercise_id: 'we1', weight_kg: '110.00', reps: 8 },
+          { id: 'set-b', workout_exercise_id: 'we2', weight_kg: '150.00', reps: 5 },
         ],
         error: null,
       },
@@ -83,6 +83,7 @@ describe('fetchAllExerciseHistory', () => {
 
     expect(result).toEqual([
       {
+        setId: 'set-b',
         weightKg: 150,
         reps: 5,
         performedAt: '2026-01-01T00:00:00Z',
@@ -93,6 +94,7 @@ describe('fetchAllExerciseHistory', () => {
         movementType: 'bilateral',
       },
       {
+        setId: 'set-a',
         weightKg: 110,
         reps: 8,
         performedAt: '2026-02-01T00:00:00Z',
@@ -258,6 +260,7 @@ describe('groupByExercise', () => {
   it('splits a combined feed back out per exercise', () => {
     const sets: HistoricalSetWithExercise[] = [
       {
+        setId: 'set-we1',
         weightKg: 110,
         reps: 8,
         performedAt: '2026-02-01T00:00:00Z',
@@ -268,6 +271,7 @@ describe('groupByExercise', () => {
         movementType: 'bilateral',
       },
       {
+        setId: 'set-we2',
         weightKg: 150,
         reps: 5,
         performedAt: '2026-01-01T00:00:00Z',
@@ -278,6 +282,7 @@ describe('groupByExercise', () => {
         movementType: 'bilateral',
       },
       {
+        setId: 'set-we3',
         weightKg: 115,
         reps: 8,
         performedAt: '2026-03-01T00:00:00Z',
@@ -295,8 +300,20 @@ describe('groupByExercise', () => {
     const bench = groups.find((g) => g.exerciseId === 'ex-bench');
     expect(bench?.exerciseName).toBe('Bench Press');
     expect(bench?.sets).toEqual([
-      { weightKg: 110, reps: 8, performedAt: '2026-02-01T00:00:00Z', workoutExerciseId: 'we1' },
-      { weightKg: 115, reps: 8, performedAt: '2026-03-01T00:00:00Z', workoutExerciseId: 'we3' },
+      {
+        setId: 'set-we1',
+        weightKg: 110,
+        reps: 8,
+        performedAt: '2026-02-01T00:00:00Z',
+        workoutExerciseId: 'we1',
+      },
+      {
+        setId: 'set-we3',
+        weightKg: 115,
+        reps: 8,
+        performedAt: '2026-03-01T00:00:00Z',
+        workoutExerciseId: 'we3',
+      },
     ]);
   });
 

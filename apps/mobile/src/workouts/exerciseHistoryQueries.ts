@@ -10,11 +10,13 @@ import { supabase } from '../lib/supabase';
  */
 export function fetchCompletedSetValues<Reps extends number | null = number | null>(
   workoutExerciseIds: string[],
-): Promise<{ workout_exercise_id: string; weight_kg: string | number | null; reps: Reps }[]> {
+): Promise<
+  { id: string; workout_exercise_id: string; weight_kg: string | number | null; reps: Reps }[]
+> {
   return fetchAllRowsForIds(workoutExerciseIds, (ids, from, to) =>
     supabase
       .from('sets')
-      .select('workout_exercise_id, weight_kg, reps', { count: 'exact' })
+      .select('id, workout_exercise_id, weight_kg, reps', { count: 'exact' })
       .in('workout_exercise_id', ids)
       .is('deleted_at', null)
       .not('completed_at', 'is', null)
@@ -32,6 +34,8 @@ export function fetchCompletedSetValues<Reps extends number | null = number | nu
 // in workoutQueries.ts, for the same reason: PostgREST embedded-table
 // filter/order support isn't relied on here.
 export interface HistoricalSet {
+  /** The set itself -- what editing a top set changes. */
+  setId: string;
   weightKg: number;
   reps: number;
   performedAt: string;
@@ -87,6 +91,7 @@ export async function fetchExerciseSetHistory(
 
   return sets
     .map((s) => ({
+      setId: s.id,
       weightKg: Number(s.weight_kg),
       reps: s.reps,
       performedAt: performedAtByWorkoutExercise.get(s.workout_exercise_id)!,
