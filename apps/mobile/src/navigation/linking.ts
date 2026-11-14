@@ -1,17 +1,21 @@
 import type { LinkingOptions } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
+import * as Notifications from 'expo-notifications';
 import { useEffect, useMemo, useRef } from 'react';
+import { notificationLink } from '../notifications/reminderScheduler';
 import type { RootStackParamList } from './types';
 
 /**
  * The screens a link can open, e.g. progresso://workouts/<id>. Each opens on top of Feed, so
- * Back lands there. A link to any other path just starts the app on Feed.
+ * Back lands there. A link to any other path just starts the app on Feed. A tapped reminder
+ * carries one of these too (notifications/reminderPlan.ts).
  */
 export const LINK_CONFIG: NonNullable<LinkingOptions<RootStackParamList>['config']> = {
   initialRouteName: 'Feed',
   screens: {
     Feed: 'feed',
     Nutrition: 'nutrition',
+    ProgressOverview: 'progress',
     NewWorkout: 'workouts/new',
     WorkoutDetail: 'workouts/:workoutId',
     ActiveWorkout: 'workouts/:workoutId/live',
@@ -37,8 +41,10 @@ const INITIAL_URL_WAIT_MS = 150;
 /**
  * The navigator's linking options. Links only open once the user is signed in: the navigator
  * only exists then, and a link that arrives while signed out is held until it does. The link
- * that launched the app is used once, so signing out and back in starts on Feed again. Call
- * from the component that stays mounted across sign-in and sign-out (App.tsx's Root).
+ * that launched the app is used once, so signing out and back in starts on Feed again. A tapped
+ * reminder opens its link the same way -- the one that launched the app, or one tapped while
+ * it's open. Call from the component that stays mounted across sign-in and sign-out (App.tsx's
+ * Root).
  */
 export function useAppLinking(signedIn: boolean): LinkingOptions<RootStackParamList> {
   const heldLink = useRef<string | null>(null);
@@ -68,9 +74,29 @@ export function useAppLinking(signedIn: boolean): LinkingOptions<RootStackParamL
         return Promise.race([
           Linking.getInitialURL(),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), INITIAL_URL_WAIT_MS)),
-        ]);
+        ]).then((url) => url ?? launchingNotificationLink());
+      },
+      subscribe: (listener: (url: string) => void) => {
+        const links = Linking.addEventListener('url', ({ url }) => listener(url));
+        const taps = Notifications.addNotificationResponseReceivedListener((response) => {
+          const url = notificationLink(response);
+          if (url) listener(url);
+        });
+        return () => {
+          links.remove();
+          taps.remove();
+        };
       },
     }),
     [],
   );
+}
+
+/** The link of the reminder whose tap launched the app, if one did. */
+function launchingNotificationLink(): string | null {
+  try {
+    return notificationLink(Notifications.getLastNotificationResponse());
+  } catch {
+    return null;
+  }
 }

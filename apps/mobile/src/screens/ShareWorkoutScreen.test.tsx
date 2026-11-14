@@ -45,6 +45,7 @@ const mockGoBack = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation: any = { goBack: mockGoBack };
 const route = { params: { workoutId: 'w1' } } as never;
+const justFinished = { params: { workoutId: 'w1', justFinished: true } } as never;
 
 const cardData = {
   workoutName: 'Push Day',
@@ -498,5 +499,71 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
 
     expectNoBareText();
     await settle();
+  });
+});
+
+describe('ShareWorkoutScreen -- cheering a new PR', () => {
+  const { scheduleNotificationAsync } = jest.requireMock('expo-notifications') as {
+    scheduleNotificationAsync: jest.Mock;
+  };
+  const { RemindersContext } = jest.requireActual(
+    '../notifications/remindersContext',
+  ) as typeof import('../notifications/remindersContext');
+  const { defaultReminderSettings } = jest.requireActual(
+    '../notifications/reminderSettings',
+  ) as typeof import('../notifications/reminderSettings');
+
+  function renderFinished(prCheers = true, routeValue: never = justFinished) {
+    const settings = defaultReminderSettings(3);
+    return render(
+      <ProfileProvider>
+        <RemindersContext.Provider
+          value={{
+            settings: { ...settings, prCheers: { on: prCheers } },
+            update: jest.fn(),
+            allowed: true,
+            refreshAllowed: jest.fn(),
+            active: true,
+          }}
+        >
+          <ShareWorkoutScreen navigation={navigation} route={routeValue} />
+        </RemindersContext.Provider>
+      </ProfileProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    scheduleNotificationAsync.mockClear();
+    mockFetchMyProfile.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@example.com',
+      role: 'user',
+      displayName: 'Harbir Bains',
+      username: null,
+      weightUnit: 'kg',
+    });
+  });
+
+  it('cheers by name as the workout is finished with a new PR', async () => {
+    renderFinished();
+
+    await waitFor(() =>
+      expect(scheduleNotificationAsync).toHaveBeenCalledWith({
+        content: {
+          title: 'KEEP GOING, HARBIR!',
+          body: 'You hit a new PR on your Push Day workout: Bench Press, 110 kg × 8.',
+        },
+        trigger: null,
+      }),
+    );
+  });
+
+  it('does not cheer a workout opened to share later, or with PR Cheers off', async () => {
+    renderFinished(true, route);
+    await screen.findByTestId('share-card', {}, { timeout: 5000 });
+    renderFinished(false);
+    await settle();
+
+    expect(scheduleNotificationAsync).not.toHaveBeenCalled();
   });
 });

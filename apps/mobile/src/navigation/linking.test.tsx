@@ -5,6 +5,7 @@ import {
 } from '@react-navigation/native-stack';
 import { act, render, screen } from '@testing-library/react-native';
 import * as Linking from 'expo-linking';
+import * as Notifications from 'expo-notifications';
 import { Text } from 'react-native';
 import { isAuthLink, LINK_CONFIG, useAppLinking } from './linking';
 import type { RootStackParamList } from './types';
@@ -16,6 +17,8 @@ describe('LINK_CONFIG', () => {
   it.each([
     ['feed', ['Feed']],
     ['nutrition', ['Feed', 'Nutrition']],
+    // The weekly summary reminder.
+    ['progress', ['Feed', 'ProgressOverview']],
     ['workouts/w-1', ['Feed', 'WorkoutDetail']],
     ['workouts/w-1/live', ['Feed', 'ActiveWorkout']],
     // The Next Workout widget's Start, and a group workout's Resume.
@@ -159,5 +162,37 @@ describe('useAppLinking', () => {
 
     expect(remove).toHaveBeenCalled();
     expect(await screen.findByText('Feed screen')).toBeTruthy();
+  });
+});
+
+describe('useAppLinking -- a tapped reminder', () => {
+  const tapped = (url: string) =>
+    ({ notification: { request: { content: { data: { url } } } } }) as never;
+
+  beforeEach(() => {
+    mockGetInitialURL.mockReset().mockResolvedValue(null);
+    jest.mocked(Notifications.getLastNotificationResponse).mockReturnValue(null);
+  });
+
+  it('opens the screen of the reminder that launched the app', async () => {
+    jest
+      .mocked(Notifications.getLastNotificationResponse)
+      .mockReturnValue(tapped('progresso://nutrition'));
+    render(<TestApp signedIn />);
+
+    expect(await screen.findByText('Nutrition screen')).toBeTruthy();
+  });
+
+  it('opens the screen of a reminder tapped while the app is open', async () => {
+    render(<TestApp signedIn />);
+    await screen.findByText('Feed screen');
+
+    const onTap = jest
+      .mocked(Notifications.addNotificationResponseReceivedListener)
+      .mock.calls.at(-1)?.[0];
+    if (!onTap) throw new Error('nothing is listening for taps');
+    act(() => onTap(tapped('progresso://workouts/w-9')));
+
+    expect(await screen.findByText('Workout w-9')).toBeTruthy();
   });
 });

@@ -14,6 +14,9 @@ import { STORY_CANVAS, STORY_CAPTURE, ShareStory } from '../sharing/ShareCard';
 import { fetchShareCardData, type ShareCardData } from '../sharing/shareCardData';
 import { shareCardStyles as styles } from '../sharing/shareCardStyles';
 import { SkeletonCards } from '../design/Skeleton';
+import { useProfile } from '../profile/ProfileProvider';
+import { useReminders } from '../notifications/remindersContext';
+import { prCheer, showPrCheer } from '../notifications/reminderScheduler';
 
 type Props = RootStackScreenProps<'ShareWorkout'>;
 
@@ -23,9 +26,13 @@ type Props = RootStackScreenProps<'ShareWorkout'>;
 // one story size and only the preview is scaled to fit the phone, so the
 // image never depends on the device. The image is made on the phone and only
 // leaves through the system share sheet, where the user picks the app (and
-// can also save it) -- nothing is uploaded.
+// can also save it) -- nothing is uploaded. Opened as the workout is finished, a new PR in it is
+// cheered with a notification ("KEEP GOING, HARBIR!"), when PR Cheers is on.
 export function ShareWorkoutScreen({ route, navigation }: Props) {
-  const { workoutId } = route.params;
+  const { workoutId, justFinished = false } = route.params;
+  const { profile } = useProfile();
+  const reminders = useReminders();
+  const cheered = useRef(false);
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
@@ -59,6 +66,16 @@ export function ShareWorkoutScreen({ route, navigation }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Once, as the finished workout's figures arrive -- the PR labels are worked out with them.
+  useEffect(() => {
+    if (!justFinished || !cardData || cheered.current) return;
+    if (!reminders.active || !reminders.settings?.prCheers.on) return;
+    cheered.current = true;
+    const firstName = profile?.displayName?.trim().split(/\s+/)[0] || null;
+    const cheer = prCheer(firstName, cardData.workoutName, cardData.topSets, weightUnit);
+    if (cheer) void showPrCheer(cheer);
+  }, [justFinished, cardData, reminders.active, reminders.settings, profile, weightUnit]);
 
   function handleStageLayout(event: LayoutChangeEvent) {
     const { width, height } = event.nativeEvent.layout;

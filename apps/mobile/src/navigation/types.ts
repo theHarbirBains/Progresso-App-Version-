@@ -36,7 +36,8 @@ export type RootStackParamList = {
   WorkoutDetail: { workoutId: string; clientId?: string; clientName?: string };
   /** clientId is set when a trainer edits one of a client's workouts. */
   EditWorkout: { workoutId: string; clientId?: string; clientName?: string };
-  ShareWorkout: { workoutId: string };
+  /** `justFinished`: opened as the workout was finished -- a new PR in it is cheered. */
+  ShareWorkout: { workoutId: string; justFinished?: boolean };
   NewWorkout: undefined;
   /**
    * `planned`: just started from a split day's plan, so its blank sets start from last time.

@@ -6,6 +6,9 @@ import { registerPushToken, unregisterPushToken, updateMyProfile } from '../lib/
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { SettingsNotificationsScreen } from './SettingsNotificationsScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
+import { MembershipContext } from '../membership/useMembership';
+import { RemindersContext, type RemindersContextValue } from '../notifications/remindersContext';
+import { defaultReminderSettings } from '../notifications/reminderSettings';
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -48,10 +51,31 @@ beforeEach(() => {
   mockGoBack.mockClear();
 });
 
-function renderScreen() {
+const mockUpdateReminders = jest.fn();
+const mockRefreshAllowed = jest.fn(async () => undefined);
+
+function reminders(overrides: Partial<RemindersContextValue> = {}): RemindersContextValue {
+  return {
+    settings: defaultReminderSettings(3),
+    update: mockUpdateReminders,
+    allowed: true,
+    refreshAllowed: mockRefreshAllowed,
+    active: true,
+    ...overrides,
+  };
+}
+
+function renderScreen(
+  remindersValue: RemindersContextValue = reminders(),
+  tier: 'workouts' | 'workouts_nutrition' | 'everything' = 'everything',
+) {
   return render(
     <ProfileProvider>
-      <SettingsNotificationsScreen navigation={navigation} route={{} as never} />
+      <MembershipContext.Provider value={tier}>
+        <RemindersContext.Provider value={remindersValue}>
+          <SettingsNotificationsScreen navigation={navigation} route={{} as never} />
+        </RemindersContext.Provider>
+      </MembershipContext.Provider>
     </ProfileProvider>,
   );
 }
@@ -149,19 +173,113 @@ describe('SettingsNotificationsScreen', () => {
     expect(await screen.findByTestId('notif-email-toggle')).toHaveProp('value', false);
   });
 
-  it('shows the granular notification categories as real Coming Soon rows, not fake toggles', async () => {
+  it('keeps social notifications a real Coming Soon row, not a fake toggle', async () => {
     renderScreen();
     await screen.findByTestId('notif-push-toggle');
 
-    expect(screen.getByTestId('notif-workout-reminders')).toHaveTextContent(/Coming Soon/);
-    expect(screen.getByTestId('notif-pr-notifications')).toHaveTextContent(/Coming Soon/);
-    expect(screen.getByTestId('notif-weekly-summary')).toHaveTextContent(/Coming Soon/);
     expect(screen.getByTestId('notif-social-notifications')).toHaveTextContent(/Coming Soon/);
+  });
+
+  it('asks the phone again once push is turned on, so the reminders can start', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, pushNotificationsOptIn: true });
+    renderScreen();
+    await screen.findByTestId('notif-push-toggle');
+
+    fireEvent(screen.getByTestId('notif-push-toggle'), 'valueChange', true);
+
+    await waitFor(() => expect(mockRefreshAllowed).toHaveBeenCalled());
   });
 
   it('renders no bare text outside <Text>', async () => {
     renderScreen();
     await screen.findByTestId('notif-push-toggle');
     expectNoBareText();
+  });
+});
+
+describe('SettingsNotificationsScreen -- reminders', () => {
+  beforeEach(() => {
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, pushNotificationsOptIn: true });
+    mockUpdateReminders.mockClear();
+  });
+
+  it('shows each reminder with its toggle, time and the workout days', async () => {
+    renderScreen();
+    await screen.findByTestId('notif-workout-toggle');
+
+    expect(screen.getByTestId('notif-workout-toggle')).toHaveProp('value', true);
+    expect(screen.getByTestId('notif-workout-time')).toHaveTextContent(/5:00 PM/);
+    expect(screen.getByTestId('notif-workout-days-label')).toHaveTextContent('Mon, Wed, Fri');
+    expect(screen.getByTestId('notif-prCheers-toggle')).toHaveProp('value', true);
+    expect(screen.getByTestId('notif-weekly-time')).toHaveTextContent(/6:00 PM/);
+    expect(screen.getByTestId('notif-meals-time')).toHaveTextContent(/12:30 PM/);
+    expect(screen.getByTestId('notif-checkIn-time')).toHaveTextContent(/8:00 PM/);
+    expectNoBareText();
+  });
+
+  it('turns a reminder off, and drops its time with it', async () => {
+    renderScreen();
+    await waitFor(() => expect(screen.getByTestId('notif-push-toggle')).toHaveProp('value', true));
+
+    fireEvent(screen.getByTestId('notif-meals-toggle'), 'valueChange', false);
+
+    expect(mockUpdateReminders).toHaveBeenCalledWith(
+      expect.objectContaining({ meals: { on: false, time: 12 * 60 + 30 } }),
+    );
+  });
+
+  it('changes the workout days from the chips', async () => {
+    renderScreen();
+    await waitFor(() => expect(screen.getByTestId('notif-push-toggle')).toHaveProp('value', true));
+
+    fireEvent.press(screen.getByTestId('notif-workout-days-6'));
+
+    expect(mockUpdateReminders).toHaveBeenCalledWith(
+      expect.objectContaining({ workout: { on: true, time: 17 * 60, days: [1, 3, 5, 6] } }),
+    );
+  });
+
+  it("chooses a reminder's time on the wheels", async () => {
+    renderScreen();
+    // Once the saved push choice is in: until then the reminders are held off.
+    await waitFor(() => expect(screen.getByTestId('notif-push-toggle')).toHaveProp('value', true));
+    fireEvent.press(screen.getByTestId('notif-checkIn-time'));
+
+    fireEvent.press(screen.getByTestId('reminder-time-hour-item-9'));
+    fireEvent.press(screen.getByTestId('reminder-time-minute-item-30'));
+    expect(screen.getByTestId('reminder-time-preview')).toHaveTextContent('9:30 PM');
+    fireEvent.press(screen.getByTestId('reminder-time-done'));
+
+    expect(mockUpdateReminders).toHaveBeenCalledWith(
+      expect.objectContaining({ checkIn: { on: true, time: 21 * 60 + 30 } }),
+    );
+  });
+
+  it('has no nutrition reminders without Nutrition in the membership', async () => {
+    renderScreen(reminders(), 'workouts');
+    await screen.findByTestId('notif-workout-toggle');
+
+    expect(screen.queryByTestId('notif-meals')).toBeNull();
+    expect(screen.queryByTestId('notif-checkIn')).toBeNull();
+    expect(screen.getByTestId('notif-prCheers')).toBeTruthy();
+  });
+
+  it('says reminders need Push Notifications, and holds them off, until it is on', async () => {
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, pushNotificationsOptIn: false });
+    renderScreen(reminders({ active: false }));
+    await screen.findByTestId('notif-workout-toggle');
+
+    expect(screen.getByTestId('notif-reminders-need-push')).toBeTruthy();
+    expect(screen.getByTestId('notif-workout-toggle')).toHaveProp('disabled', true);
+  });
+
+  it("says when the phone doesn't allow notifications, with a way to its Settings", async () => {
+    renderScreen(reminders({ allowed: false, active: false }));
+
+    expect(await screen.findByTestId('notif-reminders-blocked')).toHaveTextContent(
+      /turned off for Progresso/,
+    );
+    expect(screen.getByTestId('notif-open-settings')).toBeTruthy();
+    expect(screen.getByTestId('notif-workout-toggle')).toHaveProp('disabled', true);
   });
 });

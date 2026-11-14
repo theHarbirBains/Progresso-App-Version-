@@ -831,7 +831,10 @@ describe('ActiveWorkoutScreen', () => {
     // Straight to the Share screen (History stays underneath it).
     expect(mockReset).toHaveBeenCalledWith({
       index: 1,
-      routes: [{ name: 'WorkoutHistory' }, { name: 'ShareWorkout', params: { workoutId: 'w1' } }],
+      routes: [
+        { name: 'WorkoutHistory' },
+        { name: 'ShareWorkout', params: { workoutId: 'w1', justFinished: true } },
+      ],
     });
     expect(mockCancelWorkout).not.toHaveBeenCalled();
   });

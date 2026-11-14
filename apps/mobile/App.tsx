@@ -117,6 +117,7 @@ import { WorkoutSplitsScreen } from './src/screens/WorkoutSplitsScreen';
 import { WorkoutSplitViewScreen } from './src/screens/WorkoutSplitViewScreen';
 import { SplitDayPlanScreen } from './src/screens/SplitDayPlanScreen';
 import { WidgetSync } from './src/widgets/WidgetSync';
+import { RemindersProvider } from './src/notifications/RemindersProvider';
 
 type AuthMode = 'signIn' | 'signUp' | 'forgotPassword';
 
@@ -607,10 +608,12 @@ function App() {
             <NutritionGoalsProvider>
               <FoodLogProvider>
                 <AllTimeStatsProvider>
-                  <AppThemeProvider>
-                    <AppShell fontsLoaded={fontsLoaded} />
-                    <WidgetSync />
-                  </AppThemeProvider>
+                  <RemindersProvider>
+                    <AppThemeProvider>
+                      <AppShell fontsLoaded={fontsLoaded} />
+                      <WidgetSync />
+                    </AppThemeProvider>
+                  </RemindersProvider>
                   <StatusBar style="light" />
                 </AllTimeStatsProvider>
               </FoodLogProvider>

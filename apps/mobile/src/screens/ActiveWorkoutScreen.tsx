@@ -638,7 +638,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         index: 1,
         routes: [
           { name: 'WorkoutHistory' },
-          { name: 'ShareWorkout', params: { workoutId: workout.id } },
+          { name: 'ShareWorkout', params: { workoutId: workout.id, justFinished: true } },
         ],
       });
     } catch (err) {

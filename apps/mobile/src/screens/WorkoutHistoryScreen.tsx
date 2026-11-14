@@ -203,7 +203,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
         index: 1,
         routes: [
           { name: 'WorkoutHistory' },
-          { name: 'ShareWorkout', params: { workoutId: activeWorkout.id } },
+          { name: 'ShareWorkout', params: { workoutId: activeWorkout.id, justFinished: true } },
         ],
       });
     } catch (err) {

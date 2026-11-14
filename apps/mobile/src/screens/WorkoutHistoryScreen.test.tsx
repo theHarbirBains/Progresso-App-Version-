@@ -723,7 +723,7 @@ describe('unfinished workout recovery', () => {
       index: 1,
       routes: [
         { name: 'WorkoutHistory' },
-        { name: 'ShareWorkout', params: { workoutId: ACTIVE_ID } },
+        { name: 'ShareWorkout', params: { workoutId: ACTIVE_ID, justFinished: true } },
       ],
     });
   });
