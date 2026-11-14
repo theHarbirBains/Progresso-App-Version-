@@ -3,7 +3,7 @@
 // Dev/CI tooling only - not part of the shipped app.
 import EmbeddedPostgres from 'embedded-postgres';
 import pg from 'pg';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -4756,6 +4756,191 @@ async function main() {
       ) === 1,
     );
     await admin.query('delete from auth.users where id = $1', [adminId]);
+  }
+
+  // ---- social: likes, comments, a person's heaviest lifts, finding friends by email ----
+  {
+    const lifter = randomUUID();
+    const fan = randomUUID();
+    const coach = randomUUID();
+    const hidden = randomUUID();
+    await admin.query(
+      `insert into auth.users (id, email) values
+         ($1, 'Lifter.Social@Example.com'), ($2, 'fan-social@test.local'),
+         ($3, 'coach-social@test.local'), ($4, 'hidden-social@test.local')`,
+      [lifter, fan, coach, hidden],
+    );
+    const bench = (
+      await admin.query(
+        "select id from public.exercises where created_by is null and measurement_type = 'weight_reps' order by name limit 2",
+      )
+    ).rows.map((r) => r.id);
+
+    // A workout with sets of [weight, reps] on one exercise; options for who logged it and
+    // whether it's deleted.
+    const workoutWith = async (exerciseId, sets, { loggedBy = null, deleted = false } = {}) => {
+      const w = (
+        await admin.query(
+          `insert into public.workouts (user_id, name, performed_at, completed_at, logged_by, deleted_at)
+           values ($1, 'Social Check', now(), now(), $2, $3) returning id`,
+          [lifter, loggedBy, deleted ? new Date().toISOString() : null],
+        )
+      ).rows[0].id;
+      const we = (
+        await admin.query(
+          'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+          [w, exerciseId],
+        )
+      ).rows[0].id;
+      let index = 0;
+      for (const [weight, reps] of sets) {
+        index += 1;
+        await admin.query(
+          'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, $2, $3, $4, now())',
+          [we, index, weight, reps],
+        );
+      }
+      return w;
+    };
+
+    const shared = await workoutWith(bench[0], [
+      [90, 8],
+      [100, 5],
+    ]);
+    await workoutWith(bench[1], [[60, 10]]);
+    // A trainer's logging and a deleted workout are never shown to followers.
+    await admin.query(
+      "insert into public.trainer_clients (trainer_id, client_id, status) values ($1, $2, 'active')",
+      [coach, lifter],
+    );
+    await workoutWith(bench[0], [[120, 5]], { loggedBy: coach });
+    await workoutWith(bench[0], [[150, 1]], { deleted: true });
+
+    const best = (await admin.query('select * from public.person_best_lifts($1, 5)', [lifter]))
+      .rows;
+    record(
+      "A person's heaviest lifts come from the workouts their followers can see, heaviest first",
+      best.length === 2 &&
+        best[0].exercise_id === bench[0] &&
+        Number(best[0].weight_kg) === 100 &&
+        best[0].reps === 5 &&
+        best[1].exercise_id === bench[1] &&
+        Number(best[1].weight_kg) === 60,
+      JSON.stringify(best),
+    );
+    record(
+      'Heaviest lifts stop at the number asked for',
+      (await admin.query('select * from public.person_best_lifts($1, 1)', [lifter])).rows.length ===
+        1,
+    );
+
+    // Likes and comments are the API's alone.
+    await admin.query('insert into public.workout_likes (workout_id, user_id) values ($1, $2)', [
+      shared,
+      fan,
+    ]);
+    const comment = (
+      await admin.query(
+        "insert into public.workout_comments (workout_id, user_id, body) values ($1, $2, 'Strong!') returning id",
+        [shared, fan],
+      )
+    ).rows[0].id;
+    await expectThrows(
+      asUser(lifter, (c) => c.query('select * from public.workout_likes')),
+      'A person cannot read likes directly -- only through the API',
+      /permission denied/i,
+    );
+    await expectThrows(
+      asUser(fan, (c) =>
+        c.query(
+          "insert into public.workout_comments (workout_id, user_id, body) values ($1, $2, 'x')",
+          [shared, fan],
+        ),
+      ),
+      'A person cannot write a comment directly -- only through the API',
+      /permission denied/i,
+    );
+    await expectThrows(
+      admin.query(
+        "insert into public.workout_comments (workout_id, user_id, body) values ($1, $2, '   ')",
+        [shared, fan],
+      ),
+      'A comment must say something',
+      /violates check constraint/i,
+    );
+    await expectThrows(
+      asUser(fan, (c) => c.query('select * from public.person_best_lifts($1, 5)', [lifter])),
+      "A person cannot read someone's heaviest lifts directly",
+      /permission denied/i,
+    );
+
+    // A report can be about a comment.
+    await admin.query(
+      "insert into public.user_reports (reporter_id, reported_user_id, workout_id, comment_id, reason) values ($1, $2, $3, $4, 'harassment')",
+      [lifter, fan, shared, comment],
+    );
+    record('A report can name the comment it is about', true);
+
+    // Finding friends by email: hashed as compared, and only people who let themselves be found.
+    await admin.query('update public.users set findable_by_email = false where id = $1', [hidden]);
+    const hash = (email) =>
+      createHash('sha256').update(email.trim().toLowerCase(), 'utf8').digest('hex');
+    const found = (
+      await admin.query('select user_id from public.find_users_by_email_hashes($1::text[])', [
+        [
+          hash('lifter.social@example.com'),
+          hash('hidden-social@test.local'),
+          hash('nobody@test.local'),
+        ],
+      ])
+    ).rows.map((r) => r.user_id);
+    record(
+      'Contacts find a person by their email, whatever its case -- never someone who turned it off',
+      found.length === 1 && found[0] === lifter,
+      JSON.stringify(found),
+    );
+    await expectThrows(
+      asUser(fan, (c) =>
+        c.query('select * from public.find_users_by_email_hashes($1::text[])', [[hash('x@y.z')]]),
+      ),
+      'A person cannot match emails directly -- only through the API',
+      /permission denied/i,
+    );
+    const defaults = (
+      await admin.query(
+        'select notify_follows, notify_likes, notify_comments, findable_by_email from public.users where id = $1',
+        [fan],
+      )
+    ).rows[0];
+    record(
+      'Social notifications and being findable are on unless turned off',
+      defaults.notify_follows &&
+        defaults.notify_likes &&
+        defaults.notify_comments &&
+        defaults.findable_by_email,
+      JSON.stringify(defaults),
+    );
+
+    // An account's likes and comments go with it.
+    await admin.query('select public.delete_account($1)', [fan]);
+    await admin.query('delete from auth.users where id = $1', [fan]);
+    const left = (
+      await admin.query(
+        `select (select count(*) from public.workout_likes where user_id = $1)::int +
+                (select count(*) from public.workout_comments where user_id = $1)::int as n`,
+        [fan],
+      )
+    ).rows[0].n;
+    record("A deleted account's likes and comments go with it", left === 0, String(left));
+    await admin.query('select public.delete_account($1)', [lifter]);
+    await admin.query('delete from auth.users where id = $1', [lifter]);
+    const onDeleted = (
+      await admin.query(
+        'select count(*)::int as n from public.workout_comments where workout_id = $1',
+        [shared],
+      )
+    ).rows[0].n;
+    record("Likes and comments on a deleted account's workouts go with them", onDeleted === 0);
   }
 
   await admin.end();
