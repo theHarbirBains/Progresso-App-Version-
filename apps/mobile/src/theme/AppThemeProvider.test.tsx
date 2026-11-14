@@ -45,6 +45,7 @@ describe('AppThemeProvider', () => {
       expect(JSON.parse((await AsyncStorage.getItem(KEY))!)).toEqual({
         themeId: 'forest',
         followSeasons: false,
+        snowfall: true,
       }),
     );
   });
@@ -110,5 +111,62 @@ describe('AppThemeProvider', () => {
 
     expect(result.current.followSeasons).toBe(false);
     expect(result.current.theme.id).toBe('alpine');
+  });
+
+  describe('snowfall', () => {
+    // Only the clock is faked.
+    function on(date: Date) {
+      jest.useFakeTimers({
+        now: date,
+        doNotFake: [
+          'setTimeout',
+          'clearTimeout',
+          'setInterval',
+          'clearInterval',
+          'setImmediate',
+          'clearImmediate',
+          'nextTick',
+          'queueMicrotask',
+        ],
+      });
+    }
+
+    it('snows through the holidays, with the switch on unless turned off', async () => {
+      on(new Date(2026, 11, 20));
+      const { result } = renderHook(() => useAppTheme(), { wrapper });
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+
+      expect(result.current).toMatchObject({ snowSeason: true, snowfall: true, snowing: true });
+
+      act(() => result.current.setSnowfall(false));
+
+      expect(result.current.snowing).toBe(false);
+      await waitFor(async () =>
+        expect(JSON.parse((await AsyncStorage.getItem(KEY))!)).toMatchObject({ snowfall: false }),
+      );
+      // The theme is left as it was.
+      expect(result.current.theme.id).toBe('golden-hour-gym');
+    });
+
+    it('keeps it off once turned off', async () => {
+      on(new Date(2026, 11, 20));
+      await AsyncStorage.setItem(
+        KEY,
+        JSON.stringify({ themeId: 'winter', followSeasons: false, snowfall: false }),
+      );
+      const { result } = renderHook(() => useAppTheme(), { wrapper });
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+
+      expect(result.current).toMatchObject({ snowfall: false, snowing: false });
+      expect(result.current.theme.id).toBe('winter');
+    });
+
+    it('never snows out of season', async () => {
+      on(new Date(2027, 6, 1));
+      const { result } = renderHook(() => useAppTheme(), { wrapper });
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+
+      expect(result.current).toMatchObject({ snowSeason: false, snowfall: true, snowing: false });
+    });
   });
 });

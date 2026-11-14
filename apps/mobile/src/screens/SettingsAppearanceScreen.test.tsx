@@ -8,6 +8,9 @@ import { AppThemeProvider } from '../theme/AppThemeProvider';
 import { SettingsAppearanceScreen } from './SettingsAppearanceScreen';
 
 jest.mock('../profile/ProfileProvider', () => ({ useProfile: jest.fn() }));
+// The holidays, unless a test says otherwise (the real date would make these tests seasonal).
+const mockIsSnowSeason = jest.fn(() => true);
+jest.mock('../theme/snowSeason', () => ({ isSnowSeason: () => mockIsSnowSeason() }));
 
 const mockUseProfile = useProfile as jest.Mock;
 const mockGoBack = jest.fn();
@@ -32,6 +35,7 @@ async function renderScreen() {
 }
 
 beforeEach(async () => {
+  mockIsSnowSeason.mockReturnValue(true);
   await AsyncStorage.clear();
   mockUseProfile.mockReturnValue({ profile: { country: 'CA' } });
 });
@@ -90,5 +94,24 @@ describe('SettingsAppearanceScreen', () => {
     fireEvent.press(screen.getByLabelText('Back'));
     expect(mockGoBack).toHaveBeenCalled();
     expectNoBareText();
+  });
+
+  it('turns the holiday snow off and on, through the holidays', async () => {
+    await renderScreen();
+
+    const snowfall = screen.getByTestId('appearance-snowfall');
+    expect(snowfall.props.value).toBe(true);
+    expect(screen.getByTestId('appearance-snowfall-row')).toHaveTextContent(/until early January/);
+
+    fireEvent(snowfall, 'valueChange', false);
+
+    expect(screen.getByTestId('appearance-snowfall').props.value).toBe(false);
+  });
+
+  it('has no Snowfall switch the rest of the year', async () => {
+    mockIsSnowSeason.mockReturnValue(false);
+    await renderScreen();
+
+    expect(screen.queryByTestId('appearance-snowfall-row')).toBeNull();
   });
 });

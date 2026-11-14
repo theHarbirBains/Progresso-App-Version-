@@ -15,10 +15,20 @@ type Props = RootStackScreenProps<'SettingsAppearance'>;
  * top of every screen and one accent -- Golden Hour Gym, the default, first -- as tiles in a grid
  * (theme/ThemeChoices, which onboarding shows too); and Change with the seasons, off unless the
  * person turns it on, which shows Spring, Summer, Autumn or Winter by the date where they live. Picking a theme turns the seasons off,
- * so a pick always shows. Applied at once, and kept on the phone.
+ * so a pick always shows. Through the holidays, Snowfall too -- light snow over the app, on unless
+ * turned off. Applied at once, and kept on the phone.
  */
 export function SettingsAppearanceScreen({ navigation }: Props) {
-  const { theme, accent, followSeasons, choose, setFollowSeasons } = useAppTheme();
+  const {
+    theme,
+    accent,
+    followSeasons,
+    choose,
+    setFollowSeasons,
+    snowSeason,
+    snowfall,
+    setSnowfall,
+  } = useAppTheme();
 
   return (
     <Screen
@@ -59,6 +69,28 @@ export function SettingsAppearanceScreen({ navigation }: Props) {
           }
         />
       </Section>
+
+      {/* Only through the holidays (theme/snowSeason.ts): the rest of the year there's no snow. */}
+      {snowSeason ? (
+        <Section title="Holidays">
+          <ListRow
+            testID="appearance-snowfall-row"
+            icon="cloud-snow"
+            title="Snowfall"
+            subtitle="Light snow drifting over the app, until early January."
+            trailing={
+              <Toggle
+                testID="appearance-snowfall"
+                value={snowfall}
+                onValueChange={setSnowfall}
+                accentColor={accent.accent}
+                onAccentColor={accent.onAccent}
+                accessibilityLabel="Snowfall"
+              />
+            }
+          />
+        </Section>
+      ) : null}
     </Screen>
   );
 }

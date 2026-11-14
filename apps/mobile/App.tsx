@@ -75,6 +75,7 @@ import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { LaunchScreen } from './src/screens/LaunchScreen';
+import { Snowfall } from './src/design/Snowfall';
 import { EditWorkoutScreen } from './src/screens/EditWorkoutScreen';
 import { LogPastWorkoutScreen } from './src/screens/LogPastWorkoutScreen';
 import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
@@ -572,7 +573,7 @@ function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { status } = useAuth();
   // The chosen theme is read before anything shows, so the default never flashes first -- and
   // the launch screen wears it as soon as it's read.
-  const { loaded: themeLoaded, theme } = useAppTheme();
+  const { loaded: themeLoaded, theme, snowing } = useAppTheme();
   const ready = fontsLoaded && status !== 'loading' && themeLoaded;
 
   return (
@@ -585,6 +586,8 @@ function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
           *seen* pre-sign-in -- a plain flat theme fill, no glow, no mode. */}
       <AppBackgroundLayer showAtmosphere={false} />
       {ready ? <Root /> : null}
+      {/* Over every screen through the holidays; touches pass straight through it. */}
+      {ready && snowing ? <Snowfall /> : null}
       <LaunchScreen ready={ready} theme={themeLoaded ? theme : null} />
     </View>
   );

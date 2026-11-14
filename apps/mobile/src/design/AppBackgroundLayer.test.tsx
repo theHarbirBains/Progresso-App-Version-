@@ -221,6 +221,10 @@ describe('ScreenBackdrop in a theme', () => {
           loaded: true,
           choose: () => undefined,
           setFollowSeasons: () => undefined,
+          snowSeason: false,
+          snowfall: true,
+          snowing: false,
+          setSnowfall: () => undefined,
         }}
       >
         <ScreenBackdrop>{children}</ScreenBackdrop>

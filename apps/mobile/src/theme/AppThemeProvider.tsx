@@ -4,12 +4,15 @@ import { useProfile } from '../profile/ProfileProvider';
 import { buildAccentTheme } from './accentColor';
 import { AppThemeContext, type AppThemeValue } from './appThemeContext';
 import { DEFAULT_THEME_ID, isAppThemeId, seasonFor, themeById, type AppThemeId } from './appThemes';
+import { isSnowSeason } from './snowSeason';
 
 const STORAGE_KEY = '@progresso/appearance';
 
 interface Saved {
   themeId: AppThemeId;
   followSeasons: boolean;
+  /** Snow over the app through the holidays: on unless turned off. */
+  snowfall: boolean;
 }
 
 /**
@@ -21,7 +24,11 @@ interface Saved {
  */
 export function AppThemeProvider({ children }: PropsWithChildren) {
   const { profile } = useProfile();
-  const [saved, setSaved] = useState<Saved>({ themeId: DEFAULT_THEME_ID, followSeasons: false });
+  const [saved, setSaved] = useState<Saved>({
+    themeId: DEFAULT_THEME_ID,
+    followSeasons: false,
+    snowfall: true,
+  });
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -31,10 +38,11 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         const parsed: unknown = raw ? JSON.parse(raw) : null;
         if (!cancelled && parsed && typeof parsed === 'object') {
-          const { themeId, followSeasons } = parsed as Record<string, unknown>;
+          const { themeId, followSeasons, snowfall } = parsed as Record<string, unknown>;
           setSaved({
             themeId: isAppThemeId(themeId) ? themeId : DEFAULT_THEME_ID,
             followSeasons: followSeasons === true,
+            snowfall: snowfall !== false,
           });
         }
       } catch {
@@ -57,17 +65,23 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
 
   const country = profile?.country ?? null;
   const value = useMemo<AppThemeValue>(() => {
+    const now = new Date();
     const theme = saved.followSeasons
-      ? themeById(seasonFor(new Date(), country))
+      ? themeById(seasonFor(now, country))
       : themeById(saved.themeId);
+    const snowSeason = isSnowSeason(now);
     return {
       theme,
       accent: buildAccentTheme(theme.accent),
       chosenId: saved.themeId,
       followSeasons: saved.followSeasons,
       loaded,
-      choose: (id) => save({ themeId: id, followSeasons: false }),
-      setFollowSeasons: (on) => save({ themeId: saved.themeId, followSeasons: on }),
+      choose: (id) => save({ ...saved, themeId: id, followSeasons: false }),
+      setFollowSeasons: (on) => save({ ...saved, followSeasons: on }),
+      snowSeason,
+      snowfall: saved.snowfall,
+      snowing: snowSeason && saved.snowfall,
+      setSnowfall: (on) => save({ ...saved, snowfall: on }),
     };
   }, [saved, country, loaded, save]);
 
