@@ -77,11 +77,11 @@ describe('SettingsAppearanceScreen', () => {
     );
   });
 
-  it('credits the photographers', async () => {
+  it('credits no one else: every photo is Progresso’s own', async () => {
     await renderScreen();
 
-    expect(screen.getByTestId('appearance-credits')).toHaveTextContent(/Unsplash/);
-    expect(screen.getByTestId('appearance-credits')).toHaveTextContent(/Sergei A \(Forest\)/);
+    expect(screen.queryByTestId('appearance-credits')).toBeNull();
+    expect(screen.queryByText(/Unsplash/)).toBeNull();
   });
 
   it('goes back from its header, and renders no bare text', async () => {

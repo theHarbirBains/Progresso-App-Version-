@@ -8,6 +8,10 @@ import { requestNotificationPermission } from '../lib/pushNotifications';
 import { EMPTY_DRAFT, STEP_ORDER, type OnboardingDraft } from '../onboarding/onboardingDraft';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { OnboardingScreen } from './OnboardingScreen';
+import { AppThemeProvider } from '../theme/AppThemeProvider';
+
+// The theme provider reads the profile's country (for the seasons); before sign-in there's none.
+jest.mock('../profile/ProfileProvider', () => ({ useProfile: () => ({ profile: null }) }));
 
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -231,7 +235,8 @@ describe('OnboardingScreen', () => {
     expect(screen.getByText('Everything')).toBeTruthy();
     fireEvent.press(screen.getByTestId('onboarding-step-membership-workouts'));
 
-    expect(await screen.findByTestId('onboarding-step-workout-split')).toBeTruthy();
+    // Then the look: the default showing, Continue ready.
+    expect(await screen.findByTestId('onboarding-theme-golden-hour-gym')).toBeTruthy();
     await waitFor(async () => {
       const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
       expect(stored.draft.membershipTier).toBe('workouts');
@@ -250,6 +255,7 @@ describe('OnboardingScreen', () => {
           weightValue: 80,
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
+          themeChosen: true,
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
@@ -285,6 +291,7 @@ describe('OnboardingScreen', () => {
           weightValue: 80,
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
+          themeChosen: true,
           hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
@@ -352,6 +359,10 @@ describe('OnboardingScreen', () => {
 
     await screen.findByTestId('onboarding-step-membership');
     fireEvent.press(screen.getByTestId('onboarding-step-membership-workouts_nutrition'));
+
+    // The look, applied as it's tapped; Continue moves on.
+    fireEvent.press(await screen.findByTestId('onboarding-theme-forest'));
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-workout-split');
     fireEvent.press(screen.getByTestId('onboarding-step-workout-split-preset-ppl'));
@@ -433,6 +444,7 @@ describe('OnboardingScreen', () => {
           heightUnit: 'cm',
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
+          themeChosen: true,
           hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
@@ -480,6 +492,7 @@ describe('OnboardingScreen', () => {
           heightUnit: 'cm',
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
+          themeChosen: true,
           hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
@@ -546,6 +559,7 @@ describe('OnboardingScreen', () => {
           heightUnit: 'cm',
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
+          themeChosen: true,
           hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
@@ -625,6 +639,7 @@ describe('OnboardingScreen', () => {
           heightUnit: 'cm',
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
+          themeChosen: true,
           hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
@@ -675,6 +690,7 @@ describe('OnboardingScreen', () => {
     heightUnit: 'cm',
     fitnessGoals: ['build_muscle'],
     membershipTier: 'everything',
+    themeChosen: true,
     hasTrainerCode: false,
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
@@ -747,6 +763,7 @@ describe('OnboardingScreen -- notifications step', () => {
     weightValue: 80,
     fitnessGoals: ['build_muscle'],
     membershipTier: 'everything',
+    themeChosen: true,
     hasTrainerCode: false,
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
@@ -827,5 +844,56 @@ describe('OnboardingScreen -- notifications step', () => {
     fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
     expect(screen.getByTestId('onboarding-step-push-notifications')).toBeTruthy();
     expect(mockRequestNotificationPermission).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('OnboardingScreen -- picking a look', () => {
+  it('applies a tapped theme at once, keeps it on the phone, and moves on with Continue', async () => {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({
+        stepIndex: STEP_ORDER.indexOf('theme'),
+        draft: {
+          ...EMPTY_DRAFT,
+          referralSource: 'tiktok',
+          country: 'CA',
+          gender: 'male',
+          weightValue: 80,
+          fitnessGoals: ['build_muscle'],
+          trainingComfort: 'knows_basics',
+          workoutFrequencyDays: 4,
+          averageWorkoutLength: '45_60',
+          membershipTier: 'everything',
+        },
+      }),
+    );
+    render(
+      <AppThemeProvider>
+        <OnboardingScreen onSwitchToSignIn={mockSwitchToSignIn} />
+      </AppThemeProvider>,
+    );
+
+    expect(await screen.findByText('Pick your look')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-theme-golden-hour-gym')).toHaveProp(
+      'accessibilityState',
+      { selected: true },
+    );
+
+    fireEvent.press(screen.getByTestId('onboarding-theme-alpine'));
+    expect(screen.getByTestId('onboarding-theme-alpine')).toHaveProp('accessibilityState', {
+      selected: true,
+    });
+    await waitFor(async () =>
+      expect(JSON.parse((await AsyncStorage.getItem('@progresso/appearance'))!)).toMatchObject({
+        themeId: 'alpine',
+      }),
+    );
+
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+    expect(await screen.findByTestId('onboarding-step-workout-split')).toBeTruthy();
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
+      expect(stored.draft.themeChosen).toBe(true);
+    });
   });
 });

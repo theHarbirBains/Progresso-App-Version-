@@ -61,6 +61,9 @@ export interface OnboardingDraft {
   /** Skipped choosing a split for now: like Create Your Own, the account starts with no split --
    * Start Workout asks for one the first time it's needed. */
   skippedSplit: boolean;
+  /** Went past the theme step. The theme itself is kept on the phone the moment it's tapped
+   * (theme/AppThemeProvider), not in the account, so the draft only records that it was seen. */
+  themeChosen: boolean;
   emailOptIn: boolean | null;
   pushNotificationsOptIn: boolean | null;
   /** Whether a trainer has been logging their workouts: true with the code the trainer gave
@@ -103,6 +106,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   selectedSplitPresetId: null,
   wantsCustomSplit: false,
   skippedSplit: false,
+  themeChosen: false,
   emailOptIn: null,
   pushNotificationsOptIn: null,
   hasTrainerCode: null,
@@ -129,6 +133,7 @@ export const STEP_ORDER = [
   'workoutFrequency',
   'averageWorkoutLength',
   'membership',
+  'theme',
   'workoutSplit',
   'emailPreference',
   'pushNotifications',
@@ -165,6 +170,8 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
       return draft.fitnessGoals.length > 0;
     case 'membership':
       return draft.membershipTier != null;
+    case 'theme':
+      return draft.themeChosen;
     case 'trainingComfort':
       return draft.trainingComfort != null;
     case 'workoutFrequency':

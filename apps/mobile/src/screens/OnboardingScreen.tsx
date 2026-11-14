@@ -38,6 +38,7 @@ import {
   saveOnboardingDraft,
 } from '../onboarding/onboardingDraftStorage';
 import { MembershipChoices } from '../membership/MembershipChoices';
+import { ThemeChoices } from '../theme/ThemeChoices';
 import { TextInput } from '../design/TextInput';
 import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
 import { OnboardingProgress } from '../onboarding/OnboardingProgress';
@@ -65,6 +66,8 @@ const CONTINUE_STEPS = new Set<OnboardingStep>([
   'fitnessGoal',
   // The trainer's code is typed.
   'trainerCode',
+  // A theme shows as it's tapped, so there's time to look before moving on.
+  'theme',
 ]);
 
 // How long a tapped answer shows as chosen before the next question takes its place.
@@ -88,7 +91,9 @@ const DEFAULT_BIRTH_YEAR = new Date().getFullYear() - 25;
 // onboardingDraftStorage) is what makes this resumable across an app kill,
 // the same guarantee the old profile-backed flow had.
 export function OnboardingScreen({ onSwitchToSignIn }: Props) {
-  const { accent } = useAppTheme();
+  // The theme step applies a tapped theme at once, behind onboarding itself.
+  const appTheme = useAppTheme();
+  const { accent } = appTheme;
   const { signUpWithPassword, signInWithProvider } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -168,6 +173,8 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
 
   function advance() {
     cancelPendingAdvance();
+    // The theme step is answered by moving on from it, whichever theme is showing.
+    if (STEP_ORDER[stepIndex] === 'theme') updateDraft({ themeChosen: true });
     goToStep(stepIndex + 1);
   }
 
@@ -188,7 +195,8 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
   }
 
   function canContinue(step: OnboardingStep): boolean {
-    return isStepAnswered(step, draft);
+    // The default theme is a fine answer: it's already showing.
+    return step === 'theme' || isStepAnswered(step, draft);
   }
 
   async function handleCreateAccount(fields: CreateAccountFields) {
@@ -472,6 +480,21 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
               testID="onboarding-step-membership"
               value={draft.membershipTier}
               onChange={(membershipTier) => choose({ membershipTier })}
+            />
+          </>
+        ) : null}
+
+        {step === 'theme' ? (
+          <>
+            <Text style={styles.stepTitle}>Pick your look</Text>
+            <Text style={styles.stepExplanation}>
+              A gym photo behind your screens and the colour of your buttons. You can change it any
+              time in Settings &gt; Appearance.
+            </Text>
+            <ThemeChoices
+              selectedId={appTheme.theme.id}
+              onChoose={appTheme.choose}
+              testIDPrefix="onboarding-theme"
             />
           </>
         ) : null}

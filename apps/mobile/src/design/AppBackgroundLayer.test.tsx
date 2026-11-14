@@ -186,13 +186,14 @@ describe('ScreenBackdrop behind a photo hero', () => {
     expect(topDarkness('screen-backdrop')).toBeCloseTo(0.7, 2);
   });
 
-  it('shows the photo almost in full (10% darkening) while a hero is on the screen, and back when it goes', () => {
+  it("shows the photo almost in full (its theme's darkening) while a hero is on the screen, and back when it goes", () => {
     const { rerender } = render(
       <ScreenBackdrop>
         <Hero />
       </ScreenBackdrop>,
     );
-    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.1, 2);
+    // Golden Hour Gym, the default: 20%, measured against the original gym photo's 10%.
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.2, 2);
 
     rerender(
       <ScreenBackdrop>

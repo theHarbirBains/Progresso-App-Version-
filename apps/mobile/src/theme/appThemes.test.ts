@@ -52,12 +52,6 @@ describe('app themes', () => {
     }
   });
 
-  it('credits every photo that isn’t Progresso’s own', () => {
-    expect(APP_THEMES.filter((t) => t.id !== 'golden-hour-gym').every((t) => t.photographer)).toBe(
-      true,
-    );
-  });
-
   it('falls back to the default for a theme it doesn’t know', () => {
     expect(themeById('obsidian').id).toBe('golden-hour-gym');
     expect(themeById(null).id).toBe('golden-hour-gym');

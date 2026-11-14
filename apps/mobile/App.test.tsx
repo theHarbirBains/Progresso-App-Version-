@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { StyleSheet } from 'react-native';
 import App from './App';
 import { fetchMyProfile } from './src/profile/profileQueries';
+import { STEP_ORDER } from './src/onboarding/onboardingDraft';
 
 interface MockAuthHandles {
   signInWithPassword: jest.Mock;
@@ -322,7 +323,7 @@ describe('Authentication flow', () => {
     await AsyncStorage.setItem(
       '@progresso/onboardingDraft',
       JSON.stringify({
-        stepIndex: 15,
+        stepIndex: STEP_ORDER.indexOf('createAccount'),
         draft: {
           referralSource: 'tiktok',
           country: 'CA',
@@ -334,6 +335,7 @@ describe('Authentication flow', () => {
           heightUnit: 'cm',
           fitnessGoal: 'build_muscle',
           membershipTier: 'everything',
+          themeChosen: true,
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',

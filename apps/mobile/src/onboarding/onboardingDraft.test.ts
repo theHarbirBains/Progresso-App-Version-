@@ -47,6 +47,7 @@ const FULL_DRAFT: OnboardingDraft = {
   heightValue: 180,
   fitnessGoals: ['build_muscle'],
   membershipTier: 'everything',
+  themeChosen: true,
   trainingComfort: 'knows_basics',
   workoutFrequencyDays: 4,
   averageWorkoutLength: '45_60',

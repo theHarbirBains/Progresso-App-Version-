@@ -1,10 +1,12 @@
-// The looks Progresso can wear (Settings > Appearance). Each is a photo behind the top of every
-// screen and one accent; everything else -- surfaces, text, charts, forms, the live workout --
-// stays the same warm dark in every theme, so a theme never costs readability. Golden Hour Gym
-// is the original look and the default. The photos are graded to sit together and drawn under
-// the same darkening layers (design/AppBackgroundLayer.tsx); each theme's `heroDarkness` is how
-// dark its photo stays behind Feed's Next Workout, measured so hero text keeps at least the
-// contrast it has over the gym photo.
+// The looks Progresso can wear (Settings > Appearance, and onboarding). Each is a photo behind the
+// top of every screen and one accent; everything else -- surfaces, text, charts, forms, the live
+// workout -- stays the same warm dark in every theme, so a theme never costs readability. Golden
+// Hour Gym is the default. Every photo is Progresso's own: a gym open onto its scene (a mountain
+// lake at sunset, a waterfall, snowy peaks, the sea, blossom, palms, autumn woods, snow), cut to
+// the same proportions and drawn under the same darkening layers (design/AppBackgroundLayer.tsx);
+// each theme's `heroDarkness` is how dark its photo stays behind Feed's Next Workout, measured so
+// hero text keeps at least the contrast it had over the original gym photo at 10% -- over the
+// photo's brightest specks and over its broad bright areas alike.
 
 export type AppThemeId =
   'golden-hour-gym' | 'forest' | 'alpine' | 'coast' | 'spring' | 'summer' | 'autumn' | 'winter';
@@ -20,13 +22,11 @@ export interface AppTheme {
   photo: number;
   /** How dark the photo stays through its upper part behind Feed's hero (0-1). */
   heroDarkness: number;
-  /** Who took the photo (Unsplash), for the credit on Appearance. Null for Progresso's own. */
-  photographer: string | null;
 }
 
 export const DEFAULT_THEME_ID: AppThemeId = 'golden-hour-gym';
 
-/** Every photo's width / height -- they're all cut to the gym photo's proportions. */
+/** Every photo's width / height -- they're all cut to the same proportions (852 x 1300). */
 export const THEME_PHOTO_ASPECT = 852 / 1300;
 
 export const APP_THEMES: readonly AppTheme[] = [
@@ -35,32 +35,28 @@ export const APP_THEMES: readonly AppTheme[] = [
     name: 'Golden Hour Gym',
     accent: '#D99A50',
     photo: require('../../assets/background-gym-sunset.jpg'),
-    heroDarkness: 0.1,
-    photographer: null,
+    heroDarkness: 0.2,
   },
   {
     id: 'forest',
     name: 'Forest',
     accent: '#9DBF7A',
     photo: require('../../assets/themes/forest.jpg'),
-    heroDarkness: 0.35,
-    photographer: 'Sergei A',
+    heroDarkness: 0.1,
   },
   {
     id: 'alpine',
     name: 'Alpine',
     accent: '#8DB8D6',
     photo: require('../../assets/themes/alpine.jpg'),
-    heroDarkness: 0.35,
-    photographer: 'Nick Da Fonseca',
+    heroDarkness: 0.15,
   },
   {
     id: 'coast',
     name: 'Coast',
     accent: '#6FC2B8',
     photo: require('../../assets/themes/coast.jpg'),
-    heroDarkness: 0.35,
-    photographer: 'Lina Bob',
+    heroDarkness: 0.25,
   },
   {
     id: 'spring',
@@ -68,15 +64,13 @@ export const APP_THEMES: readonly AppTheme[] = [
     accent: '#E8A0B4',
     photo: require('../../assets/themes/spring.jpg'),
     heroDarkness: 0.2,
-    photographer: 'Lynn Danielson',
   },
   {
     id: 'summer',
     name: 'Summer',
     accent: '#E8B84A',
     photo: require('../../assets/themes/summer.jpg'),
-    heroDarkness: 0.1,
-    photographer: 'David Dür',
+    heroDarkness: 0.25,
   },
   {
     id: 'autumn',
@@ -84,15 +78,13 @@ export const APP_THEMES: readonly AppTheme[] = [
     accent: '#D9774A',
     photo: require('../../assets/themes/autumn.jpg'),
     heroDarkness: 0.1,
-    photographer: 'James Wainscoat',
   },
   {
     id: 'winter',
     name: 'Winter',
     accent: '#A9C4E0',
     photo: require('../../assets/themes/winter.jpg'),
-    heroDarkness: 0.2,
-    photographer: 'Barnabas Davoti',
+    heroDarkness: 0.1,
   },
 ];
 
