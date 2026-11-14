@@ -296,7 +296,7 @@ describe('GroupWorkoutEditor', () => {
     expect(mockAdd).toHaveBeenCalledWith('w-sam', 'ex-lat-pulldown', 7);
   });
 
-  it('starts a new set from the set before it', async () => {
+  it('starts a new set empty, never from the set before it', async () => {
     renderEditor();
     await screen.findByDisplayValue('100');
 
@@ -305,13 +305,13 @@ describe('GroupWorkoutEditor', () => {
     const weight = await screen.findByTestId(
       'group-workout-exercise-squat-set-w-me-we-1-set-2-weight',
     );
-    expect(weight.props.value).toBe('100');
+    expect(weight.props.value).toBe('');
     expect(
       screen.getByTestId('group-workout-exercise-squat-set-w-me-we-1-set-2-reps').props.value,
-    ).toBe('5');
+    ).toBe('');
   });
 
-  it("fills each person's first set of a new exercise from their own last session", async () => {
+  it("starts each person's first set of a new exercise empty, whatever their last session", async () => {
     mockAdd.mockImplementation(
       async (workoutId: string, exerciseId: string, orderIndex: number) => {
         const id = `${workoutId}-we-lat`;
@@ -372,22 +372,22 @@ describe('GroupWorkoutEditor', () => {
     const mine = await screen.findByTestId(
       'group-workout-exercise-ex-lat-pulldown-set-w-me-we-lat-set-1-weight',
     );
-    expect(mine.props.value).toBe('50');
+    expect(mine.props.value).toBe('');
     expect(
       screen.getByTestId('group-workout-exercise-ex-lat-pulldown-set-w-me-we-lat-set-1-reps').props
         .value,
-    ).toBe('10');
+    ).toBe('');
 
     fireEvent.press(screen.getByText('Sam'));
 
     const sams = await screen.findByTestId(
       'group-workout-exercise-ex-lat-pulldown-set-w-sam-we-lat-set-1-weight',
     );
-    expect(sams.props.value).toBe('40');
+    expect(sams.props.value).toBe('');
     expect(
       screen.getByTestId('group-workout-exercise-ex-lat-pulldown-set-w-sam-we-lat-set-1-reps').props
         .value,
-    ).toBe('12');
+    ).toBe('');
   });
 });
 

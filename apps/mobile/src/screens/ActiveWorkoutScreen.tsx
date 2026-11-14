@@ -36,7 +36,6 @@ import {
   computeUnilateralSets,
   draftFromSet,
   hasDraftInput,
-  withPrefilledSets,
   type SetInputDraft,
 } from '../workouts/setInputDrafts';
 import {
@@ -74,9 +73,9 @@ type Props = RootStackScreenProps<'ActiveWorkout'>;
 
 // The live-tracking half of the Start Workout experience (see
 // NewWorkoutScreen.tsx for the pre-start planning half), sharing the same
-// "exactly one set per new exercise" rule. A new set's fields start filled
-// in from the set before it or from last session (see withPrefilledSets).
-// There's no check to tap: a set saves as it's typed (useSetAutosave), and
+// "exactly one set per new exercise" rule. A new set's fields start empty --
+// never filled in from the set before it or from last session, which shows
+// above the sets to log instead. There's no check to tap: a set saves as it's typed (useSetAutosave), and
 // Finish saves what's left on the screen, asking first about any set with an
 // empty field -- fill it in, or remove it.
 //
@@ -303,31 +302,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               nextPreviousPerformance[exerciseId] = previous;
           }
           setPreviousPerformance(nextPreviousPerformance);
-          // A workout just started from a split day's plan: its sets were made ahead of time,
-          // blank, and start from last time, as a set added with Add Set does. A set with
-          // anything typed or ticked is left as it is.
-          if (planned)
-            setSetInputs((prev) => {
-              let next = prev;
-              for (const exercise of detail.exercises) {
-                const indexes = Array.from(new Set(exercise.sets.map((set) => set.setIndex))).sort(
-                  (a, b) => a - b,
-                );
-                for (const index of indexes) {
-                  const rows = exercise.sets.filter((set) => set.setIndex === index);
-                  if (rows.some((row) => row.completedAt !== null)) continue;
-                  next = withPrefilledSets(
-                    next,
-                    rows,
-                    exercise.sets.filter((set) => set.setIndex < index),
-                    nextPreviousPerformance[exercise.exerciseId]?.sets,
-                    weightUnit,
-                    measurementTypeOf(exercise),
-                  );
-                }
-              }
-              return next;
-            });
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load workout');
@@ -360,8 +334,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
 
   async function handleAddSet(exercise: WorkoutExerciseWithSets) {
     setError(null);
-    const lastSession = previousPerformance[exercise.exerciseId]?.sets;
-    const type = measurementTypeOf(exercise);
     try {
       const nextIndex = exercise.sets.reduce((max, s) => Math.max(max, s.setIndex), 0) + 1;
       if (exercise.movementType === 'unilateral') {
@@ -373,16 +345,10 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           createSet(exercise.id, nextIndex, 'right'),
         ]);
         updateExerciseSets(exercise.id, (ex) => ({ ...ex, sets: [...ex.sets, left, right] }));
-        setSetInputs((prev) =>
-          withPrefilledSets(prev, [left, right], exercise.sets, lastSession, weightUnit, type),
-        );
         return;
       }
       const created = await createSet(exercise.id, nextIndex);
       updateExerciseSets(exercise.id, (ex) => ({ ...ex, sets: [...ex.sets, created] }));
-      setSetInputs((prev) =>
-        withPrefilledSets(prev, [created], exercise.sets, lastSession, weightUnit, type),
-      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add set');
     }
@@ -552,11 +518,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     if (!workout) return;
     setPickerOpen(false);
     setError(null);
-    // Loads while the exercise and its first set are created; that set starts from it.
-    const lastSessionLoad =
-      exercise.id in previousPerformance
-        ? Promise.resolve(previousPerformance[exercise.id])
-        : loadPreviousPerformance(exercise.id);
+    // Last Time loads while the exercise and its first set are created; the set starts empty.
+    if (!(exercise.id in previousPerformance)) void loadPreviousPerformance(exercise.id);
     try {
       const nextOrderIndex = await fetchNextExerciseOrderIndex(workout.id);
       const workoutExerciseId = await addExerciseToWorkout(workout.id, exercise.id, nextOrderIndex);
@@ -595,18 +558,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       );
       // On a muscle tab, the new exercise's own tab, so it's never added out of sight.
       setMuscleTab((tab) => (tab === 'all' ? tab : exercise.muscleGroup));
-      const lastSession = await lastSessionLoad;
-      // Anything typed into the new set while last session loaded is kept.
-      setSetInputs((prev) =>
-        withPrefilledSets(
-          prev,
-          createdSets,
-          [],
-          lastSession?.sets,
-          weightUnit,
-          exercise.measurementType,
-        ),
-      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add exercise');
     }

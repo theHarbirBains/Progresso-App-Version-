@@ -9,10 +9,10 @@ import type { SetRecord } from './workoutQueries';
 // A live workout's sets save as they're typed -- no check to tap. Once a set's fields hold what
 // its exercise records (weight and reps, reps, or a time), it's saved as done a moment after the
 // typing stops, and saved again whenever it's changed; emptied, it's reopened. Only what the
-// person types (or a timer they pause) starts a save: values filled in for them -- a new set
-// copied from the one before, or last session -- wait for Finish (readyToFinish), where a timer
-// still going stops, any set left with an empty field is asked about -- fill it in, or remove it
-// -- and everything still on the screen is saved.
+// person types (or a timer they pause) starts a save -- a new set starts empty, never filled in
+// for them. At Finish (readyToFinish) a timer still going stops, any set left with an empty
+// field is asked about -- fill it in, or remove it -- and everything still on the screen is
+// saved.
 
 /** How long after the last keystroke a set saves. */
 export const AUTOSAVE_DELAY_MS = 700;

@@ -28,7 +28,6 @@ import {
   computeCardSets,
   computeUnilateralSets,
   draftFromSet,
-  withPrefilledSets,
   type SetInputDraft,
 } from './setInputDrafts';
 import { LiveProgressionSheets, RepRangeRow, useLiveProgression } from './useLiveProgression';
@@ -249,7 +248,7 @@ export function GroupWorkoutEditor({
   }, [loadAll]);
 
   // One exercise into one workout: the next order, then its first set (both sides if
-  // unilateral), filled in from that person's last session with the exercise. The next order
+  // unilateral), empty -- never filled in from that person's last session. The next order
   // comes from every order index that workout has ever used, not just its currently visible
   // exercises -- a removed one still holds its slot (see fetchNextExerciseOrderIndex).
   async function addToWorkout(
@@ -261,25 +260,14 @@ export function GroupWorkoutEditor({
     },
   ) {
     const { movementType } = shape;
-    // Loads alongside the writes below; it only fills in the set, so a failure is ignored.
-    const lastSessionLoad = fetchPreviousPerformance(
-      member.userId,
-      exerciseId,
-      member.workoutId,
-    ).catch(() => null);
     const order = await fetchNextExerciseOrderIndex(member.workoutId);
     const workoutExerciseId = await addExerciseToWorkout(member.workoutId, exerciseId, order);
-    const created =
-      movementType === 'unilateral'
-        ? [
-            await createSet(workoutExerciseId, 1, 'left'),
-            await createSet(workoutExerciseId, 1, 'right'),
-          ]
-        : [await createSet(workoutExerciseId, 1)];
-    const lastSession = await lastSessionLoad;
-    setSetInputs((prev) =>
-      withPrefilledSets(prev, created, [], lastSession?.sets, weightUnit, measurementTypeOf(shape)),
-    );
+    if (movementType === 'unilateral') {
+      await createSet(workoutExerciseId, 1, 'left');
+      await createSet(workoutExerciseId, 1, 'right');
+    } else {
+      await createSet(workoutExerciseId, 1);
+    }
   }
 
   /** Runs one change, then reloads so each row shows what is saved. */
@@ -395,25 +383,13 @@ export function GroupWorkoutEditor({
   async function addSet(exercise: WorkoutExerciseWithSets) {
     if (!selected) return;
     const nextIndex = exercise.sets.reduce((max, s) => Math.max(max, s.setIndex), 0) + 1;
-    const lastSession = previous[`${selected.userId}:${exercise.exerciseId}`]?.sets;
     await change(async () => {
-      const created =
-        exercise.movementType === 'unilateral'
-          ? [
-              await createSet(exercise.id, nextIndex, 'left'),
-              await createSet(exercise.id, nextIndex, 'right'),
-            ]
-          : [await createSet(exercise.id, nextIndex)];
-      setSetInputs((prev) =>
-        withPrefilledSets(
-          prev,
-          created,
-          exercise.sets,
-          lastSession,
-          weightUnit,
-          measurementTypeOf(exercise),
-        ),
-      );
+      if (exercise.movementType === 'unilateral') {
+        await createSet(exercise.id, nextIndex, 'left');
+        await createSet(exercise.id, nextIndex, 'right');
+      } else {
+        await createSet(exercise.id, nextIndex);
+      }
     });
   }
 

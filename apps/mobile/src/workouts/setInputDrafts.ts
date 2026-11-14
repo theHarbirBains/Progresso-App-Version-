@@ -197,59 +197,6 @@ export function hasDraftInput(draft: SetInputDraft | undefined): draft is SetInp
   );
 }
 
-/**
- * The inputs with each new set filled in as editable values: a copy of the set before it in
- * this workout when that set has anything in it, otherwise the same set number from last
- * session. A unilateral exercise fills each side from the same side. A set that already has
- * something typed in it is left alone. Filling never completes a set: that still takes a tap.
- */
-export function withPrefilledSets(
-  setInputs: Record<string, SetInputDraft>,
-  newSets: SetRecord[],
-  setsBefore: SetRecord[],
-  lastSession: SetRecord[] | undefined,
-  unit: 'kg' | 'lb',
-  type: MeasurementType = 'weight_reps',
-): Record<string, SetInputDraft> {
-  const next = { ...setInputs };
-  for (const set of newSets) {
-    if (hasDraftInput(setInputs[set.id])) continue;
-    next[set.id] = prefillFor(set.side, setsBefore, setInputs, lastSession, unit, type);
-  }
-  return next;
-}
-
-function prefillFor(
-  side: SetSide,
-  setsBefore: SetRecord[],
-  setInputs: Record<string, SetInputDraft>,
-  lastSession: SetRecord[] | undefined,
-  unit: 'kg' | 'lb',
-  type: MeasurementType,
-): SetInputDraft {
-  const onSide = (set: SetRecord) => side === null || set.side === side;
-  const before = setsBefore
-    .filter(onSide)
-    .reduce<SetRecord | undefined>(
-      (latest, set) => (latest && latest.setIndex > set.setIndex ? latest : set),
-      undefined,
-    );
-  const beforeInput = before ? setInputs[before.id] : undefined;
-  if (hasDraftInput(beforeInput)) return { ...beforeInput };
-
-  // Set numbers count a left/right pair as one set, in the order the sets were logged.
-  const setNumber = new Set(setsBefore.map((set) => set.setIndex)).size + 1;
-  const lastIndexes = Array.from(new Set((lastSession ?? []).map((set) => set.setIndex))).sort(
-    (a, b) => a - b,
-  );
-  const match = lastSession?.find(
-    (set) => set.setIndex === lastIndexes[setNumber - 1] && onSide(set),
-  );
-  return match ? draftFromSet(match, type, unit) : draftFromSet(EMPTY_SET, type, unit);
-}
-
-const EMPTY_SET = { weightKg: null, reps: null, durationSeconds: null };
-
 /** Groups a unilateral exercise's flat sets array into one row per LOGICAL
  * set (left + right sharing a setIndex), for ExerciseCard's unilateralSets
  * prop. Only setIndexes with both sides present render -- handleAddSet/

@@ -1127,7 +1127,7 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
     expect(screen.getByTestId('exercise-card-we-bss-set-2-right-weight')).toBeTruthy();
   });
 
-  it('fills each side of a new unilateral set from the same side of the set before it', async () => {
+  it('starts both sides of a new unilateral set empty, whatever the set before it holds', async () => {
     mockCreateSet
       .mockReset()
       .mockImplementation(async (_weId: string, setIndex: number, side?: string) => ({
@@ -1151,10 +1151,10 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
     fireEvent.press(screen.getByTestId('exercise-card-we-bss-add-set'));
 
     const leftWeight = await screen.findByTestId('exercise-card-we-bss-set-2-left-weight');
-    expect(leftWeight.props.value).toBe('42.5');
-    expect(screen.getByTestId('exercise-card-we-bss-set-2-left-reps').props.value).toBe('10');
-    expect(screen.getByTestId('exercise-card-we-bss-set-2-right-weight').props.value).toBe('40');
-    expect(screen.getByTestId('exercise-card-we-bss-set-2-right-reps').props.value).toBe('9');
+    expect(leftWeight.props.value).toBe('');
+    expect(screen.getByTestId('exercise-card-we-bss-set-2-left-reps').props.value).toBe('');
+    expect(screen.getByTestId('exercise-card-we-bss-set-2-right-weight').props.value).toBe('');
+    expect(screen.getByTestId('exercise-card-we-bss-set-2-right-reps').props.value).toBe('');
   });
 
   it('adds a unilateral exercise from the picker, creating both a left and a right blank row for its first set', async () => {
@@ -1197,7 +1197,7 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
   });
 });
 
-describe('Pre-filled sets', () => {
+describe('New sets start empty', () => {
   const lastBench = {
     performedAt: '2026-01-05T00:00:00Z',
     sets: [
@@ -1224,7 +1224,7 @@ describe('Pre-filled sets', () => {
     });
   });
 
-  it('after 100 kg x 8, a new set shows 100 and 8 ready to edit, and is not saved until changed', async () => {
+  it('after 100 kg x 8, a new set is empty -- never a copy of the set before -- and saves nothing', async () => {
     renderScreen();
     await screen.findByTestId('exercise-card-we1');
 
@@ -1240,15 +1240,15 @@ describe('Pre-filled sets', () => {
     fireEvent.press(screen.getByTestId('exercise-card-we1-add-set'));
 
     const weight = await screen.findByTestId('exercise-card-we1-set-s3-weight');
-    expect(weight.props.value).toBe('100');
+    expect(weight.props.value).toBe('');
     expect(weight.props.editable).toBe(true);
-    expect(screen.getByTestId('exercise-card-we1-set-s3-reps').props.value).toBe('8');
+    expect(screen.getByTestId('exercise-card-we1-set-s3-reps').props.value).toBe('');
     expect(screen.queryByTestId('exercise-card-we1-set-s3-complete')).toBeNull();
     await pastTheSaveDelay();
     expect(mockUpdateSet).not.toHaveBeenCalledWith('s3', expect.anything());
   });
 
-  it("starts a planned day's blank sets from last session; a resumed workout's are left blank", async () => {
+  it("leaves a planned day's sets empty, with last session shown above them", async () => {
     mockFetchWorkoutDetail.mockResolvedValue({
       ...baseWorkout,
       exercises: [
@@ -1270,12 +1270,10 @@ describe('Pre-filled sets', () => {
       { wrapper: TestProviders },
     );
 
-    await waitFor(() =>
-      expect(screen.getByTestId('exercise-card-we1-set-pl1-weight').props.value).toBe('100'),
-    );
-    expect(screen.getByTestId('exercise-card-we1-set-pl1-reps').props.value).toBe('10');
-    // Set 2 starts from set 1, as a set added with Add Set does.
-    expect(screen.getByTestId('exercise-card-we1-set-pl2-weight').props.value).toBe('100');
+    await screen.findByTestId('exercise-card-we1-previous-session');
+    expect(screen.getByTestId('exercise-card-we1-set-pl1-weight').props.value).toBe('');
+    expect(screen.getByTestId('exercise-card-we1-set-pl1-reps').props.value).toBe('');
+    expect(screen.getByTestId('exercise-card-we1-set-pl2-weight').props.value).toBe('');
   });
 
   it('shows why part of a planned day is missing, when starting it said so', async () => {
@@ -1296,7 +1294,7 @@ describe('Pre-filled sets', () => {
     );
   });
 
-  it('uses the same set number from last session when the set before it is empty', async () => {
+  it('never fills a new set from the same set number last session', async () => {
     mockFetchPreviousPerformance.mockResolvedValue(lastBench);
     renderScreen();
     await screen.findByTestId('exercise-card-we1-previous-session');
@@ -1304,11 +1302,11 @@ describe('Pre-filled sets', () => {
     fireEvent.press(screen.getByTestId('exercise-card-we1-add-set'));
 
     const weight = await screen.findByTestId('exercise-card-we1-set-s3-weight');
-    expect(weight.props.value).toBe('95');
-    expect(screen.getByTestId('exercise-card-we1-set-s3-reps').props.value).toBe('8');
+    expect(weight.props.value).toBe('');
+    expect(screen.getByTestId('exercise-card-we1-set-s3-reps').props.value).toBe('');
   });
 
-  it("starts a newly added exercise's first set from set 1 of last session", async () => {
+  it("starts a newly added exercise's first set empty, with its last session shown", async () => {
     mockFetchExercises.mockResolvedValue([
       { id: 'ex2', name: 'Barbell Back Squat', muscleGroup: 'quadriceps', isActive: true },
     ]);
@@ -1336,10 +1334,9 @@ describe('Pre-filled sets', () => {
     fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
     fireEvent.press(await screen.findByTestId('exercise-item-ex2'));
 
-    await waitFor(() =>
-      expect(screen.getByTestId('exercise-card-we2-set-s3-weight').props.value).toBe('60'),
-    );
-    expect(screen.getByTestId('exercise-card-we2-set-s3-reps').props.value).toBe('8');
+    await screen.findByTestId('exercise-card-we2-previous-session');
+    expect(screen.getByTestId('exercise-card-we2-set-s3-weight').props.value).toBe('');
+    expect(screen.getByTestId('exercise-card-we2-set-s3-reps').props.value).toBe('');
     expect(mockUpdateSet).not.toHaveBeenCalled();
   });
 
@@ -1646,10 +1643,10 @@ describe('Last Workout', () => {
     );
     expect(screen.queryByTestId('exercise-card-we1-view-history')).toBeNull();
 
-    // A new set starts from the time typed in the set before it.
+    // A new set starts empty, never from the time typed in the set before it.
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-time'), '1:20');
     fireEvent.press(screen.getByTestId('exercise-card-we1-add-set'));
-    expect((await screen.findByTestId('exercise-card-we1-set-s3-time')).props.value).toBe('1:20');
+    expect((await screen.findByTestId('exercise-card-we1-set-s3-time')).props.value).toBe('');
   });
 });
 
