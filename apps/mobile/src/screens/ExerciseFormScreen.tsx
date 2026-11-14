@@ -68,6 +68,14 @@ export function ExerciseFormScreen(props: Props) {
     props.mode === 'edit' ? props.exercise.measurementType : 'weight_reps',
   );
   const [isActive] = useState(props.mode === 'edit' ? props.exercise.isActive : true);
+  // What sets this machine apart from others like it -- all optional.
+  const [gym, setGym] = useState(props.mode === 'edit' ? (props.exercise.gym ?? '') : '');
+  const [feelNotes, setFeelNotes] = useState(
+    props.mode === 'edit' ? (props.exercise.feelNotes ?? '') : '',
+  );
+  const [attachment, setAttachment] = useState(
+    props.mode === 'edit' ? (props.exercise.attachment ?? '') : '',
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +106,12 @@ export function ExerciseFormScreen(props: Props) {
       }
 
       const movementType: MovementType = isUnilateral ? 'unilateral' : 'bilateral';
+      // A blank box is nothing: cleared on an edit, left out on a new exercise.
+      const details = {
+        gym: gym.trim() || null,
+        feelNotes: feelNotes.trim() || null,
+        attachment: attachment.trim() || null,
+      };
 
       if (props.mode === 'create') {
         await createExercise(accessToken, {
@@ -109,6 +123,8 @@ export function ExerciseFormScreen(props: Props) {
           // comment. Always 'single_side' since this form never asks.
           ...(isUnilateral ? { loggingStyle: 'single_side' as const } : {}),
           ...(photoUrl !== undefined ? { photoUrl: photoUrl ?? undefined } : {}),
+          // Only the details that were filled in.
+          ...Object.fromEntries(Object.entries(details).filter(([, value]) => value !== null)),
         });
       } else {
         await updateExercise(accessToken, props.exercise.id, {
@@ -119,6 +135,7 @@ export function ExerciseFormScreen(props: Props) {
           ...(isUnilateral ? { loggingStyle: 'single_side' as const } : {}),
           isActive,
           ...(photoUrl !== undefined ? { photoUrl } : {}),
+          ...details,
         });
       }
 
@@ -189,7 +206,8 @@ export function ExerciseFormScreen(props: Props) {
         <TextInput
           testID="exercise-form-name"
           label="Exercise Name"
-          placeholder="Exercise name"
+          placeholder="e.g. Seated Row"
+          helperText="The only thing you have to fill in."
           value={name}
           onChangeText={setName}
         />
@@ -235,6 +253,45 @@ export function ExerciseFormScreen(props: Props) {
           />
         </View>
       </View>
+
+      {/* The same exercise feels heavier or lighter on a different machine, so progress is only
+          comparable on the same one: these tell look-alike machines apart. */}
+      <Section title="About This Machine (Optional)">
+        <View style={styles.photo}>
+          <Text style={styles.helperText}>
+            The same exercise can feel heavier or lighter on a different machine. These help you
+            keep tracking on the same one.
+          </Text>
+          <TextInput
+            testID="exercise-form-gym"
+            label="Gym"
+            placeholder="e.g. Fit4Less Downtown"
+            helperText="Where this machine is. It shows under the name, so two machines with the same name are easy to tell apart."
+            value={gym}
+            onChangeText={setGym}
+            maxLength={60}
+          />
+          <TextInput
+            testID="exercise-form-feel"
+            label="How It Feels"
+            placeholder="e.g. Heavier than the one at my other gym"
+            helperText="Does it feel heavier or lighter than other machines like it -- here, or at other gyms?"
+            value={feelNotes}
+            onChangeText={setFeelNotes}
+            multiline
+            maxLength={300}
+          />
+          <TextInput
+            testID="exercise-form-attachment"
+            label="Handle or Attachment"
+            placeholder="e.g. Wide bar, V-handle, Rope"
+            helperText="Which bar or handle you use on it."
+            value={attachment}
+            onChangeText={setAttachment}
+            maxLength={60}
+          />
+        </View>
+      </Section>
 
       <Section title="Machine Photo (Optional)">
         <View style={styles.photo}>

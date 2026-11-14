@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../auth/AuthProvider';
+import { updateExercise } from '../lib/api';
 import { Modal, View } from 'react-native';
 import { AppHeader } from '../design/AppHeader';
 import { ListRow } from '../design/ListRow';
@@ -7,6 +9,7 @@ import { colors } from '../design/theme';
 import {
   fetchAllExercises,
   fetchExerciseSourceCounts,
+  invalidateExerciseCache,
   type ExerciseRow,
   type ExerciseSource,
   type ExerciseSourceCounts,
@@ -65,6 +68,20 @@ export function ExercisePickerModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sourceCounts, setSourceCounts] = useState<ExerciseSourceCounts | null>(null);
+  const accessToken = useAuth().session?.access_token;
+
+  // Swiping one of your own exercises away deletes it from your library, here as in the library
+  // itself: it leaves the list and the picker, and every workout it was logged in keeps it.
+  const deleteMine = useCallback(
+    async (exercise: ExerciseRow) => {
+      if (!accessToken) throw new Error('Please sign in again.');
+      await updateExercise(accessToken, exercise.id, { isActive: false });
+      invalidateExerciseCache(userId);
+      setRows((prev) => prev.filter((row) => row.id !== exercise.id));
+      setSourceCounts((prev) => prev && { ...prev, all: prev.all - 1, mine: prev.mine - 1 });
+    },
+    [accessToken, userId],
+  );
   const [photoOpen, setPhotoOpen] = useState<string | null>(null);
   // Bumped by Retry to load the exercises again.
   const [attempt, setAttempt] = useState(0);
@@ -151,6 +168,7 @@ export function ExercisePickerModal({
             rowSuffix={(exercise) => (alreadyAddedIdSet.has(exercise.id) ? ' (added)' : '')}
             onSelectRow={onSelect}
             onPhotoPress={(exercise) => setPhotoOpen(exercise.photoUrl)}
+            onDeleteMine={deleteMine}
             listHeader={
               onCreateCustom ? (
                 <ListRow

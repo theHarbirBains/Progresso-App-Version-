@@ -101,6 +101,39 @@ describe('ExerciseFormScreen (create mode)', () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  it("saves what sets the machine apart -- only what's filled in, trimmed", async () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Seated Leg Extension');
+    selectMuscleGroup('exercise-form-muscle-group', 'quadriceps');
+    fireEvent.changeText(screen.getByTestId('exercise-form-gym'), ' Downtown ');
+    fireEvent.changeText(
+      screen.getByTestId('exercise-form-feel'),
+      'Heavier than the other one in this gym',
+    );
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
+        name: 'Seated Leg Extension',
+        muscleGroup: 'quadriceps',
+        movementType: 'bilateral',
+        measurementType: 'weight_reps',
+        gym: 'Downtown',
+        feelNotes: 'Heavier than the other one in this gym',
+      }),
+    );
+  });
+
+  it('explains each box plainly, and only the name is required', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    expect(screen.getByText('The only thing you have to fill in.')).toBeTruthy();
+    expect(screen.getByText(/feel heavier or lighter than other machines like it/)).toBeTruthy();
+    expect(screen.getByText('Which bar or handle you use on it.')).toBeTruthy();
+    expect(screen.getByTestId('exercise-form-attachment')).toBeTruthy();
+  });
+
   it('creates a unilateral exercise with logging_style set automatically -- never asked as its own question', async () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
@@ -330,6 +363,9 @@ describe('ExerciseFormScreen (edit mode)', () => {
         movementType: 'bilateral',
         measurementType: 'weight_reps',
         isActive: true,
+        gym: null,
+        feelNotes: null,
+        attachment: null,
       }),
     );
     expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');

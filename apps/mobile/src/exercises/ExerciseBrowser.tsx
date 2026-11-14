@@ -183,7 +183,15 @@ export function ExerciseBrowser({
               testID={`exercise-item-${item.id}`}
               leading={photo}
               title={`${item.name}${rowSuffix?.(item) ?? ''}`}
-              subtitle={`${MUSCLE_GROUP_LABELS[item.muscleGroup]} · ${MOVEMENT_TYPE_LABELS[item.movementType]}`}
+              // Its gym and handle after the muscle, so two machines of the same name read apart.
+              subtitle={[
+                MUSCLE_GROUP_LABELS[item.muscleGroup],
+                MOVEMENT_TYPE_LABELS[item.movementType],
+                item.gym,
+                item.attachment,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
               onPress={disabled ? undefined : onRowPress}
               disabled={disabled}
               accessibilityActions={deletable ? [{ name: 'delete', label: 'Delete' }] : undefined}

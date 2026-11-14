@@ -166,6 +166,7 @@ describe('fetchExercises', () => {
           id: 'ex-1',
           name: 'Barbell Curl',
           muscle_group: 'biceps',
+          gym: 'Downtown',
           is_active: true,
           created_by: 'user-1',
         },
@@ -182,6 +183,10 @@ describe('fetchExercises', () => {
         muscleGroup: 'biceps',
         // A row from before measurement types says nothing: it measures weight and reps.
         measurementType: 'weight_reps',
+        // What sets the machine apart, nothing said where it wasn't given.
+        gym: 'Downtown',
+        feelNotes: null,
+        attachment: null,
         isActive: true,
         createdBy: 'user-1',
       },

@@ -1,9 +1,15 @@
-import { Modal, StyleSheet } from 'react-native';
+import { Alert, Modal, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { fetchAllExercises } from '../exercises/exerciseQueries';
+import { fetchAllExercises, invalidateExerciseCache } from '../exercises/exerciseQueries';
+import { updateExercise } from '../lib/api';
 import { colors } from '../design/theme';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { ExercisePickerModal } from './ExercisePickerModal';
+
+jest.mock('../auth/AuthProvider', () => ({
+  useAuth: () => ({ session: { access_token: 'token-123' } }),
+}));
+jest.mock('../lib/api', () => ({ updateExercise: jest.fn() }));
 
 jest.mock('../exercises/exerciseQueries', () => ({
   fetchAllExercises: jest.fn(),
@@ -38,6 +44,60 @@ beforeEach(() => {
       createdBy: null,
     },
   ]);
+});
+
+describe('ExercisePickerModal -- deleting your own exercises', () => {
+  it('deletes one of your own exercises by swipe, leaving the built-ins alone', async () => {
+    mockFetchExercises.mockResolvedValue([
+      {
+        id: 'ex-mine',
+        name: 'Seated Leg Extension',
+        muscleGroup: 'quadriceps',
+        movementType: 'bilateral',
+        gym: 'Downtown',
+        attachment: null,
+        isActive: true,
+        createdBy: 'user-1',
+      },
+      {
+        id: 'ex1',
+        name: 'Barbell Bench Press',
+        muscleGroup: 'chest',
+        movementType: 'bilateral',
+        isActive: true,
+        createdBy: null,
+      },
+    ]);
+    jest.mocked(updateExercise).mockResolvedValue({} as never);
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Delete')?.onPress?.();
+    });
+    render(
+      <ExercisePickerModal
+        visible={true}
+        onClose={jest.fn()}
+        onSelect={jest.fn()}
+        userId="user-1"
+        alreadyAddedIds={[]}
+        onCreateCustom={jest.fn()}
+      />,
+    );
+
+    const mine = await screen.findByTestId('exercise-item-ex-mine');
+    // Its gym after the muscle, so look-alike machines read apart.
+    expect(within(mine).getByText('Quadriceps · Bilateral · Downtown')).toBeTruthy();
+    expect(screen.getByTestId('exercise-item-ex1').props.accessibilityActions).toBeUndefined();
+
+    fireEvent(mine, 'accessibilityAction', { nativeEvent: { actionName: 'delete' } });
+
+    await waitFor(() =>
+      expect(updateExercise).toHaveBeenCalledWith('token-123', 'ex-mine', { isActive: false }),
+    );
+    expect(invalidateExerciseCache).toHaveBeenCalledWith('user-1');
+    await waitFor(() => expect(screen.queryByTestId('exercise-item-ex-mine')).toBeNull());
+    expect(screen.getByTestId('exercise-item-ex1')).toBeTruthy();
+    alert.mockRestore();
+  });
 });
 
 describe('ExercisePickerModal', () => {

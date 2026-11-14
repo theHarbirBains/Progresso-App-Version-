@@ -14,6 +14,10 @@ export interface ExerciseResponse {
   loggingStyle: LoggingStyle | null;
   measurementType: MeasurementType;
   photoUrl: string | null;
+  /** Where the machine is, how it feels next to others like it, its bar or handle. */
+  gym: string | null;
+  feelNotes: string | null;
+  attachment: string | null;
   isActive: boolean;
   createdBy: string | null;
   createdAt: string;
@@ -29,6 +33,9 @@ export interface CreateExerciseInput {
   /** What a set records; the API defaults to weight and reps. */
   measurementType?: MeasurementType;
   photoUrl?: string;
+  gym?: string | null;
+  feelNotes?: string | null;
+  attachment?: string | null;
 }
 
 export interface UpdateExerciseInput {
@@ -41,6 +48,10 @@ export interface UpdateExerciseInput {
   isActive?: boolean;
   /** Omit to leave the stored photo alone; null clears it, a string sets/replaces it -- editable any time, not just at create. */
   photoUrl?: string | null;
+  /** Each: omit to leave it, a blank or null clears it. */
+  gym?: string | null;
+  feelNotes?: string | null;
+  attachment?: string | null;
 }
 
 export function createExercise(

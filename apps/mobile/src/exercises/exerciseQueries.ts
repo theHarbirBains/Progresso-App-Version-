@@ -19,6 +19,10 @@ export interface ExerciseRow {
   measurementType: MeasurementType;
   /** An optional photo of the machine/equipment, shown as a small thumbnail in the library -- null for most exercises (built-ins never have one, a custom exercise only if its owner added one). */
   photoUrl: string | null;
+  /** What sets a custom exercise's machine apart (all optional): its gym, how it feels, its handle. */
+  gym?: string | null;
+  feelNotes?: string | null;
+  attachment?: string | null;
   isActive: boolean;
   createdBy: string | null;
 }
@@ -49,6 +53,9 @@ interface ExerciseDbRow {
   logging_style: LoggingStyle | null;
   measurement_type: MeasurementType | null;
   photo_url: string | null;
+  gym: string | null;
+  feel_notes: string | null;
+  attachment: string | null;
   is_active: boolean;
   created_by: string | null;
 }
@@ -62,6 +69,9 @@ function toExerciseRow(row: ExerciseDbRow): ExerciseRow {
     loggingStyle: row.logging_style,
     measurementType: row.measurement_type ?? 'weight_reps',
     photoUrl: row.photo_url,
+    gym: row.gym ?? null,
+    feelNotes: row.feel_notes ?? null,
+    attachment: row.attachment ?? null,
     isActive: row.is_active,
     createdBy: row.created_by,
   };
@@ -80,7 +90,7 @@ function buildExerciseQuery(params: {
   let query = supabase
     .from('exercises')
     .select(
-      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, is_active, created_by',
+      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, is_active, created_by',
       count ? { count } : undefined,
     )
     .eq('is_active', true)
@@ -152,7 +162,7 @@ async function fetchFullExerciseList(userId: string): Promise<ExerciseRow[]> {
   const { data, error } = await supabase
     .from('exercises')
     .select(
-      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, is_active, created_by',
+      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, is_active, created_by',
     )
     .eq('is_active', true)
     .order('name', { ascending: true });
