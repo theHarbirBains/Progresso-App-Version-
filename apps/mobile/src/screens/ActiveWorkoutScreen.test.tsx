@@ -3,6 +3,7 @@ import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet } from 'react-nativ
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { fetchExerciseSettings, saveExerciseSetting } from '../workouts/exerciseSettingsQueries';
 import { useAuth } from '../auth/AuthProvider';
+import { clearLiveWorkoutDraft } from '../workouts/liveWorkoutDraft';
 import { AppCard } from '../design/AppCard';
 import { Card } from '../design/Card';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
@@ -163,7 +164,9 @@ const baseWorkout = {
   ],
 };
 
-beforeEach(() => {
+beforeEach(async () => {
+  // What a test typed into a set is kept on the device for the workout; each test starts clean.
+  await clearLiveWorkoutDraft('w1');
   (fetchExerciseSettings as jest.Mock).mockReset().mockResolvedValue(new Map());
   (saveExerciseSetting as jest.Mock).mockReset();
   mockUseAuth.mockReturnValue({
@@ -223,6 +226,20 @@ function exerciseList() {
   return lists[0];
 }
 
+/** Answers Finish's question about sets left empty: removes them and finishes. */
+function removeEmptySetsOnFinish() {
+  return jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    buttons?.find((button) => /^Remove .* and Finish$/.test(button.text ?? ''))?.onPress?.();
+  });
+}
+
+/** Waits out a set's save delay (useSetAutosave), for checking nothing was saved. */
+async function pastTheSaveDelay() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+  });
+}
+
 describe('ActiveWorkoutScreen', () => {
   it('loads the workout for the given workoutId (resuming the correct session)', async () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
@@ -271,17 +288,19 @@ describe('ActiveWorkoutScreen', () => {
     expect(screen.queryByTestId('workout-summary-total-volume')).toBeNull();
   });
 
-  it('completing a set requires a valid weight and reps first', async () => {
+  it('has no check to tap, and saves nothing until a set has a weight and reps', async () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
     });
     await screen.findByTestId('exercise-card-we1');
 
-    const completeButton = screen.getByTestId('exercise-card-we1-set-s2-complete');
-    expect(completeButton.props.accessibilityState.disabled).toBe(true);
+    expect(screen.queryByTestId('exercise-card-we1-set-s2-complete')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '120');
+    await pastTheSaveDelay();
+    expect(mockUpdateSet).not.toHaveBeenCalledWith('s2', expect.anything());
   });
 
-  it('marks a set complete once weight and reps are entered, using the existing set-update path', async () => {
+  it('saves a set as its weight and reps are typed, using the existing set-update path', async () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
     });
@@ -289,7 +308,6 @@ describe('ActiveWorkoutScreen', () => {
 
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '120');
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '6');
-    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
 
     await waitFor(() =>
       expect(mockUpdateSet).toHaveBeenCalledWith(
@@ -297,9 +315,18 @@ describe('ActiveWorkoutScreen', () => {
         expect.objectContaining({ weightKg: 120, reps: 6, completedAt: expect.any(String) }),
       ),
     );
+
+    // Changed, it saves again; the time it was done stays.
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '7');
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenLastCalledWith(
+        's2',
+        expect.objectContaining({ weightKg: 120, reps: 7 }),
+      ),
+    );
   });
 
-  it('completes a bodyweight set on reps alone, and saves no weight', async () => {
+  it('saves a bodyweight set on reps alone, and no weight', async () => {
     mockFetchWorkoutDetail.mockResolvedValue({
       ...baseWorkout,
       exercises: [
@@ -319,7 +346,6 @@ describe('ActiveWorkoutScreen', () => {
     expect(screen.queryByTestId('exercise-card-we1-set-s2-weight')).toBeNull();
     expect(screen.getByTestId('exercise-card-we1-set-s2-bodyweight')).toHaveTextContent('BW');
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '20');
-    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
 
     await waitFor(() =>
       expect(mockUpdateSet).toHaveBeenCalledWith(
@@ -334,7 +360,7 @@ describe('ActiveWorkoutScreen', () => {
     );
   });
 
-  it('completes a timed set on a time typed as minutes and seconds', async () => {
+  it('saves a timed set on a time typed as minutes and seconds', async () => {
     mockFetchWorkoutDetail.mockResolvedValue({
       ...baseWorkout,
       exercises: [
@@ -352,10 +378,7 @@ describe('ActiveWorkoutScreen', () => {
     });
     await screen.findByTestId('exercise-card-we1');
 
-    const complete = screen.getByTestId('exercise-card-we1-set-s2-complete');
-    expect(complete.props.accessibilityState.disabled).toBe(true);
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-time'), '1:30');
-    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
 
     await waitFor(() =>
       expect(mockUpdateSet).toHaveBeenCalledWith(
@@ -379,9 +402,12 @@ describe('ActiveWorkoutScreen', () => {
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '100.5');
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '6');
 
-    expect(
-      screen.getByTestId('exercise-card-we1-set-s2-complete').props.accessibilityState.disabled,
-    ).toBe(false);
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        's2',
+        expect.objectContaining({ weightKg: 100.5 }),
+      ),
+    );
   });
 
   it('accepts weights in steps of 0.25, such as 61.25 with 1.25 kg plates', async () => {
@@ -393,9 +419,12 @@ describe('ActiveWorkoutScreen', () => {
     for (const valid of ['61.25', '100.75']) {
       fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), valid);
       fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '6');
-      expect(
-        screen.getByTestId('exercise-card-we1-set-s2-complete').props.accessibilityState.disabled,
-      ).toBe(false);
+      await waitFor(() =>
+        expect(mockUpdateSet).toHaveBeenCalledWith(
+          's2',
+          expect.objectContaining({ weightKg: Number(valid) }),
+        ),
+      );
     }
   });
 
@@ -408,12 +437,9 @@ describe('ActiveWorkoutScreen', () => {
     for (const invalid of ['100.1', '100.3', '100.125']) {
       fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), invalid);
       fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '6');
-      expect(
-        screen.getByTestId('exercise-card-we1-set-s2-complete').props.accessibilityState.disabled,
-      ).toBe(true);
     }
 
-    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
+    await pastTheSaveDelay();
     expect(mockUpdateSet).not.toHaveBeenCalledWith(
       's2',
       expect.objectContaining({ completedAt: expect.any(String) }),
@@ -688,10 +714,10 @@ describe('ActiveWorkoutScreen', () => {
       wrapper: TestProviders,
     });
 
-    // A completed set's check button is filled with the accent -- always the
-    // app's amber, never a color saved by the old color picker.
-    const complete = await screen.findByTestId('exercise-card-we1-set-s1-complete');
-    expect(StyleSheet.flatten(complete.props.style).backgroundColor).toBe('#D99A50');
+    // The selected muscle tab is filled with the accent -- always the app's amber, never a
+    // color saved by the old color picker.
+    const allTab = await screen.findByTestId('active-workout-muscle-tabs-all');
+    expect(StyleSheet.flatten(allTab.props.style).backgroundColor).toBe('#D99A50');
   });
 
   it('has no back arrow or "..." options menu -- Finish Workout/Cancel Workout are the only exits', async () => {
@@ -714,9 +740,11 @@ describe('ActiveWorkoutScreen', () => {
 
     expect(recallLiveWorkout('user-1')).toMatchObject({ id: 'w1', completedAt: null });
 
+    const alert = removeEmptySetsOnFinish();
     fireEvent.press(screen.getByTestId('complete-workout'));
     await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
     await waitFor(() => expect(recallLiveWorkout('user-1')).toBeNull());
+    alert.mockRestore();
   });
 
   it('is on the Lock Screen and the Next Workout widget while it goes, and off the Lock Screen once finished', async () => {
@@ -747,10 +775,12 @@ describe('ActiveWorkoutScreen', () => {
 
     const card = start.mock.results[0].value;
     (workoutActivity.getInstances as jest.Mock).mockReturnValueOnce([card]);
+    const alert = removeEmptySetsOnFinish();
     fireEvent.press(screen.getByTestId('complete-workout'));
 
     await waitFor(() => expect(card.end).toHaveBeenCalledWith('immediate'));
     expect(refreshNextWorkout).toHaveBeenCalledWith('user-1', null);
+    alert.mockRestore();
   });
 
   it('comes off the Lock Screen when it is cancelled too', async () => {
@@ -784,10 +814,20 @@ describe('ActiveWorkoutScreen', () => {
     expect(button).toHaveTextContent('Finish Workout');
     expect(screen.queryByText('Workout Complete')).toBeNull();
 
+    const alert = removeEmptySetsOnFinish();
     fireEvent.press(button);
 
     await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
     expect(mockCompleteWorkout).toHaveBeenCalledTimes(1);
+    // The set left empty was asked about, and removed.
+    expect(alert).toHaveBeenCalledWith(
+      'A set is missing a value',
+      expect.stringContaining('Fill it in, or remove it and finish.'),
+      expect.any(Array),
+      expect.anything(),
+    );
+    expect(mockDeleteSet).toHaveBeenCalledWith('s2');
+    alert.mockRestore();
     // Straight to the Share screen (History stays underneath it).
     expect(mockReset).toHaveBeenCalledWith({
       index: 1,
@@ -803,9 +843,11 @@ describe('ActiveWorkoutScreen', () => {
     await screen.findByTestId('exercise-card-we1');
     await waitFor(() => expect(mockFetchAllCompletedWorkouts).toHaveBeenCalledTimes(1));
 
+    const alert = removeEmptySetsOnFinish();
     fireEvent.press(screen.getByTestId('complete-workout'));
 
     await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
+    alert.mockRestore();
     // Cancelling a workout never sets completed_at, so it must never trigger
     // this refetch -- only completeWorkout invalidates the cache.
     await waitFor(() => expect(mockFetchAllCompletedWorkouts).toHaveBeenCalledTimes(2));
@@ -971,7 +1013,6 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
     fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-reps'), '10');
     fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-right-weight'), '40');
     fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-right-reps'), '10');
-    fireEvent.press(screen.getByTestId('exercise-card-we-bss-set-1-complete'));
 
     await waitFor(() =>
       expect(mockUpdateSet).toHaveBeenCalledWith(
@@ -979,9 +1020,12 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
         expect.objectContaining({ weightKg: 42.5, reps: 10, completedAt: expect.any(String) }),
       ),
     );
-    expect(mockUpdateSet).toHaveBeenCalledWith(
-      's-right',
-      expect.objectContaining({ weightKg: 40, reps: 10, completedAt: expect.any(String) }),
+    // Each side saves as its own set, a moment after its own typing.
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        's-right',
+        expect.objectContaining({ weightKg: 40, reps: 10, completedAt: expect.any(String) }),
+      ),
     );
     // Confirms each side's own real weight was sent -- never 42.5 + 40 = 82.5.
     expect(mockUpdateSet).not.toHaveBeenCalledWith(
@@ -1005,24 +1049,54 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
     );
   });
 
-  it('keeps the set incomplete (and Complete disabled) until BOTH sides have valid values', async () => {
+  it('asks at Finish about a side left empty, and removes the whole set -- both sides', async () => {
+    mockUpdateSet.mockImplementation(async (setId: string, updates: unknown) => ({
+      id: setId,
+      setIndex: 1,
+      side: setId === 's-left' ? 'left' : 'right',
+      weightKg: null,
+      reps: null,
+      completedAt: null,
+      ...(updates as object),
+    }));
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
     });
     await screen.findByTestId('exercise-card-we-bss');
 
-    const completeButton = screen.getByTestId('exercise-card-we-bss-set-1-complete');
-    expect(completeButton.props.accessibilityState.disabled).toBe(true);
-
-    // Only the left side filled in -- still incomplete.
+    // Only the left side filled in.
     fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-weight'), '42.5');
     fireEvent.changeText(screen.getByTestId('exercise-card-we-bss-set-1-left-reps'), '10');
-    expect(
-      screen.getByTestId('exercise-card-we-bss-set-1-complete').props.accessibilityState.disabled,
-    ).toBe(true);
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith('s-left', expect.objectContaining({ reps: 10 })),
+    );
+    expect(mockUpdateSet).not.toHaveBeenCalledWith('s-right', expect.anything());
 
-    fireEvent.press(completeButton);
-    expect(mockUpdateSet).not.toHaveBeenCalled();
+    const alert = removeEmptySetsOnFinish();
+    fireEvent.press(screen.getByTestId('complete-workout'));
+
+    await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
+    expect(mockDeleteSet).toHaveBeenCalledWith('s-left');
+    expect(mockDeleteSet).toHaveBeenCalledWith('s-right');
+    alert.mockRestore();
+  });
+
+  it('keeps the workout open to fill in, when Fill In is chosen', async () => {
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we-bss');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Fill In')?.onPress?.();
+    });
+
+    fireEvent.press(screen.getByTestId('complete-workout'));
+
+    expect(alert).toHaveBeenCalled();
+    await pastTheSaveDelay();
+    expect(mockCompleteWorkout).not.toHaveBeenCalled();
+    expect(mockDeleteSet).not.toHaveBeenCalled();
+    alert.mockRestore();
   });
 
   it('creates a new set for a unilateral exercise as a left+right pair sharing the next set_index', async () => {
@@ -1147,13 +1221,12 @@ describe('Pre-filled sets', () => {
     });
   });
 
-  it('after completing 100 kg x 8, a new set shows 100 and 8 ready to edit, and is not completed', async () => {
+  it('after 100 kg x 8, a new set shows 100 and 8 ready to edit, and is not saved until changed', async () => {
     renderScreen();
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '100');
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '8');
-    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
     await waitFor(() =>
       expect(mockUpdateSet).toHaveBeenCalledWith(
         's2',
@@ -1167,9 +1240,8 @@ describe('Pre-filled sets', () => {
     expect(weight.props.value).toBe('100');
     expect(weight.props.editable).toBe(true);
     expect(screen.getByTestId('exercise-card-we1-set-s3-reps').props.value).toBe('8');
-    expect(
-      screen.getByTestId('exercise-card-we1-set-s3-complete').props.accessibilityState,
-    ).toEqual({ selected: false, disabled: false });
+    expect(screen.queryByTestId('exercise-card-we1-set-s3-complete')).toBeNull();
+    await pastTheSaveDelay();
     expect(mockUpdateSet).not.toHaveBeenCalledWith('s3', expect.anything());
   });
 
@@ -1694,7 +1766,6 @@ describe('Progressive overload', () => {
 
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '110');
     fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '12');
-    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-complete'));
 
     expect(await screen.findByTestId('exercise-card-we1-session-cue')).toHaveTextContent(
       /Top of your range\. Increase the weight next time\./,
@@ -1862,7 +1933,7 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     expect(custom).toHaveTextContent('Create Custom Exercise');
   });
 
-  it('makes each set input a large, named, mono readout and each complete button a 44pt target', async () => {
+  it('makes each set input a large, named, mono readout, with no check to aim for', async () => {
     await renderReady();
 
     const weight = screen.getByTestId('exercise-card-we1-set-s2-weight');
@@ -1873,11 +1944,7 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     expect(screen.getByTestId('exercise-card-we1-set-s2-reps').props.accessibilityLabel).toBe(
       'Set 2 reps',
     );
-    const complete = StyleSheet.flatten(
-      screen.getByTestId('exercise-card-we1-set-s2-complete').props.style,
-    );
-    expect(complete.width).toBeGreaterThanOrEqual(44);
-    expect(complete.height).toBeGreaterThanOrEqual(44);
+    expect(screen.queryByTestId('exercise-card-we1-set-s2-complete')).toBeNull();
   });
 
   it('avoids the on-screen keyboard so the set being typed stays visible', async () => {
@@ -2066,19 +2133,16 @@ describe('ActiveWorkoutScreen -- timing a timed set', () => {
 
   const timer = () => screen.getByTestId('exercise-card-we1-set-s2-timer');
   const time = () => screen.getByTestId('exercise-card-we1-set-s2-time');
-  const complete = () => screen.getByTestId('exercise-card-we1-set-s2-complete');
 
   it('starts, pauses with the time in the field, and resumes', async () => {
     renderLive();
     await screen.findByTestId('exercise-card-we1');
 
     expect(timer()).toHaveTextContent(/Start/);
-    expect(complete().props.accessibilityState.disabled).toBe(true);
 
     fireEvent.press(timer());
     expect(timer()).toHaveTextContent(/Pause/);
-    // Running, the time can be finished with the check; the field isn't typed into.
-    expect(complete().props.accessibilityState.disabled).toBe(false);
+    // Running, the field isn't typed into.
     expect(time().props.editable).toBe(false);
 
     now += 42_000;
@@ -2092,13 +2156,29 @@ describe('ActiveWorkoutScreen -- timing a timed set', () => {
     expect(time().props.value).toBe('1:00');
   });
 
-  it("finishes with the set's check, saving the time as the set's duration", async () => {
+  it('saves the time when the timer is paused', async () => {
+    renderLive();
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(timer());
+    now += 30_000;
+    fireEvent.press(timer());
+
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        's2',
+        expect.objectContaining({ durationSeconds: 30, completedAt: expect.any(String) }),
+      ),
+    );
+  });
+
+  it("stops a timer still going at Finish, saving its time as the set's", async () => {
     renderLive();
     await screen.findByTestId('exercise-card-we1');
 
     fireEvent.press(timer());
     now += 75_400;
-    fireEvent.press(complete());
+    fireEvent.press(screen.getByTestId('complete-workout'));
 
     await waitFor(() =>
       expect(mockUpdateSet).toHaveBeenCalledWith(
@@ -2106,8 +2186,7 @@ describe('ActiveWorkoutScreen -- timing a timed set', () => {
         expect.objectContaining({ durationSeconds: 75, completedAt: expect.any(String) }),
       ),
     );
-    // A finished set has no timer left.
-    await waitFor(() => expect(screen.queryByTestId('exercise-card-we1-set-s2-timer')).toBeNull());
+    await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
   });
 
   it('keeps time while the page is away: a remount finds it still running', async () => {

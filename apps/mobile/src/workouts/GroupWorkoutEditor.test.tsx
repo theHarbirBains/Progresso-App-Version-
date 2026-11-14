@@ -7,10 +7,12 @@ import {
   fetchPreviousPerformance,
   fetchWorkoutDetail,
   removeExerciseFromWorkout,
+  updateSet,
   type SetRecord,
   type WorkoutDetail,
 } from './workoutQueries';
-import { GroupWorkoutEditor } from './GroupWorkoutEditor';
+import { GroupWorkoutEditor, type LiveWorkoutFinish } from './GroupWorkoutEditor';
+import { clearLiveWorkoutDraft } from './liveWorkoutDraft';
 import { colors } from '../design/theme';
 
 jest.mock('./workoutQueries', () => ({
@@ -131,7 +133,9 @@ const members = [
   { userId: 'sam', displayName: 'Sam Lifts', workoutId: 'w-sam' },
 ];
 
-beforeEach(() => {
+beforeEach(async () => {
+  // What a test typed is kept on the device for each workout; each test starts clean.
+  await Promise.all(members.map((member) => clearLiveWorkoutDraft(member.workoutId)));
   addedExercises = {};
   addedSets = {};
   mockFetch.mockReset().mockImplementation(async (workoutId: string) => loadWorkout(workoutId));
@@ -384,5 +388,69 @@ describe('GroupWorkoutEditor', () => {
       screen.getByTestId('group-workout-exercise-ex-lat-pulldown-set-w-sam-we-lat-set-1-reps').props
         .value,
     ).toBe('12');
+  });
+});
+
+describe('GroupWorkoutEditor -- sets save as they are typed', () => {
+  it("saves a person's set as it is typed, with no check to tap", async () => {
+    jest
+      .mocked(updateSet)
+      .mockReset()
+      .mockImplementation(async (setId, updates) => ({
+        id: setId,
+        setIndex: 1,
+        side: null,
+        weightKg: null,
+        reps: null,
+        completedAt: null,
+        ...updates,
+      }));
+    renderEditor();
+    const weight = await screen.findByDisplayValue('100');
+
+    expect(screen.queryByTestId(/-complete$/)).toBeNull();
+    fireEvent.changeText(weight, '105');
+
+    await waitFor(() =>
+      expect(updateSet).toHaveBeenCalledWith(
+        'w-me-set-1',
+        expect.objectContaining({ weightKg: 105, completedAt: expect.any(String) }),
+      ),
+    );
+  });
+
+  it("asks about sets left empty before the screen's Finish goes on", async () => {
+    const finish: { current: LiveWorkoutFinish | null } = { current: null };
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Fill In')?.onPress?.();
+    });
+    render(
+      <GroupWorkoutEditor
+        members={members}
+        finishRef={finish}
+        startedAt="2026-10-06T09:00:00.000Z"
+        userId="me"
+        accentColor="#3DDC97"
+        onAccentColor="#000000"
+        testID="group-workout"
+      />,
+    );
+    await screen.findByDisplayValue('100');
+    const weight = screen.getByDisplayValue('100');
+    fireEvent.changeText(weight, '');
+
+    let ready: boolean | undefined;
+    await act(async () => {
+      ready = await finish.current!.readyToFinish();
+    });
+
+    expect(alert).toHaveBeenCalledWith(
+      'A set is missing a value',
+      expect.any(String),
+      expect.any(Array),
+      expect.anything(),
+    );
+    expect(ready).toBe(false);
+    alert.mockRestore();
   });
 });

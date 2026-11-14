@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { AppCard } from '../design/AppCard';
 import { RiseIn } from '../design/RiseIn';
@@ -15,7 +15,7 @@ import { cancelGroupWorkout, finishGroup, getGroup, type GroupDetail } from '../
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
-import { GroupWorkoutEditor } from '../workouts/GroupWorkoutEditor';
+import { GroupWorkoutEditor, type LiveWorkoutFinish } from '../workouts/GroupWorkoutEditor';
 import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
 import { showNextWorkoutWidget } from '../widgets/widgetUpdates';
 import {
@@ -38,6 +38,8 @@ export function GroupSessionScreen({ navigation, route }: Props) {
   const accessToken = session?.access_token;
   const userId = user?.id ?? '';
   const { theme, activeWorkoutSplitId } = useProgressTheme();
+  // The editor's Finish step, called before the group is finished.
+  const editorFinish = useRef<LiveWorkoutFinish | null>(null);
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -111,13 +113,17 @@ export function GroupSessionScreen({ navigation, route }: Props) {
         text: 'Finish',
         style: 'destructive',
         onPress: () =>
-          void run(() => finishGroup(accessToken, groupId), 'Could not finish the group').then(
-            (saved) => {
-              if (!saved) return;
-              afterEnded();
-              navigation.goBack();
-            },
-          ),
+          void (async () => {
+            // Timers stopped, sets left empty asked about, and everything typed saved first.
+            if (!((await editorFinish.current?.readyToFinish()) ?? true)) return;
+            const saved = await run(
+              () => finishGroup(accessToken, groupId),
+              'Could not finish the group',
+            );
+            if (!saved) return;
+            afterEnded();
+            navigation.goBack();
+          })(),
       },
     ]);
   }
@@ -215,6 +221,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
         {isLive && editorMembers.length > 0 ? (
           <GroupWorkoutEditor
             members={editorMembers}
+            finishRef={editorFinish}
             startedAt={group.startedAt}
             userId={userId}
             accentColor={theme.accent}

@@ -40,7 +40,7 @@ interface Props {
    * Completes or un-completes the whole logical set. Receives the left side's id -- and, when a
    * side's timer was going, the times they stopped at, by set id (SetRow's `timed`).
    */
-  onToggleComplete: (setId: string, timed?: Record<string, string>) => void;
+  onToggleComplete?: (setId: string, timed?: Record<string, string>) => void;
   /** Each side of a timed set gets a timer (the live workout only). */
   timer?: boolean;
   /** Removes both sides together -- a unilateral logical set is one unit, same as completion.
@@ -80,6 +80,8 @@ function UnilateralSetRowComponent({
   testID,
 }: Props) {
   const timed = timer && measurementType === 'timed';
+  // Saved as it's typed: no check, and its fields (and timers) always open to change.
+  const autosaved = onToggleComplete === undefined;
   const leftTiming = useSetTimer(left.id);
   const rightTiming = useSetTimer(right.id);
   const canToggle =
@@ -88,7 +90,7 @@ function UnilateralSetRowComponent({
 
   function handleComplete() {
     if (!timed || completed) {
-      onToggleComplete(left.id);
+      onToggleComplete?.(left.id);
       return;
     }
     // Finishing: each side's timer stops, and both sides complete at their times.
@@ -97,7 +99,7 @@ function UnilateralSetRowComponent({
       const seconds = stopSetTimer(side.id);
       if (seconds !== null) stopped[side.id] = formatDuration(seconds);
     }
-    onToggleComplete(left.id, Object.keys(stopped).length > 0 ? stopped : undefined);
+    onToggleComplete?.(left.id, Object.keys(stopped).length > 0 ? stopped : undefined);
   }
 
   return (
@@ -115,7 +117,7 @@ function UnilateralSetRowComponent({
               weight={values[key].weight}
               reps={values[key].reps}
               duration={values[key].duration ?? ''}
-              completed={completed}
+              completed={autosaved ? false : completed}
               onChangeWeight={onChangeWeight}
               onChangeReps={onChangeReps}
               onChangeDuration={onChangeDuration}
@@ -132,7 +134,7 @@ function UnilateralSetRowComponent({
         setIndex={setIndex}
         completed={completed}
         canToggle={canToggle}
-        onComplete={handleComplete}
+        onComplete={autosaved ? undefined : handleComplete}
         onRemove={onRemove ? () => onRemove(left.id) : undefined}
         accentColor={accentColor}
         onAccentColor={onAccentColor}

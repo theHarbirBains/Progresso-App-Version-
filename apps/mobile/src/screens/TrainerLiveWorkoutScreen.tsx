@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
@@ -6,7 +7,7 @@ import { Screen } from '../design/Screen';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { cancelLiveWorkout, finishLiveWorkout, resolveClientExercise } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
-import { GroupWorkoutEditor } from '../workouts/GroupWorkoutEditor';
+import { GroupWorkoutEditor, type LiveWorkoutFinish } from '../workouts/GroupWorkoutEditor';
 import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
 
 type Props = RootStackScreenProps<'TrainerLiveWorkout'>;
@@ -25,6 +26,8 @@ export function TrainerLiveWorkoutScreen({ navigation, route }: Props) {
   const accessToken = session?.access_token;
   const trainerId = user?.id ?? '';
   const title = clientName ?? 'Client';
+  // The editor's Finish step, called before the session is finished.
+  const editorFinish = useRef<LiveWorkoutFinish | null>(null);
 
   function resolveExerciseId(exerciseId: string): Promise<string> {
     if (!accessToken) return Promise.reject(new Error('You are signed out'));
@@ -63,13 +66,17 @@ export function TrainerLiveWorkoutScreen({ navigation, route }: Props) {
       {
         text: 'Finish',
         style: 'destructive',
-        onPress: () => {
-          void finishLiveWorkout(accessToken, clientId, workoutId)
-            .then(() => navigation.goBack())
-            .catch((err: unknown) =>
-              Alert.alert('Could not finish', err instanceof Error ? err.message : 'Try again'),
-            );
-        },
+        onPress: () =>
+          void (async () => {
+            // Timers stopped, sets left empty asked about, and everything typed saved first.
+            if (!((await editorFinish.current?.readyToFinish()) ?? true)) return;
+            try {
+              await finishLiveWorkout(accessToken, clientId, workoutId);
+              navigation.goBack();
+            } catch (err) {
+              Alert.alert('Could not finish', err instanceof Error ? err.message : 'Try again');
+            }
+          })(),
       },
     ]);
   }
@@ -98,6 +105,7 @@ export function TrainerLiveWorkoutScreen({ navigation, route }: Props) {
       >
         <GroupWorkoutEditor
           members={[{ userId: clientId, displayName: title, workoutId }]}
+          finishRef={editorFinish}
           startedAt={startedAt ?? new Date().toISOString()}
           userId={trainerId}
           resolveExerciseId={resolveExerciseId}

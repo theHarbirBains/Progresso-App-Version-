@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { Card } from '../design/Card';
 import { Text } from '../design/Text';
@@ -17,7 +17,7 @@ import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { FilterChips } from '../design/FilterChips';
 import { workoutMuscleTabs, type MuscleTab } from '../workouts/workoutMuscleTabs';
-import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
+import { measurementTypeOf } from '../exercises/movementTypes';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -35,10 +35,7 @@ import {
   computeCardSets,
   computeUnilateralSets,
   draftFromSet,
-  draftValues,
   hasDraftInput,
-  invalidDraftMessage,
-  isValidDraft,
   withPrefilledSets,
   type SetInputDraft,
 } from '../workouts/setInputDrafts';
@@ -66,6 +63,7 @@ import {
   saveLiveWorkoutDraft,
 } from '../workouts/liveWorkoutDraft';
 import { clearSetTimers, discardSetTimer, openSetTimers } from '../workouts/setTimers';
+import { useSetAutosave, type LiveSet } from '../workouts/useSetAutosave';
 import { useSetInputDrafts } from '../workouts/useSetInputDrafts';
 import { computeTotalSets } from '../workouts/workoutSummary';
 import { WorkoutStats } from '../workouts/WorkoutStats';
@@ -74,21 +72,13 @@ import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
 
 type Props = RootStackScreenProps<'ActiveWorkout'>;
 
-/** A set's draft with a stopped timer's time as its duration, when there is one. */
-function withTimedDuration(draft: SetInputDraft, timedDuration: string | undefined): SetInputDraft {
-  if (timedDuration === undefined) return draft;
-  // A set never typed into has no draft yet.
-  return {
-    ...((draft as SetInputDraft | undefined) ?? { weight: '', reps: '' }),
-    duration: timedDuration,
-  };
-}
-
 // The live-tracking half of the Start Workout experience (see
 // NewWorkoutScreen.tsx for the pre-start planning half), sharing the same
 // "exactly one set per new exercise" rule. A new set's fields start filled
-// in from the set before it or from last session (see withPrefilledSets);
-// completing it still takes a tap.
+// in from the set before it or from last session (see withPrefilledSets).
+// There's no check to tap: a set saves as it's typed (useSetAutosave), and
+// Finish saves what's left on the screen, asking first about any set with an
+// empty field -- fill it in, or remove it.
 //
 // Layout, built for one-handed use between sets: the header carries the
 // workout's name and muscles; under it a pinned strip keeps duration, total
@@ -130,6 +120,60 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     changeReps: changeSetReps,
     changeDuration: changeSetDuration,
   } = useSetInputDrafts();
+  // Every set on the screen saves as it's typed -- see useSetAutosave.
+  const liveSets: LiveSet[] = useMemo(
+    () =>
+      (workout?.exercises ?? []).flatMap((exercise) =>
+        exercise.sets.map((set) => ({
+          set,
+          type: measurementTypeOf(exercise),
+          exerciseId: exercise.id,
+          unilateral: exercise.movementType === 'unilateral',
+        })),
+      ),
+    [workout],
+  );
+  const autosave = useSetAutosave({
+    sets: liveSets,
+    setInputs,
+    weightUnit,
+    save: (setId, update) => updateSet(setId, update),
+    onSaved: (saved) =>
+      setWorkout((prev) =>
+        prev
+          ? {
+              ...prev,
+              exercises: prev.exercises.map((exercise) =>
+                exercise.sets.some((set) => set.id === saved.id)
+                  ? {
+                      ...exercise,
+                      sets: exercise.sets.map((set) => (set.id === saved.id ? saved : set)),
+                    }
+                  : exercise,
+              ),
+            }
+          : prev,
+      ),
+    remove: async (setIds) => {
+      await Promise.all(setIds.map((setId) => deleteSet(setId)));
+      const gone = new Set(setIds);
+      setWorkout((prev) =>
+        prev
+          ? {
+              ...prev,
+              exercises: prev.exercises.map((exercise) => ({
+                ...exercise,
+                sets: exercise.sets.filter((set) => !gone.has(set.id)),
+              })),
+            }
+          : prev,
+      );
+      dropSetInputs(...setIds);
+      for (const setId of setIds) discardSetTimer(setId);
+    },
+    onTimersStopped: (drafts) => setSetInputs((prev) => ({ ...prev, ...drafts })),
+    onError: setError,
+  });
   // A timed set's timer carries on across a remount or an app close (workouts/setTimers.ts).
   const timersWorkoutId = workout?.id;
   useEffect(() => {
@@ -344,94 +388,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     }
   }
 
-  /** Completes/uncompletes exactly one set row. Shared by the bilateral
-   * (one row per logical set) and unilateral (two rows per logical set)
-   * completion handlers below, so the validation/save logic only exists
-   * once. */
-  async function completeOrUncompleteSet(
-    exerciseId: string,
-    set: SetRecord,
-    type: MeasurementType,
-    timedDuration?: string,
-  ): Promise<{ ok: true } | { ok: false; error: string }> {
-    if (set.completedAt) {
-      const updated = await updateSet(set.id, { completedAt: null });
-      updateExerciseSets(exerciseId, (ex) => ({
-        ...ex,
-        sets: ex.sets.map((s) => (s.id === set.id ? updated : s)),
-      }));
-      return { ok: true };
-    }
-
-    const draft = withTimedDuration(setInputs[set.id], timedDuration);
-    if (!isValidDraft(draft, type)) {
-      return { ok: false, error: invalidDraftMessage(type) };
-    }
-    const updated = await updateSet(set.id, {
-      ...draftValues(draft, type, weightUnit),
-      completedAt: new Date().toISOString(),
-    });
-    updateExerciseSets(exerciseId, (ex) => ({
-      ...ex,
-      sets: ex.sets.map((s) => (s.id === set.id ? updated : s)),
-    }));
-    return { ok: true };
-  }
-
-  async function handleToggleComplete(
-    exercise: WorkoutExerciseWithSets,
-    set: WorkoutExerciseWithSets['sets'][number],
-    timed?: Record<string, string>,
-  ) {
-    setError(null);
-    try {
-      const result = await completeOrUncompleteSet(
-        exercise.id,
-        set,
-        measurementTypeOf(exercise),
-        timed?.[set.id],
-      );
-      if (!result.ok) setError(result.error);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update set');
-    }
-  }
-
-  /** Completes/uncompletes BOTH sides of one unilateral logical set
-   * together -- it's one unit from the user's perspective (see
-   * UnilateralSetRow), never two independent completions. */
-  async function handleToggleUnilateralComplete(
-    exercise: WorkoutExerciseWithSets,
-    setIndex: number,
-    timed?: Record<string, string>,
-  ) {
-    const left = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'left');
-    const right = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'right');
-    if (!left || !right) return;
-
-    setError(null);
-    const type = measurementTypeOf(exercise);
-    if (!left.completedAt || !right.completedAt) {
-      const leftDraft = withTimedDuration(setInputs[left.id], timed?.[left.id]);
-      const rightDraft = withTimedDuration(setInputs[right.id], timed?.[right.id]);
-      if (!isValidDraft(leftDraft, type) || !isValidDraft(rightDraft, type)) {
-        setError(invalidDraftMessage(type, true));
-        return;
-      }
-    }
-
-    try {
-      const [leftResult, rightResult] = await Promise.all([
-        completeOrUncompleteSet(exercise.id, left, type, timed?.[left.id]),
-        completeOrUncompleteSet(exercise.id, right, type, timed?.[right.id]),
-      ]);
-      if (!leftResult.ok) setError(leftResult.error);
-      else if (!rightResult.ok) setError(rightResult.error);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update set');
-    }
-  }
-
   async function handleRemoveExercise(exerciseId: string) {
     setError(null);
     try {
@@ -532,33 +488,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   // reference is what lets SetRow's memo skip the other rows while the user types into one.
   const workoutRef = useRef(workout);
   workoutRef.current = workout;
-  const toggleCompleteRef = useRef(handleToggleComplete);
-  toggleCompleteRef.current = handleToggleComplete;
-  const toggleUnilateralRef = useRef(handleToggleUnilateralComplete);
-  toggleUnilateralRef.current = handleToggleUnilateralComplete;
-  const changeSetDurationRef = useRef(changeSetDuration);
-  changeSetDurationRef.current = changeSetDuration;
-  const toggleSetComplete = useCallback((setId: string, timed?: Record<string, string>) => {
-    const current = workoutRef.current;
-    if (!current) return;
-    // A stopped timer's time goes into its field too, so it stays shown if completing fails.
-    for (const [timedSetId, text] of Object.entries(timed ?? {})) {
-      changeSetDurationRef.current(timedSetId, text);
-    }
-    for (const exercise of current.exercises) {
-      const set = exercise.sets.find((candidate) => candidate.id === setId);
-      if (set) {
-        // A unilateral set completes as one unit, through its own path.
-        if (exercise.movementType === 'unilateral') {
-          void toggleUnilateralRef.current(exercise, set.setIndex, timed);
-        } else {
-          void toggleCompleteRef.current(exercise, set, timed);
-        }
-        return;
-      }
-    }
-  }, []);
-
   const removeSetRef = useRef(handleRemoveSet);
   removeSetRef.current = handleRemoveSet;
   const removeUnilateralSetRef = useRef(handleRemoveUnilateralSet);
@@ -686,6 +615,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     setError(null);
     setCompleting(true);
     try {
+      // Timers stopped, sets left empty asked about, and everything on the screen saved first.
+      if (!(await autosave.readyToFinish())) {
+        setCompleting(false);
+        return;
+      }
       await completeWorkout(workout.id);
       void clearLiveWorkoutDraft(workout.id);
       void clearSetTimers(workout.id);
@@ -911,7 +845,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 onChangeWeight={changeSetWeight}
                 onChangeReps={changeSetReps}
                 onChangeDuration={changeSetDuration}
-                onToggleComplete={toggleSetComplete}
                 setTimers
                 onAddSet={() => handleAddSet(exercise)}
                 onRemoveSet={removeSet}

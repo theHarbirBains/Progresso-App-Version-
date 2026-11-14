@@ -19,7 +19,8 @@ interface LiveProps {
   completed: boolean;
   /** Whether the check can be pressed: always to un-complete, to complete once it can be. */
   canToggle: boolean;
-  onComplete: () => void;
+  /** Omitted where sets save as they're typed (the live workouts): then there's no check. */
+  onComplete?: () => void;
   /** Omitted where removing a set mid-workout isn't offered. */
   onRemove?: () => void;
   accentColor: string;
@@ -39,27 +40,29 @@ export function LiveSetActions({
 }: LiveProps) {
   return (
     <>
-      <TouchableOpacity
-        testID={testID ? `${testID}-complete` : undefined}
-        style={[
-          styles.setCompleteButton,
-          {
-            borderColor: completed ? accentColor : colors.border,
-            backgroundColor: completed ? accentColor : 'transparent',
-          },
-        ]}
-        onPress={onComplete}
-        disabled={!canToggle}
-        accessibilityRole="button"
-        accessibilityState={{ selected: completed, disabled: !canToggle }}
-        accessibilityLabel={completed ? 'Mark set incomplete' : 'Mark set complete'}
-      >
-        <Feather
-          name="check"
-          size={18}
-          color={completed ? onAccentColor : canToggle ? colors.textSecondary : colors.textMuted}
-        />
-      </TouchableOpacity>
+      {onComplete ? (
+        <TouchableOpacity
+          testID={testID ? `${testID}-complete` : undefined}
+          style={[
+            styles.setCompleteButton,
+            {
+              borderColor: completed ? accentColor : colors.border,
+              backgroundColor: completed ? accentColor : 'transparent',
+            },
+          ]}
+          onPress={onComplete}
+          disabled={!canToggle}
+          accessibilityRole="button"
+          accessibilityState={{ selected: completed, disabled: !canToggle }}
+          accessibilityLabel={completed ? 'Mark set incomplete' : 'Mark set complete'}
+        >
+          <Feather
+            name="check"
+            size={18}
+            color={completed ? onAccentColor : canToggle ? colors.textSecondary : colors.textMuted}
+          />
+        </TouchableOpacity>
+      ) : null}
       {onRemove ? (
         <TouchableOpacity
           testID={testID ? `${testID}-remove` : undefined}

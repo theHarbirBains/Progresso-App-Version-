@@ -100,7 +100,8 @@ interface Props {
   onChangeReps: (setId: string, text: string) => void;
   onChangeDuration?: (setId: string, text: string) => void;
   /** `timed`: the time a set's timer stopped at, by set id, when its check finished it. */
-  onToggleComplete: (setId: string, timed?: Record<string, string>) => void;
+  /** Omitted where sets save as they're typed (the live workouts): then a set has no check. */
+  onToggleComplete?: (setId: string, timed?: Record<string, string>) => void;
   /** Gives a timed exercise's sets a timer -- the live workout only (workouts/setTimers.ts). */
   setTimers?: boolean;
   /** Only used for a unilateral exercise -- completes/uncompletes both sides of one logical set together, since a unilateral set is one unit, not two independent ones. */

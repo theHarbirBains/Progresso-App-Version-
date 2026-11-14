@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from 'react';
 import { Alert, Modal, StyleSheet, View } from 'react-native';
 import { Card } from '../design/Card';
 import { RiseInStack } from '../design/RiseIn';
@@ -28,17 +28,17 @@ import {
   computeCardSets,
   computeUnilateralSets,
   draftFromSet,
-  draftValues,
-  invalidDraftMessage,
-  isValidDraft,
   withPrefilledSets,
   type SetInputDraft,
 } from './setInputDrafts';
 import { LiveProgressionSheets, RepRangeRow, useLiveProgression } from './useLiveProgression';
 import { useSetInputDrafts } from './useSetInputDrafts';
+import { useSetAutosave, type LiveSet } from './useSetAutosave';
+import { discardSetTimer } from './setTimers';
 import {
   addExerciseToWorkout,
   createSet,
+  deleteSet,
   fetchNextExerciseOrderIndex,
   fetchPreviousPerformance,
   fetchWorkoutDetail,
@@ -56,8 +56,16 @@ export interface GroupWorkoutMember {
   workoutId: string;
 }
 
+/** What the screen around the editor calls on its Finish button (see useSetAutosave). */
+export interface LiveWorkoutFinish {
+  /** Stops timers, asks about sets left empty and saves the rest; resolves whether to finish. */
+  readyToFinish: () => Promise<boolean>;
+}
+
 interface Props {
   members: GroupWorkoutMember[];
+  /** Filled in with the editor's Finish step, for the screen's Finish button to call first. */
+  finishRef?: MutableRefObject<LiveWorkoutFinish | null>;
   /**
    * Turns a picked exercise into the one this workout should use. A trainer's live session
    * needs the client's copy of the trainer's own exercises. Groups do not pass it.
@@ -85,6 +93,7 @@ interface Props {
  */
 export function GroupWorkoutEditor({
   members,
+  finishRef,
   resolveExerciseId,
   startedAt,
   userId,
@@ -104,6 +113,67 @@ export function GroupWorkoutEditor({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
   const progression = useLiveProgression({ userId, weightUnit, onError: setError });
+
+  // Every person's sets save as they're typed, whoever types them -- see useSetAutosave.
+  const liveSets: LiveSet[] = useMemo(
+    () =>
+      Object.values(details).flatMap((detail) =>
+        detail.exercises.flatMap((exercise) =>
+          exercise.sets.map((set) => ({
+            set,
+            type: measurementTypeOf(exercise),
+            exerciseId: exercise.id,
+            unilateral: exercise.movementType === 'unilateral',
+          })),
+        ),
+      ),
+    [details],
+  );
+  const withSets =
+    (
+      change: (sets: SetRecord[]) => SetRecord[],
+    ): ((prev: Record<string, WorkoutDetail>) => Record<string, WorkoutDetail>) =>
+    (prev) =>
+      Object.fromEntries(
+        Object.entries(prev).map(([memberId, detail]) => [
+          memberId,
+          {
+            ...detail,
+            exercises: detail.exercises.map((exercise) => ({
+              ...exercise,
+              sets: change(exercise.sets),
+            })),
+          },
+        ]),
+      );
+  const autosave = useSetAutosave({
+    sets: liveSets,
+    setInputs,
+    weightUnit,
+    save: (setId, update) => updateSet(setId, update),
+    onSaved: (saved) =>
+      setDetails(withSets((sets) => sets.map((set) => (set.id === saved.id ? saved : set)))),
+    remove: async (setIds) => {
+      await Promise.all(setIds.map((setId) => deleteSet(setId)));
+      const gone = new Set(setIds);
+      setDetails(withSets((sets) => sets.filter((set) => !gone.has(set.id))));
+      setSetInputs((prev) => {
+        const next = { ...prev };
+        for (const setId of setIds) delete next[setId];
+        return next;
+      });
+      for (const setId of setIds) discardSetTimer(setId);
+    },
+    onTimersStopped: (drafts) => setSetInputs((prev) => ({ ...prev, ...drafts })),
+    onError: setError,
+  });
+  useEffect(() => {
+    if (!finishRef) return;
+    finishRef.current = { readyToFinish: autosave.readyToFinish };
+    return () => {
+      finishRef.current = null;
+    };
+  }, [finishRef, autosave.readyToFinish]);
 
   const memberKey = members.map((m) => `${m.userId}:${m.workoutId}`).join('|');
 
@@ -347,54 +417,6 @@ export function GroupWorkoutEditor({
     });
   }
 
-  /** Completes or reopens one set of the selected person. */
-  async function toggleSet(exercise: WorkoutExerciseWithSets, set: SetRecord) {
-    if (set.completedAt) {
-      await change(() => updateSet(set.id, { completedAt: null }));
-      return;
-    }
-    const type = measurementTypeOf(exercise);
-    const draft = setInputs[set.id];
-    if (!isValidDraft(draft, type)) {
-      setError(invalidDraftMessage(type));
-      return;
-    }
-    await change(() =>
-      updateSet(set.id, {
-        ...draftValues(draft, type, weightUnit),
-        completedAt: new Date().toISOString(),
-      }),
-    );
-  }
-
-  /** Completes or reopens both sides of one unilateral set, as one unit. */
-  async function toggleUnilateral(exercise: WorkoutExerciseWithSets, setIndex: number) {
-    const left = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'left');
-    const right = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'right');
-    if (!left || !right) return;
-    const reopening = left.completedAt !== null || right.completedAt !== null;
-    const type = measurementTypeOf(exercise);
-    if (
-      !reopening &&
-      (!isValidDraft(setInputs[left.id], type) || !isValidDraft(setInputs[right.id], type))
-    ) {
-      setError(invalidDraftMessage(type, true));
-      return;
-    }
-    await change(async () => {
-      for (const set of [left, right]) {
-        if (reopening) {
-          await updateSet(set.id, { completedAt: null });
-        } else {
-          await updateSet(set.id, {
-            ...draftValues(setInputs[set.id], type, weightUnit),
-            completedAt: new Date().toISOString(),
-          });
-        }
-      }
-    });
-  }
-
   function confirmRemove(exercise: WorkoutExerciseWithSets) {
     Alert.alert(
       'Remove exercise',
@@ -496,12 +518,6 @@ export function GroupWorkoutEditor({
               onChangeWeight={changeWeight}
               onChangeReps={changeReps}
               onChangeDuration={changeDuration}
-              onToggleComplete={(setId) => {
-                const set = row.sets.find((s) => s.id === setId);
-                if (!set) return;
-                if (row.movementType === 'unilateral') void toggleUnilateral(row, set.setIndex);
-                else void toggleSet(row, set);
-              }}
               onAddSet={() => void addSet(row)}
               onRemoveExercise={() => confirmRemove(row)}
               accentColor={accentColor}
