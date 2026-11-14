@@ -10,6 +10,7 @@ import { Badge } from '../design/Badge';
 import { Screen } from '../design/Screen';
 import { StatBlock } from '../design/StatBlock';
 import { colors } from '../design/theme';
+import { UnderlineTabs } from '../design/UnderlineTabs';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -38,6 +39,11 @@ import { formatCardDuration } from '../workouts/workoutFormat';
 import { formatVolume, volumeInUnit } from '../workouts/workoutSummary';
 import { workoutDetailStyles as styles } from './workoutDetailStyles';
 import { SkeletonCards } from '../design/Skeleton';
+import {
+  fetchGroupWorkouts,
+  firstName,
+  type GroupWorkoutPerson,
+} from '../workouts/groupWorkoutHistory';
 
 type Props = RootStackScreenProps<'WorkoutDetail'>;
 
@@ -61,6 +67,12 @@ function formatDateTime(iso: string): string {
 // stat blocks) and one card per exercise -- its name (opens PR history), the
 // top set called out, and a row per logged set with a PR / 1RM badge while
 // that set is still the live record.
+//
+// A group workout shows everyone's: a tab per person across the top (You first by the
+// group's order), each tab their own workout as they logged it. Only the workout the page was
+// opened on is yours to edit, share or delete, and only its sets carry record tags -- another
+// person's records are theirs. Someone who logged nothing (a trainer who only coached) has no
+// tab, and Share only shows for a workout with something logged in it.
 export function WorkoutDetailScreen({ route, navigation }: Props) {
   const { workoutId, clientId, clientName } = route.params;
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
@@ -107,6 +119,11 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const [otherRecords, setOtherRecords] = useState<Record<string, ExerciseRecord | null>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Everyone's workout in the group this one was part of; null when it wasn't one.
+  const [people, setPeople] = useState<GroupWorkoutPerson[] | null>(null);
+  const [selectedId, setSelectedId] = useState(workoutId);
+  // Records belong to the workout's owner: a trainer looking at a client's reads the client's.
+  const ownerId = clientId ?? userId;
 
   useEffect(() => {
     let cancelled = false;
@@ -118,6 +135,12 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         const detail = await fetchWorkoutDetail(workoutId);
         if (cancelled) return;
         setWorkout(detail);
+        if (detail.groupId) {
+          // The rest of the group follows; the page shows this workout meanwhile.
+          void fetchGroupWorkouts(accessToken, detail.groupId, detail).then((group) => {
+            if (!cancelled) setPeople(group);
+          });
+        }
 
         // Whether each historical set is *still* the live PR/1RM record, not
         // whether it was one at the time it was logged -- always re-read
@@ -128,13 +151,13 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
             if (type !== 'weight_reps') {
               const record =
                 type === 'timed'
-                  ? await fetchDurationRecord(userId, exercise.exerciseId)
-                  : await fetchRepRecord(userId, exercise.exerciseId);
+                  ? await fetchDurationRecord(ownerId, exercise.exerciseId)
+                  : await fetchRepRecord(ownerId, exercise.exerciseId);
               return [exercise.id, [] as RepPR[], null, record] as const;
             }
             const [prs, orm] = await Promise.all([
-              fetchRepPRs(userId, exercise.exerciseId),
-              fetchOneRepMax(userId, exercise.exerciseId),
+              fetchRepPRs(ownerId, exercise.exerciseId),
+              fetchOneRepMax(ownerId, exercise.exerciseId),
             ]);
             return [exercise.id, prs, orm, null] as const;
           }),
@@ -154,7 +177,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [workoutId, userId, accessToken]);
+  }, [workoutId, ownerId, accessToken]);
 
   if (loading || !workout) {
     return (
@@ -182,9 +205,21 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     );
   }
 
+  // The person whose workout is showing: this one, or someone else's in the group.
+  const shown = people?.find((person) => person.workout.id === selectedId)?.workout ?? workout;
+  const isOwn = shown.id === workout.id;
+  const tabs =
+    people && people.length > 1
+      ? people.map((person) => ({
+          key: person.workout.id,
+          label: person.userId === userId ? 'You' : firstName(person.displayName),
+          icon: 'user' as const,
+        }))
+      : null;
+
   // The workout as a whole, from the sets that were actually logged -- each holding what its
   // exercise records (weight and reps; reps; a time).
-  const loggedByExercise = workout.exercises.map((exercise) => {
+  const loggedByExercise = shown.exercises.map((exercise) => {
     const type = measurementTypeOf(exercise);
     return { exercise, type, sets: loggedSets(exercise.sets, type) };
   });
@@ -194,20 +229,22 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     .flatMap((entry) => completedSetsOnly(entry.sets));
   const totalVolume = volumeInUnit(weightedLogged, weightUnit);
   const loggedSetCount = loggedByExercise.reduce((sum, entry) => sum + entry.sets.length, 0);
-  const durationMinutes = computeDurationMinutes(workout.performedAt, workout.completedAt);
+  const durationMinutes = computeDurationMinutes(shown.performedAt, shown.completedAt);
   const isRecord = (exerciseId: string, type: MeasurementType, set: SetRecord) =>
-    type === 'weight_reps'
-      ? Boolean(
-          repPRs[exerciseId]?.some((pr) => pr.reps === set.reps && pr.sourceSetId === set.id),
-        ) || oneRepMaxes[exerciseId]?.sourceSetId === set.id
-      : otherRecords[exerciseId]?.sourceSetId === set.id;
+    !isOwn
+      ? false
+      : type === 'weight_reps'
+        ? Boolean(
+            repPRs[exerciseId]?.some((pr) => pr.reps === set.reps && pr.sourceSetId === set.id),
+          ) || oneRepMaxes[exerciseId]?.sourceSetId === set.id
+        : otherRecords[exerciseId]?.sourceSetId === set.id;
   const recordCount = loggedByExercise.reduce(
     (sum, { exercise, type, sets }) =>
       sum + sets.filter((set) => isRecord(exercise.id, type, set)).length,
     0,
   );
   const muscles = Array.from(
-    new Set(workout.exercises.map((e) => MUSCLE_GROUP_LABELS[e.muscleGroup])),
+    new Set(shown.exercises.map((e) => MUSCLE_GROUP_LABELS[e.muscleGroup])),
   ).join(' • ');
 
   return (
@@ -223,14 +260,19 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
             accessibilityLabel: 'Back',
             testID: 'workout-detail-back',
           }}
-          rightAction={{
-            icon: 'edit-2',
-            onPress: () => navigation.navigate('EditWorkout', { workoutId, clientId, clientName }),
-            accessibilityLabel: 'Edit workout',
-            testID: 'workout-detail-edit',
-          }}
+          rightAction={
+            isOwn
+              ? {
+                  icon: 'edit-2',
+                  onPress: () =>
+                    navigation.navigate('EditWorkout', { workoutId, clientId, clientName }),
+                  accessibilityLabel: 'Edit workout',
+                  testID: 'workout-detail-edit',
+                }
+              : undefined
+          }
           rightAction2={
-            workout.completedAt && !clientId
+            isOwn && workout.completedAt && !clientId && loggedSetCount > 0
               ? {
                   icon: 'share',
                   onPress: () => navigation.navigate('ShareWorkout', { workoutId }),
@@ -242,7 +284,22 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         />
       }
     >
+      {tabs ? (
+        <UnderlineTabs
+          testID="workout-detail-people"
+          categories={tabs}
+          active={shown.id}
+          onSelect={setSelectedId}
+          accentColor={theme.accent}
+        />
+      ) : null}
+
       <AppCard hero topAccent={theme.accent} testID="workout-detail-summary">
+        {!isOwn ? (
+          <Text testID="workout-detail-person-workout" style={styles.exerciseTitle}>
+            {shown.name}
+          </Text>
+        ) : null}
         {muscles ? <Text style={styles.eyebrow}>{muscles}</Text> : null}
         <View style={styles.statGrid}>
           <View style={styles.statRow}>
@@ -263,12 +320,20 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
               value={`${formatVolume(totalVolume)} ${weightUnit}`}
               label="Volume"
             />
-            <StatBlock
-              testID="workout-detail-stat-records"
-              value={String(recordCount)}
-              label={recordCount === 1 ? 'Record' : 'Records'}
-              valueColor={recordCount > 0 ? theme.accent : undefined}
-            />
+            {isOwn ? (
+              <StatBlock
+                testID="workout-detail-stat-records"
+                value={String(recordCount)}
+                label={recordCount === 1 ? 'Record' : 'Records'}
+                valueColor={recordCount > 0 ? theme.accent : undefined}
+              />
+            ) : (
+              <StatBlock
+                testID="workout-detail-stat-exercises"
+                value={String(loggedByExercise.filter((entry) => entry.sets.length > 0).length)}
+                label="Exercises"
+              />
+            )}
           </View>
         </View>
       </AppCard>
@@ -291,10 +356,12 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                   exerciseName: exercise.exerciseName,
                 })
               }
-              disabled={type !== 'weight_reps'}
-              accessibilityRole={type === 'weight_reps' ? 'button' : undefined}
+              disabled={type !== 'weight_reps' || !isOwn}
+              accessibilityRole={type === 'weight_reps' && isOwn ? 'button' : undefined}
               accessibilityLabel={
-                type === 'weight_reps' ? `${exercise.exerciseName}, view PR history` : undefined
+                type === 'weight_reps' && isOwn
+                  ? `${exercise.exerciseName}, view PR history`
+                  : undefined
               }
             >
               <View style={styles.exerciseTitleBody}>
@@ -303,7 +370,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                   {MUSCLE_GROUP_LABELS[exercise.muscleGroup]}
                 </Text>
               </View>
-              {type === 'weight_reps' ? (
+              {type === 'weight_reps' && isOwn ? (
                 <Feather name="chevron-right" size={18} color={colors.textMuted} />
               ) : null}
             </TouchableOpacity>
@@ -358,12 +425,14 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         );
       })}
 
-      <TextButton
-        testID="workout-detail-delete"
-        label="Delete Workout"
-        destructive
-        onPress={confirmDeleteWorkout}
-      />
+      {isOwn ? (
+        <TextButton
+          testID="workout-detail-delete"
+          label="Delete Workout"
+          destructive
+          onPress={confirmDeleteWorkout}
+        />
+      ) : null}
     </Screen>
   );
 }

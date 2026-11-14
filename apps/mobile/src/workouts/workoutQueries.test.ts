@@ -318,6 +318,8 @@ describe('fetchWorkoutDetail', () => {
       name: 'Push Day',
       performedAt: '2026-01-01T00:00:00Z',
       completedAt: null,
+      // Not part of a group workout.
+      groupId: null,
       exercises: [
         {
           id: 'we1',

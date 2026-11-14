@@ -15,6 +15,8 @@ import { cancelGroupWorkout, finishGroup, getGroup, type GroupDetail } from '../
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
+import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
+import { hasLoggedSets } from '../workouts/groupWorkoutHistory';
 import { GroupWorkoutEditor, type LiveWorkoutFinish } from '../workouts/GroupWorkoutEditor';
 import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
 import { showNextWorkoutWidget } from '../widgets/widgetUpdates';
@@ -40,6 +42,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
   const { theme, activeWorkoutSplitId } = useProgressTheme();
   // The editor's Finish step, called before the group is finished.
   const editorFinish = useRef<LiveWorkoutFinish | null>(null);
+  const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +125,21 @@ export function GroupSessionScreen({ navigation, route }: Props) {
             );
             if (!saved) return;
             afterEnded();
+            // Your workout in the group is in your history and stats now, like a solo one.
+            void refetchAllTimeStats();
+            // Trained in it yourself: on to your share card, as after a solo workout, with
+            // Workout History underneath. Only coached (nothing of your own logged): back.
+            const mine = group?.members.find((member) => member.userId === userId)?.workoutId;
+            if (mine && (await hasLoggedSets(mine))) {
+              navigation.reset({
+                index: 1,
+                routes: [
+                  { name: 'WorkoutHistory' },
+                  { name: 'ShareWorkout', params: { workoutId: mine, justFinished: true } },
+                ],
+              });
+              return;
+            }
             navigation.goBack();
           })(),
       },

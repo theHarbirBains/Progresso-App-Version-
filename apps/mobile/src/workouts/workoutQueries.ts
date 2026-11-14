@@ -91,6 +91,8 @@ export interface WorkoutExerciseWithSets {
 
 export interface WorkoutDetail extends WorkoutSummary {
   exercises: WorkoutExerciseWithSets[];
+  /** The group workout it was part of, if any -- everyone's workouts in it can be read. */
+  groupId?: string | null;
 }
 
 const ACTIVE_WORKOUT_CONFLICT_CONSTRAINT = 'workouts_one_live_per_user';
@@ -214,7 +216,7 @@ export async function fetchWorkoutsForDateRange(
 export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDetail> {
   const { data: workout, error: workoutError } = await supabase
     .from('workouts')
-    .select('id, name, performed_at, completed_at, workout_split_day_id')
+    .select('id, name, performed_at, completed_at, workout_split_day_id, group_id')
     .eq('id', workoutId)
     .is('deleted_at', null)
     .single();
@@ -275,7 +277,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
     };
   });
 
-  return { ...toWorkoutSummary(workout), exercises };
+  return { ...toWorkoutSummary(workout), exercises, groupId: workout.group_id ?? null };
 }
 
 export type CreateWorkoutResult =

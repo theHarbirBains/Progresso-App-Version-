@@ -16,6 +16,7 @@ import {
 import { deleteWorkout, fetchWorkoutDetail } from '../workouts/workoutQueries';
 import { WorkoutDetailScreen } from './WorkoutDetailScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
+import { getGroup } from '../lib/api';
 
 jest.mock('../profile/profileQueries', () => ({
   fetchMyProfile: jest.fn(),
@@ -41,6 +42,10 @@ jest.mock('../workouts/prQueries', () => ({
 
 jest.mock('../progress/AllTimeStatsProvider', () => ({
   useAllTimeStats: jest.fn(),
+}));
+
+jest.mock('../lib/api', () => ({
+  getGroup: jest.fn(),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
@@ -611,5 +616,115 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     expect(mockRefetchAllTimeStats).not.toHaveBeenCalled();
     expect(mockGoBack).not.toHaveBeenCalled();
     alert.mockRestore();
+  });
+});
+
+describe('WorkoutDetailScreen -- a group workout', () => {
+  const mine = { ...workout, groupId: 'g1' };
+  const jashans = {
+    id: 'w-jashan',
+    name: 'Pull Day',
+    performedAt: '2026-01-01T12:00:00Z',
+    completedAt: '2026-01-01T13:00:00Z',
+    groupId: 'g1',
+    exercises: [
+      {
+        id: 'we-j1',
+        exerciseId: 'ex-row',
+        exerciseName: 'Barbell Row',
+        muscleGroup: 'back' as const,
+        orderIndex: 1,
+        sets: [
+          { id: 'sj1', setIndex: 1, weightKg: 80, reps: 8, completedAt: '2026-01-01T12:05:00Z' },
+        ],
+      },
+    ],
+  };
+  // The trainer who ran it and only coached: nothing of their own logged.
+  const coachs = { ...jashans, id: 'w-coach', name: 'Coaching', exercises: [] };
+
+  function member(userId: string, displayName: string, workoutId: string) {
+    return {
+      userId,
+      displayName,
+      role: 'member',
+      status: 'joined',
+      isGuest: false,
+      workoutId,
+      workoutSplitDayId: null,
+      workoutName: null,
+    };
+  }
+
+  beforeEach(() => {
+    jest.mocked(getGroup).mockResolvedValue({
+      id: 'g1',
+      name: 'Thursday',
+      status: 'finished',
+      hostId: 'coach',
+      startedAt: '2026-01-01T12:00:00Z',
+      finishedAt: '2026-01-01T13:00:00Z',
+      members: [
+        member('coach', 'Coach Sam', 'w-coach'),
+        member('user-1', 'Harbir Bains', 'w1'),
+        member('jashan', 'Jashan Singh', 'w-jashan'),
+      ],
+    } as never);
+    mockFetchWorkoutDetail.mockImplementation(async (id: string) =>
+      id === 'w1' ? mine : id === 'w-jashan' ? jashans : coachs,
+    );
+  });
+
+  function renderGroup() {
+    return render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+  }
+
+  it('has a tab for each person who trained, yours first chosen -- the coach who logged nothing has none', async () => {
+    renderGroup();
+
+    expect(await screen.findByTestId('workout-detail-people-w1')).toHaveTextContent(/You/);
+    expect(screen.getByTestId('workout-detail-people-w-jashan')).toHaveTextContent(/Jashan/);
+    expect(screen.queryByTestId('workout-detail-people-w-coach')).toBeNull();
+    expect(screen.getByTestId('exercise-card-we1')).toHaveTextContent(/Bench Press/);
+    expect(getGroup).toHaveBeenCalledWith('token-123', 'g1');
+  });
+
+  it("shows another person's workout as they logged it, read-only and without your records", async () => {
+    renderGroup();
+    fireEvent.press(await screen.findByTestId('workout-detail-people-w-jashan'));
+
+    expect(screen.getByTestId('workout-detail-person-workout')).toHaveTextContent('Pull Day');
+    expect(screen.getByTestId('exercise-card-we-j1')).toHaveTextContent(/Barbell Row/);
+    expect(screen.getByText(/80kg × 8/)).toBeTruthy();
+    expect(screen.queryByTestId('exercise-card-we1')).toBeNull();
+    // Theirs to edit, share or delete, not yours.
+    expect(screen.queryByTestId('workout-detail-edit')).toBeNull();
+    expect(screen.queryByTestId('workout-detail-share')).toBeNull();
+    expect(screen.queryByTestId('workout-detail-delete')).toBeNull();
+    expect(screen.queryByTestId('workout-detail-stat-records')).toBeNull();
+    expect(screen.getByTestId('workout-detail-stat-exercises')).toHaveTextContent(/^1/);
+    expectNoBareText();
+
+    fireEvent.press(screen.getByTestId('workout-detail-people-w1'));
+    expect(screen.getByTestId('workout-detail-share')).toBeTruthy();
+  });
+
+  it("shows only this workout when the group can't be read -- a trainer who wasn't in it", async () => {
+    jest.mocked(getGroup).mockRejectedValue(new Error('Not in this group'));
+    renderGroup();
+
+    expect(await screen.findByTestId('exercise-card-we1')).toBeTruthy();
+    await waitFor(() => expect(getGroup).toHaveBeenCalled());
+    expect(screen.queryByTestId('workout-detail-people')).toBeNull();
+  });
+
+  it('offers no share card for a workout with nothing logged in it', async () => {
+    mockFetchWorkoutDetail.mockImplementation(async () => ({ ...coachs, id: 'w1', groupId: null }));
+    renderGroup();
+
+    expect(await screen.findByTestId('workout-detail-summary')).toBeTruthy();
+    expect(screen.queryByTestId('workout-detail-share')).toBeNull();
   });
 });

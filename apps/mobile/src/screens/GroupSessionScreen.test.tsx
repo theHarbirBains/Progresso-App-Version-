@@ -30,6 +30,17 @@ jest.mock('../progress/useProgressTheme', () => ({
 
 jest.mock('../widgets/nextWorkoutRefresh', () => ({ refreshNextWorkout: jest.fn() }));
 
+const mockRefetchAllTimeStats = jest.fn();
+jest.mock('../progress/AllTimeStatsProvider', () => ({
+  useAllTimeStats: () => ({ refetch: mockRefetchAllTimeStats }),
+}));
+
+// Whether your own workout in the group had anything logged -- worth a share card.
+const mockHasLoggedSets = jest.fn();
+jest.mock('../workouts/groupWorkoutHistory', () => ({
+  hasLoggedSets: (workoutId: string) => mockHasLoggedSets(workoutId),
+}));
+
 // The group editor is covered on its own; here it is a marker listing the workouts it was given.
 jest.mock('../workouts/GroupWorkoutEditor', () => {
   const { Text } = jest.requireActual('react-native');
@@ -49,8 +60,9 @@ const mockGetGroup = getGroup as jest.Mock;
 const mockFinish = finishGroup as jest.Mock;
 
 const mockGoBack = jest.fn();
+const mockReset = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { navigate: jest.fn(), goBack: mockGoBack };
+const navigation: any = { navigate: jest.fn(), goBack: mockGoBack, reset: mockReset };
 
 function group(overrides: Record<string, unknown> = {}) {
   return {
@@ -109,6 +121,8 @@ beforeEach(async () => {
   mockStartActivity.mockClear();
   (nextWorkoutWidget.updateTimeline as jest.Mock).mockClear();
   (refreshNextWorkout as jest.Mock).mockClear();
+  mockReset.mockClear();
+  mockGoBack.mockClear();
   mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' }, user: { id: 'me' } });
   mockGetGroup.mockReset().mockResolvedValue(group());
   mockFinish.mockReset().mockResolvedValue({ ok: true });
@@ -180,8 +194,45 @@ describe('GroupSessionScreen', () => {
     );
   });
 
+  it('lands on your own share card once you finish a group you trained in, with your stats refreshed', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    mockHasLoggedSets.mockResolvedValue(true);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('group-finish'));
+    (alert.mock.calls[0][2] ?? []).find((button) => button.text === 'Finish')?.onPress?.();
+
+    await waitFor(() =>
+      expect(mockReset).toHaveBeenCalledWith({
+        index: 1,
+        routes: [
+          { name: 'WorkoutHistory' },
+          { name: 'ShareWorkout', params: { workoutId: 'w-me', justFinished: true } },
+        ],
+      }),
+    );
+    expect(mockHasLoggedSets).toHaveBeenCalledWith('w-me');
+    expect(mockRefetchAllTimeStats).toHaveBeenCalled();
+    expect(mockGoBack).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
+  it('just goes back, with no share card, when you only coached and logged nothing yourself', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    mockHasLoggedSets.mockResolvedValue(false);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('group-finish'));
+    (alert.mock.calls[0][2] ?? []).find((button) => button.text === 'Finish')?.onPress?.();
+
+    await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
+    expect(mockReset).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
   it('takes the card off the Lock Screen once the group is finished, and updates Next Workout', async () => {
     const alert = jest.spyOn(Alert, 'alert');
+    mockHasLoggedSets.mockResolvedValue(false);
     renderScreen();
     fireEvent.press(await screen.findByTestId('group-finish'));
     const card = mockStartActivity.mock.results[0].value;
