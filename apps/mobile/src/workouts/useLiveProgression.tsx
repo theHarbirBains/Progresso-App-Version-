@@ -296,7 +296,6 @@ export function LiveProgressionSheets({
             ? (progression.exerciseSettings.get(editingExercise.exerciseId) ?? null)
             : null
         }
-        unit={progression.weightUnit}
         saving={progression.rangeSaving}
         error={progression.rangeError}
         onSave={(setting) => void progression.saveExerciseRange(setting)}

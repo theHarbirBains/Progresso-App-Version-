@@ -6,7 +6,6 @@ import { Section } from '../design/Section';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
 import type { MeasurementType } from '../exercises/movementTypes';
-import { formatWeightKg } from '../lib/units';
 import { ExercisePickerModal } from './ExercisePickerModal';
 import { ExerciseProgressionSheet } from './ExerciseProgressionSheet';
 import { formatRepRange, type RepRange } from './progression';
@@ -56,7 +55,6 @@ interface Props {
   /** Whose ranges these are: the person's own, or a client's (for their trainer). */
   owner: 'self' | 'client';
   exceptions: RangeException[];
-  weightUnit: 'kg' | 'lb';
   /** Whose exercise library the picker shows -- always the signed-in person's. */
   pickerUserId: string;
   onEditRange: () => void;
@@ -76,20 +74,14 @@ interface Editing {
   current: ExceptionSetting;
 }
 
-function describe(exception: RangeException, unit: 'kg' | 'lb'): string {
-  return [
-    exception.range ? `Range ${formatRepRange(exception.range)}` : null,
-    exception.incrementKg !== null
-      ? `Goes up ${formatWeightKg(exception.incrementKg, unit)} ${unit}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+function describe(exception: RangeException): string {
+  return exception.range ? `Range ${formatRepRange(exception.range)}` : '';
 }
 
 /**
  * A rep range and its exceptions, as two widgets: the range every exercise follows (with Edit),
- * then the exercises trained outside it -- each with its own range and/or weight step, opening
+ * then the exercises trained outside it -- each with its own range (an exercise left with only a
+ * weight step from before steps went has no range of its own, so it isn't one), opening
  * its sheet to change it, with Remove to put it back on the range -- and Add an Exception, which
  * picks an exercise and opens it on "Its Own". The person's own (Settings > Workout Preferences >
  * Rep Range Exceptions) and a trainer's for a client use the same widgets; only where they save
@@ -98,8 +90,7 @@ function describe(exception: RangeException, unit: 'kg' | 'lb'): string {
 export function RepRangeExceptions({
   range,
   owner,
-  exceptions,
-  weightUnit,
+  exceptions: allExceptions,
   pickerUserId,
   onEditRange,
   onSave,
@@ -107,6 +98,9 @@ export function RepRangeExceptions({
   onAccentColor,
   testIDPrefix = 'rep-ranges',
 }: Props) {
+  // Only exercises with a range of their own: one left with just a weight step, saved before
+  // steps went, follows the person's range.
+  const exceptions = allExceptions.filter((exception) => exception.range !== null);
   const [picking, setPicking] = useState(false);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [saving, setSaving] = useState(false);
@@ -168,7 +162,7 @@ export function RepRangeExceptions({
               key={exception.exerciseId}
               testID={`${testIDPrefix}-exception-${exception.exerciseId}`}
               title={exception.exerciseName}
-              subtitle={describe(exception, weightUnit)}
+              subtitle={describe(exception)}
               onPress={() => open(exception)}
               divider={index > 0}
               trailing={
@@ -233,7 +227,6 @@ export function RepRangeExceptions({
         measurementType={editing?.exercise.measurementType ?? 'weight_reps'}
         personalRange={range}
         current={editing?.current ?? null}
-        unit={weightUnit}
         saving={saving}
         error={editing ? error : null}
         onSave={(setting) => {

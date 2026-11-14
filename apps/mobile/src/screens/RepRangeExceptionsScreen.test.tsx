@@ -131,6 +131,47 @@ describe('RepRangeExceptionsScreen', () => {
     );
   });
 
+  it('is a rep range only: no weight step, and a step saved before is cleared by saving', async () => {
+    (fetchExerciseSettings as jest.Mock).mockResolvedValue(
+      new Map([['ex-dead', { ...deadlift, incrementKg: 5 }]]),
+    );
+    (saveExerciseSetting as jest.Mock).mockResolvedValue({
+      ...deadlift,
+      range: { min: 3, max: 6 },
+    });
+    renderScreen();
+
+    const row = await screen.findByTestId('rep-ranges-exception-ex-dead');
+    expect(row).not.toHaveTextContent(/Goes up/);
+    fireEvent.press(row);
+    expect(screen.queryByTestId('exercise-step')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-range-max-item-6'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('exercise-progression-save'));
+    });
+
+    expect(saveExerciseSetting).toHaveBeenCalledWith('user-1', 'ex-dead', {
+      range: { min: 3, max: 6 },
+      incrementKg: null,
+    });
+  });
+
+  it('leaves out an exercise left with only a weight step: it follows your range', async () => {
+    (fetchExerciseSettings as jest.Mock).mockResolvedValue(
+      new Map<string, unknown>([
+        ['ex-dead', deadlift],
+        [
+          'ex-row',
+          { ...deadlift, exerciseId: 'ex-row', exerciseName: 'Row', range: null, incrementKg: 2.5 },
+        ],
+      ]),
+    );
+    renderScreen();
+
+    await screen.findByTestId('rep-ranges-exception-ex-dead');
+    expect(screen.queryByTestId('rep-ranges-exception-ex-row')).toBeNull();
+  });
+
   it("won't make a timed exercise an exception -- it has no range", async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     renderScreen();

@@ -37,7 +37,7 @@ export function TrainerClientRepRangesScreen({ navigation, route }: Props) {
   const { clientId, clientName } = route.params;
   const { user, session } = useAuth();
   const accessToken = session?.access_token;
-  const { theme, weightUnit } = useProgressTheme();
+  const { theme } = useProgressTheme();
   const [range, setRange] = useState<RepRange | null>(null);
   const [exceptions, setExceptions] = useState<ClientRangeException[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +100,6 @@ export function TrainerClientRepRangesScreen({ navigation, route }: Props) {
             range={range}
             owner="client"
             exceptions={exceptions}
-            weightUnit={weightUnit}
             pickerUserId={user?.id ?? ''}
             onEditRange={() => setRangeDraft(range)}
             onSave={async (exercise, setting) => {

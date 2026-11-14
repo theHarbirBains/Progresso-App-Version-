@@ -4,15 +4,12 @@ import { BottomSheet } from '../design/BottomSheet';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { Text } from '../design/Text';
-import { TextInput } from '../design/TextInput';
 import { WheelPicker } from '../design/WheelPicker';
 import { colors, spacing, typeScale } from '../design/theme';
 import type { MeasurementType } from '../exercises/movementTypes';
-import { formatWeight, fromKg, roundWeight, toKg } from '../lib/units';
-import { defaultIncrementKg, formatRepRange, type RepRange } from './progression';
+import { formatRepRange, type RepRange } from './progression';
 
 const RANGE_VALUES = Array.from({ length: 50 }, (_, i) => String(i + 1));
-const MAX_STEP = 100;
 
 type Source = 'personal' | 'own';
 
@@ -22,9 +19,8 @@ interface Props {
   measurementType: MeasurementType;
   /** The person's own range (Settings > Workout Preferences). */
   personalRange: RepRange;
-  /** This exercise's own range and step, when it has them. */
+  /** This exercise's own range, when it has one (a weight step saved before steps went is ignored). */
   current: { range: RepRange | null; incrementKg: number | null } | null;
-  unit: 'kg' | 'lb';
   saving: boolean;
   error: string | null;
   onSave: (setting: { range: RepRange | null; incrementKg: number | null }) => void;
@@ -36,11 +32,10 @@ interface Props {
 }
 
 /**
- * An exercise's own rep range and weight step, opened from its card in the live workout. Its
- * own range wins over the person's for this exercise only; with "My Range" it follows theirs.
- * The step is how much heavier the app suggests once the top set reaches the top of the range
- * (blank: 5 lb or 2.5 kg). A bodyweight exercise has a range but no step; nothing here changes
- * a set, a record or a weight.
+ * An exercise's own rep range, opened from its card in the live workout. Its own range wins over
+ * the person's for this exercise only; with "My Range" it follows theirs. There's no weight step:
+ * the suggestion once the top set reaches the top of the range says to go up, never by how much
+ * -- and saving clears a step saved before. Nothing here changes a set, a record or a weight.
  */
 export function ExerciseProgressionSheet({
   visible,
@@ -48,7 +43,6 @@ export function ExerciseProgressionSheet({
   measurementType,
   personalRange,
   current,
-  unit,
   saving,
   error,
   onSave,
@@ -59,7 +53,6 @@ export function ExerciseProgressionSheet({
 }: Props) {
   const [source, setSource] = useState<Source>('personal');
   const [range, setRange] = useState<RepRange>(personalRange);
-  const [step, setStep] = useState('');
 
   // Starts from what's saved each time it opens. The person's range is read by value, since
   // the caller builds a new object for it on every render.
@@ -69,29 +62,14 @@ export function ExerciseProgressionSheet({
     if (!visible) return;
     setSource(current?.range ? 'own' : 'personal');
     setRange(current?.range ?? { min: personalMin, max: personalMax });
-    setStep(
-      current?.incrementKg != null
-        ? formatWeight(roundWeight(fromKg(current.incrementKg, unit)))
-        : '',
-    );
-  }, [visible, current, personalMin, personalMax, unit]);
+  }, [visible, current, personalMin, personalMax]);
 
-  const weighted = measurementType === 'weight_reps';
   const rangeValid = source === 'personal' || range.min <= range.max;
-  const stepNumber = Number(step);
-  const stepValid =
-    !weighted ||
-    step.trim() === '' ||
-    (Number.isFinite(stepNumber) && stepNumber > 0 && stepNumber <= MAX_STEP);
-  const canSave = rangeValid && stepValid && !saving;
-  const defaultStep = formatWeight(roundWeight(fromKg(defaultIncrementKg(unit), unit)));
+  const canSave = rangeValid && !saving;
 
   function handleSave() {
     if (!canSave) return;
-    onSave({
-      range: source === 'own' ? range : null,
-      incrementKg: weighted && step.trim() !== '' ? toKg(stepNumber, unit) : null,
-    });
+    onSave({ range: source === 'own' ? range : null, incrementKg: null });
   }
 
   return (
@@ -139,18 +117,6 @@ export function ExerciseProgressionSheet({
           <Text testID="exercise-range-error" style={styles.error}>
             The bottom of the range can&apos;t be above the top.
           </Text>
-        ) : null}
-        {weighted ? (
-          <TextInput
-            testID="exercise-step"
-            label={`Weight step (${unit})`}
-            placeholder={defaultStep}
-            keyboardType="decimal-pad"
-            value={step}
-            onChangeText={setStep}
-            helperText={`How much heavier to suggest when it's time to go up. Blank uses ${defaultStep} ${unit}.`}
-            error={stepValid ? undefined : `Enter a step between 0 and ${MAX_STEP} ${unit}`}
-          />
         ) : null}
         {error ? (
           <Text testID="exercise-progression-error" style={styles.error}>

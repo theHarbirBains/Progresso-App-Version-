@@ -77,10 +77,10 @@ describe('the top set', () => {
 });
 
 describe("next time, on last time's sets", () => {
-  it('says to go up on each set that reached the top of the range, or beyond, by 5 lb', () => {
+  it('says to go up on each set that reached the top of the range, or beyond -- never by how much', () => {
     expect(
       lastTimeFlags({ ...weighted, lastSessionSets: lifts([50, 12], [50, 10], [45, 14]) }),
-    ).toEqual({ 1: 'Hit 12! Go up to 55 lb today.', 3: 'Hit 14! Go up to 50 lb today.' });
+    ).toEqual({ 1: 'Hit 12! Go up in weight today.', 3: 'Hit 14! Go up in weight today.' });
   });
 
   it('says nothing about a set short of the top -- there is no increment to recommend yet', () => {
@@ -99,17 +99,17 @@ describe("next time, on last time's sets", () => {
   it('follows the range: 5-10 makes 10 the top', () => {
     expect(
       lastTimeFlags({ ...weighted, range: { min: 5, max: 10 }, lastSessionSets: lifts([50, 10]) }),
-    ).toEqual({ 1: 'Hit 10! Go up to 55 lb today.' });
+    ).toEqual({ 1: 'Hit 10! Go up in weight today.' });
   });
 
-  it('shows kilograms for a kg user, up 2.5 kg', () => {
+  it('names no weight in either unit', () => {
     expect(
       lastTimeFlags({
         ...weighted,
         unit: 'kg',
         lastSessionSets: [set({ weightKg: 100, reps: 12 })],
       }),
-    ).toEqual({ 1: 'Hit 12! Go up to 102.5 kg today.' });
+    ).toEqual({ 1: 'Hit 12! Go up in weight today.' });
   });
 
   it('says to make a bodyweight exercise harder: the weighted version, or a rep more', () => {
@@ -323,7 +323,7 @@ describe('progressionForExercise', () => {
         durationSeconds: null,
         achievedAt: '2026-09-02T10:00:00.000Z',
       },
-      lastTimeFlags: { 1: 'Hit 12! Go up to 55 lb today.' },
+      lastTimeFlags: { 1: 'Hit 12! Go up in weight today.' },
       sessionCue: 'Top of your range. Increase the weight next time.',
     });
   });
@@ -356,17 +356,6 @@ describe('exercise-specific ranges and steps', () => {
     expect(effectiveRepRange({ min: 8, max: 12 }, null)).toEqual({ min: 8, max: 12 });
   });
 
-  it("goes heavier by the exercise's own step when it has one", () => {
-    expect(
-      lastTimeFlags({
-        ...weighted,
-        incrementKg: 1.25,
-        unit: 'kg',
-        lastSessionSets: [set({ weightKg: 60, reps: 12 })],
-      }),
-    ).toEqual({ 1: 'Hit 12! Go up to 61.25 kg today.' });
-  });
-
   it("judges against the exercise's own range, top included, in the live workout", () => {
     const result = progressionForExercise({
       exercise: {
@@ -389,8 +378,9 @@ describe('exercise-specific ranges and steps', () => {
       repPRs: [],
       records: [],
       library: [],
+      // A step saved before steps went is ignored.
       override: { range: { min: 3, max: 5 }, incrementKg: 5 },
     });
-    expect(result.lastTimeFlags).toEqual({ 1: 'Hit 5! Go up to 145 kg today.' });
+    expect(result.lastTimeFlags).toEqual({ 1: 'Hit 5! Go up in weight today.' });
   });
 });

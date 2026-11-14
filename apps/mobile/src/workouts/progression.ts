@@ -38,11 +38,6 @@ export function formatRepRange(range: RepRange): string {
 
 const KG_PER_LB = 0.45359237;
 
-/** The step to go heavier by when an exercise has none of its own: 5 lb, or 2.5 kg. */
-export function defaultIncrementKg(unit: 'kg' | 'lb'): number {
-  return unit === 'lb' ? 5 * KG_PER_LB : 2.5;
-}
-
 /** The range an exercise is judged against: its own when it has one, otherwise the person's. */
 export function effectiveRepRange(personal: RepRange, exerciseRange: RepRange | null): RepRange {
   return exerciseRange ?? personal;
@@ -92,33 +87,26 @@ export function topSetOf(
   };
 }
 
-function weightText(kg: number, unit: 'kg' | 'lb'): string {
-  return `${formatWeightKg(kg, unit)} ${unit}`;
-}
-
 interface CueInput {
   measurementType: MeasurementType;
   movementType: MovementType;
   range: RepRange;
   unit: 'kg' | 'lb';
-  /** How much heavier to suggest, in kg -- the exercise's own step or the default. */
-  incrementKg?: number;
   /** The weighted version of this exercise in the person's library ("Weighted Pull-Up"), if any. */
   weightedVariant?: string | null;
 }
 
 /**
  * Next time, on last session's sets: each set that reached the top of the range, or beyond,
- * gets one short line to go up -- "Hit 10! Go up to 77.5 lb today." -- or, for a bodyweight
- * exercise, to make it harder. Keyed by the set's place in that session (1 for its first set),
+ * gets one short line to go up -- "Hit 10! Go up in weight today." (never a weight to go to: how
+ * much heavier is the person's to choose) -- or, for a bodyweight exercise, to make it harder. Keyed by the set's place in that session (1 for its first set),
  * as Last Time's Sets numbers them. A set short of the top gets nothing, and a timed exercise,
  * which has no range, gets nothing.
  */
 export function lastTimeFlags(
   input: Omit<CueInput, 'movementType'> & { lastSessionSets: SetRecord[] },
 ): Record<number, string> {
-  const { measurementType, range, unit, weightedVariant } = input;
-  const step = input.incrementKg ?? defaultIncrementKg(unit);
+  const { measurementType, range, weightedVariant } = input;
   const flags: Record<number, string> = {};
   if (measurementType === 'timed') return flags;
   input.lastSessionSets.forEach((set, index) => {
@@ -128,8 +116,7 @@ export function lastTimeFlags(
         ? `Hit ${set.reps}! Try ${weightedVariant} today.`
         : `Hit ${set.reps}! Go for ${set.reps + 1} today.`;
     } else if (set.weightKg != null) {
-      flags[index + 1] =
-        `Hit ${set.reps}! Go up to ${weightText(set.weightKg + step, unit)} today.`;
+      flags[index + 1] = `Hit ${set.reps}! Go up in weight today.`;
     }
   });
   return flags;
@@ -359,7 +346,6 @@ export function progressionForExercise(input: {
             range,
             weightedVariant,
             unit: settings.unit,
-            incrementKg: input.override?.incrementKg ?? undefined,
             lastSessionSets,
           })
         : {},

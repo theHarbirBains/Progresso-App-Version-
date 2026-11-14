@@ -1704,7 +1704,7 @@ describe('Progressive overload', () => {
     renderScreen();
 
     expect(await screen.findByTestId('exercise-card-we1-previous-set-1-flag')).toHaveTextContent(
-      /Hit 12! Go up to 102\.5 kg today\./,
+      /Hit 12! Go up in weight today\./,
     );
     expect(screen.queryByTestId('exercise-card-we1-previous-set-2-flag')).toBeNull();
   });
@@ -1730,7 +1730,7 @@ describe('Progressive overload', () => {
     renderScreen();
 
     expect(await screen.findByTestId('exercise-card-we1-previous-set-1-flag')).toHaveTextContent(
-      /Hit 10! Go up to 142\.5 kg today\./,
+      /Hit 10! Go up in weight today\./,
     );
   });
 

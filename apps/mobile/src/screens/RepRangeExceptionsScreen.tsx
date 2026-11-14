@@ -31,7 +31,7 @@ export function RepRangeExceptionsScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { profile, updateProfile } = useProfile();
-  const { theme, weightUnit } = useProgressTheme();
+  const { theme } = useProgressTheme();
   const [exceptions, setExceptions] = useState<RangeException[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rangeDraft, setRangeDraft] = useState<RepRange | null>(null);
@@ -88,7 +88,6 @@ export function RepRangeExceptionsScreen({ navigation }: Props) {
             range={range}
             owner="self"
             exceptions={exceptions}
-            weightUnit={weightUnit}
             pickerUserId={userId}
             onEditRange={() => setRangeDraft(range)}
             onSave={async (exercise, setting) => {
