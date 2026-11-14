@@ -20,9 +20,10 @@ import { ConsistencyBlock } from '../progress/ConsistencyBlock';
 import { NutritionProgressSection } from '../progress/NutritionProgressSection';
 import { useProfile } from '../profile/ProfileProvider';
 import { ProgressHeader } from '../progress/ProgressHeader';
-import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
+import { ownProgressSections, type ProgressSection } from '../progress/progressSections';
 import { progressStyles as styles } from '../progress/progressStyles';
 import { useMembership } from '../membership/useMembership';
+import { StepsSection } from '../progress/StepsSection';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { groupByExercise } from '../workouts/allExerciseHistoryQueries';
@@ -132,7 +133,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
           <View style={styles.tabsWrap}>
             <UnderlineTabs
               testID="progress-tabs"
-              categories={[...PROGRESS_SECTIONS]}
+              categories={ownProgressSections()}
               active={activeSection}
               onSelect={setActiveSection}
               accentColor={theme.accent}
@@ -197,6 +198,11 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 onAccentColor={theme.onAccent}
                 navigation={navigation}
               />
+            ) : null}
+
+            {/* Steps: the phone's own, from Apple Health -- read as the tab opens. */}
+            {contentReady && activeSection === 'Steps' ? (
+              <StepsSection accentColor={theme.accent} />
             ) : null}
 
             {/* All Time: the workouts' all-time figures, or nutrition's -- two tabs of one section. */}

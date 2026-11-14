@@ -56,3 +56,39 @@ export async function stepsToday(now = new Date()): Promise<number> {
   });
   return Math.round(result.sumQuantity?.quantity ?? 0);
 }
+
+/** One day's steps: the day as "YYYY-MM-DD" (local), and its count. */
+export interface DaySteps {
+  day: string;
+  steps: number;
+}
+
+/**
+ * Each of the last `days` days' steps, oldest first and today last (so far today), from every
+ * source Apple Health has, without double counting -- read on the phone, kept nowhere.
+ */
+export async function stepsByDay(days: number, now = new Date()): Promise<DaySteps[]> {
+  const hk = await loadHealthKit();
+  const first = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));
+  const results = await hk.queryStatisticsCollectionForQuantity(
+    STEPS,
+    ['cumulativeSum'],
+    first,
+    { day: 1 },
+    { filter: { date: { startDate: first, endDate: now } }, unit: 'count' },
+  );
+  const byDay = new Map<string, number>();
+  for (const result of results) {
+    if (!result.startDate) continue;
+    byDay.set(dayKey(new Date(result.startDate)), Math.round(result.sumQuantity?.quantity ?? 0));
+  }
+  return Array.from({ length: days }, (_, i) => {
+    const day = dayKey(new Date(first.getFullYear(), first.getMonth(), first.getDate() + i));
+    return { day, steps: byDay.get(day) ?? 0 };
+  });
+}
+
+function dayKey(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}

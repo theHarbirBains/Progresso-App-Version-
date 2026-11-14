@@ -30,7 +30,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { AllTimeSection } from '../progress/AllTimeSection';
 import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { OverviewSection } from '../progress/OverviewSection';
-import { PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
+import { CLIENT_PROGRESS_SECTIONS, type ProgressSection } from '../progress/progressSections';
 import { progressStyles } from '../progress/progressStyles';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -64,8 +64,8 @@ type Props = RootStackScreenProps<'TrainerClientDetail'>;
 /** A client's page always shows pounds, whatever the trainer's own unit setting is. */
 const CLIENT_WEIGHT_UNIT = 'lb';
 
-/** Progress's tabs. All Time is its workouts alone here: a trainer doesn't see a client's food. */
-const CLIENT_PROGRESS_SECTIONS = [...PROGRESS_SECTIONS];
+// Progress's tabs, without Steps (on the client's phone only). All Time is its workouts alone
+// here: a trainer doesn't see a client's food.
 
 type Tab = 'workouts' | 'records' | 'progress';
 

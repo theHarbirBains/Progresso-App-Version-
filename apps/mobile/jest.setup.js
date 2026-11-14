@@ -262,4 +262,5 @@ jest.mock('@kingstinct/react-native-healthkit', () => ({
   getRequestStatusForAuthorization: jest.fn().mockResolvedValue(1),
   requestAuthorization: jest.fn().mockResolvedValue(true),
   queryStatisticsForQuantity: jest.fn().mockResolvedValue({ sources: [] }),
+  queryStatisticsCollectionForQuantity: jest.fn().mockResolvedValue([]),
 }));

@@ -1,12 +1,27 @@
-// Exactly three Progress sections/tabs, per the current approved product
-// scope -- Strength (removed: Progress has no line graphs), History/Volume/
+import { Platform } from 'react-native';
+
+// Progress's sections/tabs, per the current approved product scope --
+// Strength (removed: Progress has no line graphs), History/Volume/
 // Exercises/1 Rep Max/etc. are deliberately not here; do not add
 // placeholder tabs for them ahead of time. Nutrition is All Time's second
-// tab (ProgressOverviewScreen), not a section of its own.
+// tab (ProgressOverviewScreen), not a section of its own. Steps (from Apple
+// Health) is iPhone only, and only ever the person's own -- a trainer's view
+// of a client has no Steps tab (see TrainerClientDetailScreen).
 export const PROGRESS_SECTIONS = [
   { key: 'Overview', label: 'Overview', icon: 'bar-chart-2' },
   { key: 'TopSets', label: 'Top Sets', icon: 'target' },
   { key: 'AllTime', label: 'All Time', icon: 'calendar' },
+  { key: 'Steps', label: 'Steps', icon: 'trending-up' },
 ] as const;
 
 export type ProgressSection = (typeof PROGRESS_SECTIONS)[number]['key'];
+
+/** The person's own Progress tabs: Steps only where Apple Health can be (iPhone). */
+export function ownProgressSections() {
+  return PROGRESS_SECTIONS.filter((section) => section.key !== 'Steps' || Platform.OS === 'ios');
+}
+
+/** A trainer's view of a client's Progress: never Steps -- they're on the client's phone only. */
+export const CLIENT_PROGRESS_SECTIONS = PROGRESS_SECTIONS.filter(
+  (section) => section.key !== 'Steps',
+);

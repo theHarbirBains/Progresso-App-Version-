@@ -1,12 +1,13 @@
 import {
   getRequestStatusForAuthorization,
   isHealthDataAvailable,
+  queryStatisticsCollectionForQuantity,
   queryStatisticsForQuantity,
   requestAuthorization,
 } from '@kingstinct/react-native-healthkit';
 import { Platform } from 'react-native';
 import { hasHealthKitNative } from '../lib/nativeModules';
-import { askForSteps, stepsAccess, stepsToday } from './steps';
+import { askForSteps, stepsAccess, stepsByDay, stepsToday } from './steps';
 
 const STEPS = 'HKQuantityTypeIdentifierStepCount';
 
@@ -74,4 +75,42 @@ it("adds up today's steps since midnight, as a whole number", async () => {
 it('is 0 on a day with no steps recorded', async () => {
   (queryStatisticsForQuantity as jest.Mock).mockResolvedValueOnce({ sources: [] });
   expect(await stepsToday()).toBe(0);
+});
+
+describe('stepsByDay', () => {
+  const now = new Date(2026, 10, 13, 15, 42);
+
+  it("reads each day's total back to midnight `days` days ago, oldest first, today last", async () => {
+    (queryStatisticsCollectionForQuantity as jest.Mock).mockResolvedValueOnce([
+      { startDate: new Date(2026, 10, 11), sumQuantity: { unit: 'count', quantity: 6020.4 } },
+      { startDate: new Date(2026, 10, 12), sumQuantity: { unit: 'count', quantity: 9801.6 } },
+      { startDate: new Date(2026, 10, 13), sumQuantity: { unit: 'count', quantity: 3500 } },
+    ]);
+
+    expect(await stepsByDay(3, now)).toEqual([
+      { day: '2026-11-11', steps: 6020 },
+      { day: '2026-11-12', steps: 9802 },
+      { day: '2026-11-13', steps: 3500 },
+    ]);
+    expect(queryStatisticsCollectionForQuantity).toHaveBeenCalledWith(
+      STEPS,
+      ['cumulativeSum'],
+      new Date(2026, 10, 11),
+      { day: 1 },
+      { filter: { date: { startDate: new Date(2026, 10, 11), endDate: now } }, unit: 'count' },
+    );
+  });
+
+  it('fills a day Apple Health has nothing for with 0', async () => {
+    (queryStatisticsCollectionForQuantity as jest.Mock).mockResolvedValueOnce([
+      { startDate: new Date(2026, 10, 12), sumQuantity: { unit: 'count', quantity: 4000 } },
+      { startDate: new Date(2026, 10, 13) },
+    ]);
+
+    expect(await stepsByDay(3, now)).toEqual([
+      { day: '2026-11-11', steps: 0 },
+      { day: '2026-11-12', steps: 4000 },
+      { day: '2026-11-13', steps: 0 },
+    ]);
+  });
 });

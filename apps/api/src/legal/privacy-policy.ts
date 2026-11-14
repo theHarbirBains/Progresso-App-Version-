@@ -53,7 +53,7 @@ const BODY = `
 
 <h2>Health and body information</h2>
 <p>Workouts, body measurements and what you eat say a lot about your health. We use them only to provide Progresso to you, never for advertising, and we don't share them beyond what's described above.</p>
-<p><strong>Apple Health.</strong> On iPhone, if you connect Apple Health, Progresso reads your step count to show today's steps in the app and on its Home Screen widget. It reads nothing else from Apple Health and never writes to it. Your steps are read on your phone each time they're shown and never leave it: they aren't sent to us, stored on our servers, used for advertising or shared with anyone. You can stop it at any time in the Health app.</p>
+<p><strong>Apple Health.</strong> On iPhone, if you connect Apple Health, Progresso reads your step count to show today's steps and your steps over the last few weeks in the app, and today's on its Home Screen widget. It reads nothing else from Apple Health and never writes to it. Your steps are read on your phone each time they're shown and never leave it: they aren't sent to us, stored on our servers, used for advertising or shared with anyone. You can stop it at any time in the Health app.</p>
 <p><strong>Widgets.</strong> If you add a Progresso widget to your Home Screen, or start a workout with Live Activities on, your phone keeps what it shows (today's calories and macros, your next or current workout, your steps) so the widget can show it. It stays on your phone and is cleared when you sign out.</p>
 
 <h2>Keeping and deleting your data</h2>

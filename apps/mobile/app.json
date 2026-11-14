@@ -106,7 +106,7 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Progresso reads your step count to show today's steps. It never writes to Apple Health, and your steps stay on your phone.",
+          "NSHealthShareUsageDescription": "Progresso reads your step count to show your steps today and over recent weeks. It never writes to Apple Health, and your steps stay on your phone.",
           "NSHealthUpdateUsageDescription": "Progresso doesn't save anything to Apple Health. It only reads your step count to show today's steps.",
           "background": false
         }
