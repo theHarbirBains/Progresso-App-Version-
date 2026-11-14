@@ -156,7 +156,6 @@ describe('ExerciseCard', () => {
   it('shows no Last Time when there is no prior session', () => {
     render(<ExerciseCard {...baseProps} />);
 
-    expect(screen.queryByTestId('exercise-card-last')).toBeNull();
     expect(screen.queryByTestId('exercise-card-previous-session')).toBeNull();
   });
 
@@ -196,11 +195,10 @@ describe('ExerciseCard', () => {
     );
 
     expect(screen.getByTestId('exercise-card-previous-session')).toHaveTextContent(
-      /Last Time's Sets/,
+      /Last Time's Sets · Sep 1, 2026/,
     );
-    expect(screen.getByTestId('exercise-card-last')).toHaveTextContent(
-      /Last Time.*225 lb × 5.*Sep 1, 2026 · 3 sets/,
-    );
+    // Only All-Time Best sits above: last session's top set is marked in the carousel instead.
+    expect(screen.queryByTestId('exercise-card-last')).toBeNull();
     expect(screen.getByTestId('exercise-card-previous-set-1')).toHaveTextContent(
       /Set 1 of 3.*225 lb × 5.*Top Set/,
     );

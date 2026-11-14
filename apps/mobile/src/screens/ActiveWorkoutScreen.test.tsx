@@ -1550,8 +1550,8 @@ describe('Last Workout', () => {
     );
     expect(screen.getByTestId('exercise-card-we1-previous-set-2')).toHaveTextContent(/97\.5 kg/);
     expect(screen.getByTestId('exercise-card-we1-previous-set-3')).toHaveTextContent(/95 kg/);
-    // Last Time's tile: that session's top set, its date and how many sets.
-    expect(screen.getByTestId('exercise-card-we1-last')).toHaveTextContent(/100 kg × 5.*3 sets/);
+    // No Last Time tile beside All-Time Best: its top set is marked among the sets above.
+    expect(screen.queryByTestId('exercise-card-we1-last')).toBeNull();
   });
 
   it('fetches and shows the previous session for a newly added exercise too, not just ones already in the workout', async () => {

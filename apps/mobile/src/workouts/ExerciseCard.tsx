@@ -120,7 +120,7 @@ interface Props {
   testID?: string;
 }
 
-/** One of the exercise's two records: what it is, the figure, and when. */
+/** The exercise's record: what it is, the figure, and when. */
 function RecordTile({
   testID,
   label,
@@ -195,10 +195,10 @@ function slideValue(set: PreviousSessionSet, type: MeasurementType): string {
 // - its photo (tap for full size) or initial, name, muscle group, and -- only when it has one --
 //   its own rep range; a "more" glyph opens a row of actions inside the widget (Up, Down, Rep
 //   Range, Remove), so nothing opens over the workout;
-// - two records side by side: All-Time Best (the best set ever within the rep range, with its
-//   date, or "Today" in the accent once today's beats it) and Last Time (that session's top set,
-//   its date and how many sets);
-// - Last Time's sets as a carousel that moves on by itself and can be swiped to any set, the
+// - its record, All-Time Best (the best set ever within the rep range, with its date, or
+//   "Today" in the accent once today's beats it) -- last session's top set isn't repeated beside
+//   it, since it's marked among Last Time's Sets just below;
+// - Last Time's sets, under that session's date, as a carousel that moves on by itself and can be swiped to any set, the
 //   top set marked, with View History. A set that reached the top of the range says what to
 //   do about it today ("Hit 10! Go up to 77.5 lb today."), and the carousel opens on it;
 // - today's sets to log, as rows that never move, and Add Set.
@@ -325,32 +325,22 @@ function ExerciseCardComponent({
         </RiseIn>
       ) : null}
 
-      {allTimeBest || previousSession ? (
+      {allTimeBest ? (
         <View style={styles.recordTiles}>
-          {allTimeBest ? (
-            <RecordTile
-              testID={id('best')}
-              label="All-Time Best"
-              value={formatSetValues(allTimeBest, weightUnit)}
-              meta={allTimeBest.achievedAt ? formatShortDate(allTimeBest.achievedAt) : 'Today'}
-              valueColor={allTimeBest.achievedAt ? undefined : accentColor}
-            />
-          ) : null}
-          {previousSession ? (
-            <RecordTile
-              testID={id('last')}
-              label="Last Time"
-              value={previousSession.topSetDisplay ?? '—'}
-              meta={`${previousSession.dateDisplay} · ${previousSets.length} ${previousSets.length === 1 ? 'set' : 'sets'}`}
-            />
-          ) : null}
+          <RecordTile
+            testID={id('best')}
+            label="All-Time Best"
+            value={formatSetValues(allTimeBest, weightUnit)}
+            meta={allTimeBest.achievedAt ? formatShortDate(allTimeBest.achievedAt) : 'Today'}
+            valueColor={allTimeBest.achievedAt ? undefined : accentColor}
+          />
         </View>
       ) : null}
 
       {previousSets.length > 0 ? (
         <View testID={id('previous-session')} style={styles.previousSession}>
           <View style={styles.previousHeaderRow}>
-            <SectionHeader label="Last Time's Sets" />
+            <SectionHeader label={`Last Time's Sets · ${previousSession!.dateDisplay}`} />
             {onViewHistory ? (
               <TouchableOpacity
                 testID={id('view-history')}

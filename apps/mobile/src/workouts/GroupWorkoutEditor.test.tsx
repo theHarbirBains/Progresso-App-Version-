@@ -206,9 +206,9 @@ describe('GroupWorkoutEditor', () => {
     fireEvent.press(screen.getByText('Sam'));
 
     // Sam's own last time still shows; nothing from your records or settings does.
-    expect(await screen.findByTestId('group-workout-exercise-squat-last')).toHaveTextContent(
-      /60 kg × 5/,
-    );
+    expect(
+      await screen.findByTestId('group-workout-exercise-squat-previous-set-1'),
+    ).toHaveTextContent(/60 kg × 5/);
     expect(screen.queryByTestId('group-workout-rep-range')).toBeNull();
     expect(screen.queryByTestId('group-workout-exercise-squat-best')).toBeNull();
     expect(screen.queryByTestId('group-workout-exercise-squat-range')).toBeNull();
