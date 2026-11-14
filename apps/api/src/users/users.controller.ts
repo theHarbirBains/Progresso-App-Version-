@@ -6,12 +6,14 @@ import { Role } from '../common/enums/role.enum';
 import { AccountDeletionService } from './account-deletion.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
+import { WelcomeEmailService } from './welcome-email.service';
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly accountDeletionService: AccountDeletionService,
+    private readonly welcomeEmailService: WelcomeEmailService,
   ) {}
 
   // Any authenticated role is allowed through; the point of listing all
@@ -34,9 +36,25 @@ export class UsersController {
   // supplying a different id/userId field, because nothing here ever
   // reads one.
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  //
+  // Finishing onboarding for the first time sends the welcome email -- after the save, and
+  // without waiting for it: an email that doesn't go never fails the save.
   @Patch('me')
   async updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateUserDto) {
+    const welcome =
+      dto.onboardingCompleted === true &&
+      Boolean(user.email) &&
+      this.welcomeEmailService.isConfigured() &&
+      (await this.usersService.getProfile(user.id)).onboardingCompletedAt === null;
     const profile = await this.usersService.updateProfile(user.id, dto);
+    if (welcome && user.email) {
+      void this.welcomeEmailService.send({
+        to: user.email,
+        userId: user.id,
+        name: profile.displayName,
+        nutrition: profile.membershipTier !== 'workouts',
+      });
+    }
     return {
       id: user.id,
       email: user.email,

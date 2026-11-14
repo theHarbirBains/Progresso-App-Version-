@@ -27,7 +27,7 @@ const BODY = `
   <li>To run Progresso: saving your workouts and meals, working out your records, progress and calorie estimates, and showing them back to you.</li>
   <li>To run the features you choose to use with other people: following, the Friends feed, group workouts and trainers.</li>
   <li>To look up foods and nutrition when you search, scan a barcode or describe a meal.</li>
-  <li>To send the notifications you've turned on.</li>
+  <li>To send the notifications you've turned on, and one welcome email to your sign-in address when your account is set up.</li>
   <li>To keep Progresso safe: reviewing reports, and keeping blocked people away from you.</li>
   <li>To read the feedback you send, follow it up and improve Progresso with it.</li>
   <li>To fix crashes and keep the service secure.</li>
@@ -44,6 +44,7 @@ const BODY = `
       <li>Apple and Google: sign-in, if you use them, and delivering notifications to your device.</li>
       <li>Anthropic: when you describe a meal to the AI food search, the text you type, to estimate its nutrition. It isn't sent with your name or account.</li>
       <li>USDA FoodData Central and Open Food Facts: the food you search for or the barcode you scan.</li>
+      <li>Resend: sending the welcome email, with your email address and first name.</li>
       <li>Sentry: crash reports.</li>
     </ul>
   </li>

@@ -13,6 +13,10 @@ export interface EnvironmentVariables {
   ANTHROPIC_API_KEY: string;
   /** Optional. Empty string means the daily-notifications trigger route rejects everything. */
   INTERNAL_NOTIFICATIONS_SECRET: string;
+  /** Optional. Empty string means no welcome email is sent (users/welcome-email.service.ts). */
+  RESEND_API_KEY: string;
+  /** Optional. The welcome email's sender, e.g. "Progresso <hello@yourdomain.com>"; empty sends none. */
+  EMAIL_FROM: string;
 }
 
 const NODE_ENVS: EnvironmentVariables['NODE_ENV'][] = ['development', 'production', 'test'];
@@ -45,5 +49,7 @@ export function validate(config: Record<string, unknown>): EnvironmentVariables 
     REVENUECAT_WEBHOOK_SECRET: (config.REVENUECAT_WEBHOOK_SECRET as string) || '',
     ANTHROPIC_API_KEY: (config.ANTHROPIC_API_KEY as string) || '',
     INTERNAL_NOTIFICATIONS_SECRET: (config.INTERNAL_NOTIFICATIONS_SECRET as string) || '',
+    RESEND_API_KEY: (config.RESEND_API_KEY as string) || '',
+    EMAIL_FROM: (config.EMAIL_FROM as string) || '',
   };
 }
