@@ -69,6 +69,12 @@ export interface ProfileResponse {
   repRangeMax: number;
   /** Whether the live workout suggests when to go heavier or make an exercise harder. */
   progressionCuesEnabled: boolean;
+  /** Push for social activity (Settings > Notifications > Social), each on unless turned off. */
+  notifyFollows: boolean;
+  notifyLikes: boolean;
+  notifyComments: boolean;
+  /** Whether people with their email in their contacts can find them. */
+  findableByEmail: boolean;
 }
 
 export interface UpdateProfileInput {
@@ -104,6 +110,10 @@ export interface UpdateProfileInput {
   repRangeMin?: number;
   repRangeMax?: number;
   progressionCuesEnabled?: boolean;
+  notifyFollows?: boolean;
+  notifyLikes?: boolean;
+  notifyComments?: boolean;
+  findableByEmail?: boolean;
 }
 
 export function updateMyProfile(

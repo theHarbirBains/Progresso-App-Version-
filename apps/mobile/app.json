@@ -42,6 +42,12 @@
       ],
       "@sentry/react-native",
       "expo-web-browser",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Progresso looks for the people in your contacts who are on Progresso, by their email. Emails are scrambled on your phone before anything is sent, and nothing is kept."
+        }
+      ],
       "expo-font",
       "expo-sharing",
       "expo-status-bar",

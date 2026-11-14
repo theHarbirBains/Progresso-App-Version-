@@ -10,6 +10,8 @@ import type { EnrichedWorkoutSummary } from '../workouts/workoutHistoryEnrichmen
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
 import { feedStyles as styles } from '../screens/feedStyles';
+import type { SocialSummary } from '../lib/socialApi';
+import { WorkoutSocialBar } from '../social/WorkoutSocialBar';
 import { RecentWorkoutTopSets } from './RecentWorkoutTopSets';
 
 /** The fields a workout card shows; Feed and the trainer view both supply these. */
@@ -36,6 +38,15 @@ interface Props {
   onPress?: () => void;
   /** Shows a "more" glyph in the byline -- a friend's workout, to report it or block them. */
   onMore?: () => void;
+  /** The byline (avatar and name) opens its person's profile. */
+  onAuthorPress?: () => void;
+  /** Likes and comments under the card (social/WorkoutSocialBar): absent, no bar. */
+  social?: {
+    summary: SocialSummary;
+    onToggleLike: () => void;
+    onComments: () => void;
+    accentColor: string;
+  };
   /** Extra actions shown under the card, e.g. a trainer's Edit and Delete. Feed passes none. */
   actions?: ReactNode;
 }
@@ -54,30 +65,41 @@ export function WorkoutFeedCard({
   weightUnit,
   onPress,
   onMore,
+  onAuthorPress,
+  social,
   actions,
 }: Props) {
   return (
     <Card testID={`${idPrefix}-${workout.id}`} onPress={onPress}>
       <View style={styles.metaRow}>
-        <View style={styles.avatarWrap}>
-          <Avatar
-            uri={avatarUrl ?? null}
-            initial={authorName.charAt(0).toUpperCase()}
-            size={32}
-            iconSize={16}
-            iconColor={colors.textSecondary}
-            initialStyle={styles.avatarInitial}
-          />
-        </View>
-        <View style={styles.metaBody}>
-          <Text style={styles.metaName} numberOfLines={1}>
-            {authorName}
-          </Text>
-          <View style={styles.metaSubRow}>
-            <Feather name="activity" size={11} color={colors.textMuted} />
-            <Text style={styles.metaTimestamp}>{formatCardDate(timestamp)}</Text>
+        <TouchableOpacity
+          testID={`${idPrefix}-${workout.id}-author`}
+          style={styles.authorTap}
+          onPress={onAuthorPress}
+          disabled={!onAuthorPress}
+          accessibilityRole={onAuthorPress ? 'button' : undefined}
+          accessibilityLabel={onAuthorPress ? `${authorName}, open profile` : undefined}
+        >
+          <View style={styles.avatarWrap}>
+            <Avatar
+              uri={avatarUrl ?? null}
+              initial={authorName.charAt(0).toUpperCase()}
+              size={32}
+              iconSize={16}
+              iconColor={colors.textSecondary}
+              initialStyle={styles.avatarInitial}
+            />
           </View>
-        </View>
+          <View style={styles.metaBody}>
+            <Text style={styles.metaName} numberOfLines={1}>
+              {authorName}
+            </Text>
+            <View style={styles.metaSubRow}>
+              <Feather name="activity" size={11} color={colors.textMuted} />
+              <Text style={styles.metaTimestamp}>{formatCardDate(timestamp)}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
         {onMore ? (
           <TouchableOpacity
             testID={`${idPrefix}-${workout.id}-more`}
@@ -122,6 +144,15 @@ export function WorkoutFeedCard({
         topSets={workout.topSets}
         weightUnit={weightUnit}
       />
+      {social ? (
+        <WorkoutSocialBar
+          testID={`${idPrefix}-${workout.id}-social`}
+          summary={social.summary}
+          onToggleLike={social.onToggleLike}
+          onComments={social.onComments}
+          accentColor={social.accentColor}
+        />
+      ) : null}
       {actions}
     </Card>
   );

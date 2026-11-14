@@ -16,3 +16,4 @@ export * from './trainerApi';
 export * from './groupsApi';
 export * from './safetyApi';
 export * from './feedbackApi';
+export * from './socialApi';

@@ -48,7 +48,24 @@ export function listFollowing(accessToken: string): Promise<FollowUser[]> {
 // which stays the full management list for Find People's Requests tab.
 export type FollowNotification =
   | { kind: 'request'; followId: string; user: FollowUser; at: string }
-  | { kind: 'accepted'; followId: string; user: FollowUser; at: string };
+  | { kind: 'accepted'; followId: string; user: FollowUser; at: string }
+  | {
+      kind: 'like';
+      id: string;
+      user: FollowUser;
+      workoutId: string;
+      workoutName: string;
+      at: string;
+    }
+  | {
+      kind: 'comment';
+      id: string;
+      user: FollowUser;
+      workoutId: string;
+      workoutName: string;
+      body: string;
+      at: string;
+    };
 
 export function listFollowNotifications(accessToken: string): Promise<FollowNotification[]> {
   return request<FollowNotification[]>('/api/v1/follows/notifications', accessToken);

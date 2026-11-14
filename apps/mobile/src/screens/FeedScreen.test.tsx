@@ -46,6 +46,9 @@ jest.mock('../lib/api', () => ({
   fetchFriendsFeed: jest.fn(),
   listFollowNotifications: jest.fn(),
   listGroups: jest.fn().mockResolvedValue([]),
+  getSocialSummary: jest.fn().mockResolvedValue({}),
+  likeWorkout: jest.fn().mockResolvedValue(null),
+  unlikeWorkout: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('../profile/profileQueries', () => ({
@@ -673,14 +676,46 @@ describe('FeedScreen -- merged Friends activity', () => {
     await waitFor(() => expect(screen.queryByTestId('feed-item-workout-fw1')).toBeNull());
   });
 
-  it("does not navigate on tap -- a friend's workout isn't the signed-in user's to open", async () => {
+  it("opens a friend's workout read-only, and their name opens their profile", async () => {
     mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
     renderScreen();
     await screen.findByTestId('feed-item-workout-fw1');
 
     fireEvent.press(screen.getByTestId('feed-item-workout-fw1'));
+    expect(mockNavigate).toHaveBeenCalledWith('WorkoutDetail', {
+      workoutId: 'fw1',
+      authorId: 'user-2',
+    });
 
-    expect(mockNavigate).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('feed-item-workout-fw1-author'));
+    expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'user-2' });
+  });
+
+  it('shows each card its likes and comments, liking at a tap and opening its comments', async () => {
+    const { getSocialSummary, likeWorkout } = jest.requireMock('../lib/api') as {
+      getSocialSummary: jest.Mock;
+      likeWorkout: jest.Mock;
+    };
+    getSocialSummary.mockResolvedValue({
+      fw1: { likeCount: 2, commentCount: 1, likedByMe: false },
+    });
+    mockFetchFriendsFeed.mockResolvedValue(feedPage([friendWorkoutItem]));
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-item-workout-fw1-social-like-count')).toHaveTextContent(
+      '2',
+    );
+    fireEvent.press(screen.getByTestId('feed-item-workout-fw1-social-like'));
+    expect(screen.getByTestId('feed-item-workout-fw1-social-like-count')).toHaveTextContent('3');
+    await waitFor(() => expect(likeWorkout).toHaveBeenCalledWith('token-123', 'fw1'));
+
+    fireEvent.press(screen.getByTestId('feed-item-workout-fw1-social-comments'));
+    expect(mockNavigate).toHaveBeenCalledWith('WorkoutDetail', {
+      workoutId: 'fw1',
+      authorId: 'user-2',
+      focusComments: true,
+    });
+    getSocialSummary.mockResolvedValue({});
   });
 
   it('a friends-feed failure does not block your own activity from showing', async () => {

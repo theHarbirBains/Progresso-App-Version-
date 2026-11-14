@@ -24,6 +24,14 @@ jest.mock('../lib/supabase', () => ({
   supabase: { auth: { signOut: jest.fn() } },
 }));
 
+// The signed-in person's profile: findable by email unless a test says otherwise.
+const mockUpdateProfile = jest.fn();
+// One profile object per test, as the real provider keeps it between renders.
+let mockProfile = { findableByEmail: true };
+jest.mock('../profile/ProfileProvider', () => ({
+  useProfile: () => ({ profile: mockProfile, updateProfile: mockUpdateProfile }),
+}));
+
 const mockDeleteMyAccount = deleteMyAccount as jest.Mock;
 const mockLocalSignOut = supabase.auth.signOut as jest.Mock;
 
@@ -56,6 +64,30 @@ function renderScreen() {
 }
 
 describe('SettingsAccountSecurityScreen', () => {
+  it('lets people with your email find you, until you turn it off', async () => {
+    mockProfile = { findableByEmail: true };
+    mockUpdateProfile.mockReset().mockResolvedValue({});
+    renderScreen();
+
+    expect(screen.getByTestId('account-findable-toggle').props.value).toBe(true);
+    fireEvent(screen.getByTestId('account-findable-toggle'), 'valueChange', false);
+
+    await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith({ findableByEmail: false }));
+    expect(screen.getByTestId('account-findable-toggle').props.value).toBe(false);
+  });
+
+  it('puts the switch back when it does not save', async () => {
+    mockProfile = { findableByEmail: true };
+    mockUpdateProfile.mockReset().mockRejectedValue(new Error('offline'));
+    renderScreen();
+
+    fireEvent(screen.getByTestId('account-findable-toggle'), 'valueChange', false);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('account-findable-toggle').props.value).toBe(true),
+    );
+  });
+
   it('goes back when the header back button is pressed', () => {
     renderScreen();
 

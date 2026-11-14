@@ -46,6 +46,18 @@ jest.mock('../progress/AllTimeStatsProvider', () => ({
 
 jest.mock('../lib/api', () => ({
   getGroup: jest.fn(),
+  // A followed person's workout, and any workout's likes and comments.
+  getFriendWorkout: jest.fn(),
+  getWorkoutSocial: jest.fn().mockResolvedValue({
+    likeCount: 0,
+    likedByMe: false,
+    likers: [],
+    comments: [],
+  }),
+  likeWorkout: jest.fn(),
+  unlikeWorkout: jest.fn(),
+  postComment: jest.fn(),
+  deleteComment: jest.fn(),
 }));
 
 // Not a trainer, unless a test says so.
@@ -506,11 +518,12 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     await screen.findByTestId('exercise-card-we2');
   }
 
-  it('leads with one summary card, then one card per exercise', async () => {
+  it('leads with one summary card, then one card per exercise, then its likes and comments', async () => {
     await ready();
+    await screen.findByTestId('workout-comments');
 
-    // Summary + two exercises.
-    expect(screen.UNSAFE_getAllByType(AppCard)).toHaveLength(3);
+    // Summary + two exercises + likes and comments.
+    expect(screen.UNSAFE_getAllByType(AppCard)).toHaveLength(4);
     expect(screen.getByTestId('workout-detail-summary')).toBeTruthy();
   });
 
@@ -839,5 +852,79 @@ describe('WorkoutDetailScreen -- a group workout', () => {
 
     expect(await screen.findByTestId('workout-detail-summary')).toBeTruthy();
     expect(screen.queryByTestId('workout-detail-share')).toBeNull();
+  });
+});
+
+describe("WorkoutDetailScreen -- a friend's workout", () => {
+  const theirs = {
+    id: 'fw1',
+    name: 'Pull Day',
+    performedAt: '2026-01-01T12:00:00Z',
+    completedAt: '2026-01-01T13:00:00Z',
+    author: { id: 'sam', username: 'sam', displayName: 'Sam Lee', avatarUrl: null },
+    exercises: [
+      {
+        id: 'we-f1',
+        exerciseId: 'ex-row',
+        exerciseName: 'Seated Row',
+        muscleGroup: 'back',
+        movementType: 'bilateral',
+        measurementType: 'weight_reps',
+        photoUrl: null,
+        gym: 'Downtown',
+        attachment: 'V-handle',
+        orderIndex: 1,
+        sets: [
+          {
+            id: 'fs1',
+            setIndex: 1,
+            side: null,
+            weightKg: 80,
+            reps: 10,
+            durationSeconds: null,
+            completedAt: '2026-01-01T12:05:00Z',
+          },
+        ],
+      },
+    ],
+  };
+
+  it('reads it through the API, read-only, saying whose it is -- with its likes and comments', async () => {
+    const { getFriendWorkout } = jest.requireMock('../lib/api') as { getFriendWorkout: jest.Mock };
+    getFriendWorkout.mockResolvedValue(theirs);
+    mockFetchWorkoutDetail.mockClear();
+    render(
+      <WorkoutDetailScreen
+        navigation={navigation}
+        route={{ params: { workoutId: 'fw1', authorId: 'sam' } } as never}
+      />,
+      { wrapper: ProfileProvider },
+    );
+
+    expect(await screen.findByTestId('workout-detail-author')).toHaveTextContent(
+      "Sam Lee's workout",
+    );
+    expect(screen.getByTestId('exercise-card-we-f1')).toHaveTextContent(/Seated Row/);
+    expect(screen.getByTestId('exercise-muscle-we-f1')).toHaveTextContent(
+      'Back · Downtown · V-handle',
+    );
+    expect(screen.getByText(/80kg × 10/)).toBeTruthy();
+    expect(mockFetchWorkoutDetail).not.toHaveBeenCalled();
+    // Theirs: nothing to edit, share or delete.
+    expect(screen.queryByTestId('workout-detail-edit')).toBeNull();
+    expect(screen.queryByTestId('workout-detail-share')).toBeNull();
+    expect(screen.queryByTestId('workout-detail-delete')).toBeNull();
+    expect(await screen.findByTestId('workout-comments')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('workout-detail-author'));
+    expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'sam' });
+  });
+
+  it('has likes and comments on your own finished workout too', async () => {
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('workout-comments')).toBeTruthy();
   });
 });

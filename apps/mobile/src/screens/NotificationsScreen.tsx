@@ -36,6 +36,26 @@ function displayName(user: FollowUser): string {
   return user.displayName ?? (user.username ? `@${user.username}` : 'Someone');
 }
 
+/** One activity row's own key: the follow it's about, or the like or comment. */
+function activityKey(item: FollowNotification): string {
+  return item.kind === 'request' || item.kind === 'accepted' ? item.followId : item.id;
+}
+
+/** What happened, in a line. */
+function activityTitle(item: FollowNotification): string {
+  const who = displayName(item.user);
+  switch (item.kind) {
+    case 'request':
+      return `${who} wants to follow you`;
+    case 'accepted':
+      return `${who} accepted your follow request`;
+    case 'like':
+      return `${who} liked your workout ${item.workoutName}`;
+    default:
+      return `${who} commented on ${item.workoutName}`;
+  }
+}
+
 /**
  * The bell's destination: two honest, real sections -- no fake "notification
  * center" placeholder (see CLAUDE.md, real notification delivery doesn't
@@ -122,7 +142,7 @@ export function NotificationsScreen({ navigation }: Props) {
     setPending((p) => ({ ...p, [followId]: true }));
     try {
       await respondToFollowRequest(accessToken, followId, 'accept');
-      setActivity((prev) => prev.filter((item) => item.followId !== followId));
+      setActivity((prev) => prev.filter((item) => activityKey(item) !== followId));
     } catch (err) {
       setActivityError(err instanceof Error ? err.message : 'Failed to accept request');
       setPending((p) => ({ ...p, [followId]: false }));
@@ -134,7 +154,7 @@ export function NotificationsScreen({ navigation }: Props) {
     setPending((p) => ({ ...p, [followId]: true }));
     try {
       await respondToFollowRequest(accessToken, followId, 'reject');
-      setActivity((prev) => prev.filter((item) => item.followId !== followId));
+      setActivity((prev) => prev.filter((item) => activityKey(item) !== followId));
     } catch (err) {
       setActivityError(err instanceof Error ? err.message : 'Failed to reject request');
       setPending((p) => ({ ...p, [followId]: false }));
@@ -260,11 +280,21 @@ export function NotificationsScreen({ navigation }: Props) {
                 <SectionHeader label="Activity" />
               </View>
               {activity.map((item) => {
-                const isPending = Boolean(pending[item.followId]);
+                const key = activityKey(item);
+                const isPending = Boolean(pending[key]);
                 return (
                   <AppCard
-                    key={`${item.kind}-${item.followId}`}
-                    testID={`notifications-activity-${item.kind}-${item.followId}`}
+                    key={`${item.kind}-${key}`}
+                    testID={`notifications-activity-${item.kind}-${key}`}
+                    // A like or comment opens the workout at its comments; a follow, the person.
+                    onPress={() =>
+                      item.kind === 'like' || item.kind === 'comment'
+                        ? navigation.navigate('WorkoutDetail', {
+                            workoutId: item.workoutId,
+                            focusComments: true,
+                          })
+                        : navigation.navigate('PersonProfile', { userId: item.user.id })
+                    }
                   >
                     <View style={styles.itemRow}>
                       <Avatar
@@ -276,11 +306,16 @@ export function NotificationsScreen({ navigation }: Props) {
                         initialStyle={styles.avatarInitial}
                       />
                       <View style={styles.itemBody}>
-                        <Text style={styles.itemTitle}>
-                          {item.kind === 'request'
-                            ? `${displayName(item.user)} wants to follow you`
-                            : `${displayName(item.user)} accepted your follow request`}
-                        </Text>
+                        <Text style={styles.itemTitle}>{activityTitle(item)}</Text>
+                        {item.kind === 'comment' ? (
+                          <Text
+                            testID={`notifications-activity-comment-${key}-body`}
+                            style={styles.itemSubtitle}
+                            numberOfLines={2}
+                          >
+                            “{item.body}”
+                          </Text>
+                        ) : null}
                         <Text style={styles.itemSubtitle}>{formatCardDate(item.at)}</Text>
                       </View>
                     </View>
@@ -288,16 +323,16 @@ export function NotificationsScreen({ navigation }: Props) {
                       <View style={styles.itemActionWrap}>
                         <View style={styles.requestActions}>
                           <SecondaryButton
-                            testID={`notifications-activity-request-${item.followId}-reject`}
+                            testID={`notifications-activity-request-${key}-reject`}
                             label="Reject"
                             loading={isPending}
-                            onPress={() => handleReject(item.followId)}
+                            onPress={() => handleReject(key)}
                           />
                           <PrimaryButton
-                            testID={`notifications-activity-request-${item.followId}-accept`}
+                            testID={`notifications-activity-request-${key}-accept`}
                             label="Accept"
                             loading={isPending}
-                            onPress={() => handleAccept(item.followId)}
+                            onPress={() => handleAccept(key)}
                           />
                         </View>
                       </View>

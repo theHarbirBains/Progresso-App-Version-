@@ -8,6 +8,9 @@ import {
   type ExerciseRow,
 } from './exerciseQueries';
 
+/** Nothing shared: one list, so "still nothing" never reads as a change (and a reload). */
+const NONE: ExerciseRow[] = [];
+
 export interface SharedExercises {
   /** Every exercise shared with this person; empty until read, or when it can't be. */
   rows: ExerciseRow[];
@@ -30,7 +33,7 @@ export function useSharedExercises(active: boolean): SharedExercises {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
-  const [rows, setRows] = useState<ExerciseRow[]>([]);
+  const [rows, setRows] = useState<ExerciseRow[]>(NONE);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -40,12 +43,12 @@ export function useSharedExercises(active: boolean): SharedExercises {
     fetchSharedExercises(accessToken)
       .then((shared) => {
         if (cancelled) return;
-        setRows(shared.map(sharedExerciseRow));
+        setRows(shared.length > 0 ? shared.map(sharedExerciseRow) : NONE);
         setError(null);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setRows([]);
+        setRows(NONE);
         setError(err instanceof Error ? err.message : 'Could not load shared exercises');
       });
     return () => {

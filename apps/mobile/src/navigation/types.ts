@@ -33,7 +33,18 @@ export type RootStackParamList = {
   ExerciseLibrary: undefined;
   WorkoutHistory: undefined;
   /** clientId is set when a trainer opens one of a client’s workouts. */
-  WorkoutDetail: { workoutId: string; clientId?: string; clientName?: string };
+  /**
+   * `authorId`: someone else's workout, opened from the Friends feed or their profile -- read
+   * through the API, read-only, with its likes and comments.
+   */
+  WorkoutDetail: {
+    workoutId: string;
+    clientId?: string;
+    clientName?: string;
+    authorId?: string;
+    /** Opens scrolled to its likes and comments (a feed card's comment bubble). */
+    focusComments?: boolean;
+  };
   /** clientId is set when a trainer edits one of a client's workouts. */
   EditWorkout: { workoutId: string; clientId?: string; clientName?: string };
   /** `justFinished`: opened as the workout was finished -- a new PR in it is cheered. */
@@ -106,6 +117,10 @@ export type RootStackParamList = {
   Profile: undefined;
   FindPeople: undefined;
   Notifications: undefined;
+  /** Someone's profile: who they are, who follows them, and -- following them -- their training. */
+  PersonProfile: { userId: string };
+  /** Who follows someone, or who they follow. */
+  FollowList: { userId: string; which: 'followers' | 'following'; name?: string };
 };
 
 export type RootStackScreenProps<Screen extends keyof RootStackParamList> = NativeStackScreenProps<

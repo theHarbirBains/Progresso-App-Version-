@@ -28,6 +28,8 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../lib/api', () => ({
   updateMyProfile: jest.fn(),
+  // Your follower and following counts, on the You tab.
+  getPersonProfile: jest.fn().mockResolvedValue({ followerCount: 4, followingCount: 2 }),
 }));
 
 jest.mock('../profile/profileQueries', () => ({
@@ -528,13 +530,19 @@ describe('ProfileScreen lifetime stats', () => {
 // section exists on this screen at all now (previously a placeholder),
 // per the explicit redesign layout (header -> stats -> Edit Profile ->
 // tabs -> tab content -> bottom nav, nothing else).
-describe('ProfileScreen has no social-media functionality', () => {
-  it('renders no Friends/followers section', async () => {
+describe('ProfileScreen followers', () => {
+  it('shows how many follow you and how many you follow, each opening its list', async () => {
     renderProfile();
-    await screen.findByTestId('profile-display-name');
 
+    expect(await screen.findByTestId('profile-followers')).toHaveTextContent(/4.*Followers/);
+    expect(screen.getByTestId('profile-following')).toHaveTextContent(/2.*Following/);
+    fireEvent.press(screen.getByTestId('profile-followers'));
+    expect(mockNavigate).toHaveBeenCalledWith('FollowList', {
+      userId: 'user-1',
+      which: 'followers',
+    });
+    // Still no friends feed of its own: that's Feed's.
     expect(screen.queryByTestId('profile-friends-card')).toBeNull();
-    expect(screen.queryByText('Friends')).toBeNull();
   });
 });
 

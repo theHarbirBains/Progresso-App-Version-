@@ -272,3 +272,10 @@ jest.mock('@kingstinct/react-native-healthkit', () => ({
   queryStatisticsForQuantity: jest.fn().mockResolvedValue({ sources: [] }),
   queryStatisticsCollectionForQuantity: jest.fn().mockResolvedValue([]),
 }));
+
+// The phone's contacts (Find People > Contacts): none, and allowed, unless a test says otherwise.
+jest.mock('expo-contacts', () => ({
+  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  getContactsAsync: jest.fn().mockResolvedValue({ data: [] }),
+  Fields: { Emails: 'emails' },
+}));

@@ -39,6 +39,8 @@ jest.mock('./src/lib/sentry', () => ({
 // separately below and in OnboardingScreen.test.tsx.
 jest.mock('./src/lib/api', () => ({
   updateMyProfile: jest.fn(),
+  // Your follower and following counts, on the You tab.
+  getPersonProfile: jest.fn().mockResolvedValue({ followerCount: 4, followingCount: 2 }),
 }));
 
 jest.mock('./src/profile/profileQueries', () => ({

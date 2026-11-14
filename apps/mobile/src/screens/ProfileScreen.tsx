@@ -3,6 +3,7 @@ import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
+import { getPersonProfile } from '../lib/api';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
@@ -121,7 +122,8 @@ function ProfileWorkoutRow({ workout, weightUnit, divider, onPress }: ProfileWor
 // same accent-tinted initial-letter/icon avatar used elsewhere -- there is
 // still no bio/location field, this is a fitness profile, not a social one.
 export function ProfileScreen({ navigation }: Props) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const accessToken = session?.access_token;
   const userId = user?.id ?? '';
   const { theme, nutritionTheme, weightUnit, themeLoading } = useProgressTheme();
   const { profile, error: profileError } = useProfile();
@@ -161,6 +163,29 @@ export function ProfileScreen({ navigation }: Props) {
   const [workoutsError, setWorkoutsError] = useState<string | null>(null);
 
   const avatar = useAvatarPhoto(userId);
+
+  // Who follows you and who you follow, read each time the page opens (others change them).
+  const [followCounts, setFollowCounts] = useState<{
+    followers: number;
+    following: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!accessToken || !userId) return;
+    let cancelled = false;
+    const read = () =>
+      getPersonProfile(accessToken, userId)
+        .then((me) => {
+          if (!cancelled) {
+            setFollowCounts({ followers: me.followerCount, following: me.followingCount });
+          }
+        })
+        .catch(() => undefined);
+    const unsubscribe = navigation.addListener('focus', () => void read());
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [navigation, accessToken, userId]);
 
   const [loading, setLoading] = useState(!shownWorkouts);
   const hasLoadedOnce = useRef(Boolean(shownWorkouts));
@@ -339,6 +364,33 @@ export function ProfileScreen({ navigation }: Props) {
               ) : null}
             </View>
           </View>
+
+          {followCounts ? (
+            <View style={styles.followCounts}>
+              <TouchableOpacity
+                testID="profile-followers"
+                style={styles.followCount}
+                onPress={() => navigation.navigate('FollowList', { userId, which: 'followers' })}
+                accessibilityRole="button"
+                accessibilityLabel={`${followCounts.followers} ${followCounts.followers === 1 ? 'follower' : 'followers'}`}
+              >
+                <Text style={styles.followCountValue}>{formatCount(followCounts.followers)}</Text>
+                <Text style={styles.followCountLabel}>
+                  {followCounts.followers === 1 ? 'Follower' : 'Followers'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="profile-following"
+                style={styles.followCount}
+                onPress={() => navigation.navigate('FollowList', { userId, which: 'following' })}
+                accessibilityRole="button"
+                accessibilityLabel={`Following ${followCounts.following}`}
+              >
+                <Text style={styles.followCountValue}>{formatCount(followCounts.following)}</Text>
+                <Text style={styles.followCountLabel}>Following</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
           <View style={styles.editProfileWrap}>
             <SecondaryButton

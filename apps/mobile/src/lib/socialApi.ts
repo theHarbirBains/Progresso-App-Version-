@@ -1,0 +1,189 @@
+import { request } from './apiClient';
+import type { FriendsFeedPage } from './feedApi';
+import type { FollowSearchResult, FollowStatus, FollowUser } from './followsApi';
+
+// Profiles, follower lists, finding friends from contacts, a followed person's workout, and
+// likes and comments -- see apps/api/src/social. All through the API: they read other people's
+// data, which only the server may decide to show (follows accepted, blocks either way).
+
+export interface BestLift {
+  exerciseId: string;
+  exerciseName: string;
+  photoUrl: string | null;
+  gym: string | null;
+  attachment: string | null;
+  weightKg: number;
+  reps: number;
+  performedAt: string;
+}
+
+export interface PersonProfile {
+  user: FollowUser;
+  isSelf: boolean;
+  /** Your follow of them. */
+  followStatus: FollowStatus;
+  /** Their accepted follow of you. */
+  followsYou: boolean;
+  /** Their request to follow you, waiting for your answer. */
+  requestId: string | null;
+  followerCount: number;
+  followingCount: number;
+  /** Whether you can see their workouts, stats and lifts: yours, or they accepted your follow. */
+  canSeeActivity: boolean;
+  stats: { workouts: number; lastThirtyDays: number } | null;
+  bestLifts: BestLift[] | null;
+}
+
+export function getPersonProfile(accessToken: string, personId: string): Promise<PersonProfile> {
+  return request<PersonProfile>(`/api/v1/people/${encodeURIComponent(personId)}`, accessToken);
+}
+
+/** A page of their finished workouts, as the Friends feed shows them. */
+export function getPersonWorkouts(
+  accessToken: string,
+  personId: string,
+  page = 0,
+): Promise<FriendsFeedPage> {
+  return request<FriendsFeedPage>(
+    `/api/v1/people/${encodeURIComponent(personId)}/workouts?page=${page}`,
+    accessToken,
+  );
+}
+
+export function listPersonFollowers(
+  accessToken: string,
+  personId: string,
+): Promise<FollowSearchResult[]> {
+  return request<FollowSearchResult[]>(
+    `/api/v1/people/${encodeURIComponent(personId)}/followers`,
+    accessToken,
+  );
+}
+
+export function listPersonFollowing(
+  accessToken: string,
+  personId: string,
+): Promise<FollowSearchResult[]> {
+  return request<FollowSearchResult[]>(
+    `/api/v1/people/${encodeURIComponent(personId)}/following`,
+    accessToken,
+  );
+}
+
+/** The people on Progresso with one of these hashed contact emails (social/contactEmails.ts). */
+export function matchContacts(
+  accessToken: string,
+  hashes: string[],
+): Promise<FollowSearchResult[]> {
+  return request<FollowSearchResult[]>('/api/v1/people/contacts', accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ hashes }),
+  });
+}
+
+export interface FriendWorkoutSet {
+  id: string;
+  setIndex: number;
+  side: 'left' | 'right' | null;
+  weightKg: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
+  completedAt: string | null;
+}
+
+/** A followed person's finished workout, to read. */
+export interface FriendWorkout {
+  id: string;
+  name: string;
+  performedAt: string;
+  completedAt: string | null;
+  author: FollowUser;
+  exercises: {
+    id: string;
+    exerciseId: string;
+    exerciseName: string;
+    muscleGroup: string;
+    movementType: string;
+    measurementType: string;
+    photoUrl: string | null;
+    gym: string | null;
+    attachment: string | null;
+    orderIndex: number;
+    sets: FriendWorkoutSet[];
+  }[];
+}
+
+export function getFriendWorkout(accessToken: string, workoutId: string): Promise<FriendWorkout> {
+  return request<FriendWorkout>(`/api/v1/workouts/${encodeURIComponent(workoutId)}`, accessToken);
+}
+
+export interface WorkoutComment {
+  id: string;
+  workoutId: string;
+  user: FollowUser;
+  body: string;
+  createdAt: string;
+  /** You wrote it, or it's on your workout. */
+  canDelete: boolean;
+}
+
+export interface WorkoutSocial {
+  likeCount: number;
+  likedByMe: boolean;
+  likers: FollowUser[];
+  comments: WorkoutComment[];
+}
+
+export interface SocialSummary {
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+}
+
+export function getWorkoutSocial(accessToken: string, workoutId: string): Promise<WorkoutSocial> {
+  return request<WorkoutSocial>(
+    `/api/v1/workouts/${encodeURIComponent(workoutId)}/social`,
+    accessToken,
+  );
+}
+
+/** Likes and comments on each of these workouts you can see (others are left out). */
+export function getSocialSummary(
+  accessToken: string,
+  workoutIds: string[],
+): Promise<Record<string, SocialSummary>> {
+  return request<Record<string, SocialSummary>>('/api/v1/workouts/social-summary', accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ workoutIds }),
+  });
+}
+
+export function likeWorkout(accessToken: string, workoutId: string): Promise<null> {
+  return request<null>(`/api/v1/workouts/${encodeURIComponent(workoutId)}/like`, accessToken, {
+    method: 'PUT',
+  });
+}
+
+export function unlikeWorkout(accessToken: string, workoutId: string): Promise<null> {
+  return request<null>(`/api/v1/workouts/${encodeURIComponent(workoutId)}/like`, accessToken, {
+    method: 'DELETE',
+  });
+}
+
+export function postComment(
+  accessToken: string,
+  workoutId: string,
+  body: string,
+): Promise<WorkoutComment> {
+  return request<WorkoutComment>(
+    `/api/v1/workouts/${encodeURIComponent(workoutId)}/comments`,
+    accessToken,
+    { method: 'POST', body: JSON.stringify({ body }) },
+  );
+}
+
+export function deleteComment(accessToken: string, commentId: string): Promise<null> {
+  return request<null>(`/api/v1/workouts/comments/${encodeURIComponent(commentId)}`, accessToken, {
+    method: 'DELETE',
+  });
+}

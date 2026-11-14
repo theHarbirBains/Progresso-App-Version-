@@ -15,7 +15,6 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useAuth } from '../auth/AuthProvider';
 import { useProfile } from '../profile/ProfileProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { ComingSoonRow } from '../settings/ComingSoonRow';
 import { settingsStyles as styles } from '../settings/settingsStyles';
 import { useMembership } from '../membership/useMembership';
 import { useReminders } from '../notifications/remindersContext';
@@ -136,6 +135,34 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
     );
   }
 
+  // Social pushes, each on unless turned off -- saved to the account, since the server sends them.
+  const [social, setSocial] = useState({
+    notifyFollows: profile?.notifyFollows ?? true,
+    notifyLikes: profile?.notifyLikes ?? true,
+    notifyComments: profile?.notifyComments ?? true,
+  });
+  useEffect(() => {
+    if (!profile) return;
+    setSocial({
+      notifyFollows: profile.notifyFollows ?? true,
+      notifyLikes: profile.notifyLikes ?? true,
+      notifyComments: profile.notifyComments ?? true,
+    });
+  }, [profile]);
+
+  async function handleToggleSocial(key: keyof typeof social, value: boolean) {
+    const previous = social;
+    setSocial({ ...social, [key]: value });
+    setSaving(true);
+    try {
+      await updateProfile({ [key]: value });
+    } catch {
+      setSocial(previous);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleToggleEmail(value: boolean) {
     const previous = emailOptIn;
     setEmailOptIn(value);
@@ -197,12 +224,6 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
               accessibilityLabel="Email Notifications"
             />
           }
-        />
-        <ComingSoonRow
-          testID="notif-social-notifications"
-          icon="users"
-          title="Social Notifications"
-          showDivider
         />
       </Section>
 
@@ -289,6 +310,64 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
           {timeRow('checkIn')}
         </Section>
       ) : null}
+
+      <Section title="Social">
+        {!pushNotificationsOptIn ? (
+          <Text testID="notif-social-need-push" style={styles.intro}>
+            Turn on Push Notifications to get these.
+          </Text>
+        ) : null}
+        <ListRow
+          testID="notif-social-follows"
+          icon="user-plus"
+          title="Follow Requests"
+          subtitle="When someone asks to follow you, or accepts your request."
+          trailing={
+            <Toggle
+              testID="notif-social-follows-toggle"
+              value={social.notifyFollows}
+              onValueChange={(value) => void handleToggleSocial('notifyFollows', value)}
+              disabled={saving}
+              accentColor={theme.accent}
+              accessibilityLabel="Follow Requests"
+            />
+          }
+        />
+        <ListRow
+          testID="notif-social-likes"
+          icon="heart"
+          title="Likes"
+          subtitle="When someone likes one of your workouts."
+          divider
+          trailing={
+            <Toggle
+              testID="notif-social-likes-toggle"
+              value={social.notifyLikes}
+              onValueChange={(value) => void handleToggleSocial('notifyLikes', value)}
+              disabled={saving}
+              accentColor={theme.accent}
+              accessibilityLabel="Likes"
+            />
+          }
+        />
+        <ListRow
+          testID="notif-social-comments"
+          icon="message-circle"
+          title="Comments"
+          subtitle="When someone comments on one of your workouts."
+          divider
+          trailing={
+            <Toggle
+              testID="notif-social-comments-toggle"
+              value={social.notifyComments}
+              onValueChange={(value) => void handleToggleSocial('notifyComments', value)}
+              disabled={saving}
+              accentColor={theme.accent}
+              accessibilityLabel="Comments"
+            />
+          }
+        />
+      </Section>
 
       <TimeChoiceSheet
         title={choosingTime ? TIME_TITLES[choosingTime] : null}

@@ -9,6 +9,8 @@ export interface ReportInput {
   reportedUserId: string;
   /** The Friends-feed workout the report is about, when there is one. */
   workoutId?: string;
+  /** The comment the report is about, when it's about one (written by the person reported). */
+  commentId?: string;
   reason: ReportReason;
   details?: string;
 }

@@ -58,6 +58,8 @@ import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
 import { ExerciseProgressScreen } from './src/screens/ExerciseProgressScreen';
 import { FeedScreen } from './src/screens/FeedScreen';
 import { FindPeopleScreen } from './src/screens/FindPeopleScreen';
+import { FollowListScreen } from './src/screens/FollowListScreen';
+import { PersonProfileScreen } from './src/screens/PersonProfileScreen';
 import { TrainerAccessScreen } from './src/screens/TrainerAccessScreen';
 import { TrainerClaimScreen } from './src/screens/TrainerClaimScreen';
 import { GroupsScreen } from './src/screens/GroupsScreen';
@@ -486,6 +488,8 @@ function Root() {
                   <Stack.Screen name="TrainerSessions" component={TrainerSessionsScreen} />
                   <Stack.Screen name="FindPeople" component={FindPeopleScreen} />
                   <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                  <Stack.Screen name="PersonProfile" component={PersonProfileScreen} />
+                  <Stack.Screen name="FollowList" component={FollowListScreen} />
                 </Stack.Navigator>
               </NavigationContainer>
             </View>

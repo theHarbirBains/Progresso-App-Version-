@@ -294,3 +294,50 @@ describe('NotificationsScreen -- misc', () => {
     expectNoBareText();
   });
 });
+
+describe('NotificationsScreen -- likes and comments', () => {
+  it('lists likes and comments on your workouts, each opening the workout at its comments', async () => {
+    (listFollowNotifications as jest.Mock).mockResolvedValue([
+      {
+        kind: 'comment',
+        id: 'c1',
+        user: { id: 'user-3', username: 'bob', displayName: 'Bob Smith', avatarUrl: null },
+        workoutId: 'w9',
+        workoutName: 'Push Day',
+        body: 'Strong!',
+        at: '2026-01-03T00:00:00Z',
+      },
+      {
+        kind: 'like',
+        id: 'w9:user-2',
+        user: { id: 'user-2', username: 'jane', displayName: 'Jane Doe', avatarUrl: null },
+        workoutId: 'w9',
+        workoutName: 'Push Day',
+        at: '2026-01-02T00:00:00Z',
+      },
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('notifications-activity-comment-c1')).toHaveTextContent(
+      /Bob Smith commented on Push Day.*Strong!/,
+    );
+    expect(screen.getByTestId('notifications-activity-like-w9:user-2')).toHaveTextContent(
+      /Jane Doe liked your workout Push Day/,
+    );
+
+    fireEvent.press(screen.getByTestId('notifications-activity-comment-c1'));
+    expect(mockNavigate).toHaveBeenCalledWith('WorkoutDetail', {
+      workoutId: 'w9',
+      focusComments: true,
+    });
+  });
+
+  it('opens the profile of someone who asked to follow you', async () => {
+    (listFollowNotifications as jest.Mock).mockResolvedValue([janeRequest]);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('notifications-activity-request-follow-1'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'user-2' });
+  });
+});

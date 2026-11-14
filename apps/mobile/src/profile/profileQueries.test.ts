@@ -47,6 +47,10 @@ const row = {
   progression_cues_enabled: true,
   fitness_goals: ['build_muscle', 'lose_fat'],
   membership_tier: 'workouts_nutrition',
+  notify_follows: true,
+  notify_likes: false,
+  notify_comments: true,
+  findable_by_email: null,
 };
 
 beforeEach(() => {
@@ -95,6 +99,11 @@ describe('fetchMyProfile', () => {
       progressionCuesEnabled: true,
       fitnessGoals: ['build_muscle', 'lose_fat'],
       membershipTier: 'workouts_nutrition',
+      notifyFollows: true,
+      notifyLikes: false,
+      notifyComments: true,
+      // On unless turned off.
+      findableByEmail: true,
     });
   });
 

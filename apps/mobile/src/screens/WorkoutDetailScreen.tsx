@@ -15,7 +15,11 @@ import { UnderlineTabs } from '../design/UnderlineTabs';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import { machineLine } from '../exercises/machineDetails';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
+import { getFriendWorkout, type FollowUser } from '../lib/api';
 import { listTrainerClients } from '../lib/trainerApi';
+import { friendWorkoutDetail } from '../social/friendWorkout';
+import { personLabel } from '../social/PeopleList';
+import { WorkoutComments } from '../social/WorkoutComments';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
@@ -79,7 +83,7 @@ function formatDateTime(iso: string): string {
 // person's records are theirs. Someone who logged nothing (a trainer who only coached) has no
 // tab, and Share only shows for a workout with something logged in it.
 export function WorkoutDetailScreen({ route, navigation }: Props) {
-  const { workoutId, clientId, clientName } = route.params;
+  const { workoutId, clientId, clientName, authorId, focusComments } = route.params;
   const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   // A trainer removes a client's workout from the client's history, or the user
@@ -116,6 +120,11 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const userId = user?.id ?? '';
   const accessToken = session?.access_token;
   const { theme, weightUnit } = useProgressTheme();
+  // Someone else's workout, from the Friends feed or their profile: read through the API, to
+  // read and to like and comment on -- never to edit, share or delete, and with no record tags
+  // (their records are theirs).
+  const friend = authorId !== undefined && authorId !== userId;
+  const [author, setAuthor] = useState<FollowUser | null>(null);
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [repPRs, setRepPRs] = useState<Record<string, RepPR[]>>({});
@@ -142,6 +151,13 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
       setLoading(true);
       setError(null);
       try {
+        if (friend) {
+          const theirs = await getFriendWorkout(accessToken, workoutId);
+          if (cancelled) return;
+          setWorkout(friendWorkoutDetail(theirs));
+          setAuthor(theirs.author);
+          return;
+        }
         const detail = await fetchWorkoutDetail(workoutId);
         if (cancelled) return;
         setWorkout(detail);
@@ -203,7 +219,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [workoutId, ownerId, accessToken, userId]);
+  }, [workoutId, ownerId, accessToken, userId, friend]);
 
   if (loading || !workout) {
     return (
@@ -234,7 +250,19 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   // The person whose workout is showing: this one, or someone else's in the group.
   const shownPerson = people?.find((person) => person.workout.id === selectedId);
   const shown = shownPerson?.workout ?? workout;
-  const isOwn = shown.id === workout.id;
+  const isOwn = !friend && shown.id === workout.id;
+  // Likes and comments: on your own finished workout, or a friend's -- not a client's (a
+  // trainer's view) or another group member's tab.
+  const showsSocial =
+    workout.completedAt !== null && !clientId && (friend || (isOwn && shown.id === workoutId));
+  const comments = showsSocial ? (
+    <WorkoutComments
+      workoutId={shown.id}
+      accentColor={theme.accent}
+      onAccentColor={theme.onAccent}
+      onOpenPerson={(id) => navigation.navigate('PersonProfile', { userId: id })}
+    />
+  ) : null;
   // Another person's workout in the group can be edited by their trainer, to fix a set logged
   // wrong -- under the trainer's link, recorded for the client like any trainer edit.
   const editsAsTrainer = !isOwn && shownPerson !== undefined && clientIds.has(shownPerson.userId);
@@ -351,6 +379,16 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
             {shown.name}
           </Text>
         ) : null}
+        {friend && author ? (
+          <TouchableOpacity
+            testID="workout-detail-author"
+            onPress={() => navigation.navigate('PersonProfile', { userId: author.id })}
+            accessibilityRole="button"
+            accessibilityLabel={`${personLabel(author).title}, open profile`}
+          >
+            <Text style={styles.eyebrow}>{personLabel(author).title}&apos;s workout</Text>
+          </TouchableOpacity>
+        ) : null}
         {muscles ? <Text style={styles.eyebrow}>{muscles}</Text> : null}
         <View style={styles.statGrid}>
           <View style={styles.statRow}>
@@ -388,6 +426,10 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           </View>
         </View>
       </AppCard>
+
+      {/* Opened at its comments (a feed card's bubble, a like or comment in the bell): they
+          come first. */}
+      {focusComments ? comments : null}
 
       {muscleTabs.length > 0 ? (
         <FilterChips<MuscleTab>
@@ -497,6 +539,8 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           </AppCard>
         );
       })}
+
+      {focusComments ? null : comments}
 
       {isOwn ? (
         <TextButton

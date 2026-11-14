@@ -12,7 +12,6 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
-import { Badge } from '../design/Badge';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
@@ -34,7 +33,7 @@ import {
   type FollowUser,
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
-import { PersonActionsSheet } from '../social/PersonActionsSheet';
+import { ContactsFinder } from '../social/ContactsFinder';
 import { findPeopleStyles as styles } from './findPeopleStyles';
 import { SkeletonRows } from '../design/Skeleton';
 import { useAppTheme } from '../theme/appThemeContext';
@@ -63,19 +62,16 @@ function rowLabel(user: FollowUser): { title: string; subtitle: string | undefin
  *
  * Friends tab: search when typing; when empty, a Suggested/Contacts
  * sub-row. Suggested is real (recency-ranked users you have no existing
- * follow row toward -- see FollowsService.listSuggested); Contacts is
- * visibly present but honestly "Coming Soon" -- it would need a phone
- * number field and device-contacts permission that don't exist yet, so a
- * working tab here isn't a small addition, and a silently-broken one
- * would violate CLAUDE.md's placeholder rules.
+ * follow row toward -- see FollowsService.listSuggested); Contacts finds the
+ * people in your phone's contacts by email (social/ContactsFinder.tsx).
  *
  * Requests tab: the full follow-request management list. The
  * notifications bell (NotificationsScreen) surfaces the same pending
  * requests too, alongside recent acceptances -- that's the quick/recent
  * view; this is the full list, same underlying data.
  *
- * Tapping a person opens PersonActionsSheet: report or block them. Blocking
- * drops them from every list here.
+ * Tapping a person opens their profile (PersonProfileScreen), where Report and
+ * Block are.
  */
 export function FindPeopleScreen({ navigation }: Props) {
   const accent = useAppTheme().accent.accent;
@@ -104,14 +100,7 @@ export function FindPeopleScreen({ navigation }: Props) {
   // rather than freezing the whole screen.
   const [pending, setPending] = useState<Record<string, boolean>>({});
 
-  // The person whose report/block sheet is open.
-  const [actionsFor, setActionsFor] = useState<FollowUser | null>(null);
-
-  function handleBlocked(userId: string) {
-    setResults((prev) => prev.filter((r) => r.user.id !== userId));
-    setSuggested((prev) => prev.filter((r) => r.user.id !== userId));
-    setRequests((prev) => prev.filter((r) => r.user.id !== userId));
-  }
+  const openProfile = (userId: string) => navigation.navigate('PersonProfile', { userId });
 
   const loadRequests = useCallback(async () => {
     if (!accessToken) return;
@@ -293,8 +282,8 @@ export function FindPeopleScreen({ navigation }: Props) {
         key={result.user.id}
         testID={`${testIDPrefix}-${result.user.id}`}
         divider={index > 0}
-        onPress={() => setActionsFor(result.user)}
-        accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ''}, report or block`}
+        onPress={() => openProfile(result.user.id)}
+        accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ''}, open profile`}
         leading={
           <Avatar
             uri={result.user.avatarUrl}
@@ -375,8 +364,8 @@ export function FindPeopleScreen({ navigation }: Props) {
                   key={request.followId}
                   testID={`find-people-request-${request.followId}`}
                   divider={index > 0}
-                  onPress={() => setActionsFor(request.user)}
-                  accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ''}, report or block`}
+                  onPress={() => openProfile(request.user.id)}
+                  accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ''}, open profile`}
                   leading={
                     <Avatar
                       uri={request.user.avatarUrl}
@@ -460,22 +449,7 @@ export function FindPeopleScreen({ navigation }: Props) {
           </View>
 
           {friendsSubTab === 'contacts' ? (
-            <AppCard testID="find-people-contacts-card">
-              <ListRow
-                testID="find-people-contacts-coming-soon"
-                icon="phone"
-                title="Find friends from your contacts"
-                subtitle="Match your phone contacts to people already on Progresso"
-                trailing={
-                  <Badge
-                    label="Coming Soon"
-                    color={colors.textMuted}
-                    backgroundColor={colors.surfaceRaised}
-                    testID="find-people-contacts-coming-soon-badge"
-                  />
-                }
-              />
-            </AppCard>
+            <ContactsFinder onOpen={openProfile} />
           ) : suggestedLoading ? (
             <View style={styles.loading}>
               <ActivityIndicator
@@ -523,11 +497,6 @@ export function FindPeopleScreen({ navigation }: Props) {
           </View>
         </>
       )}
-      <PersonActionsSheet
-        person={actionsFor}
-        onClose={() => setActionsFor(null)}
-        onBlocked={handleBlocked}
-      />
     </Screen>
   );
 }

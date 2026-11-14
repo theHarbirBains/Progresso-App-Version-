@@ -33,6 +33,8 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { musclesLabel, type NextWorkoutPlan } from '../workouts/nextWorkout';
 import { fetchActiveWorkout, type WorkoutSummary } from '../workouts/workoutQueries';
 import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
+import { useAppTheme } from '../theme/appThemeContext';
+import { useSocialSummaries } from '../social/useSocialSummaries';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { FeedHeroCard } from '../feed/FeedHeroCard';
 import { LiveNowCard } from '../feed/LiveNowCard';
@@ -55,11 +57,9 @@ function startedTime(iso: string): string {
 
 // A normalized shape both "You" (feedQueries.ts, self-only) and "Friends"
 // (lib/api.ts's fetchFriendsFeed, backend-merged followees' activity) map
-// into, so the card JSX below is written once rather than twice. `onPress`
-// is undefined for a friend's card -- WorkoutDetail/Nutrition both assume
-// ownership (direct-to-Supabase reads RLS-scoped to the signed-in user), so
-// a friend's item is informational only, not a navigation target, until
-// there's a real "someone else's read-only detail" screen to send it to.
+// into, so the card JSX below is written once rather than twice. A friend's
+// card opens their workout read-only (WorkoutDetail with its authorId, read
+// through the API) and their name opens their profile.
 interface DisplayItem {
   key: string;
   kind: 'workout';
@@ -69,6 +69,10 @@ interface DisplayItem {
   onPress?: () => void;
   /** A friend's workout: report it, or block them. */
   onMore?: () => void;
+  /** A friend's: their profile, from the byline. */
+  onAuthorPress?: () => void;
+  /** Opens the workout at its likes and comments. */
+  onComments: () => void;
   workout: {
     id: string;
     name: string;
@@ -525,6 +529,8 @@ export function FeedScreen({ navigation }: Props) {
     authorName: byline,
     avatarUrl,
     onPress: () => navigation.navigate('WorkoutDetail', { workoutId: item.workout.id }),
+    onComments: () =>
+      navigation.navigate('WorkoutDetail', { workoutId: item.workout.id, focusComments: true }),
     workout: {
       id: item.workout.id,
       name: item.workout.splitDayName ?? item.workout.name,
@@ -547,6 +553,18 @@ export function FeedScreen({ navigation }: Props) {
       item.author.displayName ?? (item.author.username ? `@${item.author.username}` : 'Someone'),
     avatarUrl: item.author.avatarUrl,
     onMore: () => setActionsFor({ person: item.author, workoutId: item.workout.id }),
+    onPress: () =>
+      navigation.navigate('WorkoutDetail', {
+        workoutId: item.workout.id,
+        authorId: item.author.id,
+      }),
+    onAuthorPress: () => navigation.navigate('PersonProfile', { userId: item.author.id }),
+    onComments: () =>
+      navigation.navigate('WorkoutDetail', {
+        workoutId: item.workout.id,
+        authorId: item.author.id,
+        focusComments: true,
+      }),
     workout: {
       id: item.workout.id,
       name: item.workout.splitDayName ?? item.workout.name,
@@ -564,6 +582,9 @@ export function FeedScreen({ navigation }: Props) {
   const displayItems = [...mineDisplayItems, ...friendsDisplayItems].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
   );
+  // Each card's likes and comments, read whenever the cards change.
+  const social = useSocialSummaries(displayItems.map((item) => item.workout.id));
+  const accent = useAppTheme().accent;
   // Both sources load together on every focus (see the effect above), so
   // the very first load is "in progress" until both have settled at least
   // once -- same reasoning useSignedInResource's own loading flag uses.
@@ -769,6 +790,17 @@ export function FeedScreen({ navigation }: Props) {
                   weightUnit={weightUnit}
                   onPress={item.onPress}
                   onMore={item.onMore}
+                  onAuthorPress={item.onAuthorPress}
+                  social={
+                    social.summaries[item.workout.id]
+                      ? {
+                          summary: social.summaries[item.workout.id]!,
+                          onToggleLike: () => void social.toggleLike(item.workout.id),
+                          onComments: item.onComments,
+                          accentColor: accent.accent,
+                        }
+                      : undefined
+                  }
                 />
               </RiseIn>
             ))}

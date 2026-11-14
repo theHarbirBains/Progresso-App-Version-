@@ -94,8 +94,12 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 
 - A one-directional, accept-gated follow graph (Instagram-style follow requests) — send/accept/reject a request, unfollow, search for people by name/username
 - A Friends tab on Feed showing accepted followees' own completed workouts (never their nutrition), reverse-chronological, reusing the same activity-card visual language as your own feed
-- A Notifications screen with follow requests and recent follows, plus suggestions from your own data
-- Report or block someone: tap a person in Find People, or the "…" on a friend's workout in Feed. A block ends following each other, and keeps them from finding, following or inviting you; reports are kept for review in the Supabase dashboard (`user_reports`)
+- Profiles: tap a person anywhere (Find People, a friend's card, a follower list, a comment) for their profile -- photo, name, follower and following counts, and Follow / Requested / Following (or Accept and Decline when they asked to follow you). Once they accept your follow: their workouts in all and in the last 30 days, their heaviest lift on each exercise (with its photo, gym and grip), who they follow and who follows them, and their workouts in full, read-only. Your own counts are on the You tab
+- Likes and comments on finished workouts: a heart and a comment count on every feed card; the workout page lists who liked it and the comments, with a box to add one. Delete your own comments (or any on your workout); report someone else's
+- Find friends from your contacts (Find People > Contacts): email addresses are scrambled on the phone before anything is sent, and nothing is kept. Settings > Account & Security turns off being found this way
+- Push notifications for follow requests and accepts, likes and comments, each with its own switch in Settings > Notifications > Social (iOS delivery needs an APNs key in EAS)
+- A Notifications screen with follow requests and recent follows, likes and comments on your workouts, plus suggestions from your own data
+- Report or block someone: from their profile's "…", the "…" on a friend's workout in Feed, or a comment's "…". A block ends following each other, and keeps them from finding, following or inviting you; reports are kept for review in the Supabase dashboard (`user_reports`)
 - No likes, comments, or leaderboards yet
 
 **Backend (NestJS API)**
@@ -268,7 +272,7 @@ Some areas are intentionally incomplete rather than hidden:
 - **Admin**: role-based authorization is implemented and tested end to end, but the admin surface itself is a minimal placeholder route, not a full admin dashboard.
 - **Subscriptions**: RevenueCat webhook handling exists, but there is no in-app purchase or paywall yet.
 
-Social v1 (a follow graph and a read-only Friends feed) is implemented and real, not a placeholder — see the Social section above. Likes, comments, and leaderboards are not built yet.
+Social (a follow graph, the Friends feed, profiles, likes, comments, finding friends from contacts and social push) is implemented and real, not a placeholder — see the Social section above. Leaderboards are not built.
 
 ## Roadmap
 

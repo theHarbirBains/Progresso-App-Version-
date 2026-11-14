@@ -173,11 +173,19 @@ describe('SettingsNotificationsScreen', () => {
     expect(await screen.findByTestId('notif-email-toggle')).toHaveProp('value', false);
   });
 
-  it('keeps social notifications a real Coming Soon row, not a fake toggle', async () => {
+  it('switches each kind of social push on and off: follow requests, likes, comments', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, notifyLikes: false });
     renderScreen();
     await screen.findByTestId('notif-push-toggle');
 
-    expect(screen.getByTestId('notif-social-notifications')).toHaveTextContent(/Coming Soon/);
+    expect(screen.getByTestId('notif-social-follows-toggle').props.value).toBe(true);
+    expect(screen.getByTestId('notif-social-comments-toggle').props.value).toBe(true);
+    fireEvent(screen.getByTestId('notif-social-likes-toggle'), 'valueChange', false);
+
+    await waitFor(() =>
+      expect(mockUpdateMyProfile).toHaveBeenCalledWith(expect.any(String), { notifyLikes: false }),
+    );
+    expect(screen.getByTestId('notif-social-likes-toggle').props.value).toBe(false);
   });
 
   it('asks the phone again once push is turned on, so the reminders can start', async () => {

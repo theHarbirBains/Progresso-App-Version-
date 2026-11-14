@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Alert, Share } from 'react-native';
+import { Share } from 'react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import {
@@ -10,7 +10,6 @@ import {
   sendFollowRequest,
   unfollowUser,
 } from '../lib/api';
-import { blockUser } from '../lib/safetyApi';
 import { FindPeopleScreen } from './FindPeopleScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -29,6 +28,13 @@ jest.mock('../lib/api', () => ({
   searchUsers: jest.fn(),
   sendFollowRequest: jest.fn(),
   unfollowUser: jest.fn(),
+  matchContacts: jest.fn(),
+}));
+
+// The phone's contacts, as hashes -- the reading and hashing have their own tests.
+const mockContactEmailHashes = jest.fn();
+jest.mock('../social/contactEmails', () => ({
+  contactEmailHashes: () => mockContactEmailHashes(),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
@@ -40,9 +46,11 @@ const mockSendFollowRequest = sendFollowRequest as jest.Mock;
 const mockUnfollowUser = unfollowUser as jest.Mock;
 
 const mockGoBack = jest.fn();
+const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation: any = {
   goBack: mockGoBack,
+  navigate: mockNavigate,
   addListener: jest.fn((event: string, cb: () => void) => {
     if (event === 'focus') cb();
     return jest.fn();
@@ -210,15 +218,53 @@ describe('FindPeopleScreen -- Suggested/Contacts (shown when search is empty)', 
     expect(await screen.findByTestId('find-people-suggested-user-3')).toBeTruthy();
   });
 
-  it('shows Contacts as an honest Coming Soon row, not a broken tap', async () => {
+  it('finds your contacts on Progresso by their scrambled emails, to follow from there', async () => {
+    const { matchContacts } = jest.requireMock('../lib/api') as { matchContacts: jest.Mock };
+    mockContactEmailHashes.mockResolvedValue({ access: 'granted', hashes: ['a'.repeat(64)] });
+    matchContacts.mockResolvedValue([bobResult]);
     renderScreen();
     await screen.findByTestId('find-people-suggested-empty');
 
     fireEvent.press(screen.getByTestId('find-people-subtab-contacts'));
+    // Nothing is read until asked.
+    expect(screen.getByTestId('contacts-finder-start')).toHaveTextContent(/nothing is kept/);
+    expect(mockContactEmailHashes).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('contacts-finder-find'));
 
-    expect(await screen.findByTestId('find-people-contacts-coming-soon-badge')).toHaveTextContent(
-      /Coming Soon/,
+    expect(await screen.findByTestId('contacts-finder-found')).toHaveTextContent(
+      /1 contact on Progresso/,
     );
+    expect(matchContacts).toHaveBeenCalledWith('token-123', ['a'.repeat(64)]);
+    expect(screen.getByTestId('contacts-finder-person-user-3-follow')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('contacts-finder-person-user-3'));
+    expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'user-3' });
+  });
+
+  it('says how to allow contacts when Progresso may not see them', async () => {
+    mockContactEmailHashes.mockResolvedValue({ access: 'denied', hashes: [] });
+    renderScreen();
+    await screen.findByTestId('find-people-suggested-empty');
+
+    fireEvent.press(screen.getByTestId('find-people-subtab-contacts'));
+    fireEvent.press(screen.getByTestId('contacts-finder-find'));
+
+    expect(await screen.findByTestId('contacts-finder-denied')).toHaveTextContent(
+      /allow Contacts for Progresso/,
+    );
+    expect(screen.getByTestId('contacts-finder-settings')).toBeTruthy();
+  });
+
+  it('says so when none of your contacts are on Progresso yet', async () => {
+    const { matchContacts } = jest.requireMock('../lib/api') as { matchContacts: jest.Mock };
+    mockContactEmailHashes.mockResolvedValue({ access: 'granted', hashes: ['b'.repeat(64)] });
+    matchContacts.mockResolvedValue([]);
+    renderScreen();
+    await screen.findByTestId('find-people-suggested-empty');
+
+    fireEvent.press(screen.getByTestId('find-people-subtab-contacts'));
+    fireEvent.press(screen.getByTestId('contacts-finder-find'));
+
+    expect(await screen.findByTestId('contacts-finder-none')).toBeTruthy();
   });
 
   it('invites via the OS share sheet', async () => {
@@ -343,42 +389,23 @@ describe('FindPeopleScreen -- misc', () => {
   });
 });
 
-describe('FindPeopleScreen -- report and block', () => {
-  it('opens report and block for a person when their row is tapped', async () => {
+describe('FindPeopleScreen -- profiles', () => {
+  it("opens a person's profile when their row is tapped -- Report and Block are there", async () => {
     mockListSuggestedUsers.mockResolvedValue([bobResult]);
     renderScreen();
 
     fireEvent.press(await screen.findByTestId('find-people-suggested-user-3'));
 
-    expect(screen.getByTestId('person-actions-report')).toHaveTextContent(/Report Bob Smith/);
-    expect(screen.getByTestId('person-actions-block')).toHaveTextContent(/Block Bob Smith/);
+    expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'user-3' });
   });
 
-  it('drops a blocked person from the list straight away', async () => {
-    (blockUser as jest.Mock).mockResolvedValue({ success: true });
-    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
-      buttons?.find((b) => b.text === 'Block')?.onPress?.();
-    });
-    mockListSuggestedUsers.mockResolvedValue([bobResult]);
-    renderScreen();
-
-    fireEvent.press(await screen.findByTestId('find-people-suggested-user-3'));
-    fireEvent.press(screen.getByTestId('person-actions-block'));
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(screen.queryByTestId('find-people-suggested-user-3')).toBeNull();
-    expect(blockUser).toHaveBeenCalledWith('token-123', 'user-3');
-  });
-
-  it('lets you block someone straight from their follow request', async () => {
+  it('opens the profile of someone who asked to follow you', async () => {
     mockListFollowRequests.mockResolvedValue([janeRequest]);
     renderScreen();
 
     fireEvent.press(await screen.findByTestId('find-people-tab-requests'));
     fireEvent.press(await screen.findByTestId('find-people-request-follow-1'));
 
-    expect(screen.getByTestId('person-actions-block')).toHaveTextContent(/Block Jane Doe/);
+    expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'user-2' });
   });
 });

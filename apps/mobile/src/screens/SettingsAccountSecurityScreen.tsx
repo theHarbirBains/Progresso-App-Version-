@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { Text } from '../design/Text';
 import { AppHeader } from '../design/AppHeader';
 import { ListRow } from '../design/ListRow';
+import { useProfile } from '../profile/ProfileProvider';
+import { useAppTheme } from '../theme/appThemeContext';
+import { Toggle } from '../design/Toggle';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { useAuth } from '../auth/AuthProvider';
@@ -32,6 +35,23 @@ type Props = RootStackScreenProps<'SettingsAccountSecurity'>;
 export function SettingsAccountSecurityScreen({ navigation }: Props) {
   const { user, session, signOut } = useAuth();
   const [deleting, setDeleting] = useState(false);
+  const { profile, updateProfile } = useProfile();
+  const theme = useAppTheme().accent;
+  // Whether people with your email in their contacts can find you (Find People > Contacts).
+  const [findable, setFindable] = useState(profile?.findableByEmail ?? true);
+  useEffect(() => {
+    if (profile) setFindable(profile.findableByEmail ?? true);
+  }, [profile]);
+
+  async function handleFindable(value: boolean) {
+    const previous = findable;
+    setFindable(value);
+    try {
+      await updateProfile({ findableByEmail: value });
+    } catch {
+      setFindable(previous);
+    }
+  }
 
   function handleDeleteAccount() {
     Alert.alert(
@@ -105,7 +125,23 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
 
       <Section title="Privacy">
         <ListRow
+          testID="account-findable"
+          icon="at-sign"
+          title="Let people with my email find me"
+          subtitle="When someone looks for friends in their contacts, you show up if your email is in them."
+          trailing={
+            <Toggle
+              testID="account-findable-toggle"
+              value={findable}
+              onValueChange={(value) => void handleFindable(value)}
+              accentColor={theme.accent}
+              accessibilityLabel="Let people with my email find me"
+            />
+          }
+        />
+        <ListRow
           testID="account-blocked-people"
+          divider
           icon="slash"
           title="Blocked People"
           onPress={() => navigation.navigate('SettingsBlockedPeople')}

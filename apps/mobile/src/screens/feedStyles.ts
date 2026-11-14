@@ -56,6 +56,13 @@ export const feedStyles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.md,
   },
+  // The byline's avatar and name, which open its person's profile.
+  authorTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
   avatarWrap: {
     width: 32,
     height: 32,

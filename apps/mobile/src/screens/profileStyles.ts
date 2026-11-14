@@ -82,6 +82,24 @@ export const profileStyles = StyleSheet.create({
   editProfileWrap: {
     marginBottom: spacing.xl,
   },
+  // Followers and Following, each opening its list.
+  followCounts: {
+    flexDirection: 'row',
+    gap: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  followCount: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  followCountValue: {
+    ...typeScale.statSmall,
+    color: colors.textPrimary,
+  },
+  followCountLabel: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
 
   statsRow: {
     flexDirection: 'row',

@@ -19,6 +19,8 @@ interface Props {
   person: FollowUser | null;
   /** The Friends-feed workout the sheet was opened from, so a report can point at it. */
   workoutId?: string;
+  /** The comment the sheet was opened from (one the person wrote), so a report can point at it. */
+  commentId?: string;
   onClose: () => void;
   /** After a block succeeds, so the screen can drop the person from what it shows. */
   onBlocked: (userId: string) => void;
@@ -42,6 +44,7 @@ export function personName(person: FollowUser): string {
 export function PersonActionsSheet({
   person,
   workoutId,
+  commentId,
   onClose,
   onBlocked,
   accentColor: accentColorProp,
@@ -106,6 +109,7 @@ export function PersonActionsSheet({
       await reportUser(accessToken, {
         reportedUserId: person.id,
         ...(workoutId ? { workoutId } : {}),
+        ...(commentId ? { commentId } : {}),
         reason,
         ...(details.trim() ? { details: details.trim() } : {}),
       });
@@ -144,7 +148,7 @@ export function PersonActionsSheet({
           <ListRow
             testID={`${testID}-report`}
             icon="flag"
-            title={workoutId ? 'Report Workout' : `Report ${name}`}
+            title={commentId ? 'Report Comment' : workoutId ? 'Report Workout' : `Report ${name}`}
             onPress={() => setStep('report')}
             disabled={busy}
           />
