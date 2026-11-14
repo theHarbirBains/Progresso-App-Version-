@@ -100,21 +100,42 @@ export class FeedService {
     if (followeeIds.length === 0) {
       return { items: [], hasMore: false };
     }
+    return this.workoutPage(followeeIds, page, { includeTrainerLogged: false });
+  }
 
+  /**
+   * One person's finished workouts, newest first, as the Friends feed shows them -- for their
+   * profile. The caller has checked the viewer may see them. A workout a trainer logged is
+   * left out unless it's the person looking at their own.
+   */
+  async getPersonWorkouts(
+    ownerId: string,
+    page: number,
+    { includeTrainerLogged }: { includeTrainerLogged: boolean },
+  ): Promise<FeedPage> {
+    return this.workoutPage([ownerId], page, { includeTrainerLogged });
+  }
+
+  private async workoutPage(
+    ownerIds: string[],
+    page: number,
+    { includeTrainerLogged }: { includeTrainerLogged: boolean },
+  ): Promise<FeedPage> {
     const client = this.supabaseService.getClient();
     const items: FeedItem[] = [];
 
     const from = page * WORKOUT_PAGE_SIZE;
     const to = from + WORKOUT_PAGE_SIZE - 1;
-    const { data: workoutRows, error: workoutsError } = await client
+    let query = client
       .from('workouts')
       .select('id, user_id, name, performed_at, completed_at, workout_split_day_id')
-      .in('user_id', followeeIds)
+      .in('user_id', ownerIds)
       .not('completed_at', 'is', null)
-      .is('deleted_at', null)
-      // A workout a trainer logged for a client is the client's own, but it is not
-      // something the client chose to share with followers (trainer mode, workouts only).
-      .is('logged_by', null)
+      .is('deleted_at', null);
+    // A workout a trainer logged for a client is the client's own, but it is not
+    // something the client chose to share with followers (trainer mode, workouts only).
+    if (!includeTrainerLogged) query = query.is('logged_by', null);
+    const { data: workoutRows, error: workoutsError } = await query
       .order('performed_at', { ascending: false })
       .range(from, to);
     if (workoutsError) throw new InternalServerErrorException('Failed to load friends feed');

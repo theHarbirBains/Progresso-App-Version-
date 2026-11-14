@@ -19,6 +19,11 @@ export class CreateReportDto {
   @IsUUID()
   workoutId?: string;
 
+  /** The comment the report is about, when it's about one -- written by the person reported. */
+  @IsOptional()
+  @IsUUID()
+  commentId?: string;
+
   @IsIn(REPORT_REASONS)
   reason!: ReportReason;
 

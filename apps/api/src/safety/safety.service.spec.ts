@@ -129,6 +129,7 @@ describe('SafetyService', () => {
         reporter_id: ME,
         reported_user_id: THEM,
         workout_id: null,
+        comment_id: null,
         reason: 'harassment',
         details: 'Rude',
       });

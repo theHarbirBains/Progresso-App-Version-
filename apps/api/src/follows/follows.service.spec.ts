@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { SupabaseService } from '../supabase/supabase.service';
+import type { SocialPushService } from '../notifications/social-push.service';
 import { FollowsService } from './follows.service';
 
 interface QueuedResult {
@@ -19,6 +20,8 @@ const CHAIN_METHODS = [
   'ilike',
   'neq',
   'gte',
+  'is',
+  'not',
   'or',
   'order',
   'limit',
@@ -121,6 +124,30 @@ describe('FollowsService', () => {
         follower_id: 'user-1',
         followee_id: 'user-2',
         status: 'pending',
+      });
+    });
+
+    it('pushes the request to the person it is for', async () => {
+      const client = createMockClient();
+      client.queue('users', { data: { id: 'user-2' }, error: null });
+      client.queue('follows', { data: null, error: null });
+      client.queue('follows', { data: null, error: null });
+      const push = {
+        nameOf: jest.fn().mockResolvedValue('Harbir'),
+        notify: jest.fn().mockResolvedValue(undefined),
+      };
+      const service = new FollowsService(
+        { getClient: () => client } as unknown as SupabaseService,
+        push as unknown as SocialPushService,
+      );
+
+      await service.sendRequest('user-1', 'user-2');
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(push.notify).toHaveBeenCalledWith('user-2', 'follows', {
+        title: 'New follow request',
+        body: 'Harbir wants to follow you.',
+        path: 'notifications',
       });
     });
 
@@ -335,6 +362,8 @@ describe('FollowsService', () => {
         data: [{ id: 'user-3', username: 'bob', display_name: 'Bob', avatar_url: null }],
         error: null,
       });
+      // No recent workouts: no likes or comments to read.
+      client.queue('workouts', { data: [], error: null });
       const service = serviceWith(client);
 
       const result = await service.listNotifications('user-1');
@@ -359,9 +388,66 @@ describe('FollowsService', () => {
       const client = createMockClient();
       client.queue('follows', { data: [], error: null });
       client.queue('follows', { data: [], error: null });
+      client.queue('workouts', { data: [], error: null });
       const service = serviceWith(client);
 
       await expect(service.listNotifications('user-1')).resolves.toEqual([]);
+    });
+
+    it("adds others' likes and comments on your workouts -- nothing from someone blocked", async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [], error: null });
+      client.queue('follows', { data: [], error: null });
+      client.queue('workouts', { data: [{ id: 'w1', name: 'Push Day' }], error: null });
+      client.queue('workout_likes', {
+        data: [
+          { workout_id: 'w1', user_id: 'user-2', created_at: '2026-01-03T00:00:00Z' },
+          { workout_id: 'w1', user_id: 'blocked', created_at: '2026-01-04T00:00:00Z' },
+        ],
+        error: null,
+      });
+      client.queue('workout_comments', {
+        data: [
+          {
+            id: 'c1',
+            workout_id: 'w1',
+            user_id: 'user-3',
+            body: 'Strong!',
+            created_at: '2026-01-05T00:00:00Z',
+          },
+        ],
+        error: null,
+      });
+      client.queue('user_blocks', {
+        data: [{ blocker_id: 'user-1', blocked_id: 'blocked' }],
+        error: null,
+      });
+      client.queue('users', {
+        data: [
+          { id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null },
+          { id: 'user-3', username: 'bob', display_name: 'Bob', avatar_url: null },
+        ],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const result = await service.listNotifications('user-1');
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          kind: 'comment',
+          id: 'c1',
+          workoutId: 'w1',
+          workoutName: 'Push Day',
+          body: 'Strong!',
+          user: expect.objectContaining({ id: 'user-3' }),
+        }),
+        expect.objectContaining({
+          kind: 'like',
+          workoutId: 'w1',
+          user: expect.objectContaining({ id: 'user-2' }),
+        }),
+      ]);
     });
   });
 

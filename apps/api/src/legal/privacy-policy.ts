@@ -16,7 +16,8 @@ const BODY = `
   <li><strong>Your profile.</strong> Your name, username and profile photo, and what you tell us during onboarding: country, gender, birthday, height, weight, fitness goal, training experience and preferences, how you heard about Progresso, your units, and your notification choices.</li>
   <li><strong>Your training.</strong> Workouts, exercises, sets (weights, reps and times), workout splits, the personal records worked out from them, and custom exercises with any machine photos you add.</li>
   <li><strong>Your nutrition.</strong> Foods you log, custom foods and their photos, your nutrition goals, and the foods you search for or barcodes you scan.</li>
-  <li><strong>People.</strong> Who you follow and who follows you, group workouts you join, trainers or clients you link with, and the people you block or report.</li>
+  <li><strong>People.</strong> Who you follow and who follows you, the likes and comments you leave on workouts, group workouts you join, trainers or clients you link with, and the people you block or report (and the comment, if you report one).</li>
+  <li><strong>Your contacts, only if you use Find Friends from Contacts.</strong> The email addresses in your phone's contacts are scrambled on your phone (a one-way hash) and only those are sent, to find the people on Progresso who have them. Neither your contacts nor what's sent is kept.</li>
   <li><strong>Your device.</strong> A push notification token if you allow notifications, and crash reports that include the app version, what went wrong and your account ID. Crash reports are stripped of other personal details before they're sent.</li>
   <li><strong>Feedback you send.</strong> What you write in Feedback &amp; Suggestions, any screenshot you add to it, and the app version, platform and system version it was sent from.</li>
 </ul>
@@ -25,7 +26,7 @@ const BODY = `
 <h2>How we use it</h2>
 <ul>
   <li>To run Progresso: saving your workouts and meals, working out your records, progress and calorie estimates, and showing them back to you.</li>
-  <li>To run the features you choose to use with other people: following, the Friends feed, group workouts and trainers.</li>
+  <li>To run the features you choose to use with other people: following, profiles, the Friends feed, likes and comments, finding friends from your contacts, group workouts and trainers.</li>
   <li>To look up foods and nutrition when you search, scan a barcode or describe a meal.</li>
   <li>To send the notifications you've turned on, and one welcome email to your sign-in address when your account is set up.</li>
   <li>To keep Progresso safe: reviewing reports, and keeping blocked people away from you.</li>
@@ -35,7 +36,7 @@ const BODY = `
 
 <h2>Who can see your data</h2>
 <ul>
-  <li><strong>Other people on Progresso.</strong> Your name, username and photo can be found in search. People whose follow request you accept see your finished workouts in their Friends feed, with each exercise's machine photo, gym and handle if you added them (not your nutrition, and not workouts a trainer logged for you), and the custom exercises you make -- with their photos, gym and grip -- which they can copy into their own library. People in a group workout with you see that group's workouts. A trainer you link with can see your workouts and log or edit them for you, and every change a trainer makes is recorded; while you're linked, you and your trainer see each other's custom exercises, and using one copies it into your own library. People you block can't find you, follow you or invite you to a group.</li>
+  <li><strong>Other people on Progresso.</strong> Your name, username and photo can be found in search, along with how many people follow you and how many you follow; anyone with your email address in their contacts can find you too, unless you turn that off in Settings &gt; Account &amp; Security. People whose follow request you accept see your profile -- how many workouts you've finished (all time and the last 30 days), your heaviest lift on each exercise, who you follow and who follows you, and your workouts in full -- the likes and comments on your workouts (which they can add to; you can delete any comment on your own workout), and your finished workouts in their Friends feed, with each exercise's machine photo, gym and handle if you added them (not your nutrition, and not workouts a trainer logged for you), and the custom exercises you make -- with their photos, gym and grip -- which they can copy into their own library. People in a group workout with you see that group's workouts. A trainer you link with can see your workouts and log or edit them for you, and every change a trainer makes is recorded; while you're linked, you and your trainer see each other's custom exercises, and using one copies it into your own library. People you block can't find you, follow you or invite you to a group.</li>
   <li><strong>Companies that run parts of Progresso for us</strong>, each only for that purpose:
     <ul>
       <li>Supabase: our database, sign-in and photo storage, hosted in Canada.</li>

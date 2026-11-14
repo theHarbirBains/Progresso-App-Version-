@@ -76,13 +76,27 @@ export class SafetyService {
       if (error) throw new InternalServerErrorException('Failed to look up the workout');
       if (!workout) throw new NotFoundException('Workout not found');
     }
+    let commentWorkoutId: string | null = null;
+    if (dto.commentId) {
+      // Only a comment the person being reported wrote.
+      const { data: comment, error } = await client
+        .from('workout_comments')
+        .select('id, workout_id')
+        .eq('id', dto.commentId)
+        .eq('user_id', dto.reportedUserId)
+        .maybeSingle();
+      if (error) throw new InternalServerErrorException('Failed to look up the comment');
+      if (!comment) throw new NotFoundException('Comment not found');
+      commentWorkoutId = (comment as { workout_id: string }).workout_id;
+    }
 
     const { data, error } = await client
       .from('user_reports')
       .insert({
         reporter_id: userId,
         reported_user_id: dto.reportedUserId,
-        workout_id: dto.workoutId ?? null,
+        workout_id: dto.workoutId ?? commentWorkoutId,
+        comment_id: dto.commentId ?? null,
         reason: dto.reason,
         details: dto.details ? dto.details : null,
       })

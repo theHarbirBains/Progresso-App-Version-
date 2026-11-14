@@ -220,6 +220,24 @@ export class UpdateUserDto {
   @IsBoolean()
   progressionCuesEnabled?: boolean;
 
+  /** Social push notifications, each on unless turned off. */
+  @IsOptional()
+  @IsBoolean()
+  notifyFollows?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  notifyLikes?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  notifyComments?: boolean;
+
+  /** Whether people with this person's email in their contacts can find them. */
+  @IsOptional()
+  @IsBoolean()
+  findableByEmail?: boolean;
+
   @IsOptional()
   @IsBoolean()
   emailOptIn?: boolean;

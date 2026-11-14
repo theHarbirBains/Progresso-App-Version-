@@ -4,7 +4,9 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { SocialPushService } from '../notifications/social-push.service';
 import { isBlockedEitherWay, loadBlocks } from '../safety/blocks';
 import { SupabaseService } from '../supabase/supabase.service';
 
@@ -30,7 +32,25 @@ export interface FollowSearchResult {
 
 export type FollowNotification =
   | { kind: 'request'; followId: string; user: FollowUserSummary; at: string }
-  | { kind: 'accepted'; followId: string; user: FollowUserSummary; at: string };
+  | { kind: 'accepted'; followId: string; user: FollowUserSummary; at: string }
+  | {
+      kind: 'like';
+      /** One per person per workout. */
+      id: string;
+      user: FollowUserSummary;
+      workoutId: string;
+      workoutName: string;
+      at: string;
+    }
+  | {
+      kind: 'comment';
+      id: string;
+      user: FollowUserSummary;
+      workoutId: string;
+      workoutName: string;
+      body: string;
+      at: string;
+    };
 
 const SEARCH_RESULT_LIMIT = 20;
 const SUGGESTED_LIMIT = 20;
@@ -60,7 +80,11 @@ function unknownUser(id: string): FollowUserSummary {
 
 @Injectable()
 export class FollowsService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    // Pushes a follow request or an accept to the person it's for (when they want it).
+    @Optional() private readonly socialPush?: SocialPushService,
+  ) {}
 
   async sendRequest(followerId: string, followeeId: string): Promise<{ status: FollowStatus }> {
     if (followerId === followeeId) {
@@ -113,6 +137,7 @@ export class FollowsService {
       throw new InternalServerErrorException('Failed to send follow request');
     }
 
+    void this.pushFollow(followerId, followeeId, 'request');
     return { status: 'pending' };
   }
 
@@ -125,7 +150,7 @@ export class FollowsService {
 
     const { data: row, error: rowError } = await client
       .from('follows')
-      .select('id, followee_id, status')
+      .select('id, follower_id, followee_id, status')
       .eq('id', followId)
       .maybeSingle();
     if (rowError) {
@@ -149,6 +174,7 @@ export class FollowsService {
         .update({ status: 'accepted', responded_at: new Date().toISOString() })
         .eq('id', followId);
       if (error) throw new InternalServerErrorException('Failed to accept follow request');
+      void this.pushFollow(userId, row.follower_id as string, 'accepted');
       return;
     }
 
@@ -203,9 +229,10 @@ export class FollowsService {
    * no cross-user trust concern, unlike everything here.
    */
   async listNotifications(userId: string): Promise<FollowNotification[]> {
-    const [pending, accepted] = await Promise.all([
+    const [pending, accepted, activity] = await Promise.all([
       this.listPendingRequests(userId),
       this.listRecentlyAccepted(userId),
+      this.listRecentActivity(userId),
     ]);
 
     const items: FollowNotification[] = [
@@ -221,9 +248,112 @@ export class FollowsService {
         user: r.user,
         at: r.createdAt,
       })),
+      ...activity,
     ];
     items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
     return items;
+  }
+
+  /**
+   * Likes and comments others left on this person's workouts in the same recent window --
+   * never their own, and nothing from someone blocked either way.
+   */
+  private async listRecentActivity(userId: string): Promise<FollowNotification[]> {
+    const client = this.supabaseService.getClient();
+    const since = new Date(
+      Date.now() - RECENTLY_ACCEPTED_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const { data: workouts, error } = await client
+      .from('workouts')
+      .select('id, name')
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .not('completed_at', 'is', null)
+      .gte('performed_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString());
+    if (error) throw new InternalServerErrorException('Failed to load your activity');
+    const names = new Map(
+      ((workouts ?? []) as { id: string; name: string }[]).map((w) => [w.id, w.name]),
+    );
+    if (names.size === 0) return [];
+    const ids = Array.from(names.keys());
+    const [likes, comments, blocks] = await Promise.all([
+      client
+        .from('workout_likes')
+        .select('workout_id, user_id, created_at')
+        .in('workout_id', ids)
+        .neq('user_id', userId)
+        .gte('created_at', since),
+      client
+        .from('workout_comments')
+        .select('id, workout_id, user_id, body, created_at')
+        .in('workout_id', ids)
+        .neq('user_id', userId)
+        .gte('created_at', since),
+      loadBlocks(client, userId),
+    ]);
+    if (likes.error || comments.error) {
+      throw new InternalServerErrorException('Failed to load your activity');
+    }
+    const likeRows = (
+      (likes.data ?? []) as {
+        workout_id: string;
+        user_id: string;
+        created_at: string;
+      }[]
+    ).filter((row) => !isBlockedEitherWay(blocks, row.user_id));
+    const commentRows = (
+      (comments.data ?? []) as {
+        id: string;
+        workout_id: string;
+        user_id: string;
+        body: string;
+        created_at: string;
+      }[]
+    ).filter((row) => !isBlockedEitherWay(blocks, row.user_id));
+    const users = await this.fetchUserSummaries(client, [
+      ...likeRows.map((row) => row.user_id),
+      ...commentRows.map((row) => row.user_id),
+    ]);
+    return [
+      ...likeRows.map((row) => ({
+        kind: 'like' as const,
+        id: `${row.workout_id}:${row.user_id}`,
+        user: users.get(row.user_id) ?? unknownUser(row.user_id),
+        workoutId: row.workout_id,
+        workoutName: names.get(row.workout_id) ?? 'Workout',
+        at: row.created_at,
+      })),
+      ...commentRows.map((row) => ({
+        kind: 'comment' as const,
+        id: row.id,
+        user: users.get(row.user_id) ?? unknownUser(row.user_id),
+        workoutId: row.workout_id,
+        workoutName: names.get(row.workout_id) ?? 'Workout',
+        body: row.body,
+        at: row.created_at,
+      })),
+    ];
+  }
+
+  /** A follow request, or a request accepted, pushed to the other person. */
+  private async pushFollow(fromId: string, toId: string, what: 'request' | 'accepted') {
+    if (!this.socialPush) return;
+    const name = await this.socialPush.nameOf(fromId);
+    await this.socialPush.notify(
+      toId,
+      'follows',
+      what === 'request'
+        ? {
+            title: 'New follow request',
+            body: `${name} wants to follow you.`,
+            path: 'notifications',
+          }
+        : {
+            title: 'Follow request accepted',
+            body: `${name} accepted your follow request.`,
+            path: `people/${fromId}`,
+          },
+    );
   }
 
   private async listRecentlyAccepted(userId: string): Promise<FollowRequestSummary[]> {

@@ -10,6 +10,8 @@ export interface ExpoPushMessage {
   to: string;
   title: string;
   body: string;
+  /** Sent along to the app: `url` is the link a tap opens (progresso://...). */
+  data?: Record<string, string>;
 }
 
 /**
@@ -49,7 +51,13 @@ export class ExpoPushProvider {
         },
         signal: controller.signal,
         body: JSON.stringify(
-          batch.map(({ to, title, body }) => ({ to, title, body, sound: 'default' })),
+          batch.map(({ to, title, body, data }) => ({
+            to,
+            title,
+            body,
+            sound: 'default',
+            ...(data ? { data } : {}),
+          })),
         ),
       });
 
