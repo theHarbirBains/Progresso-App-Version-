@@ -67,7 +67,7 @@ type Props = RootStackScreenProps<'EditWorkout'>;
  * assumes PR state itself.
  */
 export function EditWorkoutScreen({ navigation, route }: Props) {
-  const { workoutId, clientId } = route.params;
+  const { workoutId, clientId, clientName } = route.params;
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading } = useProgressTheme();
@@ -288,7 +288,7 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
       }
 
       void refetchAllTimeStats();
-      navigation.replace('WorkoutDetail', { workoutId });
+      navigation.replace('WorkoutDetail', { workoutId, clientId, clientName });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save changes');
       setSaving(false);

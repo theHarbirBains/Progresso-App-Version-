@@ -15,6 +15,7 @@ import { UnderlineTabs } from '../design/UnderlineTabs';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import { machineLine } from '../exercises/machineDetails';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
+import { listTrainerClients } from '../lib/trainerApi';
 import { formatWeightKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
@@ -128,6 +129,9 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const [selectedId, setSelectedId] = useState(workoutId);
   // Which muscle group's exercises show, as in the live workout; All to start.
   const [muscleTab, setMuscleTab] = useState<MuscleTab>('all');
+  // In a group, the people who are this person's active clients: as their trainer, they can fix
+  // a set logged wrong in that client's workout (as from the client's own page).
+  const [clientIds, setClientIds] = useState<Set<string>>(new Set());
   // Records belong to the workout's owner: a trainer looking at a client's reads the client's.
   const ownerId = clientId ?? userId;
 
@@ -144,7 +148,23 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         if (detail.groupId) {
           // The rest of the group follows; the page shows this workout meanwhile.
           void fetchGroupWorkouts(accessToken, detail.groupId, detail).then((group) => {
-            if (!cancelled) setPeople(group);
+            if (cancelled) return;
+            setPeople(group);
+            if (group && group.some((person) => person.userId !== userId)) {
+              // Someone who isn't a trainer has no clients to read: nothing more to edit.
+              listTrainerClients(accessToken)
+                .then((clients) => {
+                  if (cancelled) return;
+                  setClientIds(
+                    new Set(
+                      clients
+                        .filter((client) => client.status === 'active' && client.clientId)
+                        .map((client) => client.clientId as string),
+                    ),
+                  );
+                })
+                .catch(() => undefined);
+            }
           });
         }
 
@@ -183,7 +203,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [workoutId, ownerId, accessToken]);
+  }, [workoutId, ownerId, accessToken, userId]);
 
   if (loading || !workout) {
     return (
@@ -212,8 +232,13 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   }
 
   // The person whose workout is showing: this one, or someone else's in the group.
-  const shown = people?.find((person) => person.workout.id === selectedId)?.workout ?? workout;
+  const shownPerson = people?.find((person) => person.workout.id === selectedId);
+  const shown = shownPerson?.workout ?? workout;
   const isOwn = shown.id === workout.id;
+  // Another person's workout in the group can be edited by their trainer, to fix a set logged
+  // wrong -- under the trainer's link, recorded for the client like any trainer edit.
+  const editsAsTrainer = !isOwn && shownPerson !== undefined && clientIds.has(shownPerson.userId);
+  const canEdit = isOwn || editsAsTrainer;
   const tabs =
     people && people.length > 1
       ? people.map((person) => ({
@@ -276,12 +301,23 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
             testID: 'workout-detail-back',
           }}
           rightAction={
-            isOwn
+            canEdit
               ? {
                   icon: 'edit-2',
                   onPress: () =>
-                    navigation.navigate('EditWorkout', { workoutId, clientId, clientName }),
-                  accessibilityLabel: 'Edit workout',
+                    navigation.navigate(
+                      'EditWorkout',
+                      editsAsTrainer
+                        ? {
+                            workoutId: shown.id,
+                            clientId: shownPerson.userId,
+                            clientName: shownPerson.displayName ?? undefined,
+                          }
+                        : { workoutId, clientId, clientName },
+                    ),
+                  accessibilityLabel: editsAsTrainer
+                    ? `Edit ${firstName(shownPerson.displayName)}'s workout`
+                    : 'Edit workout',
                   testID: 'workout-detail-edit',
                 }
               : undefined

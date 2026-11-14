@@ -48,6 +48,12 @@ jest.mock('../lib/api', () => ({
   getGroup: jest.fn(),
 }));
 
+// Not a trainer, unless a test says so.
+const mockListTrainerClients = jest.fn();
+jest.mock('../lib/trainerApi', () => ({
+  listTrainerClients: (...args: unknown[]) => mockListTrainerClients(...args),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockUseAllTimeStats = useAllTimeStats as jest.Mock;
 const mockRefetchAllTimeStats = jest.fn();
@@ -745,6 +751,7 @@ describe('WorkoutDetailScreen -- a group workout', () => {
   }
 
   beforeEach(() => {
+    mockListTrainerClients.mockReset().mockRejectedValue(new Error('Not a trainer'));
     jest.mocked(getGroup).mockResolvedValue({
       id: 'g1',
       name: 'Thursday',
@@ -797,6 +804,38 @@ describe('WorkoutDetailScreen -- a group workout', () => {
 
     fireEvent.press(screen.getByTestId('workout-detail-people-w1'));
     expect(screen.getByTestId('workout-detail-share')).toBeTruthy();
+  });
+
+  it("lets their trainer edit a client's workout from the client's tab, to fix a set logged wrong", async () => {
+    mockListTrainerClients.mockResolvedValue([
+      { clientId: 'jashan', status: 'active' },
+      { clientId: 'someone-else', status: 'pending' },
+    ]);
+    renderGroup();
+    fireEvent.press(await screen.findByTestId('workout-detail-people-w-jashan'));
+
+    const edit = await screen.findByTestId('workout-detail-edit');
+    expect(edit.props.accessibilityLabel).toBe("Edit Jashan's workout");
+    fireEvent.press(edit);
+
+    expect(mockNavigate).toHaveBeenCalledWith('EditWorkout', {
+      workoutId: 'w-jashan',
+      clientId: 'jashan',
+      clientName: 'Jashan Singh',
+    });
+    // Still theirs to share or delete.
+    expect(screen.queryByTestId('workout-detail-share')).toBeNull();
+    expect(screen.queryByTestId('workout-detail-delete')).toBeNull();
+    expect(mockListTrainerClients).toHaveBeenCalledWith('token-123');
+  });
+
+  it("offers a trainer no edit on someone in the group who isn't their active client", async () => {
+    mockListTrainerClients.mockResolvedValue([{ clientId: 'jashan', status: 'pending' }]);
+    renderGroup();
+    fireEvent.press(await screen.findByTestId('workout-detail-people-w-jashan'));
+    await waitFor(() => expect(mockListTrainerClients).toHaveBeenCalled());
+
+    expect(screen.queryByTestId('workout-detail-edit')).toBeNull();
   });
 
   it("shows only this workout when the group can't be read -- a trainer who wasn't in it", async () => {

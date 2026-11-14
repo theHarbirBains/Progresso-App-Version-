@@ -241,6 +241,27 @@ describe('EditWorkoutScreen -- saving changes', () => {
     expect(mockUpdateWorkout).not.toHaveBeenCalled();
   });
 
+  it("goes back to a client's workout as the client's, when their trainer saves it", async () => {
+    render(
+      <EditWorkoutScreen
+        navigation={navigation}
+        route={{ params: { workoutId: 'w1', clientId: 'jashan', clientName: 'Jashan' } } as never}
+      />,
+      { wrapper: TestProviders },
+    );
+    await screen.findByTestId(EX);
+
+    fireEvent.press(screen.getByTestId('edit-workout-save'));
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('WorkoutDetail', {
+        workoutId: 'w1',
+        clientId: 'jashan',
+        clientName: 'Jashan',
+      }),
+    );
+  });
+
   it('does not touch the workout row at all when nothing changed', async () => {
     renderScreen();
     await screen.findByTestId(EX);
