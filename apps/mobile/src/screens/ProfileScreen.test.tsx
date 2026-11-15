@@ -352,12 +352,12 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     expect(screen.getByTestId('person-profile-stat-volume')).toHaveTextContent(/19\.4K kg/);
   });
 
-  it('opens on Achievements, and lists your workouts under Workouts, each opening yours', async () => {
+  it('opens on Stats; Achievements and Workouts are a tab away, each opening yours', async () => {
     renderProfile();
 
-    expect(await screen.findByTestId('person-profile-achievements')).toHaveTextContent(
-      /First Steps/,
-    );
+    expect(await screen.findByTestId('person-profile-stats')).toBeTruthy();
+    await openTab('achievements');
+    expect(screen.getByTestId('person-profile-achievements')).toHaveTextContent(/First Steps/);
     // Your rank shows on your own, opening every rank.
     expect(screen.getByTestId('person-profile-rank')).toHaveTextContent(/Bronze I.*640 AP/);
     fireEvent.press(screen.getByTestId('person-profile-rank'));
@@ -398,7 +398,7 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     await screen.findByTestId('person-profile-name');
     expectNoBareText();
 
-    for (const tab of ['workouts', 'prs', 'stats'] as const) {
+    for (const tab of ['workouts', 'prs', 'achievements'] as const) {
       await openTab(tab);
       expectNoBareText();
     }

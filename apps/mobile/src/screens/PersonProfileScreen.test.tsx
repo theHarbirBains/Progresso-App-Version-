@@ -227,10 +227,22 @@ describe('PersonProfileScreen', () => {
     );
   });
 
-  it("opens on Achievements: only what they've earned, the latest first", async () => {
+  it('opens on Stats, with Achievements last', async () => {
     renderScreen();
 
-    expect(await screen.findByTestId('person-profile-achievements')).toHaveTextContent(
+    expect(await screen.findByTestId('person-profile-stats')).toBeTruthy();
+    expect(screen.queryByTestId('person-profile-achievements')).toBeNull();
+    const tabs = screen
+      .getAllByTestId(/^person-profile-tab-/)
+      .map((tab) => String(tab.props.testID).replace('person-profile-tab-', ''));
+    expect(tabs).toEqual(['stats', 'workouts', 'prs', 'achievements']);
+  });
+
+  it("lists only what they've earned under Achievements, the latest first", async () => {
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('person-profile-tab-achievements'));
+    expect(screen.getByTestId('person-profile-achievements')).toHaveTextContent(
       /Achievements.*2 earned/,
     );
     expect(screen.getByTestId('person-profile-tab-achievements')).toHaveTextContent(
@@ -253,7 +265,8 @@ describe('PersonProfileScreen', () => {
     (getPersonProfile as jest.Mock).mockResolvedValue(profile({ achievements: [] }));
     renderScreen();
 
-    expect(await screen.findByTestId('person-profile-no-achievements')).toBeTruthy();
+    fireEvent.press(await screen.findByTestId('person-profile-tab-achievements'));
+    expect(screen.getByTestId('person-profile-no-achievements')).toBeTruthy();
   });
 
   it('shows their lifetime rank: emblem, division, AP and the way on, opening every rank', async () => {

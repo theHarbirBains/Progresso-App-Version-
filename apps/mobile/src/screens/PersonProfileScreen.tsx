@@ -55,7 +55,7 @@ import { useSocialSummaries } from '../social/useSocialSummaries';
 import { personProfileStyles as styles } from './personProfileStyles';
 
 type Props = RootStackScreenProps<'PersonProfile'>;
-type Tab = 'achievements' | 'workouts' | 'prs' | 'stats';
+type Tab = 'stats' | 'workouts' | 'prs' | 'achievements';
 /** Past this many exercises, the PRs tab offers a search. */
 const LIFT_SEARCH_FROM = 6;
 /** All the page asks of its screen's navigation -- PersonProfile's, or the You tab's. */
@@ -88,10 +88,10 @@ interface ShownProfile {
 }
 
 const TABS: { key: Tab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { key: 'achievements', label: 'Achievements', icon: 'star' },
+  { key: 'stats', label: 'Stats', icon: 'bar-chart-2' },
   { key: 'workouts', label: 'Workouts', icon: 'activity' },
   { key: 'prs', label: 'PRs', icon: 'award' },
-  { key: 'stats', label: 'Stats', icon: 'bar-chart-2' },
+  { key: 'achievements', label: 'Achievements', icon: 'star' },
 ];
 
 /** "Sam" from "Sam Lee", else their @username, else "them". */
@@ -150,9 +150,9 @@ function StatTile({
  * followers and following, and the people you follow who follow them too; one wide Follow /
  * Following button (or Accept and Decline, or Edit Profile on your own) with Share beside it. For
  * you, or someone who accepted your follow: four figures -- workouts, the last 30 days, records
- * held and everything lifted -- then Achievements (the ones they've earned), Workouts (all of
- * them, with likes and comments), PRs (every exercise's best set, each opening its top sets and
- * records) and Stats. Until then, a line saying
+ * held and everything lifted -- then Stats (where it opens), Workouts (all of them, with likes
+ * and comments), PRs (every exercise's best set, each opening its top sets and records) and
+ * Achievements (the ones they've earned). Until then, a line saying
  * what following them shows. Report and Block are behind the header's "...". Read every time it
  * opens, the profile and its first workouts together, and shown with their likes all at once.
  */
@@ -186,7 +186,7 @@ export function PersonProfilePage({
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
-  const [tab, setTab] = useState<Tab>('achievements');
+  const [tab, setTab] = useState<Tab>('stats');
   const [liftQuery, setLiftQuery] = useState('');
   const [mutualsOpen, setMutualsOpen] = useState(false);
 
