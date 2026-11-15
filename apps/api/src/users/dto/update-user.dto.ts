@@ -90,6 +90,18 @@ export class UpdateUserDto {
   @MaxLength(50)
   displayName?: string;
 
+  /**
+   * A line about themselves on their profile, for anyone who opens it -- 80 characters at most.
+   * Trimmed; blank (or null) clears it.
+   */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() || null : value,
+  )
+  @IsString()
+  @MaxLength(80)
+  bio?: string | null;
+
   // Lowercased before validation so "Harbir" is accepted and normalized
   // rather than rejected for not already being lowercase — Instagram-style
   // usernames are conventionally case-insensitive from the user's point of

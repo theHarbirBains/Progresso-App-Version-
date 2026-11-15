@@ -12,6 +12,8 @@ import type { UpdateUserDto } from './dto/update-user.dto';
 export interface UserProfile {
   weightUnit: 'kg' | 'lb';
   displayName: string | null;
+  /** A line about themselves on their profile (null with none). */
+  bio: string | null;
   username: string | null;
   workoutAccentColor: string | null;
   nutritionAccentColor: string | null;
@@ -60,13 +62,14 @@ const PROFILE_COLUMNS =
   'apple_health_preference, onboarding_completed_at, activity_level, ' +
   'referral_source, country, average_workout_length, training_comfort, rep_range_min, ' +
   'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier, ' +
-  'notify_follows, notify_likes, notify_comments, findable_by_email';
+  'notify_follows, notify_likes, notify_comments, findable_by_email, bio';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
   return {
     weightUnit: data.weight_unit,
     displayName: data.display_name,
+    bio: data.bio,
     username: data.username,
     workoutAccentColor: data.workout_accent_color,
     nutritionAccentColor: data.nutrition_accent_color,
@@ -137,6 +140,7 @@ export class UsersService {
   async updateProfile(userId: string, dto: UpdateUserDto): Promise<UserProfile> {
     const updatePayload: Record<string, unknown> = {};
     if (dto.displayName !== undefined) updatePayload.display_name = dto.displayName;
+    if (dto.bio !== undefined) updatePayload.bio = dto.bio;
     if (dto.username !== undefined) updatePayload.username = dto.username;
     if (dto.weightUnit !== undefined) updatePayload.weight_unit = dto.weightUnit;
     if (dto.workoutAccentColor !== undefined) {

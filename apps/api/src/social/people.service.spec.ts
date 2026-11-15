@@ -85,10 +85,32 @@ describe('PeopleService', () => {
         { id: 'f2', follower_id: SAM, followee_id: ME, status: 'pending' },
       ]);
       client.queue('users', { data: [user(SAM, 'Sam')], error: null });
+      // Who you follow comes first (for mutual friends), then the two counts.
+      client.queue('follows', {
+        data: [{ followee_id: SAM }, { followee_id: JO }, { followee_id: 'blocked-id' }],
+        error: null,
+      });
       client.queue('follows', { data: null, error: null, count: 12 });
       client.queue('follows', { data: null, error: null, count: 3 });
+      client.queue('users', {
+        data: { bio: 'Building strength.', fitness_goals: ['build_muscle', 'get_stronger'] },
+        error: null,
+      });
+      client.queue('follows', {
+        data: [{ follower_id: JO }, { follower_id: 'blocked-id' }],
+        error: null,
+      });
+      client.queue('user_blocks', {
+        data: [{ blocker_id: 'blocked-id', blocked_id: ME }],
+        error: null,
+      });
+      client.queue('users', { data: [user(JO, 'Jo')], error: null });
       client.queue('workouts', { data: null, error: null, count: 40 });
       client.queue('workouts', { data: null, error: null, count: 9 });
+      client.queue('rpc:person_profile_totals', {
+        data: [{ total_volume_kg: '19400.50', pr_count: 24, best_month_workouts: 14 }],
+        error: null,
+      });
       client.queue('rpc:person_best_lifts', {
         data: [{ exercise_id: 'ex-row', weight_kg: '100.00', reps: 5, performed_at: '2026-11-01' }],
         error: null,
@@ -117,8 +139,21 @@ describe('PeopleService', () => {
         requestId: 'f2',
         followerCount: 12,
         followingCount: 3,
+        bio: 'Building strength.',
+        fitnessGoals: ['build_muscle', 'get_stronger'],
+        // Jo: followed by you, following Sam -- never Sam, never anyone blocked.
+        mutuals: {
+          count: 1,
+          people: [{ id: JO, username: 'jo', displayName: 'Jo', avatarUrl: null }],
+        },
         canSeeActivity: true,
-        stats: { workouts: 40, lastThirtyDays: 9 },
+        stats: {
+          workouts: 40,
+          lastThirtyDays: 9,
+          totalVolumeKg: 19400.5,
+          prCount: 24,
+          bestMonthWorkouts: 14,
+        },
         bestLifts: [
           {
             exerciseId: 'ex-row',
@@ -138,6 +173,10 @@ describe('PeopleService', () => {
         method: 'is',
         args: ['logged_by', null],
       });
+      expect(client.rpc).toHaveBeenCalledWith('person_profile_totals', {
+        p_owner: SAM,
+        p_include_trainer_logged: false,
+      });
     });
 
     it('shows only who someone is, and their counts, until they accept your follow', async () => {
@@ -146,20 +185,51 @@ describe('PeopleService', () => {
         { id: 'f1', follower_id: ME, followee_id: SAM, status: 'pending' },
       ]);
       client.queue('users', { data: [user(SAM, 'Sam')], error: null });
+      client.queue('follows', { data: [], error: null });
       client.queue('follows', { data: null, error: null, count: 12 });
       client.queue('follows', { data: null, error: null, count: 3 });
+      client.queue('users', { data: { bio: null, fitness_goals: ['lose_fat'] }, error: null });
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, SAM);
 
+      // Who they are -- bio and goals too -- but nothing of their training.
       expect(profile).toMatchObject({
         followStatus: 'pending',
+        bio: null,
+        fitnessGoals: ['lose_fat'],
+        mutuals: { count: 0, people: [] },
         canSeeActivity: false,
         stats: null,
         bestLifts: null,
       });
       expect(client.rpc).not.toHaveBeenCalled();
       expect(client.from).not.toHaveBeenCalledWith('workouts');
+    });
+
+    it("counts a trainer's logging on your own profile, with no mutual friends", async () => {
+      const client = createMockClient();
+      client.queue('users', { data: [user(ME, 'Me')], error: null });
+      client.queue('follows', { data: null, error: null, count: 2 });
+      client.queue('follows', { data: null, error: null, count: 5 });
+      client.queue('users', { data: { bio: null, fitness_goals: [] }, error: null });
+      client.queue('workouts', { data: null, error: null, count: 3 });
+      client.queue('workouts', { data: null, error: null, count: 1 });
+      client.queue('rpc:person_profile_totals', { data: [], error: null });
+      client.queue('rpc:person_best_lifts', { data: [], error: null });
+      const service = serviceWith(client);
+
+      const profile = await service.getProfile(ME, ME);
+
+      expect(profile).toMatchObject({
+        isSelf: true,
+        mutuals: { count: 0, people: [] },
+        stats: { workouts: 3, totalVolumeKg: 0, prCount: 0, bestMonthWorkouts: 0 },
+      });
+      expect(client.rpc).toHaveBeenCalledWith('person_profile_totals', {
+        p_owner: ME,
+        p_include_trainer_logged: true,
+      });
     });
 
     it('is not found for someone blocked either way', async () => {

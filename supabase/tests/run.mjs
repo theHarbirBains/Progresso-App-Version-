@@ -4834,6 +4834,45 @@ async function main() {
         1,
     );
 
+    // A profile's totals: what followers see leaves out a trainer's logging; the person's own
+    // count it. A deleted workout never counts.
+    const totals = async (own) =>
+      (await admin.query('select * from public.person_profile_totals($1, $2)', [lifter, own]))
+        .rows[0];
+    const followersSee = await totals(false);
+    const ownSee = await totals(true);
+    record(
+      "A profile's total volume is every finished set's weight x reps, from the workouts that count",
+      Number(followersSee.total_volume_kg) === 90 * 8 + 100 * 5 + 60 * 10 &&
+        Number(ownSee.total_volume_kg) === 90 * 8 + 100 * 5 + 60 * 10 + 120 * 5,
+      JSON.stringify({ followersSee, ownSee }),
+    );
+    record(
+      "A profile counts the records held from the workouts that count, and its busiest month's workouts",
+      followersSee.pr_count === 2 &&
+        ownSee.pr_count === 3 &&
+        followersSee.best_month_workouts === 2 &&
+        ownSee.best_month_workouts === 3,
+      JSON.stringify({ followersSee, ownSee }),
+    );
+    await expectThrows(
+      asUser(fan, (c) => c.query('select * from public.person_profile_totals($1, false)', [lifter])),
+      "A person cannot read someone's profile totals directly",
+      /permission denied/i,
+    );
+    await expectThrows(
+      admin.query("update public.users set bio = '' where id = $1", [lifter]),
+      'A bio is left out rather than empty',
+      /violates check constraint/i,
+    );
+    await expectThrows(
+      admin.query('update public.users set bio = $2 where id = $1', [lifter, 'x'.repeat(81)]),
+      'A bio is 80 characters at most',
+      /violates check constraint/i,
+    );
+    await admin.query('update public.users set bio = $2 where id = $1', [lifter, 'x'.repeat(80)]);
+    record('A bio of 80 characters is kept', true);
+
     // Likes and comments are the API's alone.
     await admin.query('insert into public.workout_likes (workout_id, user_id) values ($1, $2)', [
       shared,

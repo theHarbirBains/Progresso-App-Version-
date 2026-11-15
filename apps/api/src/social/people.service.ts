@@ -18,6 +18,20 @@ import { canSeeActivity, relationshipWith } from './relationship';
 /** How many heaviest lifts a profile shows. */
 const BEST_LIFTS = 5;
 const LAST_DAYS = 30;
+/** How many mutual friends a profile lists (the count is all of them). */
+const MUTUALS = 50;
+
+export interface ProfileStats {
+  /** Finished workouts in all, and in the last 30 days. */
+  workouts: number;
+  lastThirtyDays: number;
+  /** Everything lifted: each finished weighted set's weight x reps. */
+  totalVolumeKg: number;
+  /** Rep-count PRs and true 1RMs held now. */
+  prCount: number;
+  /** The most workouts finished in one calendar month. */
+  bestMonthWorkouts: number;
+}
 
 export interface BestLift {
   exerciseId: string;
@@ -41,10 +55,16 @@ export interface PersonProfile {
   requestId: string | null;
   followerCount: number;
   followingCount: number;
+  /** A line about themselves, for anyone who opens their profile -- null with none. */
+  bio: string | null;
+  /** Their fitness goals, in the order they picked them, for anyone who opens their profile. */
+  fitnessGoals: string[];
+  /** The people the viewer follows who follow them too (none on their own profile). */
+  mutuals: { count: number; people: FollowUserSummary[] };
   /** Whether the viewer can see their workouts, stats and lifts (their own, or following). */
   canSeeActivity: boolean;
-  /** Finished workouts in all, and in the last 30 days. Null when the viewer can't see them. */
-  stats: { workouts: number; lastThirtyDays: number } | null;
+  /** Their workout figures. Null when the viewer can't see them. */
+  stats: ProfileStats | null;
   /** Each weighted exercise's heaviest set, heaviest first. Null when the viewer can't see it. */
   bestLifts: BestLift[] | null;
 }
@@ -71,7 +91,7 @@ export class PeopleService {
     const user = users.get(personId);
     if (!user) throw new NotFoundException('User not found');
 
-    const [followers, following] = await Promise.all([
+    const [followers, following, about, mutuals] = await Promise.all([
       client
         .from('follows')
         .select('id', { count: 'exact', head: true })
@@ -82,10 +102,16 @@ export class PeopleService {
         .select('id', { count: 'exact', head: true })
         .eq('follower_id', personId)
         .eq('status', 'accepted'),
+      client.from('users').select('bio, fitness_goals').eq('id', personId).maybeSingle(),
+      relationship.isSelf
+        ? Promise.resolve({ count: 0, people: [] })
+        : this.mutualFriends(viewerId, personId),
     ]);
     if (followers.error || following.error) {
       throw new InternalServerErrorException('Failed to load follow counts');
     }
+    if (about.error) throw new InternalServerErrorException('Failed to load profile');
+    const aboutRow = about.data as { bio: string | null; fitness_goals: string[] | null } | null;
 
     const visible = canSeeActivity(relationship);
     const [stats, bestLifts] = visible
@@ -100,6 +126,9 @@ export class PeopleService {
       ...relationship,
       followerCount: followers.count ?? 0,
       followingCount: following.count ?? 0,
+      bio: aboutRow?.bio ?? null,
+      fitnessGoals: aboutRow?.fitness_goals ?? [],
+      mutuals,
       canSeeActivity: visible,
       stats,
       bestLifts,
@@ -200,10 +229,53 @@ export class PeopleService {
       }));
   }
 
+  /**
+   * The people the viewer follows (accepted) who follow this person too (accepted), less anyone
+   * blocked either way -- the newest follows first.
+   */
+  private async mutualFriends(
+    viewerId: string,
+    personId: string,
+  ): Promise<{ count: number; people: FollowUserSummary[] }> {
+    const client = this.supabaseService.getClient();
+    const { data: followed, error } = await client
+      .from('follows')
+      .select('followee_id')
+      .eq('follower_id', viewerId)
+      .eq('status', 'accepted');
+    if (error) throw new InternalServerErrorException('Failed to load mutual friends');
+    const viewerFollows = ((followed ?? []) as { followee_id: string }[])
+      .map((row) => row.followee_id)
+      .filter((id) => id !== personId);
+    if (viewerFollows.length === 0) return { count: 0, people: [] };
+    const [{ data: theirs, error: theirsError }, blocks] = await Promise.all([
+      client
+        .from('follows')
+        .select('follower_id')
+        .eq('followee_id', personId)
+        .eq('status', 'accepted')
+        .in('follower_id', viewerFollows)
+        .order('created_at', { ascending: false }),
+      loadBlocks(client, viewerId),
+    ]);
+    if (theirsError) throw new InternalServerErrorException('Failed to load mutual friends');
+    const ids = ((theirs ?? []) as { follower_id: string }[])
+      .map((row) => row.follower_id)
+      .filter((id) => !isBlockedEitherWay(blocks, id));
+    const users = await this.followsService.getUserSummaries(ids.slice(0, MUTUALS));
+    return {
+      count: ids.length,
+      people: ids
+        .slice(0, MUTUALS)
+        .map((id) => users.get(id))
+        .filter((user): user is FollowUserSummary => user !== undefined),
+    };
+  }
+
   private async workoutStats(
     personId: string,
     includeTrainerLogged: boolean,
-  ): Promise<{ workouts: number; lastThirtyDays: number }> {
+  ): Promise<ProfileStats> {
     const client = this.supabaseService.getClient();
     const since = new Date(Date.now() - LAST_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const count = (recent: boolean) => {
@@ -217,9 +289,31 @@ export class PeopleService {
       if (recent) query = query.gte('performed_at', since);
       return query;
     };
-    const [all, recent] = await Promise.all([count(false), count(true)]);
-    if (all.error || recent.error) throw new InternalServerErrorException('Failed to load stats');
-    return { workouts: all.count ?? 0, lastThirtyDays: recent.count ?? 0 };
+    const [all, recent, totals] = await Promise.all([
+      count(false),
+      count(true),
+      client.rpc('person_profile_totals', {
+        p_owner: personId,
+        p_include_trainer_logged: includeTrainerLogged,
+      }),
+    ]);
+    if (all.error || recent.error || totals.error) {
+      throw new InternalServerErrorException('Failed to load stats');
+    }
+    const row = (
+      (totals.data ?? []) as {
+        total_volume_kg: string | number;
+        pr_count: number;
+        best_month_workouts: number;
+      }[]
+    )[0];
+    return {
+      workouts: all.count ?? 0,
+      lastThirtyDays: recent.count ?? 0,
+      totalVolumeKg: Number(row?.total_volume_kg ?? 0),
+      prCount: row?.pr_count ?? 0,
+      bestMonthWorkouts: row?.best_month_workouts ?? 0,
+    };
   }
 
   private async bestLifts(personId: string): Promise<BestLift[]> {
