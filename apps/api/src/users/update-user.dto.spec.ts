@@ -37,3 +37,15 @@ describe('UpdateUserDto -- fitness goals and membership tier', () => {
     expect(await errorsFor({ membershipTier: 'platinum' })).toEqual(['membershipTier']);
   });
 });
+
+describe('UpdateUserDto -- last name', () => {
+  it('takes a last name of 1 to 50 characters, trimmed', async () => {
+    expect(await errorsFor({ lastName: 'Bains' })).toEqual([]);
+    expect(plainToInstance(UpdateUserDto, { lastName: '  Bains ' }).lastName).toBe('Bains');
+  });
+
+  it('refuses a blank or overlong last name', async () => {
+    expect(await errorsFor({ lastName: '   ' })).toEqual(['lastName']);
+    expect(await errorsFor({ lastName: 'x'.repeat(51) })).toEqual(['lastName']);
+  });
+});

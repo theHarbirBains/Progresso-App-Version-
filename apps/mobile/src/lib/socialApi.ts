@@ -75,6 +75,8 @@ export interface PersonProfile {
   requestId: string | null;
   followerCount: number;
   followingCount: number;
+  /** Their last name, after their first (user.displayName) -- null with none. */
+  lastName: string | null;
   /** A line about themselves -- null with none. */
   bio: string | null;
   /** The people you follow who follow them too: how many, and up to 50 of them. */

@@ -70,7 +70,11 @@ export interface OwnProfile {
   header: ReactNode;
   /** Who you are from the shared profile, so a photo or bio just changed shows at once. */
   identity:
-    (Pick<FollowUser, 'displayName' | 'username' | 'avatarUrl'> & { bio: string | null }) | null;
+    | (Pick<FollowUser, 'displayName' | 'username' | 'avatarUrl'> & {
+        lastName: string | null;
+        bio: string | null;
+      })
+    | null;
   avatar: { onPress: () => void; saving: boolean };
   /** Above the page: a photo that didn't save, say. */
   notices?: ReactNode;
@@ -246,6 +250,7 @@ export function PersonProfilePage({
             username: identity.username,
             avatarUrl: identity.avatarUrl,
           },
+          lastName: identity.lastName,
           bio: identity.bio,
         }
       : fetchedProfile;
@@ -317,14 +322,17 @@ export function PersonProfilePage({
   }
 
   const label = profile ? personLabel(profile.user) : null;
-  // Under the name: their @username and how many workouts they've done, once you can see that.
+  // Their full name -- first and last -- else their @username.
+  const fullName = profile
+    ? [profile.user.displayName?.trim(), profile.lastName?.trim()].filter(Boolean).join(' ')
+    : '';
+  const title = fullName || label?.title || '';
+  // Their @username heads the page.
+  const handle = profile?.user.username ? `@${profile.user.username}` : undefined;
+  // Under the name: how many workouts they've done, once you can see that.
   const workoutCount = profile?.stats?.workouts ?? null;
-  const subline = [
-    label?.subtitle,
-    workoutCount !== null ? `${workoutCount} ${workoutCount === 1 ? 'workout' : 'workouts'}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const subline =
+    workoutCount !== null ? `${workoutCount} ${workoutCount === 1 ? 'workout' : 'workouts'}` : null;
 
   function renderWorkout(item: FriendsFeedItem, target: PersonProfile, name: string) {
     const summary = social.summaries[item.workout.id];
@@ -672,13 +680,14 @@ export function PersonProfilePage({
         ) : (
           <AppHeader
             testID="person-profile-header"
+            title={handle}
             onBack={() => navigation.goBack()}
             rightAction={
               profile && !profile.isSelf
                 ? {
                     icon: 'more-horizontal',
                     onPress: () => setActionsOpen(true),
-                    accessibilityLabel: `More options for ${label?.title ?? 'this person'}`,
+                    accessibilityLabel: `More options for ${title || 'this person'}`,
                     testID: 'person-profile-more',
                   }
                 : undefined
@@ -707,7 +716,7 @@ export function PersonProfilePage({
                   accessibilityRole="button"
                   accessibilityLabel="Change profile picture"
                 >
-                  {renderAvatar(profile, label.title)}
+                  {renderAvatar(profile, title)}
                   <View style={[styles.avatarEditBadge, { backgroundColor: theme.accent }]}>
                     <Feather name="camera" size={13} color={theme.onAccent} />
                   </View>
@@ -716,24 +725,24 @@ export function PersonProfilePage({
                 // Their photo opens full screen, to see it properly.
                 <ZoomablePhoto
                   uri={profile.user.avatarUrl}
-                  name={label.title}
+                  name={title}
                   testID="person-profile-photo"
                 >
-                  {renderAvatar(profile, label.title)}
+                  {renderAvatar(profile, title)}
                 </ZoomablePhoto>
               ) : (
-                renderAvatar(profile, label.title)
+                renderAvatar(profile, title)
               )}
               <View style={styles.identityText}>
                 <Text
                   testID="person-profile-name"
                   style={styles.name}
-                  numberOfLines={1}
+                  numberOfLines={2}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.6}
+                  minimumFontScale={0.7}
                   accessibilityRole="header"
                 >
-                  {label.title}
+                  {title}
                 </Text>
                 {subline ? (
                   <Text testID="person-profile-subline" style={styles.subline} numberOfLines={1}>
@@ -758,7 +767,7 @@ export function PersonProfilePage({
                   navigation.navigate('FollowList', {
                     userId,
                     which: 'followers',
-                    name: label.title,
+                    name: title,
                   })
                 }
                 accessibilityRole={profile.canSeeActivity ? 'button' : undefined}
@@ -791,7 +800,7 @@ export function PersonProfilePage({
                   navigation.navigate('FollowList', {
                     userId,
                     which: 'following',
-                    name: label.title,
+                    name: title,
                   })
                 }
                 accessibilityRole={profile.canSeeActivity ? 'button' : undefined}
@@ -910,15 +919,15 @@ export function PersonProfilePage({
                   testID="person-profile-share"
                   label="Share Profile"
                   size="md"
-                  onPress={() => share(profile, label.title)}
+                  onPress={() => share(profile, title)}
                   accessibilityLabel={
-                    profile.isSelf ? 'Share your profile' : `Share ${label.title}'s profile`
+                    profile.isSelf ? 'Share your profile' : `Share ${title}'s profile`
                   }
                 />
               </View>
             </View>
 
-            {profile.rank ? renderRank(profile, label.title) : null}
+            {profile.rank ? renderRank(profile, title) : null}
           </View>
 
           {!profile.canSeeActivity ? (
@@ -979,7 +988,7 @@ export function PersonProfilePage({
                 accentColor={theme.accent}
               />
 
-              {renderTab(profile, label.title)}
+              {renderTab(profile, title)}
             </>
           )}
 
@@ -989,7 +998,7 @@ export function PersonProfilePage({
             testID="person-profile-mutuals-sheet"
           >
             <Text style={styles.sheetTitle}>Mutual Friends</Text>
-            <Text style={styles.sheetSubtitle}>People you follow who follow {label.title}</Text>
+            <Text style={styles.sheetSubtitle}>People you follow who follow {title}</Text>
             <ScrollView>
               <PeopleList
                 people={profile.mutuals.people.map((user) => ({ user, status: 'accepted' }))}

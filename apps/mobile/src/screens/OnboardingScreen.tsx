@@ -205,7 +205,11 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
     // Written into the draft (not just kept as this function's own local
     // fields) so it survives the email-confirmation gap below -- see
     // OnboardingDraft's own comment on pendingUsername/pendingDisplayName.
-    updateDraft({ pendingUsername: fields.username, pendingDisplayName: fields.displayName });
+    updateDraft({
+      pendingUsername: fields.username,
+      pendingDisplayName: fields.displayName,
+      pendingLastName: fields.lastName,
+    });
 
     try {
       if (!accountCreatedRef.current) {
@@ -241,7 +245,12 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
         // draft's own state update above hasn't necessarily flushed into
         // this closure yet -- pass the fields through explicitly via a
         // fresh merge instead of relying on the next render's `draft`.
-        { ...draft, pendingUsername: fields.username, pendingDisplayName: fields.displayName },
+        {
+          ...draft,
+          pendingUsername: fields.username,
+          pendingDisplayName: fields.displayName,
+          pendingLastName: fields.lastName,
+        },
       );
       await clearOnboardingDraft();
       // No explicit navigation: signUpWithPassword already established the
@@ -272,8 +281,13 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
       ...draft,
       pendingUsername: fields.username,
       pendingDisplayName: fields.displayName,
+      pendingLastName: fields.lastName,
     };
-    updateDraft({ pendingUsername: fields.username, pendingDisplayName: fields.displayName });
+    updateDraft({
+      pendingUsername: fields.username,
+      pendingDisplayName: fields.displayName,
+      pendingLastName: fields.lastName,
+    });
     await saveOnboardingDraft(nextDraft, stepIndex);
 
     const errorMessage = await signInWithProvider('google');

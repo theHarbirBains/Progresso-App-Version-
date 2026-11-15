@@ -18,6 +18,7 @@ function mockQuery(result: { data: unknown; error: { message: string } | null })
 const row = {
   weight_unit: 'lb',
   display_name: 'Harbir',
+  last_name: 'Bains',
   username: 'harbir',
   workout_accent_color: '#EF4444',
   nutrition_accent_color: null,
@@ -73,6 +74,7 @@ describe('fetchMyProfile', () => {
       id: 'user-1',
       weightUnit: 'lb',
       displayName: 'Harbir',
+      lastName: 'Bains',
       username: 'harbir',
       workoutAccentColor: '#EF4444',
       nutritionAccentColor: null,

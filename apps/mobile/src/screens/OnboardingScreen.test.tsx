@@ -377,10 +377,8 @@ describe('OnboardingScreen', () => {
     fireEvent.press(screen.getByTestId('onboarding-no-trainer-code'));
 
     await screen.findByTestId('onboarding-step-create-account');
-    fireEvent.changeText(
-      screen.getByTestId('onboarding-create-account-display-name'),
-      'Harbir Bains',
-    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
     fireEvent.changeText(
       screen.getByTestId('onboarding-create-account-email'),
@@ -419,7 +417,8 @@ describe('OnboardingScreen', () => {
           emailOptIn: true,
           pushNotificationsOptIn: false,
           username: 'harbirb',
-          displayName: 'Harbir Bains',
+          displayName: 'Harbir',
+          lastName: 'Bains',
           onboardingCompleted: true,
         }),
       ),
@@ -428,7 +427,7 @@ describe('OnboardingScreen', () => {
     await settle();
   });
 
-  it('labels the name field "First Name", not "Display Name"', async () => {
+  it('asks for a First Name and a Last Name, and needs both', async () => {
     await AsyncStorage.setItem(
       '@progresso/onboardingDraft',
       JSON.stringify({
@@ -464,7 +463,31 @@ describe('OnboardingScreen', () => {
     expect(
       screen.getByTestId('onboarding-create-account-display-name').props.accessibilityLabel,
     ).toBe('First Name');
+    expect(screen.getByTestId('onboarding-create-account-last-name').props.accessibilityLabel).toBe(
+      'Last Name',
+    );
     expect(screen.queryByText('Display Name')).toBeNull();
+
+    // Both are needed to create the account.
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-email'),
+      'harbir@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-create-account-confirm-password'),
+      'password123',
+    );
+    expect(screen.getByTestId('onboarding-create-account-submit')).toBeDisabled();
+
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), '   ');
+    expect(screen.getByTestId('onboarding-create-account-submit')).toBeDisabled();
+
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
+    expect(screen.getByTestId('onboarding-create-account-submit')).toBeEnabled();
+    await settle();
   });
 
   it('keeps the draft on disk and shows a confirmation message when email confirmation is required', async () => {
@@ -508,10 +531,8 @@ describe('OnboardingScreen', () => {
 
     renderScreen();
     await screen.findByTestId('onboarding-step-create-account');
-    fireEvent.changeText(
-      screen.getByTestId('onboarding-create-account-display-name'),
-      'Harbir Bains',
-    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
     fireEvent.changeText(
       screen.getByTestId('onboarding-create-account-email'),
@@ -589,10 +610,8 @@ describe('OnboardingScreen', () => {
     fireEvent.press(screen.getByTestId('onboarding-no-trainer-code'));
 
     await screen.findByTestId('onboarding-step-create-account');
-    fireEvent.changeText(
-      screen.getByTestId('onboarding-create-account-display-name'),
-      'Harbir Bains',
-    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
     fireEvent.changeText(
       screen.getByTestId('onboarding-create-account-email'),
@@ -655,10 +674,8 @@ describe('OnboardingScreen', () => {
 
     renderScreen();
     await screen.findByTestId('onboarding-step-create-account');
-    fireEvent.changeText(
-      screen.getByTestId('onboarding-create-account-display-name'),
-      'Harbir Bains',
-    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
 
     await act(async () => {
@@ -672,7 +689,8 @@ describe('OnboardingScreen', () => {
     expect(stored).not.toBeNull();
     const parsed = JSON.parse(stored as string).draft;
     expect(parsed.pendingUsername).toBe('harbirb');
-    expect(parsed.pendingDisplayName).toBe('Harbir Bains');
+    expect(parsed.pendingDisplayName).toBe('Harbir');
+    expect(parsed.pendingLastName).toBe('Bains');
     // App.tsx's Root -- not this screen -- submits the profile once the
     // OAuth session actually appears, so nothing here calls updateMyProfile.
     expect(mockUpdateMyProfile).not.toHaveBeenCalled();
@@ -736,10 +754,8 @@ describe('OnboardingScreen', () => {
     );
     renderScreen();
     await screen.findByTestId('onboarding-step-create-account');
-    fireEvent.changeText(
-      screen.getByTestId('onboarding-create-account-display-name'),
-      'Harbir Bains',
-    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
 
     await act(async () => {

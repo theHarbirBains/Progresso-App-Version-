@@ -33,7 +33,10 @@ export type MembershipTier = 'workouts' | 'workouts_nutrition' | 'everything';
 
 export interface ProfileResponse {
   id: string;
+  /** Their first name. */
   displayName: string | null;
+  /** Their last name, after their first on their profile -- null for anyone who hasn't added one. */
+  lastName: string | null;
   username: string | null;
   /** A line about themselves on their profile, for anyone who opens it -- null with none. */
   bio: string | null;
@@ -83,6 +86,7 @@ export interface ProfileResponse {
 
 export interface UpdateProfileInput {
   displayName?: string;
+  lastName?: string;
   /** 80 characters at most; blank or null clears it. */
   bio?: string | null;
   username?: string;

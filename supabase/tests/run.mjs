@@ -4856,6 +4856,18 @@ async function main() {
     );
     await admin.query('update public.users set bio = $2 where id = $1', [lifter, 'x'.repeat(80)]);
     record('A bio of 80 characters is kept', true);
+    await expectThrows(
+      admin.query("update public.users set last_name = '' where id = $1", [lifter]),
+      'A last name is left out rather than empty',
+      /violates check constraint/i,
+    );
+    await expectThrows(
+      admin.query('update public.users set last_name = $2 where id = $1', [lifter, 'x'.repeat(51)]),
+      'A last name is 50 characters at most',
+      /violates check constraint/i,
+    );
+    await admin.query("update public.users set last_name = 'Bains' where id = $1", [lifter]);
+    record('A last name is kept beside the first', true);
 
     // Likes and comments are the API's alone.
     await admin.query('insert into public.workout_likes (workout_id, user_id) values ($1, $2)', [

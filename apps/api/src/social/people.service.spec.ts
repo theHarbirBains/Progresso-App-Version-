@@ -93,7 +93,7 @@ describe('PeopleService', () => {
       client.queue('follows', { data: null, error: null, count: 12 });
       client.queue('follows', { data: null, error: null, count: 3 });
       client.queue('users', {
-        data: { bio: 'Building strength.' },
+        data: { last_name: 'Lee', bio: 'Building strength.' },
         error: null,
       });
       client.queue('follows', {
@@ -223,6 +223,8 @@ describe('PeopleService', () => {
         requestId: 'f2',
         followerCount: 12,
         followingCount: 3,
+        // Their last name, after their first.
+        lastName: 'Lee',
         bio: 'Building strength.',
         // Jo: followed by you, following Sam -- never Sam, never anyone blocked.
         mutuals: {

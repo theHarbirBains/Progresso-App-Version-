@@ -36,6 +36,7 @@ const baseProfile = {
   email: 'athlete@example.com',
   role: 'user',
   displayName: 'Athlete',
+  lastName: 'One',
   username: 'athlete1',
   weightUnit: 'kg' as const,
   heightUnit: 'cm' as const,
@@ -109,11 +110,39 @@ describe('SettingsPersonalInfoScreen', () => {
     expect(await screen.findByTestId('account-saved')).toBeTruthy();
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
       displayName: 'New Name',
+      lastName: 'One',
       username: 'athlete1',
       bio: null,
       weightUnit: 'lb',
       heightUnit: 'ft_in',
     });
+  });
+
+  it('asks for First Name and Last Name, and saves a last name added later', async () => {
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, lastName: null });
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, lastName: 'Bains' });
+    renderScreen();
+
+    expect(await screen.findByTestId('account-display-name')).toHaveProp('value', 'Athlete');
+    expect(screen.getByTestId('account-display-name').props.accessibilityLabel).toBe('First Name');
+    expect(screen.getByTestId('account-last-name')).toHaveProp('value', '');
+
+    // Both are needed, as at sign-up.
+    fireEvent.press(screen.getByTestId('account-save'));
+    expect(await screen.findByTestId('account-save-error')).toHaveTextContent(
+      'Add your last name.',
+    );
+    expect(mockUpdateMyProfile).not.toHaveBeenCalled();
+
+    fireEvent.changeText(screen.getByTestId('account-last-name'), '  Bains ');
+    fireEvent.press(screen.getByTestId('account-save'));
+
+    expect(await screen.findByTestId('account-saved')).toBeTruthy();
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith(
+      'token-123',
+      expect.objectContaining({ displayName: 'Athlete', lastName: 'Bains' }),
+    );
+    expect(screen.getByTestId('account-last-name')).toHaveProp('value', 'Bains');
   });
 
   it('saves a bio for their profile, trimmed, 80 characters at most', async () => {

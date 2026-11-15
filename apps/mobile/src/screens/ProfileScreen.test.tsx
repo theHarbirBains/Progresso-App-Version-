@@ -110,6 +110,7 @@ const baseProfile = {
   email: 'a@test.local',
   role: 'user',
   displayName: 'Harbir',
+  lastName: 'Bains',
   username: 'harbir',
   bio: 'Chasing progress.',
   fitnessGoals: ['build_muscle'],
@@ -287,10 +288,10 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     renderProfile();
     expect(screen.getByTestId('profile-loading')).toBeTruthy();
 
-    expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Harbir');
-    expect(screen.getByTestId('person-profile-subline')).toHaveTextContent(
-      '@harbir · 120 workouts',
-    );
+    // Your full name, with your @username heading the page.
+    expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Harbir Bains');
+    expect(screen.getByTestId('profile-header')).toHaveTextContent(/@harbir/);
+    expect(screen.getByTestId('person-profile-subline')).toHaveTextContent('120 workouts');
     expect(screen.getByTestId('person-profile-bio')).toHaveTextContent('Chasing progress.');
     expect(screen.queryByTestId('profile-loading')).toBeNull();
   });
@@ -302,7 +303,7 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     mockFetchMyProfile.mockResolvedValue({ ...baseProfile, bio: 'Just changed.' });
     renderProfile();
 
-    expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Harbir');
+    expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Harbir Bains');
     expect(screen.getByTestId('person-profile-bio')).toHaveTextContent('Just changed.');
   });
 
@@ -344,7 +345,7 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     expect(mockNavigate).toHaveBeenCalledWith('FollowList', {
       userId: 'user-1',
       which: 'followers',
-      name: 'Harbir',
+      name: 'Harbir Bains',
     });
   });
 

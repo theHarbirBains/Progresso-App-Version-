@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 
 // Same columns and mapping as the API's GET /users/me (apps/api/src/users/users.service.ts).
 const PROFILE_COLUMNS =
-  'weight_unit, display_name, username, workout_accent_color, nutrition_accent_color, ' +
+  'weight_unit, display_name, last_name, username, workout_accent_color, nutrition_accent_color, ' +
   'background_theme, avatar_url, active_workout_split_id, gender, birthday, weight_value, ' +
   'height_value, height_unit, fitness_goal, training_experience, workout_frequency_days, ' +
   'training_style_preference, email_opt_in, push_notifications_opt_in, ' +
@@ -15,6 +15,7 @@ const PROFILE_COLUMNS =
 interface ProfileRow {
   weight_unit: ProfileResponse['weightUnit'];
   display_name: string | null;
+  last_name: string | null;
   username: string | null;
   workout_accent_color: string | null;
   nutrition_accent_color: string | null;
@@ -57,6 +58,7 @@ function toProfile(userId: string, row: ProfileRow): ProfileResponse {
     id: userId,
     weightUnit: row.weight_unit,
     displayName: row.display_name,
+    lastName: row.last_name ?? null,
     username: row.username,
     workoutAccentColor: row.workout_accent_color,
     nutritionAccentColor: row.nutrition_accent_color,

@@ -178,11 +178,17 @@ beforeEach(() => {
 });
 
 describe('PersonProfileScreen', () => {
-  it('shows who they are: name, @username and workouts, bio, counts and mutual friends', async () => {
+  it('shows who they are: full name, @username heading the page, workouts, bio, counts and mutual friends', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({ user: { ...sam, displayName: 'Sam' }, lastName: 'Lee' }),
+    );
     renderScreen();
 
+    // First and last name together.
     expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Sam Lee');
-    expect(screen.getByTestId('person-profile-subline')).toHaveTextContent('@sam · 120 workouts');
+    expect(screen.getByTestId('person-profile-header')).toHaveTextContent(/@sam/);
+    expect(screen.getByTestId('person-profile-subline')).toHaveTextContent('120 workouts');
+    expect(screen.getByTestId('person-profile-identity')).not.toHaveTextContent(/@sam/);
     expect(screen.getByTestId('person-profile-bio')).toHaveTextContent(
       'Building strength. Chasing progress.',
     );
@@ -230,8 +236,8 @@ describe('PersonProfileScreen', () => {
     );
     renderScreen();
 
-    expect(await screen.findByTestId('person-profile-subline')).toHaveTextContent('@sam');
-    expect(screen.getByTestId('person-profile-subline')).not.toHaveTextContent(/workouts/);
+    expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Sam Lee');
+    expect(screen.queryByTestId('person-profile-subline')).toBeNull();
   });
 
   it('puts your follow requests between the counts on your own, opening them', async () => {

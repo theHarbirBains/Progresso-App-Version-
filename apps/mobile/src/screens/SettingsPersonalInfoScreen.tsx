@@ -23,8 +23,8 @@ import { settingsStyles as styles } from '../settings/settingsStyles';
 type Props = RootStackScreenProps<'SettingsPersonalInfo'>;
 
 /**
- * Profile & Personal Information: identity (picture, display name,
- * username) and the measurement units that apply across the whole app,
+ * Profile & Personal Information: identity (picture, first and last name
+ * -- both needed to save, as at sign-up -- username and bio) and the measurement units that apply across the whole app,
  * plus a link to the existing body-measurements editor -- not a second
  * copy of it. Gender/birthday/height/weight/activity level are already
  * fully editable on CalorieEstimationScreen (reached today only from
@@ -39,6 +39,7 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
   const { profile, loading, error: loadError, updateProfile } = useProfile();
 
   const [displayName, setDisplayName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('lb');
@@ -60,6 +61,7 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
     if (!profile || hasSeededRef.current) return;
     hasSeededRef.current = true;
     setDisplayName(profile.displayName ?? '');
+    setLastName(profile.lastName ?? '');
     setUsername(profile.username ?? '');
     setBio(profile.bio ?? '');
     setWeightUnit(profile.weightUnit);
@@ -69,16 +71,28 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
   async function handleSave() {
     setSaveError(null);
     setSavedMessage(null);
+    // Both names, as at sign-up -- someone who signed up before the last name was asked for adds
+    // theirs here.
+    if (!displayName.trim()) {
+      setSaveError('Add your first name.');
+      return;
+    }
+    if (!lastName.trim()) {
+      setSaveError('Add your last name.');
+      return;
+    }
     setSaving(true);
     try {
       const updated = await updateProfile({
         displayName: displayName.trim(),
+        lastName: lastName.trim(),
         username: username.trim() || undefined,
         bio: bio.trim() || null,
         weightUnit,
         heightUnit,
       });
       setDisplayName(updated.displayName ?? '');
+      setLastName(updated.lastName ?? '');
       setUsername(updated.username ?? '');
       setBio(updated.bio ?? '');
       setSavedMessage('Saved');
@@ -158,10 +172,22 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
 
             <TextInput
               testID="account-display-name"
-              label="Display name"
-              placeholder="Display name"
+              label="First Name"
+              placeholder="First name"
+              autoComplete="name-given"
+              maxLength={50}
               value={displayName}
               onChangeText={setDisplayName}
+            />
+
+            <TextInput
+              testID="account-last-name"
+              label="Last Name"
+              placeholder="Last name"
+              autoComplete="name-family"
+              maxLength={50}
+              value={lastName}
+              onChangeText={setLastName}
             />
 
             <TextInput

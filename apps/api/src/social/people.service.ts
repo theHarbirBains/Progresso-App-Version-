@@ -150,6 +150,8 @@ export interface PersonProfile {
   requestId: string | null;
   followerCount: number;
   followingCount: number;
+  /** Their last name, after their first (user.displayName) -- null with none. */
+  lastName: string | null;
   /** A line about themselves, for anyone who opens their profile -- null with none. */
   bio: string | null;
   /** The people the viewer follows who follow them too (none on their own profile). */
@@ -205,7 +207,11 @@ export class PeopleService {
         .select('id', { count: 'exact', head: true })
         .eq('follower_id', personId)
         .eq('status', 'accepted'),
-      client.from('users').select('bio, show_rank, time_zone').eq('id', personId).maybeSingle(),
+      client
+        .from('users')
+        .select('last_name, bio, show_rank, time_zone')
+        .eq('id', personId)
+        .maybeSingle(),
       relationship.isSelf
         ? Promise.resolve({ count: 0, people: [] })
         : this.mutualFriends(viewerId, personId),
@@ -215,6 +221,7 @@ export class PeopleService {
     }
     if (about.error) throw new InternalServerErrorException('Failed to load profile');
     const aboutRow = about.data as {
+      last_name?: string | null;
       bio: string | null;
       show_rank: boolean | null;
       time_zone: string | null;
@@ -236,6 +243,7 @@ export class PeopleService {
       ...relationship,
       followerCount: followers.count ?? 0,
       followingCount: following.count ?? 0,
+      lastName: aboutRow?.last_name ?? null,
       bio: aboutRow?.bio ?? null,
       mutuals,
       canSeeActivity: visible,

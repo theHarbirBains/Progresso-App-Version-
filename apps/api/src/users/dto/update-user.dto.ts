@@ -90,6 +90,14 @@ export class UpdateUserDto {
   @MaxLength(50)
   displayName?: string;
 
+  /** Their last name, shown after their first (displayName) on their profile. Trimmed. */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MinLength(1)
+  @MaxLength(50)
+  lastName?: string;
+
   /**
    * A line about themselves on their profile, for anyone who opens it -- 80 characters at most.
    * Trimmed; blank (or null) clears it.

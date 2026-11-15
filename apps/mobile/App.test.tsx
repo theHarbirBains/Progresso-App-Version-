@@ -355,10 +355,8 @@ describe('Authentication flow', () => {
     fireEvent.press(screen.getByTestId('sign-in-switch'));
 
     await screen.findByTestId('onboarding-step-create-account');
-    fireEvent.changeText(
-      screen.getByTestId('onboarding-create-account-display-name'),
-      'Harbir Bains',
-    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-email'), 'new@example.com');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');

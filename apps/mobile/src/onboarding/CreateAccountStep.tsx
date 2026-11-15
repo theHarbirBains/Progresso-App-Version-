@@ -14,7 +14,9 @@ import { colors, spacing, typeScale } from '../design/theme';
 const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
 export interface CreateAccountFields {
+  /** Their first name. */
   displayName: string;
+  lastName: string;
   username: string;
   email: string;
   password: string;
@@ -22,6 +24,7 @@ export interface CreateAccountFields {
 
 export interface GoogleSignUpFields {
   displayName: string;
+  lastName: string;
   username: string;
 }
 
@@ -37,15 +40,13 @@ interface Props {
 }
 
 // The final onboarding step: create the account with everything answered
-// so far ready to submit right behind it (see onboardingDraft.ts). Only
-// Display Name, Username, Email, and Password -- unlike the old, separate
-// SignUpScreen this replaces, there's no First/Last Name here: those
-// fields were collected there but never actually persisted anywhere (no
-// column backed them), so this doesn't carry that dead weight forward.
+// so far ready to submit right behind it (see onboardingDraft.ts). First
+// Name and Last Name (each required -- users.display_name and
+// users.last_name; their profile shows both), Username, Email, and Password.
 // Google is the one alternative to typing an email/password (see
-// SignInScreen's own equivalent) -- Display Name/Username are still
-// required either way, since those are Progresso-specific, not something
-// Google's own profile supplies.
+// SignInScreen's own equivalent) -- the names and Username are still
+// required either way, since the username is Progresso-specific, not
+// something Google's own profile supplies.
 export function CreateAccountStep({
   testID,
   submitting,
@@ -55,6 +56,7 @@ export function CreateAccountStep({
   googleSubmitting,
 }: Props) {
   const [displayName, setDisplayName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -63,6 +65,7 @@ export function CreateAccountStep({
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  const lastNameRef = useRef<TextInputInstance>(null);
   const usernameRef = useRef<TextInputInstance>(null);
   const emailRef = useRef<TextInputInstance>(null);
   const passwordRef = useRef<TextInputInstance>(null);
@@ -72,6 +75,7 @@ export function CreateAccountStep({
   const anySubmitting = submitting || googleSubmitting;
   const canSubmit =
     displayName.trim().length > 0 &&
+    lastName.trim().length > 0 &&
     USERNAME_PATTERN.test(username.trim().toLowerCase()) &&
     email.trim().length > 0 &&
     password.length >= 6 &&
@@ -79,15 +83,21 @@ export function CreateAccountStep({
     !anySubmitting;
   const canSubmitGoogle =
     displayName.trim().length > 0 &&
+    lastName.trim().length > 0 &&
     USERNAME_PATTERN.test(username.trim().toLowerCase()) &&
     !anySubmitting;
 
-  function validateNameAndUsername(): { displayName: string; username: string } | null {
+  function validateNameAndUsername(): GoogleSignUpFields | null {
     const trimmedDisplayName = displayName.trim();
+    const trimmedLastName = lastName.trim();
     const normalizedUsername = username.trim().toLowerCase();
 
     if (!trimmedDisplayName) {
-      setLocalError('Display name is required.');
+      setLocalError('First name is required.');
+      return null;
+    }
+    if (!trimmedLastName) {
+      setLocalError('Last name is required.');
       return null;
     }
     if (!USERNAME_PATTERN.test(normalizedUsername)) {
@@ -96,7 +106,11 @@ export function CreateAccountStep({
       );
       return null;
     }
-    return { displayName: trimmedDisplayName, username: normalizedUsername };
+    return {
+      displayName: trimmedDisplayName,
+      lastName: trimmedLastName,
+      username: normalizedUsername,
+    };
   }
 
   function handleSubmit() {
@@ -144,8 +158,21 @@ export function CreateAccountStep({
         placeholder="Enter your first name"
         autoComplete="name-given"
         returnKeyType="next"
+        maxLength={50}
         value={displayName}
         onChangeText={setDisplayName}
+        onSubmitEditing={() => lastNameRef.current?.focus()}
+      />
+      <TextInput
+        inputRef={lastNameRef}
+        testID="onboarding-create-account-last-name"
+        label="Last Name"
+        placeholder="Enter your last name"
+        autoComplete="name-family"
+        returnKeyType="next"
+        maxLength={50}
+        value={lastName}
+        onChangeText={setLastName}
         onSubmitEditing={() => usernameRef.current?.focus()}
       />
       <TextInput

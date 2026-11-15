@@ -106,6 +106,21 @@ describe('UsersService', () => {
       expect(client.updateEq).toHaveBeenCalledWith('id', 'user-1');
     });
 
+    it('saves a last name beside the first', async () => {
+      const client = createMockClient({
+        updateData: { display_name: 'Harbir', last_name: 'Bains' },
+      });
+      const service = serviceWith(client);
+
+      const profile = await service.updateProfile('user-1', {
+        displayName: 'Harbir',
+        lastName: 'Bains',
+      });
+
+      expect(client.update).toHaveBeenCalledWith({ display_name: 'Harbir', last_name: 'Bains' });
+      expect(profile).toMatchObject({ displayName: 'Harbir', lastName: 'Bains' });
+    });
+
     it('saves whether people who open the profile see the rank', async () => {
       const client = createMockClient({ updateData: { show_rank: false } });
       const service = serviceWith(client);

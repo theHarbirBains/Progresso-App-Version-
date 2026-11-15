@@ -273,7 +273,8 @@ function YourRecords({ navigation }: { navigation: Props['navigation'] }) {
 // Achievements / Workouts / PRs / Stats -- plus what's yours alone, inside
 // the same tabs: your full records under PRs, and under Stats today's
 // calories and macros (with Nutrition in your membership), your weekly
-// trends and your muscle groups. The header has Find People and Settings,
+// trends and your muscle groups. The header has Find People, your
+// @username and Settings,
 // and tapping your photo chooses, changes or removes it (useAvatarPhoto).
 export function ProfileScreen({ navigation }: Props) {
   const { user } = useAuth();
@@ -310,13 +311,15 @@ export function ProfileScreen({ navigation }: Props) {
         own={{
           header: (
             <AppHeader
-              rightAction={{
+              testID="profile-header"
+              title={profile?.username ? `@${profile.username}` : undefined}
+              leftAction={{
                 icon: 'search',
                 onPress: () => navigation.navigate('FindPeople'),
                 accessibilityLabel: 'Find people',
                 testID: 'profile-find-people',
               }}
-              rightAction2={{
+              rightAction={{
                 icon: 'settings',
                 onPress: () => navigation.navigate('AccountSettings'),
                 accessibilityLabel: 'Settings',
@@ -327,6 +330,7 @@ export function ProfileScreen({ navigation }: Props) {
           identity: profile
             ? {
                 displayName: profile.displayName,
+                lastName: profile.lastName,
                 username: profile.username,
                 avatarUrl: profile.avatarUrl,
                 bio: profile.bio,

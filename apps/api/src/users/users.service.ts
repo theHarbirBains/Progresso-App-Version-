@@ -11,7 +11,10 @@ import type { UpdateUserDto } from './dto/update-user.dto';
 
 export interface UserProfile {
   weightUnit: 'kg' | 'lb';
+  /** Their first name. */
   displayName: string | null;
+  /** Their last name, shown after it on their profile (null for anyone who hasn't added one). */
+  lastName: string | null;
   /** A line about themselves on their profile (null with none). */
   bio: string | null;
   username: string | null;
@@ -57,7 +60,7 @@ const USERNAME_UNIQUE_VIOLATION = '23505';
 const CHECK_VIOLATION = '23514';
 
 const PROFILE_COLUMNS =
-  'weight_unit, display_name, username, workout_accent_color, nutrition_accent_color, ' +
+  'weight_unit, display_name, last_name, username, workout_accent_color, nutrition_accent_color, ' +
   'background_theme, avatar_url, active_workout_split_id, gender, birthday, weight_value, ' +
   'height_value, height_unit, fitness_goal, training_experience, workout_frequency_days, ' +
   'training_style_preference, email_opt_in, push_notifications_opt_in, ' +
@@ -71,6 +74,7 @@ function toProfile(data: any): UserProfile {
   return {
     weightUnit: data.weight_unit,
     displayName: data.display_name,
+    lastName: data.last_name,
     bio: data.bio,
     username: data.username,
     workoutAccentColor: data.workout_accent_color,
@@ -143,6 +147,7 @@ export class UsersService {
   async updateProfile(userId: string, dto: UpdateUserDto): Promise<UserProfile> {
     const updatePayload: Record<string, unknown> = {};
     if (dto.displayName !== undefined) updatePayload.display_name = dto.displayName;
+    if (dto.lastName !== undefined) updatePayload.last_name = dto.lastName;
     if (dto.bio !== undefined) updatePayload.bio = dto.bio;
     if (dto.username !== undefined) updatePayload.username = dto.username;
     if (dto.weightUnit !== undefined) updatePayload.weight_unit = dto.weightUnit;
