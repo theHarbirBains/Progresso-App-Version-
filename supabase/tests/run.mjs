@@ -5643,6 +5643,31 @@ async function main() {
       JSON.stringify({ firstSeen, farSeen }),
     );
 
+    // Nutrition achievements come only with Nutrition in the membership.
+    const lean = randomUUID();
+    await admin.query("insert into auth.users (id, email) values ($1, 'lv-lean@test.local')", [
+      lean,
+    ]);
+    await admin.query("update public.users set membership_tier = 'workouts' where id = $1", [lean]);
+    await admin.query(
+      `insert into public.food_logs (user_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, logged_at)
+       values ($1, 'Lean Oats', 100, 'g', 1, 300, 10, 50, 5, now())`,
+      [lean],
+    );
+    const leanWithout = ids(await award(lean));
+    await admin.query(
+      "update public.users set membership_tier = 'workouts_nutrition' where id = $1",
+      [lean],
+    );
+    const leanWith = ids(await award(lean));
+    record(
+      'Without Nutrition in the membership, nutrition achievements are never awarded -- with it, they are',
+      !leanWithout.includes('first-bite@1') &&
+        Number((await progressOf(lean, 'first-bite')).value) === 1 &&
+        leanWith.includes('first-bite@1'),
+      JSON.stringify({ leanWithout, leanWith }),
+    );
+
     // An account's awards and progress go with it.
     await admin.query('delete from auth.users where id = $1', [zoned]);
     record(

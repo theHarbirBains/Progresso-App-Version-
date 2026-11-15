@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, spacing, typeScale, widgetGap } from '../design/theme';
+import { colors, minTouchTarget, spacing, typeScale, widgetGap } from '../design/theme';
 
 // AchievementsScreen. Token-only: the rank hero (emblem, rank, AP, the bar to the next
 // division), the filter, then the earned and not-started cards -- each a list of divided rows:
@@ -35,6 +35,34 @@ export const achievementsStyles = StyleSheet.create({
     ...typeScale.secondary,
     color: colors.textSecondary,
     marginTop: spacing.md,
+  },
+
+  // Without Nutrition in the membership: why nutrition achievements aren't here.
+  note: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  noteText: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  noteTitle: {
+    ...typeScale.callout,
+    color: colors.textPrimary,
+  },
+  noteBody: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+  },
+  noteLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: minTouchTarget,
+  },
+  noteLinkLabel: {
+    ...typeScale.label,
   },
 
   section: {

@@ -204,6 +204,32 @@ export function AchievementsScreen({ navigation }: Props) {
             </Text>
           </AppCard>
 
+          {nutrition ? null : (
+            <AppCard testID="achievements-nutrition-note">
+              <View style={styles.note}>
+                <Feather name="info" size={18} color={colors.textSecondaryBright} />
+                <View style={styles.noteText}>
+                  <Text style={styles.noteTitle}>Nutrition achievements aren&apos;t included</Text>
+                  <Text style={styles.noteBody}>
+                    They come with Workouts + Nutrition and Everything. With your membership they
+                    can&apos;t be earned, so they don&apos;t add points to your rank.
+                  </Text>
+                  <TouchableOpacity
+                    testID="achievements-nutrition-note-membership"
+                    style={styles.noteLink}
+                    onPress={() => navigation.navigate('SettingsMembership')}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.noteLinkLabel, { color: theme.accent }]}>
+                      Change Membership
+                    </Text>
+                    <Feather name="arrow-right" size={14} color={theme.accent} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </AppCard>
+          )}
+
           <FilterChips
             testID="achievements-filter"
             options={filters}

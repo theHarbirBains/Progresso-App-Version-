@@ -15,9 +15,10 @@ export const personProfileStyles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.lg,
   },
+  // The photo, and beside it who they are -- centred in the room it leaves, both ways.
   identity: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.lg,
   },
   // The photo in a ring of the accent, a hairline of the background between them.
@@ -52,35 +53,36 @@ export const personProfileStyles = StyleSheet.create({
   },
   identityText: {
     flex: 1,
-    gap: 2,
-    paddingTop: spacing.xs,
+    alignItems: 'center',
+    gap: spacing.xs,
   },
+  // As big as the room allows: `display`, shrinking to fit one line.
   name: {
-    ...typeScale.screenTitle,
+    ...typeScale.display,
     color: colors.textPrimary,
+    textAlign: 'center',
   },
   username: {
-    ...typeScale.callout,
+    ...typeScale.body,
     color: colors.textSecondaryBright,
+    textAlign: 'center',
   },
   bio: {
     ...typeScale.body,
     color: colors.textPrimary,
+    textAlign: 'center',
     marginTop: spacing.xs,
-  },
-  followsYou: {
-    ...typeScale.caption,
-    color: colors.textSecondaryBright,
-    marginTop: 2,
   },
   counts: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  // Each count takes an equal share of the row, centred in it.
   count: {
+    flex: 1,
     minHeight: minTouchTarget,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingRight: spacing.lg,
   },
   countValue: {
     ...typeScale.statSmall,
@@ -94,13 +96,13 @@ export const personProfileStyles = StyleSheet.create({
     width: StyleSheet.hairlineWidth,
     alignSelf: 'stretch',
     marginVertical: spacing.sm,
-    marginRight: spacing.lg,
     backgroundColor: colors.glassBorderStrong,
   },
   mutuals: {
-    flex: 1,
+    flex: 1.6,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
     minHeight: minTouchTarget,
   },

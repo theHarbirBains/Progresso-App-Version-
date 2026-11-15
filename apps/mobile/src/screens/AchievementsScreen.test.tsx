@@ -242,6 +242,19 @@ describe('AchievementsScreen', () => {
     expect(screen.getByTestId('achievements-ahead')).toHaveTextContent(/Only you see these/);
   });
 
+  it('says why there are no nutrition ones without Nutrition -- and only then', () => {
+    const full = renderScreen();
+    expect(screen.queryByTestId('achievements-nutrition-note')).toBeNull();
+    full.unmount();
+
+    renderScreen('workouts');
+    expect(screen.getByTestId('achievements-nutrition-note')).toHaveTextContent(
+      /Nutrition achievements aren't included.*Workouts \+ Nutrition and Everything.*can't be earned.*don't add points to your rank/,
+    );
+    fireEvent.press(screen.getByTestId('achievements-nutrition-note-membership'));
+    expect(mockNavigate).toHaveBeenCalledWith('SettingsMembership');
+  });
+
   it('has no nutrition ones without Nutrition', () => {
     renderScreen('workouts');
 

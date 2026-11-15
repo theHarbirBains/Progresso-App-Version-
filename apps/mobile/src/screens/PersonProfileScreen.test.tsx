@@ -185,7 +185,9 @@ describe('PersonProfileScreen', () => {
     );
     // Their fitness goals aren't for their profile.
     expect(screen.queryByTestId('person-profile-goals')).toBeNull();
-    expect(screen.getByTestId('person-profile-follows-you')).toBeTruthy();
+    // No "Follows you" line: the counts and the Following button say it.
+    expect(screen.queryByTestId('person-profile-follows-you')).toBeNull();
+    expect(screen.queryByText('Follows you')).toBeNull();
     expect(screen.getByTestId('person-profile-count-followers')).toHaveTextContent(/12.*Followers/);
     expect(screen.getByTestId('person-profile-count-following')).toHaveTextContent(/3.*Following/);
     expect(screen.getByTestId('person-profile-mutuals')).toHaveTextContent(/4 mutual friends/);

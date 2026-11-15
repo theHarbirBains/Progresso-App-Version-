@@ -709,20 +709,21 @@ export function PersonProfilePage({
                 <Text
                   testID="person-profile-name"
                   style={styles.name}
-                  numberOfLines={2}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
                   accessibilityRole="header"
                 >
                   {label.title}
                 </Text>
-                {label.subtitle ? <Text style={styles.username}>{label.subtitle}</Text> : null}
+                {label.subtitle ? (
+                  <Text style={styles.username} numberOfLines={1}>
+                    {label.subtitle}
+                  </Text>
+                ) : null}
                 {profile.bio ? (
                   <Text testID="person-profile-bio" style={styles.bio}>
                     {profile.bio}
-                  </Text>
-                ) : null}
-                {profile.followsYou ? (
-                  <Text testID="person-profile-follows-you" style={styles.followsYou}>
-                    Follows you
                   </Text>
                 ) : null}
               </View>
