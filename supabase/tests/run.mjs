@@ -4982,6 +4982,283 @@ async function main() {
     record("Likes and comments on a deleted account's workouts go with them", onDeleted === 0);
   }
 
+  // ---- ranked achievements' figures, and a person's records on every exercise ----
+  {
+    const athlete = randomUUID();
+    const pal = randomUUID();
+    const trainer = randomUUID();
+    await admin.query(
+      `insert into auth.users (id, email) values
+         ($1, 'athlete-ranks@test.local'), ($2, 'pal-ranks@test.local'),
+         ($3, 'trainer-ranks@test.local')`,
+      [athlete, pal, trainer],
+    );
+    await admin.query(
+      "insert into public.trainer_clients (trainer_id, client_id, status) values ($1, $2, 'active')",
+      [trainer, athlete],
+    );
+    const exercise = async (name, type) =>
+      (
+        await admin.query(
+          'insert into public.exercises (name, muscle_group, created_by, measurement_type) values ($1, $2, $3, $4) returning id',
+          [name, 'chest', athlete, type],
+        )
+      ).rows[0].id;
+    const press = await exercise('Rank Press', 'weight_reps');
+    const pushUp = await exercise('Rank Push-Up', 'bodyweight');
+    const plank = await exercise('Rank Plank', 'timed');
+
+    // A workout `minutes` long, `day` days before Nov 11, with sets of { weight, reps, seconds } on one
+    // exercise; options for who logged it, whether it's deleted, and a group.
+    const session = async (
+      exerciseId,
+      sets,
+      { day = 0, minutes = 60, loggedBy = null, deleted = false, groupId = null } = {},
+    ) => {
+      // Wednesday Nov 11, 2026 and the days before it: Mon-Wed are one week, Sunday the last.
+      const performed = new Date(Date.parse('2026-11-11T10:00:00Z') - day * 86400000);
+      const completed = new Date(performed.getTime() + minutes * 60000);
+      const w = (
+        await admin.query(
+          `insert into public.workouts (user_id, name, performed_at, completed_at, logged_by, deleted_at, group_id)
+           values ($1, 'Rank Check', $2, $3, $4, $5, $6) returning id`,
+          [
+            athlete,
+            performed.toISOString(),
+            completed.toISOString(),
+            loggedBy,
+            deleted ? new Date().toISOString() : null,
+            groupId,
+          ],
+        )
+      ).rows[0].id;
+      const we = (
+        await admin.query(
+          'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+          [w, exerciseId],
+        )
+      ).rows[0].id;
+      let index = 0;
+      for (const set of sets) {
+        index += 1;
+        await admin.query(
+          'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, duration_seconds, completed_at) values ($1, $2, $3, $4, $5, now())',
+          [we, index, set.weight ?? null, set.reps ?? null, set.seconds ?? null],
+        );
+      }
+      return w;
+    };
+
+    const group = randomUUID();
+    await admin.query(
+      "insert into public.workout_groups (id, host_id, name, status, finished_at) values ($1, $2, 'Rank group', 'finished', now())",
+      [group, athlete],
+    );
+    await admin.query(
+      `insert into public.workout_group_members (group_id, user_id, role, status, is_guest, added_by)
+       values ($1, $2, 'host', 'joined', false, $2)`,
+      [group, athlete],
+    );
+
+    const heavy = await session(press, [
+      { weight: 100, reps: 5 },
+      { weight: 110, reps: 1 },
+    ]);
+    await session(press, [{ weight: 90, reps: 8 }], { day: 1, minutes: 45, groupId: group });
+    // Left open overnight: counts six hours at most.
+    await session(pushUp, [{ reps: 20 }, { reps: 25 }], { day: 2, minutes: 600 });
+    await session(plank, [{ seconds: 90 }], { day: 3, minutes: 10 });
+    // A trainer's logging only counts on their own; a deleted workout never.
+    await session(press, [{ weight: 140, reps: 2 }], { day: 4, loggedBy: trainer });
+    await session(press, [{ weight: 200, reps: 1 }], { day: 5, deleted: true });
+
+    // Likes: one from a friend on a workout that counts, one they gave a friend.
+    const palWorkout = (
+      await admin.query(
+        "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'Pal day', now(), now()) returning id",
+        [pal],
+      )
+    ).rows[0].id;
+    await admin.query(
+      'insert into public.workout_likes (workout_id, user_id) values ($1, $2), ($3, $4)',
+      [heavy, pal, palWorkout, athlete],
+    );
+
+    const totals = async (own) =>
+      (await admin.query('select * from public.person_profile_totals($1, $2)', [athlete, own]))
+        .rows[0];
+    const seen = await totals(false);
+    const own = await totals(true);
+    record(
+      "A profile's achievement figures count every finished set from the workouts that count",
+      seen.total_sets === 6 &&
+        own.total_sets === 7 &&
+        seen.total_reps === 5 + 1 + 8 + 20 + 25 &&
+        own.total_reps === 5 + 1 + 8 + 20 + 25 + 2 &&
+        seen.bodyweight_reps === 45 &&
+        seen.timed_seconds === 90 &&
+        seen.exercise_count === 3,
+      JSON.stringify({ seen, own }),
+    );
+    record(
+      'Time trained is each workout start to finish, six hours at most',
+      seen.training_minutes === 60 + 45 + 360 + 10 &&
+        own.training_minutes === 60 + 45 + 360 + 10 + 60,
+      JSON.stringify(seen),
+    );
+    record(
+      "A profile's biggest session and true 1RMs come from the workouts that count",
+      // The group workout's 90 x 8 outweighs the heavier day's 100 x 5 and 110 x 1.
+      Number(seen.best_session_volume_kg) === 90 * 8 &&
+        Number(own.best_session_volume_kg) === 90 * 8 &&
+        seen.one_rep_max_count === 1,
+      JSON.stringify(seen),
+    );
+    record(
+      'Group workouts, busy months and weeks, and likes received and given are counted',
+      seen.group_workouts === 1 &&
+        seen.committed_months === 0 &&
+        seen.best_month_workouts === 4 &&
+        seen.strong_weeks === 1 &&
+        seen.likes_received === 1 &&
+        seen.likes_given === 1,
+      JSON.stringify(seen),
+    );
+
+    const bests = (
+      await admin.query('select * from public.person_exercise_bests($1, false)', [athlete])
+    ).rows;
+    const bestOf = (id) => bests.find((row) => row.exercise_id === id);
+    record(
+      "Every exercise's best set: heaviest for weights, most reps for bodyweight, longest for timed",
+      bests.length === 3 &&
+        bests[0].exercise_id === press &&
+        bestOf(press).workouts === 2 &&
+        Number(bestOf(press).weight_kg) === 110 &&
+        bestOf(press).reps === 1 &&
+        bestOf(pushUp).weight_kg === null &&
+        bestOf(pushUp).reps === 25 &&
+        bestOf(plank).duration_seconds === 90 &&
+        bestOf(plank).reps === null,
+      JSON.stringify(bests),
+    );
+    const ownBests = (
+      await admin.query('select * from public.person_exercise_bests($1, true)', [athlete])
+    ).rows;
+    record(
+      "A trainer's logging counts towards a person's own bests only",
+      Number(ownBests.find((row) => row.exercise_id === press).weight_kg) === 140,
+      JSON.stringify(ownBests),
+    );
+
+    const history = (
+      await admin.query('select * from public.person_exercise_history($1, $2, false, 10)', [
+        athlete,
+        press,
+      ])
+    ).rows;
+    record(
+      "An exercise's top set from each workout that counts, newest first",
+      history.length === 2 &&
+        history[0].workout_id === heavy &&
+        Number(history[0].weight_kg) === 110 &&
+        history[0].reps === 1 &&
+        Number(history[1].weight_kg) === 90,
+      JSON.stringify(history),
+    );
+    record(
+      "An exercise's top sets stop at the number asked for",
+      (
+        await admin.query('select * from public.person_exercise_history($1, $2, true, 1)', [
+          athlete,
+          press,
+        ])
+      ).rows.length === 1,
+    );
+
+    const recordsOf = async (exerciseId, ownView) =>
+      (
+        await admin.query('select * from public.person_exercise_records($1, $2, $3)', [
+          athlete,
+          exerciseId,
+          ownView,
+        ])
+      ).rows;
+    const records = await recordsOf(press, false);
+    const ownRecords = await recordsOf(press, true);
+    record(
+      'The records held on an exercise come from the workouts that count',
+      records.some((row) => row.kind === 'max' && Number(row.weight_kg) === 110) &&
+        records.some(
+          (row) => row.kind === 'rep' && row.reps === 5 && Number(row.weight_kg) === 100,
+        ) &&
+        !records.some((row) => row.kind === 'rep' && row.reps === 2) &&
+        ownRecords.some(
+          (row) => row.kind === 'rep' && row.reps === 2 && Number(row.weight_kg) === 140,
+        ),
+      JSON.stringify({ records, ownRecords }),
+    );
+    const bodyRecords = await recordsOf(pushUp, false);
+    record(
+      "A bodyweight exercise's record is its most reps",
+      bodyRecords.length === 1 && bodyRecords[0].kind === 'most_reps' && bodyRecords[0].reps === 25,
+      JSON.stringify(bodyRecords),
+    );
+    for (const [name, call] of [
+      ['bests', 'select * from public.person_exercise_bests($1, false)'],
+      ['top sets', `select * from public.person_exercise_history($1, '${press}', false, 10)`],
+      ['records', `select * from public.person_exercise_records($1, '${press}', false)`],
+    ]) {
+      await expectThrows(
+        asUser(pal, (c) => c.query(call, [athlete])),
+        `A person cannot read someone's exercise ${name} directly -- only through the API`,
+        /permission denied/i,
+      );
+    }
+
+    // Nutrition figures: only ever your own, counted by the day where you live.
+    // Tokyo keeps no daylight time: one UTC day there is two.
+    const late = '2026-11-10T14:30:00Z'; // Nov 10, 11:30pm in Tokyo
+    const early = '2026-11-10T15:30:00Z'; // Nov 11, 12:30am in Tokyo
+    for (const [user, at, protein] of [
+      [athlete, late, 30],
+      [athlete, early, 40],
+      [pal, early, 99],
+    ]) {
+      await admin.query(
+        `insert into public.food_logs (user_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, logged_at)
+         values ($1, 'Rank Food', 100, 'g', 1, 500, $2, 10, 5, $3)`,
+        [user, protein, at],
+      );
+    }
+    await admin.query(
+      "insert into public.foods (created_by, name, calories, protein_g, carbs_g, fat_g, recipe_servings) values ($1, 'Rank Chili', 300, 20, 20, 10, 4)",
+      [athlete],
+    );
+    await admin.query(
+      "insert into public.saved_meals (user_id, name) values ($1, 'Rank Breakfast')",
+      [athlete],
+    );
+    const mine = (zone) =>
+      asUser(
+        athlete,
+        async (c) => (await c.query('select * from public.my_nutrition_totals($1)', [zone])).rows[0],
+      );
+    const tokyo = await mine('Asia/Tokyo');
+    const unknown = await mine('Not/AZone');
+    record(
+      "A person's nutrition figures are their own, with days counted where they live",
+      tokyo.days_logged === 2 &&
+        unknown.days_logged === 1 &&
+        tokyo.foods_logged === 2 &&
+        Number(tokyo.protein_g) === 70 &&
+        Number(tokyo.calories) === 1000 &&
+        tokyo.recipes === 1 &&
+        tokyo.saved_meals === 1,
+      JSON.stringify({ tokyo, unknown }),
+    );
+  }
+
   await admin.end();
 }
 

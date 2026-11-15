@@ -78,7 +78,7 @@ function queueRelationship(
 
 describe('PeopleService', () => {
   describe('getProfile', () => {
-    it('shows someone you follow in full: counts, workout stats and heaviest lifts', async () => {
+    it('shows someone you follow in full: counts, workout figures and every exercise', async () => {
       const client = createMockClient();
       queueRelationship(client, [
         { id: 'f1', follower_id: ME, followee_id: SAM, status: 'accepted' },
@@ -108,11 +108,51 @@ describe('PeopleService', () => {
       client.queue('workouts', { data: null, error: null, count: 40 });
       client.queue('workouts', { data: null, error: null, count: 9 });
       client.queue('rpc:person_profile_totals', {
-        data: [{ total_volume_kg: '19400.50', pr_count: 24, best_month_workouts: 14 }],
+        data: [
+          {
+            total_volume_kg: '19400.50',
+            pr_count: 24,
+            best_month_workouts: 14,
+            total_sets: 900,
+            total_reps: 7200,
+            training_minutes: 2400,
+            one_rep_max_count: 3,
+            exercise_count: 18,
+            best_session_volume_kg: '9100.00',
+            bodyweight_reps: 640,
+            timed_seconds: 1800,
+            group_workouts: 4,
+            committed_months: 2,
+            strong_weeks: 11,
+            likes_received: 31,
+            likes_given: 27,
+          },
+        ],
         error: null,
       });
-      client.queue('rpc:person_best_lifts', {
-        data: [{ exercise_id: 'ex-row', weight_kg: '100.00', reps: 5, performed_at: '2026-11-01' }],
+      client.queue('rpc:person_exercise_bests', {
+        data: [
+          {
+            exercise_id: 'ex-row',
+            measurement_type: 'weight_reps',
+            weight_kg: '100.00',
+            reps: 5,
+            duration_seconds: null,
+            performed_at: '2026-11-01',
+            workouts: 12,
+            last_performed_at: '2026-11-10',
+          },
+          {
+            exercise_id: 'ex-plank',
+            measurement_type: 'timed',
+            weight_kg: null,
+            reps: null,
+            duration_seconds: 95,
+            performed_at: '2026-11-02',
+            workouts: 3,
+            last_performed_at: '2026-11-02',
+          },
+        ],
         error: null,
       });
       client.queue('exercises', {
@@ -124,6 +164,7 @@ describe('PeopleService', () => {
             gym: 'Downtown',
             attachment: 'V-handle',
           },
+          { id: 'ex-plank', name: 'Plank', photo_url: null, gym: null, attachment: null },
         ],
         error: null,
       });
@@ -152,7 +193,21 @@ describe('PeopleService', () => {
           totalVolumeKg: 19400.5,
           prCount: 24,
           bestMonthWorkouts: 14,
+          totalSets: 900,
+          totalReps: 7200,
+          trainingMinutes: 2400,
+          oneRepMaxCount: 3,
+          exerciseCount: 18,
+          bestSessionVolumeKg: 9100,
+          bodyweightReps: 640,
+          timedSeconds: 1800,
+          groupWorkouts: 4,
+          committedMonths: 2,
+          strongWeeks: 11,
+          likesReceived: 31,
+          likesGiven: 27,
         },
+        // App versions before every exercise: the heaviest weighted lifts alone.
         bestLifts: [
           {
             exerciseId: 'ex-row',
@@ -165,6 +220,36 @@ describe('PeopleService', () => {
             performedAt: '2026-11-01',
           },
         ],
+        exercises: [
+          {
+            exerciseId: 'ex-row',
+            exerciseName: 'Seated Row',
+            photoUrl: 'https://example.com/row.jpg',
+            gym: 'Downtown',
+            attachment: 'V-handle',
+            measurementType: 'weight_reps',
+            weightKg: 100,
+            reps: 5,
+            durationSeconds: null,
+            performedAt: '2026-11-01',
+            workouts: 12,
+            lastPerformedAt: '2026-11-10',
+          },
+          {
+            exerciseId: 'ex-plank',
+            exerciseName: 'Plank',
+            photoUrl: null,
+            gym: null,
+            attachment: null,
+            measurementType: 'timed',
+            weightKg: null,
+            reps: null,
+            durationSeconds: 95,
+            performedAt: '2026-11-02',
+            workouts: 3,
+            lastPerformedAt: '2026-11-02',
+          },
+        ],
       });
       // Followers see what their followers can: no trainer-logged workouts in the counts.
       expect(client.calls).toContainEqual({
@@ -173,6 +258,10 @@ describe('PeopleService', () => {
         args: ['logged_by', null],
       });
       expect(client.rpc).toHaveBeenCalledWith('person_profile_totals', {
+        p_owner: SAM,
+        p_include_trainer_logged: false,
+      });
+      expect(client.rpc).toHaveBeenCalledWith('person_exercise_bests', {
         p_owner: SAM,
         p_include_trainer_logged: false,
       });
@@ -200,6 +289,7 @@ describe('PeopleService', () => {
         canSeeActivity: false,
         stats: null,
         bestLifts: null,
+        exercises: null,
       });
       expect(client.rpc).not.toHaveBeenCalled();
       expect(client.from).not.toHaveBeenCalledWith('workouts');
@@ -214,7 +304,7 @@ describe('PeopleService', () => {
       client.queue('workouts', { data: null, error: null, count: 3 });
       client.queue('workouts', { data: null, error: null, count: 1 });
       client.queue('rpc:person_profile_totals', { data: [], error: null });
-      client.queue('rpc:person_best_lifts', { data: [], error: null });
+      client.queue('rpc:person_exercise_bests', { data: [], error: null });
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, ME);
@@ -222,7 +312,8 @@ describe('PeopleService', () => {
       expect(profile).toMatchObject({
         isSelf: true,
         mutuals: { count: 0, people: [] },
-        stats: { workouts: 3, totalVolumeKg: 0, prCount: 0, bestMonthWorkouts: 0 },
+        stats: { workouts: 3, totalVolumeKg: 0, prCount: 0, bestMonthWorkouts: 0, totalSets: 0 },
+        exercises: [],
       });
       expect(client.rpc).toHaveBeenCalledWith('person_profile_totals', {
         p_owner: ME,
@@ -236,6 +327,170 @@ describe('PeopleService', () => {
       const service = serviceWith(client);
 
       await expect(service.getProfile(ME, SAM)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('getExercise', () => {
+    const EX = '44444444-4444-4444-4444-444444444444';
+    const following = [{ id: 'f1', follower_id: ME, followee_id: SAM, status: 'accepted' }];
+
+    it("shows a friend's top set from each workout and every record they hold on it", async () => {
+      const client = createMockClient();
+      queueRelationship(client, following);
+      client.queue('rpc:person_exercise_history', {
+        data: [
+          {
+            workout_id: 'w2',
+            performed_at: '2026-11-10',
+            measurement_type: 'weight_reps',
+            weight_kg: '110.00',
+            reps: 3,
+            duration_seconds: null,
+          },
+          {
+            workout_id: 'w1',
+            performed_at: '2026-11-03',
+            measurement_type: 'weight_reps',
+            weight_kg: '100.00',
+            reps: 5,
+            duration_seconds: null,
+          },
+        ],
+        error: null,
+      });
+      client.queue('rpc:person_exercise_records', {
+        data: [
+          { kind: 'max', reps: 1, weight_kg: '120.00', duration_seconds: null, achieved_at: 'a1' },
+          { kind: 'rep', reps: 5, weight_kg: '100.00', duration_seconds: null, achieved_at: 'a5' },
+          { kind: 'rep', reps: 3, weight_kg: '110.00', duration_seconds: null, achieved_at: 'a3' },
+        ],
+        error: null,
+      });
+      client.queue('exercises', {
+        data: [{ id: EX, name: 'Bench Press', photo_url: null, gym: 'Downtown', attachment: null }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const exercise = await service.getExercise(ME, SAM, EX);
+
+      expect(exercise).toEqual({
+        exercise: {
+          exerciseId: EX,
+          exerciseName: 'Bench Press',
+          photoUrl: null,
+          gym: 'Downtown',
+          attachment: null,
+          measurementType: 'weight_reps',
+        },
+        topSets: [
+          {
+            workoutId: 'w2',
+            performedAt: '2026-11-10',
+            weightKg: 110,
+            reps: 3,
+            durationSeconds: null,
+          },
+          {
+            workoutId: 'w1',
+            performedAt: '2026-11-03',
+            weightKg: 100,
+            reps: 5,
+            durationSeconds: null,
+          },
+        ],
+        repPRs: [
+          { reps: 3, weightKg: 110, achievedAt: 'a3' },
+          { reps: 5, weightKg: 100, achievedAt: 'a5' },
+        ],
+        oneRepMax: { weightKg: 120, achievedAt: 'a1' },
+        mostReps: null,
+        longest: null,
+      });
+      // Only the workouts their followers can see.
+      expect(client.rpc).toHaveBeenCalledWith('person_exercise_history', {
+        p_owner: SAM,
+        p_exercise: EX,
+        p_include_trainer_logged: false,
+        p_limit: 100,
+      });
+    });
+
+    it("counts a trainer's logging on your own, with a bodyweight exercise's most reps", async () => {
+      const client = createMockClient();
+      client.queue('rpc:person_exercise_history', {
+        data: [
+          {
+            workout_id: 'w1',
+            performed_at: '2026-11-10',
+            measurement_type: 'bodyweight',
+            weight_kg: null,
+            reps: 25,
+            duration_seconds: null,
+          },
+        ],
+        error: null,
+      });
+      client.queue('rpc:person_exercise_records', {
+        data: [
+          {
+            kind: 'most_reps',
+            reps: 25,
+            weight_kg: null,
+            duration_seconds: null,
+            achieved_at: 'b',
+          },
+        ],
+        error: null,
+      });
+      client.queue('exercises', {
+        data: [{ id: EX, name: 'Push-Up', photo_url: null, gym: null, attachment: null }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const exercise = await service.getExercise(ME, ME, EX);
+
+      expect(exercise).toMatchObject({
+        exercise: { measurementType: 'bodyweight' },
+        repPRs: [],
+        oneRepMax: null,
+        mostReps: { reps: 25, achievedAt: 'b' },
+      });
+      expect(client.rpc).toHaveBeenCalledWith(
+        'person_exercise_records',
+        expect.objectContaining({ p_include_trainer_logged: true }),
+      );
+    });
+
+    it("refuses someone you don't follow", async () => {
+      const client = createMockClient();
+      queueRelationship(client, [
+        { id: 'f1', follower_id: ME, followee_id: SAM, status: 'pending' },
+      ]);
+      const service = serviceWith(client);
+
+      await expect(service.getExercise(ME, SAM, EX)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(client.rpc).not.toHaveBeenCalled();
+    });
+
+    it("is not found for an exercise they haven't done", async () => {
+      const client = createMockClient();
+      queueRelationship(client, following);
+      client.queue('rpc:person_exercise_history', { data: [], error: null });
+      client.queue('rpc:person_exercise_records', { data: [], error: null });
+      const service = serviceWith(client);
+
+      await expect(service.getExercise(ME, SAM, EX)).rejects.toBeInstanceOf(NotFoundException);
+      expect(client.from).not.toHaveBeenCalledWith('exercises');
+    });
+
+    it('is not found for someone blocked either way', async () => {
+      const client = createMockClient();
+      queueRelationship(client, [], [{ blocker_id: SAM, blocked_id: ME }]);
+      const service = serviceWith(client);
+
+      await expect(service.getExercise(ME, SAM, EX)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

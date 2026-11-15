@@ -58,6 +58,16 @@ export class PeopleController {
   }
 
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
+  @Get(':personId/exercises/:exerciseId')
+  async exercise(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('personId', ParseUUIDPipe) personId: string,
+    @Param('exerciseId', ParseUUIDPipe) exerciseId: string,
+  ) {
+    return this.peopleService.getExercise(user.id, personId, exerciseId);
+  }
+
+  @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Get(':personId/followers')
   async followers(
     @CurrentUser() user: AuthenticatedUser,

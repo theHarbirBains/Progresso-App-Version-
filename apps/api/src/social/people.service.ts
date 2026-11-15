@@ -15,8 +15,10 @@ import { isBlockedEitherWay, loadBlocks } from '../safety/blocks';
 import { SupabaseService } from '../supabase/supabase.service';
 import { canSeeActivity, relationshipWith } from './relationship';
 
-/** How many heaviest lifts a profile shows. */
+/** How many heaviest lifts a profile's `bestLifts` holds (app versions before every exercise). */
 const BEST_LIFTS = 5;
+/** How many of an exercise's top sets its page lists, newest first. */
+const TOP_SETS = 100;
 const LAST_DAYS = 30;
 /** How many mutual friends a profile lists (the count is all of them). */
 const MUTUALS = 50;
@@ -31,6 +33,76 @@ export interface ProfileStats {
   prCount: number;
   /** The most workouts finished in one calendar month. */
   bestMonthWorkouts: number;
+  // What their achievements are ranked on (apps/mobile/src/social/achievements.ts).
+  /** Finished sets, of every kind. */
+  totalSets: number;
+  /** Reps on weighted and bodyweight sets. */
+  totalReps: number;
+  /** Time trained, start to finish -- at most six hours a workout. */
+  trainingMinutes: number;
+  /** True 1RMs held now. */
+  oneRepMaxCount: number;
+  /** Different exercises done. */
+  exerciseCount: number;
+  /** The most lifted in one workout. */
+  bestSessionVolumeKg: number;
+  bodyweightReps: number;
+  timedSeconds: number;
+  groupWorkouts: number;
+  /** Calendar months with 12 or more workouts. */
+  committedMonths: number;
+  /** Weeks with 3 or more workouts. */
+  strongWeeks: number;
+  /** Likes from others on their workouts, and likes they've given others'. */
+  likesReceived: number;
+  likesGiven: number;
+}
+
+export type MeasurementType = 'weight_reps' | 'bodyweight' | 'timed';
+
+/** An exercise as a profile shows it: what it is, which machine, and what its sets record. */
+export interface ExerciseSummary {
+  exerciseId: string;
+  exerciseName: string;
+  photoUrl: string | null;
+  gym: string | null;
+  attachment: string | null;
+  measurementType: MeasurementType;
+}
+
+/**
+ * An exercise they've done, with its best set: the heaviest (weightKg x reps) for weights, the
+ * most reps for bodyweight, the longest (durationSeconds) for timed.
+ */
+export interface ExerciseBest extends ExerciseSummary {
+  weightKg: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
+  performedAt: string;
+  /** How many workouts it's in. */
+  workouts: number;
+  lastPerformedAt: string;
+}
+
+/** A workout's top set on one exercise. */
+export interface TopSet {
+  workoutId: string;
+  performedAt: string;
+  weightKg: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
+}
+
+/** One exercise of theirs: each workout's top set, newest first, and the records they hold. */
+export interface PersonExercise {
+  exercise: ExerciseSummary;
+  topSets: TopSet[];
+  /** The heaviest at each rep count from 2 up, fewest reps first. */
+  repPRs: { reps: number; weightKg: number; achievedAt: string }[];
+  /** True 1RM: only ever a logged single. */
+  oneRepMax: { weightKg: number; achievedAt: string } | null;
+  mostReps: { reps: number; achievedAt: string } | null;
+  longest: { durationSeconds: number; achievedAt: string } | null;
 }
 
 export interface BestLift {
@@ -63,14 +135,17 @@ export interface PersonProfile {
   canSeeActivity: boolean;
   /** Their workout figures. Null when the viewer can't see them. */
   stats: ProfileStats | null;
-  /** Each weighted exercise's heaviest set, heaviest first. Null when the viewer can't see it. */
+  /** The heaviest few weighted lifts, heaviest first -- for app versions before `exercises`. */
   bestLifts: BestLift[] | null;
+  /** Every exercise they've done, with its best set, the most-done first. Null when hidden. */
+  exercises: ExerciseBest[] | null;
 }
 
 /**
  * Other people's profiles: who they are, who follows them, and -- for someone the viewer follows
- * (accepted), or the viewer themselves -- their workouts, stats and heaviest lifts, from the
- * workouts their followers can see (finished, not deleted, not logged by a trainer). Finding
+ * (accepted), or the viewer themselves -- their workouts, stats, and every exercise's best set,
+ * top sets and records, from the workouts their followers can see (finished, not deleted, not
+ * logged by a trainer -- their own count those too). Finding
  * friends from contacts lives here too. Everyone blocked either way is left out, and a person
  * who blocked the viewer can't be opened at all.
  */
@@ -112,10 +187,10 @@ export class PeopleService {
     const aboutRow = about.data as { bio: string | null } | null;
 
     const visible = canSeeActivity(relationship);
-    const [stats, bestLifts] = visible
+    const [stats, exercises] = visible
       ? await Promise.all([
           this.workoutStats(personId, relationship.isSelf),
-          this.bestLifts(personId),
+          this.exerciseBests(personId, relationship.isSelf),
         ])
       : [null, null];
 
@@ -128,7 +203,8 @@ export class PeopleService {
       mutuals,
       canSeeActivity: visible,
       stats,
-      bestLifts,
+      bestLifts: exercises ? heaviestLifts(exercises) : null,
+      exercises,
     };
   }
 
@@ -144,6 +220,86 @@ export class PeopleService {
     return this.feedService.getPersonWorkouts(personId, page, {
       includeTrainerLogged: relationship.isSelf,
     });
+  }
+
+  /**
+   * One exercise of theirs, for someone the viewer follows (accepted) or the viewer: its top set
+   * from each workout that counts, newest first, and the records they hold on it.
+   */
+  async getExercise(
+    viewerId: string,
+    personId: string,
+    exerciseId: string,
+  ): Promise<PersonExercise> {
+    const client = this.supabaseService.getClient();
+    const relationship = await relationshipWith(client, viewerId, personId);
+    if (!canSeeActivity(relationship)) {
+      throw new ForbiddenException('Follow them to see their lifts');
+    }
+    const args = {
+      p_owner: personId,
+      p_exercise: exerciseId,
+      p_include_trainer_logged: relationship.isSelf,
+    };
+    const [history, records] = await Promise.all([
+      client.rpc('person_exercise_history', { ...args, p_limit: TOP_SETS }),
+      client.rpc('person_exercise_records', args),
+    ]);
+    if (history.error || records.error) {
+      throw new InternalServerErrorException('Failed to load this exercise');
+    }
+    const sets = (history.data ?? []) as {
+      workout_id: string;
+      performed_at: string;
+      measurement_type: MeasurementType;
+      weight_kg: string | number | null;
+      reps: number | null;
+      duration_seconds: number | null;
+    }[];
+    // Only an exercise they've done, from a workout that counts, is theirs to show.
+    const latest = sets[0];
+    if (!latest) throw new NotFoundException('Exercise not found');
+    const [exercise] = await this.exerciseSummaries([
+      { id: exerciseId, measurementType: latest.measurement_type },
+    ]);
+    const held = (records.data ?? []) as {
+      kind: 'rep' | 'max' | 'most_reps' | 'longest';
+      reps: number | null;
+      weight_kg: string | number | null;
+      duration_seconds: number | null;
+      achieved_at: string;
+    }[];
+    const max = held.find((row) => row.kind === 'max');
+    const most = held.find((row) => row.kind === 'most_reps');
+    const longest = held.find((row) => row.kind === 'longest');
+    return {
+      exercise: exercise!,
+      topSets: sets.map((row) => ({
+        workoutId: row.workout_id,
+        performedAt: row.performed_at,
+        weightKg: numberOrNull(row.weight_kg),
+        reps: row.reps,
+        durationSeconds: row.duration_seconds,
+      })),
+      repPRs: held
+        .filter((row) => row.kind === 'rep' && row.reps !== null && row.weight_kg !== null)
+        .map((row) => ({
+          reps: row.reps!,
+          weightKg: Number(row.weight_kg),
+          achievedAt: row.achieved_at,
+        }))
+        .sort((a, b) => a.reps - b.reps),
+      oneRepMax:
+        max && max.weight_kg !== null
+          ? { weightKg: Number(max.weight_kg), achievedAt: max.achieved_at }
+          : null,
+      mostReps:
+        most && most.reps !== null ? { reps: most.reps, achievedAt: most.achieved_at } : null,
+      longest:
+        longest && longest.duration_seconds !== null
+          ? { durationSeconds: longest.duration_seconds, achievedAt: longest.achieved_at }
+          : null,
+    };
   }
 
   /** Who follows this person, each with the viewer's own follow of them. */
@@ -302,6 +458,19 @@ export class PeopleService {
         total_volume_kg: string | number;
         pr_count: number;
         best_month_workouts: number;
+        total_sets: number;
+        total_reps: number;
+        training_minutes: number;
+        one_rep_max_count: number;
+        exercise_count: number;
+        best_session_volume_kg: string | number;
+        bodyweight_reps: number;
+        timed_seconds: number;
+        group_workouts: number;
+        committed_months: number;
+        strong_weeks: number;
+        likes_received: number;
+        likes_given: number;
       }[]
     )[0];
     return {
@@ -310,34 +479,73 @@ export class PeopleService {
       totalVolumeKg: Number(row?.total_volume_kg ?? 0),
       prCount: row?.pr_count ?? 0,
       bestMonthWorkouts: row?.best_month_workouts ?? 0,
+      totalSets: row?.total_sets ?? 0,
+      totalReps: row?.total_reps ?? 0,
+      trainingMinutes: row?.training_minutes ?? 0,
+      oneRepMaxCount: row?.one_rep_max_count ?? 0,
+      exerciseCount: row?.exercise_count ?? 0,
+      bestSessionVolumeKg: Number(row?.best_session_volume_kg ?? 0),
+      bodyweightReps: row?.bodyweight_reps ?? 0,
+      timedSeconds: row?.timed_seconds ?? 0,
+      groupWorkouts: row?.group_workouts ?? 0,
+      committedMonths: row?.committed_months ?? 0,
+      strongWeeks: row?.strong_weeks ?? 0,
+      likesReceived: row?.likes_received ?? 0,
+      likesGiven: row?.likes_given ?? 0,
     };
   }
 
-  private async bestLifts(personId: string): Promise<BestLift[]> {
-    const client = this.supabaseService.getClient();
-    const { data, error } = await client.rpc('person_best_lifts', {
+  /** Every exercise they've done, with its best set, the most-done first. */
+  private async exerciseBests(
+    personId: string,
+    includeTrainerLogged: boolean,
+  ): Promise<ExerciseBest[]> {
+    const { data, error } = await this.supabaseService.getClient().rpc('person_exercise_bests', {
       p_owner: personId,
-      p_limit: BEST_LIFTS,
+      p_include_trainer_logged: includeTrainerLogged,
     });
     if (error) throw new InternalServerErrorException('Failed to load lifts');
     const rows = (data ?? []) as {
       exercise_id: string;
-      weight_kg: string | number;
-      reps: number;
+      measurement_type: MeasurementType;
+      weight_kg: string | number | null;
+      reps: number | null;
+      duration_seconds: number | null;
       performed_at: string;
+      workouts: number;
+      last_performed_at: string;
     }[];
-    if (rows.length === 0) return [];
-    const { data: exercises, error: exercisesError } = await client
+    const summaries = await this.exerciseSummaries(
+      rows.map((row) => ({ id: row.exercise_id, measurementType: row.measurement_type })),
+    );
+    return rows.map((row, index) => ({
+      ...summaries[index]!,
+      weightKg: numberOrNull(row.weight_kg),
+      reps: row.reps,
+      durationSeconds: row.duration_seconds,
+      performedAt: row.performed_at,
+      workouts: row.workouts,
+      lastPerformedAt: row.last_performed_at,
+    }));
+  }
+
+  /** Each exercise's name, photo, gym and grip, in the order asked for. */
+  private async exerciseSummaries(
+    wanted: { id: string; measurementType: MeasurementType }[],
+  ): Promise<ExerciseSummary[]> {
+    if (wanted.length === 0) return [];
+    const { data, error } = await this.supabaseService
+      .getClient()
       .from('exercises')
       .select('id, name, photo_url, gym, attachment')
       .in(
         'id',
-        rows.map((row) => row.exercise_id),
+        wanted.map((exercise) => exercise.id),
       );
-    if (exercisesError) throw new InternalServerErrorException('Failed to load lifts');
+    if (error) throw new InternalServerErrorException('Failed to load lifts');
     const byId = new Map(
       (
-        (exercises ?? []) as {
+        (data ?? []) as {
           id: string;
           name: string;
           photo_url: string | null;
@@ -346,18 +554,44 @@ export class PeopleService {
         }[]
       ).map((exercise) => [exercise.id, exercise]),
     );
-    return rows.map((row) => {
-      const exercise = byId.get(row.exercise_id);
+    return wanted.map(({ id, measurementType }) => {
+      const exercise = byId.get(id);
       return {
-        exerciseId: row.exercise_id,
+        exerciseId: id,
         exerciseName: exercise?.name ?? 'Exercise',
         photoUrl: exercise?.photo_url ?? null,
         gym: exercise?.gym ?? null,
         attachment: exercise?.attachment ?? null,
-        weightKg: Number(row.weight_kg),
-        reps: row.reps,
-        performedAt: row.performed_at,
+        measurementType,
       };
     });
   }
+}
+
+/** The heaviest few weighted lifts, heaviest (then most reps) first. */
+function heaviestLifts(exercises: ExerciseBest[]): BestLift[] {
+  return exercises
+    .filter(
+      (exercise): exercise is ExerciseBest & { weightKg: number; reps: number } =>
+        exercise.measurementType === 'weight_reps' &&
+        exercise.weightKg !== null &&
+        exercise.reps !== null,
+    )
+    .sort((a, b) => b.weightKg - a.weightKg || b.reps - a.reps)
+    .slice(0, BEST_LIFTS)
+    .map((exercise) => ({
+      exerciseId: exercise.exerciseId,
+      exerciseName: exercise.exerciseName,
+      photoUrl: exercise.photoUrl,
+      gym: exercise.gym,
+      attachment: exercise.attachment,
+      weightKg: exercise.weightKg,
+      reps: exercise.reps,
+      performedAt: exercise.performedAt,
+    }));
+}
+
+/** A numeric column (a string from Postgres) as a number, or null. */
+function numberOrNull(value: string | number | null): number | null {
+  return value === null ? null : Number(value);
 }
