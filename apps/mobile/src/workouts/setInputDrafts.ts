@@ -8,7 +8,7 @@ import type {
   PreviousSessionDisplay,
   UnilateralExerciseCardSet,
 } from './ExerciseCard';
-import type { SetRecord, SetSide } from './workoutQueries';
+import type { SetRecord } from './workoutQueries';
 
 // The set-entry rules every live workout shares: what counts as a valid draft, what a new
 // set starts with, how a unilateral exercise groups its two sides, and how last session is

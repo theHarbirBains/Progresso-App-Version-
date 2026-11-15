@@ -15,9 +15,6 @@ export const findPeopleStyles = StyleSheet.create({
   subTabWrap: {
     marginBottom: spacing.sm,
   },
-  loading: {
-    paddingVertical: spacing.xxl,
-  },
   requestActions: {
     flexDirection: 'row',
     gap: spacing.sm,

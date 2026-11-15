@@ -1,6 +1,5 @@
 import type { MeasurementType, MovementType } from '../exercises/movementTypes';
 import type { TrainingComfort } from '../lib/api';
-import { formatWeightKg } from '../lib/units';
 import { bestLoggedSet, loggedSets } from './setValues';
 import type { SetRecord } from './workoutQueries';
 
@@ -35,8 +34,6 @@ export function defaultRepRange(comfort: TrainingComfort | null): RepRange {
 export function formatRepRange(range: RepRange): string {
   return range.min === range.max ? String(range.min) : `${range.min}–${range.max}`;
 }
-
-const KG_PER_LB = 0.45359237;
 
 /** The range an exercise is judged against: its own when it has one, otherwise the person's. */
 export function effectiveRepRange(personal: RepRange, exerciseRange: RepRange | null): RepRange {

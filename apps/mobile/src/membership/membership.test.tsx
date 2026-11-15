@@ -33,7 +33,7 @@ describe('the memberships', () => {
     ]);
     for (const option of MEMBERSHIP_OPTIONS) {
       expect(option.summary.length).toBeGreaterThan(0);
-      expect(option.includes.length).toBeGreaterThan(0);
+      expect(option.areas.length).toBeGreaterThan(0);
     }
   });
 

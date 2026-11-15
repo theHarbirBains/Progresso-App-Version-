@@ -1054,13 +1054,21 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     });
   });
 
-  it('explains how ranks work, then moves on', async () => {
+  it('says what ranks are, opens the full explanation as a page, then moves on', async () => {
     await startAt('ranks', { ranksSeen: false });
     const ranks = await screen.findByTestId('onboarding-step-ranks');
 
-    expect(ranks).toHaveTextContent(/Earn Achievement Points/);
-    expect(ranks).toHaveTextContent(/Bronze.*Legacy/);
-    expect(ranks).toHaveTextContent(/Never lose it/);
+    // A line on the step; the detail is a page of its own.
+    expect(ranks).toHaveTextContent(/a rank that's yours for life, from Bronze to Legacy/);
+    expect(screen.queryByText('Earn Achievement Points')).toBeNull();
+    fireEvent.press(screen.getByTestId('onboarding-ranks-open'));
+    const page = screen.getByTestId('rank-explainer-page');
+    expect(page).toHaveTextContent(/Earn Achievement Points/);
+    expect(page).toHaveTextContent(/Bronze.*Legacy/);
+    expect(page).toHaveTextContent(/Never lose it/);
+    fireEvent.press(screen.getByTestId('rank-explainer-page-close'));
+    expect(screen.queryByTestId('rank-explainer-page')).toBeNull();
+
     fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     expect(await screen.findByTestId('onboarding-step-email-preference')).toBeTruthy();

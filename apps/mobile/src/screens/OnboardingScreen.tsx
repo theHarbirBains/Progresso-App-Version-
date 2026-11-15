@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthProvider';
 import { IconButton } from '../design/IconButton';
 import { LoadingState } from '../design/LoadingState';
-import { PrimaryButton, TextButton } from '../design/Button';
+import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { CountryStep } from '../onboarding/CountryStep';
 import {
   CreateAccountStep,
@@ -43,7 +43,7 @@ import {
   saveOnboardingDraft,
 } from '../onboarding/onboardingDraftStorage';
 import { MembershipCards } from '../membership/MembershipCards';
-import { RankExplainer } from '../achievements/RankExplainer';
+import { RankExplainerPage } from '../achievements/RankExplainerPage';
 import { askForSteps, stepsAccess } from '../health/steps';
 import { ACTIVITY_LEVELS } from '../nutrition/calorieEstimationInput';
 import { NutritionTargetsStep } from '../onboarding/NutritionTargetsStep';
@@ -108,6 +108,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
   const [stepIndex, setStepIndex] = useState(0);
   const [restoringDraft, setRestoringDraft] = useState(true);
   const [requestingNotifications, setRequestingNotifications] = useState(false);
+  const [ranksOpen, setRanksOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -605,10 +606,20 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
         {step === 'ranks' ? (
           <>
             <Text style={styles.stepTitle}>How ranks work</Text>
-            <Text style={styles.stepExplanation}>
-              Everything you do in Progresso earns points toward a rank that&apos;s yours for life.
-            </Text>
-            <RankExplainer testID="onboarding-step-ranks" />
+            <View testID="onboarding-step-ranks">
+              <Text style={styles.stepExplanation}>
+                Everything you do in Progresso earns points toward a rank that&apos;s yours for
+                life, from Bronze to Legacy.
+              </Text>
+              {/* The full explanation is a page of its own, opened from here. */}
+              <SecondaryButton
+                testID="onboarding-ranks-open"
+                label="See How Ranks Work"
+                icon="info"
+                onPress={() => setRanksOpen(true)}
+              />
+            </View>
+            <RankExplainerPage visible={ranksOpen} onClose={() => setRanksOpen(false)} />
           </>
         ) : null}
 
