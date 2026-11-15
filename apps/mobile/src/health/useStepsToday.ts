@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
+import { recallShown, rememberShown } from '../lib/lastShown';
 import { recordQuietFailure } from '../lib/sentry';
 import { showStepsWidget } from '../widgets/widgetUpdates';
 import { askForSteps, stepsAccess, stepsToday, type StepsAccess } from './steps';
@@ -18,15 +19,29 @@ export interface StepsToday {
   connect: () => Promise<void>;
 }
 
+/** What Feed last showed of today's steps, for `userId` (lib/lastShown.ts). */
+interface ShownSteps {
+  access: StepsAccess;
+  steps: number | null;
+  /** The day it was read (toDateString), so yesterday's count never shows as today's. */
+  day: string;
+}
+const SHOWN_KEY = 'feed.steps';
+
 /**
  * Today's steps for Feed's Steps card. Read from Apple Health on the phone each time Feed is
  * shown (Feed calls `refresh` on every focus, its first included) and when the app comes back to
  * the front -- it's a local read, so nothing is cached -- and handed to the Steps widget as it's
- * read.
+ * read. A reopened Feed starts from what it last showed today, so the card is there at once
+ * with the page while it's read again.
  */
-export function useStepsToday(): StepsToday {
-  const [access, setAccess] = useState<StepsAccess | null>(null);
-  const [steps, setSteps] = useState<number | null>(null);
+export function useStepsToday(userId?: string): StepsToday {
+  const [shown] = useState(() => {
+    const last = recallShown<ShownSteps>(userId, SHOWN_KEY);
+    return last && last.day === new Date().toDateString() ? last : null;
+  });
+  const [access, setAccess] = useState<StepsAccess | null>(shown?.access ?? null);
+  const [steps, setSteps] = useState<number | null>(shown?.steps ?? null);
   const [connecting, setConnecting] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const mounted = useRef(true);
@@ -44,20 +59,23 @@ export function useStepsToday(): StepsToday {
       if (!mounted.current) return;
       setAccess(nextAccess);
       setFailure(null);
+      const day = new Date().toDateString();
       if (nextAccess === 'unavailable') return;
       if (nextAccess === 'notAsked') {
+        rememberShown<ShownSteps>(userId, SHOWN_KEY, { access: nextAccess, steps: null, day });
         void showStepsWidget(null);
         return;
       }
       const count = await stepsToday();
       if (!mounted.current) return;
       setSteps(count);
+      rememberShown<ShownSteps>(userId, SHOWN_KEY, { access: nextAccess, steps: count, day });
       void showStepsWidget(count);
     } catch (error) {
       // Feed goes on; the card says what went wrong.
       failed(error);
     }
-  }, [failed]);
+  }, [failed, userId]);
 
   const connect = useCallback(async () => {
     setConnecting(true);

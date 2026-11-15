@@ -52,6 +52,7 @@ import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { CopyYesterdaySheet, SaveAsMealSheet } from '../nutrition/TodayShortcutSheets';
 import { readAheadDayLogs, readDayLogs, useDayLogs } from '../nutrition/useDayLogs';
 import { WeeklyCalorieBudget } from '../nutrition/WeeklyCalorieBudget';
+import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import { wholeFigure } from '../nutrition/wholeFigures';
 
 type Props = RootStackScreenProps<'Nutrition'>;
@@ -284,6 +285,9 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     };
   }, [day, weekLogs]);
   const remaining = useMemo(() => calculateRemaining(consumed, goals), [consumed, goals]);
+  // The page shows all at once: the first time, the week's budget comes with the day's foods (or
+  // soon after, if its read is slow), never a moment later.
+  const showPage = useShowAllAtOnce(weekLogs !== null || weekFailed);
   const displayError = error ?? goalsError ?? logsError;
   const accent = nutritionTheme.accent;
 
@@ -350,7 +354,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
     </View>
   );
 
-  if (goalsLoading || (isToday && logsLoading)) {
+  if (goalsLoading || (isToday && logsLoading) || !showPage) {
     return (
       <Screen header={header} contentContainerStyle={styles.content}>
         <SkeletonCards testID="nutrition-today-loading" heights={[216, 132, 176]} />

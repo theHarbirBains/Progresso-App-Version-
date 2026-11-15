@@ -19,6 +19,7 @@ import { greetingName } from '../dashboard/greeting';
 import { fromKg } from '../lib/units';
 import type { RootStackScreenProps } from '../navigation/types';
 import { recallShown, rememberShown } from '../lib/lastShown';
+import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
@@ -164,11 +165,13 @@ export function ProfileScreen({ navigation }: Props) {
 
   const avatar = useAvatarPhoto(userId);
 
-  // Who follows you and who you follow, read each time the page opens (others change them).
+  // Who follows you and who you follow, read each time the page opens (others change them) --
+  // starting from what it last showed, and part of what the page waits for the first time.
   const [followCounts, setFollowCounts] = useState<{
     followers: number;
     following: number;
-  } | null>(null);
+  } | null>(() => recallShown(userId, 'profile.followCounts') ?? null);
+  const [countsSettled, setCountsSettled] = useState(followCounts !== null);
   useEffect(() => {
     if (!accessToken || !userId) return;
     let cancelled = false;
@@ -176,10 +179,15 @@ export function ProfileScreen({ navigation }: Props) {
       getPersonProfile(accessToken, userId)
         .then((me) => {
           if (!cancelled) {
-            setFollowCounts({ followers: me.followerCount, following: me.followingCount });
+            const counts = { followers: me.followerCount, following: me.followingCount };
+            setFollowCounts(counts);
+            rememberShown(userId, 'profile.followCounts', counts);
           }
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          if (!cancelled) setCountsSettled(true);
+        });
     const unsubscribe = navigation.addListener('focus', () => void read());
     return () => {
       cancelled = true;
@@ -276,6 +284,8 @@ export function ProfileScreen({ navigation }: Props) {
   }, [tab, allWorkouts, allSetHistory, weightUnit]);
 
   const todaysNutritionTotals = useMemo(() => sumDailyTotals(todaysFoodLogs), [todaysFoodLogs]);
+  // The page shows all at once: the follow counts come with the rest (or soon after, if slow).
+  const showPage = useShowAllAtOnce(countsSettled);
 
   if (
     loading ||
@@ -283,7 +293,8 @@ export function ProfileScreen({ navigation }: Props) {
     nutritionGoalsLoading ||
     statsLoading ||
     prsLoading ||
-    logsLoading
+    logsLoading ||
+    !showPage
   ) {
     return <LoadingState testID="profile-loading" />;
   }

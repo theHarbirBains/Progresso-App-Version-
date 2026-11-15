@@ -806,6 +806,77 @@ const oneDaySplit = {
   days: [{ id: 'day-push', name: 'Push', orderIndex: 1, muscleGroups: ['chest' as const] }],
 };
 
+describe('FeedScreen -- shows all at once', () => {
+  const api = () =>
+    jest.requireMock('../lib/api') as {
+      getSocialSummary: jest.Mock;
+    };
+  afterEach(() => {
+    api().getSocialSummary.mockResolvedValue({});
+  });
+
+  it('keeps its placeholders until the likes are in, then shows the cards with them', async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    api().getSocialSummary.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    renderScreen();
+
+    await waitFor(() => expect(api().getSocialSummary).toHaveBeenCalled());
+    expect(screen.getByTestId('feed-loading')).toBeTruthy();
+    expect(screen.queryByTestId('feed-item-workout-w1')).toBeNull();
+    expect(screen.queryByTestId('feed-start-workout')).toBeNull();
+
+    await act(async () => {
+      answer({ w1: { likeCount: 4, commentCount: 0, likedByMe: false } });
+    });
+
+    expect(screen.getByTestId('feed-item-workout-w1-social-like-count')).toHaveTextContent('4');
+    await waitFor(() => expect(screen.queryByTestId('feed-loading')).toBeNull());
+  });
+
+  it('shows what it has after a few seconds when one part is slow', async () => {
+    jest.useFakeTimers();
+    try {
+      api().getSocialSummary.mockReturnValue(new Promise(() => undefined));
+      mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+      renderScreen();
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(screen.getByTestId('feed-loading')).toBeTruthy();
+
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+      });
+
+      expect(screen.getByTestId('feed-item-workout-w1')).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('opens again with the likes it showed, while it reads them again', async () => {
+    api().getSocialSummary.mockResolvedValue({
+      w1: { likeCount: 2, commentCount: 1, likedByMe: true },
+    });
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    const first = renderScreen();
+    expect(await screen.findByTestId('feed-item-workout-w1-social-like-count')).toHaveTextContent(
+      '2',
+    );
+    first.unmount();
+
+    api().getSocialSummary.mockReturnValue(new Promise(() => undefined));
+    renderScreen();
+
+    expect(screen.getByTestId('feed-item-workout-w1-social-like-count')).toHaveTextContent('2');
+  });
+});
+
 describe('FeedScreen reopened', () => {
   it('shows what it showed last time at once -- no placeholder -- while it refreshes', async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));

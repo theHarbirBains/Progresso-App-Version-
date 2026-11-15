@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { useHeroBackdrop } from '../design/AppBackgroundLayer';
 import { recallShown, rememberShown } from '../lib/lastShown';
+import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import { AppHeader } from '../design/AppHeader';
 import { BubbleMenu, BubbleMenuRow } from '../design/BubbleMenu';
 import { TextButton } from '../design/Button';
@@ -146,7 +147,7 @@ export function FeedScreen({ navigation }: Props) {
     useProgressTheme();
   // Today's steps from Apple Health, under Next Workout (iPhone only). A local read, so it's read
   // again on every visit, never gated.
-  const steps = useStepsToday();
+  const steps = useStepsToday(userId);
   const refreshStepsRef = useRef(steps.refresh);
   refreshStepsRef.current = steps.refresh;
 
@@ -211,6 +212,8 @@ export function FeedScreen({ navigation }: Props) {
   // Whether the next workout has been read at least once -- until then a missing one isn't
   // "no split", just not known yet, and the Next Workout widget isn't told otherwise.
   const [nextLoaded, setNextLoaded] = useState(shown.nextPlan !== undefined);
+  // Whether that read has finished at least once, even by failing -- all the page waits for.
+  const [nextSettled, setNextSettled] = useState(shown.nextPlan !== undefined);
   const setNextPlan = useCallback(
     (plan: NextWorkoutPlan | null) => {
       setNextPlanState(plan);
@@ -299,6 +302,8 @@ export function FeedScreen({ navigation }: Props) {
       // A preview widget failing to load isn't worth a screen-level error --
       // it keeps what it last showed (nothing, if it never loaded) until the
       // next focus reads it again, same as a missing badge count above.
+    } finally {
+      setNextSettled(true);
     }
   }, [userId, activeWorkoutSplitId, setNextPlan]);
 
@@ -433,9 +438,6 @@ export function FeedScreen({ navigation }: Props) {
   const showStartWorkout = nextPlan === null && nextKnown && liveKnown && liveEntries.length === 0;
   const noNextDayLine =
     activeWorkoutSplitId === null ? 'No split chosen yet' : 'Your split has no days yet';
-  // The hero has no fill of its own; while it shows, the sunset photo behind Feed is
-  // brightened so it shows through the hero (see AppBackgroundLayer).
-  useHeroBackdrop(showNextWorkout || showStartWorkout || liveHero !== undefined);
 
   // The Next Workout widget shows what Feed's hero does, once Feed knows: what's open, and, with
   // nothing open, the next day of the split (or that there's no split).
@@ -589,12 +591,30 @@ export function FeedScreen({ navigation }: Props) {
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
   );
   // Each card's likes and comments, read whenever the cards change.
-  const social = useSocialSummaries(displayItems.map((item) => item.workout.id));
+  const social = useSocialSummaries(
+    displayItems.map((item) => item.workout.id),
+    'feed.social',
+  );
   const accent = useAppTheme().accent;
   // Both sources load together on every focus (see the effect above), so
   // the very first load is "in progress" until both have settled at least
   // once -- same reasoning useSignedInResource's own loading flag uses.
   const initialLoading = loading || friendsLoading;
+
+  // The page shows all at once: the first time it opens in a session, its placeholders stay
+  // until everything is in -- your workouts and friends', the live check, the next workout,
+  // today's steps and the likes on the cards -- or a few seconds pass (useShowAllAtOnce), so one
+  // slow part never holds the rest back for long. Reopened -- or with a workout going, noted as it opened
+  // -- it starts from what it last showed, at once.
+  const startsKnown = shown.feed !== undefined || Boolean(shown.liveWorkout);
+  const stepsKnown = steps.access !== null || steps.failure !== null;
+  const nextDone = !themeLoading && (activeWorkoutSplitId === null || nextSettled);
+  const settled =
+    startsKnown || (!initialLoading && liveKnown && nextDone && stepsKnown && social.loaded);
+  const showPage = useShowAllAtOnce(settled);
+  // The hero has no fill of its own; while it shows, the sunset photo behind Feed is
+  // brightened so it shows through the hero (see AppBackgroundLayer).
+  useHeroBackdrop(showPage && (showNextWorkout || showStartWorkout || liveHero !== undefined));
   // Graceful degradation, same philosophy as feedQueries.ts's own
   // degrade-to-empty-page on failure: a failure on one source only blocks
   // the whole screen if there's genuinely nothing else to show; otherwise
@@ -690,7 +710,9 @@ export function FeedScreen({ navigation }: Props) {
           <FeedGreeting displayName={displayName} />
         </RiseIn>
 
-        {liveHero ? (
+        {!showPage ? <SkeletonCards testID="feed-loading" heights={[200, 220, 220]} /> : null}
+
+        {showPage && liveHero ? (
           <RiseIn>
             <FeedHeroCard
               testID={liveHero.testID}
@@ -708,7 +730,7 @@ export function FeedScreen({ navigation }: Props) {
           </RiseIn>
         ) : null}
 
-        {moreLive.map((entry) => (
+        {(showPage ? moreLive : []).map((entry) => (
           <RiseIn key={entry.testID}>
             <LiveNowCard
               testID={entry.testID}
@@ -719,7 +741,7 @@ export function FeedScreen({ navigation }: Props) {
           </RiseIn>
         ))}
 
-        {showNextWorkout && nextPlan ? (
+        {showPage && showNextWorkout && nextPlan ? (
           <RiseIn>
             <FeedHeroCard
               testID="feed-next-workout"
@@ -740,7 +762,7 @@ export function FeedScreen({ navigation }: Props) {
           </RiseIn>
         ) : null}
 
-        {showStartWorkout ? (
+        {showPage && showStartWorkout ? (
           <RiseIn>
             <FeedHeroCard
               testID="feed-start-workout"
@@ -754,7 +776,7 @@ export function FeedScreen({ navigation }: Props) {
           </RiseIn>
         ) : null}
 
-        {steps.access === 'notAsked' || steps.access === 'asked' || steps.failure ? (
+        {showPage && (steps.access === 'notAsked' || steps.access === 'asked' || steps.failure) ? (
           <RiseIn>
             <StepsCard
               access={steps.access}
@@ -766,7 +788,7 @@ export function FeedScreen({ navigation }: Props) {
           </RiseIn>
         ) : null}
 
-        {blockingError ? (
+        {!showPage ? null : blockingError ? (
           <ErrorState testID="feed-error" message={blockingError} onRetry={retryAll} />
         ) : initialLoading ? (
           <SkeletonCards testID="feed-loading" heights={[220, 220]} />

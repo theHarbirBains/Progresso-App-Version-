@@ -20,6 +20,7 @@ import { useAppMenu } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import { Skeleton, SkeletonRows } from '../design/Skeleton';
 import { recallShown, rememberShown } from '../lib/lastShown';
+import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { musclesLabel, type NextWorkoutPlan } from '../workouts/nextWorkout';
@@ -308,8 +309,16 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
     ? monthWorkouts.filter((w) => isoToLocalDateKey(w.performedAt) === selectedDateKey)
     : [];
 
+  // The page shows all at once: the first time, each part keeps its placeholder until the next
+  // workout, the month and the recent workouts are all in (or a few seconds pass), then they show
+  // together. After that, a part refreshing on its own (a month swiped to) shows its own.
+  const nextPending = nextPlan === undefined && Boolean(themeLoading || activeWorkoutSplitId);
+  const showPage = useShowAllAtOnce(!monthLoading && !recentLoading && !nextPending);
+  const monthPending = monthLoading || !showPage;
+  const recentPending = recentLoading || !showPage;
+
   const hasAnyHistory = recentWorkouts.length > 0;
-  const showEmptyState = !recentLoading && !recentError && !activeWorkout && !hasAnyHistory;
+  const showEmptyState = !recentPending && !recentError && !activeWorkout && !hasAnyHistory;
 
   return (
     <Screen
@@ -330,7 +339,9 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
       {/* One widget: what's next -- the workout to resume, the next day, or a start -- over the
           month's calendar. */}
       <Card testID="workout-history-calendar-card">
-        {activeWorkout ? (
+        {!showPage ? (
+          <Skeleton testID="workout-history-next-loading" height={176} radius={radii.lg} />
+        ) : activeWorkout ? (
           <View testID="active-workout-banner">
             <Text style={[styles.actionLine, { color: colors.textPrimary }]}>
               You have a workout in progress
@@ -384,7 +395,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
               />
             </View>
           </View>
-        ) : nextPlan === undefined && (themeLoading || activeWorkoutSplitId) ? (
+        ) : nextPending ? (
           <Skeleton testID="workout-history-next-loading" height={176} radius={radii.lg} />
         ) : (
           <View testID="workout-history-start">
@@ -441,7 +452,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
           <Text testID="workout-month-error" style={styles.errorText}>
             {monthError}
           </Text>
-        ) : monthLoading ? (
+        ) : monthPending ? (
           <Skeleton testID="workout-month-loading" height={280} radius={radii.lg} />
         ) : (
           <View testID="workout-month-summary" style={styles.summaryRow}>
@@ -493,7 +504,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
 
         {recentError ? (
           <ErrorState testID="workout-history-error" message={recentError} onRetry={loadRecent} />
-        ) : recentLoading ? (
+        ) : recentPending ? (
           <SkeletonRows testID="workout-history-loading" count={4} />
         ) : showEmptyState ? (
           <EmptyState

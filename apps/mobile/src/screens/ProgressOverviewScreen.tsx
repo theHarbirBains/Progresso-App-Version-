@@ -14,6 +14,7 @@ import { AllTimeSection } from '../progress/AllTimeSection';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { OverviewSection } from '../progress/OverviewSection';
+import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import { useWeeklySummaries } from '../progress/useWeeklySummaries';
 import { WeeklySummaryBlock } from '../progress/WeeklySummaryBlock';
 import { ConsistencyBlock } from '../progress/ConsistencyBlock';
@@ -107,6 +108,10 @@ export function ProgressOverviewScreen({ navigation }: Props) {
     const frame = requestAnimationFrame(() => setContentReady(true));
     return () => cancelAnimationFrame(frame);
   }, []);
+  // Overview shows all at once: its section waits for the Weekly Summary too (or a few seconds,
+  // if its read is slow), so the summary never drops in above what's already showing.
+  const weekShown = useShowAllAtOnce(weekSummaries !== null || weekError !== null);
+  const sectionReady = contentReady && (activeSection !== 'Overview' || weekShown);
   const totalPRs = repPRs.length + oneRepMaxes.length + exerciseRecords.length;
 
   if (loading || themeLoading) {
@@ -154,11 +159,11 @@ export function ProgressOverviewScreen({ navigation }: Props) {
         {/* Fills the rest of the screen, like the card inside it. */}
         <RiseIn style={styles.sectionRise}>
           <AppCard testID="progress-section-card" style={styles.sectionCard}>
-            {!contentReady ? (
+            {!sectionReady ? (
               <SkeletonCards testID="progress-section-loading" heights={[132, 168, 112]} />
             ) : null}
 
-            {contentReady && activeSection === 'Overview' ? (
+            {sectionReady && activeSection === 'Overview' ? (
               <OverviewSection
                 groups={groups}
                 lifetimeStats={lifetimeStats}
