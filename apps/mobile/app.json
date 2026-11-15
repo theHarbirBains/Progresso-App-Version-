@@ -45,7 +45,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Progresso looks for the people in your contacts who are on Progresso, by their email. Emails are scrambled on your phone before anything is sent, and nothing is kept."
+          "contactsPermission": "Progresso looks for the people in your contacts who are on Progresso, by their email or phone number. They're scrambled on your phone before anything is sent, and nothing is kept."
         }
       ],
       "expo-font",
