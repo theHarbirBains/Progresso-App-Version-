@@ -95,7 +95,7 @@ export const MEMBERSHIP_OPTIONS: MembershipOption[] = [
   {
     tier: 'workouts_nutrition',
     name: 'Workouts + Nutrition',
-    summary: 'Everything in Workouts, plus tracking what you eat.',
+    summary: 'Your training and what you eat, side by side.',
     includes: ['Everything in Workouts', 'Food logging and macros', 'Calorie and macro targets'],
     icon: 'pie-chart',
     areas: ['workouts', 'nutrition'],
@@ -103,7 +103,7 @@ export const MEMBERSHIP_OPTIONS: MembershipOption[] = [
   {
     tier: 'everything',
     name: 'Everything',
-    summary: 'Workouts and Nutrition, plus Trainer Mode for coaching clients.',
+    summary: 'For coaches: train your clients in Progresso too.',
     includes: ['Everything in Workouts + Nutrition', 'Trainer Mode: clients, logging, sessions'],
     icon: 'star',
     areas: ['workouts', 'nutrition', 'trainer'],

@@ -17,7 +17,7 @@ import { colors, minTouchTarget, radii, spacing, typeScale } from '../design/the
 import type { MembershipTier } from '../lib/api';
 import { withAlpha } from '../theme/accentColor';
 import { useAppTheme } from '../theme/appThemeContext';
-import { MEMBERSHIP_AREAS, MEMBERSHIP_OPTIONS } from './membershipTiers';
+import { membershipArea, MEMBERSHIP_OPTIONS } from './membershipTiers';
 
 interface Props {
   testID: string;
@@ -28,15 +28,32 @@ interface Props {
   saving?: MembershipTier | null;
 }
 
+/** How much of the next card shows at the right edge, so it's plain there's more to swipe to. */
+const PEEK = 28;
+/** The room between two cards. */
+const GAP = spacing.md;
+/** A card's width before the pager's been measured (tests, the first frame). */
+const UNMEASURED_WIDTH = 320;
+
 /**
- * The three memberships as large cards side by side, one to a page: swipe left for the next.
- * Each lists everything it includes, part by part (Workouts, Nutrition, Trainer Mode -- a part it
- * leaves out says so), and ends with a button to choose it. Opens on the one chosen. Onboarding's
- * membership step and Settings > Membership.
+ * The three memberships as large cards in a row, one at a time: swipe left for the next, its
+ * edge showing at the right. Each card says only what it adds -- Workouts lists everything in
+ * Workouts; the next says "Everything in Workouts, plus:" and lists Nutrition; the last
+ * "Everything in Workouts + Nutrition, plus:" and Trainer Mode -- and ends with a button to choose
+ * it and, but for the last, "Swipe for ..." (a tap goes there too). Dots beneath say which is
+ * showing and open any of them. Opens on the one chosen. Onboarding's membership step and
+ * Settings > Membership.
  */
 export function MembershipCards({ testID, value, onChoose, saving = null }: Props) {
   const { accent } = useAppTheme();
   const [width, setWidth] = useState(0);
+  const cardWidth = width > 0 ? width - PEEK - GAP : UNMEASURED_WIDTH;
+  const interval = cardWidth + GAP;
+  const lastIndex = MEMBERSHIP_OPTIONS.length - 1;
+  // The furthest the row scrolls: the last card at the right edge.
+  const maxOffset = Math.max(0, MEMBERSHIP_OPTIONS.length * interval - GAP - width);
+  const offsetOf = (index: number) => Math.min(index * interval, maxOffset);
+
   const startIndex = Math.max(
     0,
     MEMBERSHIP_OPTIONS.findIndex((option) => option.tier === value),
@@ -47,9 +64,9 @@ export function MembershipCards({ testID, value, onChoose, saving = null }: Prop
   // Once its width is known, open on the one chosen.
   useEffect(() => {
     if (width > 0 && startIndex > 0) {
-      scroller.current?.scrollTo({ x: startIndex * width, animated: false });
+      scroller.current?.scrollTo({ x: offsetOf(startIndex), animated: false });
     }
-    // Only as it's first laid out: a choice made here leaves the page where it is.
+    // Only as it's first laid out: a choice made here leaves the card where it is.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width]);
 
@@ -59,13 +76,13 @@ export function MembershipCards({ testID, value, onChoose, saving = null }: Prop
   }
 
   function onScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    if (width <= 0) return;
-    setPage(Math.round(event.nativeEvent.contentOffset.x / width));
+    const index = Math.round(event.nativeEvent.contentOffset.x / interval);
+    setPage(Math.max(0, Math.min(lastIndex, index)));
   }
 
   function goTo(index: number) {
     setPage(index);
-    scroller.current?.scrollTo({ x: index * width, animated: true });
+    scroller.current?.scrollTo({ x: offsetOf(index), animated: true });
   }
 
   return (
@@ -74,20 +91,27 @@ export function MembershipCards({ testID, value, onChoose, saving = null }: Prop
         ref={scroller}
         testID={`${testID}-pager`}
         horizontal
-        pagingEnabled
+        decelerationRate="fast"
+        snapToInterval={interval}
+        snapToAlignment="start"
+        disableIntervalMomentum
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onScrollEnd}
-        contentOffset={width > 0 ? { x: startIndex * width, y: 0 } : undefined}
+        contentOffset={width > 0 ? { x: offsetOf(startIndex), y: 0 } : undefined}
       >
-        {MEMBERSHIP_OPTIONS.map((option) => {
+        {MEMBERSHIP_OPTIONS.map((option, index) => {
           const chosen = value === option.tier;
+          // What it adds: the last part it includes -- the rest are the card before's.
+          const adds = membershipArea(option.areas[option.areas.length - 1]!);
+          const previous = index > 0 ? MEMBERSHIP_OPTIONS[index - 1] : null;
+          const next = index < lastIndex ? MEMBERSHIP_OPTIONS[index + 1] : null;
           return (
             <View
               key={option.tier}
-              style={[styles.page, width > 0 ? { width } : styles.unmeasured]}
               testID={`${testID}-card-${option.tier}`}
+              style={{ width: cardWidth, marginRight: next ? GAP : 0 }}
             >
-              <AppCard hero={chosen}>
+              <AppCard hero={chosen} style={styles.card}>
                 <View style={styles.head}>
                   <View style={[styles.icon, { backgroundColor: withAlpha(accent.accent, 0.16) }]}>
                     <Feather name={option.icon} size={22} color={accent.accent} />
@@ -107,37 +131,30 @@ export function MembershipCards({ testID, value, onChoose, saving = null }: Prop
                 </View>
                 <Text style={styles.summary}>{option.summary}</Text>
 
-                {MEMBERSHIP_AREAS.map((area) => {
-                  const included = option.areas.includes(area.area);
-                  return (
-                    <View
-                      key={area.area}
-                      testID={`${testID}-${option.tier}-${area.area}`}
-                      style={styles.area}
-                    >
-                      <View style={styles.areaHead}>
-                        <Feather
-                          name={area.icon}
-                          size={16}
-                          color={included ? accent.accent : colors.textMuted}
-                        />
-                        <Text style={[styles.areaTitle, !included && styles.areaTitleOff]}>
-                          {area.title}
-                        </Text>
-                      </View>
-                      {included ? (
-                        area.features.map((feature) => (
-                          <View key={feature} style={styles.feature}>
-                            <View style={[styles.bullet, { backgroundColor: accent.accent }]} />
-                            <Text style={styles.featureText}>{feature}</Text>
-                          </View>
-                        ))
-                      ) : (
-                        <Text style={styles.notIncluded}>Not included</Text>
-                      )}
+                {previous ? (
+                  <View
+                    testID={`${testID}-${option.tier}-plus`}
+                    style={[styles.plus, { backgroundColor: withAlpha(accent.accent, 0.12) }]}
+                  >
+                    <Feather name="plus-circle" size={16} color={accent.accent} />
+                    <Text style={styles.plusText}>
+                      Everything in <Text style={styles.plusName}>{previous.name}</Text>, plus:
+                    </Text>
+                  </View>
+                ) : null}
+
+                <View testID={`${testID}-${option.tier}-${adds.area}`} style={styles.area}>
+                  <View style={styles.areaHead}>
+                    <Feather name={adds.icon} size={16} color={accent.accent} />
+                    <Text style={styles.areaTitle}>{adds.title}</Text>
+                  </View>
+                  {adds.features.map((feature) => (
+                    <View key={feature} style={styles.feature}>
+                      <View style={[styles.bullet, { backgroundColor: accent.accent }]} />
+                      <Text style={styles.featureText}>{feature}</Text>
                     </View>
-                  );
-                })}
+                  ))}
+                </View>
 
                 <View style={styles.action}>
                   {chosen ? (
@@ -158,6 +175,21 @@ export function MembershipCards({ testID, value, onChoose, saving = null }: Prop
                     />
                   )}
                 </View>
+
+                {next ? (
+                  <TouchableOpacity
+                    testID={`${testID}-${option.tier}-next`}
+                    style={styles.next}
+                    onPress={() => goTo(index + 1)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Next: ${next.name}`}
+                  >
+                    <Text style={[styles.nextText, { color: accent.accent }]}>
+                      Swipe for {next.name}
+                    </Text>
+                    <Feather name="arrow-right" size={16} color={accent.accent} />
+                  </TouchableOpacity>
+                ) : null}
               </AppCard>
             </View>
           );
@@ -184,18 +216,14 @@ export function MembershipCards({ testID, value, onChoose, saving = null }: Prop
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={styles.hint}>Swipe to see each membership</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Each page is the pager's full width; the card keeps a little room either side while it moves.
-  page: {
-    paddingHorizontal: spacing.xs,
-  },
-  unmeasured: {
-    width: 320,
+  // Every card as tall as the tallest, so the row reads as one set.
+  card: {
+    flex: 1,
   },
   head: {
     flexDirection: 'row',
@@ -225,6 +253,25 @@ const styles = StyleSheet.create({
     color: colors.textSecondaryBright,
     marginTop: spacing.md,
   },
+  // "Everything in Workouts, plus:" -- a band in the accent's tint.
+  plus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+  },
+  plusText: {
+    ...typeScale.callout,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  plusName: {
+    ...typeScale.label,
+    color: colors.textPrimary,
+  },
   area: {
     marginTop: spacing.lg,
     gap: spacing.sm,
@@ -237,9 +284,6 @@ const styles = StyleSheet.create({
   areaTitle: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
-  },
-  areaTitleOff: {
-    color: colors.textMuted,
   },
   feature: {
     flexDirection: 'row',
@@ -257,18 +301,27 @@ const styles = StyleSheet.create({
     color: colors.textSecondaryBright,
     flex: 1,
   },
-  notIncluded: {
-    ...typeScale.secondary,
-    color: colors.textMuted,
-  },
   action: {
-    marginTop: spacing.xl,
+    marginTop: 'auto',
+    paddingTop: spacing.xl,
+  },
+  // "Swipe for Workouts + Nutrition ->", under the button -- a tap goes there too.
+  next: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    minHeight: minTouchTarget,
+    marginTop: spacing.sm,
+  },
+  nextText: {
+    ...typeScale.label,
   },
   dots: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   // Each dot a full touch target, though it's drawn small.
   dotHit: {
@@ -282,10 +335,5 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: radii.pill,
     backgroundColor: colors.glassBorderStrong,
-  },
-  hint: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-    textAlign: 'center',
   },
 });

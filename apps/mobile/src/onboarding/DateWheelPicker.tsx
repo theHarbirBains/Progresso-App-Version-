@@ -2,7 +2,14 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '../design/Text';
 import { colors, fonts, spacing, typeScale } from '../design/theme';
 import { WheelPicker } from '../design/WheelPicker';
-import { clampDay, daysInMonth, MONTH_NAMES, yearRange } from './dateWheelValues';
+import {
+  clampDay,
+  clampToLatest,
+  daysInMonth,
+  MONTH_NAMES,
+  yearRange,
+  type WheelDate,
+} from './dateWheelValues';
 
 interface Props {
   testID: string;
@@ -11,27 +18,38 @@ interface Props {
   day: number;
   year: number;
   onChange: (next: { month: number; day: number; year: number }) => void;
+  /** The latest date the wheels go to (onboarding's birthday: 13 years ago today). The year
+   * wheel ends at its year, and in that year the months and days end at it, so nothing later
+   * can be picked. */
+  latest?: WheelDate;
 }
 
 const YEARS = yearRange();
 
 /** Month/Day/Year scroll wheels -- the presentation is always Month Day, Year regardless of locale (per spec), while the value stored is a plain calendar date. */
-export function DateWheelPicker({ testID, month, day, year, onChange }: Props) {
-  const dayCount = daysInMonth(month, year);
+export function DateWheelPicker({ testID, month, day, year, onChange, latest }: Props) {
+  const years = latest ? yearRange(new Date(), latest.year) : YEARS;
+  const inLatestYear = latest !== undefined && year === latest.year;
+  const months = inLatestYear ? MONTH_NAMES.slice(0, latest.month + 1) : MONTH_NAMES;
+  const dayCount = inLatestYear && month === latest.month ? latest.day : daysInMonth(month, year);
   const days = Array.from({ length: dayCount }, (_, i) => String(i + 1));
+
+  function emit(next: WheelDate) {
+    onChange(clampToLatest(next, latest));
+  }
 
   function handleMonthChange(value: string) {
     const nextMonth = MONTH_NAMES.indexOf(value);
-    onChange({ month: nextMonth, day: clampDay(day, nextMonth, year), year });
+    emit({ month: nextMonth, day: clampDay(day, nextMonth, year), year });
   }
 
   function handleDayChange(value: string) {
-    onChange({ month, day: Number(value), year });
+    emit({ month, day: Number(value), year });
   }
 
   function handleYearChange(value: string) {
     const nextYear = Number(value);
-    onChange({ month, day: clampDay(day, month, nextYear), year: nextYear });
+    emit({ month, day: clampDay(day, month, nextYear), year: nextYear });
   }
 
   return (
@@ -39,7 +57,7 @@ export function DateWheelPicker({ testID, month, day, year, onChange }: Props) {
       <View style={styles.monthColumn}>
         <WheelPicker
           testID={`${testID}-month`}
-          values={MONTH_NAMES}
+          values={months}
           selectedValue={MONTH_NAMES[month]}
           onChange={handleMonthChange}
         />
@@ -55,7 +73,7 @@ export function DateWheelPicker({ testID, month, day, year, onChange }: Props) {
       <View style={styles.yearColumn}>
         <WheelPicker
           testID={`${testID}-year`}
-          values={YEARS.map(String)}
+          values={years.map(String)}
           selectedValue={String(year)}
           onChange={handleYearChange}
         />

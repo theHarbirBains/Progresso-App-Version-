@@ -19,11 +19,35 @@ export function currentMaxYear(now: Date = new Date()): number {
   return now.getFullYear();
 }
 
-export function yearRange(now: Date = new Date()): number[] {
-  const max = currentMaxYear(now);
+export function yearRange(now: Date = new Date(), max: number = currentMaxYear(now)): number[] {
   const years: number[] = [];
   for (let y = max; y >= MIN_YEAR; y--) years.push(y);
   return years;
+}
+
+/** A date as the wheels hold it: month 0-11. */
+export interface WheelDate {
+  month: number;
+  day: number;
+  year: number;
+}
+
+/** The latest birthday of someone `years` old today -- the same day `years` years ago (Feb 29
+ * becomes Feb 28 in a year without one). */
+export function latestBirthday(years: number, now: Date = new Date()): WheelDate {
+  const year = now.getFullYear() - years;
+  const month = now.getMonth();
+  return { month, day: clampDay(now.getDate(), month, year), year };
+}
+
+/** The date, or `latest` when it's later than that -- the wheels never go past it. */
+export function clampToLatest(date: WheelDate, latest: WheelDate | undefined): WheelDate {
+  if (!latest) return date;
+  const after =
+    date.year > latest.year ||
+    (date.year === latest.year &&
+      (date.month > latest.month || (date.month === latest.month && date.day > latest.day)));
+  return after ? latest : date;
 }
 
 export function daysInMonth(monthIndex: number, year: number): number {

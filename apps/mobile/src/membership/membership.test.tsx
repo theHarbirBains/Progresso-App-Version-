@@ -82,7 +82,7 @@ describe('Settings > Membership', () => {
     jest.mocked(useProfile).mockReturnValue({ updateProfile } as never);
   });
 
-  it('shows each membership on its own card, every feature listed, the one in use marked', async () => {
+  it('shows each membership on its own card, each saying only what it adds, the one in use marked', async () => {
     render(
       withTier(
         'everything',
@@ -90,27 +90,60 @@ describe('Settings > Membership', () => {
       ),
     );
 
-    // One card each, side by side to swipe through.
-    expect(screen.getByTestId('settings-membership-pager').props.horizontal).toBe(true);
-    expect(screen.getByTestId('settings-membership-pager').props.pagingEnabled).toBe(true);
+    // One card each, in a row to swipe through, a card at a time.
+    const pager = screen.getByTestId('settings-membership-pager');
+    expect(pager.props.horizontal).toBe(true);
+    expect(pager.props.snapToInterval).toBeGreaterThan(0);
     for (const option of MEMBERSHIP_OPTIONS) {
       expect(screen.getByTestId(`settings-membership-card-${option.tier}`)).toBeTruthy();
     }
-    // Workouts lists everything in Workouts, and says Nutrition and Trainer Mode aren't in it.
+    // Workouts lists everything in Workouts...
     expect(screen.getByTestId('settings-membership-workouts-workouts')).toHaveTextContent(
       /Live workout tracking/,
     );
-    expect(screen.getByTestId('settings-membership-workouts-nutrition')).toHaveTextContent(
-      /Not included/,
+    expect(screen.queryByTestId('settings-membership-workouts-plus')).toBeNull();
+    // ...the next only what it adds, after the one before...
+    const nutrition = screen.getByTestId('settings-membership-card-workouts_nutrition');
+    expect(screen.getByTestId('settings-membership-workouts_nutrition-plus')).toHaveTextContent(
+      /Everything in Workouts, plus:$/,
     );
-    expect(screen.getByTestId('settings-membership-everything-trainer')).toHaveTextContent(
-      /Trainer Workspace/,
+    expect(nutrition).toHaveTextContent(/Food logging/);
+    expect(nutrition).not.toHaveTextContent(/Live workout tracking/);
+    // ...and the last the same.
+    const everything = screen.getByTestId('settings-membership-card-everything');
+    expect(screen.getByTestId('settings-membership-everything-plus')).toHaveTextContent(
+      /Everything in Workouts \+ Nutrition, plus:$/,
     );
+    expect(everything).toHaveTextContent(/Trainer Workspace/);
+    expect(everything).not.toHaveTextContent(/Food logging/);
     // The one in use.
     expect(screen.getByTestId('settings-membership-chosen-everything')).toBeTruthy();
     expect(screen.getByTestId('settings-membership-everything')).toHaveTextContent(
       /Your Membership/,
     );
+  });
+
+  it('says there is a next card to swipe to, on every card but the last', () => {
+    render(
+      withTier(
+        'workouts',
+        <SettingsMembershipScreen navigation={navigation} route={{} as never} />,
+      ),
+    );
+
+    expect(screen.getByTestId('settings-membership-workouts-next')).toHaveTextContent(
+      /Swipe for Workouts \+ Nutrition/,
+    );
+    expect(screen.getByTestId('settings-membership-workouts_nutrition-next')).toHaveTextContent(
+      /Swipe for Everything/,
+    );
+    expect(screen.queryByTestId('settings-membership-everything-next')).toBeNull();
+
+    // A tap goes there too, and the dots follow.
+    fireEvent.press(screen.getByTestId('settings-membership-workouts-next'));
+    expect(screen.getByTestId('settings-membership-dot-1').props.accessibilityState).toEqual({
+      selected: true,
+    });
   });
 
   it('switches at a tap on a card', async () => {

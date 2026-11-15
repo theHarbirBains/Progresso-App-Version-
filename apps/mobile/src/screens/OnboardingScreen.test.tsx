@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { KeyboardAvoidingView, Platform } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { socialSignInEnabled } from '../auth/socialSignIn';
@@ -257,13 +257,13 @@ describe('OnboardingScreen', () => {
     renderScreen();
     await screen.findByTestId('onboarding-step-membership');
 
-    // One large card each, to swipe through, every feature listed.
+    // One large card each, to swipe through, each saying only what it adds.
     expect(screen.getByTestId('onboarding-step-membership-pager').props.horizontal).toBe(true);
     expect(screen.getByTestId('onboarding-step-membership-card-workouts')).toHaveTextContent(
-      /Workouts.*Live workout tracking.*Nutrition.*Not included.*Trainer Mode.*Not included/,
+      /Live workout tracking.*Swipe for Workouts \+ Nutrition/,
     );
     expect(screen.getByTestId('onboarding-step-membership-card-everything')).toHaveTextContent(
-      /Food logging.*Trainer Workspace/,
+      /Everything in Workouts \+ Nutrition, plus:.*Trainer Workspace/,
     );
     fireEvent.press(screen.getByTestId('onboarding-step-membership-workouts'));
 
@@ -988,17 +988,31 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     renderScreen();
   }
 
-  it("won't go on for anyone under 13", async () => {
-    const twelve = new Date();
-    const birthday = `${twelve.getFullYear() - 12}-01-01`;
-    await startAt('birthday', { birthday, referralSource: 'tiktok' });
-    // A birthday under 13 doesn't count as answered, so onboarding resumes on it.
+  it('lets no one pick a birthday under 13: the year wheel ends 13 years ago', async () => {
+    const now = new Date();
+    await startAt('gender', { gender: null });
+    fireEvent.press(await screen.findByTestId('onboarding-gender-male'));
     await screen.findByTestId('onboarding-step-birthday');
 
-    expect(screen.getByTestId('onboarding-too-young')).toHaveTextContent(
-      'Progresso is for people 13 and older.',
-    );
-    expect(screen.getByTestId('onboarding-continue')).toBeDisabled();
+    // The year wheel's whole list starts 13 years ago.
+    const years = screen
+      .UNSAFE_getAllByType(FlatList)
+      .map((list) => list.props.data as string[])
+      .find((data) => /^\d{4}$/.test(data[0] ?? ''))!;
+    expect(years[0]).toBe(String(now.getFullYear() - 13));
+  });
+
+  it('brings a birthday saved too late back to the latest the wheels go to', async () => {
+    const now = new Date();
+    await startAt('gender', { gender: null, birthday: `${now.getFullYear() - 12}-01-01` });
+    fireEvent.press(await screen.findByTestId('onboarding-gender-male'));
+    await screen.findByTestId('onboarding-step-birthday');
+
+    expect(screen.getByTestId('onboarding-continue')).toBeEnabled();
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
+      expect(stored.draft.birthday.startsWith(String(now.getFullYear() - 13))).toBe(true);
+    });
   });
 
   it('works out daily targets from their answers -- to lose, from their goal -- and lets them be changed', async () => {

@@ -12,7 +12,7 @@ import {
   type CreateAccountFields,
   type GoogleSignUpFields,
 } from '../onboarding/CreateAccountStep';
-import { toDateStringUTC } from '../onboarding/dateWheelValues';
+import { clampToLatest, latestBirthday, toDateStringUTC } from '../onboarding/dateWheelValues';
 import { DateWheelPicker } from '../onboarding/DateWheelPicker';
 import { GoalSelector } from '../onboarding/GoalSelector';
 import { HeightWheelPicker } from '../onboarding/HeightWheelPicker';
@@ -153,10 +153,22 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
       if (stored) {
         setDraft(stored.draft);
         if (stored.draft.birthday) {
+          // One later than the wheels go (13 years ago today) comes back as that latest date.
           const [y, m, d] = stored.draft.birthday.split('-').map(Number);
-          setBirthdayYear(y);
-          setBirthdayMonth(m - 1);
-          setBirthdayDay(d);
+          const shown = clampToLatest(
+            { year: y, month: m - 1, day: d },
+            latestBirthday(MIN_SIGNUP_AGE),
+          );
+          setBirthdayYear(shown.year);
+          setBirthdayMonth(shown.month);
+          setBirthdayDay(shown.day);
+          if (!isOldEnough(stored.draft.birthday)) {
+            stored.draft = {
+              ...stored.draft,
+              birthday: toDateStringUTC(shown.month, shown.day, shown.year),
+            };
+            setDraft(stored.draft);
+          }
         }
         setStepIndex(computeStartStepIndex(stored.draft));
       }
@@ -426,6 +438,8 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 month={birthdayMonth}
                 day={birthdayDay}
                 year={birthdayYear}
+                // Nobody younger than 13: the wheels end on their 13th birthday's date.
+                latest={latestBirthday(MIN_SIGNUP_AGE)}
                 onChange={({ month, day, year }) => {
                   setBirthdayMonth(month);
                   setBirthdayDay(day);
@@ -434,11 +448,6 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 }}
               />
             </View>
-            {draft.birthday && !isOldEnough(draft.birthday) ? (
-              <Text testID="onboarding-too-young" style={styles.errorText}>
-                Progresso is for people {MIN_SIGNUP_AGE} and older.
-              </Text>
-            ) : null}
           </>
         ) : null}
 
