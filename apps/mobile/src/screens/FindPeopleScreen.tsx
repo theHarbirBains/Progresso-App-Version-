@@ -23,6 +23,7 @@ import { colors } from '../design/theme';
 import { UnderlineTabs } from '../design/UnderlineTabs';
 import {
   listFollowRequests,
+  listPersonFollowing,
   listSuggestedUsers,
   respondToFollowRequest,
   searchUsers,
@@ -34,13 +35,14 @@ import {
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { ContactsFinder } from '../social/ContactsFinder';
+import { PeopleList } from '../social/PeopleList';
 import { findPeopleStyles as styles } from './findPeopleStyles';
 import { SkeletonRows } from '../design/Skeleton';
 import { useAppTheme } from '../theme/appThemeContext';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 
 type Props = RootStackScreenProps<'FindPeople'>;
-type FindPeopleTab = 'friends' | 'requests';
+type FindPeopleTab = 'friends' | 'following' | 'requests';
 type FriendsSubTab = 'suggested' | 'contacts';
 
 const INVITE_MESSAGE = 'Join me on Progresso — track your workouts and nutrition.';
@@ -65,6 +67,9 @@ function rowLabel(user: FollowUser): { title: string; subtitle: string | undefin
  * follow row toward -- see FollowsService.listSuggested); Contacts finds the
  * people in your phone's contacts by email (social/ContactsFinder.tsx).
  *
+ * Following tab: everyone you follow (whose follow was accepted), each opening their profile,
+ * with Following beside them to unfollow. Read each time the page is shown.
+ *
  * Requests tab: the full follow-request management list. The
  * notifications bell (NotificationsScreen) surfaces the same pending
  * requests too, alongside recent acceptances -- that's the quick/recent
@@ -75,7 +80,8 @@ function rowLabel(user: FollowUser): { title: string; subtitle: string | undefin
  */
 export function FindPeopleScreen({ navigation }: Props) {
   const accent = useAppTheme().accent.accent;
-  const { session } = useAuth();
+  const { user, session } = useAuth();
+  const userId = user?.id;
   const accessToken = session?.access_token;
 
   const [tab, setTab] = useState<FindPeopleTab>('friends');
@@ -84,6 +90,9 @@ export function FindPeopleScreen({ navigation }: Props) {
   const [requests, setRequests] = useState<FollowRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestsError, setRequestsError] = useState<string | null>(null);
+
+  const [following, setFollowing] = useState<FollowSearchResult[] | null>(null);
+  const [followingError, setFollowingError] = useState<string | null>(null);
 
   const [suggested, setSuggested] = useState<FollowSearchResult[]>([]);
   const [suggestedLoading, setSuggestedLoading] = useState(true);
@@ -115,6 +124,16 @@ export function FindPeopleScreen({ navigation }: Props) {
     }
   }, [accessToken]);
 
+  const loadFollowing = useCallback(async () => {
+    if (!accessToken || !userId) return;
+    setFollowingError(null);
+    try {
+      setFollowing(await listPersonFollowing(accessToken, userId));
+    } catch (err) {
+      setFollowingError(err instanceof Error ? err.message : 'Failed to load who you follow');
+    }
+  }, [accessToken, userId]);
+
   const loadSuggested = useCallback(async () => {
     if (!accessToken) return;
     setSuggestedLoading(true);
@@ -131,10 +150,11 @@ export function FindPeopleScreen({ navigation }: Props) {
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       void loadRequests();
+      void loadFollowing();
       void loadSuggested();
     });
     return unsubscribe;
-  }, [navigation, loadRequests, loadSuggested]);
+  }, [navigation, loadRequests, loadFollowing, loadSuggested]);
 
   const runSearch = useCallback(async () => {
     if (!search) {
@@ -314,6 +334,7 @@ export function FindPeopleScreen({ navigation }: Props) {
             testID="find-people-tab"
             categories={[
               { key: 'friends', label: 'Friends', icon: 'users' },
+              { key: 'following', label: 'Following', icon: 'user-check' },
               {
                 key: 'requests',
                 label: requests.length > 0 ? `Requests (${requests.length})` : 'Requests',
@@ -339,7 +360,40 @@ export function FindPeopleScreen({ navigation }: Props) {
         </View>
       }
     >
-      {tab === 'requests' ? (
+      {tab === 'following' ? (
+        followingError ? (
+          <ErrorState
+            testID="find-people-following-error"
+            message={followingError}
+            onRetry={loadFollowing}
+          />
+        ) : following === null ? (
+          <SkeletonRows testID="find-people-following-loading" count={6} />
+        ) : following.length === 0 ? (
+          <EmptyState
+            testID="find-people-following-empty"
+            title="Not following anyone yet"
+            description="People you follow show here once they accept your request."
+            action={{
+              label: 'Find People',
+              onPress: () => setTab('friends'),
+              testID: 'find-people-following-find',
+            }}
+          />
+        ) : (
+          <AppCard testID="find-people-following-card">
+            <SectionHeader
+              label={`You follow ${following.length} ${following.length === 1 ? 'person' : 'people'}`}
+            />
+            <PeopleList
+              people={following}
+              selfId={userId ?? ''}
+              onOpen={openProfile}
+              testIDPrefix="find-people-following"
+            />
+          </AppCard>
+        )
+      ) : tab === 'requests' ? (
         requestsLoading ? (
           <SkeletonRows testID="find-people-requests-loading" count={4} />
         ) : requestsError ? (

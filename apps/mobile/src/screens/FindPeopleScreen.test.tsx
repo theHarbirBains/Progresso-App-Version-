@@ -4,6 +4,7 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import {
   listFollowRequests,
+  listPersonFollowing,
   listSuggestedUsers,
   respondToFollowRequest,
   searchUsers,
@@ -23,6 +24,7 @@ jest.mock('../lib/safetyApi', () => ({
 
 jest.mock('../lib/api', () => ({
   listFollowRequests: jest.fn(),
+  listPersonFollowing: jest.fn(),
   listSuggestedUsers: jest.fn(),
   respondToFollowRequest: jest.fn(),
   searchUsers: jest.fn(),
@@ -40,6 +42,7 @@ jest.mock('../social/contactEmails', () => ({
 const mockUseAuth = useAuth as jest.Mock;
 const mockListFollowRequests = listFollowRequests as jest.Mock;
 const mockListSuggestedUsers = listSuggestedUsers as jest.Mock;
+const mockListPersonFollowing = listPersonFollowing as jest.Mock;
 const mockRespondToFollowRequest = respondToFollowRequest as jest.Mock;
 const mockSearchUsers = searchUsers as jest.Mock;
 const mockSendFollowRequest = sendFollowRequest as jest.Mock;
@@ -89,6 +92,7 @@ beforeEach(() => {
   });
   mockListFollowRequests.mockReset().mockResolvedValue([]);
   mockListSuggestedUsers.mockReset().mockResolvedValue([]);
+  mockListPersonFollowing.mockReset().mockResolvedValue([]);
   mockRespondToFollowRequest.mockReset().mockResolvedValue({ success: true });
   mockSearchUsers.mockReset().mockResolvedValue([]);
   mockSendFollowRequest.mockReset().mockResolvedValue({ status: 'pending' });
@@ -98,6 +102,72 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers();
+});
+
+describe('FindPeopleScreen -- following tab', () => {
+  const following = [
+    {
+      user: { id: 'user-3', username: 'bob', displayName: 'Bob Smith', avatarUrl: null },
+      status: 'accepted' as const,
+    },
+    {
+      user: { id: 'user-4', username: 'sam', displayName: null, avatarUrl: null },
+      status: 'accepted' as const,
+    },
+  ];
+
+  it('lists everyone you follow, each opening their profile', async () => {
+    mockListPersonFollowing.mockResolvedValue(following);
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('find-people-tab-following'));
+
+    expect(await screen.findByTestId('find-people-following-card')).toHaveTextContent(
+      /You follow 2 people/,
+    );
+    expect(mockListPersonFollowing).toHaveBeenCalledWith('token-123', 'user-1');
+    expect(screen.getByTestId('find-people-following-user-3')).toHaveTextContent(/Bob Smith/);
+    expect(screen.getByTestId('find-people-following-user-4')).toHaveTextContent(/@sam/);
+    // No search field: it's who you follow, not a search.
+    expect(screen.queryByTestId('find-people-search-input')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('find-people-following-user-3'));
+    expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'user-3' });
+  });
+
+  it('unfollows from the list with its Following button, which then offers Follow again', async () => {
+    mockListPersonFollowing.mockResolvedValue(following);
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('find-people-tab-following'));
+
+    fireEvent.press(await screen.findByTestId('find-people-following-user-3-following'));
+
+    expect(await screen.findByTestId('find-people-following-user-3-follow')).toBeTruthy();
+    expect(mockUnfollowUser).toHaveBeenCalledWith('token-123', 'user-3');
+  });
+
+  it('says so when you follow no one, with a way to find people', async () => {
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('find-people-tab-following'));
+
+    expect(await screen.findByTestId('find-people-following-empty')).toHaveTextContent(
+      'Not following anyone yet',
+    );
+    fireEvent.press(screen.getByTestId('find-people-following-find'));
+    expect(screen.getByTestId('find-people-search-input')).toBeTruthy();
+  });
+
+  it('shows an error with a working retry', async () => {
+    mockListPersonFollowing.mockRejectedValueOnce(new Error('offline'));
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('find-people-tab-following'));
+
+    expect(await screen.findByTestId('find-people-following-error')).toBeTruthy();
+    mockListPersonFollowing.mockResolvedValue(following);
+    fireEvent.press(screen.getByTestId('find-people-following-error-retry'));
+
+    expect(await screen.findByTestId('find-people-following-card')).toBeTruthy();
+  });
 });
 
 describe('FindPeopleScreen -- requests tab', () => {
