@@ -82,9 +82,10 @@ export const startWorkoutStyles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
+  // No split: Choose Your Workout Split in the hero's place, above More Ways to Train (the
+  // content's own gap separates them).
   emptyWrap: {
-    paddingVertical: spacing.xxxl,
-    paddingHorizontal: 0,
+    paddingTop: spacing.lg,
     gap: spacing.lg,
   },
 });

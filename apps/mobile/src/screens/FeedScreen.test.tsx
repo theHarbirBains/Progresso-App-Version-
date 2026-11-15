@@ -843,7 +843,7 @@ describe('FeedScreen -- Next Workout widget', () => {
     expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
   });
 
-  it('is absent for a user with no active workout split', async () => {
+  it('offers to start any workout, the same way, for a user with no active workout split', async () => {
     mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
@@ -856,20 +856,62 @@ describe('FeedScreen -- Next Workout widget', () => {
       avatarUrl: null,
       activeWorkoutSplitId: null,
     });
+    const hero = jest.spyOn(backdrop, 'useHeroBackdrop');
     renderScreen();
-    await screen.findByTestId('feed-empty');
 
+    const card = await screen.findByTestId('feed-start-workout');
+    expect(card).toHaveTextContent(/Ready to Train.*Start a Workout.*No split chosen yet/);
+    expect(card.props.accessibilityLabel).toBe('Start a workout. No split chosen yet');
     expect(screen.queryByTestId('feed-next-workout')).toBeNull();
     expect(mockFetchWorkoutSplitDetail).not.toHaveBeenCalled();
+    // The same hero: see-through over the brightened photo, with the cream button.
+    expect(hero).toHaveBeenLastCalledWith(true);
+    expect(screen.UNSAFE_getByType(PrimaryButton).props.accentColor).toBe(colors.heroAction);
+    hero.mockRestore();
+
+    fireEvent.press(card);
+    expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
   });
 
-  it('is absent when the active split has no days', async () => {
+  it('offers to start any workout when the active split has no days', async () => {
     mockFetchWorkoutSplitDetail.mockResolvedValue({ id: 'split-1', name: 'Empty', days: [] });
     mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
     renderScreen();
+
+    expect(await screen.findByTestId('feed-start-workout')).toHaveTextContent(
+      /Your split has no days yet/,
+    );
+    expect(screen.queryByTestId('feed-next-workout')).toBeNull();
+  });
+
+  it('never offers it while the next split day is still being read', async () => {
+    mockFetchWorkoutSplitDetail.mockReturnValue(new Promise(() => undefined));
+    renderScreen();
     await screen.findByTestId('feed-empty');
 
+    expect(screen.queryByTestId('feed-start-workout')).toBeNull();
     expect(screen.queryByTestId('feed-next-workout')).toBeNull();
+  });
+
+  it('keeps showing the next day when reading it again fails', async () => {
+    mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
+    mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
+    renderScreen();
+    await screen.findByTestId('feed-next-workout');
+
+    mockFetchWorkoutSplitDetail.mockRejectedValue(new Error('offline'));
+    const calls = navigation.addListener.mock.calls;
+    const [, focusCallback] = calls[calls.length - 1];
+    const now = jest.spyOn(Date, 'now');
+    now.mockReturnValue(Date.now() + 46_000);
+    await act(async () => {
+      focusCallback();
+    });
+    now.mockRestore();
+
+    await waitFor(() => expect(mockFetchWorkoutSplitDetail).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId('feed-next-workout')).toHaveTextContent(/Push/);
+    expect(screen.queryByTestId('feed-start-workout')).toBeNull();
   });
 
   it('shows up as soon as the active split loads, without needing a second focus', async () => {
@@ -1072,6 +1114,7 @@ describe('FeedScreen live workout', () => {
 
     expect(await screen.findByTestId('feed-live-workout')).toBeTruthy();
     expect(screen.queryByTestId('feed-next-workout')).toBeNull();
+    expect(screen.queryByTestId('feed-start-workout')).toBeNull();
   });
 });
 

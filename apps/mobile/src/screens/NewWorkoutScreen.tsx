@@ -45,10 +45,12 @@ function musclesLabel(day: WorkoutSplitDay): string {
 // Layout (DESIGN.md, Start Workout): one hero card for the next day, the
 // split's other days as numbered rows, then the ways to train that are not
 // the split (a group, a different workout, a past workout) as plain rows.
+// With no split, Choose Your Workout Split takes the hero's place and the
+// other ways to train still work -- a split is never needed to train.
 export function NewWorkoutScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const { theme, activeWorkoutSplitId } = useProgressTheme();
+  const { theme, activeWorkoutSplitId, themeLoading } = useProgressTheme();
 
   const [loading, setLoading] = useState(true);
   const [hasActiveSplitId, setHasActiveSplitId] = useState(false);
@@ -143,35 +145,21 @@ export function NewWorkoutScreen({ navigation }: Props) {
 
   const trimmedCustomName = customName.trim();
 
+  // Until the profile is read, a missing split isn't "no split" -- it's not known yet.
+  const waiting = loading || themeLoading;
+
   const header = (
     <AppHeader
       title="Start Workout"
-      subtitle={loading || !hasActiveSplitId ? undefined : 'Choose a workout day to begin.'}
+      subtitle={waiting || !hasActiveSplitId ? undefined : 'Choose a workout day to begin.'}
       testID="start-workout-header"
     />
   );
 
-  if (loading) {
+  if (waiting) {
     return (
       <Screen header={header} scroll={false} padded={false}>
         <LoadingState testID="new-workout-loading" inline />
-      </Screen>
-    );
-  }
-
-  if (!hasActiveSplitId) {
-    return (
-      <Screen header={header} scroll={false} padded={false}>
-        <View style={styles.emptyWrap}>
-          <EmptyState testID="new-workout-no-split" title="Choose Your Workout Split" />
-          <PrimaryButton
-            testID="new-workout-choose-split"
-            label="Choose Your Workout Split"
-            onPress={() => navigation.navigate('ChooseWorkoutSplit')}
-            accentColor={theme.accent}
-            onAccentColor={theme.onAccent}
-          />
-        </View>
       </Screen>
     );
   }
@@ -216,6 +204,19 @@ export function NewWorkoutScreen({ navigation }: Props) {
                 />
               </>
             ) : null}
+          </View>
+        ) : null}
+
+        {!hasActiveSplitId ? (
+          <View style={styles.emptyWrap}>
+            <EmptyState testID="new-workout-no-split" title="Choose Your Workout Split" />
+            <PrimaryButton
+              testID="new-workout-choose-split"
+              label="Choose Your Workout Split"
+              onPress={() => navigation.navigate('ChooseWorkoutSplit')}
+              accentColor={theme.accent}
+              onAccentColor={theme.onAccent}
+            />
           </View>
         ) : null}
 
@@ -311,9 +312,11 @@ export function NewWorkoutScreen({ navigation }: Props) {
             testID="start-workout-custom"
             divider
             title="Do a Different Workout"
-            subtitle="Not part of your split"
+            subtitle={hasActiveSplitId ? 'Not part of your split' : 'Name it and start'}
             onPress={() => setCustomSheetOpen(true)}
-            accessibilityLabel="Do a Different Workout, not part of your split"
+            accessibilityLabel={`Do a Different Workout, ${
+              hasActiveSplitId ? 'not part of your split' : 'name it and start'
+            }`}
           />
           <ListRow
             testID="start-workout-log-past"
@@ -332,7 +335,9 @@ export function NewWorkoutScreen({ navigation }: Props) {
       >
         <Text style={styles.sheetTitle}>Do a Different Workout</Text>
         <Text style={styles.sheetSubtitle}>
-          Name this workout. It won&apos;t be added to your split.
+          {hasActiveSplitId
+            ? "Name this workout. It won't be added to your split."
+            : 'Name this workout.'}
         </Text>
         <TextInput
           testID="start-workout-custom-name"

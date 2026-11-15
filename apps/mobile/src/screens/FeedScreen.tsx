@@ -203,10 +203,9 @@ export function FeedScreen({ navigation }: Props) {
   // Deliberately read-only here: tapping it opens NewWorkoutScreen rather
   // than starting the workout directly, so the one place that actually
   // creates a workout (with its one-active-workout conflict handling) stays
-  // the single source of truth, not duplicated onto Feed too. Absent
-  // entirely for a user with no active split, or an active split with no
-  // days -- never a "choose a split" prompt here, since Notifications
-  // already carries that reminder (see NotificationsScreen).
+  // the single source of truth, not duplicated onto Feed too. With no
+  // active split, or an active split with no days, the same hero offers to
+  // start any workout instead (Start Workout lets them, split or not).
   const [nextPlan, setNextPlanState] = useState<NextWorkoutPlan | null>(shown.nextPlan ?? null);
   // Whether the next workout has been read at least once -- until then a missing one isn't
   // "no split", just not known yet, and the Next Workout widget isn't told otherwise.
@@ -297,8 +296,8 @@ export function FeedScreen({ navigation }: Props) {
       lastNextWorkoutLoadAtRef.current = Date.now();
     } catch {
       // A preview widget failing to load isn't worth a screen-level error --
-      // it just doesn't show, same as a missing badge count above.
-      setNextPlan(null);
+      // it keeps what it last showed (nothing, if it never loaded) until the
+      // next focus reads it again, same as a missing badge count above.
     }
   }, [userId, activeWorkoutSplitId, setNextPlan]);
 
@@ -425,14 +424,20 @@ export function FeedScreen({ navigation }: Props) {
     })),
   ];
   const [liveHero, ...moreLive] = liveEntries;
+  // Whether the next split day is known -- or that there's no split -- so a missing one is never
+  // mistaken for "no split" while it's still being read.
+  const nextKnown = !themeLoading && (activeWorkoutSplitId === null || nextLoaded);
   const showNextWorkout = nextPlan !== null && liveKnown && liveEntries.length === 0;
+  // No next day to show (no split, or a split with no days): the same hero, to start any workout.
+  const showStartWorkout = nextPlan === null && nextKnown && liveKnown && liveEntries.length === 0;
+  const noNextDayLine =
+    activeWorkoutSplitId === null ? 'No split chosen yet' : 'Your split has no days yet';
   // The hero has no fill of its own; while it shows, the sunset photo behind Feed is
   // brightened so it shows through the hero (see AppBackgroundLayer).
-  useHeroBackdrop(showNextWorkout || liveHero !== undefined);
+  useHeroBackdrop(showNextWorkout || showStartWorkout || liveHero !== undefined);
 
   // The Next Workout widget shows what Feed's hero does, once Feed knows: what's open, and, with
   // nothing open, the next day of the split (or that there's no split).
-  const nextKnown = !themeLoading && (activeWorkoutSplitId === null || nextLoaded);
   const heroTitle = liveHero?.title;
   const heroKind = liveHero?.kind;
   const heroStartedAt = liveHero?.startedAt ?? null;
@@ -726,6 +731,20 @@ export function FeedScreen({ navigation }: Props) {
               accessibilityLabel={`Next workout: ${nextPlan.day.name}${
                 nextPlan.day.muscleGroups.length > 0 ? `, ${musclesLabel(nextPlan.day)}` : ''
               }`}
+            />
+          </RiseIn>
+        ) : null}
+
+        {showStartWorkout ? (
+          <RiseIn>
+            <FeedHeroCard
+              testID="feed-start-workout"
+              eyebrow="Ready to Train"
+              title="Start a Workout"
+              meta={noNextDayLine}
+              actionLabel="Start Workout"
+              onPress={() => navigation.navigate('NewWorkout')}
+              accessibilityLabel={`Start a workout. ${noNextDayLine}`}
             />
           </RiseIn>
         ) : null}

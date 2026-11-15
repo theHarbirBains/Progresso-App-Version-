@@ -300,7 +300,7 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
 });
 
 describe('NewWorkoutScreen without an active split', () => {
-  it('blocks with "Choose Your Workout Split" and shows no day rows or exercise UI', async () => {
+  it("offers to choose a split in the hero's place, with no day rows, and still every other way to train", async () => {
     mockFetchMyProfile.mockResolvedValue(baseProfile(null));
 
     render(<NewWorkoutScreen navigation={navigation} route={route} />, {
@@ -309,7 +309,31 @@ describe('NewWorkoutScreen without an active split', () => {
 
     expect(await screen.findByTestId('new-workout-no-split')).toBeTruthy();
     expect(screen.queryByTestId('start-workout-next')).toBeNull();
-    expect(screen.queryByTestId('start-workout-custom')).toBeNull();
+    expect(screen.queryByText('All Workout Days')).toBeNull();
+    expect(screen.getByTestId('start-workout-group')).toBeTruthy();
+    expect(screen.getByTestId('start-workout-log-past')).toBeTruthy();
+    expect(screen.getByTestId('start-workout-custom')).toHaveTextContent(/Name it and start/);
+  });
+
+  it('starts a different workout without a split', async () => {
+    mockFetchMyProfile.mockResolvedValue(baseProfile(null));
+
+    render(<NewWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    fireEvent.press(await screen.findByTestId('start-workout-custom'));
+    expect(screen.getByTestId('start-workout-custom-sheet')).not.toHaveTextContent(/your split/);
+    fireEvent.changeText(screen.getByTestId('start-workout-custom-name'), 'Arms + Abs');
+    fireEvent.press(screen.getByTestId('start-workout-custom-confirm'));
+
+    await waitFor(() =>
+      expect(mockCreateWorkout).toHaveBeenCalledWith('user-1', 'Arms + Abs', undefined),
+    );
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('ActiveWorkout', { workoutId: 'w1' }),
+    );
+    expect(mockFetchWorkoutSplitDetail).not.toHaveBeenCalled();
   });
 
   it('navigates to ChooseWorkoutSplit when the button is pressed', async () => {
