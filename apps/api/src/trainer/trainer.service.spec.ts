@@ -762,9 +762,15 @@ describe('TrainerService: clients without an account', () => {
         ok({ trainer_id: TRAINER, placeholder_user_id: PLACEHOLDER, code_expires_at: future() }),
       );
       mock.queueRpc('claim_placeholder_history', ok(3));
+      mock.queue('users', ok({ time_zone: 'America/Toronto' }));
+      mock.queueRpc('award_achievements', ok([]));
       mock.queue('trainer_actions', ok());
 
       await expect(service.claimHistory(CLIENT, 'abcd-2345')).resolves.toEqual({ workouts: 3 });
+
+      // Their achievements count the claimed history at once, in their own time zone.
+      const award = mock.calls.find((c) => c.target === 'rpc:award_achievements');
+      expect(award?.args[0]).toEqual({ p_user: CLIENT, p_zone: 'America/Toronto' });
 
       const rpc = mock.calls.find((c) => c.target === 'rpc:claim_placeholder_history');
       expect(rpc?.args[0]).toEqual({ p_placeholder: PLACEHOLDER, p_client: CLIENT });

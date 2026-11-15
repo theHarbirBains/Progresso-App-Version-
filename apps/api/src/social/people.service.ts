@@ -205,7 +205,7 @@ export class PeopleService {
         .select('id', { count: 'exact', head: true })
         .eq('follower_id', personId)
         .eq('status', 'accepted'),
-      client.from('users').select('bio, show_rank').eq('id', personId).maybeSingle(),
+      client.from('users').select('bio, show_rank, time_zone').eq('id', personId).maybeSingle(),
       relationship.isSelf
         ? Promise.resolve({ count: 0, people: [] })
         : this.mutualFriends(viewerId, personId),
@@ -214,10 +214,16 @@ export class PeopleService {
       throw new InternalServerErrorException('Failed to load follow counts');
     }
     if (about.error) throw new InternalServerErrorException('Failed to load profile');
-    const aboutRow = about.data as { bio: string | null; show_rank: boolean | null } | null;
+    const aboutRow = about.data as {
+      bio: string | null;
+      show_rank: boolean | null;
+      time_zone: string | null;
+    } | null;
 
     const visible = canSeeActivity(relationship);
     const showsRank = relationship.isSelf || aboutRow?.show_rank !== false;
+    // Their rank and achievements as of now, whether or not their own app has asked lately.
+    if (showsRank || visible) await this.awardAchievements(personId, aboutRow?.time_zone ?? null);
     const [stats, exercises, achievements, rank] = await Promise.all([
       visible ? this.workoutStats(personId, relationship.isSelf) : null,
       visible ? this.exerciseBests(personId, relationship.isSelf) : null,
@@ -526,6 +532,21 @@ export class PeopleService {
       likesReceived: row?.likes_received ?? 0,
       likesGiven: row?.likes_given ?? 0,
     };
+  }
+
+  /**
+   * Awards whatever their training now reaches (award_achievements -- it only ever adds), so a
+   * profile is never behind someone who hasn't opened the app lately. Best-effort: a failure
+   * leaves the profile showing what was awarded before, and the nightly run catches up.
+   */
+  private async awardAchievements(personId: string, timeZone: string | null): Promise<void> {
+    try {
+      await this.supabaseService
+        .getClient()
+        .rpc('award_achievements', { p_user: personId, p_zone: timeZone ?? 'UTC' });
+    } catch {
+      // Caught up tonight.
+    }
   }
 
   /** Their lifetime AP: the sum of their awards (achievement_summary). */

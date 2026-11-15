@@ -141,3 +141,20 @@ export async function awardMyAchievements(): Promise<AchievementAward[]> {
   if (error) throw new Error(error.message);
   return ((data ?? []) as AwardRow[]).map(toAward);
 }
+
+/** The latest award you've been shown (null before any): newer ones get their unlock. */
+export async function fetchAchievementsSeenAt(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('achievements_seen_at')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as { achievements_seen_at: string | null } | null)?.achievements_seen_at ?? null;
+}
+
+/** You've been shown every award up to `until` (only ever moves forward). */
+export async function markAchievementsSeen(until: string): Promise<void> {
+  const { error } = await supabase.rpc('mark_achievements_seen', { p_until: until });
+  if (error) throw new Error(error.message);
+}

@@ -5580,6 +5580,69 @@ async function main() {
         (await seen(other, 'achievement_levels')) === 175,
     );
 
+    // Everyone is awarded, whether or not their own app has asked -- never a tracked client's
+    // placeholder, which nobody is behind.
+    const away = randomUUID();
+    const coach = randomUUID();
+    const placeholder = randomUUID();
+    await admin.query(
+      `insert into auth.users (id, email) values
+         ($1, 'lv-away@test.local'), ($2, 'lv-coach@test.local'), ($3, 'lv-placeholder@test.local')`,
+      [away, coach, placeholder],
+    );
+    await admin.query(
+      `insert into public.trainer_placeholder_clients (trainer_id, placeholder_user_id, code_hash, code_expires_at)
+       values ($1, $2, 'lv-hash', now() + interval '7 days')`,
+      [coach, placeholder],
+    );
+    const awayCurl = await exercise(away, 'Away Curl', 'biceps');
+    const trackedCurl = await exercise(placeholder, 'Tracked Curl', 'biceps');
+    await workout(away, awayCurl, '2026-10-01T10:00:00Z', [{ weight: 20, reps: 10 }]);
+    await workout(placeholder, trackedCurl, '2026-10-01T10:00:00Z', [{ weight: 20, reps: 10 }]);
+    const people = (await admin.query('select public.award_everyone() as n')).rows[0].n;
+    const awardedTo = async (user) =>
+      (
+        await admin.query(
+          'select achievement_id from public.achievement_awards where user_id = $1',
+          [user],
+        )
+      ).rows.map((r) => r.achievement_id);
+    record(
+      "Everyone is awarded what they've reached, even without opening the app -- never a tracked client's placeholder",
+      people > 0 &&
+        (await awardedTo(away)).includes('first-steps') &&
+        (await awardedTo(placeholder)).length === 0,
+      JSON.stringify({ people, away: await awardedTo(away) }),
+    );
+    await expectThrows(
+      asUser(away, (c) => c.query('select public.award_everyone()')),
+      "Nobody runs everyone's awarding from the app",
+      /permission denied/i,
+    );
+
+    // The latest award a person has been shown: only ever forward, never past now, their own.
+    const seenAt = async (user) =>
+      (await admin.query('select achievements_seen_at from public.users where id = $1', [user]))
+        .rows[0].achievements_seen_at;
+    await asUserCommitted(away, (c) =>
+      c.query("select public.mark_achievements_seen('2026-11-01T10:00:00Z')"),
+    );
+    await asUserCommitted(away, (c) =>
+      c.query("select public.mark_achievements_seen('2026-10-01T10:00:00Z')"),
+    );
+    const firstSeen = await seenAt(away);
+    await asUserCommitted(away, (c) =>
+      c.query("select public.mark_achievements_seen('2999-01-01T00:00:00Z')"),
+    );
+    const farSeen = await seenAt(away);
+    record(
+      'What a person has been shown only moves forward, and never past now',
+      new Date(firstSeen).toISOString() === '2026-11-01T10:00:00.000Z' &&
+        new Date(farSeen).getTime() <= Date.now() &&
+        (await seenAt(other)) === null,
+      JSON.stringify({ firstSeen, farSeen }),
+    );
+
     // An account's awards and progress go with it.
     await admin.query('delete from auth.users where id = $1', [zoned]);
     record(

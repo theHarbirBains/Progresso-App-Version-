@@ -2,6 +2,7 @@ import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { claimTrainerHistory } from '../lib/api';
+import { AchievementsContext, type AchievementsValue } from '../achievements/achievementsContext';
 import { TrainerClaimScreen } from './TrainerClaimScreen';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -19,14 +20,23 @@ const mockGoBack = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation: any = { goBack: mockGoBack };
 
+const mockEvaluate = jest.fn(async () => undefined);
+
 function renderScreen() {
-  return render(<TrainerClaimScreen navigation={navigation} route={{} as never} />);
+  return render(
+    <AchievementsContext.Provider
+      value={{ evaluate: mockEvaluate } as unknown as AchievementsValue}
+    >
+      <TrainerClaimScreen navigation={navigation} route={{} as never} />
+    </AchievementsContext.Provider>,
+  );
 }
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' } });
   mockClaim.mockReset();
   mockGoBack.mockClear();
+  mockEvaluate.mockClear();
 });
 
 describe('TrainerClaimScreen', () => {
@@ -44,6 +54,8 @@ describe('TrainerClaimScreen', () => {
       'History linked',
       expect.stringContaining('3 workouts are now on your account'),
     );
+    // The claimed history counts toward their achievements at once.
+    expect(mockEvaluate).toHaveBeenCalled();
     alert.mockRestore();
   });
 

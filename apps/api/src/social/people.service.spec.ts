@@ -206,6 +206,7 @@ describe('PeopleService', () => {
         ],
         error: null,
       });
+      client.queue('rpc:award_achievements', { data: [], error: null });
       client.queue('rpc:achievement_summary', {
         data: [{ points: 1250, awards: 14 }],
         error: null,
@@ -343,6 +344,8 @@ describe('PeopleService', () => {
         p_owner: SAM,
         p_include_trainer_logged: false,
       });
+      // Their achievements as of now, before they're read.
+      expect(client.rpc).toHaveBeenCalledWith('award_achievements', { p_user: SAM, p_zone: 'UTC' });
     });
 
     it('shows only who someone is, and their counts, until they accept your follow', async () => {
@@ -355,6 +358,7 @@ describe('PeopleService', () => {
       client.queue('follows', { data: null, error: null, count: 12 });
       client.queue('follows', { data: null, error: null, count: 3 });
       client.queue('users', { data: { bio: null }, error: null });
+      client.queue('rpc:award_achievements', { data: [], error: null });
       client.queue('rpc:achievement_summary', { data: [{ points: 640, awards: 9 }], error: null });
       const service = serviceWith(client);
 
@@ -372,9 +376,32 @@ describe('PeopleService', () => {
         rank: { points: 640, awards: 9 },
         achievements: null,
       });
-      expect(client.rpc).toHaveBeenCalledTimes(1);
+      // Brought up to date for their rank, which anyone may see.
+      expect(client.rpc).toHaveBeenCalledWith(
+        'award_achievements',
+        expect.objectContaining({ p_user: SAM }),
+      );
       expect(client.from).not.toHaveBeenCalledWith('workouts');
       expect(client.from).not.toHaveBeenCalledWith('achievement_awards');
+    });
+
+    it('still shows the profile when bringing their achievements up to date fails', async () => {
+      const client = createMockClient();
+      queueRelationship(client, [
+        { id: 'f1', follower_id: ME, followee_id: SAM, status: 'pending' },
+      ]);
+      client.queue('users', { data: [user(SAM, 'Sam')], error: null });
+      client.queue('follows', { data: [], error: null });
+      client.queue('follows', { data: null, error: null, count: 12 });
+      client.queue('follows', { data: null, error: null, count: 3 });
+      client.queue('users', { data: { bio: null }, error: null });
+      // Nothing queued for award_achievements: it fails.
+      client.queue('rpc:achievement_summary', { data: [{ points: 640, awards: 9 }], error: null });
+      const service = serviceWith(client);
+
+      await expect(service.getProfile(ME, SAM)).resolves.toMatchObject({
+        rank: { points: 640, awards: 9 },
+      });
     });
 
     it('hides the rank of someone who chose to hide it', async () => {
@@ -400,7 +427,11 @@ describe('PeopleService', () => {
       client.queue('users', { data: [user(ME, 'Me')], error: null });
       client.queue('follows', { data: null, error: null, count: 2 });
       client.queue('follows', { data: null, error: null, count: 5 });
-      client.queue('users', { data: { bio: null, show_rank: false }, error: null });
+      client.queue('users', {
+        data: { bio: null, show_rank: false, time_zone: 'America/Toronto' },
+        error: null,
+      });
+      client.queue('rpc:award_achievements', { data: [], error: null });
       client.queue('workouts', { data: null, error: null, count: 3 });
       client.queue('workouts', { data: null, error: null, count: 1 });
       client.queue('rpc:person_profile_totals', { data: [], error: null });
@@ -421,6 +452,10 @@ describe('PeopleService', () => {
         // Your own rank shows to you, even hidden from others.
         rank: { points: 75, awards: 2 },
         achievements: [],
+      });
+      expect(client.rpc).toHaveBeenCalledWith('award_achievements', {
+        p_user: ME,
+        p_zone: 'America/Toronto',
       });
       expect(client.rpc).toHaveBeenCalledWith('person_profile_totals', {
         p_owner: ME,

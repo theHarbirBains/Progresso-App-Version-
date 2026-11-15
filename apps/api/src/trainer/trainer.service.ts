@@ -799,6 +799,9 @@ export class TrainerService {
     // cannot sign in, so a failure to delete it is harmless and not reported.
     await client.auth.admin.deleteUser(placeholder.placeholder_user_id);
 
+    // Their achievements count the history they've just claimed, at once.
+    await this.awardAchievements(userId);
+
     const workouts = Number(moved ?? 0);
     // There's no trainer to record it against once their account is gone.
     if (!placeholder.trainer_id) return { workouts };
@@ -813,6 +816,27 @@ export class TrainerService {
       },
     );
     return { workouts };
+  }
+
+  /**
+   * Awards whatever a person's history now reaches (award_achievements -- it only ever adds).
+   * Best-effort: the nightly run catches anything this misses, so a failure never stops a claim.
+   */
+  private async awardAchievements(userId: string): Promise<void> {
+    const client = this.supabaseService.getClient();
+    try {
+      const { data } = await client
+        .from('users')
+        .select('time_zone')
+        .eq('id', userId)
+        .maybeSingle();
+      await client.rpc('award_achievements', {
+        p_user: userId,
+        p_zone: (data as { time_zone: string | null } | null)?.time_zone ?? 'UTC',
+      });
+    } catch {
+      // Caught up tonight.
+    }
   }
 
   private async issueClaimCode(

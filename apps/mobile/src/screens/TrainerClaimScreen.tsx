@@ -10,6 +10,7 @@ import { colors, spacing, typeScale } from '../design/theme';
 import { Card } from '../design/Card';
 import { claimTrainerHistory } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
+import { useAchievements } from '../achievements/achievementsContext';
 
 type Props = RootStackScreenProps<'TrainerClaim'>;
 
@@ -25,6 +26,7 @@ export function TrainerClaimScreen({ navigation }: Props) {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { evaluate } = useAchievements();
 
   async function handleClaim() {
     if (!accessToken || saving) return;
@@ -38,6 +40,8 @@ export function TrainerClaimScreen({ navigation }: Props) {
     setError(null);
     try {
       const { workouts } = await claimTrainerHistory(accessToken, entered);
+      // The claimed history counts toward their achievements: show what it's earned.
+      void evaluate();
       const count = workouts === 1 ? '1 workout is' : `${workouts} workouts are`;
       Alert.alert(
         'History linked',
