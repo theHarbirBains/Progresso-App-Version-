@@ -23,7 +23,7 @@ describe('app themes', () => {
     expect(APP_THEMES[0].accent).toBe(colors.accent);
   });
 
-  it('has the eight themes, each with its own photo', () => {
+  it('has the nine themes, each with its own photo', () => {
     expect(APP_THEMES.map((t) => t.name)).toEqual([
       'Golden Hour Gym',
       'Forest',
@@ -33,8 +33,9 @@ describe('app themes', () => {
       'Summer',
       'Autumn',
       'Winter',
+      'Holiday Gym',
     ]);
-    expect(new Set(APP_THEMES.map((t) => t.photo)).size).toBe(8);
+    expect(new Set(APP_THEMES.map((t) => t.photo)).size).toBe(9);
   });
 
   it('keeps every accent readable: as text on the dark, and with its ink on it', () => {

@@ -82,6 +82,8 @@ export function ThemeChoices({
               testID={`${testIDPrefix}-${item.id}`}
             />
           ))}
+          {/* A last row of one keeps its tile the size of the rest. */}
+          {row.length === 1 ? <View style={styles.tile} /> : null}
         </View>
       ))}
     </View>

@@ -45,6 +45,10 @@ const PHOTOS: Record<AppThemeId, { small: number; medium: number }> = {
     small: require('../../assets/widgets/winter-small.jpg'),
     medium: require('../../assets/widgets/winter-medium.jpg'),
   },
+  'holiday-gym': {
+    small: require('../../assets/widgets/holiday-gym-small.jpg'),
+    medium: require('../../assets/widgets/holiday-gym-medium.jpg'),
+  },
 };
 
 /** The theme's photos, kept in the App Group: where each one is, or nothing without the App Group. */

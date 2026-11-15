@@ -2,14 +2,23 @@
 // top of every screen and one accent; everything else -- surfaces, text, charts, forms, the live
 // workout -- stays the same warm dark in every theme, so a theme never costs readability. Golden
 // Hour Gym is the default. Every photo is Progresso's own: a gym open onto its scene (a mountain
-// lake at sunset, a waterfall, snowy peaks, the sea, blossom, palms, autumn woods, snow), cut to
+// lake at sunset, a waterfall, snowy peaks, the sea, blossom, palms, autumn woods, snow -- and a
+// gym dressed for Christmas at night, its tree and garlands lit, Holiday Gym), cut to
 // the same proportions and drawn under the same darkening layers (design/AppBackgroundLayer.tsx);
 // each theme's `heroDarkness` is how dark its photo stays behind Feed's Next Workout, measured so
 // hero text keeps at least the contrast it had over the original gym photo at 10% -- over the
 // photo's brightest specks and over its broad bright areas alike.
 
 export type AppThemeId =
-  'golden-hour-gym' | 'forest' | 'alpine' | 'coast' | 'spring' | 'summer' | 'autumn' | 'winter';
+  | 'golden-hour-gym'
+  | 'forest'
+  | 'alpine'
+  | 'coast'
+  | 'spring'
+  | 'summer'
+  | 'autumn'
+  | 'winter'
+  | 'holiday-gym';
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
@@ -84,6 +93,16 @@ export const APP_THEMES: readonly AppTheme[] = [
     name: 'Winter',
     accent: '#A9C4E0',
     photo: require('../../assets/themes/winter.jpg'),
+    heroDarkness: 0.1,
+  },
+  {
+    // A gym dressed for Christmas at night. The darkest photo of all, its brightest specks (the
+    // string lights) no brighter than Forest's or Winter's, so the lightest darkening keeps hero
+    // text as readable; its accent is the gold of the lights, red staying for delete and errors.
+    id: 'holiday-gym',
+    name: 'Holiday Gym',
+    accent: '#EBC27C',
+    photo: require('../../assets/themes/holiday-gym.jpg'),
     heroDarkness: 0.1,
   },
 ];
