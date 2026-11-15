@@ -38,6 +38,7 @@ import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
 import { endWorkoutActivities } from '../widgets/workoutActivity';
 import { ActiveWorkoutScreen } from './ActiveWorkoutScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
+import { DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 
 const { nextWorkoutWidget, workoutActivity } = homeWidgets();
 
@@ -703,7 +704,7 @@ describe('ActiveWorkoutScreen', () => {
     );
   });
 
-  it('uses the one amber accent, even if an old custom Workout color is saved on the account', async () => {
+  it("uses the theme's one accent, even if an old custom Workout color is saved on the account", async () => {
     mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
@@ -720,10 +721,10 @@ describe('ActiveWorkoutScreen', () => {
       wrapper: TestProviders,
     });
 
-    // The selected muscle tab is filled with the accent -- always the app's amber, never a
+    // The selected muscle tab is filled with the accent -- always the theme's, never a
     // color saved by the old color picker.
     const allTab = await screen.findByTestId('active-workout-muscle-tabs-all');
-    expect(StyleSheet.flatten(allTab.props.style).backgroundColor).toBe('#D99A50');
+    expect(StyleSheet.flatten(allTab.props.style).backgroundColor).toBe(DEFAULT_WORKOUT_COLOR);
   });
 
   it('has no back arrow or "..." options menu -- Finish Workout/Cancel Workout are the only exits', async () => {
@@ -768,7 +769,7 @@ describe('ActiveWorkoutScreen', () => {
         title: 'Push Day',
         kind: 'Your workout',
         startedAt: Date.parse('2026-01-01T00:00:00Z'),
-        accent: '#D99A50',
+        accent: '#EBC27C',
       },
       'progresso://workouts/w1/live',
     );
@@ -878,7 +879,7 @@ describe('ActiveWorkoutScreen', () => {
     expect(mockFetchAllCompletedWorkouts).toHaveBeenCalledTimes(1);
   });
 
-  it('the Finish Workout button is amber, even if an old custom Workout color is saved', async () => {
+  it("the Finish Workout button is in the theme's accent, even if an old custom Workout color is saved", async () => {
     mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',
       email: 'a@example.com',
@@ -898,7 +899,7 @@ describe('ActiveWorkoutScreen', () => {
 
     const button = screen.getByTestId('complete-workout');
     const flat = StyleSheet.flatten(button.props.style);
-    expect(flat.backgroundColor).toBe('#D99A50');
+    expect(flat.backgroundColor).toBe(DEFAULT_WORKOUT_COLOR);
   });
 
   it('is reachable without scrolling even with many exercises, and does not interfere with adding sets/exercises', async () => {

@@ -91,7 +91,7 @@ describe('updating the widgets', () => {
     // In the original look until the theme is applied, and dated.
     expect(entries[0]).toMatchObject({
       date: now,
-      props: { calories: '1,240', accent: '#D99A50', day: expect.any(String) },
+      props: { calories: '1,240', accent: '#EBC27C', day: expect.any(String) },
     });
   });
 

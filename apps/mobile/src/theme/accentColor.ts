@@ -1,4 +1,5 @@
 import { colors } from '../design/theme';
+import { DEFAULT_THEME_ID, themeById } from './appThemes';
 
 // A per-mode accent theme, derived entirely from one base hex color (see
 // buildAccentTheme below). Shape is deliberately unchanged from the earlier
@@ -99,13 +100,13 @@ export function buildAccentTheme(hex: string): AccentTheme {
   };
 }
 
-// The app's one accent, soft amber (Warm Minimal, matching colors.accent),
-// for both modes. There is no color picker: Train and Nutrition are told
-// apart by label and icon, not by color (the same approach Feed's cards
-// already use -- see DESIGN.md's Feed section), and the page you're on is
-// always highlighted in this amber.
-export const DEFAULT_WORKOUT_COLOR = '#D99A50';
-export const DEFAULT_NUTRITION_COLOR = '#D99A50';
+// The app's one accent when no theme has been chosen -- the default theme's
+// (theme/appThemes.ts), for both modes. There is no color picker: Train and
+// Nutrition are told apart by label and icon, not by color (the same approach
+// Feed's cards already use -- see DESIGN.md's Feed section), and the page
+// you're on is always highlighted in it.
+export const DEFAULT_WORKOUT_COLOR = themeById(DEFAULT_THEME_ID).accent;
+export const DEFAULT_NUTRITION_COLOR = DEFAULT_WORKOUT_COLOR;
 
 export const DEFAULT_WORKOUT_THEME = buildAccentTheme(DEFAULT_WORKOUT_COLOR);
 export const DEFAULT_NUTRITION_THEME = buildAccentTheme(DEFAULT_NUTRITION_COLOR);

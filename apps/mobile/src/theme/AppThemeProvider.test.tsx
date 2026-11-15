@@ -24,13 +24,13 @@ afterEach(() => {
 });
 
 describe('AppThemeProvider', () => {
-  it('starts on Golden Hour Gym, and says when the saved choice has been read', async () => {
+  it('starts on Holiday Gym, the default, and says when the saved choice has been read', async () => {
     const { result } = renderHook(() => useAppTheme(), { wrapper });
 
     expect(result.current.loaded).toBe(false);
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    expect(result.current.theme.id).toBe('golden-hour-gym');
-    expect(result.current.accent.accent).toBe('#D99A50');
+    expect(result.current.theme.id).toBe('holiday-gym');
+    expect(result.current.accent.accent).toBe('#EBC27C');
   });
 
   it('applies a chosen theme at once and keeps it on the phone', async () => {
@@ -66,7 +66,7 @@ describe('AppThemeProvider', () => {
     const { result } = renderHook(() => useAppTheme(), { wrapper });
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    expect(result.current.theme.id).toBe('golden-hour-gym');
+    expect(result.current.theme.id).toBe('holiday-gym');
     expect(result.current.followSeasons).toBe(false);
   });
 
@@ -146,7 +146,7 @@ describe('AppThemeProvider', () => {
         expect(JSON.parse((await AsyncStorage.getItem(KEY))!)).toMatchObject({ snowfall: false }),
       );
       // The theme is left as it was.
-      expect(result.current.theme.id).toBe('golden-hour-gym');
+      expect(result.current.theme.id).toBe('holiday-gym');
     });
 
     it('keeps it off once turned off', async () => {

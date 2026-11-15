@@ -104,13 +104,12 @@ describe('buildAccentTheme', () => {
 });
 
 describe('default colors', () => {
-  it('are both the same soft amber -- the Warm Minimal redesign -- and match the brand accent', () => {
-    expect(DEFAULT_WORKOUT_COLOR).toBe('#D99A50');
-    expect(DEFAULT_NUTRITION_COLOR).toBe('#D99A50');
-    expect(DEFAULT_WORKOUT_COLOR).toBe(colors.accent);
+  it("are both the default theme's accent -- Holiday Gym's string-light gold", () => {
+    expect(DEFAULT_WORKOUT_COLOR).toBe('#EBC27C');
+    expect(DEFAULT_NUTRITION_COLOR).toBe('#EBC27C');
   });
 
-  it('puts dark ink on the amber, never light', () => {
+  it('puts dark ink on the gold, never light', () => {
     expect(buildAccentTheme(DEFAULT_WORKOUT_COLOR).onAccent).toBe(colors.background);
   });
 });

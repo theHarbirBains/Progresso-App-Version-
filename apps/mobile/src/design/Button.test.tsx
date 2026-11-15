@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react-native
 import { StyleSheet } from 'react-native';
 import { colors, radii } from './theme';
 import { DestructiveButton, PrimaryButton, SecondaryButton, TextButton } from './Button';
+import { DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 
 describe('Button variants', () => {
   it.each([
@@ -35,11 +36,11 @@ describe('Button variants', () => {
 });
 
 describe('PrimaryButton accent color', () => {
-  it('defaults to the static brand accent when no accentColor is given', () => {
+  it("defaults to the theme's accent when no accentColor is given", () => {
     render(<PrimaryButton label="Do it" onPress={jest.fn()} testID="btn" />);
 
     const style = StyleSheet.flatten(screen.getByTestId('btn').props.style);
-    expect(style.backgroundColor).toBe(colors.accent);
+    expect(style.backgroundColor).toBe(DEFAULT_WORKOUT_COLOR);
   });
 
   it("uses the user's own accent color and its contrasting text color when given", () => {

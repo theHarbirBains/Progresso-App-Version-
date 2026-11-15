@@ -41,17 +41,17 @@ beforeEach(async () => {
 });
 
 describe('SettingsAppearanceScreen', () => {
-  it('offers the nine themes, Golden Hour Gym first and chosen to start, Holiday Gym last', async () => {
+  it('offers the nine themes, Golden Hour Gym first, Holiday Gym last and chosen to start', async () => {
     await renderScreen();
 
     const tiles = screen.getAllByTestId(/^appearance-theme-/);
     expect(tiles).toHaveLength(9);
     expect(tiles[0]).toHaveTextContent(/Golden Hour Gym/);
     expect(tiles[8]).toHaveTextContent(/Holiday Gym/);
-    expect(screen.getByTestId('appearance-theme-golden-hour-gym').props.accessibilityState).toEqual(
+    expect(screen.getByTestId('appearance-theme-holiday-gym').props.accessibilityState).toEqual(
       expect.objectContaining({ selected: true }),
     );
-    expect(screen.getByTestId('shown-theme')).toHaveTextContent('golden-hour-gym');
+    expect(screen.getByTestId('shown-theme')).toHaveTextContent('holiday-gym');
   });
 
   it('can wear Holiday Gym, its accent the gold of the lights', async () => {

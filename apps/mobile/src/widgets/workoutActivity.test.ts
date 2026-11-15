@@ -34,7 +34,7 @@ it('starts one card for a workout, once', async () => {
   expect(start).toHaveBeenCalledTimes(1);
   // In the app theme's accent -- the original amber until the theme is read.
   expect(start).toHaveBeenCalledWith(
-    { ...PUSH, accent: '#D99A50' },
+    { ...PUSH, accent: '#EBC27C' },
     'progresso://workouts/w1/live',
   );
 });
@@ -45,7 +45,7 @@ it("takes another workout's card off the Lock Screen when a new one starts", asy
 
   await showWorkoutActivity('group:g1', LEGS, 'progresso://groups/g1');
 
-  expect(start).toHaveBeenCalledWith({ ...LEGS, accent: '#D99A50' }, 'progresso://groups/g1');
+  expect(start).toHaveBeenCalledWith({ ...LEGS, accent: '#EBC27C' }, 'progresso://groups/g1');
   expect(old.end).toHaveBeenCalledWith('immediate');
 });
 

@@ -48,7 +48,7 @@ describe('useProgressTheme', () => {
     expect(result.current.avatarUrl).toBe('https://example.com/avatar.jpg');
   });
 
-  it("uses the app theme's accent -- amber in the default -- ignoring colors saved with the old pickers", () => {
+  it("uses the app theme's accent -- gold in the default -- ignoring colors saved with the old pickers", () => {
     mockUseProfile.mockReturnValue(
       profileContext({
         profile: {
@@ -62,8 +62,9 @@ describe('useProgressTheme', () => {
 
     expect(result.current.theme).toEqual(DEFAULT_WORKOUT_THEME);
     expect(result.current.nutritionTheme).toEqual(DEFAULT_NUTRITION_THEME);
-    expect(result.current.theme.accent).toBe('#D99A50');
-    expect(result.current.nutritionTheme.accent).toBe('#D99A50');
+    // Holiday Gym's gold, the default theme's.
+    expect(result.current.theme.accent).toBe('#EBC27C');
+    expect(result.current.nutritionTheme.accent).toBe('#EBC27C');
   });
 
   it('falls back to safe defaults, without throwing, while the shared cache has no profile yet', () => {

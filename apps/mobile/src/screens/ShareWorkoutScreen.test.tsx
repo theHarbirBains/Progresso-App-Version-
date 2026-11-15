@@ -9,7 +9,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchShareCardData } from '../sharing/shareCardData';
 import { CARD_MAX_HEIGHT, CARD_SCALE, CARD_WIDTH, STORY_SAFE_AREA } from '../sharing/ShareCard';
-import { mixHex } from '../theme/accentColor';
+import { DEFAULT_WORKOUT_COLOR, mixHex } from '../theme/accentColor';
 import { ShareWorkoutScreen } from './ShareWorkoutScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -165,7 +165,7 @@ describe('ShareWorkoutScreen loading and preview', () => {
     // Bench Press is a PR; Overhead Press isn't.
     expect(await screen.findByTestId('share-card-top-set-0-pr')).toHaveTextContent(/^PR$/);
     expect(StyleSheet.flatten(screen.getByTestId('share-card-top-set-0').props.style).color).toBe(
-      colors.accent,
+      DEFAULT_WORKOUT_COLOR,
     );
     expect(screen.queryByTestId('share-card-top-set-1-pr')).toBeNull();
     expect(StyleSheet.flatten(screen.getByTestId('share-card-top-set-1').props.style).color).toBe(
@@ -421,15 +421,15 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     await settle();
   });
 
-  it('frames the card in a warm sunset gradient, from the amber accent into the warm near-black', async () => {
+  it("frames the card in a warm gradient, from the theme's accent into the warm near-black", async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
     const frame = await screen.findByTestId('share-story-frame');
 
     expect(frame.props.colors).toEqual([
-      mixHex(colors.accent, colors.background, 0.62),
-      mixHex(colors.accent, colors.background, 0.84),
+      mixHex(DEFAULT_WORKOUT_COLOR, colors.background, 0.62),
+      mixHex(DEFAULT_WORKOUT_COLOR, colors.background, 0.84),
       colors.background,
     ]);
     await settle();
@@ -447,7 +447,7 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     expect(set.fontFamily).toBe(fonts.mono);
     // A record's value (Bench Press, here) is the one accented text on the card.
     const prValue = screen.getByTestId('share-card-top-set-0');
-    expect(StyleSheet.flatten(prValue.props.style).color).toBe(colors.accent);
+    expect(StyleSheet.flatten(prValue.props.style).color).toBe(DEFAULT_WORKOUT_COLOR);
     await settle();
   });
 

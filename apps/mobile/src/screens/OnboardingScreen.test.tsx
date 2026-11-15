@@ -911,10 +911,10 @@ describe('OnboardingScreen -- picking a look', () => {
     );
 
     expect(await screen.findByText('Pick your look')).toBeTruthy();
-    expect(screen.getByTestId('onboarding-theme-golden-hour-gym')).toHaveProp(
-      'accessibilityState',
-      { selected: true },
-    );
+    // Holiday Gym, the default.
+    expect(screen.getByTestId('onboarding-theme-holiday-gym')).toHaveProp('accessibilityState', {
+      selected: true,
+    });
 
     fireEvent.press(screen.getByTestId('onboarding-theme-alpine'));
     expect(screen.getByTestId('onboarding-theme-alpine')).toHaveProp('accessibilityState', {

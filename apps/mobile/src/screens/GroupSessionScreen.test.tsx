@@ -180,7 +180,7 @@ describe('GroupSessionScreen', () => {
         title: 'Thursday legs',
         kind: 'Group workout',
         startedAt: Date.parse('2026-10-06T09:00:00.000Z'),
-        accent: '#D99A50',
+        accent: '#EBC27C',
       },
       'progresso://groups/g1',
     );

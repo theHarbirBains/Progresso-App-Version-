@@ -81,7 +81,7 @@ import { useTrainerStatus } from './src/trainer/useTrainerStatus';
 import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
-import { LaunchScreen } from './src/screens/LaunchScreen';
+import { LaunchScreen, useHolidayLaunchHeld } from './src/screens/LaunchScreen';
 import { Snowfall } from './src/design/Snowfall';
 import { EditWorkoutScreen } from './src/screens/EditWorkoutScreen';
 import { LogPastWorkoutScreen } from './src/screens/LogPastWorkoutScreen';
@@ -596,8 +596,12 @@ function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { status } = useAuth();
   // The chosen theme is read before anything shows, so the default never flashes first -- and
   // the launch screen wears it as soon as it's read.
-  const { loaded: themeLoaded, theme, snowing } = useAppTheme();
+  const { loaded: themeLoaded, theme, snowing, decorating } = useAppTheme();
   const ready = fontsLoaded && status !== 'loading' && themeLoaded;
+  // Through the holidays (with their decorations on) the launch shows a gym dressed for
+  // Christmas, and stays about three seconds from the start -- the app opens behind it meanwhile.
+  const holidayLaunch = themeLoaded && decorating;
+  const held = useHolidayLaunchHeld();
 
   return (
     <View style={styles.shell}>
@@ -611,7 +615,11 @@ function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
       {ready ? <Root /> : null}
       {/* Over every screen through the holidays; touches pass straight through it. */}
       {ready && snowing ? <Snowfall /> : null}
-      <LaunchScreen ready={ready} theme={themeLoaded ? theme : null} />
+      <LaunchScreen
+        ready={ready && (!holidayLaunch || held)}
+        theme={themeLoaded ? theme : null}
+        holiday={holidayLaunch}
+      />
     </View>
   );
 }

@@ -1,7 +1,7 @@
 import { ScrollView, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { colors } from '../design/theme';
 import { MuscleGroupChips } from './MuscleGroupChips';
+import { DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
 
 describe('MuscleGroupChips', () => {
   // Regression test for the "chips render as skinny/empty bubbles" bug:
@@ -74,12 +74,12 @@ describe('MuscleGroupChips', () => {
     expect(screen.getByTestId('muscle-group-chip-all')).toBeTruthy();
   });
 
-  it('falls back to the brand accent for the selected chip when no accentColor is given', () => {
+  it("falls back to the theme's accent for the selected chip when no accentColor is given", () => {
     render(<MuscleGroupChips value="chest" onChange={jest.fn()} />);
 
     const chip = screen.getByTestId('muscle-group-chip-chest');
     const flat = StyleSheet.flatten(chip.props.style);
-    expect(flat.backgroundColor).toBe(colors.accent);
+    expect(flat.backgroundColor).toBe(DEFAULT_WORKOUT_COLOR);
   });
 
   it('follows the given accentColor/onAccentColor for the selected chip instead of the static color', () => {

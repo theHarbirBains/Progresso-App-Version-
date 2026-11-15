@@ -192,8 +192,8 @@ describe('ScreenBackdrop behind a photo hero', () => {
         <Hero />
       </ScreenBackdrop>,
     );
-    // Golden Hour Gym, the default: 20%, measured against the original gym photo's 10%.
-    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.2, 2);
+    // Holiday Gym, the default: 10%.
+    expect(topDarkness('screen-backdrop')).toBeCloseTo(0.1, 2);
 
     rerender(
       <ScreenBackdrop>
@@ -250,7 +250,7 @@ describe('ScreenBackdrop in a theme', () => {
     expect(topDarkness('screen-backdrop')).toBeCloseTo(themeById('alpine').heroDarkness, 2);
   });
 
-  it('shows Golden Hour Gym by default', () => {
+  it('shows Holiday Gym by default', () => {
     render(
       <ScreenBackdrop>
         <Text>page</Text>
@@ -258,7 +258,7 @@ describe('ScreenBackdrop in a theme', () => {
     );
 
     expect(screen.getByTestId('screen-backdrop-photo-image').props.source).toBe(
-      themeById('golden-hour-gym').photo,
+      themeById('holiday-gym').photo,
     );
   });
 });

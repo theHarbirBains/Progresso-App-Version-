@@ -17,9 +17,9 @@ function contrast(a: string, b: string): number {
 }
 
 describe('app themes', () => {
-  it('has Golden Hour Gym -- the original look -- first, and as the default', () => {
+  it('has Golden Hour Gym -- the original look -- first, and Holiday Gym as the default', () => {
     expect(APP_THEMES[0]).toMatchObject({ id: 'golden-hour-gym', name: 'Golden Hour Gym' });
-    expect(DEFAULT_THEME_ID).toBe('golden-hour-gym');
+    expect(DEFAULT_THEME_ID).toBe('holiday-gym');
     expect(APP_THEMES[0].accent).toBe(colors.accent);
   });
 
