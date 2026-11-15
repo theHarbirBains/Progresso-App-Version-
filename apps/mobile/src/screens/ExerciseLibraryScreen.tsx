@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { Screen } from '../design/Screen';
@@ -11,6 +11,7 @@ import {
   type ExerciseSourceCounts,
 } from '../exercises/exerciseQueries';
 import { ExerciseBrowser } from '../exercises/ExerciseBrowser';
+import { sharingFriends } from '../exercises/sharingFriends';
 import { useSharedExercises } from '../exercises/useSharedExercises';
 import { type MuscleGroup } from '../exercises/muscleGroups';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
@@ -42,7 +43,8 @@ type Mode = { type: 'list' } | { type: 'create' } | { type: 'edit'; exercise: Ex
 // that opens them for editing, and swipe left to delete. Built-ins are
 // otherwise read-only. Libraries are shared: a trainer's and their clients'
 // exercises show in All (marked Trainer or Client), and the people you
-// follow's in Friends, each with a plus that adds it to your own library.
+// follow's in Friends -- with a filter by friend, and no count -- each with a plus that adds it
+// to your own library.
 export function ExerciseLibraryScreen({ navigation }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id ?? '';
@@ -70,6 +72,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   // What the user's trainer, clients and the people they follow share, read as the page opens.
   const shared = useSharedExercises(true);
   const sharedRows = shared.rows;
+  const friends = useMemo(() => sharingFriends(sharedRows), [sharedRows]);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -206,6 +209,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         onAddShared={async (exercise) => {
           await shared.makeOwn(exercise);
         }}
+        friends={friends}
         testID="exercise-library"
       />
     </Screen>

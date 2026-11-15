@@ -588,14 +588,14 @@ describe('ExerciseLibraryScreen -- shared libraries', () => {
     attachment: 'V-handle',
     isActive: true,
     createdBy: 'sam',
-    shared: { source: 'friend', ownerName: 'Sam', inLibrary: false },
+    shared: { source: 'friend', ownerId: 'sam', ownerName: 'Sam', inLibrary: false },
   };
   const coachRow = {
     ...friendsRow,
     id: 'ex-coach',
     name: 'Hack Squat',
     createdBy: 'coach',
-    shared: { source: 'trainer', ownerName: 'Coach', inLibrary: false },
+    shared: { source: 'trainer', ownerId: 'coach', ownerName: 'Coach', inLibrary: false },
   };
 
   it("passes what's shared to the list and the tab counts", async () => {
@@ -641,6 +641,39 @@ describe('ExerciseLibraryScreen -- shared libraries', () => {
 
     expect(await screen.findByTestId('exercise-item-ex-sams-marker')).toHaveTextContent('Added');
     expect(screen.queryByTestId('exercise-add-ex-sams')).toBeNull();
+  });
+
+  it('filters Friends by friend in place of a count, and keeps the count elsewhere', async () => {
+    const lisasRow = {
+      ...friendsRow,
+      id: 'ex-lisas',
+      name: 'Leg Press',
+      createdBy: 'lisa',
+      shared: { source: 'friend', ownerId: 'lisa', ownerName: 'Lisa', inLibrary: false },
+    };
+    mockShared.rows = [friendsRow, lisasRow, coachRow];
+    mockFetchAllExercises.mockResolvedValue([friendsRow, lisasRow]);
+    renderScreen();
+
+    expect(await screen.findByTestId('exercise-library-count')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('exercise-source-friends'));
+
+    await screen.findByTestId('exercise-item-ex-lisas');
+    expect(screen.queryByTestId('exercise-library-count')).toBeNull();
+    // Only the people you follow -- not your trainer -- A-Z, after All Friends.
+    const filter = screen.getByTestId('exercise-friend-filter');
+    expect(filter).toHaveTextContent(/All Friends.*Lisa.*Sam/);
+    expect(filter).not.toHaveTextContent(/Coach/);
+    expect(screen.getByTestId('exercise-item-ex-sams')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('exercise-friend-filter-sam'));
+
+    expect(screen.getByTestId('exercise-item-ex-sams')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-item-ex-lisas')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('exercise-friend-filter-all-friends'));
+
+    expect(screen.getByTestId('exercise-item-ex-lisas')).toBeTruthy();
   });
 
   it('says what the Friends tab is for while nothing is there', async () => {

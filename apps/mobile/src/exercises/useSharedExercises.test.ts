@@ -57,7 +57,7 @@ describe('useSharedExercises', () => {
     expect(result.current.rows[0]).toMatchObject({
       id: 'ex-sams',
       gym: 'Fit4Less Downtown',
-      shared: { source: 'friend', ownerName: 'Sam Lee', inLibrary: false },
+      shared: { source: 'friend', ownerId: 'sam', ownerName: 'Sam Lee', inLibrary: false },
     });
     expect(fetchSharedExercises).toHaveBeenCalledWith('token-1');
   });
@@ -97,7 +97,7 @@ describe('useSharedExercises', () => {
         photoUrl: null,
         isActive: true,
         createdBy: 'sam',
-        shared: { source: 'friend', ownerName: 'Sam', inLibrary: false },
+        shared: { source: 'friend', ownerId: 'sam', ownerName: 'Sam', inLibrary: false },
       });
     });
 

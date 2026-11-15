@@ -15,6 +15,7 @@ import {
   type ExerciseSourceCounts,
 } from '../exercises/exerciseQueries';
 import { ExerciseBrowser } from '../exercises/ExerciseBrowser';
+import { sharingFriends } from '../exercises/sharingFriends';
 import { useSharedExercises } from '../exercises/useSharedExercises';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
@@ -73,6 +74,7 @@ export function ExercisePickerModal({
   // A trainer's, a client's or a friend's exercise can be chosen too; it becomes theirs first.
   const shared = useSharedExercises(visible);
   const sharedRows = shared.rows;
+  const friends = useMemo(() => sharingFriends(sharedRows), [sharedRows]);
 
   // Swiping one of your own exercises away deletes it from your library, here as in the library
   // itself: it leaves the list and the picker, and every workout it was logged in keeps it.
@@ -203,6 +205,7 @@ export function ExercisePickerModal({
             onSelectRow={(exercise) => void choose(exercise)}
             onPhotoPress={(exercise) => setPhotoOpen(exercise.photoUrl)}
             onDeleteMine={deleteMine}
+            friends={friends}
             listHeader={
               onCreateCustom ? (
                 <ListRow

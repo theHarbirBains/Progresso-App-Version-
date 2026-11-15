@@ -64,7 +64,7 @@ describe("ExercisePickerModal -- a trainer's, a client's or a friend's exercise"
     attachment: 'V-handle',
     isActive: true,
     createdBy: 'sam',
-    shared: { source: 'friend', ownerName: 'Sam', inLibrary: false },
+    shared: { source: 'friend', ownerId: 'sam', ownerName: 'Sam', inLibrary: false },
   };
   const ownCopy = { ...friendsRow, id: 'ex-my-copy', createdBy: 'user-1', shared: undefined };
 

@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Alert, SectionList, TouchableOpacity, View, type SectionListData } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
+import { FilterChips } from '../design/FilterChips';
 import { IconButton } from '../design/IconButton';
 import { ListRow } from '../design/ListRow';
 import { SectionHeader } from '../design/SectionHeader';
@@ -27,6 +28,9 @@ const SOURCE_OPTIONS: { value: ExerciseSource; label: string }[] = [
   { value: 'mine', label: 'Mine' },
   { value: 'friends', label: 'Friends' },
 ];
+
+/** The Friends tab's filter value for every friend at once. */
+const ALL_FRIENDS = 'all-friends';
 
 /** The word on a shared exercise's row: whose it is. */
 const SHARED_LABELS = { trainer: 'Trainer', client: 'Client', friend: 'Friend' } as const;
@@ -71,6 +75,11 @@ interface Props {
    * copy in their library). Without it, as in the picker, choosing the row does that instead.
    */
   onAddShared?: (exercise: ExerciseRow) => Promise<void>;
+  /**
+   * The people you follow who share exercises (sharingFriends) -- in Friends, a chip each to show
+   * only theirs. Whatever's searched, so a friend picked never goes from the row.
+   */
+  friends?: { id: string; name: string }[];
   /** A row shown first in the list, above the exercises (the picker's Create Custom). */
   listHeader?: ReactNode;
   testID?: string;
@@ -80,7 +89,8 @@ interface Props {
  * The Exercise Library's browse layout, shared so every exercise picker looks the same:
  * a browse card (search, muscle filter, and All / Built-in / Mine with real counts), then
  * a list card with the count and the exercises A-Z under letter headings, each with its
- * photo, name, muscle and movement, and a Built-in or Mine marker.
+ * photo, name, muscle and movement, and a Built-in or Mine marker. In Friends the count gives way
+ * to a filter by friend.
  */
 export function ExerciseBrowser({
   searchInput,
@@ -103,9 +113,25 @@ export function ExerciseBrowser({
   onPhotoPress,
   onDeleteMine,
   onAddShared,
+  friends = [],
   listHeader,
   testID = 'exercise-browser',
 }: Props) {
+  // In Friends, the one friend whose exercises show, or null for everyone's.
+  const [friendId, setFriendId] = useState<string | null>(null);
+  // A friend who no longer shares anything (unfollowed, say) stops being the filter.
+  useEffect(() => {
+    if (friendId !== null && !friends.some((friend) => friend.id === friendId)) setFriendId(null);
+  }, [friends, friendId]);
+  const inFriends = source === 'friends';
+  const shownRows = useMemo(
+    () =>
+      inFriends && friendId !== null
+        ? rows.filter((row) => row.shared?.ownerId === friendId)
+        : rows,
+    [rows, inFriends, friendId],
+  );
+
   // The one row showing Delete, if any; and whether a row is being swiped, when the list holds
   // its scroll still.
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
@@ -157,7 +183,7 @@ export function ExerciseBrowser({
     [onAddShared],
   );
 
-  const sections = useMemo(() => groupExercisesByLetter(rows), [rows]);
+  const sections = useMemo(() => groupExercisesByLetter(shownRows), [shownRows]);
   const listSections = useMemo(
     () => sections.map((section) => ({ title: section.letter, data: section.data })),
     [sections],
@@ -381,11 +407,27 @@ export function ExerciseBrowser({
       </AppCard>
 
       <AppCard testID="exercise-library-list" style={styles.listCard}>
-        <View style={styles.countSortRow}>
-          <Text testID="exercise-library-count" style={styles.countText}>
-            {rows.length} {rows.length === 1 ? 'exercise' : 'exercises'}
-          </Text>
-        </View>
+        {inFriends ? (
+          friends.length > 0 ? (
+            <FilterChips
+              testID="exercise-friend-filter"
+              options={[
+                { value: ALL_FRIENDS, label: 'All Friends' },
+                ...friends.map((friend) => ({ value: friend.id, label: friend.name })),
+              ]}
+              value={friendId ?? ALL_FRIENDS}
+              onChange={(value) => setFriendId(value === ALL_FRIENDS ? null : value)}
+              accentColor={accent.color}
+              onAccentColor={accent.onColor}
+            />
+          ) : null
+        ) : (
+          <View style={styles.countSortRow}>
+            <Text testID="exercise-library-count" style={styles.countText}>
+              {rows.length} {rows.length === 1 ? 'exercise' : 'exercises'}
+            </Text>
+          </View>
+        )}
 
         {error ? (
           <ErrorState testID="exercise-library-error" message={error} onRetry={onRetry} />

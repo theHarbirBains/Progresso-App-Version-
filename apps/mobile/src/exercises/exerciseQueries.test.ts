@@ -269,7 +269,7 @@ describe('shared exercises in the library', () => {
     photoUrl: null,
     isActive: true,
     createdBy: `owner-${id}`,
-    shared: { source, ownerName: 'Sam', inLibrary },
+    shared: { source, ownerId: 'sam', ownerName: 'Sam', inLibrary },
   });
   const coachRow = shared('ex-coach', 'Cable Row', 'trainer');
   const clientHad = shared('ex-client', 'Hack Squat', 'client', true);

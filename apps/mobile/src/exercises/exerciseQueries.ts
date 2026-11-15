@@ -34,7 +34,7 @@ export interface ExerciseRow {
    * whose, how, and whether they already have their own by that name at that gym. Using it makes
    * it theirs first (copyExercise). Absent for a built-in or their own.
    */
-  shared?: { source: ShareSource; ownerName: string; inLibrary: boolean };
+  shared?: { source: ShareSource; ownerId: string; ownerName: string; inLibrary: boolean };
 }
 
 /** An exercise as the API returns it, as a row. */
@@ -61,6 +61,7 @@ export function sharedExerciseRow(exercise: SharedExerciseResponse): ExerciseRow
     ...exerciseRowFromResponse(exercise),
     shared: {
       source: exercise.source,
+      ownerId: exercise.owner.id,
       ownerName: exercise.owner.displayName ?? exercise.owner.username ?? 'Someone',
       inLibrary: exercise.inLibrary,
     },
