@@ -1,9 +1,10 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
+import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 
 // AchievementsScreen. Token-only: the rank hero (emblem, rank, AP, the bar to the next
-// division), the filter, then the earned and still-ahead cards -- each a list of divided rows:
-// an icon well, name and AP, what it takes, and when it was earned or the bar to it.
+// division), the filter, then the earned and not-started cards -- each a list of divided rows:
+// the emblem, name and level, what it's for, the bar to its next level with what that takes and
+// its AP, and the AP it's brought.
 export const achievementsStyles = StyleSheet.create({
   content: {
     gap: widgetGap,
@@ -61,13 +62,6 @@ export const achievementsStyles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.divider,
   },
-  icon: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   rowText: {
     flex: 1,
     gap: 2,
@@ -83,7 +77,7 @@ export const achievementsStyles = StyleSheet.create({
     color: colors.textPrimary,
     flexShrink: 1,
   },
-  rowAp: {
+  rowLevel: {
     ...typeScale.label,
     color: colors.textSecondary,
   },
@@ -91,9 +85,13 @@ export const achievementsStyles = StyleSheet.create({
     ...typeScale.secondary,
     color: colors.textSecondary,
   },
-  rowEarned: {
+  rowNext: {
     ...typeScale.caption,
     color: colors.textSecondaryBright,
+  },
+  rowEarned: {
+    ...typeScale.caption,
+    color: colors.textMuted,
   },
   rowProgress: {
     flexDirection: 'row',

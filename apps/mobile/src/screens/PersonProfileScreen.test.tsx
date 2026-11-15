@@ -71,8 +71,8 @@ function earned(
   id: string,
   title: string,
   ap: number,
-  repeats: string,
-  times: number,
+  level: number,
+  levels: number,
   lastAwardedAt: string,
 ) {
   return {
@@ -81,9 +81,10 @@ function earned(
     description: `${title}, done`,
     icon: 'activity',
     category: 'workouts',
+    kind: levels > 1 ? 'levels' : 'single',
+    level,
+    levels,
     ap,
-    repeats,
-    times,
     firstAwardedAt: '2026-10-05T10:00:00Z',
     lastAwardedAt,
   };
@@ -130,8 +131,8 @@ function profile(extra: object = {}) {
     exercises: [lift('ex-row', 'Seated Row', { gym: 'Downtown', attachment: 'V-handle' })],
     rank: { points: 2250, awards: 14 },
     achievements: [
-      earned('weekly-warrior', 'Weekly Warrior', 25, 'weekly', 3, '2026-11-09T10:00:00Z'),
-      earned('dedicated', 'Dedicated', 125, 'once', 1, '2026-11-02T10:00:00Z'),
+      earned('guns-blazin', "Guns Blazin'", 60, 2, 8, '2026-11-09T10:00:00Z'),
+      earned('first-steps', 'First Steps', 25, 1, 1, '2026-11-02T10:00:00Z'),
     ],
     ...extra,
   };
@@ -235,14 +236,14 @@ describe('PersonProfileScreen', () => {
     expect(screen.getByTestId('person-profile-tab-achievements')).toHaveTextContent(
       /Achievements$/,
     );
-    expect(screen.getByTestId('person-profile-achievement-weekly-warrior')).toHaveTextContent(
-      /Weekly Warrior.*Weekly Warrior, done.*3 times · last.*\+75/,
+    expect(screen.getByTestId('person-profile-achievement-guns-blazin')).toHaveTextContent(
+      /Guns Blazin'.*Guns Blazin', done.*Level 2 of 8 ·.*\+60/,
     );
-    expect(screen.getByTestId('person-profile-achievement-dedicated')).toHaveTextContent(
-      /Dedicated.*\+125/,
+    expect(screen.getByTestId('person-profile-achievement-first-steps')).toHaveTextContent(
+      /First Steps.*Unlocked ·.*\+25/,
     );
     // Never one still ahead, and never theirs to see all of.
-    expect(screen.queryByTestId('person-profile-achievement-first-steps')).toBeNull();
+    expect(screen.queryByTestId('person-profile-achievement-iron-regular')).toBeNull();
     expect(screen.queryByTestId('profile-all-achievements')).toBeNull();
     // Their workouts are under Workouts.
     expect(screen.queryByTestId('person-profile-workout-w1')).toBeNull();
@@ -259,7 +260,7 @@ describe('PersonProfileScreen', () => {
     renderScreen();
 
     expect(await screen.findByTestId('person-profile-rank')).toHaveTextContent(
-      /Gold III.*2,250 AP · 2 achievements.*150 AP to Gold II/,
+      /Gold V.*2,250 AP · 2 achievements.*150 AP to Gold IV/,
     );
     fireEvent.press(screen.getByTestId('person-profile-rank'));
     expect(mockNavigate).toHaveBeenCalledWith('RankProgression', { points: 2250, name: 'Sam' });
@@ -423,7 +424,7 @@ describe('PersonProfileScreen', () => {
     expect(screen.queryByTestId('person-profile-tiles')).toBeNull();
     expect(screen.queryByTestId('person-profile-tab')).toBeNull();
     // Their rank is anyone's to see; what earned it isn't, yet.
-    expect(screen.getByTestId('person-profile-rank')).toHaveTextContent(/Gold III.*2,250 AP/);
+    expect(screen.getByTestId('person-profile-rank')).toHaveTextContent(/Gold V.*2,250 AP/);
     expect(screen.getByTestId('person-profile-rank')).not.toHaveTextContent(/achievements/);
 
     await act(async () => {

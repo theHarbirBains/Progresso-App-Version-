@@ -97,10 +97,12 @@ export interface EarnedAchievement {
   description: string;
   icon: string;
   category: string;
+  kind: 'single' | 'levels';
+  /** The level reached, out of how many there are (1 of 1 for a single unlock). */
+  level: number;
+  levels: number;
+  /** The AP every level reached has brought. */
   ap: number;
-  repeats: 'once' | 'weekly' | 'monthly';
-  /** 1 for a one-time achievement; a repeatable one's weeks or months. */
-  times: number;
   firstAwardedAt: string;
   lastAwardedAt: string;
 }

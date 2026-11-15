@@ -43,6 +43,7 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { withAlpha } from '../theme/accentColor';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 import { compactNumber } from '../social/compactNumber';
+import { AchievementEmblem } from '../achievements/AchievementEmblem';
 import { RankEmblem } from '../achievements/RankEmblem';
 import { nextRankLabel, rankForPoints } from '../achievements/ranks';
 import { AnimatedBar } from '../design/AnimatedBar';
@@ -369,26 +370,23 @@ export function PersonProfilePage({
   }
 
   function renderAchievement(achievement: EarnedAchievement, index: number) {
-    const repeats = achievement.repeats !== 'once';
+    const levelled = achievement.kind === 'levels';
+    const step = levelled ? `Level ${achievement.level} of ${achievement.levels}` : 'Unlocked';
     return (
       <View
         key={achievement.id}
         testID={`person-profile-achievement-${achievement.id}`}
         style={[styles.achievement, index > 0 && styles.liftDivider]}
         accessible
-        accessibilityLabel={`${achievement.title}, ${achievement.ap} AP. ${achievement.description}. ${
-          repeats
-            ? `Earned ${achievement.times} times`
-            : `Earned ${formatCardDate(achievement.firstAwardedAt)}`
-        }`}
+        accessibilityLabel={`${achievement.title}, ${step}, ${achievement.ap} AP. ${achievement.description}. Last on ${formatCardDate(achievement.lastAwardedAt)}`}
       >
-        <View style={[styles.achievementIcon, { backgroundColor: withAlpha(theme.accent, 0.16) }]}>
-          <Feather
-            name={achievement.icon as keyof typeof Feather.glyphMap}
-            size={18}
-            color={theme.accent}
-          />
-        </View>
+        <AchievementEmblem
+          icon={achievement.icon as keyof typeof Feather.glyphMap}
+          level={achievement.level}
+          levels={achievement.levels}
+          accentColor={theme.accent}
+          size={40}
+        />
         <View style={styles.liftText}>
           <Text style={styles.liftName} numberOfLines={1}>
             {achievement.title}
@@ -397,13 +395,11 @@ export function PersonProfilePage({
             {achievement.description}
           </Text>
           <Text style={styles.achievementWhen}>
-            {repeats
-              ? `${achievement.times} ${achievement.times === 1 ? 'time' : 'times'} · last ${formatCardDate(achievement.lastAwardedAt)}`
-              : formatCardDate(achievement.firstAwardedAt)}
+            {step} · {formatCardDate(achievement.lastAwardedAt)}
           </Text>
         </View>
         <Text style={[styles.achievementAp, { color: theme.accent }]}>
-          +{(achievement.ap * achievement.times).toLocaleString('en-US')}
+          +{achievement.ap.toLocaleString('en-US')}
         </Text>
       </View>
     );

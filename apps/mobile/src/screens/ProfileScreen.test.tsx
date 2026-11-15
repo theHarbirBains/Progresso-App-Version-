@@ -161,9 +161,10 @@ function me(extra: object = {}) {
         description: 'Finish your first workout',
         icon: 'play',
         category: 'workouts',
+        kind: 'single',
+        level: 1,
+        levels: 1,
         ap: 25,
-        repeats: 'once',
-        times: 1,
         firstAwardedAt: '2026-11-01T10:00:00Z',
         lastAwardedAt: '2026-11-01T10:00:00Z',
       },
@@ -358,7 +359,7 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
       /First Steps/,
     );
     // Your rank shows on your own, opening every rank.
-    expect(screen.getByTestId('person-profile-rank')).toHaveTextContent(/Silver V.*640 AP/);
+    expect(screen.getByTestId('person-profile-rank')).toHaveTextContent(/Bronze I.*640 AP/);
     fireEvent.press(screen.getByTestId('person-profile-rank'));
     expect(mockNavigate).toHaveBeenCalledWith('RankProgression', undefined);
     // Yours, with nutrition, are a tap away.

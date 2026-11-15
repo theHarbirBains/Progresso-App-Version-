@@ -8,27 +8,43 @@ import {
 } from './achievementsContext';
 import { AchievementUnlockHost } from './AchievementUnlockHost';
 
-function definition(id: string, title: string, ap: number): AchievementDefinition {
+jest.mock('../progress/useProgressTheme', () => ({
+  useProgressTheme: () => ({
+    theme: { accent: '#D99A50', onAccent: '#000000', accentBg: '#332211' },
+    weightUnit: 'lb',
+  }),
+}));
+
+/** A single unlock, or (with `levels`) a ladder of that many, 10 workouts a level apart. */
+function definition(id: string, title: string, ap: number, levels = 1): AchievementDefinition {
   return {
     id,
     category: 'workouts',
+    kind: levels > 1 ? 'levels' : 'single',
     title,
     description: `${title}, done`,
     icon: 'activity',
-    ap,
-    repeats: 'once',
     metric: 'workouts',
-    threshold: 1,
     unit: 'count',
+    goalLabel: 'workouts',
     visibility: 'public',
     sort: 1,
+    levels: Array.from({ length: levels }, (_, i) => ({
+      level: i + 1,
+      goal: (i + 1) * 10,
+      ap: ap * (i + 1),
+    })),
   };
 }
 
-function batch(items: [string, string, number][], pointsBefore: number): UnlockBatch {
-  const awards = items.map(([id, title, ap]) => ({
-    award: { achievementId: id, periodKey: 'once', ap, awardedAt: '2026-11-14T10:00:00Z' },
-    definition: definition(id, title, ap),
+/** Levels awarded together: [id, title, ap, level, levels]. */
+function batch(
+  items: [string, string, number, number?, number?][],
+  pointsBefore: number,
+): UnlockBatch {
+  const awards = items.map(([id, title, ap, level = 1, levels = 1]) => ({
+    award: { achievementId: id, level, ap, awardedAt: '2026-11-14T10:00:00Z' },
+    definition: definition(id, title, ap / level, levels),
   }));
   return {
     id: 'b1',
@@ -41,11 +57,15 @@ function batch(items: [string, string, number][], pointsBefore: number): UnlockB
 const dismissUnlock = jest.fn();
 const onOpen = jest.fn();
 
-function renderHost(unlocks: UnlockBatch[], route = 'Feed') {
+function renderHost(
+  unlocks: UnlockBatch[],
+  route = 'Feed',
+  progress: AchievementsValue['progress'] = [],
+) {
   const value: AchievementsValue = {
     definitions: [],
-    awards: [],
-    metrics: {},
+    awards: unlocks.flatMap((b) => b.awards.map((a) => a.award)),
+    progress,
     points: 0,
     loading: false,
     error: null,
@@ -66,16 +86,32 @@ beforeEach(() => {
 });
 
 describe('AchievementUnlockHost', () => {
-  it('shows an achievement, the AP it gave and the rank it leaves you at', () => {
-    renderHost([batch([['dedicated', 'Dedicated', 125]], 300)]);
+  it('shows a level up: the level it was at and has reached, its AP and how far to the next', () => {
+    renderHost([batch([['iron-regular', 'Iron Regular', 75, 3, 5]], 300)], 'Feed', [
+      { achievementId: 'iron-regular', value: 34, level: 3 },
+    ]);
 
     expect(screen.getByTestId('achievement-unlock-awards')).toHaveTextContent(
-      /Achievement Unlocked.*Dedicated.*Dedicated, done/,
+      /Level Up.*Iron Regular/,
+    );
+    // Level 2 to 3: 75 AP; next, level 4 at 40 workouts for 100.
+    expect(screen.getByTestId('achievement-unlock-step')).toHaveTextContent('Level 2 → Level 3');
+    expect(screen.getByTestId('achievement-unlock-ap')).toHaveTextContent('+75 AP');
+    expect(screen.getByTestId('achievement-unlock-next')).toHaveTextContent(
+      'Level 4 at 40 workouts · +100 AP',
+    );
+  });
+
+  it('shows an achievement, the AP it gave and the rank it leaves you at', () => {
+    renderHost([batch([['dedicated', 'Dedicated', 125]], 200)]);
+
+    expect(screen.getByTestId('achievement-unlock-awards')).toHaveTextContent(
+      /Achievement Unlocked.*Dedicated.*Unlocked.*Dedicated, done/,
     );
     expect(screen.getByTestId('achievement-unlock-ap')).toHaveTextContent('+125 AP');
-    // 425 AP: Bronze I, with 75 to go to Silver V.
+    // 200 to 325 AP: Bronze IV to Bronze III, with 125 to go to Bronze II.
     expect(screen.getByTestId('achievement-unlock-awards')).toHaveTextContent(
-      /Bronze I.*New division.*75 AP to Silver V/,
+      /Bronze III.*New division.*125 AP to Bronze II/,
     );
     expectNoBareText();
 
@@ -95,7 +131,7 @@ describe('AchievementUnlockHost', () => {
     renderHost([batch([['veteran', 'Veteran', 1000]], 1000)]);
 
     expect(screen.getByTestId('achievement-unlock-rank')).toHaveTextContent(
-      /New Rank.*Gold.*Gold IV · 2,000 AP/,
+      /New Rank.*Gold.*Gold V · 2,000 AP/,
     );
     expect(screen.queryByTestId('achievement-unlock-awards')).toBeNull();
 
@@ -119,7 +155,7 @@ describe('AchievementUnlockHost', () => {
     ]);
 
     expect(screen.getByTestId('achievement-unlock-awards')).toHaveTextContent(
-      /5 Achievements Unlocked.*First Steps.*\+25.*Split Creator.*and 1 more/,
+      /5 Achievements Unlocked.*First Steps.*Unlocked.*\+25.*Split Creator.*and 1 more/,
     );
     expect(screen.getByTestId('achievement-unlock-ap')).toHaveTextContent('+225 AP');
   });

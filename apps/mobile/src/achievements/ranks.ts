@@ -26,22 +26,25 @@ export interface Tier {
   palette: { primary: string; deep: string };
 }
 
+// Balanced against the catalogue (npm run db:simulate): Bronze to Diamond come with steady
+// training in the first year or two; Vanguard, Titan and Sovereign take years; Legacy about four
+// for someone training five or six times a week, and longer for most.
 export const TIERS: readonly Tier[] = [
-  { id: 'bronze', name: 'Bronze', floor: 0, step: 100, palette: rankPalettes.bronze },
-  { id: 'silver', name: 'Silver', floor: 500, step: 200, palette: rankPalettes.silver },
-  { id: 'gold', name: 'Gold', floor: 1_500, step: 300, palette: rankPalettes.gold },
-  { id: 'platinum', name: 'Platinum', floor: 3_000, step: 400, palette: rankPalettes.platinum },
-  { id: 'diamond', name: 'Diamond', floor: 5_000, step: 600, palette: rankPalettes.diamond },
-  { id: 'vanguard', name: 'Vanguard', floor: 8_000, step: 800, palette: rankPalettes.vanguard },
-  { id: 'titan', name: 'Titan', floor: 12_000, step: 1_000, palette: rankPalettes.titan },
+  { id: 'bronze', name: 'Bronze', floor: 0, step: 150, palette: rankPalettes.bronze },
+  { id: 'silver', name: 'Silver', floor: 750, step: 250, palette: rankPalettes.silver },
+  { id: 'gold', name: 'Gold', floor: 2_000, step: 400, palette: rankPalettes.gold },
+  { id: 'platinum', name: 'Platinum', floor: 4_000, step: 600, palette: rankPalettes.platinum },
+  { id: 'diamond', name: 'Diamond', floor: 7_000, step: 800, palette: rankPalettes.diamond },
+  { id: 'vanguard', name: 'Vanguard', floor: 11_000, step: 1_000, palette: rankPalettes.vanguard },
+  { id: 'titan', name: 'Titan', floor: 16_000, step: 1_200, palette: rankPalettes.titan },
   {
     id: 'sovereign',
     name: 'Sovereign',
-    floor: 17_000,
-    step: 1_200,
+    floor: 22_000,
+    step: 1_600,
     palette: rankPalettes.sovereign,
   },
-  { id: 'legacy', name: 'Legacy', floor: 23_000, step: 2_000, palette: rankPalettes.legacy },
+  { id: 'legacy', name: 'Legacy', floor: 30_000, step: 2_000, palette: rankPalettes.legacy },
 ];
 
 /** Lowest first: V, IV, III, II, I. */

@@ -31,18 +31,18 @@ describe('RankProgressionScreen', () => {
       'legacy',
     ];
     for (const id of ids) expect(screen.getByTestId(`rank-tier-${id}`)).toBeTruthy();
-    expect(screen.getByTestId('rank-tier-gold')).toHaveTextContent(/Gold.*1,500–2,999 AP/);
+    expect(screen.getByTestId('rank-tier-gold')).toHaveTextContent(/Gold.*2,000–3,999 AP/);
     expect(screen.getByTestId('rank-tier-legacy')).toHaveTextContent(
-      /23,000\+ AP.*every 2,000 AP is another Legacy level/,
+      /30,000\+ AP.*every 2,000 AP is another Legacy level/,
     );
     expect(screen.getByTestId('rank-silver-V').props.accessibilityLabel).toBe(
-      'Silver V: from 500 AP, reached',
+      'Silver V: from 750 AP, reached',
     );
-    expect(screen.getByTestId('rank-gold-III').props.accessibilityLabel).toBe(
-      'Gold III: from 2,100 AP, current',
+    expect(screen.getByTestId('rank-gold-V').props.accessibilityLabel).toBe(
+      'Gold V: from 2,000 AP, current',
     );
-    expect(screen.getByTestId('rank-gold-II').props.accessibilityLabel).toBe(
-      'Gold II: from 2,400 AP',
+    expect(screen.getByTestId('rank-gold-IV').props.accessibilityLabel).toBe(
+      'Gold IV: from 2,400 AP',
     );
     expectNoBareText();
   });
@@ -54,9 +54,9 @@ describe('RankProgressionScreen', () => {
   });
 
   it("shows someone else's place when opened from their profile", () => {
-    renderScreen({ points: 9_000, name: 'Sam' });
+    renderScreen({ points: 11_500, name: 'Sam' });
 
     expect(screen.getByTestId('rank-tier-vanguard')).toHaveTextContent(/Sam is here/);
-    expect(screen.getByTestId('rank-intro')).toHaveTextContent(/Sam is Vanguard IV with 9,000 AP/);
+    expect(screen.getByTestId('rank-intro')).toHaveTextContent(/Sam is Vanguard V with 11,500 AP/);
   });
 });

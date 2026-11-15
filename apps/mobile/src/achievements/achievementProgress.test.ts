@@ -1,121 +1,142 @@
-import {
-  achievementStatuses,
-  describe as describeAchievement,
-  lifetimePoints,
-} from './achievementProgress';
+import { achievementStatuses, goalText, levelText, lifetimePoints } from './achievementProgress';
 import type { AchievementDefinition } from './achievementQueries';
+
+const LB = 0.45359237;
 
 function definition(extra: Partial<AchievementDefinition>): AchievementDefinition {
   return {
-    id: 'dedicated',
+    id: 'iron-regular',
     category: 'workouts',
-    title: 'Dedicated',
-    description: 'Finish 25 workouts',
+    kind: 'levels',
+    title: 'Iron Regular',
+    description: 'Finish workouts',
     icon: 'activity',
-    ap: 125,
-    repeats: 'once',
     metric: 'workouts',
-    threshold: 25,
     unit: 'count',
+    goalLabel: 'workouts',
     visibility: 'public',
-    sort: 40,
+    sort: 90,
+    levels: [
+      { level: 1, goal: 5, ap: 50 },
+      { level: 2, goal: 10, ap: 75 },
+      { level: 3, goal: 25, ap: 125 },
+    ],
     ...extra,
   };
 }
 
-const heavy = definition({
-  id: 'heavy-lifter',
-  category: 'volume',
-  title: 'Heavy Lifter',
-  description: 'Lift 10,000 lb in all',
-  metric: 'volume_kg',
-  threshold: 4535.9237,
+const guns = definition({
+  id: 'guns-blazin',
+  category: 'muscles',
+  title: "Guns Blazin'",
+  description: 'Lift weight on biceps exercises',
+  metric: 'muscle_volume_kg_biceps',
   unit: 'kg',
-  ap: 100,
+  goalLabel: 'lifted on biceps',
+  levels: [
+    { level: 1, goal: 1_000 * LB, ap: 20 },
+    { level: 2, goal: 10_000 * LB, ap: 40 },
+    { level: 3, goal: 40_000 * LB, ap: 75 },
+  ],
 });
-const weekly = definition({
-  id: 'weekly-warrior',
-  category: 'consistency',
-  title: 'Weekly Warrior',
-  repeats: 'weekly',
-  metric: 'week_goal',
-  threshold: 1,
-  ap: 25,
+
+const award = (
+  achievementId: string,
+  level: number,
+  ap: number,
+  awardedAt = '2026-11-01T10:00:00Z',
+) => ({
+  achievementId,
+  level,
+  ap,
+  awardedAt,
 });
 
 describe('achievementStatuses', () => {
-  it('says how far along a locked achievement is, exactly against what it takes', () => {
-    const [status] = achievementStatuses([definition({})], [], { workouts: 12 }, 'lb');
-
-    expect(status).toMatchObject({ earned: false, current: 12, target: 25, progress: 0.48 });
-    expect(status!.progressLabel).toBe('12 / 25');
-  });
-
-  it('says when an achievement was earned and the AP it brought', () => {
+  it('starts at no level, measuring the way to level 1 exactly', () => {
     const [status] = achievementStatuses(
       [definition({})],
-      [
-        {
-          achievementId: 'dedicated',
-          periodKey: 'once',
-          ap: 125,
-          awardedAt: '2026-11-01T10:00:00Z',
-        },
-      ],
-      { workouts: 30 },
+      [],
+      [{ achievementId: 'iron-regular', value: 3, level: 0 }],
       'lb',
     );
 
-    expect(status).toMatchObject({
-      earned: true,
-      times: 1,
-      firstAwardedAt: '2026-11-01T10:00:00Z',
-      apEarned: 125,
-      progressLabel: '25 / 25',
-    });
+    expect(status).toMatchObject({ level: 0, levels: 3, earned: false, maxed: false });
+    expect(status!.next).toEqual({ level: 1, goal: 5, ap: 50 });
+    expect(status!.progressLabel).toBe('3 / 5');
+    expect(status!.progress).toBe(0.6);
+    expect(status!.nextGoalLabel).toBe('5 workouts');
+    expect(levelText(status!)).toBe('Not started');
   });
 
-  it('reads weight in the reader’s own unit', () => {
-    expect(achievementStatuses([heavy], [], { volume_kg: 2000 }, 'lb')[0]!.progressLabel).toBe(
-      '4,409 / 10,000 lb',
-    );
-    expect(achievementStatuses([heavy], [], { volume_kg: 2000 }, 'kg')[0]!.progressLabel).toBe(
-      '2,000 / 4,536 kg',
-    );
-    expect(describeAchievement(heavy, 'kg')).toBe('Lift 4,536 kg in all');
-    expect(describeAchievement(heavy, 'lb')).toBe('Lift 10,000 lb in all');
-  });
-
-  it("counts a repeatable one's times, and shows this week's progress toward the next", () => {
+  it("measures the way from the last level reached to the next, and the AP it's brought", () => {
     const [status] = achievementStatuses(
-      [weekly],
-      [
-        { achievementId: 'weekly-warrior', periodKey: 'W:2026-11-02', ap: 25, awardedAt: 'a' },
-        { achievementId: 'weekly-warrior', periodKey: 'W:2026-11-09', ap: 25, awardedAt: 'b' },
-      ],
-      { week_workouts: 1, goal: 4 },
+      [definition({})],
+      [award('iron-regular', 1, 50), award('iron-regular', 2, 75, '2026-11-08T10:00:00Z')],
+      [{ achievementId: 'iron-regular', value: 16, level: 2 }],
       'lb',
     );
 
     expect(status).toMatchObject({
-      times: 2,
-      apEarned: 50,
-      lastAwardedAt: 'b',
-      current: 1,
-      target: 4,
+      level: 2,
+      earned: true,
+      apEarned: 125,
+      lastAwardedAt: '2026-11-08T10:00:00Z',
     });
-    expect(status!.progressLabel).toBe('1 / 4');
+    // 16 of the way from 10 to 25.
+    expect(status!.progress).toBeCloseTo(6 / 15);
+    expect(status!.next).toEqual({ level: 3, goal: 25, ap: 125 });
+    expect(levelText(status!)).toBe('Level 2 of 3');
+  });
+
+  it('never shows a level below one awarded, whatever the figure does after', () => {
+    const [status] = achievementStatuses(
+      [definition({})],
+      [award('iron-regular', 1, 50), award('iron-regular', 2, 75)],
+      [{ achievementId: 'iron-regular', value: 0, level: 0 }],
+      'lb',
+    );
+    expect(status!.level).toBe(2);
+  });
+
+  it('says when every level is reached', () => {
+    const [status] = achievementStatuses(
+      [definition({})],
+      [award('iron-regular', 1, 50), award('iron-regular', 2, 75), award('iron-regular', 3, 125)],
+      [{ achievementId: 'iron-regular', value: 30, level: 3 }],
+      'lb',
+    );
+    expect(status).toMatchObject({ maxed: true, next: null, progress: 1, apEarned: 250 });
+  });
+
+  it("reads weight in the reader's own unit, as the goal was set", () => {
+    const progress = [{ achievementId: 'guns-blazin', value: 2_000, level: 1 }];
+    const lb = achievementStatuses([guns], [award('guns-blazin', 1, 20)], progress, 'lb')[0]!;
+    const kg = achievementStatuses([guns], [award('guns-blazin', 1, 20)], progress, 'kg')[0]!;
+
+    expect(lb.progressLabel).toBe('4,409 / 10,000 lb');
+    expect(lb.nextGoalLabel).toBe('10,000 lb lifted on biceps');
+    expect(kg.progressLabel).toBe('2,000 / 4,536 kg');
+    expect(goalText(guns, guns.levels[2]!.goal, 'lb')).toBe('40,000 lb lifted on biceps');
+  });
+
+  it('says a single unlock is unlocked or locked', () => {
+    const single = definition({
+      id: 'first-steps',
+      kind: 'single',
+      levels: [{ level: 1, goal: 1, ap: 25 }],
+    });
+    const [locked] = achievementStatuses([single], [], [], 'lb');
+    const [unlocked] = achievementStatuses([single], [award('first-steps', 1, 25)], [], 'lb');
+    expect(levelText(locked!)).toBe('Locked');
+    expect(levelText(unlocked!)).toBe('Unlocked');
   });
 });
 
 describe('lifetimePoints', () => {
   it('is the sum of every award', () => {
     expect(
-      lifetimePoints([
-        { achievementId: 'a', periodKey: 'once', ap: 25, awardedAt: 'x' },
-        { achievementId: 'b', periodKey: 'W:2026-11-02', ap: 25, awardedAt: 'y' },
-        { achievementId: 'c', periodKey: 'once', ap: 350, awardedAt: 'z' },
-      ]),
-    ).toBe(400);
+      lifetimePoints([award('a', 1, 25), award('b', 1, 20), award('b', 2, 40), award('c', 1, 350)]),
+    ).toBe(435);
   });
 });

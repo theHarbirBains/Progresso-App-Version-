@@ -2,14 +2,14 @@ import { createContext, useContext } from 'react';
 import type {
   AchievementAward,
   AchievementDefinition,
-  AchievementMetrics,
+  AchievementProgressRow,
 } from './achievementQueries';
 
 // The signed-in person's achievements as every component reads them. Kept apart from
 // AchievementsProvider (which reads Supabase), so a component that only shows them never pulls
 // the database client in with it -- the same split as the app theme and membership.
 
-/** Awards that came in together, to show as one unlock -- with the AP before and after. */
+/** Levels awarded together, to show as one unlock -- with the AP before and after. */
 export interface UnlockBatch {
   id: string;
   awards: { award: AchievementAward; definition: AchievementDefinition }[];
@@ -20,7 +20,8 @@ export interface UnlockBatch {
 export interface AchievementsValue {
   definitions: AchievementDefinition[];
   awards: AchievementAward[];
-  metrics: AchievementMetrics;
+  /** Where you stand on each, as of the last award run. */
+  progress: AchievementProgressRow[];
   /** Lifetime AP: the sum of every award. */
   points: number;
   loading: boolean;
@@ -36,7 +37,7 @@ export interface AchievementsValue {
 export const AchievementsContext = createContext<AchievementsValue>({
   definitions: [],
   awards: [],
-  metrics: {},
+  progress: [],
   points: 0,
   loading: false,
   error: null,

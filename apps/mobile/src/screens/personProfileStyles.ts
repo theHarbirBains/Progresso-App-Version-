@@ -193,20 +193,13 @@ export const personProfileStyles = StyleSheet.create({
     ...typeScale.caption,
     color: colors.textSecondary,
   },
-  // An earned achievement: its glyph in an accent well, name, what it was for, when -- and the
-  // AP it brought in, in the accent.
+  // An earned achievement: its emblem at its level, name, what it's for, its level and when --
+  // and the AP its levels brought, in the accent.
   achievement: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     paddingVertical: spacing.sm,
-  },
-  achievementIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   achievementWhen: {
     ...typeScale.caption,

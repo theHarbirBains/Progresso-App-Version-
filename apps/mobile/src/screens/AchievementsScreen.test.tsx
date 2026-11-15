@@ -13,6 +13,7 @@ jest.mock('../progress/useProgressTheme', () => ({
   }),
 }));
 
+const LB = 0.45359237;
 const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation: any = {
@@ -27,18 +28,22 @@ const route = {} as never;
 
 function def(extra: Partial<AchievementDefinition>): AchievementDefinition {
   return {
-    id: 'dedicated',
+    id: 'iron-regular',
     category: 'workouts',
-    title: 'Dedicated',
-    description: 'Finish 25 workouts',
+    kind: 'levels',
+    title: 'Iron Regular',
+    description: 'Finish workouts',
     icon: 'activity',
-    ap: 125,
-    repeats: 'once',
     metric: 'workouts',
-    threshold: 25,
     unit: 'count',
+    goalLabel: 'workouts',
     visibility: 'public',
-    sort: 40,
+    sort: 90,
+    levels: [
+      { level: 1, goal: 5, ap: 50 },
+      { level: 2, goal: 10, ap: 75 },
+      { level: 3, goal: 25, ap: 125 },
+    ],
     ...extra,
   };
 }
@@ -46,45 +51,38 @@ function def(extra: Partial<AchievementDefinition>): AchievementDefinition {
 const definitions = [
   def({
     id: 'first-steps',
+    kind: 'single',
     title: 'First Steps',
     description: 'Finish your first workout',
-    ap: 25,
-    threshold: 1,
     sort: 10,
+    levels: [{ level: 1, goal: 1, ap: 25 }],
   }),
   def({}),
   def({
-    id: 'heavy-lifter',
-    category: 'volume',
-    title: 'Heavy Lifter',
-    description: 'Lift 10,000 lb in all',
-    metric: 'volume_kg',
-    threshold: 4535.9237,
+    id: 'guns-blazin',
+    category: 'muscles',
+    title: "Guns Blazin'",
+    description: 'Lift weight on biceps exercises',
+    metric: 'muscle_volume_kg_biceps',
     unit: 'kg',
-    ap: 100,
-    sort: 620,
-  }),
-  def({
-    id: 'weekly-warrior',
-    category: 'consistency',
-    title: 'Weekly Warrior',
-    description: 'Meet your weekly workout goal -- every week you do',
-    repeats: 'weekly',
-    metric: 'week_goal',
-    threshold: 1,
-    ap: 25,
-    sort: 120,
+    goalLabel: 'lifted on biceps',
+    sort: 300,
+    levels: [
+      { level: 1, goal: 1_000 * LB, ap: 20 },
+      { level: 2, goal: 10_000 * LB, ap: 40 },
+    ],
   }),
   def({
     id: 'first-bite',
     category: 'nutrition',
+    kind: 'single',
     title: 'First Bite',
     description: 'Log your first food',
     metric: 'food_entries',
-    threshold: 1,
-    ap: 25,
+    goalLabel: 'foods logged',
     visibility: 'private',
-    sort: 310,
+    sort: 60,
+    levels: [{ level: 1, goal: 1, ap: 25 }],
   }),
 ];
 
@@ -97,27 +95,17 @@ function renderScreen(
   const value: AchievementsValue = {
     definitions,
     awards: [
-      {
-        achievementId: 'first-steps',
-        periodKey: 'once',
-        ap: 25,
-        awardedAt: '2026-11-01T10:00:00Z',
-      },
-      {
-        achievementId: 'weekly-warrior',
-        periodKey: 'W:2026-11-02',
-        ap: 25,
-        awardedAt: '2026-11-04T10:00:00Z',
-      },
-      {
-        achievementId: 'weekly-warrior',
-        periodKey: 'W:2026-11-09',
-        ap: 25,
-        awardedAt: '2026-11-11T10:00:00Z',
-      },
+      { achievementId: 'first-steps', level: 1, ap: 25, awardedAt: '2026-11-01T10:00:00Z' },
+      { achievementId: 'iron-regular', level: 1, ap: 50, awardedAt: '2026-11-04T10:00:00Z' },
+      { achievementId: 'iron-regular', level: 2, ap: 75, awardedAt: '2026-11-11T10:00:00Z' },
     ],
-    metrics: { workouts: 12, volume_kg: 2000, week_workouts: 1, goal: 3, food_entries: 0 },
-    points: 2_250,
+    progress: [
+      { achievementId: 'first-steps', value: 12, level: 1 },
+      { achievementId: 'iron-regular', value: 12, level: 2 },
+      { achievementId: 'guns-blazin', value: 300, level: 0 },
+      { achievementId: 'first-bite', value: 0, level: 0 },
+    ],
+    points: 2_150,
     loading: false,
     error: null,
     evaluate,
@@ -144,10 +132,11 @@ describe('AchievementsScreen', () => {
     renderScreen();
 
     expect(screen.getByTestId('achievements-rank')).toHaveTextContent(
-      /Gold III.*2,250 AP.*150 AP to Gold II/,
+      /Gold V.*2,150 AP.*250 AP to Gold IV/,
     );
+    // 1 + 2 of 1 + 3 + 2 + 1 levels.
     expect(screen.getByTestId('achievements-count')).toHaveTextContent(
-      '2 of 5 achievements earned',
+      '3 of 7 levels reached across 4 achievements',
     );
     fireEvent.press(screen.getByTestId('achievements-rank'));
     expect(mockNavigate).toHaveBeenCalledWith('RankProgression');
@@ -156,35 +145,46 @@ describe('AchievementsScreen', () => {
     expectNoBareText();
   });
 
-  it('lists what you earned, when -- and what is still ahead, with exactly where you are', () => {
+  it('shows each one at its level, the way to its next level, what that takes and its AP', () => {
     renderScreen();
 
+    expect(screen.getByTestId('achievement-iron-regular')).toHaveTextContent(
+      /Iron Regular.*Level 2 of 3.*Finish workouts.*12 \/ 25.*Level 3: 25 workouts · \+125 AP.*125 AP earned/,
+    );
     expect(screen.getByTestId('achievement-first-steps')).toHaveTextContent(
-      /First Steps.*25 AP.*Earned/,
+      /First Steps.*Unlocked/,
     );
-    expect(screen.getByTestId('achievement-dedicated')).toHaveTextContent(
-      /Dedicated.*125 AP.*Finish 25 workouts.*12 \/ 25/,
-    );
-    expect(screen.getByTestId('achievement-heavy-lifter')).toHaveTextContent(
-      /Lift 10,000 lb in all.*4,409 \/ 10,000 lb/,
-    );
-    expect(screen.getByTestId('achievement-weekly-warrior')).toHaveTextContent(
-      /25 AP each.*Earned 2 times.*1 \/ 3 this week/,
+    expect(screen.getByTestId('achievement-guns-blazin')).toHaveTextContent(
+      /Guns Blazin'.*Not started.*661 \/ 1,000 lb.*Level 1: 1,000 lb lifted on biceps · \+20 AP/,
     );
     expect(screen.getByTestId('achievements-earned')).toHaveTextContent(/Earned \(2\)/);
-    expect(screen.getByTestId('achievements-ahead')).toHaveTextContent(/Still Ahead \(3\)/);
+    expect(screen.getByTestId('achievements-ahead')).toHaveTextContent(/Not Started \(2\)/);
   });
 
-  it('filters by kind, and by repeatable', () => {
+  it('says when every level is reached', () => {
+    renderScreen('everything', {
+      awards: [1, 2, 3].map((level) => ({
+        achievementId: 'iron-regular',
+        level,
+        ap: [50, 75, 125][level - 1]!,
+        awardedAt: `2026-11-0${level}T10:00:00Z`,
+      })),
+      progress: [{ achievementId: 'iron-regular', value: 40, level: 3 }],
+    });
+
+    expect(screen.getByTestId('achievement-iron-regular')).toHaveTextContent(
+      /Level 3 of 3.*Every level reached.*250 AP earned/,
+    );
+  });
+
+  it('filters by kind', () => {
     renderScreen();
 
-    fireEvent.press(screen.getByTestId('achievements-filter-volume'));
-    expect(screen.getByTestId('achievement-heavy-lifter')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('achievements-filter-muscles'));
+    expect(screen.getByTestId('achievement-guns-blazin')).toBeTruthy();
     expect(screen.queryByTestId('achievement-first-steps')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('achievements-filter-repeatable'));
-    expect(screen.getByTestId('achievement-weekly-warrior')).toBeTruthy();
-    expect(screen.queryByTestId('achievement-heavy-lifter')).toBeNull();
+    // No repeatable achievements any more.
+    expect(screen.queryByTestId('achievements-filter-repeatable')).toBeNull();
   });
 
   it('shows nutrition ones, only you see, with Nutrition in your membership', () => {
@@ -199,9 +199,7 @@ describe('AchievementsScreen', () => {
 
     expect(screen.queryByTestId('achievement-first-bite')).toBeNull();
     expect(screen.queryByTestId('achievements-filter-nutrition')).toBeNull();
-    expect(screen.getByTestId('achievements-count')).toHaveTextContent(
-      '2 of 4 achievements earned',
-    );
+    expect(screen.getByTestId('achievements-count')).toHaveTextContent(/across 3 achievements/);
   });
 
   it('shows placeholders while it loads, and says so when it cannot', () => {

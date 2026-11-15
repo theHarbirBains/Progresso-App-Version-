@@ -6,8 +6,8 @@ import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import {
   awardMyAchievements,
   fetchAchievementDefinitions,
-  fetchMyAchievementMetrics,
   fetchMyAwards,
+  fetchMyProgress,
 } from './achievementQueries';
 import { useAchievements, type AchievementsValue } from './achievementsContext';
 import { AchievementsProvider } from './AchievementsProvider';
@@ -18,27 +18,27 @@ jest.mock('../progress/AllTimeStatsProvider', () => ({ useAllTimeStats: jest.fn(
 jest.mock('./achievementQueries', () => ({
   fetchAchievementDefinitions: jest.fn(),
   fetchMyAwards: jest.fn(),
-  fetchMyAchievementMetrics: jest.fn(),
+  fetchMyProgress: jest.fn(),
   awardMyAchievements: jest.fn(),
 }));
 
 const firstSteps = {
   id: 'first-steps',
   category: 'workouts',
+  kind: 'single',
   title: 'First Steps',
   description: 'Finish your first workout',
   icon: 'play',
-  ap: 25,
-  repeats: 'once',
   metric: 'workouts',
-  threshold: 1,
   unit: 'count',
+  goalLabel: 'workouts',
   visibility: 'public',
   sort: 10,
+  levels: [{ level: 1, goal: 1, ap: 25 }],
 };
-const award = (id: string, ap: number, periodKey = 'once') => ({
+const award = (id: string, ap: number, level = 1) => ({
   achievementId: id,
-  periodKey,
+  level,
   ap,
   awardedAt: '2026-11-14T10:00:00Z',
 });
@@ -64,13 +64,15 @@ beforeEach(() => {
   (useAllTimeStats as jest.Mock).mockImplementation(() => stats);
   (useFoodLog as jest.Mock).mockImplementation(() => food);
   (fetchAchievementDefinitions as jest.Mock).mockReset().mockResolvedValue([firstSteps]);
-  (fetchMyAwards as jest.Mock).mockReset().mockResolvedValue([award('getting-started', 50)]);
-  (fetchMyAchievementMetrics as jest.Mock).mockReset().mockResolvedValue({ workouts: 1 });
+  (fetchMyAwards as jest.Mock).mockReset().mockResolvedValue([award('iron-regular', 50)]);
+  (fetchMyProgress as jest.Mock)
+    .mockReset()
+    .mockResolvedValue([{ achievementId: 'first-steps', value: 1, level: 1 }]);
   (awardMyAchievements as jest.Mock).mockReset().mockResolvedValue([]);
 });
 
 describe('AchievementsProvider', () => {
-  it('reads the catalogue, your awards and figures as you sign in, then awards what you reached', async () => {
+  it('reads the catalogue, your awards and progress as you sign in, then awards what you reached', async () => {
     (awardMyAchievements as jest.Mock).mockResolvedValueOnce([award('first-steps', 25)]);
     render(
       <AchievementsProvider>
@@ -80,6 +82,9 @@ describe('AchievementsProvider', () => {
 
     await waitFor(() => expect(latest.points).toBe(75));
     expect(fetchMyAwards).toHaveBeenCalledWith('me');
+    // Progress is read again after the award run.
+    expect(fetchMyProgress).toHaveBeenCalledTimes(2);
+    expect(latest.progress).toEqual([{ achievementId: 'first-steps', value: 1, level: 1 }]);
     expect(latest.definitions).toHaveLength(1);
     // What came in is queued to be shown, with the AP before and after.
     expect(latest.unlocks).toHaveLength(1);

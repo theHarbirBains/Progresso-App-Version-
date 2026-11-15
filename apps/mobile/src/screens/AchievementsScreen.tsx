@@ -15,35 +15,35 @@ import { colors } from '../design/theme';
 import { useMembership } from '../membership/useMembership';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { withAlpha } from '../theme/accentColor';
 import {
   achievementStatuses,
   CATEGORY_LABELS,
   CATEGORY_ORDER,
-  describe,
+  levelText,
   type AchievementStatus,
 } from '../achievements/achievementProgress';
 import type { AchievementCategory } from '../achievements/achievementQueries';
 import { useAchievements } from '../achievements/achievementsContext';
+import { AchievementEmblem } from '../achievements/AchievementEmblem';
 import { RankEmblem } from '../achievements/RankEmblem';
 import { nextRankLabel, rankForPoints } from '../achievements/ranks';
 import { formatCardDate } from '../workouts/workoutFormat';
 import { achievementsStyles as styles } from './achievementsStyles';
 
 type Props = RootStackScreenProps<'Achievements'>;
-type Filter = 'all' | 'repeatable' | AchievementCategory;
+type Filter = 'all' | AchievementCategory;
 
 /**
  * Your achievements, from the side menu. At the top, your lifetime rank: its emblem, rank and
  * division, lifetime AP and the bar to the next division, with every rank a tap away. Then a
- * filter (All, each kind, Repeatable) and the achievements -- the ones you've earned, latest
- * first, with when (a repeatable one how many times), then the ones still ahead, nearest first,
- * each with exactly what it takes, where you are and its AP. Nutrition ones only with Nutrition
- * in your membership; only you ever see them. Asks the server to award anything new each time
- * it opens.
+ * filter (All, each kind) and the achievements -- the ones you've started, the most recently
+ * levelled first, then the ones not started -- each with its emblem (a ring of its levels), its
+ * level, the bar to its next level, what that level takes and its AP, and the AP it's brought.
+ * Nutrition ones only with Nutrition in your membership; only you ever see them. Asks the server
+ * to award anything new each time it opens.
  */
 export function AchievementsScreen({ navigation }: Props) {
-  const { definitions, awards, metrics, points, loading, error, evaluate } = useAchievements();
+  const { definitions, awards, progress, points, loading, error, evaluate } = useAchievements();
   const { theme, weightUnit } = useProgressTheme();
   const { nutrition } = useMembership();
   const [filter, setFilter] = useState<Filter>('all');
@@ -58,99 +58,90 @@ export function AchievementsScreen({ navigation }: Props) {
       achievementStatuses(
         definitions.filter((d) => nutrition || d.category !== 'nutrition'),
         awards,
-        metrics,
+        progress,
         weightUnit,
       ),
-    [definitions, awards, metrics, weightUnit, nutrition],
+    [definitions, awards, progress, weightUnit, nutrition],
   );
   const rank = rankForPoints(points);
-  const filtered = shown.filter((status) =>
-    filter === 'all'
-      ? true
-      : filter === 'repeatable'
-        ? status.definition.repeats !== 'once'
-        : status.definition.category === filter,
+  const filtered = shown.filter(
+    (status) => filter === 'all' || status.definition.category === filter,
   );
-  const earned = filtered
+  const started = filtered
     .filter((status) => status.earned)
     .sort((a, b) => (b.lastAwardedAt ?? '').localeCompare(a.lastAwardedAt ?? ''));
   const ahead = filtered
     .filter((status) => !status.earned)
     .sort((a, b) => b.progress - a.progress || a.definition.sort - b.definition.sort);
+  const levelsReached = shown.reduce((sum, status) => sum + status.level, 0);
+  const levelsInAll = shown.reduce((sum, status) => sum + status.levels, 0);
 
   const filters: { value: Filter; label: string }[] = [
     { value: 'all', label: 'All' },
     ...CATEGORY_ORDER.filter((category) => nutrition || category !== 'nutrition').map(
       (category) => ({ value: category, label: CATEGORY_LABELS[category] }),
     ),
-    { value: 'repeatable', label: 'Repeatable' },
   ];
 
   function renderRow(status: AchievementStatus, index: number) {
     const { definition } = status;
-    const repeats = definition.repeats !== 'once';
     return (
       <View
         key={definition.id}
         testID={`achievement-${definition.id}`}
         style={[styles.row, index > 0 && styles.rowDivider]}
         accessible
-        accessibilityLabel={`${definition.title}, ${definition.ap} AP. ${describe(definition, weightUnit)}. ${
-          status.earned
-            ? repeats
-              ? `Earned ${status.times} ${status.times === 1 ? 'time' : 'times'}`
-              : `Earned ${formatCardDate(status.firstAwardedAt!)}`
-            : `${status.progressLabel} so far`
-        }`}
+        accessibilityLabel={`${definition.title}, ${levelText(status)}. ${definition.description}. ${
+          status.next
+            ? `${status.progressLabel}; next, ${status.nextGoalLabel} for ${status.next.ap} AP`
+            : 'Every level reached'
+        }. ${status.apEarned} AP earned`}
       >
-        <View
-          style={[
-            styles.icon,
-            {
-              backgroundColor: status.earned
-                ? withAlpha(theme.accent, 0.16)
-                : withAlpha(colors.textMuted, 0.12),
-            },
-          ]}
-        >
-          <Feather
-            name={definition.icon}
-            size={20}
-            color={status.earned ? theme.accent : colors.textMuted}
-          />
-        </View>
+        <AchievementEmblem
+          icon={definition.icon}
+          level={status.level}
+          levels={status.levels}
+          accentColor={theme.accent}
+          size={48}
+        />
         <View style={styles.rowText}>
           <View style={styles.rowTitleLine}>
             <Text style={styles.rowTitle} numberOfLines={1}>
               {definition.title}
             </Text>
-            <Text style={[styles.rowAp, status.earned && { color: theme.accent }]}>
-              {repeats ? `${definition.ap} AP each` : `${definition.ap} AP`}
+            <Text style={[styles.rowLevel, status.earned && { color: theme.accent }]}>
+              {levelText(status)}
             </Text>
           </View>
-          <Text style={styles.rowDescription}>{describe(definition, weightUnit)}</Text>
+          <Text style={styles.rowDescription}>{definition.description}</Text>
+          {status.next ? (
+            <>
+              <View style={styles.rowProgress}>
+                <View style={styles.rowBar}>
+                  <AnimatedBar
+                    testID={`achievement-${definition.id}-bar`}
+                    fraction={status.progress}
+                    color={theme.accent}
+                  />
+                </View>
+                <Text style={styles.rowProgressLabel}>{status.progressLabel}</Text>
+              </View>
+              <Text style={styles.rowNext}>
+                {definition.kind === 'single'
+                  ? `+${status.next.ap} AP`
+                  : `Level ${status.next.level}: ${status.nextGoalLabel} · +${status.next.ap} AP`}
+              </Text>
+            </>
+          ) : (
+            <Text style={[styles.rowNext, { color: theme.accent }]}>
+              {definition.kind === 'single' ? 'Unlocked' : 'Every level reached'}
+            </Text>
+          )}
           {status.earned ? (
             <Text style={styles.rowEarned}>
-              {repeats
-                ? `Earned ${status.times} ${status.times === 1 ? 'time' : 'times'} · last ${formatCardDate(status.lastAwardedAt!)}`
-                : `Earned ${formatCardDate(status.firstAwardedAt!)}`}
+              {status.apEarned.toLocaleString('en-US')} AP earned · last{' '}
+              {formatCardDate(status.lastAwardedAt!)}
             </Text>
-          ) : null}
-          {!status.earned || repeats ? (
-            <View style={styles.rowProgress}>
-              <View style={styles.rowBar}>
-                <AnimatedBar
-                  testID={`achievement-${definition.id}-bar`}
-                  fraction={status.progress}
-                  color={theme.accent}
-                />
-              </View>
-              <Text style={styles.rowProgressLabel}>
-                {repeats
-                  ? `${status.progressLabel} ${definition.repeats === 'weekly' ? 'this week' : 'this month'}`
-                  : status.progressLabel}
-              </Text>
-            </View>
           ) : null}
         </View>
       </View>
@@ -202,7 +193,7 @@ export function AchievementsScreen({ navigation }: Props) {
               <Feather name="chevron-right" size={18} color={colors.textMuted} />
             </TouchableOpacity>
             <Text testID="achievements-count" style={styles.count}>
-              {shown.filter((s) => s.earned).length} of {shown.length} achievements earned
+              {levelsReached} of {levelsInAll} levels reached across {shown.length} achievements
             </Text>
           </AppCard>
 
@@ -215,19 +206,22 @@ export function AchievementsScreen({ navigation }: Props) {
             onAccentColor={theme.onAccent}
           />
 
-          {earned.length > 0 ? (
+          {started.length > 0 ? (
             <View style={styles.section} testID="achievements-earned">
               <View style={styles.sectionHeader}>
-                <SectionHeader label={`Earned (${earned.length})`} />
+                <SectionHeader label={`Earned (${started.length})`} />
+                {filter === 'nutrition' ? (
+                  <Text style={styles.sectionNote}>Only you see these</Text>
+                ) : null}
               </View>
-              <AppCard>{earned.map(renderRow)}</AppCard>
+              <AppCard>{started.map(renderRow)}</AppCard>
             </View>
           ) : null}
           {ahead.length > 0 ? (
             <View style={styles.section} testID="achievements-ahead">
               <View style={styles.sectionHeader}>
-                <SectionHeader label={`Still Ahead (${ahead.length})`} />
-                {filter === 'nutrition' ? (
+                <SectionHeader label={`Not Started (${ahead.length})`} />
+                {filter === 'nutrition' && started.length === 0 ? (
                   <Text style={styles.sectionNote}>Only you see these</Text>
                 ) : null}
               </View>

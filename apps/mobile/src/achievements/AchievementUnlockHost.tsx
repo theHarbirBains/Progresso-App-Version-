@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, StyleSheet, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { AnimatedBar } from '../design/AnimatedBar';
 import { PrimaryButton, TextButton } from '../design/Button';
 import { GlassBackground } from '../design/GlassBackground';
 import { Text } from '../design/Text';
 import { colors, radii, spacing, typeScale } from '../design/theme';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
+import { useProgressTheme } from '../progress/useProgressTheme';
 import { useAppTheme } from '../theme/appThemeContext';
 import { withAlpha } from '../theme/accentColor';
-import { useAchievements } from './achievementsContext';
+import { achievementStatuses, goalText, type AchievementStatus } from './achievementProgress';
+import type { AchievementDefinition } from './achievementQueries';
+import { useAchievements, type UnlockBatch } from './achievementsContext';
+import { AchievementEmblem } from './AchievementEmblem';
 import { RankEmblem } from './RankEmblem';
 import { rankForPoints } from './ranks';
 
@@ -18,12 +21,42 @@ const LIVE_ROUTES = new Set(['ActiveWorkout', 'GroupSession', 'TrainerLiveWorkou
 /** More than this at once shows as a summary, not one by one. */
 const LISTED = 4;
 
+/** One achievement's part of a batch: the level it was at, the level it's reached, its AP. */
+interface LevelUp {
+  definition: AchievementDefinition;
+  from: number;
+  to: number;
+  ap: number;
+}
+
+function levelUps(batch: UnlockBatch): LevelUp[] {
+  const byId = new Map<string, LevelUp>();
+  for (const { award, definition } of batch.awards) {
+    const seen = byId.get(definition.id);
+    if (seen) {
+      seen.from = Math.min(seen.from, award.level - 1);
+      seen.to = Math.max(seen.to, award.level);
+      seen.ap += award.ap;
+    } else {
+      byId.set(definition.id, { definition, from: award.level - 1, to: award.level, ap: award.ap });
+    }
+  }
+  return [...byId.values()];
+}
+
+/** "Level 2 → Level 3", "Level 1", or for a single unlock, "Unlocked". */
+function stepText(up: LevelUp): string {
+  if (up.definition.kind === 'single') return 'Unlocked';
+  return up.from > 0 ? `Level ${up.from} → Level ${up.to}` : `Level ${up.to}`;
+}
+
 /**
- * Shows each batch of newly awarded achievements as it comes in -- never over a live workout,
- * where it waits until you've left it. A new tier comes first, on its own: the emblem rising in,
- * "New Rank" and its name. Then the achievements: one with its glyph, name, what it was for and
- * the AP; several as a list with the total. Under them the rank bar fills from where it was to
- * where it is now. Continue goes on to the next batch; See Achievements opens the page.
+ * Shows each batch of newly awarded levels as it comes in -- never over a live workout, where it
+ * waits until you've left it. A new tier comes first, on its own: the emblem rising in, "New
+ * Rank" and its name. Then the achievements: one with its emblem, name, the level it was at and
+ * the one it's reached, the AP, and how far to its next level; several as a list, each with its
+ * new level and AP, and the total. Under them the rank bar shows where you are now. Continue
+ * goes on to the next batch; See Achievements opens the page.
  */
 export function AchievementUnlockHost({
   currentRouteName,
@@ -32,8 +65,9 @@ export function AchievementUnlockHost({
   currentRouteName: string | undefined;
   onOpenAchievements: () => void;
 }) {
-  const { unlocks, dismissUnlock } = useAchievements();
+  const { unlocks, dismissUnlock, awards, progress } = useAchievements();
   const accent = useAppTheme().accent;
+  const { weightUnit } = useProgressTheme();
   const reduceMotion = useReduceMotionPreference();
   const batch = unlocks[0];
   const live = LIVE_ROUTES.has(currentRouteName ?? '');
@@ -64,7 +98,12 @@ export function AchievementUnlockHost({
 
   if (!batch || !before || !after) return null;
   const total = batch.pointsAfter - batch.pointsBefore;
-  const single = batch.awards.length === 1 ? batch.awards[0] : null;
+  const ups = levelUps(batch);
+  const single = ups.length === 1 ? ups[0]! : null;
+  // Where the one achievement stands now, toward its next level.
+  const now: AchievementStatus | null = single
+    ? (achievementStatuses([single.definition], awards, progress, weightUnit)[0] ?? null)
+    : null;
   const motion = {
     opacity: rise,
     transform: [
@@ -117,33 +156,66 @@ export function AchievementUnlockHost({
           ) : (
             <View testID="achievement-unlock-awards" accessible accessibilityLiveRegion="polite">
               <Text style={styles.eyebrow}>
-                {single ? 'Achievement Unlocked' : `${batch.awards.length} Achievements Unlocked`}
+                {single
+                  ? single.definition.kind === 'single' || single.from === 0
+                    ? 'Achievement Unlocked'
+                    : 'Level Up'
+                  : `${ups.length} Achievements Unlocked`}
               </Text>
               {single ? (
                 <View style={styles.single}>
-                  <View
-                    style={[styles.iconWell, { backgroundColor: withAlpha(accent.accent, 0.16) }]}
-                  >
-                    <Feather name={single.definition.icon} size={30} color={accent.accent} />
-                  </View>
+                  <AchievementEmblem
+                    icon={single.definition.icon}
+                    level={single.to}
+                    levels={single.definition.levels.length}
+                    accentColor={accent.accent}
+                    size={76}
+                  />
                   <Text style={styles.title} accessibilityRole="header">
                     {single.definition.title}
                   </Text>
+                  <Text
+                    testID="achievement-unlock-step"
+                    style={[styles.step, { color: accent.accent }]}
+                  >
+                    {stepText(single)}
+                  </Text>
                   <Text style={styles.description}>{single.definition.description}</Text>
+                  {now?.next ? (
+                    <View testID="achievement-unlock-next" style={styles.next}>
+                      <AnimatedBar fraction={now.progress} color={accent.accent} />
+                      <Text style={styles.rankLine}>
+                        Level {now.next.level} at{' '}
+                        {goalText(single.definition, now.next.goal, weightUnit)} · +{now.next.ap} AP
+                      </Text>
+                    </View>
+                  ) : single.definition.kind === 'levels' &&
+                    single.to >= single.definition.levels.length ? (
+                    <Text style={styles.rankLine}>Every level reached</Text>
+                  ) : null}
                 </View>
               ) : (
                 <View style={styles.list}>
-                  {batch.awards.slice(0, LISTED).map(({ award, definition }) => (
-                    <View key={`${award.achievementId}-${award.periodKey}`} style={styles.listRow}>
-                      <Feather name={definition.icon} size={18} color={accent.accent} />
-                      <Text style={styles.listTitle} numberOfLines={1}>
-                        {definition.title}
-                      </Text>
-                      <Text style={styles.listAp}>+{award.ap}</Text>
+                  {ups.slice(0, LISTED).map((up) => (
+                    <View key={up.definition.id} style={styles.listRow}>
+                      <AchievementEmblem
+                        icon={up.definition.icon}
+                        level={up.to}
+                        levels={up.definition.levels.length}
+                        accentColor={accent.accent}
+                        size={34}
+                      />
+                      <View style={styles.listText}>
+                        <Text style={styles.listTitle} numberOfLines={1}>
+                          {up.definition.title}
+                        </Text>
+                        <Text style={styles.listStep}>{stepText(up)}</Text>
+                      </View>
+                      <Text style={styles.listAp}>+{up.ap}</Text>
                     </View>
                   ))}
-                  {batch.awards.length > LISTED ? (
-                    <Text style={styles.more}>and {batch.awards.length - LISTED} more</Text>
+                  {ups.length > LISTED ? (
+                    <Text style={styles.more}>and {ups.length - LISTED} more</Text>
                   ) : null}
                 </View>
               )}
@@ -230,13 +302,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  iconWell: {
-    width: 64,
-    height: 64,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
+  step: {
+    ...typeScale.label,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  next: {
+    alignSelf: 'stretch',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
   },
   title: {
     ...typeScale.cardTitle,
@@ -256,10 +330,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
+  listText: {
+    flex: 1,
+  },
   listTitle: {
     ...typeScale.callout,
     color: colors.textPrimary,
-    flex: 1,
+  },
+  listStep: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
   },
   listAp: {
     ...typeScale.statSmall,
