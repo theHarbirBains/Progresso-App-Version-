@@ -188,6 +188,8 @@ describe('fetchExercises', () => {
         gym: 'Downtown',
         feelNotes: null,
         attachment: null,
+        loadType: null,
+        pulley: null,
         isActive: true,
         createdBy: 'user-1',
       },
@@ -342,6 +344,8 @@ describe('fetchExerciseDetails', () => {
         photo_url: 'https://example.com/row.jpg',
         gym: 'Fit4Less Downtown',
         attachment: 'V-handle',
+        load_type: 'double_stack',
+        pulley: 'lighter',
       },
       error: null,
     });
@@ -352,6 +356,8 @@ describe('fetchExerciseDetails', () => {
       photoUrl: 'https://example.com/row.jpg',
       gym: 'Fit4Less Downtown',
       attachment: 'V-handle',
+      loadType: 'double_stack',
+      pulley: 'lighter',
     });
     expect(builder.eq).toHaveBeenCalledWith('id', 'ex-row');
     expect(builder.eq).not.toHaveBeenCalledWith('is_active', true);

@@ -330,6 +330,8 @@ describe('fetchWorkoutDetail', () => {
           photoUrl: 'https://example.com/bench.jpg',
           gym: 'Fit4Less Downtown',
           attachment: null,
+          loadType: null,
+          pulley: null,
           muscleGroup: 'chest',
           movementType: 'bilateral',
           loggingStyle: null,

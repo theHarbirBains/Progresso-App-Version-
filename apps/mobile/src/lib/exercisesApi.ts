@@ -1,3 +1,4 @@
+import type { LoadType, Pulley } from '../exercises/machineLoad';
 import type { LoggingStyle, MeasurementType, MovementType } from '../exercises/movementTypes';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import { request } from './apiClient';
@@ -18,6 +19,9 @@ export interface ExerciseResponse {
   gym: string | null;
   feelNotes: string | null;
   attachment: string | null;
+  /** How it's loaded and its pulley (exercises/machineLoad.ts). */
+  loadType: LoadType | null;
+  pulley: Pulley | null;
   isActive: boolean;
   createdBy: string | null;
   createdAt: string;
@@ -36,6 +40,8 @@ export interface CreateExerciseInput {
   gym?: string | null;
   feelNotes?: string | null;
   attachment?: string | null;
+  loadType?: LoadType | null;
+  pulley?: Pulley | null;
 }
 
 export interface UpdateExerciseInput {
@@ -52,6 +58,8 @@ export interface UpdateExerciseInput {
   gym?: string | null;
   feelNotes?: string | null;
   attachment?: string | null;
+  loadType?: LoadType | null;
+  pulley?: Pulley | null;
 }
 
 export function createExercise(

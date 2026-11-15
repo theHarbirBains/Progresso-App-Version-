@@ -108,6 +108,8 @@ describe('fetchSummaryTraining', () => {
         photoUrl: 'https://example.com/bench.jpg',
         gym: 'Fit4Less Downtown',
         attachment: 'Wide grip bar',
+        loadType: null,
+        pulley: null,
         measurementType: 'weight_reps',
         weightKg: 80,
         reps: 8,

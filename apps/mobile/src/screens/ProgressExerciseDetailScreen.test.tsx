@@ -261,13 +261,15 @@ describe('ProgressExerciseDetailScreen background refresh on focus', () => {
 });
 
 describe('ProgressExerciseDetailScreen -- which machine', () => {
-  it('shows its photo, muscle, movement, gym and handle at the top, as the library does', async () => {
+  it('shows its photo, muscle, movement, gym, handle, loading and pulley at the top, as the library does', async () => {
     jest.mocked(fetchExerciseDetails).mockResolvedValueOnce({
       muscleGroup: 'back',
       movementType: 'bilateral',
       photoUrl: 'https://example.com/row.jpg',
       gym: 'Fit4Less Downtown',
       attachment: 'V-handle',
+      loadType: 'double_stack',
+      pulley: 'lighter',
     });
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
     render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
@@ -275,7 +277,7 @@ describe('ProgressExerciseDetailScreen -- which machine', () => {
     });
 
     expect(await screen.findByTestId('progress-exercise-detail-details-line')).toHaveTextContent(
-      'Back · Bilateral · Fit4Less Downtown · V-handle',
+      'Back · Bilateral · Fit4Less Downtown · V-handle · Double stack · Lighter pulley',
     );
     expect(fetchExerciseDetails).toHaveBeenCalledWith('user-1', 'ex-1');
     // The photo opens full size.
@@ -290,6 +292,8 @@ describe('ProgressExerciseDetailScreen -- which machine', () => {
       photoUrl: null,
       gym: 'Fit4Less Downtown',
       attachment: null,
+      loadType: null,
+      pulley: null,
     });
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
     render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {

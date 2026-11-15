@@ -87,6 +87,8 @@ describe('ExercisesService', () => {
         gym: null,
         feel_notes: null,
         attachment: null,
+        load_type: null,
+        pulley: null,
       });
       expect(result).toEqual({
         id: 'ex-mine',
@@ -99,6 +101,8 @@ describe('ExercisesService', () => {
         gym: null,
         feelNotes: null,
         attachment: null,
+        loadType: null,
+        pulley: null,
         isActive: true,
         createdBy: 'user-1',
         createdAt: '2026-01-02T00:00:00.000Z',
@@ -134,6 +138,8 @@ describe('ExercisesService', () => {
         gym: null,
         feel_notes: null,
         attachment: null,
+        load_type: null,
+        pulley: null,
       });
       expect(result.movementType).toBe('unilateral');
       expect(result.loggingStyle).toBe('single_side');
@@ -244,6 +250,38 @@ describe('ExercisesService', () => {
         }),
       );
       expect(result.gym).toBe('Downtown');
+    });
+
+    it('saves how it is loaded and its pulley', async () => {
+      const client = createMockClient({
+        insertData: { ...ownCustomRow, load_type: 'double_stack', pulley: 'lighter' },
+      });
+      const service = serviceWith(client);
+
+      const result = await service.createCustom('user-1', {
+        name: 'Cable Crossover',
+        muscleGroup: 'chest',
+        movementType: 'bilateral',
+        loadType: 'double_stack',
+        pulley: 'lighter',
+      });
+
+      expect(client.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ load_type: 'double_stack', pulley: 'lighter' }),
+      );
+      expect(result).toMatchObject({ loadType: 'double_stack', pulley: 'lighter' });
+    });
+
+    it('changes how it is loaded, and clears its pulley with null', async () => {
+      const client = createMockClient({ selectData: ownCustomRow, updateData: ownCustomRow });
+      const service = serviceWith(client);
+
+      await service.updateCustom('user-1', ownCustomRow.id as string, {
+        loadType: 'plate_loaded',
+        pulley: null,
+      });
+
+      expect(client.update).toHaveBeenCalledWith({ load_type: 'plate_loaded', pulley: null });
     });
 
     it('changes one detail on its own, and clears one with null', async () => {

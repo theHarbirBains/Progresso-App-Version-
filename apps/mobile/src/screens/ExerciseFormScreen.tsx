@@ -7,6 +7,15 @@ import { DestructiveButton, PrimaryButton, SecondaryButton, TextButton } from '.
 import { PhotoLightbox } from '../design/PhotoLightbox';
 import { FilterChips } from '../design/FilterChips';
 import { chosenGrip, gripFieldFor } from '../exercises/gripChoices';
+import {
+  hasPulley,
+  LOAD_TYPE_LABELS,
+  LOAD_TYPES,
+  PULLEY_LABELS,
+  PULLEYS,
+  type LoadType,
+  type Pulley,
+} from '../exercises/machineLoad';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { SegmentedControl } from '../design/SegmentedControl';
@@ -49,8 +58,10 @@ type Props = {
 // changes any actual behavior, is set to 'single_side' automatically rather
 // than asked as a second question), and, optionally, what tells this
 // machine apart from look-alikes: its photo (shown beside it everywhere), its
-// gym, and how it's held -- a grip or handle, or for a leg machine where the
-// feet go (exercises/gripChoices.ts) -- with the common ones to tap.
+// gym, how it's held -- a grip or handle, or for a leg machine where the
+// feet go (exercises/gripChoices.ts) -- with the common ones to tap, how it's
+// loaded (a single or double weight stack, or plates) and, on a stack, whether
+// its pulley feels heavier or lighter (exercises/machineLoad.ts).
 export function ExerciseFormScreen(props: Props) {
   const { session, user } = useAuth();
   const accessToken = session?.access_token;
@@ -75,6 +86,12 @@ export function ExerciseFormScreen(props: Props) {
   const [gym, setGym] = useState(props.mode === 'edit' ? (props.exercise.gym ?? '') : '');
   const [attachment, setAttachment] = useState(
     props.mode === 'edit' ? (props.exercise.attachment ?? '') : '',
+  );
+  const [loadType, setLoadType] = useState<LoadType | null>(
+    props.mode === 'edit' ? (props.exercise.loadType ?? null) : null,
+  );
+  const [pulley, setPulley] = useState<Pulley | null>(
+    props.mode === 'edit' ? (props.exercise.pulley ?? null) : null,
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +129,9 @@ export function ExerciseFormScreen(props: Props) {
       const details = {
         gym: gym.trim() || null,
         attachment: attachment.trim() || null,
+        loadType,
+        // Plates have no pulley to speak of.
+        pulley: hasPulley(loadType) ? pulley : null,
       };
 
       if (props.mode === 'create') {
@@ -353,6 +373,45 @@ export function ExerciseFormScreen(props: Props) {
               </Text>
             ) : null}
           </View>
+
+          {/* How it's loaded; tapping the one chosen clears it. */}
+          <View style={styles.grip}>
+            <Text style={styles.fieldLabel}>Weight Type</Text>
+            <FilterChips
+              testID="exercise-form-load-type"
+              options={LOAD_TYPES.map((value) => ({ value, label: LOAD_TYPE_LABELS[value] }))}
+              value={loadType ?? ''}
+              onChange={(choice) =>
+                setLoadType((current) => (current === choice ? null : (choice as LoadType)))
+              }
+              accentColor={accentColor}
+              onAccentColor={onAccentColor}
+            />
+            <Text style={styles.helperText}>
+              How the weight goes on. A single stack, a double stack and plates load the same
+              muscles very differently, so the same number isn&apos;t the same weight.
+            </Text>
+          </View>
+
+          {hasPulley(loadType) ? (
+            <View style={styles.grip}>
+              <Text style={styles.fieldLabel}>Pulley</Text>
+              <FilterChips
+                testID="exercise-form-pulley"
+                options={PULLEYS.map((value) => ({ value, label: PULLEY_LABELS[value] }))}
+                value={pulley ?? ''}
+                onChange={(choice) =>
+                  setPulley((current) => (current === choice ? null : (choice as Pulley)))
+                }
+                accentColor={accentColor}
+                onAccentColor={onAccentColor}
+              />
+              <Text style={styles.helperText}>
+                On a cable machine, the pulley can make each plate on the stack feel heavier or
+                lighter than on another machine.
+              </Text>
+            </View>
+          ) : null}
         </View>
       </Section>
 

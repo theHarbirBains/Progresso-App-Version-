@@ -66,6 +66,8 @@ function exerciseRow(id: string, owner: string | null, extra: Record<string, unk
     gym: 'Fit4Less Downtown',
     feel_notes: 'Heavier than the one at home',
     attachment: 'V-handle',
+    load_type: 'single_stack',
+    pulley: 'heavier',
     is_active: true,
     created_by: owner,
     created_at: '2026-11-01T00:00:00.000Z',
@@ -213,6 +215,8 @@ describe('SharedExercisesService', () => {
             photo_url: 'https://example.com/row.jpg',
             gym: 'Fit4Less Downtown',
             attachment: 'V-handle',
+            load_type: 'single_stack',
+            pulley: 'heavier',
           },
         },
       ]);
@@ -238,6 +242,21 @@ describe('SharedExercisesService', () => {
       queueSharers(client);
       client.queue('exercises', {
         data: [exerciseRow('ex-mine', 'user-1', { attachment: 'Wide grip' })],
+        error: null,
+      });
+      client.queue('exercises', { data: exerciseRow('ex-copy', 'user-1'), error: null });
+      const service = serviceWith(client);
+
+      await expect(service.copy('user-1', 'ex-coach')).resolves.toMatchObject({ id: 'ex-copy' });
+      expect(client.inserts).toHaveLength(1);
+    });
+
+    it('makes a copy when their same-named exercise is loaded another way', async () => {
+      const client = createMockClient();
+      client.queue('exercises', { data: exerciseRow('ex-coach', 'coach'), error: null });
+      queueSharers(client);
+      client.queue('exercises', {
+        data: [exerciseRow('ex-mine', 'user-1', { load_type: 'plate_loaded', pulley: null })],
         error: null,
       });
       client.queue('exercises', { data: exerciseRow('ex-copy', 'user-1'), error: null });

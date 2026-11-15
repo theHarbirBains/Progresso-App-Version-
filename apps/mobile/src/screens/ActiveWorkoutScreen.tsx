@@ -770,6 +770,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 photoUrl={exercise.photoUrl}
                 gym={exercise.gym}
                 attachment={exercise.attachment}
+                loadType={exercise.loadType}
+                pulley={exercise.pulley}
                 weightUnit={weightUnit}
                 previousSession={buildPreviousSessionDisplay(
                   previousPerformance[exercise.exerciseId],

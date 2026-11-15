@@ -2,6 +2,7 @@ import type { ExerciseResponse, SharedExerciseResponse, ShareSource } from '../l
 import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
 import { MACHINE_COLUMNS, machineDetailsOf, type MachineDetails } from './machineDetails';
+import type { LoadType, Pulley } from './machineLoad';
 import type { LoggingStyle, MeasurementType, MovementType } from './movementTypes';
 import type { MuscleGroup } from './muscleGroups';
 
@@ -27,6 +28,9 @@ export interface ExerciseRow {
   gym?: string | null;
   feelNotes?: string | null;
   attachment?: string | null;
+  /** How it's loaded and its pulley (exercises/machineLoad.ts) -- optional too. */
+  loadType?: LoadType | null;
+  pulley?: Pulley | null;
   isActive: boolean;
   createdBy: string | null;
   /**
@@ -50,6 +54,8 @@ export function exerciseRowFromResponse(exercise: ExerciseResponse): ExerciseRow
     gym: exercise.gym ?? null,
     feelNotes: exercise.feelNotes ?? null,
     attachment: exercise.attachment ?? null,
+    loadType: exercise.loadType ?? null,
+    pulley: exercise.pulley ?? null,
     isActive: exercise.isActive,
     createdBy: exercise.createdBy,
   };
@@ -97,6 +103,8 @@ interface ExerciseDbRow {
   gym: string | null;
   feel_notes: string | null;
   attachment: string | null;
+  load_type: LoadType | null;
+  pulley: Pulley | null;
   is_active: boolean;
   created_by: string | null;
 }
@@ -113,6 +121,8 @@ function toExerciseRow(row: ExerciseDbRow): ExerciseRow {
     gym: row.gym ?? null,
     feelNotes: row.feel_notes ?? null,
     attachment: row.attachment ?? null,
+    loadType: row.load_type ?? null,
+    pulley: row.pulley ?? null,
     isActive: row.is_active,
     createdBy: row.created_by,
   };
@@ -131,7 +141,7 @@ function buildExerciseQuery(params: {
   let query = supabase
     .from('exercises')
     .select(
-      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, is_active, created_by',
+      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, load_type, pulley, is_active, created_by',
       count ? { count } : undefined,
     )
     .eq('is_active', true)
@@ -205,7 +215,7 @@ async function fetchFullExerciseList(userId: string): Promise<ExerciseRow[]> {
   const { data, error } = await supabase
     .from('exercises')
     .select(
-      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, is_active, created_by',
+      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, load_type, pulley, is_active, created_by',
     )
     .eq('is_active', true)
     .order('name', { ascending: true });
@@ -346,6 +356,8 @@ export async function fetchExerciseDetails(
       photoUrl: cached.photoUrl,
       gym: cached.gym ?? null,
       attachment: cached.attachment ?? null,
+      loadType: cached.loadType ?? null,
+      pulley: cached.pulley ?? null,
     };
   }
   const { data, error } = await supabase
@@ -361,6 +373,8 @@ export async function fetchExerciseDetails(
     photo_url: string | null;
     gym: string | null;
     attachment: string | null;
+    load_type: LoadType | null;
+    pulley: Pulley | null;
   };
   return {
     muscleGroup: row.muscle_group,

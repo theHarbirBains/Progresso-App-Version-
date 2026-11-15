@@ -10,6 +10,7 @@ import { Text } from '../design/Text';
 import { colors } from '../design/theme';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import { machineLine } from '../exercises/machineDetails';
+import type { LoadType, Pulley } from '../exercises/machineLoad';
 import type { MeasurementType, MovementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
@@ -73,9 +74,12 @@ interface Props {
   measurementType?: MeasurementType;
   /** The exercise's machine photo, when it has one: beside its name, opening full size on a tap. */
   photoUrl?: string | null;
-  /** Its gym and handle, when it has them: after its muscle, as in the Exercise Library. */
+  /** Its gym, handle, loading and pulley, when it has them: after its muscle, as in the
+   * Exercise Library. */
   gym?: string | null;
   attachment?: string | null;
+  loadType?: LoadType | null;
+  pulley?: Pulley | null;
   /** The unit the all-time best is shown in. */
   weightUnit?: 'kg' | 'lb';
   /** Every set from the user's last completed session with this exercise
@@ -210,6 +214,8 @@ function ExerciseCardComponent({
   photoUrl = null,
   gym = null,
   attachment = null,
+  loadType = null,
+  pulley = null,
   weightUnit = 'lb',
   previousSession = null,
   onViewHistory,
@@ -254,7 +260,7 @@ function ExerciseCardComponent({
         <View style={styles.exerciseTitleBlock}>
           <Text style={styles.exerciseName}>{exerciseName}</Text>
           <Text testID={id('muscle-group')} style={styles.exerciseMuscle}>
-            {machineLine({ gym, attachment }, MUSCLE_GROUP_LABELS[muscleGroup])}
+            {machineLine({ gym, attachment, loadType, pulley }, MUSCLE_GROUP_LABELS[muscleGroup])}
           </Text>
           {ownRangeText ? (
             <Text testID={id('own-range')} style={[styles.ownRange, { color: accentColor }]}>
@@ -592,6 +598,8 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     (prev.photoUrl ?? null) === (next.photoUrl ?? null) &&
     (prev.gym ?? null) === (next.gym ?? null) &&
     (prev.attachment ?? null) === (next.attachment ?? null) &&
+    (prev.loadType ?? null) === (next.loadType ?? null) &&
+    (prev.pulley ?? null) === (next.pulley ?? null) &&
     prev.weightUnit === next.weightUnit &&
     prev.accentColor === next.accentColor &&
     prev.onAccentColor === next.onAccentColor &&

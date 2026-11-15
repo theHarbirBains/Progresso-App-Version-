@@ -43,3 +43,22 @@ describe("an exercise's machine details", () => {
     expect(instance).toMatchObject({ gym: null, attachment: 'Rope' });
   });
 });
+
+describe('how a machine is loaded, and its pulley', () => {
+  it('takes one stack, two, or plates, and a heavier or lighter pulley -- or null for none', async () => {
+    const { errors } = await check(CreateExerciseDto, {
+      name: 'Cable Row',
+      muscleGroup: 'back',
+      movementType: 'bilateral',
+      loadType: 'double_stack',
+      pulley: 'lighter',
+    });
+    expect(errors).toEqual([]);
+    expect((await check(UpdateExerciseDto, { loadType: null, pulley: null })).errors).toEqual([]);
+  });
+
+  it('refuses anything else', async () => {
+    const { errors } = await check(UpdateExerciseDto, { loadType: 'cable', pulley: 'medium' });
+    expect(errors).toEqual(['loadType', 'pulley']);
+  });
+});

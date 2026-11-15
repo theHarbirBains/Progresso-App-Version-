@@ -2,12 +2,16 @@ import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
 import {
+  LOAD_TYPES,
   LOGGING_STYLES,
   MEASUREMENT_TYPES,
   MOVEMENT_TYPES,
+  PULLEYS,
+  type LoadType,
   type LoggingStyle,
   type MeasurementType,
   type MovementType,
+  type Pulley,
 } from '../movement-type';
 
 /** A typed detail: trimmed, and null when nothing is left -- so a blank box clears it. */
@@ -72,4 +76,13 @@ export class CreateExerciseDto {
   @IsString()
   @MaxLength(60)
   attachment?: string | null;
+
+  // How it's loaded, and its pulley -- each optional, null for none (exercises.load_type, pulley).
+  @IsOptional()
+  @IsIn(LOAD_TYPES)
+  loadType?: LoadType | null;
+
+  @IsOptional()
+  @IsIn(PULLEYS)
+  pulley?: Pulley | null;
 }

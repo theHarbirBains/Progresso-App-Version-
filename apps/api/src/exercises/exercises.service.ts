@@ -9,7 +9,13 @@ import { SupabaseService } from '../supabase/supabase.service';
 import type { CreateExerciseDto } from './dto/create-exercise.dto';
 import type { UpdateExerciseDto } from './dto/update-exercise.dto';
 import type { MuscleGroup } from './muscle-group';
-import type { LoggingStyle, MeasurementType, MovementType } from './movement-type';
+import type {
+  LoadType,
+  LoggingStyle,
+  MeasurementType,
+  MovementType,
+  Pulley,
+} from './movement-type';
 
 export interface ExerciseRecord {
   id: string;
@@ -23,6 +29,9 @@ export interface ExerciseRecord {
   gym: string | null;
   feelNotes: string | null;
   attachment: string | null;
+  /** How it's loaded (one stack, two, or plates) and whether its pulley feels heavier or lighter. */
+  loadType: LoadType | null;
+  pulley: Pulley | null;
   isActive: boolean;
   createdBy: string | null;
   createdAt: string;
@@ -43,6 +52,8 @@ export function toExerciseRecord(row: Record<string, unknown>): ExerciseRecord {
     gym: (row.gym as string | null) ?? null,
     feelNotes: (row.feel_notes as string | null) ?? null,
     attachment: (row.attachment as string | null) ?? null,
+    loadType: (row.load_type as LoadType | null) ?? null,
+    pulley: (row.pulley as Pulley | null) ?? null,
     isActive: row.is_active as boolean,
     createdBy: (row.created_by as string | null) ?? null,
     createdAt: row.created_at as string,
@@ -76,6 +87,8 @@ export class ExercisesService {
         gym: dto.gym ?? null,
         feel_notes: dto.feelNotes ?? null,
         attachment: dto.attachment ?? null,
+        load_type: dto.loadType ?? null,
+        pulley: dto.pulley ?? null,
       })
       .select('*')
       .single();
@@ -118,6 +131,8 @@ export class ExercisesService {
     if (dto.gym !== undefined) updatePayload.gym = dto.gym;
     if (dto.feelNotes !== undefined) updatePayload.feel_notes = dto.feelNotes;
     if (dto.attachment !== undefined) updatePayload.attachment = dto.attachment;
+    if (dto.loadType !== undefined) updatePayload.load_type = dto.loadType;
+    if (dto.pulley !== undefined) updatePayload.pulley = dto.pulley;
     if (dto.measurementType !== undefined) updatePayload.measurement_type = dto.measurementType;
 
     if (Object.keys(updatePayload).length === 0) {

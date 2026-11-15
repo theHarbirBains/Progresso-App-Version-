@@ -122,6 +122,44 @@ describe('ExerciseFormScreen (create mode)', () => {
     );
   });
 
+  it('saves how it is loaded and its pulley -- a pulley only on a weight stack', async () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Cable Crossover');
+    selectMuscleGroup('exercise-form-muscle-group', 'chest');
+    fireEvent.press(screen.getByTestId('exercise-form-load-type-double_stack'));
+    fireEvent.press(screen.getByTestId('exercise-form-pulley-lighter'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith(
+        'token-123',
+        expect.objectContaining({ loadType: 'double_stack', pulley: 'lighter' }),
+      ),
+    );
+  });
+
+  it('asks nothing about a pulley on a plate-loaded machine, and clears a choice tapped again', async () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Chest Press');
+    selectMuscleGroup('exercise-form-muscle-group', 'chest');
+    fireEvent.press(screen.getByTestId('exercise-form-load-type-single_stack'));
+    fireEvent.press(screen.getByTestId('exercise-form-pulley-heavier'));
+    fireEvent.press(screen.getByTestId('exercise-form-load-type-plate_loaded'));
+    expect(screen.queryByTestId('exercise-form-pulley')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() => expect(mockCreateExercise).toHaveBeenCalled());
+    const sent = mockCreateExercise.mock.calls[0][1];
+    expect(sent.loadType).toBe('plate_loaded');
+    expect(sent).not.toHaveProperty('pulley');
+
+    // Tapped again, it's cleared.
+    fireEvent.press(screen.getByTestId('exercise-form-load-type-plate_loaded'));
+    expect(screen.getByTestId('exercise-form-pulley')).toBeTruthy();
+  });
+
   it('explains each box plainly, and only the name is required -- with no note on how it feels', () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
@@ -410,6 +448,8 @@ describe('ExerciseFormScreen (edit mode)', () => {
         isActive: true,
         gym: null,
         attachment: null,
+        loadType: null,
+        pulley: null,
       }),
     );
     expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');

@@ -18,6 +18,7 @@ import { groupExercisesByLetter } from './exerciseLibraryGrouping';
 import { ExercisePhoto } from './ExercisePhoto';
 import type { ExerciseRow, ExerciseSource, ExerciseSourceCounts } from './exerciseQueries';
 import { MuscleGroupChips } from './MuscleGroupChips';
+import { machineLine } from './machineDetails';
 import { MOVEMENT_TYPE_LABELS } from './movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
 import { SkeletonRows } from '../design/Skeleton';
@@ -253,15 +254,15 @@ export function ExerciseBrowser({
               testID={`exercise-item-${item.id}`}
               leading={photo}
               title={`${item.name}${rowSuffix?.(item) ?? ''}`}
-              // Its gym and handle after the muscle, so two machines of the same name read apart.
-              subtitle={[
-                MUSCLE_GROUP_LABELS[item.muscleGroup],
-                MOVEMENT_TYPE_LABELS[item.movementType],
-                item.gym,
-                item.attachment,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
+              // Its gym, handle, loading and pulley after the muscle, so two machines of the same
+              // name read apart.
+              subtitle={
+                machineLine(
+                  item,
+                  MUSCLE_GROUP_LABELS[item.muscleGroup],
+                  MOVEMENT_TYPE_LABELS[item.movementType],
+                ) ?? ''
+              }
               detail={shared ? `From ${shared.ownerName}` : undefined}
               onPress={disabled ? undefined : onRowPress}
               disabled={disabled}

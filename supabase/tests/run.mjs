@@ -590,20 +590,45 @@ async function main() {
   record('The same exercise name can be used twice at the same gym', true);
   const machineKeys = (
     await admin.query(
-      `select public.exercise_machine_key(' Lat Pulldown ', 'Downtown', 'Wide grip', 'a.jpg') =
-              public.exercise_machine_key('lat pulldown', 'downtown ', 'WIDE GRIP', 'a.jpg') as same,
-              public.exercise_machine_key('Lat Pulldown', 'Downtown', 'Wide grip', 'a.jpg') =
-              public.exercise_machine_key('Lat Pulldown', 'Downtown', 'Close grip', 'a.jpg') as other_grip,
-              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, 'a.jpg') =
-              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, 'b.jpg') as other_photo`,
+      `select public.exercise_machine_key(' Lat Pulldown ', 'Downtown', 'Wide grip', 'a.jpg', 'single_stack', 'heavier') =
+              public.exercise_machine_key('lat pulldown', 'downtown ', 'WIDE GRIP', 'a.jpg', 'single_stack', 'heavier') as same,
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', 'Wide grip', 'a.jpg', null, null) =
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', 'Close grip', 'a.jpg', null, null) as other_grip,
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, 'a.jpg', null, null) =
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, 'b.jpg', null, null) as other_photo,
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, null, 'single_stack', null) =
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, null, 'double_stack', null) as other_load,
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, null, null, null) =
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, null, 'plate_loaded', null) as load_or_none,
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, null, 'single_stack', 'heavier') =
+              public.exercise_machine_key('Lat Pulldown', 'Downtown', null, null, 'single_stack', 'lighter') as other_pulley`,
     )
   ).rows[0];
   record(
-    'One machine is its name, gym, grip and photo -- case and spaces aside',
+    'One machine is its name, gym, grip, photo, how it is loaded and its pulley -- case and spaces aside',
     machineKeys.same === true &&
       machineKeys.other_grip === false &&
-      machineKeys.other_photo === false,
+      machineKeys.other_photo === false &&
+      machineKeys.other_load === false &&
+      machineKeys.load_or_none === false &&
+      machineKeys.other_pulley === false,
     JSON.stringify(machineKeys),
+  );
+  await expectThrows(
+    admin.query(
+      "insert into public.exercises (name, muscle_group, created_by, load_type) values ('Load Check', 'back', $1, 'cable')",
+      [userA],
+    ),
+    'A machine is loaded by one stack, two, or plates -- nothing else',
+    /violates check constraint/i,
+  );
+  await expectThrows(
+    admin.query(
+      "insert into public.exercises (name, muscle_group, created_by, pulley) values ('Pulley Check', 'back', $1, 'medium')",
+      [userA],
+    ),
+    "A machine's pulley is heavier or lighter -- nothing else",
+    /violates check constraint/i,
   );
   await expectThrows(
     admin.query(
@@ -2783,7 +2808,7 @@ async function main() {
     [trainerCustom, T, otherUsersCustom, CO, retiredCustom],
   );
   await admin.query(
-    "update public.exercises set gym = 'Gym B', feel_notes = 'Lighter than the one downtown', attachment = 'Wide bar' where id = $1",
+    "update public.exercises set gym = 'Gym B', feel_notes = 'Lighter than the one downtown', attachment = 'Wide bar', load_type = 'double_stack', pulley = 'lighter' where id = $1",
     [trainerCustom],
   );
   await admin.query('update public.exercises set is_active = false where id = $1', [retiredCustom]);
@@ -2819,7 +2844,7 @@ async function main() {
   );
 
   const clientCopy = await admin.query(
-    "select id, created_by, photo_url, gym, feel_notes, attachment from public.exercises where created_by = $1 and name = 'Gym B Chest Machine'",
+    "select id, created_by, photo_url, gym, feel_notes, attachment, load_type, pulley from public.exercises where created_by = $1 and name = 'Gym B Chest Machine'",
     [C],
   );
   const workoutExerciseRows = (
@@ -2836,10 +2861,12 @@ async function main() {
     JSON.stringify({ copies: clientCopy.rows.length, used: workoutExerciseRows }),
   );
   record(
-    "The client's copy keeps what sets the machine apart: its gym, how it feels, its handle",
+    "The client's copy keeps what sets the machine apart: its gym, how it feels, its handle, how it's loaded and its pulley",
     clientCopy.rows[0].gym === 'Gym B' &&
       clientCopy.rows[0].feel_notes === 'Lighter than the one downtown' &&
-      clientCopy.rows[0].attachment === 'Wide bar',
+      clientCopy.rows[0].attachment === 'Wide bar' &&
+      clientCopy.rows[0].load_type === 'double_stack' &&
+      clientCopy.rows[0].pulley === 'lighter',
     JSON.stringify(clientCopy.rows[0]),
   );
 
@@ -2877,6 +2904,31 @@ async function main() {
       gripUsed[0].id !== clientsCloseGrip &&
       gripUsed[0].attachment === 'Wide grip',
     JSON.stringify(gripUsed),
+  );
+
+  // Same name, gym and grip, but plates instead of a stack: another machine too.
+  const trainerPlates = randomUUID();
+  const clientsStack = randomUUID();
+  await admin.query(
+    `insert into public.exercises (id, created_by, name, muscle_group, movement_type, gym, attachment, load_type) values
+       ($1, $2, 'Load Check Row', 'back', 'bilateral', 'Gym B', 'Wide grip', 'plate_loaded'),
+       ($3, $4, 'Load Check Row', 'back', 'bilateral', 'Gym B', 'Wide grip', 'single_stack')`,
+    [trainerPlates, T, clientsStack, C],
+  );
+  const loadLogged = await logFor(T, C, logPayload(trainerPlates, twoSets));
+  const loadUsed = (
+    await admin.query(
+      `select e.id, e.load_type from public.workout_exercises we
+       join public.exercises e on e.id = we.exercise_id where we.workout_id = $1`,
+      [loadLogged.rows[0].id],
+    )
+  ).rows;
+  record(
+    "A client's same machine on a weight stack is never used for the trainer's plate-loaded one",
+    loadUsed.length === 1 &&
+      loadUsed[0].id !== clientsStack &&
+      loadUsed[0].load_type === 'plate_loaded',
+    JSON.stringify(loadUsed),
   );
 
   const attributedSets = await admin.query(
@@ -3452,9 +3504,9 @@ async function main() {
   const ownCopy = randomUUID();
   const ownOtherGrip = randomUUID();
   await admin.query(
-    `insert into public.exercises (id, created_by, name, muscle_group, movement_type, gym, attachment, photo_url) values
-       ($1, $2, 'Gym B Chest Machine', 'chest', 'bilateral', 'Gym B', 'Wide bar', 'https://example.test/gym-b.jpg'),
-       ($3, $2, 'Gym B Chest Machine', 'chest', 'bilateral', 'Gym B', 'Close grip', null)`,
+    `insert into public.exercises (id, created_by, name, muscle_group, movement_type, gym, attachment, photo_url, load_type, pulley) values
+       ($1, $2, 'Gym B Chest Machine', 'chest', 'bilateral', 'Gym B', 'Wide bar', 'https://example.test/gym-b.jpg', 'double_stack', 'lighter'),
+       ($3, $2, 'Gym B Chest Machine', 'chest', 'bilateral', 'Gym B', 'Close grip', null, 'double_stack', 'lighter')`,
     [ownCopy, mergeClaimant, ownOtherGrip],
   );
   await trackPlaceholder(mergePlaceholder, 'code-hash-3');

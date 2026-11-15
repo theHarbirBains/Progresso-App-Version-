@@ -23,18 +23,27 @@ export interface SharedExercise extends Omit<ExerciseRecord, 'feelNotes'> {
 const UNIQUE_VIOLATION = '23505';
 
 /**
- * One machine in a library: its name, gym and grip (case and spaces aside) and its photo -- as
- * the database's exercise_machine_key has it. Two of a person's exercises may share a name, told
- * apart by these.
+ * One machine in a library: its name, gym and grip (case and spaces aside), its photo, how it's
+ * loaded and its pulley -- as the database's exercise_machine_key has it. Two of a person's
+ * exercises may share a name, told apart by these.
  */
 function libraryKey(row: {
   name: string;
   gym: string | null;
   attachment: string | null;
   photoUrl: string | null;
+  loadType: string | null;
+  pulley: string | null;
 }): string {
   const text = (value: string | null) => (value ?? '').trim().toLowerCase();
-  return [text(row.name), text(row.gym), text(row.attachment), row.photoUrl ?? ''].join('\u001f');
+  return [
+    text(row.name),
+    text(row.gym),
+    text(row.attachment),
+    row.photoUrl ?? '',
+    row.loadType ?? '',
+    row.pulley ?? '',
+  ].join('\u001f');
 }
 
 /** An exercise as it's shared: everything but an old note on how it feels. */
@@ -155,8 +164,8 @@ export class SharedExercisesService {
 
   /**
    * Makes a shared exercise this user's own: their own of the very same machine (its name, gym,
-   * grip and photo) if they have one, otherwise a copy of it in their library -- its name, muscle,
-   * movement, what it measures, photo, gym and grip. A built-in, or one already theirs, is
+   * grip, photo, loading and pulley) if they have one, otherwise a copy of it in their library --
+   * its name, muscle, movement, what it measures, photo, gym, grip, loading and pulley. A built-in, or one already theirs, is
    * returned as it is.
    */
   async copy(userId: string, exerciseId: string): Promise<ExerciseRecord> {
@@ -192,6 +201,8 @@ export class SharedExercisesService {
         photo_url: source.photoUrl,
         gym: source.gym,
         attachment: source.attachment,
+        load_type: source.loadType,
+        pulley: source.pulley,
       })
       .select('*')
       .single();
