@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from 'react';
+import type { HistoricalSetWithExercise } from './exerciseHistoryGrouping';
 import { Alert, Modal, StyleSheet, View } from 'react-native';
 import { Card } from '../design/Card';
 import { RiseInStack } from '../design/RiseIn';
@@ -76,6 +77,8 @@ interface Props {
   userId: string;
   accentColor: string;
   onAccentColor: string;
+  /** The signed-in person's own logged sets, for the picker's Recent (ExercisePickerModal). */
+  recentHistory?: HistoricalSetWithExercise[];
   testID?: string;
 }
 
@@ -98,6 +101,7 @@ export function GroupWorkoutEditor({
   userId,
   accentColor,
   onAccentColor,
+  recentHistory,
   testID = 'group-workout',
 }: Props) {
   const { weightUnit } = useProgressTheme();
@@ -517,6 +521,7 @@ export function GroupWorkoutEditor({
         onAccentColor={onAccentColor}
       />
       <ExercisePickerModal
+        recentHistory={recentHistory}
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={(exercise) => void addExercise(exercise)}

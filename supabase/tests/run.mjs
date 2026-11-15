@@ -5298,6 +5298,154 @@ async function main() {
     }
   }
 
+  // ---- a friend's exercise, used as it is ----
+  {
+    const maker = randomUUID();
+    const follower = randomUUID();
+    const stranger = randomUUID();
+    const blocked = randomUUID();
+    await admin.query(
+      'insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6),($7,$8)',
+      [
+        maker,
+        'shared-maker@test.local',
+        follower,
+        'shared-follower@test.local',
+        stranger,
+        'shared-stranger@test.local',
+        blocked,
+        'shared-blocked@test.local',
+      ],
+    );
+    const shared = (
+      await admin.query(
+        `insert into public.exercises (created_by, name, muscle_group, movement_type, gym, attachment)
+         values ($1, 'Friend Row', 'back', 'bilateral', 'Downtown', 'V-handle') returning id`,
+        [maker],
+      )
+    ).rows[0].id;
+    await admin.query(
+      "insert into public.follows (follower_id, followee_id, status) values ($1, $2, 'accepted'), ($3, $2, 'accepted')",
+      [follower, maker, blocked],
+    );
+    await admin.query('insert into public.user_blocks (blocker_id, blocked_id) values ($1, $2)', [
+      maker,
+      blocked,
+    ]);
+    const sees = async (userId) =>
+      (
+        await asUser(userId, (c) =>
+          c.query('select name from public.exercises where id = $1', [shared]),
+        )
+      ).rows[0]?.name ?? null;
+
+    record(
+      "Someone you follow's exercise can be read; a stranger's or a blocker's can't",
+      (await sees(follower)) === 'Friend Row' &&
+        (await sees(stranger)) === null &&
+        (await sees(blocked)) === null,
+    );
+
+    // Logged as it is -- no copy -- and a rep range set on it.
+    const loggedWorkout = await asUserCommitted(follower, async (c) => {
+      const workout = (
+        await c.query(
+          "insert into public.workouts (user_id, name, performed_at) values ($1, 'Back', now()) returning id",
+          [follower],
+        )
+      ).rows[0].id;
+      const we = (
+        await c.query(
+          'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+          [workout, shared],
+        )
+      ).rows[0].id;
+      await c.query(
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 60, 8, now())',
+        [we],
+      );
+      await c.query(
+        'insert into public.exercise_progression_settings (user_id, exercise_id, rep_range_min, rep_range_max) values ($1, $2, 6, 10)',
+        [follower, shared],
+      );
+      return workout;
+    });
+    const copies = (
+      await admin.query(
+        "select count(*)::int as n from public.exercises where created_by = $1 and name = 'Friend Row'",
+        [follower],
+      )
+    ).rows[0].n;
+    record("A friend's exercise is logged as it is -- no copy is made", copies === 0);
+    const followerPr = (
+      await admin.query(
+        'select count(*)::int as n from public.rep_prs where user_id = $1 and exercise_id = $2',
+        [follower, shared],
+      )
+    ).rows[0].n;
+    record("Their records on a friend's exercise are their own", followerPr > 0);
+    await expectThrows(
+      asUser(stranger, (c) =>
+        c.query(
+          'insert into public.exercise_progression_settings (user_id, exercise_id, rep_range_min, rep_range_max) values ($1, $2, 6, 10)',
+          [stranger, shared],
+        ),
+      ),
+      "A rep range can't be set on an exercise of someone you don't follow",
+      /exercise not available/,
+    );
+
+    // Only its maker changes it, and the change reaches everyone using it.
+    const followerEdit = await asUser(follower, (c) =>
+      c.query("update public.exercises set name = 'Mine Now' where id = $1", [shared]),
+    );
+    record("Only its maker changes a friend's exercise", followerEdit.rowCount === 0);
+    await asUserCommitted(maker, (c) =>
+      c.query("update public.exercises set name = 'Friend Row (Wide)', attachment = 'Wide bar' where id = $1", [
+        shared,
+      ]),
+    );
+    record(
+      "Its maker's change reaches everyone using it",
+      (await sees(follower)) === 'Friend Row (Wide)',
+    );
+
+    // Unfollowing keeps the history's names: what's been logged stays readable.
+    await admin.query('delete from public.follows where follower_id = $1 and followee_id = $2', [
+      follower,
+      maker,
+    ]);
+    record(
+      'An exercise you logged stays readable after an unfollow',
+      (await sees(follower)) === 'Friend Row (Wide)',
+    );
+
+    // Its maker's account deleted: everyone using it moves onto a copy of their own.
+    await admin.query('select public.delete_user_data($1)', [maker]);
+    const moved = (
+      await admin.query(
+        `select e.created_by, e.name from public.workout_exercises we
+         join public.exercises e on e.id = we.exercise_id where we.workout_id = $1`,
+        [loggedWorkout],
+      )
+    ).rows[0];
+    const movedRange = (
+      await admin.query(
+        `select e.created_by from public.exercise_progression_settings s
+         join public.exercises e on e.id = s.exercise_id where s.user_id = $1`,
+        [follower],
+      )
+    ).rows;
+    record(
+      "Deleting a maker's account moves a friend's workout and rep range onto their own copy",
+      moved?.created_by === follower &&
+        moved?.name === 'Friend Row (Wide)' &&
+        movedRange.length === 1 &&
+        movedRange[0].created_by === follower,
+      JSON.stringify({ moved, movedRange }),
+    );
+  }
+
   // ---- achievement levels: awarding, idempotency, muscles, time zones, integrity ----
   {
     const ath = randomUUID();

@@ -42,7 +42,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
   const { theme, activeWorkoutSplitId } = useProgressTheme();
   // The editor's Finish step, called before the group is finished.
   const editorFinish = useRef<LiveWorkoutFinish | null>(null);
-  const { refetch: refetchAllTimeStats } = useAllTimeStats();
+  const { refetch: refetchAllTimeStats, allSetHistory } = useAllTimeStats();
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -238,6 +238,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
 
         {isLive && editorMembers.length > 0 ? (
           <GroupWorkoutEditor
+            recentHistory={allSetHistory}
             members={editorMembers}
             finishRef={editorFinish}
             startedAt={group.startedAt}

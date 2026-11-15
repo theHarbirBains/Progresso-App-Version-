@@ -622,25 +622,16 @@ describe('ExerciseLibraryScreen -- shared libraries', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("adds a friend's exercise to their library from its plus", async () => {
+  it("shows a friend's exercise as theirs -- whose it is, with nothing to copy or edit", async () => {
     mockFetchAllExercises.mockResolvedValue([friendsRow]);
-    mockShared.makeOwn.mockResolvedValue({ ...friendsRow, id: 'ex-copy', shared: undefined });
     renderScreen();
 
     fireEvent.press(screen.getByTestId('exercise-source-friends'));
-    fireEvent.press(await screen.findByTestId('exercise-add-ex-sams'));
 
-    await waitFor(() => expect(mockShared.makeOwn).toHaveBeenCalledWith(friendsRow));
-  });
-
-  it("shows Added, with no plus, for a friend's exercise already theirs", async () => {
-    mockFetchAllExercises.mockResolvedValue([
-      { ...friendsRow, shared: { ...friendsRow.shared, inLibrary: true } },
-    ]);
-    renderScreen();
-
-    expect(await screen.findByTestId('exercise-item-ex-sams-marker')).toHaveTextContent('Added');
+    expect(await screen.findByTestId('exercise-item-ex-sams')).toHaveTextContent(/From Sam/);
     expect(screen.queryByTestId('exercise-add-ex-sams')).toBeNull();
+    expect(screen.queryByTestId('exercise-edit-ex-sams')).toBeNull();
+    expect(mockShared.makeOwn).not.toHaveBeenCalled();
   });
 
   it('filters Friends by friend in place of a count, and keeps the count elsewhere', async () => {

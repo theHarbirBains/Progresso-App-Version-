@@ -72,11 +72,6 @@ interface Props {
    */
   onDeleteMine?: (exercise: ExerciseRow) => Promise<void>;
   /**
-   * The library's Add for a friend's exercise: a plus at the row's end that makes it theirs (a
-   * copy in their library). Without it, as in the picker, choosing the row does that instead.
-   */
-  onAddShared?: (exercise: ExerciseRow) => Promise<void>;
-  /**
    * The people you follow who share exercises (sharingFriends) -- in Friends, a chip each to show
    * only theirs. Whatever's searched, so a friend picked never goes from the row.
    */
@@ -113,7 +108,6 @@ export function ExerciseBrowser({
   onOpenExercise,
   onPhotoPress,
   onDeleteMine,
-  onAddShared,
   friends = [],
   listHeader,
   testID = 'exercise-browser',
@@ -164,26 +158,6 @@ export function ExerciseBrowser({
     [onDeleteMine],
   );
 
-  // A friend's exercise being added, so its plus can't be tapped twice.
-  const [addingId, setAddingId] = useState<string | null>(null);
-  const addShared = useCallback(
-    async (exercise: ExerciseRow) => {
-      if (!onAddShared) return;
-      setAddingId(exercise.id);
-      try {
-        await onAddShared(exercise);
-      } catch (err) {
-        Alert.alert(
-          `Couldn't add ${exercise.name}`,
-          err instanceof Error ? err.message : 'Please try again.',
-        );
-      } finally {
-        setAddingId(null);
-      }
-    },
-    [onAddShared],
-  );
-
   const sections = useMemo(() => groupExercisesByLetter(shownRows), [shownRows]);
   const listSections = useMemo(
     () => sections.map((section) => ({ title: section.letter, data: section.data })),
@@ -217,13 +191,9 @@ export function ExerciseBrowser({
       // With the row opening the exercise's page, one of their own is edited from its pencil.
       const editButton = !onSelectRow && onOpenExercise && isMine && onOpenMine;
       const showsChevron = !onSelectRow && !shared && (onOpenExercise || (isMine && onOpenMine));
-      const addButton =
-        !onSelectRow && onAddShared && shared?.source === 'friend' && !shared.inLibrary;
       const marker = shared
         ? shared.source === 'friend'
-          ? shared.inLibrary
-            ? 'Added'
-            : null
+          ? null
           : SHARED_LABELS[shared.source]
         : isMine
           ? 'Mine'
@@ -299,16 +269,6 @@ export function ExerciseBrowser({
               color={colors.textSecondary}
             />
           ) : null}
-          {addButton ? (
-            <IconButton
-              testID={`exercise-add-${item.id}`}
-              icon="plus"
-              onPress={() => void addShared(item)}
-              disabled={addingId === item.id}
-              accessibilityLabel={`Add ${item.name} to My Library`}
-              color={accent.color}
-            />
-          ) : null}
         </View>
       );
       if (!deletable) return row;
@@ -328,10 +288,7 @@ export function ExerciseBrowser({
     },
     [
       accent.color,
-      addShared,
-      addingId,
       isRowDisabled,
-      onAddShared,
       onDeleteMine,
       onOpenExercise,
       onOpenMine,

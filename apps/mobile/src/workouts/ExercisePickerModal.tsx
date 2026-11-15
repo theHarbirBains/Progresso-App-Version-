@@ -23,6 +23,15 @@ import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
 import { withAlpha } from '../theme/accentColor';
 import { useAppTheme } from '../theme/appThemeContext';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
+import { SectionHeader } from '../design/SectionHeader';
+import { ExercisePhoto } from '../exercises/ExercisePhoto';
+import { machineLine } from '../exercises/machineDetails';
+import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
+import type { HistoricalSetWithExercise } from './exerciseHistoryGrouping';
+
+/** How many recent exercises show, and how far back through them it looks to find that many. */
+const RECENT_COUNT = 6;
+const RECENT_LOOKBACK = 12;
 
 interface Props {
   visible: boolean;
@@ -36,6 +45,9 @@ interface Props {
   /** Opens the Create Custom Exercise flow without leaving this picker. */
   /** Offers "Create Custom Exercise" at the top of the list; left out, it isn't offered. */
   onCreateCustom?: () => void;
+  /** Their own logged sets (the shared history): given, the exercises they logged most recently
+   * are listed first, as Recent -- a live workout's picker. */
+  recentHistory?: HistoricalSetWithExercise[];
   /** Defaults to the static brand accent -- pass the user's Workout accent. */
   accentColor?: string;
   onAccentColor?: string;
@@ -54,6 +66,7 @@ export function ExercisePickerModal({
   userId,
   alreadyAddedIds,
   onCreateCustom,
+  recentHistory,
   accentColor: accentColorProp,
   onAccentColor: onAccentColorProp,
 }: Props) {
@@ -130,11 +143,42 @@ export function ExercisePickerModal({
 
   const alreadyAddedIdSet = useMemo(() => new Set(alreadyAddedIds), [alreadyAddedIds]);
 
-  // Someone else's exercise is made theirs (a copy in their library, or their own by that name at
-  // that gym) before it's added, so what they log is always on an exercise of their own.
+  // Recent: the exercises they logged last, newest first, from the history already read (no
+  // fetch) -- before any search or filter, leaving out what's already in the workout.
+  const recentIds = useMemo(() => {
+    if (!recentHistory) return [];
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    const newestFirst = [...recentHistory].sort(
+      (a, b) => Date.parse(b.performedAt) - Date.parse(a.performedAt),
+    );
+    for (const set of newestFirst) {
+      if (seen.has(set.exerciseId)) continue;
+      seen.add(set.exerciseId);
+      ids.push(set.exerciseId);
+      if (ids.length >= RECENT_LOOKBACK) break;
+    }
+    return ids;
+  }, [recentHistory]);
+  const recent = useMemo(() => {
+    if (recentIds.length === 0 || searchInput.trim() || muscleGroup || source !== 'all') return [];
+    const byId = new Map([...rows, ...sharedRows].map((row) => [row.id, row]));
+    return recentIds
+      .map((id) => byId.get(id))
+      .filter((row): row is ExerciseRow => row !== undefined && !alreadyAddedIdSet.has(row.id))
+      .slice(0, RECENT_COUNT);
+  }, [recentIds, searchInput, muscleGroup, source, rows, sharedRows, alreadyAddedIdSet]);
+
+  // A friend's exercise is used as it is -- its creator's changes reach everyone using it. A
+  // trainer's or client's is made theirs first (a copy in their library, or their own of the very
+  // same machine), as before.
   const [choosing, setChoosing] = useState(false);
   async function choose(exercise: ExerciseRow) {
-    if (!exercise.shared) {
+    if (!exercise.shared || exercise.shared.source === 'friend') {
+      if (alreadyAddedIdSet.has(exercise.id)) {
+        Alert.alert(`${exercise.name} is already here`, "It's already in this workout.");
+        return;
+      }
       onSelect(exercise);
       return;
     }
@@ -207,15 +251,40 @@ export function ExercisePickerModal({
             onDeleteMine={deleteMine}
             friends={friends}
             listHeader={
-              onCreateCustom ? (
-                <ListRow
-                  testID="exercise-picker-create-custom"
-                  icon="plus"
-                  title="Create Custom Exercise"
-                  subtitle="Can't find the exercise? Create your own."
-                  onPress={onCreateCustom}
-                  accessibilityLabel="Create Custom Exercise. Can't find the exercise? Create your own."
-                />
+              onCreateCustom || recent.length > 0 ? (
+                <>
+                  {onCreateCustom ? (
+                    <ListRow
+                      testID="exercise-picker-create-custom"
+                      icon="plus"
+                      title="Create Custom Exercise"
+                      subtitle="Can't find the exercise? Create your own."
+                      onPress={onCreateCustom}
+                      accessibilityLabel="Create Custom Exercise. Can't find the exercise? Create your own."
+                    />
+                  ) : null}
+                  {recent.length > 0 ? (
+                    <View testID="exercise-picker-recent">
+                      <SectionHeader label="Recent" />
+                      {recent.map((exercise, index) => (
+                        <ListRow
+                          key={exercise.id}
+                          testID={`exercise-picker-recent-${exercise.id}`}
+                          divider={index > 0}
+                          leading={
+                            <ExercisePhoto uri={exercise.photoUrl} name={exercise.name} size={40} />
+                          }
+                          title={exercise.name}
+                          subtitle={
+                            machineLine(exercise, MUSCLE_GROUP_LABELS[exercise.muscleGroup]) ??
+                            undefined
+                          }
+                          onPress={() => void choose(exercise)}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                </>
               ) : undefined
             }
             testID="exercise-picker"

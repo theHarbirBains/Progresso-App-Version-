@@ -94,7 +94,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading, activeWorkoutSplitId } = useProgressTheme();
-  const { refetch: refetchAllTimeStats } = useAllTimeStats();
+  const { refetch: refetchAllTimeStats, allSetHistory } = useAllTimeStats();
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   // The muscle tab chosen along the top: every exercise, or one primary muscle group's.
@@ -854,6 +854,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       </Screen>
 
       <ExercisePickerModal
+        recentHistory={allSetHistory}
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={handleSelectExercise}

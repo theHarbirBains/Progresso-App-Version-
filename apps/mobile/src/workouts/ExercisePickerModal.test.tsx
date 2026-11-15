@@ -66,11 +66,17 @@ describe("ExercisePickerModal -- a trainer's, a client's or a friend's exercise"
     createdBy: 'sam',
     shared: { source: 'friend', ownerId: 'sam', ownerName: 'Sam', inLibrary: false },
   };
+  const coachRow = {
+    ...friendsRow,
+    id: 'ex-coach',
+    createdBy: 'coach',
+    shared: { source: 'trainer', ownerId: 'coach', ownerName: 'Coach', inLibrary: false },
+  };
   const ownCopy = { ...friendsRow, id: 'ex-my-copy', createdBy: 'user-1', shared: undefined };
 
-  it('makes it theirs first, then adds their own one', async () => {
+  it("adds a friend's exercise as it is -- its creator's changes reach everyone using it", async () => {
     mockFetchExercises.mockResolvedValue([friendsRow]);
-    mockMakeOwn.mockReset().mockResolvedValue(ownCopy);
+    mockMakeOwn.mockReset();
     const onSelect = jest.fn();
     render(
       <ExercisePickerModal
@@ -89,12 +95,32 @@ describe("ExercisePickerModal -- a trainer's, a client's or a friend's exercise"
     );
     fireEvent.press(screen.getByTestId('exercise-item-ex-sams'));
 
+    expect(onSelect).toHaveBeenCalledWith(friendsRow);
+    expect(mockMakeOwn).not.toHaveBeenCalled();
+  });
+
+  it("makes a trainer's exercise theirs first, then adds their own one", async () => {
+    mockFetchExercises.mockResolvedValue([coachRow]);
+    mockMakeOwn.mockReset().mockResolvedValue(ownCopy);
+    const onSelect = jest.fn();
+    render(
+      <ExercisePickerModal
+        visible
+        onClose={jest.fn()}
+        onSelect={onSelect}
+        userId="user-1"
+        alreadyAddedIds={[]}
+      />,
+    );
+
+    fireEvent.press(await screen.findByTestId('exercise-item-ex-coach'));
+
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith(ownCopy));
-    expect(mockMakeOwn).toHaveBeenCalledWith(friendsRow);
+    expect(mockMakeOwn).toHaveBeenCalledWith(coachRow);
   });
 
   it('says so when their own one is already in the workout', async () => {
-    mockFetchExercises.mockResolvedValue([friendsRow]);
+    mockFetchExercises.mockResolvedValue([coachRow]);
     mockMakeOwn.mockReset().mockResolvedValue(ownCopy);
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const onSelect = jest.fn();
@@ -108,7 +134,7 @@ describe("ExercisePickerModal -- a trainer's, a client's or a friend's exercise"
       />,
     );
 
-    fireEvent.press(await screen.findByTestId('exercise-item-ex-sams'));
+    fireEvent.press(await screen.findByTestId('exercise-item-ex-coach'));
 
     await waitFor(() =>
       expect(alertSpy).toHaveBeenCalledWith('Seated Row is already here', expect.any(String)),
@@ -134,6 +160,68 @@ describe("ExercisePickerModal -- a trainer's, a client's or a friend's exercise"
 
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'ex1' }));
     expect(mockMakeOwn).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExercisePickerModal -- Recent', () => {
+  const set = (exerciseId: string, performedAt: string) =>
+    ({ exerciseId, performedAt, muscleGroup: 'chest' }) as never;
+
+  it('lists the exercises logged last first, newest first, one tap to add', async () => {
+    const onSelect = jest.fn();
+    render(
+      <ExercisePickerModal
+        visible
+        onClose={jest.fn()}
+        onSelect={onSelect}
+        userId="user-1"
+        alreadyAddedIds={[]}
+        recentHistory={[
+          set('ex1', '2026-11-01T10:00:00Z'),
+          set('ex2', '2026-11-10T10:00:00Z'),
+          set('ex1', '2026-11-03T10:00:00Z'),
+        ]}
+      />,
+    );
+
+    const recent = await screen.findByTestId('exercise-picker-recent');
+    expect(recent).toHaveTextContent(/Recent.*Barbell Back Squat.*Barbell Bench Press/);
+    fireEvent.press(screen.getByTestId('exercise-picker-recent-ex2'));
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'ex2' }));
+  });
+
+  it("leaves out what's already in the workout, and goes once a search is typed", async () => {
+    render(
+      <ExercisePickerModal
+        visible
+        onClose={jest.fn()}
+        onSelect={jest.fn()}
+        userId="user-1"
+        alreadyAddedIds={['ex2']}
+        recentHistory={[set('ex1', '2026-11-01T10:00:00Z'), set('ex2', '2026-11-10T10:00:00Z')]}
+      />,
+    );
+
+    await screen.findByTestId('exercise-picker-recent-ex1');
+    expect(screen.queryByTestId('exercise-picker-recent-ex2')).toBeNull();
+
+    fireEvent.changeText(screen.getByTestId('exercise-search'), 'bench');
+    expect(screen.queryByTestId('exercise-picker-recent')).toBeNull();
+  });
+
+  it('has no Recent without the history (a planner, not a live workout)', async () => {
+    render(
+      <ExercisePickerModal
+        visible
+        onClose={jest.fn()}
+        onSelect={jest.fn()}
+        userId="user-1"
+        alreadyAddedIds={[]}
+      />,
+    );
+
+    await screen.findByTestId('exercise-item-ex1');
+    expect(screen.queryByTestId('exercise-picker-recent')).toBeNull();
   });
 });
 

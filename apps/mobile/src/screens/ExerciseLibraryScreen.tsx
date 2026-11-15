@@ -206,9 +206,6 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
           })
         }
         onDeleteMine={deleteMine}
-        onAddShared={async (exercise) => {
-          await shared.makeOwn(exercise);
-        }}
         friends={friends}
         testID="exercise-library"
       />
