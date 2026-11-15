@@ -57,8 +57,6 @@ export interface PersonProfile {
   followingCount: number;
   /** A line about themselves, for anyone who opens their profile -- null with none. */
   bio: string | null;
-  /** Their fitness goals, in the order they picked them, for anyone who opens their profile. */
-  fitnessGoals: string[];
   /** The people the viewer follows who follow them too (none on their own profile). */
   mutuals: { count: number; people: FollowUserSummary[] };
   /** Whether the viewer can see their workouts, stats and lifts (their own, or following). */
@@ -102,7 +100,7 @@ export class PeopleService {
         .select('id', { count: 'exact', head: true })
         .eq('follower_id', personId)
         .eq('status', 'accepted'),
-      client.from('users').select('bio, fitness_goals').eq('id', personId).maybeSingle(),
+      client.from('users').select('bio').eq('id', personId).maybeSingle(),
       relationship.isSelf
         ? Promise.resolve({ count: 0, people: [] })
         : this.mutualFriends(viewerId, personId),
@@ -111,7 +109,7 @@ export class PeopleService {
       throw new InternalServerErrorException('Failed to load follow counts');
     }
     if (about.error) throw new InternalServerErrorException('Failed to load profile');
-    const aboutRow = about.data as { bio: string | null; fitness_goals: string[] | null } | null;
+    const aboutRow = about.data as { bio: string | null } | null;
 
     const visible = canSeeActivity(relationship);
     const [stats, bestLifts] = visible
@@ -127,7 +125,6 @@ export class PeopleService {
       followerCount: followers.count ?? 0,
       followingCount: following.count ?? 0,
       bio: aboutRow?.bio ?? null,
-      fitnessGoals: aboutRow?.fitness_goals ?? [],
       mutuals,
       canSeeActivity: visible,
       stats,

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, Share, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Alert, ScrollView, Share, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { useHeroBackdrop } from '../design/AppBackgroundLayer';
@@ -12,6 +12,7 @@ import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { GlassBackground } from '../design/GlassBackground';
 import { IconButton } from '../design/IconButton';
+import { ZoomablePhoto } from '../design/PhotoLightbox';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { SkeletonCards } from '../design/Skeleton';
@@ -28,12 +29,14 @@ import {
   respondToFollowRequest,
   sendFollowRequest,
   unfollowUser,
+  type FollowUser,
   type FriendsFeedItem,
   type PersonProfile,
 } from '../lib/api';
+import { recallShown, rememberShown } from '../lib/lastShown';
 import { formatWeightKg, fromKg } from '../lib/units';
+import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import type { RootStackScreenProps } from '../navigation/types';
-import { FITNESS_GOAL_OPTIONS } from '../onboarding/onboardingOptions';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { withAlpha } from '../theme/accentColor';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
@@ -45,26 +48,42 @@ import { useSocialSummaries } from '../social/useSocialSummaries';
 import { personProfileStyles as styles } from './personProfileStyles';
 
 type Props = RootStackScreenProps<'PersonProfile'>;
-type Tab = 'overview' | 'workouts' | 'prs' | 'stats';
+type Tab = 'achievements' | 'workouts' | 'prs' | 'stats';
+/** All the page asks of its screen's navigation -- PersonProfile's, or the You tab's. */
+type Navigation = Pick<Props['navigation'], 'navigate' | 'push' | 'goBack' | 'addListener'>;
+
+/**
+ * What the You tab brings when it shows your own profile on this page (screens/ProfileScreen.tsx):
+ * its own header, your photo to change, and your own figures inside the tabs, under what friends
+ * see.
+ */
+export interface OwnProfile {
+  header: ReactNode;
+  /** Who you are from the shared profile, so a photo or bio just changed shows at once. */
+  identity:
+    (Pick<FollowUser, 'displayName' | 'username' | 'avatarUrl'> & { bio: string | null }) | null;
+  avatar: { onPress: () => void; saving: boolean };
+  /** Above the page: a photo that didn't save, say. */
+  notices?: ReactNode;
+  stats?: ReactNode;
+  prs?: ReactNode;
+  /** Whether what those read is in, so the page shows all at once. */
+  ready: boolean;
+}
+
+/** What the You tab last showed, so it opens again at once (lib/lastShown.ts). */
+interface ShownProfile {
+  profile: PersonProfile;
+  workouts: FriendsFeedItem[];
+  hasMore: boolean;
+}
 
 const TABS: { key: Tab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { key: 'overview', label: 'Overview', icon: 'grid' },
+  { key: 'achievements', label: 'Achievements', icon: 'star' },
   { key: 'workouts', label: 'Workouts', icon: 'activity' },
   { key: 'prs', label: 'PRs', icon: 'award' },
   { key: 'stats', label: 'Stats', icon: 'bar-chart-2' },
 ];
-
-/** Each fitness goal's glyph on its chip. */
-const GOAL_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
-  build_muscle: 'trending-up',
-  get_stronger: 'zap',
-  lose_fat: 'trending-down',
-  improve_fitness: 'activity',
-  improve_athletic_performance: 'target',
-  maintain_fitness: 'shield',
-  general_health: 'heart',
-  other: 'star',
-};
 
 /** "Sam" from "Sam Lee", else their @username, else "them". */
 function firstName(profile: PersonProfile): string {
@@ -118,35 +137,51 @@ function StatTile({
 
 /**
  * Someone's profile, after the design Harbir drew: the theme's photo glowing behind the top, where
- * their photo sits in an accent ring beside their name, @username, bio and fitness goals; their
+ * their photo sits in an accent ring beside their name, @username and bio; their
  * followers and following, and the people you follow who follow them too; one wide Follow /
  * Following button (or Accept and Decline, or Edit Profile on your own) with Share beside it. For
  * you, or someone who accepted your follow: four figures -- workouts, the last 30 days, records
- * held and everything lifted -- then Overview (badges and their latest workout), Workouts (all of
+ * held and everything lifted -- then Achievements (the badges they've earned), Workouts (all of
  * them, with likes and comments), PRs (their heaviest lifts) and Stats. Until then, a line saying
  * what following them shows. Report and Block are behind the header's "...". Read every time it
- * opens, the profile and its first workouts together, so the page shows all at once.
+ * opens, the profile and its first workouts together, and shown with their likes all at once.
  */
 export function PersonProfileScreen({ route, navigation }: Props) {
-  const { userId } = route.params;
-  const { session } = useAuth();
+  return <PersonProfilePage userId={route.params.userId} navigation={navigation} />;
+}
+
+/** Someone's profile page -- or, with `own`, yours as the You tab shows it. */
+export function PersonProfilePage({
+  userId,
+  navigation,
+  own,
+}: {
+  userId: string;
+  navigation: Navigation;
+  own?: OwnProfile;
+}) {
+  const { session, user } = useAuth();
   const accessToken = session?.access_token;
   const { theme, weightUnit } = useProgressTheme();
+  const isOwn = own !== undefined;
 
-  const [profile, setProfile] = useState<PersonProfile | null>(null);
+  const [shown] = useState(() =>
+    isOwn ? recallShown<ShownProfile>(user?.id, 'profile.page') : undefined,
+  );
+  const [fetchedProfile, setProfile] = useState<PersonProfile | null>(shown?.profile ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [workouts, setWorkouts] = useState<FriendsFeedItem[]>([]);
+  const [workouts, setWorkouts] = useState<FriendsFeedItem[]>(shown?.workouts ?? []);
   const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(shown?.hasMore ?? false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('achievements');
   const [badgesOpen, setBadgesOpen] = useState(false);
   const [mutualsOpen, setMutualsOpen] = useState(false);
 
   const load = useCallback(async () => {
-    if (!accessToken) return;
+    if (!accessToken || !userId) return;
     setError(null);
     try {
       // Both at once: the workouts are refused until they accept your follow, which the profile
@@ -155,29 +190,59 @@ export function PersonProfileScreen({ route, navigation }: Props) {
         getPersonProfile(accessToken, userId),
         getPersonWorkouts(accessToken, userId, 0).catch(() => null),
       ]);
+      const items = next.canSeeActivity && first ? first.items : [];
+      const more = next.canSeeActivity && first ? first.hasMore : false;
       setProfile(next);
-      if (next.canSeeActivity && first) {
-        setWorkouts(first.items);
-        setHasMore(first.hasMore);
-      } else {
-        setWorkouts([]);
-        setHasMore(false);
-      }
+      setWorkouts(items);
+      setHasMore(more);
       setPage(0);
+      if (isOwn) {
+        rememberShown<ShownProfile>(user?.id, 'profile.page', {
+          profile: next,
+          workouts: items,
+          hasMore: more,
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this profile');
     }
-  }, [accessToken, userId]);
+  }, [accessToken, userId, isOwn, user?.id]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => void load());
     return unsubscribe;
   }, [navigation, load]);
 
+  // On yours, who you are comes from the shared profile, which a save changes at once.
+  const identity = own?.identity;
+  const profile: PersonProfile | null =
+    fetchedProfile && identity
+      ? {
+          ...fetchedProfile,
+          user: {
+            ...fetchedProfile.user,
+            displayName: identity.displayName,
+            username: identity.username,
+            avatarUrl: identity.avatarUrl,
+          },
+          bio: identity.bio,
+        }
+      : fetchedProfile;
+
   // The photo glows through the top of the page, as behind Feed's hero.
   useHeroBackdrop(profile !== null);
 
-  const social = useSocialSummaries(workouts.map((item) => item.workout.id));
+  const social = useSocialSummaries(
+    workouts.map((item) => item.workout.id),
+    isOwn ? 'profile.social' : undefined,
+  );
+  // The page shows all at once: who they are, their workouts with their likes, and on yours your
+  // own figures -- or what there is after a few seconds. Opened again, the You tab starts from
+  // what it last showed.
+  const settled =
+    shown !== undefined ||
+    ((profile !== null || error !== null) && social.loaded && (own?.ready ?? true));
+  const showPage = useShowAllAtOnce(settled);
   const badges = useMemo(
     () => (profile?.stats ? badgesFor(profile.stats, weightUnit) : []),
     [profile?.stats, weightUnit],
@@ -276,6 +341,28 @@ export function PersonProfileScreen({ route, navigation }: Props) {
     );
   }
 
+  /** Their photo in a ring of the accent -- on yours, a spinner in its place while one saves. */
+  function renderAvatar(target: PersonProfile, title: string) {
+    return (
+      <View style={[styles.avatarRing, { borderColor: theme.accent }]}>
+        {own?.avatar.saving ? (
+          <View style={styles.avatarSaving}>
+            <ActivityIndicator testID="profile-avatar-saving" color={theme.accent} />
+          </View>
+        ) : (
+          <Avatar
+            uri={target.user.avatarUrl}
+            initial={title.charAt(0).toUpperCase()}
+            size={88}
+            iconSize={36}
+            iconColor={colors.textSecondary}
+            initialStyle={styles.avatarInitial}
+          />
+        )}
+      </View>
+    );
+  }
+
   function renderBadge(badge: Badge) {
     return (
       <View key={badge.id} style={styles.badgeColumn} testID={`person-profile-badge-${badge.id}`}>
@@ -289,7 +376,7 @@ export function PersonProfileScreen({ route, navigation }: Props) {
 
   function renderTab(target: PersonProfile, name: string) {
     const stats = target.stats;
-    if (tab === 'overview') {
+    if (tab === 'achievements') {
       const featured = featuredBadges(badges);
       return (
         <>
@@ -322,18 +409,6 @@ export function PersonProfileScreen({ route, navigation }: Props) {
               </View>
             </AppCard>
           ) : null}
-          <View style={styles.sectionHeaderWrap}>
-            <SectionHeader label="Recent Activity" />
-          </View>
-          {workouts[0] ? (
-            renderWorkout(workouts[0], target, name)
-          ) : (
-            <EmptyState
-              testID="person-profile-no-workouts"
-              title="No workouts yet"
-              description="Finished workouts show here."
-            />
-          )}
         </>
       );
     }
@@ -358,119 +433,158 @@ export function PersonProfileScreen({ route, navigation }: Props) {
       );
     }
     if (tab === 'prs') {
-      return target.bestLifts && target.bestLifts.length > 0 ? (
-        <AppCard testID="person-profile-lifts">
-          <SectionHeader label="Heaviest Lifts" />
-          {target.bestLifts.map((lift, index) => {
-            const machine = machineLine(lift);
-            return (
-              <View
-                key={lift.exerciseId}
-                testID={`person-profile-lift-${lift.exerciseId}`}
-                style={[styles.lift, index > 0 && styles.liftDivider]}
-              >
-                <ExercisePhoto
-                  testID={`person-profile-lift-${lift.exerciseId}-photo`}
-                  uri={lift.photoUrl}
-                  name={lift.exerciseName}
-                  size={40}
-                />
-                <View style={styles.liftText}>
-                  <Text style={styles.liftName} numberOfLines={1}>
-                    {lift.exerciseName}
-                  </Text>
-                  {machine ? (
-                    <Text style={styles.liftMachine} numberOfLines={1}>
-                      {machine}
-                    </Text>
-                  ) : null}
-                </View>
-                <Text style={[styles.liftValue, { color: theme.accent }]}>
-                  {formatWeightKg(lift.weightKg, weightUnit)} {weightUnit} × {lift.reps}
-                </Text>
-              </View>
-            );
-          })}
-        </AppCard>
-      ) : (
-        <EmptyState
-          testID="person-profile-no-lifts"
-          title="No lifts yet"
-          description="Their heaviest set on each weighted exercise shows here."
-        />
+      return (
+        <>
+          {renderLifts(target)}
+          {own?.prs}
+        </>
       );
     }
-    return stats ? (
-      <AppCard testID="person-profile-stats">
-        <View style={styles.statGrid}>
-          {[
-            { id: 'workouts', value: String(stats.workouts), label: 'Workouts' },
-            { id: 'recent', value: String(stats.lastThirtyDays), label: 'Last 30 Days' },
-            { id: 'month', value: String(stats.bestMonthWorkouts), label: 'Busiest Month' },
-            { id: 'prs', value: String(stats.prCount), label: 'PRs Held' },
-            {
-              id: 'volume',
-              value: `${compactNumber(fromKg(stats.totalVolumeKg, weightUnit))} ${weightUnit}`,
-              label: 'Total Volume',
-            },
-            {
-              id: 'badges',
-              value: `${badges.filter((b) => b.earned).length} of ${badges.length}`,
-              label: 'Badges',
-            },
-          ].map((cell) => (
-            <View key={cell.id} style={styles.statCell}>
-              <StatBlock
-                testID={`person-profile-stats-${cell.id}`}
-                value={cell.value}
-                label={cell.label}
-              />
+    return (
+      <>
+        {stats ? (
+          <AppCard testID="person-profile-stats">
+            <View style={styles.statGrid}>
+              {[
+                { id: 'workouts', value: String(stats.workouts), label: 'Workouts' },
+                { id: 'recent', value: String(stats.lastThirtyDays), label: 'Last 30 Days' },
+                { id: 'month', value: String(stats.bestMonthWorkouts), label: 'Busiest Month' },
+                { id: 'prs', value: String(stats.prCount), label: 'PRs Held' },
+                {
+                  id: 'volume',
+                  value: `${compactNumber(fromKg(stats.totalVolumeKg, weightUnit))} ${weightUnit}`,
+                  label: 'Total Volume',
+                },
+                {
+                  id: 'badges',
+                  value: `${badges.filter((b) => b.earned).length} of ${badges.length}`,
+                  label: 'Badges',
+                },
+              ].map((cell) => (
+                <View key={cell.id} style={styles.statCell}>
+                  <StatBlock
+                    testID={`person-profile-stats-${cell.id}`}
+                    value={cell.value}
+                    label={cell.label}
+                  />
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
+          </AppCard>
+        ) : null}
+        {own?.stats}
+      </>
+    );
+  }
+
+  /** Heaviest Lifts -- with none, an empty state, unless your full records below say so. */
+  function renderLifts(target: PersonProfile) {
+    return target.bestLifts && target.bestLifts.length > 0 ? (
+      <AppCard testID="person-profile-lifts">
+        <SectionHeader label="Heaviest Lifts" />
+        {target.bestLifts.map((lift, index) => {
+          const machine = machineLine(lift);
+          return (
+            <View
+              key={lift.exerciseId}
+              testID={`person-profile-lift-${lift.exerciseId}`}
+              style={[styles.lift, index > 0 && styles.liftDivider]}
+            >
+              <ExercisePhoto
+                testID={`person-profile-lift-${lift.exerciseId}-photo`}
+                uri={lift.photoUrl}
+                name={lift.exerciseName}
+                size={40}
+              />
+              <View style={styles.liftText}>
+                <Text style={styles.liftName} numberOfLines={1}>
+                  {lift.exerciseName}
+                </Text>
+                {machine ? (
+                  <Text style={styles.liftMachine} numberOfLines={1}>
+                    {machine}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={[styles.liftValue, { color: theme.accent }]}>
+                {formatWeightKg(lift.weightKg, weightUnit)} {weightUnit} × {lift.reps}
+              </Text>
+            </View>
+          );
+        })}
       </AppCard>
-    ) : null;
+    ) : own?.prs ? null : (
+      <EmptyState
+        testID="person-profile-no-lifts"
+        title="No lifts yet"
+        description={`${target.isSelf ? 'Your' : 'Their'} heaviest set on each weighted exercise shows here.`}
+      />
+    );
   }
 
   return (
     <Screen
-      scrollTestID="person-profile-scroll"
+      testID={own ? 'profile-screen' : undefined}
+      scrollTestID={own ? 'profile-scroll' : 'person-profile-scroll'}
       contentContainerStyle={styles.content}
       header={
-        <AppHeader
-          testID="person-profile-header"
-          onBack={() => navigation.goBack()}
-          rightAction={
-            profile && !profile.isSelf
-              ? {
-                  icon: 'more-horizontal',
-                  onPress: () => setActionsOpen(true),
-                  accessibilityLabel: `More options for ${label?.title ?? 'this person'}`,
-                  testID: 'person-profile-more',
-                }
-              : undefined
-          }
-        />
+        own ? (
+          own.header
+        ) : (
+          <AppHeader
+            testID="person-profile-header"
+            onBack={() => navigation.goBack()}
+            rightAction={
+              profile && !profile.isSelf
+                ? {
+                    icon: 'more-horizontal',
+                    onPress: () => setActionsOpen(true),
+                    accessibilityLabel: `More options for ${label?.title ?? 'this person'}`,
+                    testID: 'person-profile-more',
+                  }
+                : undefined
+            }
+          />
+        )
       }
     >
+      {own?.notices}
       {error && !profile ? (
         <ErrorState testID="person-profile-error" message={error} onRetry={() => void load()} />
-      ) : !profile || !label ? (
-        <SkeletonCards testID="person-profile-loading" heights={[200, 90, 220]} />
+      ) : !profile || !label || !showPage ? (
+        <SkeletonCards
+          testID={own ? 'profile-loading' : 'person-profile-loading'}
+          heights={[200, 90, 220]}
+        />
       ) : (
         <>
           <View testID="person-profile-identity" style={styles.top}>
             <View style={styles.identity}>
-              <View style={[styles.avatarRing, { borderColor: theme.accent }]}>
-                <Avatar
+              {own ? (
+                <TouchableOpacity
+                  testID="profile-avatar"
+                  onPress={own.avatar.onPress}
+                  disabled={own.avatar.saving}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change profile picture"
+                >
+                  {renderAvatar(profile, label.title)}
+                  <View style={[styles.avatarEditBadge, { backgroundColor: theme.accent }]}>
+                    <Feather name="camera" size={13} color={theme.onAccent} />
+                  </View>
+                </TouchableOpacity>
+              ) : profile.user.avatarUrl ? (
+                // Their photo opens full screen, to see it properly.
+                <ZoomablePhoto
                   uri={profile.user.avatarUrl}
-                  initial={label.title.charAt(0).toUpperCase()}
-                  size={88}
-                  iconSize={36}
-                  iconColor={colors.textSecondary}
-                  initialStyle={styles.avatarInitial}
-                />
-              </View>
+                  name={label.title}
+                  testID="person-profile-photo"
+                >
+                  {renderAvatar(profile, label.title)}
+                </ZoomablePhoto>
+              ) : (
+                renderAvatar(profile, label.title)
+              )}
               <View style={styles.identityText}>
                 <Text
                   testID="person-profile-name"
@@ -490,24 +604,6 @@ export function PersonProfileScreen({ route, navigation }: Props) {
                   <Text testID="person-profile-follows-you" style={styles.followsYou}>
                     Follows you
                   </Text>
-                ) : null}
-                {profile.fitnessGoals.length > 0 ? (
-                  <View testID="person-profile-goals" style={styles.chips}>
-                    {profile.fitnessGoals.map((goal) => (
-                      <View key={goal} style={styles.chip}>
-                        <GlassBackground bordered={false} />
-                        <Feather
-                          name={GOAL_ICONS[goal] ?? 'star'}
-                          size={13}
-                          color={colors.textPrimary}
-                        />
-                        <Text style={styles.chipLabel}>
-                          {FITNESS_GOAL_OPTIONS.find((option) => option.value === goal)?.label ??
-                            goal}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
                 ) : null}
               </View>
             </View>

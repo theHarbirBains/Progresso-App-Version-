@@ -1,8 +1,8 @@
 import { StyleSheet } from 'react-native';
 import { colors, minTouchTarget, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
-// PersonProfileScreen. Token-only. The top of the page -- photo, name, bio, goals, counts and the
-// follow button -- sits straight on the theme's photo, brightened behind it like Feed's hero, with
+// PersonProfileScreen, and the You tab's own profile on it. Token-only. The top of the page -- photo, name, bio, counts and the follow
+// button -- sits straight on the theme's photo, brightened behind it like Feed's hero, with
 // its words lined up with the cards' own text below; the figures, tabs and what each tab shows are
 // the usual glass cards.
 export const personProfileStyles = StyleSheet.create({
@@ -30,6 +30,26 @@ export const personProfileStyles = StyleSheet.create({
     ...typeScale.display,
     color: colors.textSecondary,
   },
+  // Your own: the photo's place while a new one saves, and the camera saying it can be changed,
+  // sitting on the ring's lower right, ringed in the background.
+  avatarSaving: {
+    width: 88,
+    height: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 28,
+    height: 28,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    borderColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   identityText: {
     flex: 1,
     gap: 2,
@@ -53,29 +73,6 @@ export const personProfileStyles = StyleSheet.create({
     color: colors.textSecondaryBright,
     marginTop: 2,
   },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  // A goal: a small glass pill with its glyph.
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.glassBorderStrong,
-    overflow: 'hidden',
-  },
-  chipLabel: {
-    ...typeScale.secondary,
-    color: colors.textPrimary,
-  },
-
   counts: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -205,10 +202,6 @@ export const personProfileStyles = StyleSheet.create({
     ...typeScale.caption,
     color: colors.textPrimary,
     textAlign: 'center',
-  },
-  sectionHeaderWrap: {
-    marginTop: spacing.md,
-    paddingHorizontal: 6,
   },
 
   lift: {

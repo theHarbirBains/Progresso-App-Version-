@@ -42,8 +42,6 @@ export interface PersonProfile {
   followingCount: number;
   /** A line about themselves -- null with none. */
   bio: string | null;
-  /** Their fitness goals, in the order picked (onboarding's FITNESS_GOAL_OPTIONS). */
-  fitnessGoals: string[];
   /** The people you follow who follow them too: how many, and up to 50 of them. */
   mutuals: { count: number; people: FollowUser[] };
   /** Whether you can see their workouts, stats and lifts: yours, or they accepted your follow. */

@@ -1,32 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
+import { useMemo } from 'react';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
-import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
-import { getPersonProfile } from '../lib/api';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { Avatar } from '../design/Avatar';
 import { BottomSheet } from '../design/BottomSheet';
-import { SecondaryButton, TextButton } from '../design/Button';
-import { EmptyState } from '../design/EmptyState';
 import { ListRow } from '../design/ListRow';
-import { LoadingState } from '../design/LoadingState';
-import { Screen } from '../design/Screen';
+import { SkeletonCards } from '../design/Skeleton';
 import { StatBlock } from '../design/StatBlock';
-import { UnderlineTabs } from '../design/UnderlineTabs';
-import { greetingName } from '../dashboard/greeting';
 import { fromKg } from '../lib/units';
+import { useMembership } from '../membership/useMembership';
 import type { RootStackScreenProps } from '../navigation/types';
-import { recallShown, rememberShown } from '../lib/lastShown';
-import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { sumDailyTotals } from '../nutrition/nutritionCalculations';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { useProfile } from '../profile/ProfileProvider';
 import { useAvatarPhoto } from '../profile/useAvatarPhoto';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
-import { computeLifetimeStats, computeLifetimeVolumeKg } from '../progress/lifetimeStats';
+import { computeLifetimeStats } from '../progress/lifetimeStats';
 import { computeMuscleGroupSetCounts } from '../progress/muscleGroupProgress';
 import { PRsSection } from '../progress/PRsSection';
 import { StatTile } from '../progress/StatTile';
@@ -37,27 +28,13 @@ import {
 } from '../progress/trainingOverTime';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { WeeklyTrendChart } from '../progress/WeeklyTrendChart';
-import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { formatTotalTime } from '../workouts/workoutMonthSummary';
-import { fetchWorkoutHistory } from '../workouts/workoutQueries';
-import {
-  enrichWorkoutSummaries,
-  type EnrichedWorkoutSummary,
-} from '../workouts/workoutHistoryEnrichment';
-import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
+import { PersonProfilePage } from './PersonProfileScreen';
 import { profileStyles as styles } from './profileStyles';
 import { wholeFigureText } from '../nutrition/wholeFigures';
 
 type Props = RootStackScreenProps<'Profile'>;
-type ProfileTab = 'Workouts' | 'Stats' | 'PRs';
 
-const PROFILE_TABS: { key: ProfileTab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { key: 'Workouts', label: 'Workouts', icon: 'list' },
-  { key: 'Stats', label: 'Stats', icon: 'bar-chart-2' },
-  { key: 'PRs', label: 'PRs', icon: 'award' },
-];
-
-const RECENT_WORKOUTS_LIMIT = 10;
 const TREND_WEEKS = 12;
 const TOP_MUSCLE_GROUPS_LIMIT = 5;
 
@@ -71,194 +48,64 @@ function formatMacro(consumed: number, goal: number | null, unit: string): strin
   return goal !== null ? `${consumedText} / ${wholeFigureText(goal)}${unit}` : consumedText;
 }
 
-function errorMessage(reason: unknown): string {
-  return reason instanceof Error ? reason.message : 'Something went wrong';
-}
+// Today's calories and macros against your targets, atop Stats -- real data
+// from the shared food log and goals, the same NutritionToday itself uses.
+// Tapping it opens Nutrition Today.
+function TodaysNutritionCard({ navigation }: { navigation: Props['navigation'] }) {
+  const { nutritionTheme } = useProgressTheme();
+  const { goals, loading: goalsLoading, error: goalsError } = useNutritionGoals();
+  const { logs, loading: logsLoading, error: logsError } = useFoodLog();
+  const totals = useMemo(() => sumDailyTotals(logs), [logs]);
+  if (goalsLoading || logsLoading) return <SkeletonCards heights={[150]} />;
+  const error = goalsError ?? logsError;
 
-interface ProfileWorkoutRowProps {
-  workout: EnrichedWorkoutSummary;
-  weightUnit: 'kg' | 'lb';
-  divider: boolean;
-  onPress: () => void;
-}
-
-// What have I done? -- real workout history, the same enrichment data
-// WorkoutHistoryScreen's own WorkoutRow uses, laid out as a plain row with the
-// set count and volume added to its one muted detail line.
-function ProfileWorkoutRow({ workout, weightUnit, divider, onPress }: ProfileWorkoutRowProps) {
-  const muscles = workout.muscleGroups.map((g) => SPLIT_MUSCLE_GROUP_LABELS[g]).join(' • ');
-  const sets = `${workout.completedSetCount} ${workout.completedSetCount === 1 ? 'set' : 'sets'}`;
-  const duration =
-    workout.durationMinutes !== null ? ` · ${formatCardDuration(workout.durationMinutes)}` : '';
   return (
-    <ListRow
-      testID={`profile-workout-${workout.id}`}
-      title={workout.splitDayName ?? workout.name}
-      subtitle={muscles || undefined}
-      detail={`${formatCardDate(workout.performedAt)}${duration} · ${sets} · ${formatCount(fromKg(workout.totalVolumeKg, weightUnit))} ${weightUnit}`}
-      divider={divider}
-      onPress={onPress}
-    />
+    <AppCard
+      testID="profile-nutrition"
+      topAccent={nutritionTheme.accent}
+      onPress={() => navigation.navigate('Nutrition')}
+    >
+      <Text style={styles.nutritionTitle}>Today&apos;s Calories & Macros</Text>
+      {error ? (
+        <Text testID="profile-nutrition-error" style={styles.errorText}>
+          {error}
+        </Text>
+      ) : null}
+      <View style={styles.statTileGrid}>
+        <StatTile
+          testID="profile-nutrition-calories"
+          label="Calories"
+          value={formatMacro(totals.calories, goals?.calories ?? null, '')}
+        />
+        <StatTile
+          testID="profile-nutrition-protein"
+          label="Protein"
+          value={formatMacro(totals.proteinG, goals?.proteinG ?? null, 'g')}
+        />
+        <StatTile
+          testID="profile-nutrition-carbs"
+          label="Carbs"
+          value={formatMacro(totals.carbsG, goals?.carbsG ?? null, 'g')}
+        />
+        <StatTile
+          testID="profile-nutrition-fat"
+          label="Fat"
+          value={formatMacro(totals.fatG, goals?.fatG ?? null, 'g')}
+        />
+      </View>
+    </AppCard>
   );
 }
 
-// The You tab's own root screen (see App.tsx's bottom nav). Deliberately
-// thin on its own logic: every statistic/record/history section here
-// re-fetches and re-derives from the exact same functions Progress/Workout
-// History already use (fetchAllCompletedWorkouts + computeLifetimeStats,
-// fetchAllExerciseHistory + computeLifetimeVolumeKg/
-// computeMuscleGroupSetCounts/trainingOverTime's weekly aggregations,
-// fetchAllRepPRs/fetchAllOneRepMaxes + PRsSection, fetchWorkoutHistory +
-// enrichWorkoutSummaries) -- nothing here is a new calculation. This is a
-// fitness profile, not a social one: no followers/likes/photo grid/social
-// badges -- three tabs answering "what have I done" (Workouts), "how am I
-// progressing" (Stats), "what have I achieved" (PRs).
-//
-// Layout: a hero identity card (avatar, name, Edit Profile), a stats card
-// (Workouts/Total Sets/Total Volume as StatBlocks), then the Workouts/
-// Stats/PRs tabs with the active tab's content in its own widget -- the
-// same AppCard-per-widget language the workout and nutrition screens use.
-// The header's avatar can be tapped to choose/change/remove a real profile
-// picture (see Avatar/avatarUpload.ts); with none set, it falls back to the
-// same accent-tinted initial-letter/icon avatar used elsewhere -- there is
-// still no bio/location field, this is a fitness profile, not a social one.
-export function ProfileScreen({ navigation }: Props) {
-  const { user, session } = useAuth();
-  const accessToken = session?.access_token;
-  const userId = user?.id ?? '';
-  const { theme, nutritionTheme, weightUnit, themeLoading } = useProgressTheme();
-  const { profile, error: profileError } = useProfile();
-  const {
-    goals: nutritionGoals,
-    loading: nutritionGoalsLoading,
-    error: nutritionGoalsError,
-  } = useNutritionGoals();
-  // The user's whole workout/set/PR history, shared with ProgressOverviewScreen
-  // via AllTimeStatsProvider -- fetched once (refreshed only after a workout
-  // is completed, not on every visit to this tab).
-  const {
-    allWorkouts,
-    allSetHistory,
-    repPRs,
-    oneRepMaxes,
-    exerciseRecords,
-    statsLoading,
-    statsError,
-    prsLoading,
-    prsError,
-  } = useAllTimeStats();
+// Your own training, under Stats' six figures: this week, your total sets and
+// time, the 12-week trends and your most-trained muscle groups -- all worked
+// out from the shared history (AllTimeStatsProvider) with the same functions
+// Progress uses, and only while the Stats tab is open.
+function YourTraining() {
+  const { theme, weightUnit } = useProgressTheme();
+  const { allWorkouts, allSetHistory, statsLoading, statsError } = useAllTimeStats();
 
-  const { logs: todaysFoodLogs, loading: logsLoading, error: logsError } = useFoodLog();
-  const displayNutritionError = nutritionGoalsError ?? logsError;
-
-  const [tab, setTab] = useState<ProfileTab>('Workouts');
-
-  // What this page showed last time (lib/lastShown.ts): a reopened You page
-  // starts from it -- no spinner -- and refreshes in the background as always.
-  const [shownWorkouts] = useState(() =>
-    recallShown<EnrichedWorkoutSummary[]>(userId, 'profile.recentWorkouts'),
-  );
-  const [recentWorkouts, setRecentWorkouts] = useState<EnrichedWorkoutSummary[]>(
-    shownWorkouts ?? [],
-  );
-  const [workoutsError, setWorkoutsError] = useState<string | null>(null);
-
-  const avatar = useAvatarPhoto(userId);
-
-  // Who follows you and who you follow, read each time the page opens (others change them) --
-  // starting from what it last showed, and part of what the page waits for the first time.
-  const [followCounts, setFollowCounts] = useState<{
-    followers: number;
-    following: number;
-  } | null>(() => recallShown(userId, 'profile.followCounts') ?? null);
-  const [countsSettled, setCountsSettled] = useState(followCounts !== null);
-  useEffect(() => {
-    if (!accessToken || !userId) return;
-    let cancelled = false;
-    const read = () =>
-      getPersonProfile(accessToken, userId)
-        .then((me) => {
-          if (!cancelled) {
-            const counts = { followers: me.followerCount, following: me.followingCount };
-            setFollowCounts(counts);
-            rememberShown(userId, 'profile.followCounts', counts);
-          }
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          if (!cancelled) setCountsSettled(true);
-        });
-    const unsubscribe = navigation.addListener('focus', () => void read());
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [navigation, accessToken, userId]);
-
-  const [loading, setLoading] = useState(!shownWorkouts);
-  const hasLoadedOnce = useRef(Boolean(shownWorkouts));
-
-  const load = useCallback(async () => {
-    if (!userId) return;
-    if (!hasLoadedOnce.current) setLoading(true);
-    setWorkoutsError(null);
-
-    try {
-      const result = await fetchWorkoutHistory(userId, 0, RECENT_WORKOUTS_LIMIT);
-      const rows = await enrichWorkoutSummaries(result.rows);
-      setRecentWorkouts(rows);
-      rememberShown(userId, 'profile.recentWorkouts', rows);
-    } catch (err) {
-      setWorkoutsError(errorMessage(err));
-    }
-
-    setLoading(false);
-    hasLoadedOnce.current = true;
-  }, [userId]);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', load);
-    return unsubscribe;
-  }, [navigation, load]);
-
-  // Shown in the summary card regardless of which tab is active, so always
-  // computed -- but memoized so opening the photo sheet, switching tabs, or
-  // any other unrelated re-render doesn't re-run this over the user's whole
-  // history every time.
-  const { lifetimeStats, totalVolumeKg, totalSets } = useMemo(
-    () => ({
-      lifetimeStats: computeLifetimeStats(allWorkouts),
-      totalVolumeKg: computeLifetimeVolumeKg(allSetHistory),
-      totalSets: allSetHistory.length,
-    }),
-    [allWorkouts, allSetHistory],
-  );
-
-  // Stats-tab-only figures -- only actually computed while that tab is
-  // active, not on every render regardless of tab (see ProgressExerciseDetailScreen
-  // for the same pattern applied elsewhere).
-  const {
-    muscleGroupCounts,
-    maxMuscleGroupCount,
-    weeklyWorkoutPoints,
-    weeklyVolumePoints,
-    weeklySetPoints,
-    thisWeekWorkouts,
-    thisWeekSets,
-    thisWeekVolume,
-  } = useMemo(() => {
-    if (tab !== 'Stats') {
-      return {
-        muscleGroupCounts: [] as ReturnType<typeof computeMuscleGroupSetCounts>,
-        maxMuscleGroupCount: 0,
-        weeklyWorkoutPoints: [] as ReturnType<typeof computeWeeklyWorkoutCounts>,
-        weeklyVolumePoints: [] as { weekStart: string; value: number }[],
-        weeklySetPoints: [] as ReturnType<typeof computeWeeklySetCounts>,
-        thisWeekWorkouts: 0,
-        thisWeekSets: 0,
-        thisWeekVolume: 0,
-      };
-    }
+  const figures = useMemo(() => {
     const muscleGroupCounts = computeMuscleGroupSetCounts(allSetHistory).slice(
       0,
       TOP_MUSCLE_GROUPS_LIMIT,
@@ -272,6 +119,7 @@ export function ProfileScreen({ navigation }: Props) {
     // computeWeekly*'s own contract: oldest first, always including the
     // current week -- so the last point is "this week".
     return {
+      totalMinutes: computeLifetimeStats(allWorkouts).totalMinutes,
       muscleGroupCounts,
       maxMuscleGroupCount: muscleGroupCounts[0]?.count ?? 0,
       weeklyWorkoutPoints,
@@ -281,381 +129,220 @@ export function ProfileScreen({ navigation }: Props) {
       thisWeekSets: weeklySetPoints[weeklySetPoints.length - 1]?.value ?? 0,
       thisWeekVolume: weeklyVolumePoints[weeklyVolumePoints.length - 1]?.value ?? 0,
     };
-  }, [tab, allWorkouts, allSetHistory, weightUnit]);
+  }, [allWorkouts, allSetHistory, weightUnit]);
 
-  const todaysNutritionTotals = useMemo(() => sumDailyTotals(todaysFoodLogs), [todaysFoodLogs]);
-  // The page shows all at once: the follow counts come with the rest (or soon after, if slow).
-  const showPage = useShowAllAtOnce(countsSettled);
-
-  if (
-    loading ||
-    themeLoading ||
-    nutritionGoalsLoading ||
-    statsLoading ||
-    prsLoading ||
-    logsLoading ||
-    !showPage
-  ) {
-    return <LoadingState testID="profile-loading" />;
-  }
-
-  const name = greetingName(profile?.displayName, profile?.username);
-  const avatarInitial = name ? name.charAt(0).toUpperCase() : null;
+  if (statsLoading) return <SkeletonCards heights={[320]} />;
 
   return (
-    <>
-      <Screen
-        testID="profile-screen"
-        scrollTestID="profile-scroll"
-        contentContainerStyle={styles.scrollContent}
-        header={
-          <AppHeader
-            title="Profile"
-            rightAction={{
-              icon: 'settings',
-              onPress: () => navigation.navigate('AccountSettings'),
-              accessibilityLabel: 'Settings',
-              testID: 'profile-open-settings',
-            }}
-          />
+    <AppCard testID="profile-training">
+      {statsError ? (
+        <Text testID="profile-stats-error" style={styles.errorText}>
+          {statsError}
+        </Text>
+      ) : null}
+      <Text style={styles.thisWeekTitle}>This Week</Text>
+      <View style={styles.thisWeekRow}>
+        <StatBlock
+          testID="profile-this-week-workouts"
+          value={formatCount(figures.thisWeekWorkouts)}
+          label="Workouts"
+        />
+        <StatBlock
+          testID="profile-this-week-sets"
+          value={formatCount(figures.thisWeekSets)}
+          label="Sets"
+        />
+        <StatBlock
+          testID="profile-this-week-volume"
+          value={formatCount(figures.thisWeekVolume)}
+          label={`Volume (${weightUnit})`}
+        />
+      </View>
+
+      <View style={styles.statTileGrid}>
+        <StatTile
+          testID="profile-stat-tile-sets"
+          label="Total Sets"
+          value={formatCount(allSetHistory.length)}
+        />
+        <StatTile
+          testID="profile-stat-tile-time"
+          label="Training Time"
+          value={formatTotalTime(figures.totalMinutes)}
+        />
+      </View>
+
+      <WeeklyTrendChart
+        testID="profile-trend-workouts"
+        label="Weekly Workouts"
+        points={figures.weeklyWorkoutPoints}
+        accentColor={theme.accent}
+        formatTotal={(total) =>
+          `${formatCount(total)} ${total === 1 ? 'workout' : 'workouts'} · last ${TREND_WEEKS} weeks`
         }
-      >
+        emptyMessage="Log a workout to see your weekly trend."
+      />
+
+      <WeeklyTrendChart
+        testID="profile-trend-volume"
+        label="Volume Over Time"
+        points={figures.weeklyVolumePoints}
+        accentColor={theme.accent}
+        formatTotal={(total) => `${formatCount(total)} ${weightUnit} · last ${TREND_WEEKS} weeks`}
+        emptyMessage="Log some sets to see your volume trend."
+      />
+
+      <WeeklyTrendChart
+        testID="profile-trend-sets"
+        label="Sets Over Time"
+        points={figures.weeklySetPoints}
+        accentColor={theme.accent}
+        formatTotal={(total) =>
+          `${formatCount(total)} ${total === 1 ? 'set' : 'sets'} · last ${TREND_WEEKS} weeks`
+        }
+        emptyMessage="Log some sets to see your sets trend."
+      />
+
+      <View style={styles.section}>
+        <Text style={styles.muscleGroupsTitle}>Most Trained Muscle Groups</Text>
+        {figures.muscleGroupCounts.length === 0 ? (
+          <Text style={styles.emptyText}>Your most-trained muscle groups will appear here.</Text>
+        ) : (
+          figures.muscleGroupCounts.map((mg) => {
+            const percent =
+              figures.maxMuscleGroupCount > 0 ? mg.count / figures.maxMuscleGroupCount : 0;
+            return (
+              <View
+                key={mg.group}
+                testID={`profile-muscle-group-${mg.group}`}
+                style={styles.muscleGroupRow}
+              >
+                <View style={styles.muscleGroupLabelRow}>
+                  <Text style={styles.muscleGroupLabel}>{mg.label}</Text>
+                  <Text style={styles.muscleGroupCount}>
+                    {mg.count} {mg.count === 1 ? 'set' : 'sets'}
+                  </Text>
+                </View>
+                <View style={styles.muscleGroupBarTrack}>
+                  <View
+                    style={[
+                      styles.muscleGroupBarFill,
+                      { width: `${percent * 100}%`, backgroundColor: theme.accent },
+                    ]}
+                  />
+                </View>
+              </View>
+            );
+          })
+        )}
+      </View>
+    </AppCard>
+  );
+}
+
+// Every record you hold, under PRs' Heaviest Lifts: rep PRs, true 1RMs and a
+// bodyweight or timed exercise's best (PRsSection, shared with Progress).
+function YourRecords({ navigation }: { navigation: Props['navigation'] }) {
+  const { theme, weightUnit } = useProgressTheme();
+  const { repPRs, oneRepMaxes, exerciseRecords, prsLoading, prsError } = useAllTimeStats();
+  if (prsLoading) return <SkeletonCards heights={[220]} />;
+
+  return (
+    <AppCard testID="profile-records">
+      {prsError ? (
+        <Text testID="profile-prs-error" style={styles.errorText}>
+          {prsError}
+        </Text>
+      ) : null}
+      <PRsSection
+        repPRs={repPRs}
+        oneRepMaxes={oneRepMaxes}
+        exerciseRecords={exerciseRecords}
+        weightUnit={weightUnit}
+        accentColor={theme.accent}
+        navigation={navigation}
+        scrollable={false}
+      />
+    </AppCard>
+  );
+}
+
+// The You tab's own root screen (see App.tsx's bottom nav): your profile
+// exactly as the people who follow you see it (PersonProfilePage) -- photo,
+// name, bio, counts, Edit Profile and Share, the four figures, and
+// Achievements / Workouts / PRs / Stats -- plus what's yours alone, inside
+// the same tabs: your full records under PRs, and under Stats today's
+// calories and macros (with Nutrition in your membership), your weekly
+// trends and your muscle groups. The header keeps Settings,
+// and tapping your photo chooses, changes or removes it (useAvatarPhoto).
+export function ProfileScreen({ navigation }: Props) {
+  const { user } = useAuth();
+  const userId = user?.id ?? '';
+  const { themeLoading } = useProgressTheme();
+  const { profile, error: profileError } = useProfile();
+  const { nutrition } = useMembership();
+  const { loading: goalsLoading } = useNutritionGoals();
+  const { loading: logsLoading } = useFoodLog();
+  const { statsLoading, prsLoading } = useAllTimeStats();
+  const avatar = useAvatarPhoto(userId);
+
+  const notices =
+    profileError || avatar.error ? (
+      <View style={styles.notices}>
         {profileError ? (
           <Text testID="profile-error" style={styles.errorText}>
             {profileError}
           </Text>
         ) : null}
-
         {avatar.error ? (
           <Text testID="profile-avatar-error" style={styles.errorText}>
             {avatar.error}
           </Text>
         ) : null}
+      </View>
+    ) : null;
 
-        <AppCard hero topAccent={theme.accent} testID="profile-identity">
-          <View style={styles.identityRow}>
-            <TouchableOpacity
-              testID="profile-avatar"
-              style={styles.avatarWrap}
-              onPress={avatar.openSheet}
-              disabled={avatar.saving}
-              accessibilityRole="button"
-              accessibilityLabel="Change profile picture"
-            >
-              <View style={[styles.avatar, { backgroundColor: theme.accentBg }]}>
-                {avatar.saving ? (
-                  <ActivityIndicator testID="profile-avatar-saving" color={theme.accent} />
-                ) : (
-                  <Avatar
-                    uri={profile?.avatarUrl}
-                    initial={avatarInitial}
-                    size={72}
-                    iconSize={32}
-                    iconColor={theme.accent}
-                    initialStyle={[styles.avatarInitial, { color: theme.accent }]}
-                  />
-                )}
-              </View>
-              <View style={[styles.avatarEditBadge, { backgroundColor: theme.accent }]}>
-                <Feather name="camera" size={12} color={theme.onAccent} />
-              </View>
-            </TouchableOpacity>
-            <View style={styles.identityBlock}>
-              <Text testID="profile-display-name" style={styles.displayName}>
-                {name ?? 'Your Profile'}
-              </Text>
-              <Text testID="profile-activity-count" style={styles.activityCount}>
-                {formatCount(lifetimeStats.totalWorkouts)}{' '}
-                {lifetimeStats.totalWorkouts === 1 ? 'workout' : 'workouts'}
-              </Text>
-              {profile?.username ? (
-                <Text testID="profile-username" style={styles.username}>
-                  @{profile.username}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-
-          {followCounts ? (
-            <View style={styles.followCounts}>
-              <TouchableOpacity
-                testID="profile-followers"
-                style={styles.followCount}
-                onPress={() => navigation.navigate('FollowList', { userId, which: 'followers' })}
-                accessibilityRole="button"
-                accessibilityLabel={`${followCounts.followers} ${followCounts.followers === 1 ? 'follower' : 'followers'}`}
-              >
-                <Text style={styles.followCountValue}>{formatCount(followCounts.followers)}</Text>
-                <Text style={styles.followCountLabel}>
-                  {followCounts.followers === 1 ? 'Follower' : 'Followers'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                testID="profile-following"
-                style={styles.followCount}
-                onPress={() => navigation.navigate('FollowList', { userId, which: 'following' })}
-                accessibilityRole="button"
-                accessibilityLabel={`Following ${followCounts.following}`}
-              >
-                <Text style={styles.followCountValue}>{formatCount(followCounts.following)}</Text>
-                <Text style={styles.followCountLabel}>Following</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-
-          <View style={styles.editProfileWrap}>
-            <SecondaryButton
-              testID="profile-edit"
-              label="Edit Profile"
-              onPress={() => navigation.navigate('AccountSettings')}
+  return (
+    <>
+      <PersonProfilePage
+        userId={userId}
+        navigation={navigation}
+        own={{
+          header: (
+            <AppHeader
+              title="Profile"
+              rightAction={{
+                icon: 'settings',
+                onPress: () => navigation.navigate('AccountSettings'),
+                accessibilityLabel: 'Settings',
+                testID: 'profile-open-settings',
+              }}
             />
-          </View>
-        </AppCard>
-
-        <AppCard testID="profile-stats">
-          {statsError ? (
-            <Text testID="profile-stats-error" style={styles.errorText}>
-              {statsError}
-            </Text>
-          ) : null}
-          <View style={styles.statsRow}>
-            <StatBlock
-              testID="profile-stat-workouts"
-              value={formatCount(lifetimeStats.totalWorkouts)}
-              label="Workouts"
-            />
-            <StatBlock
-              testID="profile-stat-sets"
-              value={formatCount(totalSets)}
-              label="Total Sets"
-            />
-            <StatBlock
-              testID="profile-stat-volume"
-              value={formatCount(fromKg(totalVolumeKg, weightUnit))}
-              label={`Total Volume (${weightUnit})`}
-            />
-          </View>
-        </AppCard>
-
-        <AppCard
-          testID="profile-nutrition"
-          topAccent={nutritionTheme.accent}
-          onPress={() => navigation.navigate('Nutrition')}
-        >
-          <Text style={styles.nutritionTitle}>Today&apos;s Calories & Macros</Text>
-          {displayNutritionError ? (
-            <Text testID="profile-nutrition-error" style={styles.errorText}>
-              {displayNutritionError}
-            </Text>
-          ) : null}
-          <View style={styles.statTileGrid}>
-            <StatTile
-              testID="profile-nutrition-calories"
-              label="Calories"
-              value={formatMacro(
-                todaysNutritionTotals.calories,
-                nutritionGoals?.calories ?? null,
-                '',
-              )}
-            />
-            <StatTile
-              testID="profile-nutrition-protein"
-              label="Protein"
-              value={formatMacro(
-                todaysNutritionTotals.proteinG,
-                nutritionGoals?.proteinG ?? null,
-                'g',
-              )}
-            />
-            <StatTile
-              testID="profile-nutrition-carbs"
-              label="Carbs"
-              value={formatMacro(todaysNutritionTotals.carbsG, nutritionGoals?.carbsG ?? null, 'g')}
-            />
-            <StatTile
-              testID="profile-nutrition-fat"
-              label="Fat"
-              value={formatMacro(todaysNutritionTotals.fatG, nutritionGoals?.fatG ?? null, 'g')}
-            />
-          </View>
-        </AppCard>
-
-        <View style={styles.tabsWrap}>
-          <UnderlineTabs
-            testID="profile-tabs"
-            categories={PROFILE_TABS}
-            active={tab}
-            onSelect={setTab}
-            accentColor={theme.accent}
-          />
-        </View>
-
-        {tab === 'Workouts' ? (
-          <AppCard testID="profile-tab-content">
-            {workoutsError ? (
-              <Text testID="profile-workouts-error" style={styles.errorText}>
-                {workoutsError}
-              </Text>
-            ) : null}
-            {recentWorkouts.length === 0 ? (
-              <EmptyState
-                testID="profile-workouts-empty"
-                title="Your workout history will appear here."
-              />
-            ) : (
-              <>
-                {recentWorkouts.map((workout, index) => (
-                  <ProfileWorkoutRow
-                    key={workout.id}
-                    workout={workout}
-                    weightUnit={weightUnit}
-                    divider={index > 0}
-                    onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout.id })}
-                  />
-                ))}
-                <TextButton
-                  testID="profile-view-all-workouts"
-                  label="View All Workouts"
-                  onPress={() => navigation.navigate('WorkoutHistory')}
-                />
-              </>
-            )}
-          </AppCard>
-        ) : null}
-
-        {tab === 'Stats' ? (
-          <AppCard testID="profile-tab-content">
-            <Text style={styles.thisWeekTitle}>This Week</Text>
-            <View style={styles.thisWeekRow}>
-              <StatBlock
-                testID="profile-this-week-workouts"
-                value={formatCount(thisWeekWorkouts)}
-                label="Workouts"
-              />
-              <StatBlock
-                testID="profile-this-week-sets"
-                value={formatCount(thisWeekSets)}
-                label="Sets"
-              />
-              <StatBlock
-                testID="profile-this-week-volume"
-                value={formatCount(thisWeekVolume)}
-                label={`Volume (${weightUnit})`}
-              />
-            </View>
-
-            <View style={styles.statTileGrid}>
-              <StatTile
-                testID="profile-stat-tile-workouts"
-                label="Workouts"
-                value={formatCount(lifetimeStats.totalWorkouts)}
-              />
-              <StatTile
-                testID="profile-stat-tile-sets"
-                label="Total Sets"
-                value={formatCount(totalSets)}
-              />
-              <StatTile
-                testID="profile-stat-tile-volume"
-                label={`Total Volume (${weightUnit})`}
-                value={formatCount(fromKg(totalVolumeKg, weightUnit))}
-              />
-              <StatTile
-                testID="profile-stat-tile-time"
-                label="Training Time"
-                value={formatTotalTime(lifetimeStats.totalMinutes)}
-              />
-            </View>
-
-            <WeeklyTrendChart
-              testID="profile-trend-workouts"
-              label="Weekly Workouts"
-              points={weeklyWorkoutPoints}
-              accentColor={theme.accent}
-              formatTotal={(total) =>
-                `${formatCount(total)} ${total === 1 ? 'workout' : 'workouts'} · last ${TREND_WEEKS} weeks`
+          ),
+          identity: profile
+            ? {
+                displayName: profile.displayName,
+                username: profile.username,
+                avatarUrl: profile.avatarUrl,
+                bio: profile.bio,
               }
-              emptyMessage="Log a workout to see your weekly trend."
-            />
-
-            <WeeklyTrendChart
-              testID="profile-trend-volume"
-              label="Volume Over Time"
-              points={weeklyVolumePoints}
-              accentColor={theme.accent}
-              formatTotal={(total) =>
-                `${formatCount(total)} ${weightUnit} · last ${TREND_WEEKS} weeks`
-              }
-              emptyMessage="Log some sets to see your volume trend."
-            />
-
-            <WeeklyTrendChart
-              testID="profile-trend-sets"
-              label="Sets Over Time"
-              points={weeklySetPoints}
-              accentColor={theme.accent}
-              formatTotal={(total) =>
-                `${formatCount(total)} ${total === 1 ? 'set' : 'sets'} · last ${TREND_WEEKS} weeks`
-              }
-              emptyMessage="Log some sets to see your sets trend."
-            />
-
-            <View style={styles.section}>
-              <Text style={styles.muscleGroupsTitle}>Most Trained Muscle Groups</Text>
-              {muscleGroupCounts.length === 0 ? (
-                <Text style={styles.emptyText}>
-                  Your most-trained muscle groups will appear here.
-                </Text>
-              ) : (
-                muscleGroupCounts.map((mg) => {
-                  const percent = maxMuscleGroupCount > 0 ? mg.count / maxMuscleGroupCount : 0;
-                  return (
-                    <View
-                      key={mg.group}
-                      testID={`profile-muscle-group-${mg.group}`}
-                      style={styles.muscleGroupRow}
-                    >
-                      <View style={styles.muscleGroupLabelRow}>
-                        <Text style={styles.muscleGroupLabel}>{mg.label}</Text>
-                        <Text style={styles.muscleGroupCount}>
-                          {mg.count} {mg.count === 1 ? 'set' : 'sets'}
-                        </Text>
-                      </View>
-                      <View style={styles.muscleGroupBarTrack}>
-                        <View
-                          style={[
-                            styles.muscleGroupBarFill,
-                            { width: `${percent * 100}%`, backgroundColor: theme.accent },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  );
-                })
-              )}
-            </View>
-          </AppCard>
-        ) : null}
-
-        {tab === 'PRs' ? (
-          <AppCard testID="profile-tab-content">
-            {prsError ? (
-              <Text testID="profile-prs-error" style={styles.errorText}>
-                {prsError}
-              </Text>
-            ) : null}
-            <PRsSection
-              repPRs={repPRs}
-              oneRepMaxes={oneRepMaxes}
-              exerciseRecords={exerciseRecords}
-              weightUnit={weightUnit}
-              accentColor={theme.accent}
-              navigation={navigation}
-              scrollable={false}
-            />
-          </AppCard>
-        ) : null}
-      </Screen>
+            : null,
+          avatar: { onPress: avatar.openSheet, saving: avatar.saving },
+          notices,
+          stats: (
+            <>
+              {nutrition ? <TodaysNutritionCard navigation={navigation} /> : null}
+              <YourTraining />
+            </>
+          ),
+          prs: <YourRecords navigation={navigation} />,
+          ready:
+            !themeLoading &&
+            !statsLoading &&
+            !prsLoading &&
+            (!nutrition || (!goalsLoading && !logsLoading)),
+        }}
+      />
 
       <BottomSheet
         visible={avatar.sheetOpen}

@@ -1,13 +1,12 @@
-import { FlatList, Image, StyleSheet } from 'react-native';
+import { FlatList, Image } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { AppCard } from '../design/AppCard';
-import { PrimaryButton } from '../design/Button';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
-import { updateMyProfile } from '../lib/api';
+import { getPersonProfile, getPersonWorkouts, updateMyProfile } from '../lib/api';
+import { forgetShown } from '../lib/lastShown';
 import { removeAvatarFile, uploadAvatar } from '../lib/avatarUpload';
-import { AppMenuContext } from '../navigation/AppMenuContext';
+import { MembershipContext } from '../membership/useMembership';
 import { fetchTodaysFoodLogs } from '../nutrition/foodLogQueries';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { NutritionGoalsProvider } from '../nutrition/NutritionGoalsProvider';
@@ -17,8 +16,7 @@ import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
-import { enrichWorkoutSummaries } from '../workouts/workoutHistoryEnrichment';
-import { fetchWorkoutHistory } from '../workouts/workoutQueries';
+import type { MembershipTier } from '../lib/api';
 import { ProfileScreen } from './ProfileScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -28,8 +26,12 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../lib/api', () => ({
   updateMyProfile: jest.fn(),
-  // Your follower and following counts, on the You tab.
-  getPersonProfile: jest.fn().mockResolvedValue({ followerCount: 4, followingCount: 2 }),
+  // Your profile as the people who follow you see it, and its first workouts.
+  getPersonProfile: jest.fn(),
+  getPersonWorkouts: jest.fn(),
+  getSocialSummary: jest.fn().mockResolvedValue({}),
+  likeWorkout: jest.fn(),
+  unlikeWorkout: jest.fn(),
 }));
 
 jest.mock('../profile/profileQueries', () => ({
@@ -70,17 +72,11 @@ jest.mock('../workouts/prSummaryQueries', () => ({
   fetchAllOneRepMaxes: jest.fn(),
 }));
 
-jest.mock('../workouts/workoutQueries', () => ({
-  fetchWorkoutHistory: jest.fn(),
-}));
-
-jest.mock('../workouts/workoutHistoryEnrichment', () => ({
-  enrichWorkoutSummaries: jest.fn(),
-}));
-
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockUpdateMyProfile = updateMyProfile as jest.Mock;
+const mockGetPersonProfile = getPersonProfile as jest.Mock;
+const mockGetPersonWorkouts = getPersonWorkouts as jest.Mock;
 const mockUploadAvatar = uploadAvatar as jest.Mock;
 const mockRemoveAvatarFile = removeAvatarFile as jest.Mock;
 const mockRequestMediaLibraryPermissionsAsync =
@@ -92,13 +88,13 @@ const mockFetchNutritionGoals = fetchNutritionGoals as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
 const mockFetchAllRepPRs = fetchAllRepPRs as jest.Mock;
 const mockFetchAllOneRepMaxes = fetchAllOneRepMaxes as jest.Mock;
-const mockFetchWorkoutHistory = fetchWorkoutHistory as jest.Mock;
-const mockEnrichWorkoutSummaries = enrichWorkoutSummaries as jest.Mock;
 
 const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation: any = {
   navigate: mockNavigate,
+  push: jest.fn(),
+  goBack: jest.fn(),
   addListener: jest.fn((event: string, cb: () => void) => {
     if (event === 'focus') cb();
     return jest.fn();
@@ -106,12 +102,16 @@ const navigation: any = {
 };
 const route = {} as never;
 
+const AVATAR = 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg';
+
 const baseProfile = {
   id: 'user-1',
   email: 'a@test.local',
   role: 'user',
   displayName: 'Harbir',
   username: 'harbir',
+  bio: 'Chasing progress.',
+  fitnessGoals: ['build_muscle'],
   weightUnit: 'kg' as const,
   workoutAccentColor: null as string | null,
   nutritionAccentColor: null as string | null,
@@ -119,29 +119,70 @@ const baseProfile = {
   avatarUrl: null as string | null,
 };
 
-function enrichedWorkout(overrides: Record<string, unknown> = {}) {
+/** Your profile as the API gives it -- what the people who follow you see. */
+function me(extra: object = {}) {
   return {
-    id: 'w1',
-    name: 'Push Day',
-    performedAt: '2026-09-01T10:00:00Z',
-    completedAt: '2026-09-01T11:00:00Z',
-    workoutSplitDayId: null,
-    splitDayName: null,
-    muscleGroups: [],
-    completedSetCount: 12,
-    totalVolumeKg: 1250,
-    durationMinutes: 60,
-    ...overrides,
+    user: { id: 'user-1', username: 'harbir', displayName: 'Harbir', avatarUrl: null },
+    isSelf: true,
+    followStatus: 'none',
+    followsYou: false,
+    requestId: null,
+    followerCount: 4,
+    followingCount: 2,
+    bio: 'Chasing progress.',
+    mutuals: { count: 0, people: [] },
+    canSeeActivity: true,
+    stats: {
+      workouts: 120,
+      lastThirtyDays: 9,
+      totalVolumeKg: 19400,
+      prCount: 24,
+      bestMonthWorkouts: 14,
+    },
+    bestLifts: [],
+    ...extra,
   };
 }
 
+const workoutItem = {
+  kind: 'workout' as const,
+  id: 'workout-w1',
+  timestamp: '2026-11-10T10:00:00Z',
+  author: { id: 'user-1', username: 'harbir', displayName: 'Harbir', avatarUrl: null },
+  workout: {
+    id: 'w1',
+    name: 'Push Day',
+    splitDayName: null,
+    muscleGroups: ['chest'],
+    durationMinutes: 60,
+    exerciseCount: 4,
+    completedSetCount: 12,
+    totalVolumeKg: 1250,
+    completedExerciseCount: 4,
+    topSets: [],
+  },
+};
+
+const benchPR = {
+  reps: 5,
+  bestWeightKg: 100,
+  sourceSetId: 's1',
+  achievedAt: '2026-09-01T00:00:00Z',
+  exerciseId: 'ex1',
+  exerciseName: 'Bench Press',
+  muscleGroup: 'chest',
+};
+
 beforeEach(() => {
+  forgetShown();
   mockUseAuth.mockReturnValue({
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
   });
   mockFetchMyProfile.mockReset().mockResolvedValue(baseProfile);
   mockUpdateMyProfile.mockReset().mockResolvedValue(baseProfile);
+  mockGetPersonProfile.mockReset().mockResolvedValue(me());
+  mockGetPersonWorkouts.mockReset().mockResolvedValue({ items: [workoutItem], hasMore: false });
   mockUploadAvatar.mockReset();
   mockRemoveAvatarFile.mockReset();
   mockRequestMediaLibraryPermissionsAsync.mockReset().mockResolvedValue({ granted: true });
@@ -184,86 +225,150 @@ beforeEach(() => {
   ]);
   mockFetchAllRepPRs.mockReset().mockResolvedValue([]);
   mockFetchAllOneRepMaxes.mockReset().mockResolvedValue([]);
-  mockFetchWorkoutHistory.mockReset().mockResolvedValue({ rows: [{ id: 'w1' }], hasMore: false });
-  mockEnrichWorkoutSummaries.mockReset().mockResolvedValue([enrichedWorkout()]);
   mockFetchTodaysFoodLogs.mockReset().mockResolvedValue([]);
   mockFetchNutritionGoals
     .mockReset()
     .mockResolvedValue({ calories: null, proteinG: null, carbsG: null, fatG: null });
   mockNavigate.mockClear();
-  mockOpenMenu.mockClear();
 });
 
-const mockOpenMenu = jest.fn();
-
-// ProfileScreen now renders the shared ModeToggle (via AppMenuContext) --
-// this stands in for that root-level provider.
-function renderProfile(currentMode: 'workout' | 'nutrition' = 'workout') {
+function renderProfile(membership: MembershipTier = 'everything') {
   return render(
-    <ProfileProvider>
-      <NutritionGoalsProvider>
-        <FoodLogProvider>
-          <AllTimeStatsProvider>
-            <AppMenuContext.Provider value={{ openMenu: mockOpenMenu, currentMode }}>
+    <MembershipContext.Provider value={membership}>
+      <ProfileProvider>
+        <NutritionGoalsProvider>
+          <FoodLogProvider>
+            <AllTimeStatsProvider>
               <ProfileScreen navigation={navigation} route={route} />
-            </AppMenuContext.Provider>
-          </AllTimeStatsProvider>
-        </FoodLogProvider>
-      </NutritionGoalsProvider>
-    </ProfileProvider>,
+            </AllTimeStatsProvider>
+          </FoodLogProvider>
+        </NutritionGoalsProvider>
+      </ProfileProvider>
+    </MembershipContext.Provider>,
   );
 }
 
-describe('ProfileScreen identity', () => {
-  it('shows a loading indicator while fetching', async () => {
+async function openTab(tab: 'achievements' | 'workouts' | 'prs' | 'stats') {
+  fireEvent.press(await screen.findByTestId(`person-profile-tab-${tab}`));
+}
+
+describe('ProfileScreen -- your profile as your friends see it', () => {
+  it('keeps its placeholders until it is all in, then shows who you are', async () => {
     renderProfile();
     expect(screen.getByTestId('profile-loading')).toBeTruthy();
-    await screen.findByTestId('profile-display-name');
+
+    expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Harbir');
+    expect(screen.getByTestId('person-profile-identity')).toHaveTextContent(/@harbir/);
+    expect(screen.getByTestId('person-profile-bio')).toHaveTextContent('Chasing progress.');
+    expect(screen.queryByTestId('profile-loading')).toBeNull();
   });
 
-  it('keeps showing the same Profile content regardless of the selected mode', async () => {
-    renderProfile('nutrition');
-
-    expect(await screen.findByTestId('profile-display-name')).toHaveTextContent('Harbir');
-    expect(screen.getByTestId('profile-username')).toHaveTextContent('@harbir');
-  });
-
-  it('shows the real display name and username, never invented data', async () => {
+  it('shows who you are from your own profile, so an edit shows at once', async () => {
+    mockGetPersonProfile.mockResolvedValue(
+      me({ user: { id: 'user-1', username: 'old', displayName: 'Old Name', avatarUrl: null } }),
+    );
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, bio: 'Just changed.' });
     renderProfile();
 
-    expect(await screen.findByTestId('profile-display-name')).toHaveTextContent('Harbir');
-    expect(screen.getByTestId('profile-username')).toHaveTextContent('@harbir');
+    expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Harbir');
+    expect(screen.getByTestId('person-profile-bio')).toHaveTextContent('Just changed.');
   });
 
-  it('falls back to username when displayName is unset', async () => {
-    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, displayName: null });
+  it('never shows your fitness goals', async () => {
     renderProfile();
 
-    expect(await screen.findByTestId('profile-display-name')).toHaveTextContent('harbir');
+    await screen.findByTestId('person-profile-name');
+    expect(screen.queryByTestId('person-profile-goals')).toBeNull();
+    expect(screen.queryByText('Build Muscle')).toBeNull();
   });
 
-  it("shows the account's total workout count as an activity-count subtitle under the name", async () => {
-    // The default mock resolves 2 completed workouts (see beforeEach).
+  it('keeps Settings in the header, and offers Edit Profile and Share -- never Follow or "..."', async () => {
     renderProfile();
+    await screen.findByTestId('person-profile-name');
 
-    expect(await screen.findByTestId('profile-activity-count')).toHaveTextContent('2 workouts');
-  });
-
-  it('navigates to AccountSettings from both the settings icon and Edit Profile', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-display-name');
-
+    expect(screen.getByTestId('profile-open-settings').props.accessibilityLabel).toBe('Settings');
     fireEvent.press(screen.getByTestId('profile-open-settings'));
     expect(mockNavigate).toHaveBeenCalledWith('AccountSettings');
 
     mockNavigate.mockClear();
-    fireEvent.press(screen.getByTestId('profile-edit'));
-    expect(mockNavigate).toHaveBeenCalledWith('AccountSettings');
+    fireEvent.press(screen.getByTestId('person-profile-edit'));
+    expect(mockNavigate).toHaveBeenCalledWith('SettingsPersonalInfo');
+
+    expect(screen.getByTestId('person-profile-share')).toBeTruthy();
+    expect(screen.queryByTestId('person-profile-follow')).toBeNull();
+    expect(screen.queryByTestId('person-profile-more')).toBeNull();
+  });
+
+  it('shows who follows you and who you follow, each opening its list', async () => {
+    renderProfile();
+
+    expect(await screen.findByTestId('person-profile-count-followers')).toHaveTextContent(
+      /4.*Followers/,
+    );
+    expect(screen.getByTestId('person-profile-count-following')).toHaveTextContent(/2.*Following/);
+    fireEvent.press(screen.getByTestId('person-profile-count-followers'));
+    expect(mockNavigate).toHaveBeenCalledWith('FollowList', {
+      userId: 'user-1',
+      which: 'followers',
+      name: 'Harbir',
+    });
+  });
+
+  it('shows the four figures your friends see', async () => {
+    renderProfile();
+
+    expect(await screen.findByTestId('person-profile-stat-workouts')).toHaveTextContent(/120/);
+    expect(screen.getByTestId('person-profile-stat-recent')).toHaveTextContent(/9.*Last 30 Days/);
+    expect(screen.getByTestId('person-profile-stat-prs')).toHaveTextContent(/24.*PRs/);
+    expect(screen.getByTestId('person-profile-stat-volume')).toHaveTextContent(/19\.4K kg/);
+  });
+
+  it('opens on Achievements, and lists your workouts under Workouts, each opening yours', async () => {
+    renderProfile();
+
+    expect(await screen.findByTestId('person-profile-achievements')).toBeTruthy();
+    expect(screen.getByTestId('person-profile-tab-achievements')).toHaveTextContent(
+      /Achievements$/,
+    );
+
+    await openTab('workouts');
+    fireEvent.press(screen.getByTestId('person-profile-workout-w1'));
+    expect(mockNavigate).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' });
+  });
+
+  it('opens again showing what it last showed, while it reads it again', async () => {
+    const first = renderProfile();
+    await screen.findByTestId('person-profile-name');
+    first.unmount();
+
+    mockGetPersonProfile.mockReturnValue(new Promise(() => undefined));
+    renderProfile();
+
+    expect(screen.queryByTestId('profile-loading')).toBeNull();
+    expect(await screen.findByTestId('person-profile-stat-workouts')).toHaveTextContent(/120/);
+  });
+
+  it('does not render its own bottom nav', async () => {
+    renderProfile();
+    await screen.findByTestId('person-profile-name');
+
+    expect(screen.queryByTestId('bottom-nav-bar')).toBeNull();
+  });
+
+  it('renders no bare text outside <Text> on any tab', async () => {
+    renderProfile();
+    await screen.findByTestId('person-profile-name');
+    expectNoBareText();
+
+    for (const tab of ['workouts', 'prs', 'stats'] as const) {
+      await openTab(tab);
+      expectNoBareText();
+    }
   });
 });
 
-describe('ProfileScreen -- Calories & Macros widget', () => {
-  it("shows today's calories and macros against goals, and navigates to Nutrition on tap", async () => {
+describe('ProfileScreen Stats tab -- yours alone, under the six figures', () => {
+  it("shows today's calories and macros against your targets, opening Nutrition", async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([
       {
         id: 'l1',
@@ -287,10 +392,10 @@ describe('ProfileScreen -- Calories & Macros widget', () => {
       fatG: 70,
     });
     renderProfile();
+    await openTab('stats');
 
-    expect(await screen.findByTestId('profile-nutrition-calories')).toHaveTextContent(
-      /400 \/ 2,200/,
-    );
+    expect(screen.getByTestId('person-profile-stats-month')).toHaveTextContent(/14.*Busiest Month/);
+    expect(screen.getByTestId('profile-nutrition-calories')).toHaveTextContent(/400 \/ 2,200/);
     expect(screen.getByTestId('profile-nutrition-protein')).toHaveTextContent(/40g \/ 180g/);
     expect(screen.getByTestId('profile-nutrition-carbs')).toHaveTextContent(/10g \/ 200g/);
     expect(screen.getByTestId('profile-nutrition-fat')).toHaveTextContent(/8g \/ 70g/);
@@ -300,21 +405,109 @@ describe('ProfileScreen -- Calories & Macros widget', () => {
   });
 
   it('shows just the consumed amount, with no "/ goal", when no goal is set', async () => {
-    mockFetchTodaysFoodLogs.mockResolvedValue([]);
     renderProfile();
+    await openTab('stats');
 
-    expect(await screen.findByTestId('profile-nutrition-calories')).toHaveTextContent(/^0/);
+    expect(screen.getByTestId('profile-nutrition-calories')).toHaveTextContent(/^0/);
     expect(screen.getByTestId('profile-nutrition-calories')).not.toHaveTextContent('/');
   });
 
-  it('shows a nutrition load error without crashing the rest of the screen', async () => {
+  it('has no calories card when Nutrition is not in your membership', async () => {
+    renderProfile('workouts');
+    await openTab('stats');
+
+    expect(screen.getByTestId('profile-training')).toBeTruthy();
+    expect(screen.queryByTestId('profile-nutrition')).toBeNull();
+  });
+
+  it('shows a nutrition load error without crashing the rest of the page', async () => {
     mockFetchNutritionGoals.mockRejectedValue(new Error('nutrition down'));
     renderProfile();
+    await openTab('stats');
 
-    expect(await screen.findByTestId('profile-nutrition-error')).toHaveTextContent(
-      'nutrition down',
+    expect(screen.getByTestId('profile-nutrition-error')).toHaveTextContent('nutrition down');
+    expect(screen.getByTestId('person-profile-name')).toBeTruthy();
+  });
+
+  it('shows your total sets, this week, the weekly trends and your most-trained muscle groups', async () => {
+    // Performed "now" so the weekly bucketing always lands inside the trend window.
+    const now = new Date();
+    mockFetchAllCompletedWorkouts.mockResolvedValue([
+      {
+        id: 'w1',
+        name: 'Push',
+        performedAt: now.toISOString(),
+        completedAt: now.toISOString(),
+        workoutSplitDayId: null,
+      },
+    ]);
+    renderProfile();
+    await openTab('stats');
+
+    expect(within(screen.getByTestId('profile-stat-tile-sets')).getByText('2')).toBeTruthy();
+    expect(screen.getByTestId('profile-stat-tile-time')).toBeTruthy();
+    expect(screen.getByTestId('profile-this-week-workouts')).toHaveTextContent(/^1/);
+    expect(screen.getByTestId('profile-trend-workouts-total')).toHaveTextContent(/1 workout/);
+    expect(screen.getByTestId('profile-trend-volume-total')).toBeTruthy();
+    expect(screen.getByTestId('profile-trend-sets-total')).toBeTruthy();
+    // One chest set and one quadriceps set.
+    expect(screen.getByTestId('profile-muscle-group-chest')).toBeTruthy();
+    expect(screen.getByTestId('profile-muscle-group-quadriceps')).toBeTruthy();
+  });
+
+  it('shows an empty message instead of an empty chart with no training at all', async () => {
+    mockFetchAllCompletedWorkouts.mockResolvedValue([]);
+    mockFetchAllExerciseHistory.mockResolvedValue([]);
+    renderProfile();
+    await openTab('stats');
+
+    expect(screen.getByTestId('profile-trend-workouts-empty')).toBeTruthy();
+    expect(screen.queryByTestId('profile-trend-workouts-chart')).toBeNull();
+  });
+
+  it('shows an error without crashing when your history cannot be read', async () => {
+    mockFetchAllCompletedWorkouts.mockRejectedValue(new Error('Network down'));
+    renderProfile();
+    await openTab('stats');
+
+    expect(screen.getByTestId('profile-stats-error')).toHaveTextContent('Network down');
+  });
+});
+
+describe('ProfileScreen PRs tab', () => {
+  it('shows every record you hold under your heaviest lifts, as one plain list', async () => {
+    mockGetPersonProfile.mockResolvedValue(
+      me({
+        bestLifts: [
+          {
+            exerciseId: 'ex1',
+            exerciseName: 'Bench Press',
+            photoUrl: null,
+            gym: null,
+            attachment: null,
+            weightKg: 100,
+            reps: 5,
+            performedAt: '2026-09-01',
+          },
+        ],
+      }),
     );
-    expect(screen.getByTestId('profile-display-name')).toBeTruthy();
+    mockFetchAllRepPRs.mockResolvedValue([benchPR]);
+    renderProfile();
+    await openTab('prs');
+
+    expect(screen.getByTestId('person-profile-lift-ex1')).toHaveTextContent(/100 kg × 5/);
+    expect(screen.getByTestId('progress-prs-count')).toHaveTextContent('1 PR');
+    // The page is one ScrollView: PRsSection never nests a FlatList in it.
+    expect(screen.UNSAFE_queryAllByType(FlatList)).toHaveLength(0);
+  });
+
+  it('lets your records speak for themselves when you have no heaviest lifts yet', async () => {
+    renderProfile();
+    await openTab('prs');
+
+    expect(screen.queryByTestId('person-profile-no-lifts')).toBeNull();
+    expect(screen.getByTestId('progress-prs-empty')).toBeTruthy();
   });
 });
 
@@ -323,62 +516,49 @@ describe('ProfileScreen profile picture', () => {
     renderProfile();
 
     expect(await screen.findByTestId('profile-avatar')).toHaveTextContent(/H/);
+    expect(screen.getByTestId('profile-avatar').props.accessibilityLabel).toBe(
+      'Change profile picture',
+    );
   });
 
   it('displays the saved picture once the profile has one', async () => {
-    mockFetchMyProfile.mockResolvedValue({
-      ...baseProfile,
-      avatarUrl: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
-    });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, avatarUrl: AVATAR });
     renderProfile();
-    await screen.findByTestId('profile-display-name');
+    await screen.findByTestId('person-profile-name');
 
-    const image = screen.getByTestId('profile-avatar').findByType(Image);
-    expect(image.props.source).toEqual({
-      uri: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
-    });
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-avatar').findByType(Image).props.source).toEqual({
+        uri: AVATAR,
+      }),
+    );
   });
 
   it('tapping the avatar opens the picture sheet, offering Choose Photo but not Remove Photo when none is set', async () => {
     renderProfile();
-    await screen.findByTestId('profile-display-name');
-
-    fireEvent.press(screen.getByTestId('profile-avatar'));
+    fireEvent.press(await screen.findByTestId('profile-avatar'));
 
     expect(screen.getByTestId('profile-avatar-choose-photo')).toBeTruthy();
     expect(screen.queryByTestId('profile-avatar-remove-photo')).toBeNull();
   });
 
   it('offers Remove Photo once a picture is already set', async () => {
-    mockFetchMyProfile.mockResolvedValue({
-      ...baseProfile,
-      avatarUrl: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
-    });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, avatarUrl: AVATAR });
     renderProfile();
-    await screen.findByTestId('profile-display-name');
-
-    fireEvent.press(screen.getByTestId('profile-avatar'));
+    fireEvent.press(await screen.findByTestId('profile-avatar'));
 
     expect(screen.getByTestId('profile-avatar-remove-photo')).toBeTruthy();
   });
 
-  it('selecting and uploading a photo saves it as the profile picture', async () => {
+  it('selecting and uploading a photo saves it and shows it at once', async () => {
     mockLaunchImageLibraryAsync.mockResolvedValue({
       canceled: false,
       assets: [{ uri: 'file:///tmp/photo.jpg' }],
     });
-    mockUploadAvatar.mockResolvedValue(
-      'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg?v=1',
-    );
-    mockUpdateMyProfile.mockResolvedValue({
-      ...baseProfile,
-      avatarUrl:
-        'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg?v=1',
-    });
+    mockUploadAvatar.mockResolvedValue(`${AVATAR}?v=1`);
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, avatarUrl: `${AVATAR}?v=1` });
     renderProfile();
-    await screen.findByTestId('profile-display-name');
 
-    fireEvent.press(screen.getByTestId('profile-avatar'));
+    fireEvent.press(await screen.findByTestId('profile-avatar'));
     await act(async () => {
       fireEvent.press(screen.getByTestId('profile-avatar-choose-photo'));
       await Promise.resolve();
@@ -387,60 +567,21 @@ describe('ProfileScreen profile picture', () => {
 
     expect(mockUploadAvatar).toHaveBeenCalledWith('user-1', 'file:///tmp/photo.jpg');
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
-      avatarUrl:
-        'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg?v=1',
+      avatarUrl: `${AVATAR}?v=1`,
     });
-
-    const image = screen.getByTestId('profile-avatar').findByType(Image);
-    expect(image.props.source).toEqual({
-      uri: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg?v=1',
-    });
-  });
-
-  it('changing an existing photo replaces it (same Choose Photo action, new upload)', async () => {
-    mockFetchMyProfile.mockResolvedValue({
-      ...baseProfile,
-      avatarUrl:
-        'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg?v=1',
-    });
-    mockLaunchImageLibraryAsync.mockResolvedValue({
-      canceled: false,
-      assets: [{ uri: 'file:///tmp/new-photo.jpg' }],
-    });
-    mockUploadAvatar.mockResolvedValue(
-      'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg?v=2',
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-avatar').findByType(Image).props.source).toEqual({
+        uri: `${AVATAR}?v=1`,
+      }),
     );
-    mockUpdateMyProfile.mockResolvedValue({
-      ...baseProfile,
-      avatarUrl:
-        'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg?v=2',
-    });
-    renderProfile();
-    await screen.findByTestId('profile-display-name');
-
-    fireEvent.press(screen.getByTestId('profile-avatar'));
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('profile-avatar-choose-photo'));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    const image = screen.getByTestId('profile-avatar').findByType(Image);
-    expect(image.props.source).toEqual({
-      uri: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg?v=2',
-    });
   });
 
   it('removing the photo deletes the file and clears the profile field, reverting to the fallback', async () => {
-    mockFetchMyProfile.mockResolvedValue({
-      ...baseProfile,
-      avatarUrl: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
-    });
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, avatarUrl: AVATAR });
     mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, avatarUrl: null });
     renderProfile();
-    await screen.findByTestId('profile-display-name');
 
-    fireEvent.press(screen.getByTestId('profile-avatar'));
+    fireEvent.press(await screen.findByTestId('profile-avatar'));
     await act(async () => {
       fireEvent.press(screen.getByTestId('profile-avatar-remove-photo'));
       await Promise.resolve();
@@ -448,15 +589,13 @@ describe('ProfileScreen profile picture', () => {
 
     expect(mockRemoveAvatarFile).toHaveBeenCalledWith('user-1');
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', { avatarUrl: null });
-    expect(screen.getByTestId('profile-avatar')).toHaveTextContent(/H/);
+    await waitFor(() => expect(screen.getByTestId('profile-avatar')).toHaveTextContent(/H/));
   });
 
   it('does nothing when the picker is cancelled', async () => {
-    mockLaunchImageLibraryAsync.mockResolvedValue({ canceled: true, assets: null });
     renderProfile();
-    await screen.findByTestId('profile-display-name');
 
-    fireEvent.press(screen.getByTestId('profile-avatar'));
+    fireEvent.press(await screen.findByTestId('profile-avatar'));
     await act(async () => {
       fireEvent.press(screen.getByTestId('profile-avatar-choose-photo'));
       await Promise.resolve();
@@ -473,9 +612,8 @@ describe('ProfileScreen profile picture', () => {
     });
     mockUploadAvatar.mockRejectedValue(new Error('Upload failed: network error'));
     renderProfile();
-    await screen.findByTestId('profile-display-name');
 
-    fireEvent.press(screen.getByTestId('profile-avatar'));
+    fireEvent.press(await screen.findByTestId('profile-avatar'));
     await act(async () => {
       fireEvent.press(screen.getByTestId('profile-avatar-choose-photo'));
       await Promise.resolve();
@@ -492,9 +630,8 @@ describe('ProfileScreen profile picture', () => {
   it('shows an error when photo library permission is denied, without opening the picker', async () => {
     mockRequestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: false });
     renderProfile();
-    await screen.findByTestId('profile-display-name');
 
-    fireEvent.press(screen.getByTestId('profile-avatar'));
+    fireEvent.press(await screen.findByTestId('profile-avatar'));
     await act(async () => {
       fireEvent.press(screen.getByTestId('profile-avatar-choose-photo'));
       await Promise.resolve();
@@ -504,282 +641,5 @@ describe('ProfileScreen profile picture', () => {
       /Photo library permission is required/,
     );
     expect(mockLaunchImageLibraryAsync).not.toHaveBeenCalled();
-  });
-});
-
-describe('ProfileScreen lifetime stats', () => {
-  it('computes Workouts/Total Sets/Total Volume from real data, not hardcoded values', async () => {
-    renderProfile();
-
-    expect(await screen.findByTestId('profile-stat-workouts')).toHaveTextContent(/2/);
-    expect(screen.getByTestId('profile-stat-sets')).toHaveTextContent(/2/);
-    // 100*5 + 60*10 = 1100 kg
-    expect(screen.getByTestId('profile-stat-volume')).toHaveTextContent(/1,100/);
-  });
-
-  it('shows an error without crashing when the lifetime stats fetch fails', async () => {
-    mockFetchAllCompletedWorkouts.mockRejectedValue(new Error('Network down'));
-    renderProfile();
-
-    expect(await screen.findByTestId('profile-stats-error')).toHaveTextContent('Network down');
-    expect(screen.getByTestId('profile-display-name')).toBeTruthy();
-  });
-});
-
-// This is a fitness profile, not a social one -- no Friends/followers
-// section exists on this screen at all now (previously a placeholder),
-// per the explicit redesign layout (header -> stats -> Edit Profile ->
-// tabs -> tab content -> bottom nav, nothing else).
-describe('ProfileScreen followers', () => {
-  it('shows how many follow you and how many you follow, each opening its list', async () => {
-    renderProfile();
-
-    expect(await screen.findByTestId('profile-followers')).toHaveTextContent(/4.*Followers/);
-    expect(screen.getByTestId('profile-following')).toHaveTextContent(/2.*Following/);
-    fireEvent.press(screen.getByTestId('profile-followers'));
-    expect(mockNavigate).toHaveBeenCalledWith('FollowList', {
-      userId: 'user-1',
-      which: 'followers',
-    });
-    // Still no friends feed of its own: that's Feed's.
-    expect(screen.queryByTestId('profile-friends-card')).toBeNull();
-  });
-});
-
-describe('ProfileScreen Workouts tab', () => {
-  it('shows real workout history by default, with real set count and volume, not a photo grid', async () => {
-    renderProfile();
-
-    const card = await screen.findByTestId('profile-workout-w1');
-    expect(within(card).getByText('Push Day')).toBeTruthy();
-    expect(within(card).getByText(/12 sets/)).toBeTruthy();
-    // 1250 kg, default 'kg' unit from baseProfile
-    expect(within(card).getByText(/1,250/)).toBeTruthy();
-  });
-
-  it('shows an empty state instead of fabricating workout posts when there is no history', async () => {
-    mockEnrichWorkoutSummaries.mockResolvedValue([]);
-    renderProfile();
-
-    expect(await screen.findByTestId('profile-workouts-empty')).toBeTruthy();
-  });
-
-  it('navigates to the existing workout detail experience when a row is pressed', async () => {
-    renderProfile();
-    const card = await screen.findByTestId('profile-workout-w1');
-
-    fireEvent.press(card);
-
-    expect(mockNavigate).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' });
-  });
-
-  it('navigates to WorkoutHistory when View All Workouts is pressed', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-
-    fireEvent.press(screen.getByTestId('profile-view-all-workouts'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('WorkoutHistory');
-  });
-});
-
-describe('ProfileScreen Stats tab', () => {
-  it('shows real lifetime numbers via StatTile, reusing the same lifetimeStats calculation', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-
-    fireEvent.press(screen.getByTestId('profile-tabs-Stats'));
-
-    const workoutsTile = await screen.findByTestId('profile-stat-tile-workouts');
-    expect(within(workoutsTile).getByText('2')).toBeTruthy();
-    const setsTile = screen.getByTestId('profile-stat-tile-sets');
-    expect(within(setsTile).getByText('2')).toBeTruthy();
-  });
-
-  it('shows the weekly trend charts, reflecting real data rather than a fabricated placeholder', async () => {
-    // Performed "now" (real clock) so the weekly bucketing always lands
-    // inside the trend window regardless of when this test actually runs --
-    // a fixed historical fixture date would fall outside an 8-week trailing
-    // window depending on wall-clock time, making the assertion flaky.
-    const now = new Date();
-    mockFetchAllCompletedWorkouts.mockResolvedValue([
-      {
-        id: 'w1',
-        name: 'Push',
-        performedAt: now.toISOString(),
-        completedAt: now.toISOString(),
-        workoutSplitDayId: null,
-      },
-    ]);
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-
-    fireEvent.press(screen.getByTestId('profile-tabs-Stats'));
-
-    expect(await screen.findByTestId('profile-trend-workouts-total')).toHaveTextContent(
-      /1 workout/,
-    );
-    expect(screen.getByTestId('profile-trend-volume-total')).toBeTruthy();
-    expect(screen.getByTestId('profile-trend-sets-total')).toBeTruthy();
-  });
-
-  it("shows This Week's real workout count -- the current (most recent) week's bucket, not a lifetime total", async () => {
-    // Same "performed now" reasoning as the trend-chart test above.
-    const now = new Date();
-    mockFetchAllCompletedWorkouts.mockResolvedValue([
-      {
-        id: 'w1',
-        name: 'Push',
-        performedAt: now.toISOString(),
-        completedAt: now.toISOString(),
-        workoutSplitDayId: null,
-      },
-    ]);
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-
-    fireEvent.press(screen.getByTestId('profile-tabs-Stats'));
-
-    expect(await screen.findByTestId('profile-this-week-workouts')).toHaveTextContent(/^1/);
-  });
-
-  it('shows an empty message instead of an empty chart when there is no training data at all', async () => {
-    mockFetchAllCompletedWorkouts.mockResolvedValue([]);
-    mockFetchAllExerciseHistory.mockResolvedValue([]);
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-
-    fireEvent.press(screen.getByTestId('profile-tabs-Stats'));
-
-    expect(await screen.findByTestId('profile-trend-workouts-empty')).toBeTruthy();
-    expect(screen.queryByTestId('profile-trend-workouts-chart')).toBeNull();
-  });
-
-  it('shows real most-trained muscle groups, most-trained first, using the existing calculation', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-
-    fireEvent.press(screen.getByTestId('profile-tabs-Stats'));
-
-    // Fixture has 1 chest set and 1 quadriceps set -- both real, tied counts.
-    expect(await screen.findByTestId('profile-muscle-group-chest')).toBeTruthy();
-    expect(screen.getByTestId('profile-muscle-group-quadriceps')).toBeTruthy();
-  });
-});
-
-describe('ProfileScreen PRs tab', () => {
-  it('reuses the existing PRsSection component with real PR data', async () => {
-    mockFetchAllRepPRs.mockResolvedValue([
-      {
-        reps: 5,
-        bestWeightKg: 100,
-        sourceSetId: 's1',
-        achievedAt: '2026-09-01T00:00:00Z',
-        exerciseId: 'ex1',
-        exerciseName: 'Bench Press',
-        muscleGroup: 'chest',
-      },
-    ]);
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-
-    fireEvent.press(screen.getByTestId('profile-tabs-PRs'));
-
-    expect(await screen.findByTestId('progress-prs-count')).toHaveTextContent('1 PR');
-  });
-
-  // Regression guard: the whole page is one vertical ScrollView, so
-  // PRsSection must never render its own FlatList here (RN's documented
-  // "VirtualizedLists should never be nested inside plain ScrollViews with
-  // the same orientation" warning/bug) -- see PRsSection's `scrollable`
-  // prop, passed false from this screen.
-  it('never nests a FlatList inside the page-level ScrollView, even on the PRs tab', async () => {
-    mockFetchAllRepPRs.mockResolvedValue([
-      {
-        reps: 5,
-        bestWeightKg: 100,
-        sourceSetId: 's1',
-        achievedAt: '2026-09-01T00:00:00Z',
-        exerciseId: 'ex1',
-        exerciseName: 'Bench Press',
-        muscleGroup: 'chest',
-      },
-    ]);
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-
-    fireEvent.press(screen.getByTestId('profile-tabs-PRs'));
-    await screen.findByTestId('progress-prs-count');
-
-    expect(screen.UNSAFE_queryAllByType(FlatList)).toHaveLength(0);
-  });
-});
-
-describe('ProfileScreen navigation', () => {
-  // The bottom nav is no longer owned by this screen -- it's mounted once
-  // at the app-shell level (App.tsx) so it persists across every screen
-  // instead of disappearing on navigation; see App.test.tsx's "Persistent
-  // bottom navigation" coverage for its active-tab/navigate behavior.
-  it('does not render its own bottom nav', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-display-name');
-
-    expect(screen.queryByTestId('bottom-nav-bar')).toBeNull();
-  });
-
-  it('reloads on focus', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-display-name');
-
-    await waitFor(() => expect(mockFetchMyProfile).toHaveBeenCalled());
-  });
-});
-
-describe('ProfileScreen -- header, widgets, one primary action', () => {
-  it('is a stack of widgets: the identity hero, the stats card, the nutrition card, and the active tab in its own card', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-
-    let cards = screen.UNSAFE_queryAllByType(AppCard);
-    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false]);
-    expect(
-      within(screen.getByTestId('profile-tab-content')).getByTestId('profile-workout-w1'),
-    ).toBeTruthy();
-
-    for (const tab of ['Stats', 'PRs']) {
-      fireEvent.press(screen.getByTestId(`profile-tabs-${tab}`));
-      cards = screen.UNSAFE_queryAllByType(AppCard);
-      expect(cards).toHaveLength(4);
-    }
-  });
-
-  it('puts a named Settings action in the shared header and offers Edit Profile as one outlined button', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-
-    expect(screen.getByTestId('profile-open-settings').props.accessibilityLabel).toBe('Settings');
-    const edit = StyleSheet.flatten(screen.getByTestId('profile-edit').props.style);
-    expect(edit.backgroundColor).toBeUndefined();
-    expect(edit.borderWidth).toBe(1);
-    expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(0);
-  });
-
-  it('shows each workout as a row, separated by hairlines, none above the first', async () => {
-    renderProfile();
-
-    const first = StyleSheet.flatten((await screen.findByTestId('profile-workout-w1')).props.style);
-    expect(first.borderTopWidth).toBeUndefined();
-    expect(screen.getByTestId('profile-workout-w1').props.accessibilityRole).toBe('button');
-  });
-
-  it('renders no bare text outside <Text> on any tab', async () => {
-    renderProfile();
-    await screen.findByTestId('profile-workout-w1');
-    expectNoBareText();
-
-    for (const tab of ['Stats', 'PRs']) {
-      fireEvent.press(screen.getByTestId(`profile-tabs-${tab}`));
-      expectNoBareText();
-    }
   });
 });

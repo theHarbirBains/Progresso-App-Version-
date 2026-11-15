@@ -93,7 +93,7 @@ describe('PeopleService', () => {
       client.queue('follows', { data: null, error: null, count: 12 });
       client.queue('follows', { data: null, error: null, count: 3 });
       client.queue('users', {
-        data: { bio: 'Building strength.', fitness_goals: ['build_muscle', 'get_stronger'] },
+        data: { bio: 'Building strength.' },
         error: null,
       });
       client.queue('follows', {
@@ -140,7 +140,6 @@ describe('PeopleService', () => {
         followerCount: 12,
         followingCount: 3,
         bio: 'Building strength.',
-        fitnessGoals: ['build_muscle', 'get_stronger'],
         // Jo: followed by you, following Sam -- never Sam, never anyone blocked.
         mutuals: {
           count: 1,
@@ -188,7 +187,7 @@ describe('PeopleService', () => {
       client.queue('follows', { data: [], error: null });
       client.queue('follows', { data: null, error: null, count: 12 });
       client.queue('follows', { data: null, error: null, count: 3 });
-      client.queue('users', { data: { bio: null, fitness_goals: ['lose_fat'] }, error: null });
+      client.queue('users', { data: { bio: null }, error: null });
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, SAM);
@@ -197,7 +196,6 @@ describe('PeopleService', () => {
       expect(profile).toMatchObject({
         followStatus: 'pending',
         bio: null,
-        fitnessGoals: ['lose_fat'],
         mutuals: { count: 0, people: [] },
         canSeeActivity: false,
         stats: null,
@@ -212,7 +210,7 @@ describe('PeopleService', () => {
       client.queue('users', { data: [user(ME, 'Me')], error: null });
       client.queue('follows', { data: null, error: null, count: 2 });
       client.queue('follows', { data: null, error: null, count: 5 });
-      client.queue('users', { data: { bio: null, fitness_goals: [] }, error: null });
+      client.queue('users', { data: { bio: null }, error: null });
       client.queue('workouts', { data: null, error: null, count: 3 });
       client.queue('workouts', { data: null, error: null, count: 1 });
       client.queue('rpc:person_profile_totals', { data: [], error: null });

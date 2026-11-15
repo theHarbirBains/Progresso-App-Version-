@@ -1,20 +1,16 @@
 import { StyleSheet } from 'react-native';
 import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
-// Profile-specific layout only -- everything reusable (cards, buttons,
-// section headers, stat blocks, segmented control) comes from src/design/
-// and src/progress/. This file exists for the handful of things unique to
-// this screen's composition, following the same per-screen-stylesheet
-// convention used throughout the app. The screen is a stack of widgets
-// (AppCards) `widgetGap` apart, same rhythm as the workout/nutrition tabs.
+// The You tab's own parts only (screens/ProfileScreen.tsx) -- the profile
+// itself is PersonProfilePage's (personProfileStyles.ts). Each part is its own
+// AppCard inside one of the page's tabs -- today's calories and macros, your
+// training, your records -- following the same per-screen-stylesheet
+// convention used throughout the app.
 export const profileStyles = StyleSheet.create({
-  scrollContent: {
-    paddingTop: spacing.sm,
-    gap: widgetGap,
-    // The persistent bottom nav (App.tsx) is a normal in-flow sibling now,
-    // not an overlay this screen has to leave room for -- this is just
-    // ordinary breathing room at the end of the scroll content.
-    paddingBottom: spacing.xxl,
+  // Above the page: a profile or a photo that didn't save, lined up with the
+  // page's own words.
+  notices: {
+    paddingHorizontal: spacing.lg,
   },
 
   errorText: {
@@ -23,91 +19,7 @@ export const profileStyles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
-  identityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  avatarWrap: {
-    position: 'relative',
-  },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarInitial: {
-    ...typeScale.display,
-  },
-  // Minimal camera badge signaling the avatar above is tappable -- the one
-  // small edit indicator DESIGN.md's icon system already supports (Feather,
-  // no new icon set), sized/positioned to sit just inside the avatar's own
-  // circle rather than a separate floating element.
-  avatarEditBadge: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 24,
-    height: 24,
-    borderRadius: radii.pill,
-    borderWidth: 2,
-    borderColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  identityBlock: {
-    flex: 1,
-  },
-  displayName: {
-    ...typeScale.screenTitle,
-    color: colors.textPrimary,
-  },
-  // "N workouts" under the display name -- Strava's own "3 activities" line,
-  // between the name and the (optional) @username.
-  activityCount: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  username: {
-    ...typeScale.callout,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-
-  editProfileWrap: {
-    marginBottom: spacing.xl,
-  },
-  // Followers and Following, each opening its list.
-  followCounts: {
-    flexDirection: 'row',
-    gap: spacing.xl,
-    marginBottom: spacing.lg,
-  },
-  followCount: {
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  followCountValue: {
-    ...typeScale.statSmall,
-    color: colors.textPrimary,
-  },
-  followCountLabel: {
-    ...typeScale.caption,
-    color: colors.textSecondary,
-  },
-
-  statsRow: {
-    flexDirection: 'row',
-    gap: widgetGap,
-  },
-
-  // Calories & Macros widget (always visible, above the tabs -- not gated
-  // behind a tab, same prominence as the lifetime stats card above it).
+  // Calories & Macros widget, on Overview.
   nutritionTitle: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
@@ -128,10 +40,6 @@ export const profileStyles = StyleSheet.create({
 
   section: {
     marginBottom: spacing.xl,
-  },
-
-  tabsWrap: {
-    marginBottom: spacing.xs,
   },
 
   emptyText: {
