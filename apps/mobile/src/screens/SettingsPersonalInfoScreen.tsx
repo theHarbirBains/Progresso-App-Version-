@@ -40,6 +40,7 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
 
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
+  const [bio, setBio] = useState('');
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('lb');
   const [heightUnit, setHeightUnit] = useState<HeightUnit>('ft_in');
 
@@ -60,6 +61,7 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
     hasSeededRef.current = true;
     setDisplayName(profile.displayName ?? '');
     setUsername(profile.username ?? '');
+    setBio(profile.bio ?? '');
     setWeightUnit(profile.weightUnit);
     setHeightUnit(profile.heightUnit);
   }, [profile]);
@@ -72,11 +74,13 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
       const updated = await updateProfile({
         displayName: displayName.trim(),
         username: username.trim() || undefined,
+        bio: bio.trim() || null,
         weightUnit,
         heightUnit,
       });
       setDisplayName(updated.displayName ?? '');
       setUsername(updated.username ?? '');
+      setBio(updated.bio ?? '');
       setSavedMessage('Saved');
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save');
@@ -167,6 +171,17 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
               autoCapitalize="none"
               value={username}
               onChangeText={(text) => setUsername(text.toLowerCase())}
+            />
+
+            {/* Shown under their name on their profile, to anyone who opens it. */}
+            <TextInput
+              testID="account-bio"
+              label="Bio"
+              placeholder="Building strength. Chasing progress."
+              value={bio}
+              onChangeText={setBio}
+              multiline
+              maxLength={80}
             />
           </View>
         </Section>

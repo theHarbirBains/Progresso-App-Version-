@@ -35,6 +35,8 @@ export interface ProfileResponse {
   id: string;
   displayName: string | null;
   username: string | null;
+  /** A line about themselves on their profile, for anyone who opens it -- null with none. */
+  bio: string | null;
   weightUnit: 'kg' | 'lb';
   workoutAccentColor: string | null;
   nutritionAccentColor: string | null;
@@ -79,6 +81,8 @@ export interface ProfileResponse {
 
 export interface UpdateProfileInput {
   displayName?: string;
+  /** 80 characters at most; blank or null clears it. */
+  bio?: string | null;
   username?: string;
   weightUnit?: 'kg' | 'lb';
   workoutAccentColor?: string;

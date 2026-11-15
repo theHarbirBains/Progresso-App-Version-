@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, Share } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import {
@@ -35,6 +35,7 @@ const mockNavigate = jest.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navigation: any = {
   navigate: mockNavigate,
+  push: jest.fn(),
   goBack: jest.fn(),
   addListener: jest.fn((event: string, cb: () => void) => {
     if (event === 'focus') cb();
@@ -54,8 +55,23 @@ function profile(extra: object = {}) {
     requestId: null,
     followerCount: 12,
     followingCount: 3,
+    bio: 'Building strength. Chasing progress.',
+    fitnessGoals: ['build_muscle', 'get_stronger'],
+    mutuals: {
+      count: 4,
+      people: [
+        { id: 'jo', username: 'jo', displayName: 'Jo Park', avatarUrl: null },
+        { id: 'al', username: 'al', displayName: 'Al Kim', avatarUrl: null },
+      ],
+    },
     canSeeActivity: true,
-    stats: { workouts: 40, lastThirtyDays: 9 },
+    stats: {
+      workouts: 120,
+      lastThirtyDays: 9,
+      totalVolumeKg: 19400,
+      prCount: 24,
+      bestMonthWorkouts: 14,
+    },
     bestLifts: [
       {
         exerciseId: 'ex-row',
@@ -109,21 +125,131 @@ beforeEach(() => {
 });
 
 describe('PersonProfileScreen', () => {
-  it('shows someone you follow in full: who they are, counts, stats, heaviest lifts and workouts', async () => {
+  it('shows who they are: name, @username, bio, fitness goals, counts and mutual friends', async () => {
     renderScreen();
 
     expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Sam Lee');
+    expect(screen.getByTestId('person-profile-identity')).toHaveTextContent(/@sam/);
+    expect(screen.getByTestId('person-profile-bio')).toHaveTextContent(
+      'Building strength. Chasing progress.',
+    );
+    expect(screen.getByTestId('person-profile-goals')).toHaveTextContent(
+      /Build Muscle.*Get Stronger/,
+    );
     expect(screen.getByTestId('person-profile-follows-you')).toBeTruthy();
     expect(screen.getByTestId('person-profile-count-followers')).toHaveTextContent(/12.*Followers/);
     expect(screen.getByTestId('person-profile-count-following')).toHaveTextContent(/3.*Following/);
-    expect(screen.getByTestId('person-profile-stat-workouts')).toHaveTextContent(/40/);
-    expect(screen.getByTestId('person-profile-stat-recent')).toHaveTextContent(/9/);
+    expect(screen.getByTestId('person-profile-mutuals')).toHaveTextContent(/4 mutual friends/);
+    expect(screen.getByTestId('person-profile-following')).toBeTruthy();
+    expectNoBareText();
+  });
+
+  it('lists the mutual friends, each opening their profile', async () => {
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('person-profile-mutuals'));
+
+    expect(screen.getByTestId('person-profile-mutuals-sheet')).toHaveTextContent(
+      /Mutual Friends.*People you follow who follow Sam Lee/,
+    );
+    fireEvent.press(screen.getByTestId('person-profile-mutual-jo'));
+    expect(navigation.push).toHaveBeenCalledWith('PersonProfile', { userId: 'jo' });
+  });
+
+  it('has no mutual friends, bio or goals line when there are none', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({ mutuals: { count: 0, people: [] }, bio: null, fitnessGoals: [] }),
+    );
+    renderScreen();
+
+    await screen.findByTestId('person-profile-name');
+    expect(screen.queryByTestId('person-profile-mutuals')).toBeNull();
+    expect(screen.queryByTestId('person-profile-bio')).toBeNull();
+    expect(screen.queryByTestId('person-profile-goals')).toBeNull();
+  });
+
+  it('shows the four figures, in your unit: workouts, the last 30 days, PRs and total volume', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('person-profile-stat-workouts')).toHaveTextContent(/120/);
+    expect(screen.getByTestId('person-profile-stat-recent')).toHaveTextContent(/9.*Last 30 Days/);
+    expect(screen.getByTestId('person-profile-stat-prs')).toHaveTextContent(/24.*PRs/);
+    expect(screen.getByTestId('person-profile-stat-volume')).toHaveTextContent(
+      /19\.4K kg.*Total Volume/,
+    );
+  });
+
+  it('opens on Overview: their badges and latest workout', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('person-profile-achievements')).toBeTruthy();
+    // 120 workouts, 14 in a month, 24 PRs, 19,400 kg: the best of each kind, then what's next.
+    expect(screen.getByTestId('person-profile-badge-workouts-100')).toHaveTextContent(
+      /100 Workouts$/,
+    );
+    expect(screen.getByTestId('person-profile-badge-consistency')).toBeTruthy();
+    expect(screen.getByTestId('person-profile-badge-prs-10')).toHaveTextContent(/10 PRs$/);
+    expect(screen.getByTestId('person-profile-badge-workouts-250')).toBeTruthy();
+    expect(await screen.findByTestId('person-profile-workout-w1')).toHaveTextContent(/Pull Day/);
+  });
+
+  it('lists every badge, earned or not, with what each takes', async () => {
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('person-profile-badges-all'));
+
+    expect(screen.getByTestId('person-profile-badges-sheet')).toHaveTextContent(/6 of 13 earned/);
+    expect(screen.getByTestId('person-profile-badges-workouts-100')).toHaveTextContent(
+      /100 Workouts.*Finish 100 workouts.*Earned/,
+    );
+    expect(screen.getByTestId('person-profile-badges-lifted-kg-50000')).toHaveTextContent(
+      /50K kg Lifted.*Lift 50K kg in all/,
+    );
+    expect(screen.getByTestId('person-profile-badges-lifted-kg-50000')).not.toHaveTextContent(
+      /Earned/,
+    );
+  });
+
+  it('shows their heaviest lifts under PRs, every workout under Workouts, and Stats', async () => {
+    (getPersonWorkouts as jest.Mock).mockResolvedValue({ items: [workoutItem], hasMore: true });
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('person-profile-tab-prs'));
     expect(screen.getByTestId('person-profile-lift-ex-row')).toHaveTextContent(
       /Seated Row.*Downtown · V-handle.*100 kg × 5/,
     );
-    expect(await screen.findByTestId('person-profile-workout-w1')).toHaveTextContent(/Pull Day/);
-    expect(screen.getByTestId('person-profile-following')).toBeTruthy();
-    expectNoBareText();
+
+    fireEvent.press(screen.getByTestId('person-profile-tab-workouts'));
+    expect(screen.getByTestId('person-profile-workout-w1')).toBeTruthy();
+    expect(screen.getByTestId('person-profile-load-more')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('person-profile-tab-stats'));
+    expect(screen.getByTestId('person-profile-stats-month')).toHaveTextContent(/14.*Busiest Month/);
+    expect(screen.getByTestId('person-profile-stats-badges')).toHaveTextContent(/6 of 13/);
+  });
+
+  it('shares their profile', async () => {
+    const share = jest
+      .spyOn(Share, 'share')
+      .mockResolvedValue({ action: 'sharedAction', activityType: undefined });
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('person-profile-share'));
+
+    expect(share).toHaveBeenCalledWith({ message: 'Check out Sam Lee on Progresso (@sam).' });
+    share.mockRestore();
+  });
+
+  it('offers Edit Profile on your own, in place of Follow', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({ isSelf: true, followStatus: 'none', followsYou: false }),
+    );
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('person-profile-edit'));
+    expect(mockNavigate).toHaveBeenCalledWith('SettingsPersonalInfo');
+    expect(screen.queryByTestId('person-profile-follow')).toBeNull();
+    expect(screen.queryByTestId('person-profile-more')).toBeNull();
   });
 
   it('opens their workouts read-only, and who follows them', async () => {
@@ -153,14 +279,17 @@ describe('PersonProfileScreen', () => {
         bestLifts: null,
       }),
     );
+    // Asked for alongside the profile, and refused until they accept.
+    (getPersonWorkouts as jest.Mock).mockRejectedValue(new Error('Follow them to see'));
     (sendFollowRequest as jest.Mock).mockResolvedValue({ status: 'pending' });
     renderScreen();
 
     expect(await screen.findByTestId('person-profile-private')).toHaveTextContent(
       /Follow Sam to see their training/,
     );
-    expect(getPersonWorkouts).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('person-profile-stats')).toBeNull();
+    expect(screen.queryByTestId('person-profile-error')).toBeNull();
+    expect(screen.queryByTestId('person-profile-tiles')).toBeNull();
+    expect(screen.queryByTestId('person-profile-tab')).toBeNull();
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('person-profile-follow'));

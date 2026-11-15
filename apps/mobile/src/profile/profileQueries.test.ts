@@ -51,6 +51,7 @@ const row = {
   notify_likes: false,
   notify_comments: true,
   findable_by_email: null,
+  bio: 'Chasing progress.',
 };
 
 beforeEach(() => {
@@ -104,6 +105,7 @@ describe('fetchMyProfile', () => {
       notifyComments: true,
       // On unless turned off.
       findableByEmail: true,
+      bio: 'Chasing progress.',
     });
   });
 

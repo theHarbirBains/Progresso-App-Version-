@@ -17,6 +17,18 @@ export interface BestLift {
   performedAt: string;
 }
 
+export interface ProfileStats {
+  /** Finished workouts in all, and in the last 30 days. */
+  workouts: number;
+  lastThirtyDays: number;
+  /** Everything lifted: each finished weighted set's weight x reps. */
+  totalVolumeKg: number;
+  /** Rep-count PRs and true 1RMs held now. */
+  prCount: number;
+  /** The most workouts finished in one calendar month. */
+  bestMonthWorkouts: number;
+}
+
 export interface PersonProfile {
   user: FollowUser;
   isSelf: boolean;
@@ -28,9 +40,15 @@ export interface PersonProfile {
   requestId: string | null;
   followerCount: number;
   followingCount: number;
+  /** A line about themselves -- null with none. */
+  bio: string | null;
+  /** Their fitness goals, in the order picked (onboarding's FITNESS_GOAL_OPTIONS). */
+  fitnessGoals: string[];
+  /** The people you follow who follow them too: how many, and up to 50 of them. */
+  mutuals: { count: number; people: FollowUser[] };
   /** Whether you can see their workouts, stats and lifts: yours, or they accepted your follow. */
   canSeeActivity: boolean;
-  stats: { workouts: number; lastThirtyDays: number } | null;
+  stats: ProfileStats | null;
   bestLifts: BestLift[] | null;
 }
 

@@ -110,9 +110,27 @@ describe('SettingsPersonalInfoScreen', () => {
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
       displayName: 'New Name',
       username: 'athlete1',
+      bio: null,
       weightUnit: 'lb',
       heightUnit: 'ft_in',
     });
+  });
+
+  it('saves a bio for their profile, trimmed, 80 characters at most', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, bio: 'Chasing progress.' });
+    renderScreen();
+    await screen.findByTestId('account-display-name');
+
+    expect(screen.getByTestId('account-bio')).toHaveProp('maxLength', 80);
+    fireEvent.changeText(screen.getByTestId('account-bio'), '  Chasing progress.  ');
+    fireEvent.press(screen.getByTestId('account-save'));
+
+    expect(await screen.findByTestId('account-saved')).toBeTruthy();
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith(
+      'token-123',
+      expect.objectContaining({ bio: 'Chasing progress.' }),
+    );
+    expect(screen.getByTestId('account-bio')).toHaveProp('value', 'Chasing progress.');
   });
 
   it('shows a save error and does not show the saved confirmation on failure', async () => {

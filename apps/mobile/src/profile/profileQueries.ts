@@ -10,7 +10,7 @@ const PROFILE_COLUMNS =
   'apple_health_preference, onboarding_completed_at, activity_level, ' +
   'referral_source, country, average_workout_length, training_comfort, rep_range_min, ' +
   'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier, ' +
-  'notify_follows, notify_likes, notify_comments, findable_by_email';
+  'notify_follows, notify_likes, notify_comments, findable_by_email, bio';
 
 interface ProfileRow {
   weight_unit: ProfileResponse['weightUnit'];
@@ -48,6 +48,7 @@ interface ProfileRow {
   notify_likes: boolean | null;
   notify_comments: boolean | null;
   findable_by_email: boolean | null;
+  bio: string | null;
 }
 
 function toProfile(userId: string, row: ProfileRow): ProfileResponse {
@@ -90,6 +91,7 @@ function toProfile(userId: string, row: ProfileRow): ProfileResponse {
     notifyLikes: row.notify_likes !== false,
     notifyComments: row.notify_comments !== false,
     findableByEmail: row.findable_by_email !== false,
+    bio: row.bio ?? null,
   };
 }
 
