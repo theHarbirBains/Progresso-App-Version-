@@ -18,13 +18,15 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useProfile } from '../profile/ProfileProvider';
 import { useAvatarPhoto } from '../profile/useAvatarPhoto';
 import { useProgressTheme } from '../progress/useProgressTheme';
+import { formatPhone, phoneCountry, toE164 } from '../lib/phoneNumbers';
 import { settingsStyles as styles } from '../settings/settingsStyles';
 
 type Props = RootStackScreenProps<'SettingsPersonalInfo'>;
 
 /**
  * Profile & Personal Information: identity (picture, first and last name
- * -- both needed to save, as at sign-up -- username and bio) and the measurement units that apply across the whole app,
+ * -- both needed to save, as at sign-up -- username, phone number -- needed
+ * to save too, never shown to anyone -- and bio) and the measurement units that apply across the whole app,
  * plus a link to the existing body-measurements editor -- not a second
  * copy of it. Gender/birthday/height/weight/activity level are already
  * fully editable on CalorieEstimationScreen (reached today only from
@@ -40,6 +42,7 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
 
   const [displayName, setDisplayName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('lb');
@@ -62,6 +65,9 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
     hasSeededRef.current = true;
     setDisplayName(profile.displayName ?? '');
     setLastName(profile.lastName ?? '');
+    setPhone(
+      profile.phoneNumber ? formatPhone(profile.phoneNumber, phoneCountry(profile.country)) : '',
+    );
     setUsername(profile.username ?? '');
     setBio(profile.bio ?? '');
     setWeightUnit(profile.weightUnit);
@@ -81,11 +87,17 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
       setSaveError('Add your last name.');
       return;
     }
+    const phoneNumber = toE164(phone, phoneCountry(profile?.country));
+    if (!phoneNumber) {
+      setSaveError(phone.trim() ? 'Enter a valid phone number.' : 'Add your phone number.');
+      return;
+    }
     setSaving(true);
     try {
       const updated = await updateProfile({
         displayName: displayName.trim(),
         lastName: lastName.trim(),
+        phoneNumber,
         username: username.trim() || undefined,
         bio: bio.trim() || null,
         weightUnit,
@@ -93,6 +105,9 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
       });
       setDisplayName(updated.displayName ?? '');
       setLastName(updated.lastName ?? '');
+      if (updated.phoneNumber) {
+        setPhone(formatPhone(updated.phoneNumber, phoneCountry(updated.country)));
+      }
       setUsername(updated.username ?? '');
       setBio(updated.bio ?? '');
       setSavedMessage('Saved');
@@ -188,6 +203,17 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
               maxLength={50}
               value={lastName}
               onChangeText={setLastName}
+            />
+
+            <TextInput
+              testID="account-phone"
+              label="Phone Number"
+              placeholder="Your mobile number"
+              keyboardType="phone-pad"
+              autoComplete="tel"
+              value={phone}
+              onChangeText={setPhone}
+              helperText="So friends with your number in their contacts can find you. Never shown to anyone."
             />
 
             <TextInput

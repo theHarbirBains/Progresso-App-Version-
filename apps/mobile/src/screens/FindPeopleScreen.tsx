@@ -6,7 +6,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from 'react';
-import { ActivityIndicator, Share, View } from 'react-native';
+import { Share, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -23,8 +23,8 @@ import { colors } from '../design/theme';
 import { UnderlineTabs } from '../design/UnderlineTabs';
 import {
   listFollowRequests,
+  listPersonFollowers,
   listPersonFollowing,
-  listSuggestedUsers,
   respondToFollowRequest,
   searchUsers,
   sendFollowRequest,
@@ -34,8 +34,8 @@ import {
   type FollowUser,
 } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
-import { ContactsFinder } from '../social/ContactsFinder';
-import { PeopleList } from '../social/PeopleList';
+import { ContactSuggestions } from '../social/ContactSuggestions';
+import { PeopleList, personLabel } from '../social/PeopleList';
 import { findPeopleStyles as styles } from './findPeopleStyles';
 import { SkeletonRows } from '../design/Skeleton';
 import { useAppTheme } from '../theme/appThemeContext';
@@ -43,7 +43,7 @@ import { useDebouncedValue } from '../lib/useDebouncedValue';
 
 type Props = RootStackScreenProps<'FindPeople'>;
 type FindPeopleTab = 'friends' | 'following' | 'requests';
-type FriendsSubTab = 'suggested' | 'contacts';
+type FriendsSubTab = 'friends' | 'suggested';
 
 const INVITE_MESSAGE = 'Join me on Progresso — track your workouts and nutrition.';
 
@@ -62,10 +62,13 @@ function rowLabel(user: FollowUser): { title: string; subtitle: string | undefin
  * own dark/monochrome theme and component set (AppCard/ListRow/Button),
  * never the source app's own colors.
  *
- * Friends tab: search when typing; when empty, a Suggested/Contacts
- * sub-row. Suggested is real (recency-ranked users you have no existing
- * follow row toward -- see FollowsService.listSuggested); Contacts finds the
- * people in your phone's contacts by email (social/ContactsFinder.tsx).
+ * Friends tab: search when typing; when empty, a Your Friends / Suggested
+ * sub-row. Your Friends is everyone who follows you or whom you follow (an
+ * accepted follow either way), each with Follow (when you don't follow them
+ * back), Requested or Following. Suggested is the people in your phone's
+ * contacts who are on Progresso and whom you don't follow yet, found by email
+ * or phone number (social/ContactSuggestions.tsx). Read each time the page is
+ * shown.
  *
  * Following tab: everyone you follow (whose follow was accepted), each opening their profile,
  * with Following beside them to unfollow. Read each time the page is shown.
@@ -90,18 +93,16 @@ export function FindPeopleScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (askedTab) setTab(askedTab);
   }, [askedTab]);
-  const [friendsSubTab, setFriendsSubTab] = useState<FriendsSubTab>('suggested');
+  const [friendsSubTab, setFriendsSubTab] = useState<FriendsSubTab>('friends');
 
   const [requests, setRequests] = useState<FollowRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestsError, setRequestsError] = useState<string | null>(null);
 
+  // Who you follow, and your friends: them and everyone who follows you.
   const [following, setFollowing] = useState<FollowSearchResult[] | null>(null);
+  const [friends, setFriends] = useState<FollowSearchResult[] | null>(null);
   const [followingError, setFollowingError] = useState<string | null>(null);
-
-  const [suggested, setSuggested] = useState<FollowSearchResult[]>([]);
-  const [suggestedLoading, setSuggestedLoading] = useState(true);
-  const [suggestedError, setSuggestedError] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState('');
   const search = useDebouncedValue(searchInput.trim());
@@ -133,33 +134,36 @@ export function FindPeopleScreen({ navigation, route }: Props) {
     if (!accessToken || !userId) return;
     setFollowingError(null);
     try {
-      setFollowing(await listPersonFollowing(accessToken, userId));
+      const [followers, followed] = await Promise.all([
+        listPersonFollowers(accessToken, userId),
+        listPersonFollowing(accessToken, userId),
+      ]);
+      setFollowing(followed);
+      // Each once, by name -- each carrying your own follow of them, so someone who follows you
+      // whom you don't follow back offers Follow.
+      const byId = new Map<string, FollowSearchResult>();
+      for (const person of [...followed, ...followers]) {
+        if (!byId.has(person.user.id)) byId.set(person.user.id, person);
+      }
+      setFriends(
+        Array.from(byId.values()).sort((a, b) =>
+          personLabel(a.user).title.localeCompare(personLabel(b.user).title, undefined, {
+            sensitivity: 'base',
+          }),
+        ),
+      );
     } catch (err) {
-      setFollowingError(err instanceof Error ? err.message : 'Failed to load who you follow');
+      setFollowingError(err instanceof Error ? err.message : 'Failed to load your friends');
     }
   }, [accessToken, userId]);
-
-  const loadSuggested = useCallback(async () => {
-    if (!accessToken) return;
-    setSuggestedLoading(true);
-    setSuggestedError(null);
-    try {
-      setSuggested(await listSuggestedUsers(accessToken));
-    } catch (err) {
-      setSuggestedError(err instanceof Error ? err.message : 'Failed to load suggested people');
-    } finally {
-      setSuggestedLoading(false);
-    }
-  }, [accessToken]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       void loadRequests();
       void loadFollowing();
-      void loadSuggested();
     });
     return unsubscribe;
-  }, [navigation, loadRequests, loadFollowing, loadSuggested]);
+  }, [navigation, loadRequests, loadFollowing]);
 
   const runSearch = useCallback(async () => {
     if (!search) {
@@ -207,10 +211,7 @@ export function FindPeopleScreen({ navigation, route }: Props) {
     }
   }
 
-  // Shared by the search-results list and the suggested-people list -- both
-  // are the same FollowSearchResult shape and Follow/Requested/Following
-  // lifecycle, just different data sources, so a follow/unfollow updates
-  // whichever list the row actually came from.
+  // The search results' Follow / Requested / Following -- kept on the row it came from.
   async function follow(
     userId: string,
     setList: Dispatch<SetStateAction<FollowSearchResult[]>>,
@@ -498,8 +499,8 @@ export function FindPeopleScreen({ navigation, route }: Props) {
             <UnderlineTabs
               testID="find-people-subtab"
               categories={[
+                { key: 'friends', label: 'Your Friends', icon: 'users' },
                 { key: 'suggested', label: 'Suggested', icon: 'star' },
-                { key: 'contacts', label: 'Contacts', icon: 'phone' },
               ]}
               active={friendsSubTab}
               onSelect={setFriendsSubTab}
@@ -507,46 +508,38 @@ export function FindPeopleScreen({ navigation, route }: Props) {
             />
           </View>
 
-          {friendsSubTab === 'contacts' ? (
-            <ContactsFinder onOpen={openProfile} />
-          ) : suggestedLoading ? (
-            <View style={styles.loading}>
-              <ActivityIndicator
-                testID="find-people-suggested-loading"
-                size="large"
-                color={colors.textPrimary}
-              />
-            </View>
-          ) : suggestedError ? (
+          {friendsSubTab === 'suggested' ? (
+            <ContactSuggestions onOpen={openProfile} />
+          ) : followingError ? (
             <ErrorState
-              testID="find-people-suggested-error"
-              message={suggestedError}
-              onRetry={loadSuggested}
+              testID="find-people-friends-error"
+              message={followingError}
+              onRetry={loadFollowing}
             />
-          ) : suggested.length === 0 ? (
+          ) : friends === null ? (
+            <SkeletonRows testID="find-people-friends-loading" count={6} />
+          ) : friends.length === 0 ? (
             <EmptyState
-              testID="find-people-suggested-empty"
-              title="No suggestions right now"
-              description="Check back once more people have joined Progresso."
+              testID="find-people-friends-empty"
+              title="No friends yet"
+              description="People who follow you, and people you follow, show here."
+              action={{
+                label: 'See Suggested',
+                onPress: () => setFriendsSubTab('suggested'),
+                testID: 'find-people-friends-suggested',
+              }}
             />
           ) : (
-            <AppCard testID="find-people-suggested-card">
+            <AppCard testID="find-people-friends-card">
               <SectionHeader
-                label={`${suggested.length} ${suggested.length === 1 ? 'person' : 'people'} to follow`}
+                label={`${friends.length} ${friends.length === 1 ? 'friend' : 'friends'}`}
               />
-              {suggested.map((result, index) =>
-                renderResultRow(
-                  result,
-                  'find-people-suggested',
-                  index,
-                  renderResultTrailing(
-                    result,
-                    'find-people-suggested',
-                    (userId) => follow(userId, setSuggested, setSuggestedError),
-                    (userId) => unfollow(userId, setSuggested, setSuggestedError),
-                  ),
-                ),
-              )}
+              <PeopleList
+                people={friends}
+                selfId={userId ?? ''}
+                onOpen={openProfile}
+                testIDPrefix="find-people-friend"
+              />
             </AppCard>
           )}
 

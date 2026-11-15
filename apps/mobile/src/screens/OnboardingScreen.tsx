@@ -209,6 +209,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
       pendingUsername: fields.username,
       pendingDisplayName: fields.displayName,
       pendingLastName: fields.lastName,
+      pendingPhoneNumber: fields.phoneNumber,
     });
 
     try {
@@ -250,6 +251,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
           pendingUsername: fields.username,
           pendingDisplayName: fields.displayName,
           pendingLastName: fields.lastName,
+          pendingPhoneNumber: fields.phoneNumber,
         },
       );
       await clearOnboardingDraft();
@@ -282,11 +284,13 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
       pendingUsername: fields.username,
       pendingDisplayName: fields.displayName,
       pendingLastName: fields.lastName,
+      pendingPhoneNumber: fields.phoneNumber,
     };
     updateDraft({
       pendingUsername: fields.username,
       pendingDisplayName: fields.displayName,
       pendingLastName: fields.lastName,
+      pendingPhoneNumber: fields.phoneNumber,
     });
     await saveOnboardingDraft(nextDraft, stepIndex);
 
@@ -669,6 +673,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
               </Text>
               <CreateAccountStep
                 testID="onboarding-step-create-account"
+                country={draft.country}
                 submitting={saving}
                 error={error}
                 onSubmit={handleCreateAccount}

@@ -35,7 +35,7 @@ export class PeopleController {
   @Post('contacts')
   @HttpCode(200)
   async matchContacts(@CurrentUser() user: AuthenticatedUser, @Body() dto: MatchContactsDto) {
-    return this.peopleService.matchContacts(user.id, dto.hashes);
+    return this.peopleService.matchContacts(user.id, dto.hashes, dto.phoneHashes ?? []);
   }
 
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)

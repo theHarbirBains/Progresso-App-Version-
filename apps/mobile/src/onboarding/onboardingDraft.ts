@@ -79,6 +79,8 @@ export interface OnboardingDraft {
   pendingUsername: string | null;
   pendingDisplayName: string | null;
   pendingLastName: string | null;
+  /** E.164. */
+  pendingPhoneNumber: string | null;
 }
 
 // Height and birthday are wheel pickers -- they always show *some* value
@@ -115,6 +117,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   pendingUsername: null,
   pendingDisplayName: null,
   pendingLastName: null,
+  pendingPhoneNumber: null,
 };
 
 // No separate terminal "completion" step: the instant createAccount
@@ -231,6 +234,7 @@ function draftToProfileInput(draft: OnboardingDraft): UpdateProfileInput {
   if (draft.pendingUsername != null) input.username = draft.pendingUsername;
   if (draft.pendingDisplayName != null) input.displayName = draft.pendingDisplayName;
   if (draft.pendingLastName != null) input.lastName = draft.pendingLastName;
+  if (draft.pendingPhoneNumber != null) input.phoneNumber = draft.pendingPhoneNumber;
   return input;
 }
 

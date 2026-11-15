@@ -37,11 +37,27 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
   const [deleting, setDeleting] = useState(false);
   const { profile, updateProfile } = useProfile();
   const theme = useAppTheme().accent;
-  // Whether people with your email in their contacts can find you (Find People > Contacts).
+  // Whether people with your email in their contacts can find you (Find People > Suggested).
   const [findable, setFindable] = useState(profile?.findableByEmail ?? true);
   useEffect(() => {
     if (profile) setFindable(profile.findableByEmail ?? true);
   }, [profile]);
+
+  // And people with your phone number in theirs.
+  const [findableByPhone, setFindableByPhone] = useState(profile?.findableByPhone ?? true);
+  useEffect(() => {
+    if (profile) setFindableByPhone(profile.findableByPhone ?? true);
+  }, [profile]);
+
+  async function handleFindableByPhone(value: boolean) {
+    const previous = findableByPhone;
+    setFindableByPhone(value);
+    try {
+      await updateProfile({ findableByPhone: value });
+    } catch {
+      setFindableByPhone(previous);
+    }
+  }
 
   // Whether people who open your profile see your achievement rank.
   const [showRank, setShowRank] = useState(profile?.showRank ?? true);
@@ -152,6 +168,22 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
               onValueChange={(value) => void handleFindable(value)}
               accentColor={theme.accent}
               accessibilityLabel="Let people with my email find me"
+            />
+          }
+        />
+        <ListRow
+          testID="account-findable-phone"
+          divider
+          icon="phone"
+          title="Let people with my phone number find me"
+          subtitle="When someone looks for friends in their contacts, you show up if your number is in them. It's never shown to anyone."
+          trailing={
+            <Toggle
+              testID="account-findable-phone-toggle"
+              value={findableByPhone}
+              onValueChange={(value) => void handleFindableByPhone(value)}
+              accentColor={theme.accent}
+              accessibilityLabel="Let people with my phone number find me"
             />
           }
         />

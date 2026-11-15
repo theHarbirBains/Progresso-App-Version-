@@ -80,6 +80,10 @@ export interface ProfileResponse {
   notifyComments: boolean;
   /** Whether people with their email in their contacts can find them. */
   findableByEmail: boolean;
+  /** Their phone number (E.164) -- only ever their own; null for an account from before it was asked. */
+  phoneNumber: string | null;
+  /** Whether people with their phone number in their contacts can find them. */
+  findableByPhone: boolean;
   /** Whether people who open their profile see their achievement rank. */
   showRank: boolean;
 }
@@ -124,6 +128,9 @@ export interface UpdateProfileInput {
   notifyLikes?: boolean;
   notifyComments?: boolean;
   findableByEmail?: boolean;
+  /** E.164 (lib/phoneNumbers.ts). Changed, never cleared. */
+  phoneNumber?: string;
+  findableByPhone?: boolean;
   showRank?: boolean;
 }
 

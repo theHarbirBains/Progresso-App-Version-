@@ -4,8 +4,8 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import {
   listFollowRequests,
+  listPersonFollowers,
   listPersonFollowing,
-  listSuggestedUsers,
   respondToFollowRequest,
   searchUsers,
   sendFollowRequest,
@@ -24,8 +24,8 @@ jest.mock('../lib/safetyApi', () => ({
 
 jest.mock('../lib/api', () => ({
   listFollowRequests: jest.fn(),
+  listPersonFollowers: jest.fn(),
   listPersonFollowing: jest.fn(),
-  listSuggestedUsers: jest.fn(),
   respondToFollowRequest: jest.fn(),
   searchUsers: jest.fn(),
   sendFollowRequest: jest.fn(),
@@ -34,14 +34,18 @@ jest.mock('../lib/api', () => ({
 }));
 
 // The phone's contacts, as hashes -- the reading and hashing have their own tests.
-const mockContactEmailHashes = jest.fn();
-jest.mock('../social/contactEmails', () => ({
-  contactEmailHashes: () => mockContactEmailHashes(),
+const mockContactHashes = jest.fn();
+jest.mock('../social/contactHashes', () => ({
+  contactHashes: (...args: unknown[]) => mockContactHashes(...args),
+}));
+// Your country, which a contact's number without its code is read as.
+jest.mock('../profile/ProfileProvider', () => ({
+  useProfile: () => ({ profile: { country: 'CA' } }),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
 const mockListFollowRequests = listFollowRequests as jest.Mock;
-const mockListSuggestedUsers = listSuggestedUsers as jest.Mock;
+const mockListPersonFollowers = listPersonFollowers as jest.Mock;
 const mockListPersonFollowing = listPersonFollowing as jest.Mock;
 const mockRespondToFollowRequest = respondToFollowRequest as jest.Mock;
 const mockSearchUsers = searchUsers as jest.Mock;
@@ -91,8 +95,11 @@ beforeEach(() => {
     session: { access_token: 'token-123' },
   });
   mockListFollowRequests.mockReset().mockResolvedValue([]);
-  mockListSuggestedUsers.mockReset().mockResolvedValue([]);
+  mockListPersonFollowers.mockReset().mockResolvedValue([]);
   mockListPersonFollowing.mockReset().mockResolvedValue([]);
+  mockContactHashes
+    .mockReset()
+    .mockResolvedValue({ access: 'undetermined', emailHashes: [], phoneHashes: [] });
   mockRespondToFollowRequest.mockReset().mockResolvedValue({ success: true });
   mockSearchUsers.mockReset().mockResolvedValue([]);
   mockSendFollowRequest.mockReset().mockResolvedValue({ status: 'pending' });
@@ -254,96 +261,125 @@ describe('FindPeopleScreen -- requests tab', () => {
   });
 });
 
-describe('FindPeopleScreen -- Suggested/Contacts (shown when search is empty)', () => {
-  it('defaults to the Suggested sub-tab and shows real suggested people, no search performed', async () => {
-    mockListSuggestedUsers.mockResolvedValue([bobResult]);
+describe('FindPeopleScreen -- Your Friends and Suggested (shown when search is empty)', () => {
+  const jane = {
+    user: { id: 'user-2', username: 'jane', displayName: 'Jane Doe', avatarUrl: null },
+    status: 'none' as const,
+  };
+  const bob = { ...bobResult, status: 'accepted' as const };
+  const sam = {
+    user: { id: 'user-4', username: 'sam', displayName: 'Sam Lee', avatarUrl: null },
+    status: 'accepted' as const,
+  };
+
+  it('opens on Your Friends: everyone who follows you or whom you follow, each once, by name', async () => {
+    // Jane follows you; you follow Sam; you and Bob follow each other.
+    mockListPersonFollowers.mockResolvedValue([jane, bob]);
+    mockListPersonFollowing.mockResolvedValue([bob, sam]);
     renderScreen();
 
-    expect(await screen.findByTestId('find-people-suggested-user-3')).toHaveTextContent(
-      /Bob Smith/,
-    );
+    expect(await screen.findByTestId('find-people-friends-card')).toHaveTextContent(/3 friends/);
+    expect(mockListPersonFollowers).toHaveBeenCalledWith('token-123', 'user-1');
+    const rows = screen
+      .getAllByTestId(/^find-people-friend-user-\d$/)
+      .map((row) => row.props.testID as string);
+    expect(rows).toEqual([
+      'find-people-friend-user-3',
+      'find-people-friend-user-2',
+      'find-people-friend-user-4',
+    ]);
+    // Someone who follows you whom you don't follow back: Follow.
+    expect(screen.getByTestId('find-people-friend-user-2-follow')).toBeTruthy();
+    expect(screen.getByTestId('find-people-friend-user-3-following')).toBeTruthy();
     expect(mockSearchUsers).not.toHaveBeenCalled();
   });
 
-  it('shows a Follow button on a suggested row, independent of the search-results list', async () => {
-    mockListSuggestedUsers.mockResolvedValue([bobResult]);
+  it('follows back someone who follows you, right from the list', async () => {
+    mockListPersonFollowers.mockResolvedValue([jane]);
     mockSendFollowRequest.mockResolvedValue({ status: 'pending' });
     renderScreen();
-    await screen.findByTestId('find-people-suggested-user-3-follow');
 
-    fireEvent.press(screen.getByTestId('find-people-suggested-user-3-follow'));
+    fireEvent.press(await screen.findByTestId('find-people-friend-user-2-follow'));
 
-    expect(mockSendFollowRequest).toHaveBeenCalledWith('token-123', 'user-3');
-    expect(await screen.findByTestId('find-people-suggested-user-3-requested')).toBeTruthy();
+    expect(mockSendFollowRequest).toHaveBeenCalledWith('token-123', 'user-2');
+    expect(await screen.findByTestId('find-people-friend-user-2-requested')).toBeTruthy();
   });
 
-  it('shows an empty state when there is nothing to suggest', async () => {
+  it('says so with no friends yet, with a way to Suggested', async () => {
     renderScreen();
 
-    expect(await screen.findByTestId('find-people-suggested-empty')).toBeTruthy();
+    expect(await screen.findByTestId('find-people-friends-empty')).toHaveTextContent(
+      'No friends yet',
+    );
+    fireEvent.press(screen.getByTestId('find-people-friends-suggested'));
+    expect(await screen.findByTestId('contact-suggestions-ask')).toBeTruthy();
   });
 
-  it('shows an error state with a working retry for suggested people', async () => {
-    mockListSuggestedUsers.mockRejectedValueOnce(new Error('network error'));
+  it('shows an error with a working retry for your friends', async () => {
+    mockListPersonFollowers.mockRejectedValueOnce(new Error('network error'));
     renderScreen();
 
-    expect(await screen.findByTestId('find-people-suggested-error')).toHaveTextContent(
+    expect(await screen.findByTestId('find-people-friends-error')).toHaveTextContent(
       'network error',
     );
+    mockListPersonFollowers.mockResolvedValue([jane]);
+    fireEvent.press(screen.getByTestId('find-people-friends-error-retry'));
 
-    mockListSuggestedUsers.mockResolvedValue([bobResult]);
-    fireEvent.press(screen.getByTestId('find-people-suggested-error-retry'));
-
-    expect(await screen.findByTestId('find-people-suggested-user-3')).toBeTruthy();
+    expect(await screen.findByTestId('find-people-friend-user-2')).toBeTruthy();
   });
 
-  it('finds your contacts on Progresso by their scrambled emails, to follow from there', async () => {
+  it('suggests the people in your contacts you do not follow yet, read without asking once allowed', async () => {
     const { matchContacts } = jest.requireMock('../lib/api') as { matchContacts: jest.Mock };
-    mockContactEmailHashes.mockResolvedValue({ access: 'granted', hashes: ['a'.repeat(64)] });
-    matchContacts.mockResolvedValue([bobResult]);
+    mockContactHashes.mockResolvedValue({
+      access: 'granted',
+      emailHashes: ['a'.repeat(64)],
+      phoneHashes: ['b'.repeat(64)],
+    });
+    matchContacts.mockResolvedValue([{ ...bobResult }, sam]);
     renderScreen();
-    await screen.findByTestId('find-people-suggested-empty');
+    await screen.findByTestId('find-people-friends-empty');
 
-    fireEvent.press(screen.getByTestId('find-people-subtab-contacts'));
-    // Nothing is read until asked.
-    expect(screen.getByTestId('contacts-finder-start')).toHaveTextContent(/nothing is kept/);
-    expect(mockContactEmailHashes).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByTestId('contacts-finder-find'));
+    fireEvent.press(screen.getByTestId('find-people-subtab-suggested'));
 
-    expect(await screen.findByTestId('contacts-finder-found')).toHaveTextContent(
+    expect(await screen.findByTestId('contact-suggestions-found')).toHaveTextContent(
       /1 contact on Progresso/,
     );
-    expect(matchContacts).toHaveBeenCalledWith('token-123', ['a'.repeat(64)]);
-    expect(screen.getByTestId('contacts-finder-person-user-3-follow')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('contacts-finder-person-user-3'));
+    // Their own country reads a number without its code; nothing asked.
+    expect(mockContactHashes).toHaveBeenCalledWith('CA', { ask: false });
+    expect(matchContacts).toHaveBeenCalledWith('token-123', ['a'.repeat(64)], ['b'.repeat(64)]);
+    // Sam, whom you already follow, isn't a suggestion.
+    expect(screen.queryByTestId('contact-suggestions-person-user-4')).toBeNull();
+    expect(screen.getByTestId('contact-suggestions-person-user-3-follow')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('contact-suggestions-person-user-3'));
     expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'user-3' });
   });
 
-  it('says how to allow contacts when Progresso may not see them', async () => {
-    mockContactEmailHashes.mockResolvedValue({ access: 'denied', hashes: [] });
+  it('asks before reading the contacts the first time', async () => {
     renderScreen();
-    await screen.findByTestId('find-people-suggested-empty');
+    await screen.findByTestId('find-people-friends-empty');
+    fireEvent.press(screen.getByTestId('find-people-subtab-suggested'));
 
-    fireEvent.press(screen.getByTestId('find-people-subtab-contacts'));
-    fireEvent.press(screen.getByTestId('contacts-finder-find'));
-
-    expect(await screen.findByTestId('contacts-finder-denied')).toHaveTextContent(
-      /allow Contacts for Progresso/,
+    expect(await screen.findByTestId('contact-suggestions-ask')).toHaveTextContent(
+      /nothing is kept/,
     );
-    expect(screen.getByTestId('contacts-finder-settings')).toBeTruthy();
+    mockContactHashes.mockResolvedValue({ access: 'granted', emailHashes: [], phoneHashes: [] });
+    fireEvent.press(screen.getByTestId('contact-suggestions-find'));
+
+    expect(await screen.findByTestId('contact-suggestions-none')).toBeTruthy();
+    expect(mockContactHashes).toHaveBeenLastCalledWith('CA', { ask: true });
   });
 
-  it('says so when none of your contacts are on Progresso yet', async () => {
-    const { matchContacts } = jest.requireMock('../lib/api') as { matchContacts: jest.Mock };
-    mockContactEmailHashes.mockResolvedValue({ access: 'granted', hashes: ['b'.repeat(64)] });
-    matchContacts.mockResolvedValue([]);
+  it('says how to allow contacts when Progresso may not see them', async () => {
+    mockContactHashes.mockResolvedValue({ access: 'denied', emailHashes: [], phoneHashes: [] });
     renderScreen();
-    await screen.findByTestId('find-people-suggested-empty');
+    await screen.findByTestId('find-people-friends-empty');
 
-    fireEvent.press(screen.getByTestId('find-people-subtab-contacts'));
-    fireEvent.press(screen.getByTestId('contacts-finder-find'));
+    fireEvent.press(screen.getByTestId('find-people-subtab-suggested'));
 
-    expect(await screen.findByTestId('contacts-finder-none')).toBeTruthy();
+    expect(await screen.findByTestId('contact-suggestions-denied')).toHaveTextContent(
+      /allow Contacts for Progresso/,
+    );
+    expect(screen.getByTestId('contact-suggestions-settings')).toBeTruthy();
   });
 
   it('invites via the OS share sheet', async () => {
@@ -470,10 +506,10 @@ describe('FindPeopleScreen -- misc', () => {
 
 describe('FindPeopleScreen -- profiles', () => {
   it("opens a person's profile when their row is tapped -- Report and Block are there", async () => {
-    mockListSuggestedUsers.mockResolvedValue([bobResult]);
+    mockListPersonFollowers.mockResolvedValue([bobResult]);
     renderScreen();
 
-    fireEvent.press(await screen.findByTestId('find-people-suggested-user-3'));
+    fireEvent.press(await screen.findByTestId('find-people-friend-user-3'));
 
     expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'user-3' });
   });

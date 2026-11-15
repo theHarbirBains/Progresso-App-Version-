@@ -9,6 +9,7 @@ import {
   IsInt,
   IsNumber,
   IsOptional,
+  IsPhoneNumber,
   IsPositive,
   IsString,
   IsUrl,
@@ -18,6 +19,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 const USERNAME_PATTERN = /^[a-z0-9_]+$/;
@@ -257,6 +259,23 @@ export class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   findableByEmail?: boolean;
+
+  /**
+   * Their phone number in E.164 form (+16045551234), worked out on the phone from what they
+   * typed and their country -- a real number for its country, never confirmed by text. Asked for
+   * at sign-up; it can be changed, never cleared.
+   */
+  // Only when sent -- and never null: a number can be changed, not taken away.
+  @ValidateIf((dto: UpdateUserDto) => dto.phoneNumber !== undefined)
+  @IsString()
+  @Matches(/^\+[1-9]\d{6,14}$/)
+  @IsPhoneNumber()
+  phoneNumber?: string;
+
+  /** Whether people with this person's phone number in their contacts can find them. */
+  @IsOptional()
+  @IsBoolean()
+  findableByPhone?: boolean;
 
   /** Settings > Account & Security > Privacy: show my rank on my profile. */
   @IsOptional()

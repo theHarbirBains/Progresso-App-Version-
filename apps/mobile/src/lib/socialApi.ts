@@ -157,14 +157,15 @@ export function listPersonFollowing(
   );
 }
 
-/** The people on Progresso with one of these hashed contact emails (social/contactEmails.ts). */
+/** The people on Progresso with one of these hashed contact emails or phone numbers (social/contactHashes.ts). */
 export function matchContacts(
   accessToken: string,
-  hashes: string[],
+  emailHashes: string[],
+  phoneHashes: string[],
 ): Promise<FollowSearchResult[]> {
   return request<FollowSearchResult[]>('/api/v1/people/contacts', accessToken, {
     method: 'POST',
-    body: JSON.stringify({ hashes }),
+    body: JSON.stringify({ hashes: emailHashes, phoneHashes }),
   });
 }
 

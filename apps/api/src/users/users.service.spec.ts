@@ -121,6 +121,24 @@ describe('UsersService', () => {
       expect(profile).toMatchObject({ displayName: 'Harbir', lastName: 'Bains' });
     });
 
+    it('saves a phone number, and whether people with it in their contacts find them', async () => {
+      const client = createMockClient({
+        updateData: { phone_e164: '+16045551234', findable_by_phone: false },
+      });
+      const service = serviceWith(client);
+
+      const profile = await service.updateProfile('user-1', {
+        phoneNumber: '+16045551234',
+        findableByPhone: false,
+      });
+
+      expect(client.update).toHaveBeenCalledWith({
+        phone_e164: '+16045551234',
+        findable_by_phone: false,
+      });
+      expect(profile).toMatchObject({ phoneNumber: '+16045551234', findableByPhone: false });
+    });
+
     it('saves whether people who open the profile see the rank', async () => {
       const client = createMockClient({ updateData: { show_rank: false } });
       const service = serviceWith(client);

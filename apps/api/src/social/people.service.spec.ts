@@ -708,6 +708,42 @@ describe('PeopleService', () => {
       expect(client.rpc).toHaveBeenCalledWith('find_users_by_email_hashes', {
         p_hashes: ['a'.repeat(64)],
       });
+      // No phone numbers sent (an older app), none asked about.
+      expect(client.rpc).not.toHaveBeenCalledWith('find_users_by_phone_hashes', expect.anything());
+    });
+
+    it('matches hashed phone numbers too, each person once', async () => {
+      const client = createMockClient();
+      client.queue('rpc:find_users_by_email_hashes', { data: [{ user_id: SAM }], error: null });
+      client.queue('rpc:find_users_by_phone_hashes', {
+        data: [{ user_id: SAM }, { user_id: JO }],
+        error: null,
+      });
+      client.queue('user_blocks', { data: [], error: null });
+      client.queue('users', { data: [user(SAM, 'Sam'), user(JO, 'Jo')], error: null });
+      client.queue('follows', { data: [], error: null });
+      const service = serviceWith(client);
+
+      const found = await service.matchContacts(ME, ['a'.repeat(64)], ['B'.repeat(64)]);
+
+      expect(found.map((person) => person.user.id).sort()).toEqual([JO, SAM].sort());
+      expect(client.rpc).toHaveBeenCalledWith('find_users_by_phone_hashes', {
+        p_hashes: ['b'.repeat(64)],
+      });
+    });
+
+    it('matches by phone number alone', async () => {
+      const client = createMockClient();
+      client.queue('rpc:find_users_by_phone_hashes', { data: [{ user_id: JO }], error: null });
+      client.queue('user_blocks', { data: [], error: null });
+      client.queue('users', { data: [user(JO, 'Jo')], error: null });
+      client.queue('follows', { data: [], error: null });
+      const service = serviceWith(client);
+
+      const found = await service.matchContacts(ME, [], ['b'.repeat(64)]);
+
+      expect(found).toEqual([{ user: expect.objectContaining({ id: JO }), status: 'none' }]);
+      expect(client.rpc).not.toHaveBeenCalledWith('find_users_by_email_hashes', expect.anything());
     });
   });
 });

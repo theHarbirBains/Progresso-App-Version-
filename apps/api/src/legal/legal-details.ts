@@ -8,5 +8,5 @@ export const LEGAL_DETAILS = {
   /** The law that governs the terms. */
   governingLaw: 'the Province of Ontario and the federal laws of Canada that apply there',
   /** When the text last changed. */
-  lastUpdated: 'October 19, 2026',
+  lastUpdated: 'November 15, 2026',
 } as const;

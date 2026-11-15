@@ -91,6 +91,7 @@ import { NutritionGoalsScreen } from './src/screens/NutritionGoalsScreen';
 import { NutritionHistoryScreen } from './src/screens/NutritionHistoryScreen';
 import { NutritionTodayScreen } from './src/screens/NutritionTodayScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { AddPhoneNumberScreen } from './src/screens/AddPhoneNumberScreen';
 import { PRHistoryScreen } from './src/screens/PRHistoryScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { ProgressExerciseDetailScreen } from './src/screens/ProgressExerciseDetailScreen';
@@ -372,6 +373,11 @@ function Root() {
   }
 
   if (status === 'signedIn') {
+    // Asked once of everyone who signed up before a phone number was: their number, before the
+    // app (screens/AddPhoneNumberScreen.tsx). A new account's comes with its onboarding.
+    if (!profileLoading && profile?.onboardingCompletedAt && !profile.phoneNumber) {
+      return <AddPhoneNumberScreen />;
+    }
     const showGlobalBottomNav = currentRouteName !== undefined;
 
     return (

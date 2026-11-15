@@ -52,6 +52,10 @@ export interface UserProfile {
   notifyComments: boolean;
   /** Whether people with this person's email in their contacts can find them. */
   findableByEmail: boolean;
+  /** Their phone number (E.164) -- only ever their own; null for an account from before it was asked. */
+  phoneNumber: string | null;
+  /** Whether people with their phone number in their contacts can find them. */
+  findableByPhone: boolean;
   /** Whether people who open their profile see their achievement rank. */
   showRank: boolean;
 }
@@ -67,7 +71,8 @@ const PROFILE_COLUMNS =
   'apple_health_preference, onboarding_completed_at, activity_level, ' +
   'referral_source, country, average_workout_length, training_comfort, rep_range_min, ' +
   'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier, ' +
-  'notify_follows, notify_likes, notify_comments, findable_by_email, bio, show_rank';
+  'notify_follows, notify_likes, notify_comments, findable_by_email, bio, show_rank, ' +
+  'phone_e164, findable_by_phone';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
@@ -109,6 +114,8 @@ function toProfile(data: any): UserProfile {
     notifyLikes: data.notify_likes,
     notifyComments: data.notify_comments,
     findableByEmail: data.findable_by_email,
+    phoneNumber: data.phone_e164,
+    findableByPhone: data.findable_by_phone,
     showRank: data.show_rank,
   };
 }
@@ -213,6 +220,8 @@ export class UsersService {
     if (dto.notifyLikes !== undefined) updatePayload.notify_likes = dto.notifyLikes;
     if (dto.notifyComments !== undefined) updatePayload.notify_comments = dto.notifyComments;
     if (dto.findableByEmail !== undefined) updatePayload.findable_by_email = dto.findableByEmail;
+    if (dto.phoneNumber !== undefined) updatePayload.phone_e164 = dto.phoneNumber;
+    if (dto.findableByPhone !== undefined) updatePayload.findable_by_phone = dto.findableByPhone;
     if (dto.showRank !== undefined) updatePayload.show_rank = dto.showRank;
 
     if (Object.keys(updatePayload).length === 0) {

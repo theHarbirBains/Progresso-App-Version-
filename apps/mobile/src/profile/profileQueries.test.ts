@@ -55,6 +55,8 @@ const row = {
   bio: 'Chasing progress.',
   // Never set before the switch existed: the rank shows.
   show_rank: null,
+  phone_e164: '+16045551234',
+  findable_by_phone: null,
 };
 
 beforeEach(() => {
@@ -111,6 +113,8 @@ describe('fetchMyProfile', () => {
       findableByEmail: true,
       bio: 'Chasing progress.',
       showRank: true,
+      phoneNumber: '+16045551234',
+      findableByPhone: true,
     });
   });
 

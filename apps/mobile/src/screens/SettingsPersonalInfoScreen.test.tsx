@@ -38,6 +38,8 @@ const baseProfile = {
   displayName: 'Athlete',
   lastName: 'One',
   username: 'athlete1',
+  country: 'CA',
+  phoneNumber: '+16045551234',
   weightUnit: 'kg' as const,
   heightUnit: 'cm' as const,
   avatarUrl: null as string | null,
@@ -111,6 +113,7 @@ describe('SettingsPersonalInfoScreen', () => {
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', {
       displayName: 'New Name',
       lastName: 'One',
+      phoneNumber: '+16045551234',
       username: 'athlete1',
       bio: null,
       weightUnit: 'lb',
@@ -143,6 +146,35 @@ describe('SettingsPersonalInfoScreen', () => {
       expect.objectContaining({ displayName: 'Athlete', lastName: 'Bains' }),
     );
     expect(screen.getByTestId('account-last-name')).toHaveProp('value', 'Bains');
+  });
+
+  it('shows their phone number as it reads at home, and needs a real one to save', async () => {
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, phoneNumber: '+16045559876' });
+    renderScreen();
+
+    expect(await screen.findByTestId('account-phone')).toHaveProp('value', '(604) 555-1234');
+
+    fireEvent.changeText(screen.getByTestId('account-phone'), '555 12');
+    fireEvent.press(screen.getByTestId('account-save'));
+    expect(await screen.findByTestId('account-save-error')).toHaveTextContent(
+      'Enter a valid phone number.',
+    );
+    fireEvent.changeText(screen.getByTestId('account-phone'), '');
+    fireEvent.press(screen.getByTestId('account-save'));
+    expect(await screen.findByTestId('account-save-error')).toHaveTextContent(
+      'Add your phone number.',
+    );
+    expect(mockUpdateMyProfile).not.toHaveBeenCalled();
+
+    fireEvent.changeText(screen.getByTestId('account-phone'), '604-555-9876');
+    fireEvent.press(screen.getByTestId('account-save'));
+
+    expect(await screen.findByTestId('account-saved')).toBeTruthy();
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith(
+      'token-123',
+      expect.objectContaining({ phoneNumber: '+16045559876' }),
+    );
+    expect(screen.getByTestId('account-phone')).toHaveProp('value', '(604) 555-9876');
   });
 
   it('saves a bio for their profile, trimmed, 80 characters at most', async () => {

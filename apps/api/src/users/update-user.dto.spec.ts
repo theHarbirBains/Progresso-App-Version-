@@ -49,3 +49,17 @@ describe('UpdateUserDto -- last name', () => {
     expect(await errorsFor({ lastName: 'x'.repeat(51) })).toEqual(['lastName']);
   });
 });
+
+describe('UpdateUserDto -- phone number', () => {
+  it('takes a real number in E.164 form', async () => {
+    expect(await errorsFor({ phoneNumber: '+16045551234' })).toEqual([]);
+    expect(await errorsFor({ phoneNumber: '+447911123456' })).toEqual([]);
+    expect(await errorsFor({ findableByPhone: false })).toEqual([]);
+  });
+
+  it('refuses a number not in E.164 form, or not a real one', async () => {
+    expect(await errorsFor({ phoneNumber: '604-555-1234' })).toEqual(['phoneNumber']);
+    expect(await errorsFor({ phoneNumber: '+1123' })).toEqual(['phoneNumber']);
+    expect(await errorsFor({ phoneNumber: null })).toEqual(['phoneNumber']);
+  });
+});

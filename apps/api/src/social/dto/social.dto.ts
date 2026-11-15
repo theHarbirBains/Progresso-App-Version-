@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsInt,
+  IsOptional,
   IsString,
   IsUUID,
   Matches,
@@ -19,12 +20,22 @@ export class PersonWorkoutsDto {
   page: number = 0;
 }
 
-/** Contact emails as SHA-256 hashes (lower-case hex) -- never the addresses themselves. */
+/**
+ * Contact emails and phone numbers as SHA-256 hashes (lower-case hex) -- never the addresses or
+ * numbers themselves. `hashes` are the emails (the name app versions before phone numbers send).
+ */
 export class MatchContactsDto {
   @IsArray()
   @ArrayMaxSize(5000)
   @Matches(/^[0-9a-f]{64}$/i, { each: true })
   hashes!: string[];
+
+  /** The contacts' phone numbers, each in E.164 form, hashed. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5000)
+  @Matches(/^[0-9a-f]{64}$/i, { each: true })
+  phoneHashes?: string[];
 }
 
 export class SocialSummaryDto {

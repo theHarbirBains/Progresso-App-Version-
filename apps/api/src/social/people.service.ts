@@ -360,19 +360,40 @@ export class PeopleService {
   }
 
   /**
-   * The people whose email is in the viewer's contacts (as SHA-256 hashes of the trimmed,
-   * lower-cased address -- the phone never sends an address) and who let themselves be found
-   * that way. Nothing sent is kept.
+   * The people whose email or phone number is in the viewer's contacts (as SHA-256 hashes of the
+   * trimmed, lower-cased address, or of the number in E.164 form -- the phone never sends either)
+   * and who let themselves be found that way. Each person once. Nothing sent is kept.
    */
-  async matchContacts(viewerId: string, hashes: string[]): Promise<FollowSearchResult[]> {
-    const wanted = Array.from(new Set(hashes.map((hash) => hash.toLowerCase())));
-    if (wanted.length === 0) return [];
+  async matchContacts(
+    viewerId: string,
+    emailHashes: string[],
+    phoneHashes: string[] = [],
+  ): Promise<FollowSearchResult[]> {
+    const emails = Array.from(new Set(emailHashes.map((hash) => hash.toLowerCase())));
+    const phones = Array.from(new Set(phoneHashes.map((hash) => hash.toLowerCase())));
+    if (emails.length === 0 && phones.length === 0) return [];
     const client = this.supabaseService.getClient();
-    const { data, error } = await client.rpc('find_users_by_email_hashes', { p_hashes: wanted });
-    if (error) throw new InternalServerErrorException('Failed to match your contacts');
-    const ids = ((data ?? []) as { user_id: string }[])
-      .map((row) => row.user_id)
-      .filter((id) => id !== viewerId);
+    const [byEmail, byPhone] = await Promise.all([
+      emails.length > 0
+        ? client.rpc('find_users_by_email_hashes', { p_hashes: emails })
+        : Promise.resolve({ data: [], error: null }),
+      phones.length > 0
+        ? client.rpc('find_users_by_phone_hashes', { p_hashes: phones })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (byEmail.error || byPhone.error) {
+      throw new InternalServerErrorException('Failed to match your contacts');
+    }
+    const ids = Array.from(
+      new Set(
+        [
+          ...((byEmail.data ?? []) as { user_id: string }[]),
+          ...((byPhone.data ?? []) as { user_id: string }[]),
+        ]
+          .map((row) => row.user_id)
+          .filter((id) => id !== viewerId),
+      ),
+    );
     return this.withFollowStatus(viewerId, ids);
   }
 

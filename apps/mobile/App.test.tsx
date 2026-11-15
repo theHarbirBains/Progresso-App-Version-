@@ -50,6 +50,7 @@ jest.mock('./src/profile/profileQueries', () => ({
     username: null,
     weightUnit: 'kg',
     onboardingCompletedAt: '2020-01-01T00:00:00.000Z',
+    phoneNumber: '+16045551234',
   }),
 }));
 
@@ -295,6 +296,27 @@ describe('Authentication flow', () => {
     expect(mockFetchMyProfile).toHaveBeenCalledTimes(1);
   });
 
+  it('asks once for a phone number before the app, of an account from before it was asked', async () => {
+    mockFetchMyProfile.mockResolvedValueOnce({
+      id: 'user-1',
+      displayName: null,
+      username: null,
+      weightUnit: 'kg',
+      country: 'CA',
+      onboardingCompletedAt: '2020-01-01T00:00:00.000Z',
+      phoneNumber: null,
+    });
+    render(<App />);
+    await screen.findByTestId('sign-in-email');
+
+    fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
+    fireEvent.press(screen.getByTestId('sign-in-submit'));
+
+    expect(await screen.findByTestId('add-phone-number-input')).toBeTruthy();
+    expect(screen.queryByTestId('feed-screen')).toBeNull();
+  });
+
   it('shows an error message on invalid credentials and does not sign in', async () => {
     render(<App />);
     await screen.findByTestId('sign-in-email');
@@ -359,6 +381,7 @@ describe('Authentication flow', () => {
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-email'), 'new@example.com');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-phone'), '604 555 1234');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');
     fireEvent.changeText(
       screen.getByTestId('onboarding-create-account-confirm-password'),

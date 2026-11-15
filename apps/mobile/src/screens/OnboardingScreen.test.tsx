@@ -384,6 +384,7 @@ describe('OnboardingScreen', () => {
       screen.getByTestId('onboarding-create-account-email'),
       'harbir@example.com',
     );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-phone'), '604 555 1234');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');
     fireEvent.changeText(
       screen.getByTestId('onboarding-create-account-confirm-password'),
@@ -419,6 +420,8 @@ describe('OnboardingScreen', () => {
           username: 'harbirb',
           displayName: 'Harbir',
           lastName: 'Bains',
+          // Typed without its code, read as a Canadian number.
+          phoneNumber: '+16045551234',
           onboardingCompleted: true,
         }),
       ),
@@ -475,6 +478,7 @@ describe('OnboardingScreen', () => {
       screen.getByTestId('onboarding-create-account-email'),
       'harbir@example.com',
     );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-phone'), '604 555 1234');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');
     fireEvent.changeText(
       screen.getByTestId('onboarding-create-account-confirm-password'),
@@ -487,6 +491,18 @@ describe('OnboardingScreen', () => {
 
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
     expect(screen.getByTestId('onboarding-create-account-submit')).toBeEnabled();
+
+    // And a real phone number -- said once they leave the field.
+    expect(screen.getByTestId('onboarding-create-account-phone').props.accessibilityLabel).toBe(
+      'Phone Number',
+    );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-phone'), '555 12');
+    expect(screen.getByTestId('onboarding-create-account-submit')).toBeDisabled();
+    expect(screen.queryByTestId('onboarding-create-account-phone-error')).toBeNull();
+    fireEvent(screen.getByTestId('onboarding-create-account-phone'), 'blur');
+    expect(screen.getByTestId('onboarding-create-account-phone-error')).toHaveTextContent(
+      'Enter a valid phone number',
+    );
     await settle();
   });
 
@@ -538,6 +554,7 @@ describe('OnboardingScreen', () => {
       screen.getByTestId('onboarding-create-account-email'),
       'harbir@example.com',
     );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-phone'), '604 555 1234');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');
     fireEvent.changeText(
       screen.getByTestId('onboarding-create-account-confirm-password'),
@@ -617,6 +634,7 @@ describe('OnboardingScreen', () => {
       screen.getByTestId('onboarding-create-account-email'),
       'harbir@example.com',
     );
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-phone'), '604 555 1234');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-password'), 'password123');
     fireEvent.changeText(
       screen.getByTestId('onboarding-create-account-confirm-password'),
@@ -677,6 +695,7 @@ describe('OnboardingScreen', () => {
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-phone'), '604 555 1234');
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('onboarding-create-account-google'));
@@ -691,6 +710,7 @@ describe('OnboardingScreen', () => {
     expect(parsed.pendingUsername).toBe('harbirb');
     expect(parsed.pendingDisplayName).toBe('Harbir');
     expect(parsed.pendingLastName).toBe('Bains');
+    expect(parsed.pendingPhoneNumber).toBe('+16045551234');
     // App.tsx's Root -- not this screen -- submits the profile once the
     // OAuth session actually appears, so nothing here calls updateMyProfile.
     expect(mockUpdateMyProfile).not.toHaveBeenCalled();
@@ -757,6 +777,7 @@ describe('OnboardingScreen', () => {
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-display-name'), 'Harbir');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-last-name'), 'Bains');
     fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'harbirb');
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-phone'), '604 555 1234');
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('onboarding-create-account-google'));

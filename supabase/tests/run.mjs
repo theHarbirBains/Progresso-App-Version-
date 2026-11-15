@@ -4936,9 +4936,46 @@ async function main() {
       'A person cannot match emails directly -- only through the API',
       /permission denied/i,
     );
+    // And by phone number: the E.164 form, hashed on the finder's phone.
+    await admin.query("update public.users set phone_e164 = '+16045551234' where id = $1", [
+      lifter,
+    ]);
+    await admin.query(
+      "update public.users set phone_e164 = '+16045559876', findable_by_phone = false where id = $1",
+      [hidden],
+    );
+    const phoneHash = (e164) => createHash('sha256').update(e164, 'utf8').digest('hex');
+    const byPhone = (
+      await admin.query('select user_id from public.find_users_by_phone_hashes($1::text[])', [
+        [phoneHash('+16045551234'), phoneHash('+16045559876'), phoneHash('+447700900123')],
+      ])
+    ).rows.map((r) => r.user_id);
+    record(
+      'Contacts find a person by their phone number -- never someone who turned it off',
+      byPhone.length === 1 && byPhone[0] === lifter,
+      JSON.stringify(byPhone),
+    );
+    await expectThrows(
+      asUser(fan, (c) =>
+        c.query('select * from public.find_users_by_phone_hashes($1::text[])', [
+          [phoneHash('+16045551234')],
+        ]),
+      ),
+      'A person cannot match phone numbers directly -- only through the API',
+      /permission denied/i,
+    );
+    await expectThrows(
+      admin.query("update public.users set phone_e164 = '604-555-1234' where id = $1", [fan]),
+      'A phone number is kept only in E.164 form',
+      /violates check constraint/i,
+    );
+    // Not unique: an unconfirmed number never stops its real owner from using it.
+    await admin.query("update public.users set phone_e164 = '+16045551234' where id = $1", [fan]);
+    record('Two accounts can give the same phone number', true);
+    await admin.query('update public.users set phone_e164 = null where id = $1', [fan]);
     const defaults = (
       await admin.query(
-        'select notify_follows, notify_likes, notify_comments, findable_by_email from public.users where id = $1',
+        'select notify_follows, notify_likes, notify_comments, findable_by_email, findable_by_phone from public.users where id = $1',
         [fan],
       )
     ).rows[0];
@@ -4947,7 +4984,8 @@ async function main() {
       defaults.notify_follows &&
         defaults.notify_likes &&
         defaults.notify_comments &&
-        defaults.findable_by_email,
+        defaults.findable_by_email &&
+        defaults.findable_by_phone,
       JSON.stringify(defaults),
     );
 

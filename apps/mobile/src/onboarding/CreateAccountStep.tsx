@@ -6,6 +6,7 @@ import { PasswordVisibilityToggle } from '../design/PasswordVisibilityToggle';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale } from '../design/theme';
+import { phoneCountry, toE164 } from '../lib/phoneNumbers';
 
 // Mirrors the backend's own username rule exactly (update-user.dto.ts /
 // 20260825100001_username.sql): lowercase letters, digits, underscores,
@@ -18,6 +19,8 @@ export interface CreateAccountFields {
   displayName: string;
   lastName: string;
   username: string;
+  /** E.164 (lib/phoneNumbers.ts). */
+  phoneNumber: string;
   email: string;
   password: string;
 }
@@ -26,10 +29,13 @@ export interface GoogleSignUpFields {
   displayName: string;
   lastName: string;
   username: string;
+  phoneNumber: string;
 }
 
 interface Props {
   testID: string;
+  /** Their country from onboarding: a phone number typed without its +code is read as one from it. */
+  country: string | null;
   submitting: boolean;
   error: string | null;
   onSubmit: (fields: CreateAccountFields) => void;
@@ -42,13 +48,17 @@ interface Props {
 // The final onboarding step: create the account with everything answered
 // so far ready to submit right behind it (see onboardingDraft.ts). First
 // Name and Last Name (each required -- users.display_name and
-// users.last_name; their profile shows both), Username, Email, and Password.
+// users.last_name; their profile shows both), Username, Email, Phone Number
+// (required -- a real number for their country, kept in E.164 form, so
+// friends with it in their contacts can find them; never shown to anyone),
+// and Password.
 // Google is the one alternative to typing an email/password (see
 // SignInScreen's own equivalent) -- the names and Username are still
 // required either way, since the username is Progresso-specific, not
 // something Google's own profile supplies.
 export function CreateAccountStep({
   testID,
+  country,
   submitting,
   error,
   onSubmit,
@@ -59,6 +69,9 @@ export function CreateAccountStep({
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  // Said to be wrong only once they've left the field.
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -68,15 +81,18 @@ export function CreateAccountStep({
   const lastNameRef = useRef<TextInputInstance>(null);
   const usernameRef = useRef<TextInputInstance>(null);
   const emailRef = useRef<TextInputInstance>(null);
+  const phoneRef = useRef<TextInputInstance>(null);
   const passwordRef = useRef<TextInputInstance>(null);
   const confirmRef = useRef<TextInputInstance>(null);
 
   const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password;
+  const phoneNumber = toE164(phone, phoneCountry(country));
   const anySubmitting = submitting || googleSubmitting;
   const canSubmit =
     displayName.trim().length > 0 &&
     lastName.trim().length > 0 &&
     USERNAME_PATTERN.test(username.trim().toLowerCase()) &&
+    phoneNumber !== null &&
     email.trim().length > 0 &&
     password.length >= 6 &&
     confirmPassword === password &&
@@ -85,6 +101,7 @@ export function CreateAccountStep({
     displayName.trim().length > 0 &&
     lastName.trim().length > 0 &&
     USERNAME_PATTERN.test(username.trim().toLowerCase()) &&
+    phoneNumber !== null &&
     !anySubmitting;
 
   function validateNameAndUsername(): GoogleSignUpFields | null {
@@ -106,10 +123,15 @@ export function CreateAccountStep({
       );
       return null;
     }
+    if (!phoneNumber) {
+      setLocalError('Enter a valid phone number.');
+      return null;
+    }
     return {
       displayName: trimmedDisplayName,
       lastName: trimmedLastName,
       username: normalizedUsername,
+      phoneNumber,
     };
   }
 
@@ -198,7 +220,27 @@ export function CreateAccountStep({
         returnKeyType="next"
         value={email}
         onChangeText={setEmail}
+        onSubmitEditing={() => phoneRef.current?.focus()}
+      />
+      <TextInput
+        inputRef={phoneRef}
+        testID="onboarding-create-account-phone"
+        label="Phone Number"
+        placeholder="Your mobile number"
+        keyboardType="phone-pad"
+        autoComplete="tel"
+        returnKeyType="next"
+        value={phone}
+        onChangeText={setPhone}
         onSubmitEditing={() => passwordRef.current?.focus()}
+        helperText="So friends with your number in their contacts can find you. Never shown to anyone."
+        error={
+          phoneTouched && phone.trim().length > 0 && phoneNumber === null
+            ? 'Enter a valid phone number'
+            : undefined
+        }
+        errorTestID="onboarding-create-account-phone-error"
+        onBlur={() => setPhoneTouched(true)}
       />
       <TextInput
         inputRef={passwordRef}
