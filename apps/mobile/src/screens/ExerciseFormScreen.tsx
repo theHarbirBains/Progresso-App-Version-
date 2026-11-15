@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
+import { Feather } from '@expo/vector-icons';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { DestructiveButton, PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { PhotoLightbox } from '../design/PhotoLightbox';
@@ -275,6 +277,31 @@ export function ExerciseFormScreen(props: Props) {
         </View>
       </View>
 
+      {/* Why the details below matter, before them: the setup is part of the exercise. */}
+      <AppCard testID="exercise-form-setup-note">
+        <View style={styles.note}>
+          <Feather name="info" size={18} color={colors.textSecondaryBright} />
+          <View style={styles.noteText}>
+            <Text style={styles.noteTitle}>Why the following details can matter?</Text>
+            <Text style={styles.noteBody}>
+              Your equipment setup is part of the exercise. Changing the machine, gym, grip, handle,
+              weight type or pulley configuration can change the resistance, mechanics and
+              difficulty of a movement.
+            </Text>
+            <Text style={styles.noteBody}>
+              For the most accurate progress tracking, keep your setup consistent. If you change any
+              of these details, create a separate exercise rather than logging it under your
+              existing one.
+            </Text>
+            <Text style={styles.noteBody}>
+              These fields are optional, but filling them in can make a huge difference. They help
+              Progresso keep your personal records, performance comparisons and long-term progress
+              accurate.
+            </Text>
+          </View>
+        </View>
+      </AppCard>
+
       {/* Two machines can do the same thing but be heavier or lighter, and a different grip
           changes the muscles worked and the weight lifted -- so progress is only comparable on
           the same machine, held the same way. These tell look-alikes apart; two can even share a
@@ -467,6 +494,24 @@ const styles = StyleSheet.create({
   helperText: {
     ...typeScale.caption,
     color: colors.textMuted,
+  },
+  // Why the setup details matter: an info glyph beside a title and its paragraphs.
+  note: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  noteText: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  noteTitle: {
+    ...typeScale.callout,
+    color: colors.textPrimary,
+  },
+  noteBody: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
   },
   measuredBy: {
     gap: spacing.sm,

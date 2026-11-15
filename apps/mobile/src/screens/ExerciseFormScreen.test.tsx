@@ -160,6 +160,21 @@ describe('ExerciseFormScreen (create mode)', () => {
     expect(screen.getByTestId('exercise-form-pulley')).toBeTruthy();
   });
 
+  it('says why the setup matters, right before the optional details', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+
+    const note = screen.getByTestId('exercise-form-setup-note');
+    expect(note).toHaveTextContent(/Why the following details can matter\?/);
+    expect(note).toHaveTextContent(/Your equipment setup is part of the exercise\./);
+    expect(note).toHaveTextContent(/create a separate exercise rather than logging it under/);
+    expect(note).toHaveTextContent(/These fields are optional, but filling them in/);
+    // Before the section it's about.
+    const page = JSON.stringify(screen.toJSON());
+    expect(page.indexOf('Why the following details can matter?')).toBeLessThan(
+      page.indexOf('Tell This Machine Apart (Optional)'),
+    );
+  });
+
   it('explains each box plainly, and only the name is required -- with no note on how it feels', () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
