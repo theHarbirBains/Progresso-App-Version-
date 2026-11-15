@@ -52,6 +52,8 @@ const row = {
   notify_comments: true,
   findable_by_email: null,
   bio: 'Chasing progress.',
+  // Never set before the switch existed: the rank shows.
+  show_rank: null,
 };
 
 beforeEach(() => {
@@ -106,6 +108,7 @@ describe('fetchMyProfile', () => {
       // On unless turned off.
       findableByEmail: true,
       bio: 'Chasing progress.',
+      showRank: true,
     });
   });
 

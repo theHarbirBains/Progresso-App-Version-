@@ -153,6 +153,21 @@ function me(extra: object = {}) {
       likesGiven: 8,
     },
     exercises: [],
+    rank: { points: 640, awards: 9 },
+    achievements: [
+      {
+        id: 'first-steps',
+        title: 'First Steps',
+        description: 'Finish your first workout',
+        icon: 'play',
+        category: 'workouts',
+        ap: 25,
+        repeats: 'once',
+        times: 1,
+        firstAwardedAt: '2026-11-01T10:00:00Z',
+        lastAwardedAt: '2026-11-01T10:00:00Z',
+      },
+    ],
     ...extra,
   };
 }
@@ -339,7 +354,13 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
   it('opens on Achievements, and lists your workouts under Workouts, each opening yours', async () => {
     renderProfile();
 
-    expect(await screen.findByTestId('person-profile-achievements')).toBeTruthy();
+    expect(await screen.findByTestId('person-profile-achievements')).toHaveTextContent(
+      /First Steps/,
+    );
+    // Your rank shows on your own, opening every rank.
+    expect(screen.getByTestId('person-profile-rank')).toHaveTextContent(/Silver V.*640 AP/);
+    fireEvent.press(screen.getByTestId('person-profile-rank'));
+    expect(mockNavigate).toHaveBeenCalledWith('RankProgression', undefined);
     // Yours, with nutrition, are a tap away.
     fireEvent.press(screen.getByTestId('profile-all-achievements'));
     expect(mockNavigate).toHaveBeenCalledWith('Achievements');

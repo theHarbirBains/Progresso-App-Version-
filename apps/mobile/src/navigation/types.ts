@@ -121,8 +121,10 @@ export type RootStackParamList = {
   PersonProfile: { userId: string };
   /** One exercise of theirs (or yours): each workout's top set and the records held on it. */
   PersonExercise: { userId: string; exerciseId: string; name?: string };
-  /** Your achievements and their ranks, from the side menu. */
+  /** Your achievements and lifetime rank, from the side menu. */
   Achievements: undefined;
+  /** Every rank and division -- yours, or (from a profile) someone else's at `points`. */
+  RankProgression: { points?: number; name?: string } | undefined;
   /** Who follows someone, or who they follow. */
   FollowList: { userId: string; which: 'followers' | 'following'; name?: string };
 };

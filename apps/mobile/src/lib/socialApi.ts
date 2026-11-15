@@ -62,29 +62,6 @@ export interface ProfileStats {
   prCount: number;
   /** The most workouts finished in one calendar month. */
   bestMonthWorkouts: number;
-  // What their achievements are ranked on (social/achievements.ts).
-  /** Finished sets, of every kind. */
-  totalSets: number;
-  /** Reps on weighted and bodyweight sets. */
-  totalReps: number;
-  /** Time trained, start to finish -- at most six hours a workout. */
-  trainingMinutes: number;
-  /** True 1RMs held now. */
-  oneRepMaxCount: number;
-  /** Different exercises done. */
-  exerciseCount: number;
-  /** The most lifted in one workout. */
-  bestSessionVolumeKg: number;
-  bodyweightReps: number;
-  timedSeconds: number;
-  groupWorkouts: number;
-  /** Calendar months with 12 or more workouts. */
-  committedMonths: number;
-  /** Weeks with 3 or more workouts. */
-  strongWeeks: number;
-  /** Likes from others on their workouts, and likes they've given others'. */
-  likesReceived: number;
-  likesGiven: number;
 }
 
 export interface PersonProfile {
@@ -107,6 +84,25 @@ export interface PersonProfile {
   stats: ProfileStats | null;
   /** Every exercise they've done, with its best set, the most-done first. */
   exercises: ExerciseBest[] | null;
+  /** Their lifetime AP -- null when they hide their rank (never on your own). */
+  rank: { points: number; awards: number } | null;
+  /** The achievements they've earned, the latest first -- once their follow is accepted. */
+  achievements: EarnedAchievement[] | null;
+}
+
+/** An achievement someone's earned, as their profile lists it -- never a nutrition one. */
+export interface EarnedAchievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: string;
+  ap: number;
+  repeats: 'once' | 'weekly' | 'monthly';
+  /** 1 for a one-time achievement; a repeatable one's weeks or months. */
+  times: number;
+  firstAwardedAt: string;
+  lastAwardedAt: string;
 }
 
 export function getPersonProfile(accessToken: string, personId: string): Promise<PersonProfile> {

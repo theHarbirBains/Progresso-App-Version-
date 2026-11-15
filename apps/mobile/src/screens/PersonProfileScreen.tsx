@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Share, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
@@ -30,6 +30,7 @@ import {
   respondToFollowRequest,
   sendFollowRequest,
   unfollowUser,
+  type EarnedAchievement,
   type FollowUser,
   type FriendsFeedItem,
   type PersonProfile,
@@ -41,16 +42,11 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { withAlpha } from '../theme/accentColor';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
-import { AchievementBadge } from '../social/AchievementBadge';
-import {
-  achievementsFor,
-  byRank,
-  compactNumber,
-  ranksEarned,
-  type Achievement,
-} from '../social/achievements';
-import { AchievementSheet, rankColor, rankName } from '../social/AchievementSheet';
-import { RANKS } from '../social/ranks';
+import { compactNumber } from '../social/compactNumber';
+import { RankEmblem } from '../achievements/RankEmblem';
+import { nextRankLabel, rankForPoints } from '../achievements/ranks';
+import { AnimatedBar } from '../design/AnimatedBar';
+import { formatCardDate } from '../workouts/workoutFormat';
 import { setText } from '../social/setText';
 import { PeopleList, personLabel } from '../social/PeopleList';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
@@ -153,7 +149,7 @@ function StatTile({
  * followers and following, and the people you follow who follow them too; one wide Follow /
  * Following button (or Accept and Decline, or Edit Profile on your own) with Share beside it. For
  * you, or someone who accepted your follow: four figures -- workouts, the last 30 days, records
- * held and everything lifted -- then Achievements (each one's rank, Bronze to Legacy), Workouts (all of
+ * held and everything lifted -- then Achievements (the ones they've earned), Workouts (all of
  * them, with likes and comments), PRs (every exercise's best set, each opening its top sets and
  * records) and Stats. Until then, a line saying
  * what following them shows. Report and Block are behind the header's "...". Read every time it
@@ -190,7 +186,6 @@ export function PersonProfilePage({
   const [busy, setBusy] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('achievements');
-  const [openAchievement, setOpenAchievement] = useState<Achievement | null>(null);
   const [liftQuery, setLiftQuery] = useState('');
   const [mutualsOpen, setMutualsOpen] = useState(false);
 
@@ -257,16 +252,6 @@ export function PersonProfilePage({
     shown !== undefined ||
     ((profile !== null || error !== null) && social.loaded && (own?.ready ?? true));
   const showPage = useShowAllAtOnce(settled);
-  // Ranked on what their followers can see -- never nutrition, which is yours alone.
-  const achievements = useMemo(
-    () =>
-      profile?.stats
-        ? byRank(
-            achievementsFor({ stats: profile.stats, followers: profile.followerCount }, weightUnit),
-          )
-        : [],
-    [profile?.stats, profile?.followerCount, weightUnit],
-  );
 
   async function loadMore() {
     if (!accessToken || loadingMore) return;
@@ -383,23 +368,82 @@ export function PersonProfilePage({
     );
   }
 
-  function renderAchievement(achievement: Achievement) {
+  function renderAchievement(achievement: EarnedAchievement, index: number) {
+    const repeats = achievement.repeats !== 'once';
     return (
-      <TouchableOpacity
+      <View
         key={achievement.id}
         testID={`person-profile-achievement-${achievement.id}`}
-        style={styles.achievement}
-        onPress={() => setOpenAchievement(achievement)}
-        accessibilityRole="button"
-        accessibilityLabel={`${achievement.title}, ${rankName(achievement)}. ${achievement.description}: ${achievement.valueLabel}`}
+        style={[styles.achievement, index > 0 && styles.liftDivider]}
+        accessible
+        accessibilityLabel={`${achievement.title}, ${achievement.ap} AP. ${achievement.description}. ${
+          repeats
+            ? `Earned ${achievement.times} times`
+            : `Earned ${formatCardDate(achievement.firstAwardedAt)}`
+        }`}
       >
-        <AchievementBadge icon={achievement.icon} rank={achievement.rank} size={56} />
-        <Text style={styles.achievementTitle} numberOfLines={1}>
-          {achievement.title}
+        <View style={[styles.achievementIcon, { backgroundColor: withAlpha(theme.accent, 0.16) }]}>
+          <Feather
+            name={achievement.icon as keyof typeof Feather.glyphMap}
+            size={18}
+            color={theme.accent}
+          />
+        </View>
+        <View style={styles.liftText}>
+          <Text style={styles.liftName} numberOfLines={1}>
+            {achievement.title}
+          </Text>
+          <Text style={styles.liftMachine} numberOfLines={2}>
+            {achievement.description}
+          </Text>
+          <Text style={styles.achievementWhen}>
+            {repeats
+              ? `${achievement.times} ${achievement.times === 1 ? 'time' : 'times'} · last ${formatCardDate(achievement.lastAwardedAt)}`
+              : formatCardDate(achievement.firstAwardedAt)}
+          </Text>
+        </View>
+        <Text style={[styles.achievementAp, { color: theme.accent }]}>
+          +{(achievement.ap * achievement.times).toLocaleString('en-US')}
         </Text>
-        <Text style={[styles.achievementRank, { color: rankColor(achievement) }]}>
-          {achievement.rank >= 0 ? rankName(achievement) : 'Locked'}
-        </Text>
+      </View>
+    );
+  }
+
+  /** Their lifetime rank: emblem, rank and division, AP and the bar to the next division. */
+  function renderRank(target: PersonProfile, title: string) {
+    const rank = rankForPoints(target.rank!.points);
+    const count = target.achievements?.length ?? null;
+    return (
+      <TouchableOpacity
+        testID="person-profile-rank"
+        style={styles.rank}
+        onPress={() =>
+          navigation.navigate(
+            'RankProgression',
+            target.isSelf ? undefined : { points: rank.points, name: firstName(target) },
+          )
+        }
+        accessibilityRole="button"
+        accessibilityLabel={`${target.isSelf ? 'Your' : `${title}'s`} rank: ${rank.label}, ${rank.points.toLocaleString('en-US')} AP. See every rank`}
+      >
+        <GlassBackground borderColor={withAlpha(rank.tier.palette.primary, 0.35)} />
+        <RankEmblem tierIndex={rank.tierIndex} divisionIndex={rank.divisionIndex} size={48} />
+        <View style={styles.rankText}>
+          <View style={styles.rankLine}>
+            <Text style={[styles.rankLabel, { color: rank.tier.palette.primary }]}>
+              {rank.label}
+            </Text>
+            <Text style={styles.rankPoints}>
+              {rank.points.toLocaleString('en-US')} AP
+              {count !== null ? ` · ${count} ${count === 1 ? 'achievement' : 'achievements'}` : ''}
+            </Text>
+          </View>
+          <AnimatedBar fraction={rank.progress} color={rank.tier.palette.primary} />
+          <Text style={styles.rankNext}>
+            {(rank.to - rank.points).toLocaleString('en-US')} AP to {nextRankLabel(rank)}
+          </Text>
+        </View>
+        <Feather name="chevron-right" size={16} color={colors.textMuted} />
       </TouchableOpacity>
     );
   }
@@ -407,24 +451,40 @@ export function PersonProfilePage({
   function renderTab(target: PersonProfile, name: string) {
     const stats = target.stats;
     if (tab === 'achievements') {
-      return stats ? (
+      const earned = target.achievements ?? [];
+      const seeAll = own ? (
+        <TextButton
+          testID="profile-all-achievements"
+          label="See All Your Achievements"
+          onPress={() => navigation.navigate('Achievements')}
+        />
+      ) : null;
+      // Only what they've earned -- never what's still ahead.
+      return earned.length === 0 ? (
+        <>
+          <EmptyState
+            testID="person-profile-no-achievements"
+            title="No achievements yet"
+            description={
+              target.isSelf
+                ? 'Finish a workout to earn your first.'
+                : 'Their achievements show here as they earn them.'
+            }
+          />
+          {seeAll}
+        </>
+      ) : (
         <AppCard testID="person-profile-achievements">
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Achievements</Text>
-            <Text testID="person-profile-ranks" style={styles.ranksEarned}>
-              {ranksEarned(achievements)} of {achievements.length * RANKS.length} ranks
+            <Text testID="person-profile-achievement-count" style={styles.ranksEarned}>
+              {earned.length} earned
             </Text>
           </View>
-          <View style={styles.achievements}>{achievements.map(renderAchievement)}</View>
-          {own ? (
-            <TextButton
-              testID="profile-all-achievements"
-              label="See All Your Achievements"
-              onPress={() => navigation.navigate('Achievements')}
-            />
-          ) : null}
+          {earned.map(renderAchievement)}
+          {seeAll}
         </AppCard>
-      ) : null;
+      );
     }
     if (tab === 'workouts') {
       return workouts.length === 0 ? (
@@ -469,11 +529,15 @@ export function PersonProfilePage({
                   value: `${compactNumber(fromKg(stats.totalVolumeKg, weightUnit))} ${weightUnit}`,
                   label: 'Total Volume',
                 },
-                {
-                  id: 'ranks',
-                  value: `${ranksEarned(achievements)} of ${achievements.length * RANKS.length}`,
-                  label: 'Ranks Earned',
-                },
+                ...(target.rank
+                  ? [
+                      {
+                        id: 'ap',
+                        value: target.rank.points.toLocaleString('en-US'),
+                        label: 'Achievement Points',
+                      },
+                    ]
+                  : []),
               ].map((cell) => (
                 <View key={cell.id} style={styles.statCell}>
                   <StatBlock
@@ -826,6 +890,8 @@ export function PersonProfilePage({
                 accessibilityLabel={profile.isSelf ? 'Share your profile' : `Share ${label.title}`}
               />
             </View>
+
+            {profile.rank ? renderRank(profile, label.title) : null}
           </View>
 
           {!profile.canSeeActivity ? (
@@ -889,12 +955,6 @@ export function PersonProfilePage({
               {renderTab(profile, label.title)}
             </>
           )}
-
-          <AchievementSheet
-            achievement={openAchievement}
-            onClose={() => setOpenAchievement(null)}
-            testID="person-profile-achievement-sheet"
-          />
 
           <BottomSheet
             visible={mutualsOpen}

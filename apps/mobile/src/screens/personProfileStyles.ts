@@ -193,27 +193,58 @@ export const personProfileStyles = StyleSheet.create({
     ...typeScale.caption,
     color: colors.textSecondary,
   },
-  // Every achievement, three to a row: its badge at its rank, its name, the rank in its colour.
-  achievements: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: spacing.lg,
-  },
+  // An earned achievement: its glyph in an accent well, name, what it was for, when -- and the
+  // AP it brought in, in the accent.
   achievement: {
-    width: '33.33%',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  achievementIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  achievementWhen: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
+  achievementAp: {
+    ...typeScale.statSmall,
+  },
+  // Their rank, on the photo under the buttons: a glass row edged in the rank's colour.
+  rank: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+  },
+  rankText: {
+    flex: 1,
     gap: spacing.xs,
-    paddingHorizontal: spacing.xs,
   },
-  achievementTitle: {
-    ...typeScale.caption,
-    color: colors.textPrimary,
-    textAlign: 'center',
+  rankLine: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
-  achievementRank: {
+  rankLabel: {
+    ...typeScale.cardTitle,
+  },
+  rankPoints: {
     ...typeScale.caption,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    color: colors.textSecondaryBright,
+    flexShrink: 1,
+  },
+  rankNext: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
   },
 
   lift: {

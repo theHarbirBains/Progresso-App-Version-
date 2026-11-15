@@ -27,7 +27,7 @@ jest.mock('../lib/supabase', () => ({
 // The signed-in person's profile: findable by email unless a test says otherwise.
 const mockUpdateProfile = jest.fn();
 // One profile object per test, as the real provider keeps it between renders.
-let mockProfile = { findableByEmail: true };
+let mockProfile: { findableByEmail: boolean; showRank?: boolean } = { findableByEmail: true };
 jest.mock('../profile/ProfileProvider', () => ({
   useProfile: () => ({ profile: mockProfile, updateProfile: mockUpdateProfile }),
 }));
@@ -74,6 +74,18 @@ describe('SettingsAccountSecurityScreen', () => {
 
     await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith({ findableByEmail: false }));
     expect(screen.getByTestId('account-findable-toggle').props.value).toBe(false);
+  });
+
+  it('shows your rank on your profile, until you hide it', async () => {
+    mockProfile = { findableByEmail: true, showRank: true };
+    mockUpdateProfile.mockReset().mockResolvedValue({});
+    renderScreen();
+
+    expect(screen.getByTestId('account-show-rank-toggle').props.value).toBe(true);
+    fireEvent(screen.getByTestId('account-show-rank-toggle'), 'valueChange', false);
+
+    await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith({ showRank: false }));
+    expect(screen.getByTestId('account-show-rank-toggle').props.value).toBe(false);
   });
 
   it('puts the switch back when it does not save', async () => {

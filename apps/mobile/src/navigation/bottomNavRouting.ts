@@ -53,6 +53,7 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   AdminFeedbackReview: 'you',
   Profile: 'you',
   Achievements: 'you',
+  RankProgression: 'you',
   // The Trainer Workspace's pages, under its own three tabs.
   TrainerClients: 'clients',
   TrainerClientDetail: 'clients',

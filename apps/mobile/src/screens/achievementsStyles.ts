@@ -1,45 +1,39 @@
 import { StyleSheet } from 'react-native';
-import { colors, spacing, typeScale, widgetGap } from '../design/theme';
+import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
 
-// AchievementsScreen. Token-only: the summary hero (ranks earned and the rank ladder), then a
-// card per kind of achievement, each a list of divided rows -- badge, name and rank, what it's
-// for, and the bar to the next rank.
+// AchievementsScreen. Token-only: the rank hero (emblem, rank, AP, the bar to the next
+// division), the filter, then the earned and still-ahead cards -- each a list of divided rows:
+// an icon well, name and AP, what it takes, and when it was earned or the bar to it.
 export const achievementsStyles = StyleSheet.create({
   content: {
     gap: widgetGap,
     paddingBottom: spacing.xxl,
   },
 
-  summaryTop: {
+  rank: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.sm,
-  },
-  summaryFigure: {
-    ...typeScale.statLarge,
-    color: colors.textPrimary,
-  },
-  summaryOf: {
-    ...typeScale.callout,
-    color: colors.textSecondary,
-  },
-  summaryNote: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  // The nine ranks side by side, each with how many achievements have reached it.
-  ladder: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.lg,
-  },
-  ladderStep: {
     alignItems: 'center',
+    gap: spacing.lg,
+  },
+  rankText: {
+    flex: 1,
     gap: spacing.xs,
   },
-  ladderCount: {
-    ...typeScale.label,
+  rankLabel: {
+    ...typeScale.screenTitle,
+  },
+  rankPoints: {
+    ...typeScale.statMedium,
+    color: colors.textPrimary,
+  },
+  rankNext: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
+  count: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
   },
 
   section: {
@@ -59,7 +53,7 @@ export const achievementsStyles = StyleSheet.create({
 
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.md,
     paddingVertical: spacing.md,
   },
@@ -67,9 +61,16 @@ export const achievementsStyles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.divider,
   },
+  icon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   rowText: {
     flex: 1,
-    gap: spacing.xs,
+    gap: 2,
   },
   rowTitleLine: {
     flexDirection: 'row',
@@ -82,17 +83,29 @@ export const achievementsStyles = StyleSheet.create({
     color: colors.textPrimary,
     flexShrink: 1,
   },
-  rowRank: {
-    ...typeScale.caption,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+  rowAp: {
+    ...typeScale.label,
+    color: colors.textSecondary,
   },
   rowDescription: {
     ...typeScale.secondary,
     color: colors.textSecondary,
   },
-  error: {
-    ...typeScale.callout,
-    color: colors.destructive,
+  rowEarned: {
+    ...typeScale.caption,
+    color: colors.textSecondaryBright,
+  },
+  rowProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  rowBar: {
+    flex: 1,
+  },
+  rowProgressLabel: {
+    ...typeScale.caption,
+    color: colors.textMuted,
   },
 });

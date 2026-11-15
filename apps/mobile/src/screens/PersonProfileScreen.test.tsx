@@ -66,6 +66,29 @@ function lift(exerciseId: string, exerciseName: string, extra: object = {}) {
   };
 }
 
+/** An achievement they've earned, as the API lists it. */
+function earned(
+  id: string,
+  title: string,
+  ap: number,
+  repeats: string,
+  times: number,
+  lastAwardedAt: string,
+) {
+  return {
+    id,
+    title,
+    description: `${title}, done`,
+    icon: 'activity',
+    category: 'workouts',
+    ap,
+    repeats,
+    times,
+    firstAwardedAt: '2026-10-05T10:00:00Z',
+    lastAwardedAt,
+  };
+}
+
 function profile(extra: object = {}) {
   return {
     user: sam,
@@ -105,6 +128,11 @@ function profile(extra: object = {}) {
       likesGiven: 8,
     },
     exercises: [lift('ex-row', 'Seated Row', { gym: 'Downtown', attachment: 'V-handle' })],
+    rank: { points: 2250, awards: 14 },
+    achievements: [
+      earned('weekly-warrior', 'Weekly Warrior', 25, 'weekly', 3, '2026-11-09T10:00:00Z'),
+      earned('dedicated', 'Dedicated', 125, 'once', 1, '2026-11-02T10:00:00Z'),
+    ],
     ...extra,
   };
 }
@@ -198,50 +226,51 @@ describe('PersonProfileScreen', () => {
     );
   });
 
-  it('opens on Achievements: every achievement at its rank, the highest first', async () => {
+  it("opens on Achievements: only what they've earned, the latest first", async () => {
     renderScreen();
 
-    expect(await screen.findByTestId('person-profile-achievements')).toBeTruthy();
+    expect(await screen.findByTestId('person-profile-achievements')).toHaveTextContent(
+      /Achievements.*2 earned/,
+    );
     expect(screen.getByTestId('person-profile-tab-achievements')).toHaveTextContent(
       /Achievements$/,
     );
-    // 120 workouts: Gold. 24 PRs: Silver. 30 likes: Silver. 1,500 sets: Gold.
-    expect(screen.getByTestId('person-profile-achievement-workouts')).toHaveTextContent(
-      /Iron Regular.*Gold/,
+    expect(screen.getByTestId('person-profile-achievement-weekly-warrior')).toHaveTextContent(
+      /Weekly Warrior.*Weekly Warrior, done.*3 times · last.*\+75/,
     );
-    expect(screen.getByTestId('person-profile-achievement-prs')).toHaveTextContent(
-      /Record Breaker.*Silver/,
+    expect(screen.getByTestId('person-profile-achievement-dedicated')).toHaveTextContent(
+      /Dedicated.*\+125/,
     );
-    expect(screen.getByTestId('person-profile-achievement-timed')).toHaveTextContent(
-      /Iron Core.*Locked/,
-    );
-    // Never nutrition: that's theirs alone.
-    expect(screen.queryByTestId('person-profile-achievement-food-days')).toBeNull();
-    expect(screen.getByTestId('person-profile-ranks')).toHaveTextContent(/of 162 ranks/);
+    // Never one still ahead, and never theirs to see all of.
+    expect(screen.queryByTestId('person-profile-achievement-first-steps')).toBeNull();
+    expect(screen.queryByTestId('profile-all-achievements')).toBeNull();
     // Their workouts are under Workouts.
     expect(screen.queryByTestId('person-profile-workout-w1')).toBeNull();
-    expect(screen.queryByTestId('profile-all-achievements')).toBeNull();
   });
 
-  it("opens an achievement's nine ranks: what each takes, and which are reached", async () => {
+  it('says so when they have earned none yet', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(profile({ achievements: [] }));
     renderScreen();
 
-    fireEvent.press(await screen.findByTestId('person-profile-achievement-workouts'));
+    expect(await screen.findByTestId('person-profile-no-achievements')).toBeTruthy();
+  });
 
-    const sheet = screen.getByTestId('person-profile-achievement-sheet');
-    expect(sheet).toHaveTextContent(/Iron Regular.*Gold.*Finish workouts/);
-    expect(screen.getByTestId('person-profile-achievement-sheet-progress')).toHaveTextContent(
-      '120 workouts · Platinum at 200 workouts',
+  it('shows their lifetime rank: emblem, division, AP and the way on, opening every rank', async () => {
+    renderScreen();
+
+    expect(await screen.findByTestId('person-profile-rank')).toHaveTextContent(
+      /Gold III.*2,250 AP · 2 achievements.*150 AP to Gold II/,
     );
-    expect(
-      screen.getByTestId('person-profile-achievement-sheet-rank-gold').props.accessibilityLabel,
-    ).toBe('Gold: 100 workouts. Reached');
-    expect(
-      screen.getByTestId('person-profile-achievement-sheet-rank-platinum').props.accessibilityLabel,
-    ).toBe('Platinum: 200 workouts. Next');
-    expect(
-      screen.getByTestId('person-profile-achievement-sheet-rank-legacy').props.accessibilityLabel,
-    ).toBe('Legacy: 1,500 workouts. Not reached yet');
+    fireEvent.press(screen.getByTestId('person-profile-rank'));
+    expect(mockNavigate).toHaveBeenCalledWith('RankProgression', { points: 2250, name: 'Sam' });
+  });
+
+  it('shows no rank for someone who hides it', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(profile({ rank: null }));
+    renderScreen();
+
+    await screen.findByTestId('person-profile-name');
+    expect(screen.queryByTestId('person-profile-rank')).toBeNull();
   });
 
   it('shows every exercise under PRs, each opening its top sets; every workout; and Stats', async () => {
@@ -290,8 +319,8 @@ describe('PersonProfileScreen', () => {
 
     fireEvent.press(screen.getByTestId('person-profile-tab-stats'));
     expect(screen.getByTestId('person-profile-stats-month')).toHaveTextContent(/14.*Busiest Month/);
-    expect(screen.getByTestId('person-profile-stats-ranks')).toHaveTextContent(
-      /of 162.*Ranks Earned/,
+    expect(screen.getByTestId('person-profile-stats-ap')).toHaveTextContent(
+      /2,250.*Achievement Points/,
     );
   });
 
@@ -379,6 +408,7 @@ describe('PersonProfileScreen', () => {
         canSeeActivity: false,
         stats: null,
         exercises: null,
+        achievements: null,
       }),
     );
     // Asked for alongside the profile, and refused until they accept.
@@ -392,6 +422,9 @@ describe('PersonProfileScreen', () => {
     expect(screen.queryByTestId('person-profile-error')).toBeNull();
     expect(screen.queryByTestId('person-profile-tiles')).toBeNull();
     expect(screen.queryByTestId('person-profile-tab')).toBeNull();
+    // Their rank is anyone's to see; what earned it isn't, yet.
+    expect(screen.getByTestId('person-profile-rank')).toHaveTextContent(/Gold III.*2,250 AP/);
+    expect(screen.getByTestId('person-profile-rank')).not.toHaveTextContent(/achievements/);
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('person-profile-follow'));

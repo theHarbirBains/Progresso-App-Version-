@@ -43,6 +43,22 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
     if (profile) setFindable(profile.findableByEmail ?? true);
   }, [profile]);
 
+  // Whether people who open your profile see your achievement rank.
+  const [showRank, setShowRank] = useState(profile?.showRank ?? true);
+  useEffect(() => {
+    if (profile) setShowRank(profile.showRank ?? true);
+  }, [profile]);
+
+  async function handleShowRank(value: boolean) {
+    const previous = showRank;
+    setShowRank(value);
+    try {
+      await updateProfile({ showRank: value });
+    } catch {
+      setShowRank(previous);
+    }
+  }
+
   async function handleFindable(value: boolean) {
     const previous = findable;
     setFindable(value);
@@ -136,6 +152,22 @@ export function SettingsAccountSecurityScreen({ navigation }: Props) {
               onValueChange={(value) => void handleFindable(value)}
               accentColor={theme.accent}
               accessibilityLabel="Let people with my email find me"
+            />
+          }
+        />
+        <ListRow
+          testID="account-show-rank"
+          divider
+          icon="award"
+          title="Show my rank on my profile"
+          subtitle="Your achievement rank and AP, for anyone who opens your profile. You always see yours."
+          trailing={
+            <Toggle
+              testID="account-show-rank-toggle"
+              value={showRank}
+              onValueChange={(value) => void handleShowRank(value)}
+              accentColor={theme.accent}
+              accessibilityLabel="Show my rank on my profile"
             />
           }
         />

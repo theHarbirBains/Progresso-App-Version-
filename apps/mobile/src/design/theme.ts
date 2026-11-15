@@ -70,22 +70,21 @@ export const colors = {
   launchWood: '#2E1707',
 } as const;
 
-// Achievement ranks (social/ranks.ts), Bronze to Legacy: the one place a run
-// of hues beyond the accent appears -- by explicit request, each rank its own
-// colour so it reads at a glance, like a game's ranked tiers. Legacy shimmers
-// through three (its badge's gradient); its one colour, for its name, is the
-// first.
-export const rankColors = {
-  bronze: '#C98A5A',
-  silver: '#C3CBD3',
-  gold: '#F2C14E',
-  platinum: '#7FDCCF',
-  diamond: '#6FB8FF',
-  vanguard: '#4FD18B',
-  titan: '#E5506A',
-  sovereign: '#A97CFF',
-  legacy: '#FF8BD1',
-  legacyGradient: ['#FF8BD1', '#FFD36E', '#7FE3FF'],
+// Lifetime ranks (achievements/ranks.ts), Bronze to Legacy: the one place a
+// run of hues beyond the accent appears -- by explicit request, each rank its
+// own two-colour palette so it reads at a glance: `primary` for its outline,
+// name and figures, `deep` for its emblem's body. Flat colour, no gradients or
+// glow.
+export const rankPalettes = {
+  bronze: { primary: '#C98A5A', deep: '#4A2E1C' },
+  silver: { primary: '#C3CBD3', deep: '#3A4048' },
+  gold: { primary: '#F2C14E', deep: '#5A4214' },
+  platinum: { primary: '#7FDCCF', deep: '#1F4A45' },
+  diamond: { primary: '#6FB8FF', deep: '#1B3A5C' },
+  vanguard: { primary: '#4FD18B', deep: '#174A31' },
+  titan: { primary: '#E5506A', deep: '#561A26' },
+  sovereign: { primary: '#A97CFF', deep: '#36255C' },
+  legacy: { primary: '#FF8BD1', deep: '#55203F' },
 } as const;
 
 // Three working radii plus the pill, each with one role so nested surfaces

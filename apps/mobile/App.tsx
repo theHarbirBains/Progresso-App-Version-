@@ -62,6 +62,9 @@ import { FollowListScreen } from './src/screens/FollowListScreen';
 import { PersonProfileScreen } from './src/screens/PersonProfileScreen';
 import { PersonExerciseScreen } from './src/screens/PersonExerciseScreen';
 import { AchievementsScreen } from './src/screens/AchievementsScreen';
+import { RankProgressionScreen } from './src/screens/RankProgressionScreen';
+import { AchievementsProvider } from './src/achievements/AchievementsProvider';
+import { AchievementUnlockHost } from './src/achievements/AchievementUnlockHost';
 import { TrainerAccessScreen } from './src/screens/TrainerAccessScreen';
 import { TrainerClaimScreen } from './src/screens/TrainerClaimScreen';
 import { GroupsScreen } from './src/screens/GroupsScreen';
@@ -493,6 +496,7 @@ function Root() {
                   <Stack.Screen name="PersonProfile" component={PersonProfileScreen} />
                   <Stack.Screen name="PersonExercise" component={PersonExerciseScreen} />
                   <Stack.Screen name="Achievements" component={AchievementsScreen} />
+                  <Stack.Screen name="RankProgression" component={RankProgressionScreen} />
                   <Stack.Screen name="FollowList" component={FollowListScreen} />
                 </Stack.Navigator>
               </NavigationContainer>
@@ -548,6 +552,11 @@ function Root() {
               accentColor={
                 backgroundMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent
               }
+            />
+
+            <AchievementUnlockHost
+              currentRouteName={currentRouteName}
+              onOpenAchievements={() => navigationRef.current?.navigate('Achievements')}
             />
           </View>
         </WorkspaceContext.Provider>
@@ -620,12 +629,14 @@ function App() {
             <NutritionGoalsProvider>
               <FoodLogProvider>
                 <AllTimeStatsProvider>
-                  <RemindersProvider>
-                    <AppThemeProvider>
-                      <AppShell fontsLoaded={fontsLoaded} />
-                      <WidgetSync />
-                    </AppThemeProvider>
-                  </RemindersProvider>
+                  <AchievementsProvider>
+                    <RemindersProvider>
+                      <AppThemeProvider>
+                        <AppShell fontsLoaded={fontsLoaded} />
+                        <WidgetSync />
+                      </AppThemeProvider>
+                    </RemindersProvider>
+                  </AchievementsProvider>
                   <StatusBar style="light" />
                 </AllTimeStatsProvider>
               </FoodLogProvider>

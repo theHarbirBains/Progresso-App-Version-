@@ -77,6 +77,8 @@ export interface ProfileResponse {
   notifyComments: boolean;
   /** Whether people with their email in their contacts can find them. */
   findableByEmail: boolean;
+  /** Whether people who open their profile see their achievement rank. */
+  showRank: boolean;
 }
 
 export interface UpdateProfileInput {
@@ -118,6 +120,7 @@ export interface UpdateProfileInput {
   notifyLikes?: boolean;
   notifyComments?: boolean;
   findableByEmail?: boolean;
+  showRank?: boolean;
 }
 
 export function updateMyProfile(
