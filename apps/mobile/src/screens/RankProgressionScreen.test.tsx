@@ -16,6 +16,19 @@ function renderScreen(params?: { points?: number; name?: string }, points = 2_25
 }
 
 describe('RankProgressionScreen', () => {
+  it('explains how ranks work first: AP, the nine ranks, never losing one, who sees it', () => {
+    renderScreen();
+
+    const how = screen.getByTestId('rank-how');
+    expect(how).toHaveTextContent(/How Ranks Work/);
+    expect(how).toHaveTextContent(/Earn Achievement Points/);
+    expect(how).toHaveTextContent(
+      /Bronze.*Silver.*Gold.*Platinum.*Diamond.*Vanguard.*Titan.*Sovereign.*Legacy/,
+    );
+    expect(how).toHaveTextContent(/Never lose it/);
+    expect(how).toHaveTextContent(/Settings > Account & Security/);
+  });
+
   it('lists all nine ranks in order, each with its AP range and five divisions, V to I', () => {
     renderScreen();
 

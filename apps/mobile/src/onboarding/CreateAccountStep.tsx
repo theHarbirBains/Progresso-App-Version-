@@ -6,7 +6,9 @@ import { PasswordVisibilityToggle } from '../design/PasswordVisibilityToggle';
 import { PrimaryButton, SecondaryButton } from '../design/Button';
 import { TextInput } from '../design/TextInput';
 import { colors, spacing, typeScale } from '../design/theme';
+import { openLegalPage } from '../lib/legalLinks';
 import { phoneCountry, toE164 } from '../lib/phoneNumbers';
+import { useAppTheme } from '../theme/appThemeContext';
 
 // Mirrors the backend's own username rule exactly (update-user.dto.ts /
 // 20260825100001_username.sql): lowercase letters, digits, underscores,
@@ -65,6 +67,7 @@ export function CreateAccountStep({
   onGoogleSignUp,
   googleSubmitting,
 }: Props) {
+  const accent = useAppTheme().accent.accent;
   const [displayName, setDisplayName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
@@ -206,7 +209,9 @@ export function CreateAccountStep({
         autoComplete="username-new"
         returnKeyType="next"
         value={username}
-        onChangeText={(text) => setUsername(text.toLowerCase())}
+        // No spaces, ever: one typed (or pasted) is simply left out.
+        onChangeText={(text) => setUsername(text.replace(/\s/g, '').toLowerCase())}
+        helperText="Lowercase letters, numbers and underscores, 3-20 of them. No spaces."
         onSubmitEditing={() => emailRef.current?.focus()}
       />
       <TextInput
@@ -293,6 +298,29 @@ export function CreateAccountStep({
         disabled={!canSubmit}
       />
 
+      {/* What creating an account agrees to, each opening its page (lib/legalLinks.ts). */}
+      <Text testID="onboarding-create-account-terms" style={formStyles.terms}>
+        By creating an account, you agree to Progresso&apos;s{' '}
+        <Text
+          testID="onboarding-create-account-terms-link"
+          style={[formStyles.termsLink, { color: accent }]}
+          onPress={() => void openLegalPage('terms')}
+          accessibilityRole="link"
+        >
+          Terms of Service
+        </Text>{' '}
+        and{' '}
+        <Text
+          testID="onboarding-create-account-privacy-link"
+          style={[formStyles.termsLink, { color: accent }]}
+          onPress={() => void openLegalPage('privacy')}
+          accessibilityRole="link"
+        >
+          Privacy Policy
+        </Text>
+        .
+      </Text>
+
       {socialSignInEnabled() ? (
         <>
           <View style={dividerStyles.row}>
@@ -325,6 +353,14 @@ const formStyles = StyleSheet.create({
   errorText: {
     ...typeScale.callout,
     color: colors.destructive,
+  },
+  terms: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  termsLink: {
+    ...typeScale.label,
   },
 });
 

@@ -20,7 +20,8 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 **Accounts & onboarding**
 
 - Email/password sign-up and sign-in (Supabase Auth), password reset, and Google sign-in; an Apple button uses the same web sign-in flow
-- A guided onboarding that ends in creating the account: where you heard about Progresso, country, gender, birthday, weight and height, fitness goal, how comfortable you are planning and progressing your workouts (which sets your starting rep range: 8–12, or 5–10 for experienced lifters), weekly frequency, workout length, a starting split, and email and push preferences — then a first and last name (both required; a profile shows both), a username, email, phone number and password, or Google
+- A guided onboarding that ends in creating the account: where you heard about Progresso, country, gender, birthday, weight and height, fitness goal, how comfortable you are planning and progressing your workouts (which sets your starting rep range: 8–12, or 5–10 for experienced lifters), weekly frequency, workout length, a membership (each one's every feature on its own card, swiped through), with Nutrition how active you are and your daily calorie and macro targets, a starting split, how ranks work, and email, push and Apple Health steps preferences — then a first and last name (both required; a profile shows both), a username, email, phone number and password, or Google
+- Sign-up is for 13 and up and agrees to the Terms of Service and Privacy Policy (each a tap away); a new account is then welcomed with a profile photo and the friends in its contacts already on Progresso, each skippable. A trainer's code can wait -- Settings > Trainer Code takes it any time
 - Allowing notifications during onboarding asks iOS for permission and registers the device for push
 - Change Password in Settings, for accounts that sign in with email
 

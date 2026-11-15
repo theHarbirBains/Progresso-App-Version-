@@ -92,6 +92,9 @@ import { NutritionHistoryScreen } from './src/screens/NutritionHistoryScreen';
 import { NutritionTodayScreen } from './src/screens/NutritionTodayScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { AddPhoneNumberScreen } from './src/screens/AddPhoneNumberScreen';
+import { WelcomeScreen } from './src/screens/WelcomeScreen';
+import { LoadingState } from './src/design/LoadingState';
+import { getWelcomeStage, setWelcomeStage, useWelcomeStage } from './src/onboarding/welcomeStage';
 import { PRHistoryScreen } from './src/screens/PRHistoryScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { ProgressExerciseDetailScreen } from './src/screens/ProgressExerciseDetailScreen';
@@ -167,6 +170,8 @@ const NUTRITION_SCREENS = {
 function Root() {
   const { status, session, user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
+  // A new account between onboarding and the app: saving, then its welcome.
+  const welcomeStage = useWelcomeStage();
   // Trainer Mode: a trainer, with a membership that includes it.
   const membership = useMembership();
   const isTrainer = useTrainerStatus() && membership.trainerMode;
@@ -351,6 +356,8 @@ function Root() {
     if (!session?.access_token || !user?.id) return;
     if (pendingDraftCheckedRef.current) return;
     pendingDraftCheckedRef.current = true;
+    // An account made in onboarding just now is saving its own answers.
+    if (getWelcomeStage() !== 'none') return;
 
     if (profile?.onboardingCompletedAt) {
       void clearOnboardingDraft();
@@ -360,10 +367,13 @@ function Root() {
     const userId = user.id;
     loadOnboardingDraft().then((stored) => {
       if (!stored) return;
+      setWelcomeStage('saving');
       submitOnboardingDraft(accessToken, userId, stored.draft)
         .then(() => clearOnboardingDraft())
+        .then(() => setWelcomeStage('welcome'))
         .catch(() => {
           // Leave the draft in place -- retried on the next sign-in.
+          setWelcomeStage('none');
         });
     });
   }, [status, session, user, profile, profileLoading]);
@@ -373,6 +383,13 @@ function Root() {
   }
 
   if (status === 'signedIn') {
+    // A new account: onboarding's answers saving, then its welcome -- before the app.
+    if (welcomeStage === 'saving') {
+      return <LoadingState testID="welcome-saving" />;
+    }
+    if (welcomeStage === 'welcome') {
+      return <WelcomeScreen onDone={() => setWelcomeStage('none')} />;
+    }
     // Asked once of everyone who signed up before a phone number was: their number, before the
     // app (screens/AddPhoneNumberScreen.tsx). A new account's comes with its onboarding.
     if (!profileLoading && profile?.onboardingCompletedAt && !profile.phoneNumber) {

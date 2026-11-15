@@ -3,6 +3,7 @@ import {
   claimTrainerHistory,
   registerPushToken,
   updateMyProfile,
+  type ActivityLevel,
   type AverageWorkoutLength,
   type FitnessGoal,
   type Gender,
@@ -14,6 +15,10 @@ import {
   type UpdateProfileInput,
 } from '../lib/api';
 import { requestPushToken } from '../lib/pushNotifications';
+import { includesNutrition } from '../membership/membershipTiers';
+import { ageFromBirthday } from '../nutrition/calorieEstimationInput';
+import { saveNutritionGoals } from '../nutrition/nutritionGoalQueries';
+import type { TargetValues } from '../nutrition/targetMath';
 import { toDateStringUTC } from './dateWheelValues';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { WORKOUT_SPLIT_PRESETS } from '../workouts/workoutSplitPresets';
@@ -41,6 +46,17 @@ export interface OnboardingDraft {
   fitnessGoals: FitnessGoal[];
   /** Which parts of the app they'll use (membership/membershipTiers.ts). */
   membershipTier: MembershipTier | null;
+  /** How active they are -- for the calorie estimate, with Nutrition in the membership. */
+  activityLevel: ActivityLevel | null;
+  /** The daily targets they chose to use (with Nutrition in the membership), saved as their
+   * nutrition goals once the account exists; null until chosen, or when skipped. */
+  nutritionTargets: TargetValues | null;
+  skippedNutritionTargets: boolean;
+  /** Went past How ranks work. */
+  ranksSeen: boolean;
+  /** Answered the Apple Health question: true if they asked to connect, false for Not Now. Kept
+   * only here -- Apple Health itself remembers what they allowed. */
+  appleHealthAsked: boolean | null;
   /** Also sets the starting rep range: see defaultRepRange. */
   trainingComfort: TrainingComfort | null;
   workoutFrequencyDays: number | null;
@@ -61,9 +77,6 @@ export interface OnboardingDraft {
   /** Skipped choosing a split for now: like Create Your Own, the account starts with no split --
    * Start Workout asks for one the first time it's needed. */
   skippedSplit: boolean;
-  /** Went past the theme step. The theme itself is kept on the phone the moment it's tapped
-   * (theme/AppThemeProvider), not in the account, so the draft only records that it was seen. */
-  themeChosen: boolean;
   emailOptIn: boolean | null;
   pushNotificationsOptIn: boolean | null;
   /** Whether a trainer has been logging their workouts: true with the code the trainer gave
@@ -103,13 +116,17 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   heightUnit: 'cm',
   fitnessGoals: [],
   membershipTier: null,
+  activityLevel: null,
+  nutritionTargets: null,
+  skippedNutritionTargets: false,
+  ranksSeen: false,
+  appleHealthAsked: null,
   trainingComfort: null,
   workoutFrequencyDays: null,
   averageWorkoutLength: null,
   selectedSplitPresetId: null,
   wantsCustomSplit: false,
   skippedSplit: false,
-  themeChosen: false,
   emailOptIn: null,
   pushNotificationsOptIn: null,
   hasTrainerCode: null,
@@ -138,13 +155,70 @@ export const STEP_ORDER = [
   'workoutFrequency',
   'averageWorkoutLength',
   'membership',
-  'theme',
+  // With Nutrition in the membership: how active they are, then their daily targets.
+  'activityLevel',
+  'nutritionTargets',
   'workoutSplit',
+  'ranks',
   'emailPreference',
   'pushNotifications',
+  // Where Apple Health is there to ask.
+  'appleHealth',
   'trainerCode',
   'createAccount',
 ] as const;
+
+/** Progresso is for people this old and up (the Privacy Policy says so). */
+export const MIN_SIGNUP_AGE = 13;
+
+/** Whether someone with this birthday is old enough for Progresso. */
+export function isOldEnough(birthday: string | null, now: Date = new Date()): boolean {
+  if (!birthday) return false;
+  const age = ageFromBirthday(birthday, now);
+  return age !== null && age >= MIN_SIGNUP_AGE;
+}
+
+/** What the phone can do, for the steps that depend on it. */
+export interface StepContext {
+  /** Apple Health is on this phone, in this copy of the app. */
+  healthAvailable: boolean;
+}
+
+/** Whether a step is asked at all: Nutrition's only with it in the membership, Apple Health's
+ * only where it's there to ask. */
+export function stepApplies(
+  step: OnboardingStep,
+  draft: OnboardingDraft,
+  context: StepContext,
+): boolean {
+  switch (step) {
+    case 'activityLevel':
+    case 'nutritionTargets':
+      return draft.membershipTier !== null && includesNutrition(draft.membershipTier);
+    case 'appleHealth':
+      return context.healthAvailable;
+    default:
+      return true;
+  }
+}
+
+/** The steps asked, in order. */
+export function stepsAsked(draft: OnboardingDraft, context: StepContext): OnboardingStep[] {
+  return STEP_ORDER.filter((step) => stepApplies(step, draft, context));
+}
+
+/** The step to go to from `from`, a way: the nearest one asked, or `from` itself at either end. */
+export function nextStepIndex(
+  from: number,
+  direction: 1 | -1,
+  draft: OnboardingDraft,
+  context: StepContext,
+): number {
+  for (let index = from + direction; index >= 0 && index < STEP_ORDER.length; index += direction) {
+    if (stepApplies(STEP_ORDER[index], draft, context)) return index;
+  }
+  return from;
+}
 
 /** A trainer's claim code as the API takes it: 8 to 12 letters and numbers, dashes and spaces allowed. */
 const TRAINER_CODE_PATTERN = /^[A-Za-z0-9 -]{8,12}$/;
@@ -166,7 +240,7 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
     case 'gender':
       return draft.gender != null;
     case 'birthday':
-      return draft.birthday != null;
+      return isOldEnough(draft.birthday);
     case 'weight':
       return draft.weightValue != null;
     case 'height':
@@ -175,8 +249,14 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
       return draft.fitnessGoals.length > 0;
     case 'membership':
       return draft.membershipTier != null;
-    case 'theme':
-      return draft.themeChosen;
+    case 'activityLevel':
+      return draft.activityLevel != null;
+    case 'nutritionTargets':
+      return draft.nutritionTargets != null || draft.skippedNutritionTargets;
+    case 'ranks':
+      return draft.ranksSeen;
+    case 'appleHealth':
+      return draft.appleHealthAsked != null;
     case 'trainingComfort':
       return draft.trainingComfort != null;
     case 'workoutFrequency':
@@ -199,11 +279,16 @@ export function isStepAnswered(step: OnboardingStep, draft: OnboardingDraft): bo
   }
 }
 
-/** The first unanswered step -- always createAccount once every real
+/** The first unanswered step asked -- always createAccount once every real
  * question is done, since it's never itself "answered" (it's a terminal
  * action, not a stored field). */
-export function computeStartStepIndex(draft: OnboardingDraft): number {
-  const index = STEP_ORDER.findIndex((step) => !isStepAnswered(step, draft));
+export function computeStartStepIndex(
+  draft: OnboardingDraft,
+  context: StepContext = { healthAvailable: false },
+): number {
+  const index = STEP_ORDER.findIndex(
+    (step) => stepApplies(step, draft, context) && !isStepAnswered(step, draft),
+  );
   return index === -1 ? STEP_ORDER.length - 1 : index;
 }
 
@@ -219,6 +304,7 @@ function draftToProfileInput(draft: OnboardingDraft): UpdateProfileInput {
   input.heightUnit = draft.heightUnit;
   if (draft.fitnessGoals.length > 0) input.fitnessGoals = draft.fitnessGoals;
   if (draft.membershipTier != null) input.membershipTier = draft.membershipTier;
+  if (draft.activityLevel != null) input.activityLevel = draft.activityLevel;
   if (draft.trainingComfort != null) {
     input.trainingComfort = draft.trainingComfort;
     const range = defaultRepRange(draft.trainingComfort);
@@ -273,6 +359,13 @@ export async function submitOnboardingDraft(
 
   input.onboardingCompleted = true;
   const profile = await updateMyProfile(accessToken, input);
+  if (
+    draft.nutritionTargets &&
+    draft.membershipTier !== null &&
+    includesNutrition(draft.membershipTier)
+  ) {
+    await saveTargets(userId, draft.nutritionTargets);
+  }
   if (draft.pushNotificationsOptIn) await registerThisDevice(accessToken);
   if (draft.hasTrainerCode && draft.trainerCode)
     await claimTrainerCode(accessToken, draft.trainerCode);
@@ -291,6 +384,19 @@ async function claimTrainerCode(accessToken: string, code: string): Promise<void
     Alert.alert(
       "Your trainer's code didn't work",
       `${error instanceof Error ? error.message : String(error)}\n\nYou can enter it again in Trainer Access.`,
+    );
+  }
+}
+
+/** The daily targets they chose, as their nutrition goals. A failure never fails sign-up, which has
+ * already been saved: they're told, and can set them in Nutrition Goals. */
+async function saveTargets(userId: string, targets: TargetValues): Promise<void> {
+  try {
+    await saveNutritionGoals(userId, targets);
+  } catch {
+    Alert.alert(
+      "Your daily targets didn't save",
+      'You can set them any time in Settings > Nutrition & Goals.',
     );
   }
 }

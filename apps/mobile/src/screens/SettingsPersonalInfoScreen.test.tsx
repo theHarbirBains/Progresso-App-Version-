@@ -99,6 +99,15 @@ describe('SettingsPersonalInfoScreen', () => {
     expect(screen.getByTestId('account-username')).toHaveProp('value', 'newhandle');
   });
 
+  it('keeps spaces out of a username as it is typed', async () => {
+    renderScreen();
+    await screen.findByTestId('account-display-name');
+
+    fireEvent.changeText(screen.getByTestId('account-username'), 'new handle ');
+
+    expect(screen.getByTestId('account-username')).toHaveProp('value', 'newhandle');
+  });
+
   it('saves display name, username, and both measurement units together', async () => {
     mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, displayName: 'New Name' });
     renderScreen();

@@ -25,20 +25,29 @@ import {
 import {
   computeStartStepIndex,
   EMPTY_DRAFT,
+  isOldEnough,
   isStepAnswered,
+  MIN_SIGNUP_AGE,
+  nextStepIndex,
   STEP_ORDER,
+  stepsAsked,
   submitOnboardingDraft,
   MAX_FITNESS_GOALS,
   type OnboardingDraft,
   type OnboardingStep,
+  type StepContext,
 } from '../onboarding/onboardingDraft';
 import {
   clearOnboardingDraft,
   loadOnboardingDraft,
   saveOnboardingDraft,
 } from '../onboarding/onboardingDraftStorage';
-import { MembershipChoices } from '../membership/MembershipChoices';
-import { ThemeChoices } from '../theme/ThemeChoices';
+import { MembershipCards } from '../membership/MembershipCards';
+import { RankExplainer } from '../achievements/RankExplainer';
+import { askForSteps, stepsAccess } from '../health/steps';
+import { ACTIVITY_LEVELS } from '../nutrition/calorieEstimationInput';
+import { NutritionTargetsStep } from '../onboarding/NutritionTargetsStep';
+import { setWelcomeStage } from '../onboarding/welcomeStage';
 import { TextInput } from '../design/TextInput';
 import { OnboardingOptionCard } from '../onboarding/OnboardingOptionCard';
 import { OnboardingProgress } from '../onboarding/OnboardingProgress';
@@ -66,8 +75,8 @@ const CONTINUE_STEPS = new Set<OnboardingStep>([
   'fitnessGoal',
   // The trainer's code is typed.
   'trainerCode',
-  // A theme shows as it's tapped, so there's time to look before moving on.
-  'theme',
+  // How ranks work is read, then moved on from.
+  'ranks',
 ]);
 
 // How long a tapped answer shows as chosen before the next question takes its place.
@@ -91,9 +100,7 @@ const DEFAULT_BIRTH_YEAR = new Date().getFullYear() - 25;
 // onboardingDraftStorage) is what makes this resumable across an app kill,
 // the same guarantee the old profile-backed flow had.
 export function OnboardingScreen({ onSwitchToSignIn }: Props) {
-  // The theme step applies a tapped theme at once, behind onboarding itself.
-  const appTheme = useAppTheme();
-  const { accent } = appTheme;
+  const { accent } = useAppTheme();
   const { signUpWithPassword, signInWithProvider } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -110,6 +117,24 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
   const [birthdayMonth, setBirthdayMonth] = useState(0);
   const [birthdayDay, setBirthdayDay] = useState(1);
   const [birthdayYear, setBirthdayYear] = useState(DEFAULT_BIRTH_YEAR);
+
+  // Whether Apple Health is here to ask about (an iPhone, in a copy of the app that has it).
+  const [healthAvailable, setHealthAvailable] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    stepsAccess()
+      .then((access) => {
+        if (mounted) setHealthAvailable(access !== 'unavailable');
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  const context: StepContext = { healthAvailable };
+  // The latest of each, for a tapped answer's move on to read once it's shown as chosen.
+  const latest = useRef({ draft, context });
+  latest.current = { draft, context };
 
   // Set once signUpWithPassword has actually created the auth account, so a
   // retry after a later failure (e.g. the profile PATCH itself fails)
@@ -158,6 +183,11 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
     setStepIndex(Math.min(STEP_ORDER.length - 1, Math.max(0, index)));
   }
 
+  /** The nearest step asked, a way from this one -- a step that doesn't apply is passed by. */
+  function stepFrom(index: number, direction: 1 | -1): number {
+    return nextStepIndex(index, direction, latest.current.draft, latest.current.context);
+  }
+
   // A tapped answer's move to the next question, waiting out CHOSEN_PAUSE_MS.
   const pendingAdvance = useRef<ReturnType<typeof setTimeout> | null>(null);
   function cancelPendingAdvance() {
@@ -168,14 +198,14 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
 
   function goBackStep() {
     cancelPendingAdvance();
-    goToStep(stepIndex - 1);
+    goToStep(stepFrom(stepIndex, -1));
   }
 
   function advance() {
     cancelPendingAdvance();
-    // The theme step is answered by moving on from it, whichever theme is showing.
-    if (STEP_ORDER[stepIndex] === 'theme') updateDraft({ themeChosen: true });
-    goToStep(stepIndex + 1);
+    // How ranks work is answered by moving on from it.
+    if (STEP_ORDER[stepIndex] === 'ranks') updateDraft({ ranksSeen: true });
+    goToStep(stepFrom(stepIndex, 1));
   }
 
   /**
@@ -188,15 +218,14 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
     const from = stepIndex;
     pendingAdvance.current = setTimeout(() => {
       pendingAdvance.current = null;
-      setStepIndex((current) =>
-        current === from ? Math.min(STEP_ORDER.length - 1, from + 1) : current,
-      );
+      // The answer's in by now, so a step it rules out (Nutrition's, without it) is passed by.
+      setStepIndex((current) => (current === from ? stepFrom(from, 1) : current));
     }, CHOSEN_PAUSE_MS);
   }
 
   function canContinue(step: OnboardingStep): boolean {
-    // The default theme is a fine answer: it's already showing.
-    return step === 'theme' || isStepAnswered(step, draft);
+    // How ranks work is only read.
+    return step === 'ranks' || isStepAnswered(step, draft);
   }
 
   async function handleCreateAccount(fields: CreateAccountFields) {
@@ -212,10 +241,13 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
       pendingPhoneNumber: fields.phoneNumber,
     });
 
+    // The app waits while the answers save, then welcomes them (onboarding/welcomeStage.ts).
+    setWelcomeStage('saving');
     try {
       if (!accountCreatedRef.current) {
         const result = await signUpWithPassword(fields.email, fields.password);
         if (result.error) {
+          setWelcomeStage('none');
           setError(result.error);
           setSaving(false);
           return;
@@ -227,6 +259,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
           // pendingUsername/pendingDisplayName) stays there; App.tsx's Root
           // finishes this the moment a real session appears, once the user
           // confirms and signs in.
+          setWelcomeStage('none');
           setConfirmationEmail(fields.email);
           setConfirmationSent(true);
           setSaving(false);
@@ -255,12 +288,14 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
         },
       );
       await clearOnboardingDraft();
+      setWelcomeStage('welcome');
       // No explicit navigation: signUpWithPassword already established the
       // session above, so AuthProvider's status flips to 'signedIn'
       // shortly after (via its own onAuthStateChange listener), and
       // App.tsx's Root swaps this whole screen for the real, signed-in app
       // on its own.
     } catch (err) {
+      setWelcomeStage('none');
       setError(err instanceof Error ? err.message : 'Failed to finish creating your account');
       setSaving(false);
     }
@@ -307,6 +342,8 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
 
   const step = STEP_ORDER[stepIndex];
   const isNoScrollStep = NO_OUTER_SCROLL_STEPS.has(step);
+  // The progress bar counts only the steps asked.
+  const asked = stepsAsked(draft, context);
 
   const content = (
     <>
@@ -322,8 +359,8 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
         <View style={styles.progress}>
           <OnboardingProgress
             testID="onboarding-progress"
-            currentIndex={stepIndex}
-            totalSteps={STEP_ORDER.length}
+            currentIndex={Math.max(0, asked.indexOf(step))}
+            totalSteps={asked.length}
           />
         </View>
       </View>
@@ -397,6 +434,11 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 }}
               />
             </View>
+            {draft.birthday && !isOldEnough(draft.birthday) ? (
+              <Text testID="onboarding-too-young" style={styles.errorText}>
+                Progresso is for people {MIN_SIGNUP_AGE} and older.
+              </Text>
+            ) : null}
           </>
         ) : null}
 
@@ -494,26 +536,70 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
             <Text style={styles.stepExplanation}>
               All free for now. You can change it any time in Settings.
             </Text>
-            <MembershipChoices
+            <MembershipCards
               testID="onboarding-step-membership"
               value={draft.membershipTier}
-              onChange={(membershipTier) => choose({ membershipTier })}
+              onChoose={(membershipTier) => choose({ membershipTier })}
             />
           </>
         ) : null}
 
-        {step === 'theme' ? (
+        {step === 'activityLevel' ? (
           <>
-            <Text style={styles.stepTitle}>Pick your look</Text>
+            <Text style={styles.stepTitle}>How active are you?</Text>
             <Text style={styles.stepExplanation}>
-              A gym photo behind your screens and the colour of your buttons. You can change it any
-              time in Settings &gt; Appearance.
+              On a typical week, counting your workouts. It sets your daily calories.
             </Text>
-            <ThemeChoices
-              selectedId={appTheme.theme.id}
-              onChoose={appTheme.choose}
-              testIDPrefix="onboarding-theme"
+            <View testID="onboarding-step-activity-level">
+              {ACTIVITY_LEVELS.map((option) => (
+                <OnboardingOptionCard
+                  key={option.value}
+                  testID={`onboarding-activity-${option.value}`}
+                  label={option.label}
+                  description={option.description}
+                  selected={draft.activityLevel === option.value}
+                  onPress={() => choose({ activityLevel: option.value })}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {step === 'nutritionTargets' ? (
+          <>
+            <Text style={styles.stepTitle}>Your daily targets</Text>
+            <Text style={styles.stepExplanation}>
+              Worked out from what you&apos;ve told us. Use them as they are, change any of them, or
+              set them later.
+            </Text>
+            <NutritionTargetsStep
+              testID="onboarding-step-nutrition-targets"
+              gender={draft.gender}
+              birthday={draft.birthday}
+              weightKg={draft.weightValue}
+              heightCm={draft.heightValue}
+              activityLevel={draft.activityLevel}
+              fitnessGoals={draft.fitnessGoals}
+              value={draft.nutritionTargets}
+              onUse={(nutritionTargets) => {
+                updateDraft({ nutritionTargets, skippedNutritionTargets: false });
+                advance();
+              }}
+              onSkip={() => {
+                updateDraft({ nutritionTargets: null, skippedNutritionTargets: true });
+                advance();
+              }}
             />
+          </>
+        ) : null}
+
+        {step === 'ranks' ? (
+          <>
+            <Text style={styles.stepTitle}>How ranks work</Text>
+            <Text style={styles.stepExplanation}>
+              Everything you do in Progresso earns points toward a rank that&apos;s yours for life.
+            </Text>
+            <RankExplainer testID="onboarding-step-ranks" />
           </>
         ) : null}
 
@@ -617,6 +703,30 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
           />
         ) : null}
 
+        {step === 'appleHealth' ? (
+          <PermissionStep
+            testID="onboarding-step-apple-health"
+            icon="heart"
+            title="Count your steps"
+            description="Allow Apple Health so Progresso can show today's steps on Feed and your last four weeks in Progress. Progresso only reads your steps -- it never changes anything in Apple Health or keeps them."
+            connectLabel="Allow"
+            skipLabel="Not Now"
+            onConnect={() => {
+              // Apple Health's own sheet; whatever's chosen there, move on once it's answered.
+              void askForSteps()
+                .catch(() => undefined)
+                .then(() => {
+                  updateDraft({ appleHealthAsked: true });
+                  advance();
+                });
+            }}
+            onSkip={() => {
+              updateDraft({ appleHealthAsked: false });
+              advance();
+            }}
+          />
+        ) : null}
+
         {step === 'trainerCode' ? (
           <>
             <Text style={styles.stepTitle}>Has a trainer been logging your workouts?</Text>
@@ -645,6 +755,17 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                     advance();
                   }}
                 />
+                <TextButton
+                  testID="onboarding-trainer-code-later"
+                  label="Do this later"
+                  onPress={() => {
+                    updateDraft({ hasTrainerCode: false, trainerCode: null });
+                    advance();
+                  }}
+                />
+                <Text style={styles.footnote}>
+                  You can enter it any time in Settings &gt; Trainer Code.
+                </Text>
               </View>
             </View>
           </>

@@ -51,4 +51,11 @@ export const onboardingStyles = StyleSheet.create({
   footer: {
     paddingTop: spacing.lg,
   },
+  // A quiet line under a step's own buttons: where to find this again later.
+  footnote: {
+    ...typeScale.secondary,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
 });

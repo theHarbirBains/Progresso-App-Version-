@@ -5,10 +5,18 @@ import { useAuth } from '../auth/AuthProvider';
 import { socialSignInEnabled } from '../auth/socialSignIn';
 import { updateMyProfile } from '../lib/api';
 import { requestNotificationPermission } from '../lib/pushNotifications';
-import { EMPTY_DRAFT, STEP_ORDER, type OnboardingDraft } from '../onboarding/onboardingDraft';
+import { askForSteps, stepsAccess } from '../health/steps';
+import { openLegalPage } from '../lib/legalLinks';
+import { saveNutritionGoals } from '../nutrition/nutritionGoalQueries';
+import {
+  EMPTY_DRAFT,
+  STEP_ORDER,
+  type OnboardingDraft,
+  type OnboardingStep,
+} from '../onboarding/onboardingDraft';
+import { getWelcomeStage, setWelcomeStage } from '../onboarding/welcomeStage';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { OnboardingScreen } from './OnboardingScreen';
-import { AppThemeProvider } from '../theme/AppThemeProvider';
 
 // The theme provider reads the profile's country (for the seasons); before sign-in there's none.
 jest.mock('../profile/ProfileProvider', () => ({ useProfile: () => ({ profile: null }) }));
@@ -28,6 +36,16 @@ jest.mock('../lib/pushNotifications', () => ({
   requestNotificationPermission: jest.fn(),
   requestPushToken: jest.fn(),
 }));
+
+// Apple Health isn't here unless a test says so (its own tests, below).
+jest.mock('../health/steps', () => ({
+  stepsAccess: jest.fn(),
+  askForSteps: jest.fn(),
+}));
+jest.mock('../nutrition/nutritionGoalQueries', () => ({
+  saveNutritionGoals: jest.fn(),
+}));
+jest.mock('../lib/legalLinks', () => ({ openLegalPage: jest.fn() }));
 
 jest.mock('../workouts/workoutSplitQueries', () => ({
   materializeWorkoutSplitPreset: jest.fn(),
@@ -58,6 +76,15 @@ beforeEach(async () => {
   mockUpdateMyProfile.mockReset().mockResolvedValue({ id: 'user-1' });
   mockRequestNotificationPermission.mockReset().mockResolvedValue(true);
   mockMaterialize.mockReset().mockResolvedValue({ id: 'split-new', name: 'Push / Pull / Legs' });
+  jest.mocked(stepsAccess).mockReset().mockResolvedValue('unavailable');
+  jest.mocked(askForSteps).mockReset().mockResolvedValue(undefined);
+  jest.mocked(saveNutritionGoals).mockReset().mockResolvedValue({
+    calories: 2000,
+    proteinG: 140,
+    carbsG: 200,
+    fatG: 52,
+  });
+  setWelcomeStage('none');
   mockSwitchToSignIn.mockClear();
 });
 
@@ -230,13 +257,19 @@ describe('OnboardingScreen', () => {
     renderScreen();
     await screen.findByTestId('onboarding-step-membership');
 
-    expect(screen.getByText('Workouts')).toBeTruthy();
-    expect(screen.getByText('Workouts + Nutrition')).toBeTruthy();
-    expect(screen.getByText('Everything')).toBeTruthy();
+    // One large card each, to swipe through, every feature listed.
+    expect(screen.getByTestId('onboarding-step-membership-pager').props.horizontal).toBe(true);
+    expect(screen.getByTestId('onboarding-step-membership-card-workouts')).toHaveTextContent(
+      /Workouts.*Live workout tracking.*Nutrition.*Not included.*Trainer Mode.*Not included/,
+    );
+    expect(screen.getByTestId('onboarding-step-membership-card-everything')).toHaveTextContent(
+      /Food logging.*Trainer Workspace/,
+    );
     fireEvent.press(screen.getByTestId('onboarding-step-membership-workouts'));
 
-    // Then the look: the default showing, Continue ready.
-    expect(await screen.findByTestId('onboarding-theme-golden-hour-gym')).toBeTruthy();
+    // No Nutrition in it, so no daily targets: on to the split, with no theme to pick.
+    expect(await screen.findByTestId('onboarding-step-workout-split')).toBeTruthy();
+    expect(screen.queryByText('Pick your look')).toBeNull();
     await waitFor(async () => {
       const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
       expect(stored.draft.membershipTier).toBe('workouts');
@@ -255,7 +288,9 @@ describe('OnboardingScreen', () => {
           weightValue: 80,
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
-          themeChosen: true,
+          ranksSeen: true,
+          activityLevel: 'moderately_active',
+          skippedNutritionTargets: true,
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',
@@ -291,7 +326,9 @@ describe('OnboardingScreen', () => {
           weightValue: 80,
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
-          themeChosen: true,
+          ranksSeen: true,
+          activityLevel: 'moderately_active',
+          skippedNutritionTargets: true,
           hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
@@ -304,7 +341,7 @@ describe('OnboardingScreen', () => {
 
     fireEvent.press(screen.getByTestId('onboarding-skip-workout-split'));
 
-    expect(await screen.findByTestId('onboarding-step-email-preference')).toBeTruthy();
+    expect(await screen.findByTestId('onboarding-step-ranks')).toBeTruthy();
     await waitFor(async () => {
       const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
       expect(stored.draft).toMatchObject({
@@ -360,12 +397,24 @@ describe('OnboardingScreen', () => {
     await screen.findByTestId('onboarding-step-membership');
     fireEvent.press(screen.getByTestId('onboarding-step-membership-workouts_nutrition'));
 
-    // The look, applied as it's tapped; Continue moves on.
-    fireEvent.press(await screen.findByTestId('onboarding-theme-forest'));
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
+    // With Nutrition: how active, then the daily targets worked out from it.
+    await screen.findByTestId('onboarding-step-activity-level');
+    fireEvent.press(screen.getByTestId('onboarding-activity-moderately_active'));
+    await screen.findByTestId('onboarding-step-nutrition-targets');
+    // 176 lb: 140 g protein, 52 g fat.
+    expect(screen.getByTestId('onboarding-step-nutrition-targets-protein')).toHaveProp(
+      'value',
+      '140',
+    );
+    expect(screen.getByTestId('onboarding-step-nutrition-targets-fat')).toHaveProp('value', '52');
+    fireEvent.press(screen.getByTestId('onboarding-step-nutrition-targets-use'));
 
     await screen.findByTestId('onboarding-step-workout-split');
     fireEvent.press(screen.getByTestId('onboarding-step-workout-split-preset-ppl'));
+
+    // How ranks work, read and moved on from.
+    await screen.findByTestId('onboarding-step-ranks');
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
 
     await screen.findByTestId('onboarding-step-email-preference');
     fireEvent.press(screen.getByTestId('onboarding-email-yes'));
@@ -426,7 +475,18 @@ describe('OnboardingScreen', () => {
         }),
       ),
     );
+    // The daily targets, as their nutrition goals; how active they are, on their profile.
+    expect(saveNutritionGoals).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ proteinG: 140, fatG: 52, calories: expect.any(Number) }),
+    );
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith(
+      'token-123',
+      expect.objectContaining({ activityLevel: 'moderately_active' }),
+    );
     expect(await AsyncStorage.getItem('@progresso/onboardingDraft')).toBeNull();
+    // The app welcomes them once it's all saved.
+    expect(getWelcomeStage()).toBe('welcome');
     await settle();
   });
 
@@ -446,7 +506,9 @@ describe('OnboardingScreen', () => {
           heightUnit: 'cm',
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
-          themeChosen: true,
+          ranksSeen: true,
+          activityLevel: 'moderately_active',
+          skippedNutritionTargets: true,
           hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
@@ -531,7 +593,9 @@ describe('OnboardingScreen', () => {
           heightUnit: 'cm',
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
-          themeChosen: true,
+          ranksSeen: true,
+          activityLevel: 'moderately_active',
+          skippedNutritionTargets: true,
           hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
@@ -597,7 +661,9 @@ describe('OnboardingScreen', () => {
           heightUnit: 'cm',
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
-          themeChosen: true,
+          ranksSeen: true,
+          activityLevel: 'moderately_active',
+          skippedNutritionTargets: true,
           hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
@@ -613,6 +679,7 @@ describe('OnboardingScreen', () => {
 
     fireEvent.press(screen.getByTestId('onboarding-step-workout-split-create-own'));
 
+    fireEvent.press(await screen.findByTestId('onboarding-continue'));
     expect(await screen.findByTestId('onboarding-step-email-preference')).toBeTruthy();
     const stored = await AsyncStorage.getItem('@progresso/onboardingDraft');
     const draft = JSON.parse(stored as string).draft;
@@ -676,7 +743,9 @@ describe('OnboardingScreen', () => {
           heightUnit: 'cm',
           fitnessGoals: ['build_muscle'],
           membershipTier: 'everything',
-          themeChosen: true,
+          ranksSeen: true,
+          activityLevel: 'moderately_active',
+          skippedNutritionTargets: true,
           hasTrainerCode: false,
           trainingComfort: 'knows_basics',
           repRangeMin: 8,
@@ -728,7 +797,9 @@ describe('OnboardingScreen', () => {
     heightUnit: 'cm',
     fitnessGoals: ['build_muscle'],
     membershipTier: 'everything',
-    themeChosen: true,
+    ranksSeen: true,
+    activityLevel: 'moderately_active',
+    skippedNutritionTargets: true,
     hasTrainerCode: false,
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
@@ -800,7 +871,9 @@ describe('OnboardingScreen -- notifications step', () => {
     weightValue: 80,
     fitnessGoals: ['build_muscle'],
     membershipTier: 'everything',
-    themeChosen: true,
+    ranksSeen: true,
+    activityLevel: 'moderately_active',
+    skippedNutritionTargets: true,
     hasTrainerCode: false,
     trainingComfort: 'knows_basics',
     workoutFrequencyDays: 4,
@@ -884,53 +957,157 @@ describe('OnboardingScreen -- notifications step', () => {
   });
 });
 
-describe('OnboardingScreen -- picking a look', () => {
-  it('applies a tapped theme at once, keeps it on the phone, and moves on with Continue', async () => {
+describe('OnboardingScreen -- the steps added for sign-up', () => {
+  const ANSWERED: OnboardingDraft = {
+    ...EMPTY_DRAFT,
+    referralSource: 'tiktok',
+    country: 'CA',
+    gender: 'male',
+    birthday: '2000-06-15',
+    weightValue: 80,
+    heightValue: 180,
+    fitnessGoals: ['lose_fat'],
+    trainingComfort: 'knows_basics',
+    workoutFrequencyDays: 4,
+    averageWorkoutLength: '45_60',
+    membershipTier: 'workouts_nutrition',
+    activityLevel: 'moderately_active',
+    skippedNutritionTargets: true,
+    selectedSplitPresetId: 'ppl',
+    ranksSeen: true,
+    emailOptIn: true,
+    pushNotificationsOptIn: false,
+    hasTrainerCode: false,
+  };
+
+  async function startAt(step: OnboardingStep, draft: Partial<OnboardingDraft> = {}) {
     await AsyncStorage.setItem(
       '@progresso/onboardingDraft',
-      JSON.stringify({
-        stepIndex: STEP_ORDER.indexOf('theme'),
-        draft: {
-          ...EMPTY_DRAFT,
-          referralSource: 'tiktok',
-          country: 'CA',
-          gender: 'male',
-          weightValue: 80,
-          fitnessGoals: ['build_muscle'],
-          trainingComfort: 'knows_basics',
-          workoutFrequencyDays: 4,
-          averageWorkoutLength: '45_60',
-          membershipTier: 'everything',
-        },
-      }),
+      JSON.stringify({ stepIndex: STEP_ORDER.indexOf(step), draft: { ...ANSWERED, ...draft } }),
     );
-    render(
-      <AppThemeProvider>
-        <OnboardingScreen onSwitchToSignIn={mockSwitchToSignIn} />
-      </AppThemeProvider>,
+    renderScreen();
+  }
+
+  it("won't go on for anyone under 13", async () => {
+    const twelve = new Date();
+    const birthday = `${twelve.getFullYear() - 12}-01-01`;
+    await startAt('birthday', { birthday, referralSource: 'tiktok' });
+    // A birthday under 13 doesn't count as answered, so onboarding resumes on it.
+    await screen.findByTestId('onboarding-step-birthday');
+
+    expect(screen.getByTestId('onboarding-too-young')).toHaveTextContent(
+      'Progresso is for people 13 and older.',
     );
+    expect(screen.getByTestId('onboarding-continue')).toBeDisabled();
+  });
 
-    expect(await screen.findByText('Pick your look')).toBeTruthy();
-    // Holiday Gym, the default.
-    expect(screen.getByTestId('onboarding-theme-holiday-gym')).toHaveProp('accessibilityState', {
-      selected: true,
-    });
+  it('works out daily targets from their answers -- to lose, from their goal -- and lets them be changed', async () => {
+    await startAt('nutritionTargets', { skippedNutritionTargets: false });
+    await screen.findByTestId('onboarding-step-nutrition-targets');
 
-    fireEvent.press(screen.getByTestId('onboarding-theme-alpine'));
-    expect(screen.getByTestId('onboarding-theme-alpine')).toHaveProp('accessibilityState', {
-      selected: true,
-    });
-    await waitFor(async () =>
-      expect(JSON.parse((await AsyncStorage.getItem('@progresso/appearance'))!)).toMatchObject({
-        themeId: 'alpine',
-      }),
+    // 180 cm, 80 kg, 26ish, moderately active: about 2,700 to maintain; losing is 300 under.
+    expect(screen.getByTestId('onboarding-step-nutrition-targets-plan-lose')).toHaveProp(
+      'accessibilityState',
+      expect.objectContaining({ selected: true }),
     );
+    const calories = () =>
+      Number(screen.getByTestId('onboarding-step-nutrition-targets-calories').props.value);
+    const lose = calories();
+    fireEvent.press(screen.getByTestId('onboarding-step-nutrition-targets-plan-maintain'));
+    expect(calories()).toBe(lose + 300);
 
-    fireEvent.press(screen.getByTestId('onboarding-continue'));
-    expect(await screen.findByTestId('onboarding-step-workout-split')).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId('onboarding-step-nutrition-targets-calories'), '2500');
+    fireEvent.press(screen.getByTestId('onboarding-step-nutrition-targets-use'));
+
+    await screen.findByTestId('onboarding-step-workout-split');
     await waitFor(async () => {
       const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
-      expect(stored.draft.themeChosen).toBe(true);
+      expect(stored.draft.nutritionTargets).toMatchObject({ calories: 2500, proteinG: 140 });
     });
+  });
+
+  it('lets the daily targets be skipped, saving none', async () => {
+    await startAt('nutritionTargets', { skippedNutritionTargets: false });
+    fireEvent.press(await screen.findByTestId('onboarding-step-nutrition-targets-skip'));
+
+    await screen.findByTestId('onboarding-step-workout-split');
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('@progresso/onboardingDraft'))!);
+      expect(stored.draft).toMatchObject({
+        nutritionTargets: null,
+        skippedNutritionTargets: true,
+      });
+    });
+  });
+
+  it('explains how ranks work, then moves on', async () => {
+    await startAt('ranks', { ranksSeen: false });
+    const ranks = await screen.findByTestId('onboarding-step-ranks');
+
+    expect(ranks).toHaveTextContent(/Earn Achievement Points/);
+    expect(ranks).toHaveTextContent(/Bronze.*Legacy/);
+    expect(ranks).toHaveTextContent(/Never lose it/);
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+
+    expect(await screen.findByTestId('onboarding-step-email-preference')).toBeTruthy();
+  });
+
+  it('asks about Apple Health steps where it can, after notifications', async () => {
+    jest.mocked(stepsAccess).mockResolvedValue('notAsked');
+    await startAt('pushNotifications', { pushNotificationsOptIn: null });
+    await screen.findByTestId('onboarding-step-push-notifications');
+    await settle();
+
+    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
+    await screen.findByTestId('onboarding-step-apple-health');
+    fireEvent.press(screen.getByTestId('onboarding-step-apple-health-connect'));
+
+    expect(await screen.findByTestId('onboarding-step-trainer-code')).toBeTruthy();
+    expect(askForSteps).toHaveBeenCalledTimes(1);
+  });
+
+  it('never asks about Apple Health where it is not there', async () => {
+    await startAt('pushNotifications', { pushNotificationsOptIn: null });
+    await screen.findByTestId('onboarding-step-push-notifications');
+    await settle();
+
+    fireEvent.press(screen.getByTestId('onboarding-step-push-notifications-skip'));
+
+    expect(await screen.findByTestId('onboarding-step-trainer-code')).toBeTruthy();
+    expect(screen.queryByTestId('onboarding-step-apple-health')).toBeNull();
+  });
+
+  it("lets the trainer's code wait, saying where to enter it later", async () => {
+    await startAt('trainerCode', { hasTrainerCode: null });
+    await screen.findByTestId('onboarding-step-trainer-code');
+
+    expect(screen.getByText('You can enter it any time in Settings > Trainer Code.')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('onboarding-trainer-code-later'));
+
+    expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
+  });
+
+  it('says what creating an account agrees to, each page a tap away', async () => {
+    await startAt('createAccount');
+    await screen.findByTestId('onboarding-step-create-account');
+
+    expect(screen.getByTestId('onboarding-create-account-terms')).toHaveTextContent(
+      /By creating an account, you agree to Progresso's Terms of Service and Privacy Policy/,
+    );
+    fireEvent.press(screen.getByTestId('onboarding-create-account-terms-link'));
+    fireEvent.press(screen.getByTestId('onboarding-create-account-privacy-link'));
+    expect(jest.mocked(openLegalPage).mock.calls).toEqual([['terms'], ['privacy']]);
+  });
+
+  it('keeps spaces out of a username as it is typed', async () => {
+    await startAt('createAccount');
+    await screen.findByTestId('onboarding-step-create-account');
+
+    fireEvent.changeText(screen.getByTestId('onboarding-create-account-username'), 'Harbir B ains');
+
+    expect(screen.getByTestId('onboarding-create-account-username')).toHaveProp(
+      'value',
+      'harbirbains',
+    );
   });
 });

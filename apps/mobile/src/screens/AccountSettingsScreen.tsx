@@ -101,6 +101,16 @@ export function AccountSettingsScreen({ navigation }: Props) {
           divider
           onPress={() => navigation.navigate('SettingsWorkoutPreferences')}
         />
+        {/* A code from a trainer who tracked your workouts -- also asked in onboarding, where it
+            can be left for later. */}
+        <ListRow
+          testID="settings-category-trainer-code"
+          icon="key"
+          title="Trainer Code"
+          subtitle="Enter the code your trainer gave you"
+          divider
+          onPress={() => navigation.navigate('TrainerClaim')}
+        />
         {/* Nutrition's settings only with a membership that includes it. */}
         {nutrition ? (
           <ListRow

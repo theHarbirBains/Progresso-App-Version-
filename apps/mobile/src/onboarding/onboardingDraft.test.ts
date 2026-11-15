@@ -2,10 +2,14 @@ import { Alert } from 'react-native';
 import { claimTrainerHistory, registerPushToken, updateMyProfile } from '../lib/api';
 import { requestPushToken } from '../lib/pushNotifications';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
+import { saveNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import {
   computeStartStepIndex,
   EMPTY_DRAFT,
+  isOldEnough,
   isStepAnswered,
+  nextStepIndex,
+  stepApplies,
   STEP_ORDER,
   submitOnboardingDraft,
   type OnboardingDraft,
@@ -21,6 +25,9 @@ jest.mock('../lib/pushNotifications', () => ({
   requestPushToken: jest.fn(),
 }));
 
+jest.mock('../nutrition/nutritionGoalQueries', () => ({
+  saveNutritionGoals: jest.fn().mockResolvedValue({}),
+}));
 jest.mock('../workouts/workoutSplitQueries', () => ({
   materializeWorkoutSplitPreset: jest.fn(),
 }));
@@ -35,6 +42,7 @@ beforeEach(() => {
   mockRegisterPushToken.mockReset().mockResolvedValue({ registered: true });
   mockRequestPushToken.mockReset().mockResolvedValue('ExponentPushToken[test]');
   mockMaterialize.mockReset().mockResolvedValue({ id: 'split-new', name: 'Push / Pull / Legs' });
+  jest.mocked(saveNutritionGoals).mockClear();
 });
 
 const FULL_DRAFT: OnboardingDraft = {
@@ -47,7 +55,9 @@ const FULL_DRAFT: OnboardingDraft = {
   heightValue: 180,
   fitnessGoals: ['build_muscle'],
   membershipTier: 'everything',
-  themeChosen: true,
+  activityLevel: 'moderately_active',
+  nutritionTargets: { calories: 2400, proteinG: 141, carbsG: 290, fatG: 52 },
+  ranksSeen: true,
   trainingComfort: 'knows_basics',
   workoutFrequencyDays: 4,
   averageWorkoutLength: '45_60',
@@ -101,6 +111,41 @@ describe('isStepAnswered / computeStartStepIndex', () => {
   it('treats workoutSplit as answered when the user skipped it for now', () => {
     expect(isStepAnswered('workoutSplit', { ...EMPTY_DRAFT, skippedSplit: true })).toBe(true);
     expect(isStepAnswered('workoutSplit', EMPTY_DRAFT)).toBe(false);
+  });
+
+  it('asks for daily targets only with Nutrition in the membership, and about Apple Health only where it is', () => {
+    const none = { healthAvailable: false };
+    expect(stepApplies('activityLevel', { ...FULL_DRAFT, membershipTier: 'workouts' }, none)).toBe(
+      false,
+    );
+    expect(stepApplies('nutritionTargets', FULL_DRAFT, none)).toBe(true);
+    expect(stepApplies('appleHealth', FULL_DRAFT, none)).toBe(false);
+    expect(stepApplies('appleHealth', FULL_DRAFT, { healthAvailable: true })).toBe(true);
+    // From membership with Workouts alone: past both Nutrition steps, to the split.
+    expect(
+      nextStepIndex(
+        STEP_ORDER.indexOf('membership'),
+        1,
+        { ...FULL_DRAFT, membershipTier: 'workouts' },
+        none,
+      ),
+    ).toBe(STEP_ORDER.indexOf('workoutSplit'));
+    // And back again.
+    expect(
+      nextStepIndex(
+        STEP_ORDER.indexOf('workoutSplit'),
+        -1,
+        { ...FULL_DRAFT, membershipTier: 'workouts' },
+        none,
+      ),
+    ).toBe(STEP_ORDER.indexOf('membership'));
+  });
+
+  it('only takes a birthday 13 years ago or more', () => {
+    const now = new Date(2026, 10, 15);
+    expect(isOldEnough('2013-11-15', now)).toBe(true);
+    expect(isOldEnough('2013-11-16', now)).toBe(false);
+    expect(isStepAnswered('birthday', { ...EMPTY_DRAFT, birthday: '2020-01-01' })).toBe(false);
   });
 
   it('createAccount is never "answered" -- it is always the resume target once every question is done', () => {
@@ -194,6 +239,30 @@ describe('submitOnboardingDraft', () => {
     // Nor the two questions the comfort question replaced.
     expect(mockUpdateMyProfile.mock.calls[0][1]).not.toHaveProperty('trainingExperience');
     expect(mockUpdateMyProfile.mock.calls[0][1]).not.toHaveProperty('trainingStylePreference');
+  });
+
+  it('saves the daily targets chosen as their nutrition goals, and how active they are', async () => {
+    await submitOnboardingDraft('token-123', 'user-1', FULL_DRAFT);
+
+    expect(saveNutritionGoals).toHaveBeenCalledWith('user-1', {
+      calories: 2400,
+      proteinG: 141,
+      carbsG: 290,
+      fatG: 52,
+    });
+    expect(mockUpdateMyProfile).toHaveBeenCalledWith(
+      'token-123',
+      expect.objectContaining({ activityLevel: 'moderately_active' }),
+    );
+  });
+
+  it('saves no targets without Nutrition in the membership', async () => {
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...FULL_DRAFT,
+      membershipTier: 'workouts',
+    });
+
+    expect(saveNutritionGoals).not.toHaveBeenCalled();
   });
 
   it('starts an experienced lifter on a 5-10 rep range', async () => {

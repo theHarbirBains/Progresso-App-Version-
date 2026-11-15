@@ -3,10 +3,12 @@ import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Screen } from '../design/Screen';
+import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
 import { colors } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAchievements } from '../achievements/achievementsContext';
+import { RankExplainer } from '../achievements/RankExplainer';
 import { RankEmblem } from '../achievements/RankEmblem';
 import { DIVISIONS, TIERS, divisionFloor, rankForPoints } from '../achievements/ranks';
 import { rankProgressionStyles as styles } from './rankProgressionStyles';
@@ -35,6 +37,10 @@ export function RankProgressionScreen({ route, navigation }: Props) {
         <Text style={{ color: rank.tier.palette.primary }}>{rank.label}</Text> with{' '}
         {points.toLocaleString('en-US')} AP. Every achievement adds to it, and a rank is never lost.
       </Text>
+      <AppCard testID="rank-how">
+        <SectionHeader label="How Ranks Work" />
+        <RankExplainer />
+      </AppCard>
       {TIERS.map((tier, tierIndex) => {
         const reached = rank.tierIndex >= tierIndex;
         const current = rank.tierIndex === tierIndex;

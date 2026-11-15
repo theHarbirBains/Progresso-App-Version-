@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 import App from './App';
 import { fetchMyProfile } from './src/profile/profileQueries';
 import { STEP_ORDER } from './src/onboarding/onboardingDraft';
+import { setWelcomeStage } from './src/onboarding/welcomeStage';
 
 interface MockAuthHandles {
   signInWithPassword: jest.Mock;
@@ -296,6 +297,28 @@ describe('Authentication flow', () => {
     expect(mockFetchMyProfile).toHaveBeenCalledTimes(1);
   });
 
+  it('welcomes a new account before the app -- a photo, then friends -- and waits while it saves', async () => {
+    setWelcomeStage('saving');
+    try {
+      render(<App />);
+      await screen.findByTestId('sign-in-email');
+      fireEvent.changeText(screen.getByTestId('sign-in-email'), 'athlete@example.com');
+      fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct-password');
+      fireEvent.press(screen.getByTestId('sign-in-submit'));
+
+      expect(await screen.findByTestId('welcome-saving')).toBeTruthy();
+      await act(async () => setWelcomeStage('welcome'));
+      expect(await screen.findByTestId('welcome-photo')).toBeTruthy();
+      expect(screen.queryByTestId('feed-screen')).toBeNull();
+
+      fireEvent.press(screen.getByTestId('welcome-photo-skip'));
+      fireEvent.press(await screen.findByTestId('welcome-done'));
+      expect(await screen.findByTestId('feed-screen')).toBeTruthy();
+    } finally {
+      setWelcomeStage('none');
+    }
+  });
+
   it('asks once for a phone number before the app, of an account from before it was asked', async () => {
     mockFetchMyProfile.mockResolvedValueOnce({
       id: 'user-1',
@@ -359,7 +382,9 @@ describe('Authentication flow', () => {
           heightUnit: 'cm',
           fitnessGoal: 'build_muscle',
           membershipTier: 'everything',
-          themeChosen: true,
+          activityLevel: 'moderately_active',
+          skippedNutritionTargets: true,
+          ranksSeen: true,
           trainingComfort: 'knows_basics',
           workoutFrequencyDays: 4,
           averageWorkoutLength: '45_60',

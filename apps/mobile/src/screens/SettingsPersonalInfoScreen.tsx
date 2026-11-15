@@ -222,7 +222,9 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
               placeholder="username"
               autoCapitalize="none"
               value={username}
-              onChangeText={(text) => setUsername(text.toLowerCase())}
+              // No spaces, ever: one typed (or pasted) is simply left out.
+              onChangeText={(text) => setUsername(text.replace(/\s/g, '').toLowerCase())}
+              helperText="Lowercase letters, numbers and underscores, 3-20 of them. No spaces."
             />
 
             {/* Shown under their name on their profile, to anyone who opens it. */}

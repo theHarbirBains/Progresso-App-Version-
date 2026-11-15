@@ -4,7 +4,7 @@ import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { Text } from '../design/Text';
 import type { MembershipTier } from '../lib/api';
-import { MembershipChoices } from '../membership/MembershipChoices';
+import { MembershipCards } from '../membership/MembershipCards';
 import { useMembership } from '../membership/useMembership';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProfile } from '../profile/ProfileProvider';
@@ -59,7 +59,12 @@ export function SettingsMembershipScreen({ navigation }: Props) {
             {error}
           </Text>
         ) : null}
-        <MembershipChoices testID="settings-membership" value={saving ?? tier} onChange={choose} />
+        <MembershipCards
+          testID="settings-membership"
+          value={tier}
+          saving={saving}
+          onChoose={(next) => void choose(next)}
+        />
       </Section>
     </Screen>
   );

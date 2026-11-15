@@ -49,6 +49,8 @@ describe('AccountSettingsScreen', () => {
   it.each([
     ['settings-category-personal-info', 'SettingsPersonalInfo'],
     ['settings-category-workout-preferences', 'SettingsWorkoutPreferences'],
+    // A trainer's code, also offered (to do later) in onboarding.
+    ['settings-category-trainer-code', 'TrainerClaim'],
     ['settings-category-nutrition', 'SettingsNutrition'],
     ['settings-category-notifications', 'SettingsNotifications'],
     ['settings-category-account-security', 'SettingsAccountSecurity'],
