@@ -36,6 +36,7 @@ import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
 import { useAppTheme } from '../theme/appThemeContext';
 import { useSocialSummaries } from '../social/useSocialSummaries';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
+import { FeedGreeting } from '../feed/FeedGreeting';
 import { FeedHeroCard } from '../feed/FeedHeroCard';
 import { LiveNowCard } from '../feed/LiveNowCard';
 import { StepsCard } from '../feed/StepsCard';
@@ -684,6 +685,10 @@ export function FeedScreen({ navigation }: Props) {
             }}
           />
         </BubbleMenu>
+
+        <RiseIn>
+          <FeedGreeting displayName={displayName} />
+        </RiseIn>
 
         {liveHero ? (
           <RiseIn>

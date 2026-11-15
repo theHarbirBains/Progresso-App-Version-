@@ -28,6 +28,7 @@ import {
 import { widgetShown } from '../testUtils/widgetShown';
 import { homeWidgets } from '../widgets/homeWidgets';
 import { endWorkoutActivities, showWorkoutActivity } from '../widgets/workoutActivity';
+import { greetingFor } from '../feed/greeting';
 import { FeedScreen } from './FeedScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -826,6 +827,16 @@ describe('FeedScreen reopened', () => {
     renderScreen();
 
     expect(screen.getByTestId('feed-loading').props.accessibilityLabel).toBe('Loading');
+  });
+});
+
+describe('FeedScreen -- greeting', () => {
+  it('greets them by first name for the time of day, above everything else', async () => {
+    renderScreen();
+
+    const greeting = await screen.findByTestId('feed-greeting-headline');
+    expect(greeting.props.children).toBe(greetingFor(new Date(), 'Harbir').headline);
+    expect(greeting.props.accessibilityRole).toBe('header');
   });
 });
 

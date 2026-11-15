@@ -16,6 +16,20 @@ export const feedStyles = StyleSheet.create({
   content: {
     gap: widgetGap,
   },
+  // The greeting at the top (feed/FeedGreeting.tsx): straight on the photo, its words lined up
+  // with the cards' own text below it, and a little more room under it than between widgets.
+  greeting: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+  },
+  greetingHeadline: {
+    ...typeScale.screenTitle,
+  },
+  greetingLine: {
+    ...typeScale.body,
+    marginTop: 2,
+  },
   // "Get Started" (the empty-state actions card's header) sits directly on
   // the screen, not inside a card -- same explicit 6px gutter call as
   // NotificationsScreen's own section headers.
