@@ -189,19 +189,31 @@ export const personProfileStyles = StyleSheet.create({
   viewAllLabel: {
     ...typeScale.label,
   },
-  badges: {
+  ranksEarned: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
+  // Every achievement, three to a row: its badge at its rank, its name, the rank in its colour.
+  achievements: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    rowGap: spacing.lg,
   },
-  badgeColumn: {
-    flex: 1,
+  achievement: {
+    width: '33.33%',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xs,
   },
-  badgeTitle: {
+  achievementTitle: {
     ...typeScale.caption,
     color: colors.textPrimary,
     textAlign: 'center',
+  },
+  achievementRank: {
+    ...typeScale.caption,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 
   lift: {
@@ -228,6 +240,14 @@ export const personProfileStyles = StyleSheet.create({
   liftValue: {
     ...typeScale.statSmall,
   },
+  liftSearch: {
+    marginBottom: spacing.sm,
+  },
+  liftNone: {
+    ...typeScale.secondary,
+    color: colors.textMuted,
+    paddingVertical: spacing.sm,
+  },
   statGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -247,27 +267,5 @@ export const personProfileStyles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
     marginBottom: spacing.md,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  badgeRowText: {
-    flex: 1,
-  },
-  badgeRowTitle: {
-    ...typeScale.callout,
-    color: colors.textPrimary,
-  },
-  badgeRowRequirement: {
-    ...typeScale.secondary,
-    color: colors.textSecondary,
-  },
-  badgeEarned: {
-    ...typeScale.caption,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
 });

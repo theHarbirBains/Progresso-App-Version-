@@ -51,6 +51,17 @@ describe('APP_MENU_SECTIONS', () => {
     });
   });
 
+  it('lists Achievements under Training, right after Progress', () => {
+    const training = APP_MENU_SECTIONS.find((section) => section.title === 'TRAINING')!;
+    const labels = training.items.map((i) => i.label);
+    expect(labels.indexOf('Achievements')).toBe(labels.indexOf('Progress') + 1);
+    expect(findItem('Achievements')).toEqual({
+      route: 'Achievements',
+      label: 'Achievements',
+      icon: 'award',
+    });
+  });
+
   it("routes the 'Find People' item to the FindPeople screen", () => {
     expect(findItem('Find People')).toEqual({
       route: 'FindPeople',

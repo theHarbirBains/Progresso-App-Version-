@@ -70,6 +70,24 @@ export const colors = {
   launchWood: '#2E1707',
 } as const;
 
+// Achievement ranks (social/ranks.ts), Bronze to Legacy: the one place a run
+// of hues beyond the accent appears -- by explicit request, each rank its own
+// colour so it reads at a glance, like a game's ranked tiers. Legacy shimmers
+// through three (its badge's gradient); its one colour, for its name, is the
+// first.
+export const rankColors = {
+  bronze: '#C98A5A',
+  silver: '#C3CBD3',
+  gold: '#F2C14E',
+  platinum: '#7FDCCF',
+  diamond: '#6FB8FF',
+  vanguard: '#4FD18B',
+  titan: '#E5506A',
+  sovereign: '#A97CFF',
+  legacy: '#FF8BD1',
+  legacyGradient: ['#FF8BD1', '#FFD36E', '#7FE3FF'],
+} as const;
+
 // Three working radii plus the pill, each with one role so nested surfaces
 // stay optically concentric (outer radius >= inner radius + padding gap):
 //   sm   -- small inset elements (a wheel-picker highlight, a bar track)

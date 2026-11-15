@@ -1,14 +1,14 @@
+import { useId } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
-import { Text } from '../design/Text';
-import { colors, typeScale } from '../design/theme';
+import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import { colors, rankColors } from '../design/theme';
 import { withAlpha } from '../theme/accentColor';
-import type { Badge } from './achievements';
+import { DOUBLE_OUTLINE_FROM, RANKS, TOP_RANK } from './ranks';
 
-/** A pointy-top hexagon `width` wide, inset for its stroke. */
-function hexagon(width: number, stroke: number): string {
-  const r = width / Math.sqrt(3) - stroke;
+/** A pointy-top hexagon `width` wide, inset `inset` from its edge. */
+function hexagon(width: number, inset: number): string {
+  const r = width / Math.sqrt(3) - inset;
   const cx = width / 2;
   const cy = width / Math.sqrt(3);
   const points = [-90, -30, 30, 90, 150, 210].map((deg) => {
@@ -19,40 +19,67 @@ function hexagon(width: number, stroke: number): string {
 }
 
 /**
- * One badge: a hexagon outlined in the accent, faintly filled with it, its glyph and figure
- * inside -- or, not yet earned, the same in a muted grey. Its title goes beneath, the caller's.
+ * An achievement's badge at a rank: a hexagon outlined in the rank's colour, faintly filled with
+ * it, the achievement's glyph inside. From Platinum up it wears a second, inner outline; Legacy
+ * shimmers through its three colours. Before the first rank (-1) it's the same in a muted grey;
+ * `dim` shows a rank still ahead in its own colour, faded. Its name goes beneath, the caller's.
  */
 export function AchievementBadge({
-  badge,
-  accentColor,
+  icon,
+  rank,
   size = 60,
+  dim = false,
   testID,
 }: {
-  badge: Badge;
-  accentColor: string;
+  icon: keyof typeof Feather.glyphMap;
+  rank: number;
   size?: number;
+  dim?: boolean;
   testID?: string;
 }) {
+  const gradientId = `legacy${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const height = (size * 2) / Math.sqrt(3);
-  const color = badge.earned ? accentColor : colors.textMuted;
+  const earned = rank >= 0;
+  const legacy = rank >= TOP_RANK;
+  const color = earned ? RANKS[Math.min(rank, TOP_RANK)]!.color : colors.textMuted;
+  const paint = legacy ? `url(#${gradientId})` : color;
   return (
     <View
       testID={testID}
-      style={[styles.badge, { width: size, height }, !badge.earned && styles.locked]}
+      style={[styles.badge, { width: size, height }, (!earned || dim) && styles.locked]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
       <Svg width={size} height={height} style={StyleSheet.absoluteFill}>
+        {legacy ? (
+          <Defs>
+            <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+              {rankColors.legacyGradient.map((stop, index, all) => (
+                <Stop key={stop} offset={index / (all.length - 1)} stopColor={stop} />
+              ))}
+            </LinearGradient>
+          </Defs>
+        ) : null}
         <Path
           d={hexagon(size, 1.5)}
-          fill={withAlpha(color, badge.earned ? 0.16 : 0.06)}
-          stroke={color}
+          fill={legacy ? paint : withAlpha(color, earned ? 0.16 : 0.06)}
+          fillOpacity={legacy ? 0.24 : 1}
+          stroke={paint}
           strokeWidth={2}
           strokeLinejoin="round"
         />
+        {earned && rank >= DOUBLE_OUTLINE_FROM ? (
+          <Path
+            d={hexagon(size, 1.5 + size * 0.1)}
+            fill="none"
+            stroke={paint}
+            strokeOpacity={0.55}
+            strokeWidth={1}
+            strokeLinejoin="round"
+          />
+        ) : null}
       </Svg>
-      <Feather name={badge.icon} size={Math.round(size * 0.3)} color={color} />
-      {badge.short ? <Text style={[styles.short, { color }]}>{badge.short}</Text> : null}
+      <Feather name={icon} size={Math.round(size * 0.32)} color={color} />
     </View>
   );
 }
@@ -63,10 +90,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   locked: {
-    opacity: 0.6,
-  },
-  short: {
-    ...typeScale.label,
-    marginTop: 1,
+    opacity: 0.45,
   },
 });

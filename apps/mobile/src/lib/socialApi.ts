@@ -1,3 +1,4 @@
+import type { MeasurementType } from '../exercises/movementTypes';
 import { request } from './apiClient';
 import type { FriendsFeedPage } from './feedApi';
 import type { FollowSearchResult, FollowStatus, FollowUser } from './followsApi';
@@ -6,15 +7,49 @@ import type { FollowSearchResult, FollowStatus, FollowUser } from './followsApi'
 // likes and comments -- see apps/api/src/social. All through the API: they read other people's
 // data, which only the server may decide to show (follows accepted, blocks either way).
 
-export interface BestLift {
+/** An exercise as a profile shows it: what it is, which machine, and what its sets record. */
+export interface ExerciseSummary {
   exerciseId: string;
   exerciseName: string;
   photoUrl: string | null;
   gym: string | null;
   attachment: string | null;
-  weightKg: number;
-  reps: number;
+  measurementType: MeasurementType;
+}
+
+/**
+ * An exercise they've done, with its best set: the heaviest (weightKg x reps) for weights, the
+ * most reps for bodyweight, the longest (durationSeconds) for timed.
+ */
+export interface ExerciseBest extends ExerciseSummary {
+  weightKg: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
   performedAt: string;
+  /** How many workouts it's in. */
+  workouts: number;
+  lastPerformedAt: string;
+}
+
+/** A workout's top set on one exercise. */
+export interface TopSet {
+  workoutId: string;
+  performedAt: string;
+  weightKg: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
+}
+
+/** One exercise of theirs: each workout's top set, newest first, and the records they hold. */
+export interface PersonExercise {
+  exercise: ExerciseSummary;
+  topSets: TopSet[];
+  /** The heaviest at each rep count from 2 up, fewest reps first. */
+  repPRs: { reps: number; weightKg: number; achievedAt: string }[];
+  /** True 1RM: only ever a logged single. */
+  oneRepMax: { weightKg: number; achievedAt: string } | null;
+  mostReps: { reps: number; achievedAt: string } | null;
+  longest: { durationSeconds: number; achievedAt: string } | null;
 }
 
 export interface ProfileStats {
@@ -27,6 +62,29 @@ export interface ProfileStats {
   prCount: number;
   /** The most workouts finished in one calendar month. */
   bestMonthWorkouts: number;
+  // What their achievements are ranked on (social/achievements.ts).
+  /** Finished sets, of every kind. */
+  totalSets: number;
+  /** Reps on weighted and bodyweight sets. */
+  totalReps: number;
+  /** Time trained, start to finish -- at most six hours a workout. */
+  trainingMinutes: number;
+  /** True 1RMs held now. */
+  oneRepMaxCount: number;
+  /** Different exercises done. */
+  exerciseCount: number;
+  /** The most lifted in one workout. */
+  bestSessionVolumeKg: number;
+  bodyweightReps: number;
+  timedSeconds: number;
+  groupWorkouts: number;
+  /** Calendar months with 12 or more workouts. */
+  committedMonths: number;
+  /** Weeks with 3 or more workouts. */
+  strongWeeks: number;
+  /** Likes from others on their workouts, and likes they've given others'. */
+  likesReceived: number;
+  likesGiven: number;
 }
 
 export interface PersonProfile {
@@ -47,11 +105,24 @@ export interface PersonProfile {
   /** Whether you can see their workouts, stats and lifts: yours, or they accepted your follow. */
   canSeeActivity: boolean;
   stats: ProfileStats | null;
-  bestLifts: BestLift[] | null;
+  /** Every exercise they've done, with its best set, the most-done first. */
+  exercises: ExerciseBest[] | null;
 }
 
 export function getPersonProfile(accessToken: string, personId: string): Promise<PersonProfile> {
   return request<PersonProfile>(`/api/v1/people/${encodeURIComponent(personId)}`, accessToken);
+}
+
+/** One exercise of theirs: its top set from each workout, and the records they hold on it. */
+export function getPersonExercise(
+  accessToken: string,
+  personId: string,
+  exerciseId: string,
+): Promise<PersonExercise> {
+  return request<PersonExercise>(
+    `/api/v1/people/${encodeURIComponent(personId)}/exercises/${encodeURIComponent(exerciseId)}`,
+    accessToken,
+  );
 }
 
 /** A page of their finished workouts, as the Friends feed shows them. */

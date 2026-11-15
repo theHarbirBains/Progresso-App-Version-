@@ -119,6 +119,10 @@ export type RootStackParamList = {
   Notifications: undefined;
   /** Someone's profile: who they are, who follows them, and -- following them -- their training. */
   PersonProfile: { userId: string };
+  /** One exercise of theirs (or yours): each workout's top set and the records held on it. */
+  PersonExercise: { userId: string; exerciseId: string; name?: string };
+  /** Your achievements and their ranks, from the side menu. */
+  Achievements: undefined;
   /** Who follows someone, or who they follow. */
   FollowList: { userId: string; which: 'followers' | 'following'; name?: string };
 };

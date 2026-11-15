@@ -16,6 +16,7 @@ import { ZoomablePhoto } from '../design/PhotoLightbox';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
 import { SkeletonCards } from '../design/Skeleton';
+import { TextInput } from '../design/TextInput';
 import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
 import { colors } from '../design/theme';
@@ -34,14 +35,23 @@ import {
   type PersonProfile,
 } from '../lib/api';
 import { recallShown, rememberShown } from '../lib/lastShown';
-import { formatWeightKg, fromKg } from '../lib/units';
+import { fromKg } from '../lib/units';
 import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { withAlpha } from '../theme/accentColor';
 import type { SplitMuscleGroup } from '../workouts/splitMuscleGroups';
 import { AchievementBadge } from '../social/AchievementBadge';
-import { badgesFor, compactNumber, featuredBadges, type Badge } from '../social/achievements';
+import {
+  achievementsFor,
+  byRank,
+  compactNumber,
+  ranksEarned,
+  type Achievement,
+} from '../social/achievements';
+import { AchievementSheet, rankColor, rankName } from '../social/AchievementSheet';
+import { RANKS } from '../social/ranks';
+import { setText } from '../social/setText';
 import { PeopleList, personLabel } from '../social/PeopleList';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { useSocialSummaries } from '../social/useSocialSummaries';
@@ -49,6 +59,8 @@ import { personProfileStyles as styles } from './personProfileStyles';
 
 type Props = RootStackScreenProps<'PersonProfile'>;
 type Tab = 'achievements' | 'workouts' | 'prs' | 'stats';
+/** Past this many exercises, the PRs tab offers a search. */
+const LIFT_SEARCH_FROM = 6;
 /** All the page asks of its screen's navigation -- PersonProfile's, or the You tab's. */
 type Navigation = Pick<Props['navigation'], 'navigate' | 'push' | 'goBack' | 'addListener'>;
 
@@ -141,8 +153,9 @@ function StatTile({
  * followers and following, and the people you follow who follow them too; one wide Follow /
  * Following button (or Accept and Decline, or Edit Profile on your own) with Share beside it. For
  * you, or someone who accepted your follow: four figures -- workouts, the last 30 days, records
- * held and everything lifted -- then Achievements (the badges they've earned), Workouts (all of
- * them, with likes and comments), PRs (their heaviest lifts) and Stats. Until then, a line saying
+ * held and everything lifted -- then Achievements (each one's rank, Bronze to Legacy), Workouts (all of
+ * them, with likes and comments), PRs (every exercise's best set, each opening its top sets and
+ * records) and Stats. Until then, a line saying
  * what following them shows. Report and Block are behind the header's "...". Read every time it
  * opens, the profile and its first workouts together, and shown with their likes all at once.
  */
@@ -177,7 +190,8 @@ export function PersonProfilePage({
   const [busy, setBusy] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('achievements');
-  const [badgesOpen, setBadgesOpen] = useState(false);
+  const [openAchievement, setOpenAchievement] = useState<Achievement | null>(null);
+  const [liftQuery, setLiftQuery] = useState('');
   const [mutualsOpen, setMutualsOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -243,9 +257,15 @@ export function PersonProfilePage({
     shown !== undefined ||
     ((profile !== null || error !== null) && social.loaded && (own?.ready ?? true));
   const showPage = useShowAllAtOnce(settled);
-  const badges = useMemo(
-    () => (profile?.stats ? badgesFor(profile.stats, weightUnit) : []),
-    [profile?.stats, weightUnit],
+  // Ranked on what their followers can see -- never nutrition, which is yours alone.
+  const achievements = useMemo(
+    () =>
+      profile?.stats
+        ? byRank(
+            achievementsFor({ stats: profile.stats, followers: profile.followerCount }, weightUnit),
+          )
+        : [],
+    [profile?.stats, profile?.followerCount, weightUnit],
   );
 
   async function loadMore() {
@@ -363,54 +383,48 @@ export function PersonProfilePage({
     );
   }
 
-  function renderBadge(badge: Badge) {
+  function renderAchievement(achievement: Achievement) {
     return (
-      <View key={badge.id} style={styles.badgeColumn} testID={`person-profile-badge-${badge.id}`}>
-        <AchievementBadge badge={badge} accentColor={theme.accent} />
-        <Text style={styles.badgeTitle} numberOfLines={2}>
-          {badge.title}
+      <TouchableOpacity
+        key={achievement.id}
+        testID={`person-profile-achievement-${achievement.id}`}
+        style={styles.achievement}
+        onPress={() => setOpenAchievement(achievement)}
+        accessibilityRole="button"
+        accessibilityLabel={`${achievement.title}, ${rankName(achievement)}. ${achievement.description}: ${achievement.valueLabel}`}
+      >
+        <AchievementBadge icon={achievement.icon} rank={achievement.rank} size={56} />
+        <Text style={styles.achievementTitle} numberOfLines={1}>
+          {achievement.title}
         </Text>
-      </View>
+        <Text style={[styles.achievementRank, { color: rankColor(achievement) }]}>
+          {achievement.rank >= 0 ? rankName(achievement) : 'Locked'}
+        </Text>
+      </TouchableOpacity>
     );
   }
 
   function renderTab(target: PersonProfile, name: string) {
     const stats = target.stats;
     if (tab === 'achievements') {
-      const featured = featuredBadges(badges);
-      return (
-        <>
-          {stats ? (
-            <AppCard testID="person-profile-achievements">
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Achievements</Text>
-                <TouchableOpacity
-                  testID="person-profile-badges-all"
-                  style={styles.viewAll}
-                  onPress={() => setBadgesOpen(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel="View all achievements"
-                >
-                  <Text style={[styles.viewAllLabel, { color: theme.accent }]}>View All</Text>
-                  <Feather name="arrow-right" size={14} color={theme.accent} />
-                </TouchableOpacity>
-              </View>
-              <View
-                style={styles.badges}
-                accessible
-                accessibilityLabel={`Achievements: ${
-                  featured
-                    .filter((b) => b.earned)
-                    .map((b) => b.title)
-                    .join(', ') || 'none earned yet'
-                }`}
-              >
-                {featured.map(renderBadge)}
-              </View>
-            </AppCard>
+      return stats ? (
+        <AppCard testID="person-profile-achievements">
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Achievements</Text>
+            <Text testID="person-profile-ranks" style={styles.ranksEarned}>
+              {ranksEarned(achievements)} of {achievements.length * RANKS.length} ranks
+            </Text>
+          </View>
+          <View style={styles.achievements}>{achievements.map(renderAchievement)}</View>
+          {own ? (
+            <TextButton
+              testID="profile-all-achievements"
+              label="See All Your Achievements"
+              onPress={() => navigation.navigate('Achievements')}
+            />
           ) : null}
-        </>
-      );
+        </AppCard>
+      ) : null;
     }
     if (tab === 'workouts') {
       return workouts.length === 0 ? (
@@ -456,9 +470,9 @@ export function PersonProfilePage({
                   label: 'Total Volume',
                 },
                 {
-                  id: 'badges',
-                  value: `${badges.filter((b) => b.earned).length} of ${badges.length}`,
-                  label: 'Badges',
+                  id: 'ranks',
+                  value: `${ranksEarned(achievements)} of ${achievements.length * RANKS.length}`,
+                  label: 'Ranks Earned',
                 },
               ].map((cell) => (
                 <View key={cell.id} style={styles.statCell}>
@@ -477,18 +491,71 @@ export function PersonProfilePage({
     );
   }
 
-  /** Heaviest Lifts -- with none, an empty state, unless your full records below say so. */
+  /**
+   * Every exercise they've done, the most-done first, each with its best set and opening its top
+   * sets and records -- searchable once there are more than a few. With none, an empty state,
+   * unless your full records below say so.
+   */
   function renderLifts(target: PersonProfile) {
-    return target.bestLifts && target.bestLifts.length > 0 ? (
+    const all = target.exercises ?? [];
+    if (all.length === 0) {
+      return own?.prs ? null : (
+        <EmptyState
+          testID="person-profile-no-lifts"
+          title="No lifts yet"
+          description={`${target.isSelf ? 'Your' : 'Their'} best set on each exercise shows here.`}
+        />
+      );
+    }
+    const query = liftQuery.trim().toLowerCase();
+    const shown = query
+      ? all.filter((lift) =>
+          [lift.exerciseName, machineLine(lift)].some((text) =>
+            text?.toLowerCase().includes(query),
+          ),
+        )
+      : all;
+    return (
       <AppCard testID="person-profile-lifts">
-        <SectionHeader label="Heaviest Lifts" />
-        {target.bestLifts.map((lift, index) => {
-          const machine = machineLine(lift);
+        <SectionHeader label="Every Exercise" />
+        {all.length > LIFT_SEARCH_FROM ? (
+          <View style={styles.liftSearch}>
+            <TextInput
+              testID="person-profile-lift-search"
+              placeholder="Search exercises"
+              accessibilityLabel="Search exercises"
+              value={liftQuery}
+              onChangeText={setLiftQuery}
+              autoCapitalize="none"
+              leftAccessory={<Feather name="search" size={16} color={colors.textMuted} />}
+            />
+          </View>
+        ) : null}
+        {shown.length === 0 ? (
+          <Text testID="person-profile-lift-none" style={styles.liftNone}>
+            No exercise matches &quot;{liftQuery.trim()}&quot;.
+          </Text>
+        ) : null}
+        {shown.map((lift, index) => {
+          const machine = machineLine(
+            lift,
+            `${lift.workouts} ${lift.workouts === 1 ? 'workout' : 'workouts'}`,
+          );
+          const best = setText(lift, lift.measurementType, weightUnit);
           return (
-            <View
+            <TouchableOpacity
               key={lift.exerciseId}
               testID={`person-profile-lift-${lift.exerciseId}`}
               style={[styles.lift, index > 0 && styles.liftDivider]}
+              onPress={() =>
+                navigation.navigate('PersonExercise', {
+                  userId,
+                  exerciseId: lift.exerciseId,
+                  name: lift.exerciseName,
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`${lift.exerciseName}, best ${best}. See every top set and record`}
             >
               <ExercisePhoto
                 testID={`person-profile-lift-${lift.exerciseId}-photo`}
@@ -506,19 +573,12 @@ export function PersonProfilePage({
                   </Text>
                 ) : null}
               </View>
-              <Text style={[styles.liftValue, { color: theme.accent }]}>
-                {formatWeightKg(lift.weightKg, weightUnit)} {weightUnit} × {lift.reps}
-              </Text>
-            </View>
+              <Text style={[styles.liftValue, { color: theme.accent }]}>{best}</Text>
+              <Feather name="chevron-right" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
           );
         })}
       </AppCard>
-    ) : own?.prs ? null : (
-      <EmptyState
-        testID="person-profile-no-lifts"
-        title="No lifts yet"
-        description={`${target.isSelf ? 'Your' : 'Their'} heaviest set on each weighted exercise shows here.`}
-      />
     );
   }
 
@@ -779,7 +839,7 @@ export function PersonProfilePage({
               description={
                 profile.followStatus === 'pending'
                   ? `You'll see ${firstName(profile)}'s workouts, stats and lifts once they accept.`
-                  : 'Their workouts, stats, badges and heaviest lifts show here once they accept.'
+                  : 'Their workouts, stats, achievements and lifts show here once they accept.'
               }
             />
           ) : (
@@ -830,38 +890,11 @@ export function PersonProfilePage({
             </>
           )}
 
-          <BottomSheet
-            visible={badgesOpen}
-            onClose={() => setBadgesOpen(false)}
-            testID="person-profile-badges-sheet"
-          >
-            <Text style={styles.sheetTitle}>Achievements</Text>
-            <Text style={styles.sheetSubtitle}>
-              {badges.filter((b) => b.earned).length} of {badges.length} earned
-            </Text>
-            <ScrollView>
-              {badges.map((badge) => (
-                <View
-                  key={badge.id}
-                  testID={`person-profile-badges-${badge.id}`}
-                  style={styles.badgeRow}
-                  accessible
-                  accessibilityLabel={`${badge.title}. ${badge.requirement}. ${
-                    badge.earned ? 'Earned' : 'Not earned yet'
-                  }`}
-                >
-                  <AchievementBadge badge={badge} accentColor={theme.accent} size={40} />
-                  <View style={styles.badgeRowText}>
-                    <Text style={styles.badgeRowTitle}>{badge.title}</Text>
-                    <Text style={styles.badgeRowRequirement}>{badge.requirement}</Text>
-                  </View>
-                  {badge.earned ? (
-                    <Text style={[styles.badgeEarned, { color: theme.accent }]}>Earned</Text>
-                  ) : null}
-                </View>
-              ))}
-            </ScrollView>
-          </BottomSheet>
+          <AchievementSheet
+            achievement={openAchievement}
+            onClose={() => setOpenAchievement(null)}
+            testID="person-profile-achievement-sheet"
+          />
 
           <BottomSheet
             visible={mutualsOpen}

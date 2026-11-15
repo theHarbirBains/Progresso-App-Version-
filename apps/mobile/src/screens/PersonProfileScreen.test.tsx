@@ -47,6 +47,25 @@ const route = { params: { userId: 'sam' } } as never;
 
 const sam = { id: 'sam', username: 'sam', displayName: 'Sam Lee', avatarUrl: null };
 
+/** An exercise they've done, with its best set: 100 kg x 5, in 12 workouts. */
+function lift(exerciseId: string, exerciseName: string, extra: object = {}) {
+  return {
+    exerciseId,
+    exerciseName,
+    photoUrl: null,
+    gym: null,
+    attachment: null,
+    measurementType: 'weight_reps',
+    weightKg: 100,
+    reps: 5,
+    durationSeconds: null,
+    performedAt: '2026-11-01',
+    workouts: 12,
+    lastPerformedAt: '2026-11-10',
+    ...extra,
+  };
+}
+
 function profile(extra: object = {}) {
   return {
     user: sam,
@@ -71,19 +90,21 @@ function profile(extra: object = {}) {
       totalVolumeKg: 19400,
       prCount: 24,
       bestMonthWorkouts: 14,
+      totalSets: 1500,
+      totalReps: 12000,
+      trainingMinutes: 6000,
+      oneRepMaxCount: 2,
+      exerciseCount: 20,
+      bestSessionVolumeKg: 5000,
+      bodyweightReps: 0,
+      timedSeconds: 0,
+      groupWorkouts: 1,
+      committedMonths: 1,
+      strongWeeks: 12,
+      likesReceived: 30,
+      likesGiven: 8,
     },
-    bestLifts: [
-      {
-        exerciseId: 'ex-row',
-        exerciseName: 'Seated Row',
-        photoUrl: null,
-        gym: 'Downtown',
-        attachment: 'V-handle',
-        weightKg: 100,
-        reps: 5,
-        performedAt: '2026-11-01',
-      },
-    ],
+    exercises: [lift('ex-row', 'Seated Row', { gym: 'Downtown', attachment: 'V-handle' })],
     ...extra,
   };
 }
@@ -177,49 +198,91 @@ describe('PersonProfileScreen', () => {
     );
   });
 
-  it('opens on Achievements: the badges they have earned', async () => {
+  it('opens on Achievements: every achievement at its rank, the highest first', async () => {
     renderScreen();
 
     expect(await screen.findByTestId('person-profile-achievements')).toBeTruthy();
     expect(screen.getByTestId('person-profile-tab-achievements')).toHaveTextContent(
       /Achievements$/,
     );
-    // 120 workouts, 14 in a month, 24 PRs, 19,400 kg: the best of each kind, then what's next.
-    expect(screen.getByTestId('person-profile-badge-workouts-100')).toHaveTextContent(
-      /100 Workouts$/,
+    // 120 workouts: Gold. 24 PRs: Silver. 30 likes: Silver. 1,500 sets: Gold.
+    expect(screen.getByTestId('person-profile-achievement-workouts')).toHaveTextContent(
+      /Iron Regular.*Gold/,
     );
-    expect(screen.getByTestId('person-profile-badge-consistency')).toBeTruthy();
-    expect(screen.getByTestId('person-profile-badge-prs-10')).toHaveTextContent(/10 PRs$/);
-    expect(screen.getByTestId('person-profile-badge-workouts-250')).toBeTruthy();
+    expect(screen.getByTestId('person-profile-achievement-prs')).toHaveTextContent(
+      /Record Breaker.*Silver/,
+    );
+    expect(screen.getByTestId('person-profile-achievement-timed')).toHaveTextContent(
+      /Iron Core.*Locked/,
+    );
+    // Never nutrition: that's theirs alone.
+    expect(screen.queryByTestId('person-profile-achievement-food-days')).toBeNull();
+    expect(screen.getByTestId('person-profile-ranks')).toHaveTextContent(/of 162 ranks/);
     // Their workouts are under Workouts.
     expect(screen.queryByTestId('person-profile-workout-w1')).toBeNull();
+    expect(screen.queryByTestId('profile-all-achievements')).toBeNull();
   });
 
-  it('lists every badge, earned or not, with what each takes', async () => {
+  it("opens an achievement's nine ranks: what each takes, and which are reached", async () => {
     renderScreen();
 
-    fireEvent.press(await screen.findByTestId('person-profile-badges-all'));
+    fireEvent.press(await screen.findByTestId('person-profile-achievement-workouts'));
 
-    expect(screen.getByTestId('person-profile-badges-sheet')).toHaveTextContent(/6 of 13 earned/);
-    expect(screen.getByTestId('person-profile-badges-workouts-100')).toHaveTextContent(
-      /100 Workouts.*Finish 100 workouts.*Earned/,
+    const sheet = screen.getByTestId('person-profile-achievement-sheet');
+    expect(sheet).toHaveTextContent(/Iron Regular.*Gold.*Finish workouts/);
+    expect(screen.getByTestId('person-profile-achievement-sheet-progress')).toHaveTextContent(
+      '120 workouts · Platinum at 200 workouts',
     );
-    expect(screen.getByTestId('person-profile-badges-lifted-kg-50000')).toHaveTextContent(
-      /50K kg Lifted.*Lift 50K kg in all/,
-    );
-    expect(screen.getByTestId('person-profile-badges-lifted-kg-50000')).not.toHaveTextContent(
-      /Earned/,
-    );
+    expect(
+      screen.getByTestId('person-profile-achievement-sheet-rank-gold').props.accessibilityLabel,
+    ).toBe('Gold: 100 workouts. Reached');
+    expect(
+      screen.getByTestId('person-profile-achievement-sheet-rank-platinum').props.accessibilityLabel,
+    ).toBe('Platinum: 200 workouts. Next');
+    expect(
+      screen.getByTestId('person-profile-achievement-sheet-rank-legacy').props.accessibilityLabel,
+    ).toBe('Legacy: 1,500 workouts. Not reached yet');
   });
 
-  it('shows their heaviest lifts under PRs, every workout under Workouts, and Stats', async () => {
+  it('shows every exercise under PRs, each opening its top sets; every workout; and Stats', async () => {
     (getPersonWorkouts as jest.Mock).mockResolvedValue({ items: [workoutItem], hasMore: true });
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({
+        exercises: [
+          lift('ex-row', 'Seated Row', { gym: 'Downtown', attachment: 'V-handle' }),
+          lift('ex-push', 'Push-Up', {
+            measurementType: 'bodyweight',
+            weightKg: null,
+            reps: 25,
+            workouts: 1,
+          }),
+          lift('ex-plank', 'Plank', {
+            measurementType: 'timed',
+            weightKg: null,
+            reps: null,
+            durationSeconds: 90,
+          }),
+        ],
+      }),
+    );
     renderScreen();
 
     fireEvent.press(await screen.findByTestId('person-profile-tab-prs'));
     expect(screen.getByTestId('person-profile-lift-ex-row')).toHaveTextContent(
-      /Seated Row.*Downtown · V-handle.*100 kg × 5/,
+      /Seated Row.*12 workouts · Downtown · V-handle.*100 kg × 5/,
     );
+    expect(screen.getByTestId('person-profile-lift-ex-push')).toHaveTextContent(
+      /Push-Up.*1 workout.*25 reps/,
+    );
+    expect(screen.getByTestId('person-profile-lift-ex-plank')).toHaveTextContent(/Plank.*1:30/);
+    // A few exercises need no search.
+    expect(screen.queryByTestId('person-profile-lift-search')).toBeNull();
+    fireEvent.press(screen.getByTestId('person-profile-lift-ex-row'));
+    expect(mockNavigate).toHaveBeenCalledWith('PersonExercise', {
+      userId: 'sam',
+      exerciseId: 'ex-row',
+      name: 'Seated Row',
+    });
 
     fireEvent.press(screen.getByTestId('person-profile-tab-workouts'));
     expect(screen.getByTestId('person-profile-workout-w1')).toHaveTextContent(/Pull Day/);
@@ -227,7 +290,43 @@ describe('PersonProfileScreen', () => {
 
     fireEvent.press(screen.getByTestId('person-profile-tab-stats'));
     expect(screen.getByTestId('person-profile-stats-month')).toHaveTextContent(/14.*Busiest Month/);
-    expect(screen.getByTestId('person-profile-stats-badges')).toHaveTextContent(/6 of 13/);
+    expect(screen.getByTestId('person-profile-stats-ranks')).toHaveTextContent(
+      /of 162.*Ranks Earned/,
+    );
+  });
+
+  it('searches their exercises once there are more than a few', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({
+        exercises: [
+          'Bench Press',
+          'Incline Press',
+          'Squat',
+          'Deadlift',
+          'Seated Row',
+          'Lat Pulldown',
+          'Leg Press',
+        ].map((name, index) => lift(`ex-${index}`, name, index === 6 ? { gym: 'Downtown' } : {})),
+      }),
+    );
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('person-profile-tab-prs'));
+
+    fireEvent.changeText(screen.getByTestId('person-profile-lift-search'), 'press');
+    expect(screen.getByTestId('person-profile-lift-ex-0')).toBeTruthy();
+    expect(screen.getByTestId('person-profile-lift-ex-1')).toBeTruthy();
+    expect(screen.getByTestId('person-profile-lift-ex-6')).toBeTruthy();
+    expect(screen.queryByTestId('person-profile-lift-ex-2')).toBeNull();
+
+    // The gym counts as part of the name.
+    fireEvent.changeText(screen.getByTestId('person-profile-lift-search'), 'downtown');
+    expect(screen.getByTestId('person-profile-lift-ex-6')).toBeTruthy();
+    expect(screen.queryByTestId('person-profile-lift-ex-0')).toBeNull();
+
+    fireEvent.changeText(screen.getByTestId('person-profile-lift-search'), 'zercher');
+    expect(screen.getByTestId('person-profile-lift-none')).toHaveTextContent(
+      'No exercise matches "zercher".',
+    );
   });
 
   it('shares their profile', async () => {
@@ -279,7 +378,7 @@ describe('PersonProfileScreen', () => {
         followsYou: false,
         canSeeActivity: false,
         stats: null,
-        bestLifts: null,
+        exercises: null,
       }),
     );
     // Asked for alongside the profile, and refused until they accept.
@@ -358,13 +457,13 @@ describe('PersonProfileScreen', () => {
 
   it('says yours, not theirs, with no heaviest lifts on your own', async () => {
     (getPersonProfile as jest.Mock).mockResolvedValue(
-      profile({ isSelf: true, followStatus: 'none', followsYou: false, bestLifts: [] }),
+      profile({ isSelf: true, followStatus: 'none', followsYou: false, exercises: [] }),
     );
     renderScreen();
 
     fireEvent.press(await screen.findByTestId('person-profile-tab-prs'));
     expect(screen.getByTestId('person-profile-no-lifts')).toBeTruthy();
-    expect(screen.getByText(/^Your heaviest set on each weighted exercise/)).toBeTruthy();
+    expect(screen.getByText(/^Your best set on each exercise shows here/)).toBeTruthy();
   });
 
   it('opens their photo full screen, to see it properly', async () => {

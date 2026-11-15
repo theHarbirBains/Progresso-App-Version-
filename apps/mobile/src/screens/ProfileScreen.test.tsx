@@ -138,8 +138,21 @@ function me(extra: object = {}) {
       totalVolumeKg: 19400,
       prCount: 24,
       bestMonthWorkouts: 14,
+      totalSets: 1500,
+      totalReps: 12000,
+      trainingMinutes: 6000,
+      oneRepMaxCount: 2,
+      exerciseCount: 20,
+      bestSessionVolumeKg: 5000,
+      bodyweightReps: 0,
+      timedSeconds: 0,
+      groupWorkouts: 0,
+      committedMonths: 1,
+      strongWeeks: 12,
+      likesReceived: 30,
+      likesGiven: 8,
     },
-    bestLifts: [],
+    exercises: [],
     ...extra,
   };
 }
@@ -327,6 +340,9 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     renderProfile();
 
     expect(await screen.findByTestId('person-profile-achievements')).toBeTruthy();
+    // Yours, with nutrition, are a tap away.
+    fireEvent.press(screen.getByTestId('profile-all-achievements'));
+    expect(mockNavigate).toHaveBeenCalledWith('Achievements');
     expect(screen.getByTestId('person-profile-tab-achievements')).toHaveTextContent(
       /Achievements$/,
     );
@@ -475,19 +491,23 @@ describe('ProfileScreen Stats tab -- yours alone, under the six figures', () => 
 });
 
 describe('ProfileScreen PRs tab', () => {
-  it('shows every record you hold under your heaviest lifts, as one plain list', async () => {
+  it('shows every record you hold under your exercises, as one plain list', async () => {
     mockGetPersonProfile.mockResolvedValue(
       me({
-        bestLifts: [
+        exercises: [
           {
             exerciseId: 'ex1',
             exerciseName: 'Bench Press',
             photoUrl: null,
             gym: null,
             attachment: null,
+            measurementType: 'weight_reps',
             weightKg: 100,
             reps: 5,
+            durationSeconds: null,
             performedAt: '2026-09-01',
+            workouts: 3,
+            lastPerformedAt: '2026-09-01',
           },
         ],
       }),
@@ -502,7 +522,7 @@ describe('ProfileScreen PRs tab', () => {
     expect(screen.UNSAFE_queryAllByType(FlatList)).toHaveLength(0);
   });
 
-  it('lets your records speak for themselves when you have no heaviest lifts yet', async () => {
+  it('lets your records speak for themselves when you have no exercises yet', async () => {
     renderProfile();
     await openTab('prs');
 
