@@ -176,27 +176,33 @@ describe('PeopleService', () => {
             description: 'Finish your first workout',
             icon: 'play',
             category: 'workouts',
-            ap: 25,
-            repeats: 'once',
+            kind: 'single',
           },
           {
-            id: 'weekly-warrior',
-            title: 'Weekly Warrior',
-            description: 'Meet your weekly workout goal',
-            icon: 'check-circle',
-            category: 'consistency',
-            ap: 25,
-            repeats: 'weekly',
+            id: 'guns-blazin',
+            title: "Guns Blazin'",
+            description: 'Lift weight on biceps exercises',
+            icon: 'zap',
+            category: 'muscles',
+            kind: 'levels',
           },
+        ],
+        error: null,
+      });
+      client.queue('achievement_levels', {
+        data: [
+          { achievement_id: 'first-steps', level: 1 },
+          ...Array.from({ length: 8 }, (_, i) => ({ achievement_id: 'guns-blazin', level: i + 1 })),
+          { achievement_id: 'fuel-logger', level: 1 },
         ],
         error: null,
       });
       client.queue('achievement_awards', {
         data: [
-          { achievement_id: 'first-steps', awarded_at: '2026-01-02T10:00:00Z' },
-          { achievement_id: 'first-bite', awarded_at: '2026-01-03T10:00:00Z' },
-          { achievement_id: 'weekly-warrior', awarded_at: '2026-01-04T10:00:00Z' },
-          { achievement_id: 'weekly-warrior', awarded_at: '2026-01-11T10:00:00Z' },
+          { achievement_id: 'first-steps', level: 1, ap: 25, awarded_at: '2026-01-02T10:00:00Z' },
+          { achievement_id: 'fuel-logger', level: 1, ap: 50, awarded_at: '2026-01-03T10:00:00Z' },
+          { achievement_id: 'guns-blazin', level: 1, ap: 20, awarded_at: '2026-01-04T10:00:00Z' },
+          { achievement_id: 'guns-blazin', level: 2, ap: 40, awarded_at: '2026-01-11T10:00:00Z' },
         ],
         error: null,
       });
@@ -287,17 +293,19 @@ describe('PeopleService', () => {
           },
         ],
         rank: { points: 1250, awards: 14 },
-        // The latest first, a repeatable one once with its count -- never a nutrition one.
+        // The latest first, each at the level reached with the AP its levels brought -- never a
+        // nutrition one.
         achievements: [
           {
-            id: 'weekly-warrior',
-            title: 'Weekly Warrior',
-            description: 'Meet your weekly workout goal',
-            icon: 'check-circle',
-            category: 'consistency',
-            ap: 25,
-            repeats: 'weekly',
-            times: 2,
+            id: 'guns-blazin',
+            title: "Guns Blazin'",
+            description: 'Lift weight on biceps exercises',
+            icon: 'zap',
+            category: 'muscles',
+            kind: 'levels',
+            level: 2,
+            levels: 8,
+            ap: 60,
             firstAwardedAt: '2026-01-04T10:00:00Z',
             lastAwardedAt: '2026-01-11T10:00:00Z',
           },
@@ -307,9 +315,10 @@ describe('PeopleService', () => {
             description: 'Finish your first workout',
             icon: 'play',
             category: 'workouts',
+            kind: 'single',
+            level: 1,
+            levels: 1,
             ap: 25,
-            repeats: 'once',
-            times: 1,
             firstAwardedAt: '2026-01-02T10:00:00Z',
             lastAwardedAt: '2026-01-02T10:00:00Z',
           },
@@ -397,6 +406,7 @@ describe('PeopleService', () => {
       client.queue('rpc:person_profile_totals', { data: [], error: null });
       client.queue('rpc:person_exercise_bests', { data: [], error: null });
       client.queue('achievement_definitions', { data: [], error: null });
+      client.queue('achievement_levels', { data: [], error: null });
       client.queue('achievement_awards', { data: [], error: null });
       client.queue('rpc:achievement_summary', { data: [{ points: 75, awards: 2 }], error: null });
       const service = serviceWith(client);

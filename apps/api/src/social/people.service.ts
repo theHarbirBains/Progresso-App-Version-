@@ -106,10 +106,12 @@ export interface EarnedAchievement {
   description: string;
   icon: string;
   category: string;
+  kind: 'single' | 'levels';
+  /** The level they've reached, out of how many there are (1 of 1 for a single unlock). */
+  level: number;
+  levels: number;
+  /** The AP every level they've reached has brought. */
   ap: number;
-  repeats: 'once' | 'weekly' | 'monthly';
-  /** How many times: 1 for a one-time achievement, the weeks or months for a repeatable one. */
-  times: number;
   firstAwardedAt: string;
   lastAwardedAt: string;
 }
@@ -537,23 +539,24 @@ export class PeopleService {
   }
 
   /**
-   * The achievements they've earned, the latest first, a repeatable one once with how many times
-   * -- only public ones: nutrition achievements are only ever their own to see.
+   * The achievements they've earned, the latest first, each at the level reached -- only public
+   * ones: nutrition achievements are only ever their own to see.
    */
   private async earnedAchievements(personId: string): Promise<EarnedAchievement[]> {
     const client = this.supabaseService.getClient();
-    const [definitions, awards] = await Promise.all([
+    const [definitions, levels, awards] = await Promise.all([
       client
         .from('achievement_definitions')
-        .select('id, title, description, icon, category, ap, repeats')
+        .select('id, title, description, icon, category, kind')
         .eq('visibility', 'public'),
+      client.from('achievement_levels').select('achievement_id, level'),
       client
         .from('achievement_awards')
-        .select('achievement_id, awarded_at')
+        .select('achievement_id, level, ap, awarded_at')
         .eq('user_id', personId)
         .order('awarded_at', { ascending: true }),
     ]);
-    if (definitions.error || awards.error) {
+    if (definitions.error || levels.error || awards.error) {
       throw new InternalServerErrorException('Failed to load achievements');
     }
     const byId = new Map(
@@ -564,23 +567,37 @@ export class PeopleService {
           description: string;
           icon: string;
           category: string;
-          ap: number;
-          repeats: 'once' | 'weekly' | 'monthly';
+          kind: 'single' | 'levels';
         }[]
       ).map((definition) => [definition.id, definition]),
     );
+    const levelCount = new Map<string, number>();
+    for (const row of (levels.data ?? []) as { achievement_id: string; level: number }[]) {
+      levelCount.set(
+        row.achievement_id,
+        Math.max(levelCount.get(row.achievement_id) ?? 0, row.level),
+      );
+    }
     const earned = new Map<string, EarnedAchievement>();
-    for (const award of (awards.data ?? []) as { achievement_id: string; awarded_at: string }[]) {
+    for (const award of (awards.data ?? []) as {
+      achievement_id: string;
+      level: number;
+      ap: number;
+      awarded_at: string;
+    }[]) {
       const definition = byId.get(award.achievement_id);
       if (!definition) continue;
       const seen = earned.get(definition.id);
       if (seen) {
-        seen.times += 1;
+        seen.level = Math.max(seen.level, award.level);
+        seen.ap += award.ap;
         seen.lastAwardedAt = award.awarded_at;
       } else {
         earned.set(definition.id, {
           ...definition,
-          times: 1,
+          level: award.level,
+          levels: levelCount.get(definition.id) ?? award.level,
+          ap: award.ap,
           firstAwardedAt: award.awarded_at,
           lastAwardedAt: award.awarded_at,
         });
