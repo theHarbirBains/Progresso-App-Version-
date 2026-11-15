@@ -29,6 +29,7 @@ jest.mock('../lib/api', () => ({
   // Your profile as the people who follow you see it, and its first workouts.
   getPersonProfile: jest.fn(),
   getPersonWorkouts: jest.fn(),
+  listFollowRequests: jest.fn().mockResolvedValue([]),
   getSocialSummary: jest.fn().mockResolvedValue({}),
   likeWorkout: jest.fn(),
   unlikeWorkout: jest.fn(),
@@ -287,7 +288,9 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     expect(screen.getByTestId('profile-loading')).toBeTruthy();
 
     expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Harbir');
-    expect(screen.getByTestId('person-profile-identity')).toHaveTextContent(/@harbir/);
+    expect(screen.getByTestId('person-profile-subline')).toHaveTextContent(
+      '@harbir · 120 workouts',
+    );
     expect(screen.getByTestId('person-profile-bio')).toHaveTextContent('Chasing progress.');
     expect(screen.queryByTestId('profile-loading')).toBeNull();
   });
@@ -311,9 +314,12 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     expect(screen.queryByText('Build Muscle')).toBeNull();
   });
 
-  it('keeps Settings in the header, and offers Edit Profile and Share -- never Follow or "..."', async () => {
+  it('has Find People and Settings in the header, and Edit Profile and Share Profile -- never Follow or "..."', async () => {
     renderProfile();
     await screen.findByTestId('person-profile-name');
+
+    fireEvent.press(screen.getByTestId('profile-find-people'));
+    expect(mockNavigate).toHaveBeenCalledWith('FindPeople');
 
     expect(screen.getByTestId('profile-open-settings').props.accessibilityLabel).toBe('Settings');
     fireEvent.press(screen.getByTestId('profile-open-settings'));
@@ -323,7 +329,7 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     fireEvent.press(screen.getByTestId('person-profile-edit'));
     expect(mockNavigate).toHaveBeenCalledWith('SettingsPersonalInfo');
 
-    expect(screen.getByTestId('person-profile-share')).toBeTruthy();
+    expect(screen.getByTestId('person-profile-share')).toHaveTextContent('Share Profile');
     expect(screen.queryByTestId('person-profile-follow')).toBeNull();
     expect(screen.queryByTestId('person-profile-more')).toBeNull();
   });
@@ -331,10 +337,9 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
   it('shows who follows you and who you follow, each opening its list', async () => {
     renderProfile();
 
-    expect(await screen.findByTestId('person-profile-count-followers')).toHaveTextContent(
-      /4.*Followers/,
+    expect(await screen.findByTestId('person-profile-counts')).toHaveTextContent(
+      '4 followers•2 following',
     );
-    expect(screen.getByTestId('person-profile-count-following')).toHaveTextContent(/2.*Following/);
     fireEvent.press(screen.getByTestId('person-profile-count-followers'));
     expect(mockNavigate).toHaveBeenCalledWith('FollowList', {
       userId: 'user-1',

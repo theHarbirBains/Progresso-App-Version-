@@ -13,9 +13,9 @@ export const personProfileStyles = StyleSheet.create({
 
   top: {
     paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
+    gap: spacing.md,
   },
-  // The photo, and beside it who they are -- centred in the room it leaves, both ways.
+  // The photo, and beside it who they are, level with its middle.
   identity: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -34,8 +34,8 @@ export const personProfileStyles = StyleSheet.create({
   // Your own: the photo's place while a new one saves, and the camera saying it can be changed,
   // sitting on the ring's lower right, ringed in the background.
   avatarSaving: {
-    width: 88,
-    height: 88,
+    width: 72,
+    height: 72,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -53,58 +53,49 @@ export const personProfileStyles = StyleSheet.create({
   },
   identityText: {
     flex: 1,
-    alignItems: 'center',
     gap: spacing.xs,
   },
-  // As big as the room allows: `display`, shrinking to fit one line.
+  // `screenTitle`, shrinking to fit one line.
   name: {
-    ...typeScale.display,
+    ...typeScale.screenTitle,
     color: colors.textPrimary,
-    textAlign: 'center',
   },
-  username: {
+  // "@sam · 12 workouts".
+  subline: {
     ...typeScale.body,
     color: colors.textSecondaryBright,
-    textAlign: 'center',
   },
   bio: {
     ...typeScale.body,
     color: colors.textPrimary,
-    textAlign: 'center',
-    marginTop: spacing.xs,
   },
+  // "12 followers • 2 requests • 3 following", on one line (wrapping on a narrow phone).
   counts: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    columnGap: spacing.sm,
+    marginTop: -spacing.sm,
   },
-  // Each count takes an equal share of the row, centred in it.
   count: {
-    flex: 1,
     minHeight: minTouchTarget,
-    alignItems: 'center',
     justifyContent: 'center',
   },
-  countValue: {
-    ...typeScale.statSmall,
+  countText: {
+    ...typeScale.body,
     color: colors.textPrimary,
   },
-  countLabel: {
-    ...typeScale.secondary,
-    color: colors.textSecondaryBright,
-  },
-  countDivider: {
-    width: StyleSheet.hairlineWidth,
-    alignSelf: 'stretch',
-    marginVertical: spacing.sm,
-    backgroundColor: colors.glassBorderStrong,
+  countDot: {
+    ...typeScale.body,
+    color: colors.textSecondary,
   },
   mutuals: {
-    flex: 1.6,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'flex-start',
     gap: spacing.sm,
     minHeight: minTouchTarget,
+    marginTop: -spacing.sm,
   },
   mutualAvatars: {
     flexDirection: 'row',
@@ -135,12 +126,13 @@ export const personProfileStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
+  // Two equal buttons side by side.
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  mainAction: {
+  action: {
     flex: 1,
   },
 

@@ -192,6 +192,15 @@ describe('FindPeopleScreen -- requests tab', () => {
     expect(screen.getByTestId('find-people-request-follow-1-reject')).toBeTruthy();
   });
 
+  it('opens straight on Requests from a profile\'s "2 requests"', async () => {
+    mockListFollowRequests.mockResolvedValue([janeRequest]);
+    render(
+      <FindPeopleScreen navigation={navigation} route={{ params: { tab: 'requests' } } as never} />,
+    );
+
+    expect(await screen.findByTestId('find-people-request-follow-1')).toHaveTextContent(/Jane Doe/);
+  });
+
   it('accepting removes the request and calls the backend with "accept"', async () => {
     mockListFollowRequests.mockResolvedValue([janeRequest]);
     renderScreen();

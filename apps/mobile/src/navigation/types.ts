@@ -115,7 +115,8 @@ export type RootStackParamList = {
   WorkoutSplitForm: { splitId?: string; activateOnCreate?: boolean };
   ChooseWorkoutSplit: undefined;
   Profile: undefined;
-  FindPeople: undefined;
+  /** Opens on Friends, or on the tab given (a profile's "2 requests" opens Requests). */
+  FindPeople: { tab?: 'requests' } | undefined;
   Notifications: undefined;
   /** Someone's profile: who they are, who follows them, and -- following them -- their training. */
   PersonProfile: { userId: string };

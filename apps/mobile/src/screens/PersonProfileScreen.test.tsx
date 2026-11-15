@@ -5,6 +5,7 @@ import {
   getPersonProfile,
   getSocialSummary,
   getPersonWorkouts,
+  listFollowRequests,
   respondToFollowRequest,
   sendFollowRequest,
   unfollowUser,
@@ -16,6 +17,7 @@ jest.mock('../auth/AuthProvider', () => ({ useAuth: jest.fn() }));
 jest.mock('../lib/api', () => ({
   getPersonProfile: jest.fn(),
   getPersonWorkouts: jest.fn(),
+  listFollowRequests: jest.fn(),
   sendFollowRequest: jest.fn(),
   unfollowUser: jest.fn(),
   respondToFollowRequest: jest.fn(),
@@ -171,15 +173,16 @@ beforeEach(() => {
     items: [workoutItem],
     hasMore: false,
   });
+  (listFollowRequests as jest.Mock).mockReset().mockResolvedValue([]);
   mockNavigate.mockClear();
 });
 
 describe('PersonProfileScreen', () => {
-  it('shows who they are: name, @username, bio, counts and mutual friends', async () => {
+  it('shows who they are: name, @username and workouts, bio, counts and mutual friends', async () => {
     renderScreen();
 
     expect(await screen.findByTestId('person-profile-name')).toHaveTextContent('Sam Lee');
-    expect(screen.getByTestId('person-profile-identity')).toHaveTextContent(/@sam/);
+    expect(screen.getByTestId('person-profile-subline')).toHaveTextContent('@sam · 120 workouts');
     expect(screen.getByTestId('person-profile-bio')).toHaveTextContent(
       'Building strength. Chasing progress.',
     );
@@ -188,8 +191,11 @@ describe('PersonProfileScreen', () => {
     // No "Follows you" line: the counts and the Following button say it.
     expect(screen.queryByTestId('person-profile-follows-you')).toBeNull();
     expect(screen.queryByText('Follows you')).toBeNull();
-    expect(screen.getByTestId('person-profile-count-followers')).toHaveTextContent(/12.*Followers/);
-    expect(screen.getByTestId('person-profile-count-following')).toHaveTextContent(/3.*Following/);
+    // One line: "12 followers • 3 following" -- someone else's follow requests are never asked for.
+    expect(screen.getByTestId('person-profile-counts')).toHaveTextContent(
+      '12 followers•3 following',
+    );
+    expect(listFollowRequests).not.toHaveBeenCalled();
     expect(screen.getByTestId('person-profile-mutuals')).toHaveTextContent(/4 mutual friends/);
     expect(screen.getByTestId('person-profile-following')).toBeTruthy();
     expectNoBareText();
@@ -216,6 +222,51 @@ describe('PersonProfileScreen', () => {
     await screen.findByTestId('person-profile-name');
     expect(screen.queryByTestId('person-profile-mutuals')).toBeNull();
     expect(screen.queryByTestId('person-profile-bio')).toBeNull();
+  });
+
+  it('leaves their workouts out from under their name until you can see them', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({ followStatus: 'none', canSeeActivity: false, stats: null }),
+    );
+    renderScreen();
+
+    expect(await screen.findByTestId('person-profile-subline')).toHaveTextContent('@sam');
+    expect(screen.getByTestId('person-profile-subline')).not.toHaveTextContent(/workouts/);
+  });
+
+  it('puts your follow requests between the counts on your own, opening them', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      user: { id: 'sam' },
+      session: { access_token: 'token-1' },
+    });
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({ isSelf: true, followStatus: 'none', followsYou: false }),
+    );
+    (listFollowRequests as jest.Mock).mockResolvedValue([{ followId: 'f1' }, { followId: 'f2' }]);
+    renderScreen();
+
+    expect(await screen.findByTestId('person-profile-counts')).toHaveTextContent(
+      '12 followers•2 requests•3 following',
+    );
+    fireEvent.press(screen.getByTestId('person-profile-count-requests'));
+    expect(mockNavigate).toHaveBeenCalledWith('FindPeople', { tab: 'requests' });
+  });
+
+  it('leaves the requests out of your own counts when there are none', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      user: { id: 'sam' },
+      session: { access_token: 'token-1' },
+    });
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({ isSelf: true, followStatus: 'none', followsYou: false }),
+    );
+    renderScreen();
+
+    expect(await screen.findByTestId('person-profile-counts')).toHaveTextContent(
+      '12 followers•3 following',
+    );
+    expect(listFollowRequests).toHaveBeenCalledWith('token-1');
+    expect(screen.queryByTestId('person-profile-count-requests')).toBeNull();
   });
 
   it('shows the four figures, in your unit: workouts, the last 30 days, PRs and total volume', async () => {

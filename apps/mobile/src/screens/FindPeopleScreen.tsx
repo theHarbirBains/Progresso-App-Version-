@@ -78,13 +78,18 @@ function rowLabel(user: FollowUser): { title: string; subtitle: string | undefin
  * Tapping a person opens their profile (PersonProfileScreen), where Report and
  * Block are.
  */
-export function FindPeopleScreen({ navigation }: Props) {
+export function FindPeopleScreen({ navigation, route }: Props) {
   const accent = useAppTheme().accent.accent;
   const { user, session } = useAuth();
   const userId = user?.id;
   const accessToken = session?.access_token;
 
-  const [tab, setTab] = useState<FindPeopleTab>('friends');
+  const [tab, setTab] = useState<FindPeopleTab>(route.params?.tab ?? 'friends');
+  // Opened again for a tab while already open underneath.
+  const askedTab = route.params?.tab;
+  useEffect(() => {
+    if (askedTab) setTab(askedTab);
+  }, [askedTab]);
   const [friendsSubTab, setFriendsSubTab] = useState<FriendsSubTab>('suggested');
 
   const [requests, setRequests] = useState<FollowRequest[]>([]);

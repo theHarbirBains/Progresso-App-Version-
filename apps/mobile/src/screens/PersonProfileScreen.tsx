@@ -11,7 +11,6 @@ import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { GlassBackground } from '../design/GlassBackground';
-import { IconButton } from '../design/IconButton';
 import { ZoomablePhoto } from '../design/PhotoLightbox';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
@@ -27,6 +26,7 @@ import { WorkoutFeedCard } from '../feed/WorkoutFeedCard';
 import {
   getPersonProfile,
   getPersonWorkouts,
+  listFollowRequests,
   respondToFollowRequest,
   sendFollowRequest,
   unfollowUser,
@@ -85,6 +85,7 @@ interface ShownProfile {
   profile: PersonProfile;
   workouts: FriendsFeedItem[];
   hasMore: boolean;
+  requests: number;
 }
 
 const TABS: { key: Tab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
@@ -146,9 +147,11 @@ function StatTile({
 
 /**
  * Someone's profile, after the design Harbir drew: the theme's photo glowing behind the top, where
- * their photo sits in an accent ring beside their name, @username and bio; their
- * followers and following, and the people you follow who follow them too; one wide Follow /
- * Following button (or Accept and Decline, or Edit Profile on your own) with Share beside it. For
+ * their photo sits in an accent ring beside their name, and "@username · 12 workouts" under it;
+ * their bio; "12 followers • 3 following" on one line (on your own, your follow requests between
+ * them, when there are any) and the people you follow who follow them too; then two equal buttons
+ * -- Follow / Following (or Edit Profile on your own) and Share Profile -- with Accept and Decline
+ * above them when they asked to follow you. For
  * you, or someone who accepted your follow: four figures -- workouts, the last 30 days, records
  * held and everything lifted -- then Stats (where it opens), Workouts (all of them, with likes
  * and comments), PRs (every exercise's best set, each opening its top sets and records) and
@@ -174,6 +177,8 @@ export function PersonProfilePage({
   const accessToken = session?.access_token;
   const { theme, weightUnit } = useProgressTheme();
   const isOwn = own !== undefined;
+  // Your own, from the You tab or opened like anyone's: your follow requests count beside it.
+  const isMine = userId === user?.id;
 
   const [shown] = useState(() =>
     isOwn ? recallShown<ShownProfile>(user?.id, 'profile.page') : undefined,
@@ -183,6 +188,7 @@ export function PersonProfilePage({
   const [workouts, setWorkouts] = useState<FriendsFeedItem[]>(shown?.workouts ?? []);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(shown?.hasMore ?? false);
+  const [requestCount, setRequestCount] = useState(shown?.requests ?? 0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -194,29 +200,34 @@ export function PersonProfilePage({
     if (!accessToken || !userId) return;
     setError(null);
     try {
-      // Both at once: the workouts are refused until they accept your follow, which the profile
-      // says -- so a refusal there is no error.
-      const [next, first] = await Promise.all([
+      // All at once: the workouts are refused until they accept your follow, which the profile
+      // says -- so a refusal there is no error; and on yours, your follow requests, whose count
+      // simply doesn't show if they can't be read.
+      const [next, first, requests] = await Promise.all([
         getPersonProfile(accessToken, userId),
         getPersonWorkouts(accessToken, userId, 0).catch(() => null),
+        isMine ? listFollowRequests(accessToken).catch(() => null) : null,
       ]);
       const items = next.canSeeActivity && first ? first.items : [];
       const more = next.canSeeActivity && first ? first.hasMore : false;
+      const waiting = requests?.length ?? 0;
       setProfile(next);
       setWorkouts(items);
       setHasMore(more);
+      setRequestCount(waiting);
       setPage(0);
       if (isOwn) {
         rememberShown<ShownProfile>(user?.id, 'profile.page', {
           profile: next,
           workouts: items,
           hasMore: more,
+          requests: waiting,
         });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this profile');
     }
-  }, [accessToken, userId, isOwn, user?.id]);
+  }, [accessToken, userId, isOwn, isMine, user?.id]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => void load());
@@ -306,6 +317,14 @@ export function PersonProfilePage({
   }
 
   const label = profile ? personLabel(profile.user) : null;
+  // Under the name: their @username and how many workouts they've done, once you can see that.
+  const workoutCount = profile?.stats?.workouts ?? null;
+  const subline = [
+    label?.subtitle,
+    workoutCount !== null ? `${workoutCount} ${workoutCount === 1 ? 'workout' : 'workouts'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   function renderWorkout(item: FriendsFeedItem, target: PersonProfile, name: string) {
     const summary = social.summaries[item.workout.id];
@@ -359,8 +378,8 @@ export function PersonProfilePage({
           <Avatar
             uri={target.user.avatarUrl}
             initial={title.charAt(0).toUpperCase()}
-            size={88}
-            iconSize={36}
+            size={72}
+            iconSize={30}
             iconColor={colors.textSecondary}
             initialStyle={styles.avatarInitial}
           />
@@ -716,20 +735,21 @@ export function PersonProfilePage({
                 >
                   {label.title}
                 </Text>
-                {label.subtitle ? (
-                  <Text style={styles.username} numberOfLines={1}>
-                    {label.subtitle}
-                  </Text>
-                ) : null}
-                {profile.bio ? (
-                  <Text testID="person-profile-bio" style={styles.bio}>
-                    {profile.bio}
+                {subline ? (
+                  <Text testID="person-profile-subline" style={styles.subline} numberOfLines={1}>
+                    {subline}
                   </Text>
                 ) : null}
               </View>
             </View>
 
-            <View style={styles.counts}>
+            {profile.bio ? (
+              <Text testID="person-profile-bio" style={styles.bio}>
+                {profile.bio}
+              </Text>
+            ) : null}
+
+            <View testID="person-profile-counts" style={styles.counts}>
               <TouchableOpacity
                 testID="person-profile-count-followers"
                 style={styles.count}
@@ -742,14 +762,27 @@ export function PersonProfilePage({
                   })
                 }
                 accessibilityRole={profile.canSeeActivity ? 'button' : undefined}
-                accessibilityLabel={`${profile.followerCount} ${profile.followerCount === 1 ? 'follower' : 'followers'}`}
               >
-                <Text style={styles.countValue}>{profile.followerCount}</Text>
-                <Text style={styles.countLabel}>
-                  {profile.followerCount === 1 ? 'Follower' : 'Followers'}
+                <Text style={styles.countText}>
+                  {profile.followerCount} {profile.followerCount === 1 ? 'follower' : 'followers'}
                 </Text>
               </TouchableOpacity>
-              <View style={styles.countDivider} />
+              {isMine && requestCount > 0 ? (
+                <>
+                  <Text style={styles.countDot}>•</Text>
+                  <TouchableOpacity
+                    testID="person-profile-count-requests"
+                    style={styles.count}
+                    onPress={() => navigation.navigate('FindPeople', { tab: 'requests' })}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.countText, { color: theme.accent }]}>
+                      {requestCount} {requestCount === 1 ? 'request' : 'requests'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+              <Text style={styles.countDot}>•</Text>
               <TouchableOpacity
                 testID="person-profile-count-following"
                 style={styles.count}
@@ -762,48 +795,44 @@ export function PersonProfilePage({
                   })
                 }
                 accessibilityRole={profile.canSeeActivity ? 'button' : undefined}
-                accessibilityLabel={`Following ${profile.followingCount}`}
               >
-                <Text style={styles.countValue}>{profile.followingCount}</Text>
-                <Text style={styles.countLabel}>Following</Text>
+                <Text style={styles.countText}>{profile.followingCount} following</Text>
               </TouchableOpacity>
-              {profile.mutuals.count > 0 ? (
-                <>
-                  <View style={styles.countDivider} />
-                  <TouchableOpacity
-                    testID="person-profile-mutuals"
-                    style={styles.mutuals}
-                    onPress={() => setMutualsOpen(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${profile.mutuals.count} mutual ${
-                      profile.mutuals.count === 1 ? 'friend' : 'friends'
-                    }`}
-                  >
-                    <View style={styles.mutualAvatars}>
-                      {profile.mutuals.people.slice(0, 3).map((person, index) => (
-                        <View
-                          key={person.id}
-                          style={[styles.mutualAvatar, index > 0 && styles.mutualAvatarOverlap]}
-                        >
-                          <Avatar
-                            uri={person.avatarUrl}
-                            initial={personLabel(person).title.charAt(0).toUpperCase()}
-                            size={26}
-                            iconSize={12}
-                            iconColor={colors.textSecondary}
-                          />
-                        </View>
-                      ))}
-                    </View>
-                    <Text style={styles.mutualText} numberOfLines={2}>
-                      {profile.mutuals.count} mutual{' '}
-                      {profile.mutuals.count === 1 ? 'friend' : 'friends'}
-                    </Text>
-                    <Feather name="chevron-right" size={16} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </>
-              ) : null}
             </View>
+
+            {profile.mutuals.count > 0 ? (
+              <TouchableOpacity
+                testID="person-profile-mutuals"
+                style={styles.mutuals}
+                onPress={() => setMutualsOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`${profile.mutuals.count} mutual ${
+                  profile.mutuals.count === 1 ? 'friend' : 'friends'
+                }`}
+              >
+                <View style={styles.mutualAvatars}>
+                  {profile.mutuals.people.slice(0, 3).map((person, index) => (
+                    <View
+                      key={person.id}
+                      style={[styles.mutualAvatar, index > 0 && styles.mutualAvatarOverlap]}
+                    >
+                      <Avatar
+                        uri={person.avatarUrl}
+                        initial={personLabel(person).title.charAt(0).toUpperCase()}
+                        size={26}
+                        iconSize={12}
+                        iconColor={colors.textSecondary}
+                      />
+                    </View>
+                  ))}
+                </View>
+                <Text style={styles.mutualText} numberOfLines={1}>
+                  {profile.mutuals.count} mutual{' '}
+                  {profile.mutuals.count === 1 ? 'friend' : 'friends'}
+                </Text>
+                <Feather name="chevron-right" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            ) : null}
 
             {profile.requestId ? (
               <View testID="person-profile-request" style={styles.request}>
@@ -838,12 +867,11 @@ export function PersonProfilePage({
             ) : null}
 
             <View style={styles.actions}>
-              <View style={styles.mainAction}>
+              <View style={styles.action}>
                 {profile.isSelf ? (
                   <SecondaryButton
                     testID="person-profile-edit"
                     label="Edit Profile"
-                    icon="edit-2"
                     size="md"
                     onPress={() => navigation.navigate('SettingsPersonalInfo')}
                   />
@@ -851,7 +879,6 @@ export function PersonProfilePage({
                   <PrimaryButton
                     testID="person-profile-following"
                     label="Following"
-                    icon="user-check"
                     size="md"
                     loading={busy}
                     onPress={() => confirmUnfollow(profile)}
@@ -862,7 +889,6 @@ export function PersonProfilePage({
                   <SecondaryButton
                     testID="person-profile-requested"
                     label="Requested"
-                    icon="clock"
                     size="md"
                     loading={busy}
                     onPress={() => confirmUnfollow(profile)}
@@ -871,7 +897,6 @@ export function PersonProfilePage({
                   <PrimaryButton
                     testID="person-profile-follow"
                     label="Follow"
-                    icon="user-plus"
                     size="md"
                     loading={busy}
                     onPress={() => void run(() => sendFollowRequest(accessToken!, userId))}
@@ -880,12 +905,17 @@ export function PersonProfilePage({
                   />
                 )}
               </View>
-              <IconButton
-                testID="person-profile-share"
-                icon="share"
-                onPress={() => share(profile, label.title)}
-                accessibilityLabel={profile.isSelf ? 'Share your profile' : `Share ${label.title}`}
-              />
+              <View style={styles.action}>
+                <SecondaryButton
+                  testID="person-profile-share"
+                  label="Share Profile"
+                  size="md"
+                  onPress={() => share(profile, label.title)}
+                  accessibilityLabel={
+                    profile.isSelf ? 'Share your profile' : `Share ${label.title}'s profile`
+                  }
+                />
+              </View>
             </View>
 
             {profile.rank ? renderRank(profile, label.title) : null}
