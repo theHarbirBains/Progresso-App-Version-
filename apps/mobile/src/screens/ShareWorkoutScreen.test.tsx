@@ -514,7 +514,7 @@ describe('ShareWorkoutScreen -- cheering a new PR', () => {
   ) as typeof import('../notifications/reminderSettings');
 
   function renderFinished(prCheers = true, routeValue: never = justFinished) {
-    const settings = defaultReminderSettings(3);
+    const settings = defaultReminderSettings();
     return render(
       <ProfileProvider>
         <RemindersContext.Provider

@@ -8,7 +8,13 @@ function context(overrides: Partial<ReminderContext> = {}): ReminderContext {
   return {
     now: NOW,
     nextWorkout: { name: 'Push Day', muscles: 'Chest • Shoulders • Triceps' },
-    workedOutToday: false,
+    // Thursday evening: two days ago.
+    lastWorkoutAt: new Date(2026, 10, 12, 18, 0).toISOString(),
+    musclesLastTrained: [
+      { label: 'Chest', at: new Date(2026, 10, 12, 18, 0).toISOString() },
+      // Tuesday the 3rd: 11 days ago.
+      { label: 'Quadriceps', at: new Date(2026, 10, 3, 18, 0).toISOString() },
+    ],
     nutrition: true,
     today: { logged: false, calories: 0, proteinG: 0, calorieTarget: 2200, proteinTarget: 160 },
     ...overrides,
@@ -16,9 +22,7 @@ function context(overrides: Partial<ReminderContext> = {}): ReminderContext {
 }
 
 function settings(overrides: Partial<ReminderSettings> = {}): ReminderSettings {
-  // Saturday is a workout day here, so today has one.
-  const base = defaultReminderSettings(3);
-  return { ...base, workout: { ...base.workout, days: [1, 3, 5, 6] }, ...overrides };
+  return { ...defaultReminderSettings(), ...overrides };
 }
 
 const ids = (plan: ReturnType<typeof planReminders>) => plan.map((reminder) => reminder.id);
@@ -39,39 +43,69 @@ describe('planReminders', () => {
     );
   });
 
-  it('puts the next split day on the days they train, and nowhere else', () => {
-    const plan = planReminders(settings(), context());
-    const workout = plan.filter((r) => r.kind === 'workout');
+  it('nudges from the second day without a workout, every other day, at 5:00 PM', () => {
+    const nudges = planReminders(settings(), context()).filter((r) => r.kind === 'workout');
 
-    // Saturday the 14th, then Monday, Wednesday and Friday.
-    expect(ids(workout)).toEqual([
+    // Two days since Thursday: today, then every other day.
+    expect(ids(nudges)).toEqual([
       'progresso-reminder-workout-2026-11-14',
       'progresso-reminder-workout-2026-11-16',
       'progresso-reminder-workout-2026-11-18',
       'progresso-reminder-workout-2026-11-20',
     ]);
-    expect(workout[0]).toMatchObject({
-      at: new Date(2026, 10, 14, 17, 0),
-      title: 'Push Day today',
-      body: "Chest • Shoulders • Triceps. Tap to start when you're ready.",
-      path: 'workouts/new',
+    expect(nudges[0]!.at).toEqual(new Date(2026, 10, 14, 17, 0));
+    expect(nudges.every((r) => r.path === 'workouts/new')).toBe(true);
+  });
+
+  it("takes turns: what's up next, then the muscle they've gone longest without", () => {
+    const nudges = planReminders(settings(), context()).filter((r) => r.kind === 'workout');
+
+    expect(nudges[0]).toMatchObject({
+      title: 'Up next: Push Day',
+      body: "Chest • Shoulders • Triceps. It's been 2 days since your last workout.",
     });
+    expect(nudges[1]).toMatchObject({
+      title: 'Time for some quadriceps?',
+      body: "You haven't trained quadriceps in 13 days.",
+    });
+    expect(nudges[2]!.title).toBe('Up next: Push Day');
   });
 
-  it("drops today's workout reminder once a workout is finished today", () => {
-    const plan = planReminders(settings(), context({ workedOutToday: true }));
-    expect(ids(plan)).not.toContain('progresso-reminder-workout-2026-11-14');
-    expect(ids(plan)).toContain('progresso-reminder-workout-2026-11-16');
-  });
-
-  it('still reminds without a split, without naming a day', () => {
-    const [first] = planReminders(settings(), context({ nextWorkout: null })).filter(
-      (r) => r.kind === 'workout',
+  it('nudges nothing the day after a workout -- a workout today moves them all on', () => {
+    const plan = planReminders(
+      settings(),
+      context({ lastWorkoutAt: new Date(2026, 10, 14, 9, 0).toISOString() }),
     );
+    const nudges = plan.filter((r) => r.kind === 'workout');
+    expect(ids(nudges)).toEqual([
+      'progresso-reminder-workout-2026-11-16',
+      'progresso-reminder-workout-2026-11-18',
+      'progresso-reminder-workout-2026-11-20',
+    ]);
+  });
+
+  it('says how long it has been without a split or a muscle gone a week', () => {
+    const [first] = planReminders(
+      settings(),
+      context({ nextWorkout: null, musclesLastTrained: [] }),
+    ).filter((r) => r.kind === 'workout');
     expect(first).toMatchObject({
-      title: 'Workout day',
-      body: expect.stringMatching(/Time to train/),
+      title: 'Ready when you are',
+      body: "It's been 2 days since your last workout. Tap to start one.",
     });
+  });
+
+  it('before a first workout, nudges from tomorrow, every other day', () => {
+    const nudges = planReminders(
+      settings(),
+      context({ lastWorkoutAt: null, musclesLastTrained: [] }),
+    ).filter((r) => r.kind === 'workout');
+    expect(ids(nudges)).toEqual([
+      'progresso-reminder-workout-2026-11-15',
+      'progresso-reminder-workout-2026-11-17',
+      'progresso-reminder-workout-2026-11-19',
+    ]);
+    expect(nudges[0]!.body).toMatch(/Your first workout is a tap away/);
   });
 
   it("drops today's meal reminder once anything is logged, and redoes the check-in's figures", () => {
@@ -112,12 +146,12 @@ describe('planReminders', () => {
     expect(plan.find((r) => r.kind === 'weekly')?.body).not.toMatch(/nutrition/);
   });
 
-  it('sends the weekly summary on Sunday only', () => {
+  it('sends the weekly summary as Sunday starts, at 12:00 AM, and on Sunday only', () => {
     const weekly = planReminders(settings(), context()).filter((r) => r.kind === 'weekly');
     expect(weekly).toEqual([
       expect.objectContaining({
         id: 'progresso-reminder-weekly-2026-11-15',
-        at: new Date(2026, 10, 15, 18, 0),
+        at: new Date(2026, 10, 15, 0, 0),
         path: 'progress',
       }),
     ]);
@@ -128,7 +162,7 @@ describe('planReminders', () => {
     const plan = planReminders(
       {
         ...base,
-        workout: { ...base.workout, on: false },
+        workout: { on: false },
         meals: { ...base.meals, on: false },
         checkIn: { ...base.checkIn, on: false },
         weekly: { ...base.weekly, on: false },

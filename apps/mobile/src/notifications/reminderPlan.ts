@@ -1,10 +1,10 @@
 import type { ReminderSettings } from './reminderSettings';
 
 // The reminders to schedule on the phone for the next week, worked out from what the app
-// already knows -- the next split day, whether a workout was finished today, today's food log
-// and targets. A scheduled notification can't look anything up when it fires, so the plan is
-// made again whenever any of that changes (RemindersProvider): a workout finished today drops
-// today's workout reminder, a food logged drops today's meal reminder and redoes the check-in's
+// already knows -- the next split day, when they last trained (and each muscle), today's food
+// log and targets. A scheduled notification can't look anything up when it fires, so the plan is
+// made again whenever any of that changes (RemindersProvider): a workout finished moves every
+// training nudge on, a food logged drops today's meal reminder and redoes the check-in's
 // figures. A day ahead has nothing logged yet -- logging means opening the app, which plans
 // again -- so its reminders say so. Nutrition's reminders only come with a membership that
 // includes it.
@@ -29,8 +29,10 @@ export interface ReminderContext {
   now: Date;
   /** The next day of their split, or null without one. */
   nextWorkout: { name: string; muscles: string } | null;
-  /** A workout was finished today: no more workout reminder today. */
-  workedOutToday: boolean;
+  /** When their last finished workout was (ISO), or null before their first. */
+  lastWorkoutAt: string | null;
+  /** When each muscle they've trained was last trained -- for "haven't trained legs in 9 days". */
+  musclesLastTrained: { label: string; at: string }[];
   /** The membership includes Nutrition. */
   nutrition: boolean;
   today: {
@@ -44,6 +46,66 @@ export interface ReminderContext {
 }
 
 export const REMINDER_ID_PREFIX = 'progresso-reminder-';
+
+/** Training nudges come at 5:00 PM -- no time to set. */
+export const NUDGE_TIME = 17 * 60;
+/** The first nudge comes this many days after the last workout, then every other day. */
+export const NUDGE_AFTER_DAYS = 2;
+/** A muscle counts as not trained in a while from this many days. */
+export const STALE_MUSCLE_DAYS = 7;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function startOfDay(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/** Whole days from one date's day to another's. */
+function daysBetween(from: Date, to: Date): number {
+  return Math.round((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
+}
+
+/**
+ * The day's training nudge, if it's one: from the second day without a workout, every other day
+ * (before their first workout, from tomorrow, every other day). Alternating, where both can be
+ * said: what's up next in their split, and the muscle they've gone longest without -- a week or
+ * more. With neither, how long it's been.
+ */
+export function trainingNudge(
+  context: ReminderContext,
+  day: Date,
+): { title: string; body: string } | null {
+  const last = context.lastWorkoutAt ? new Date(context.lastWorkoutAt) : null;
+  const since = last
+    ? daysBetween(last, day)
+    : daysBetween(context.now, day) + NUDGE_AFTER_DAYS - 1;
+  if (since < NUDGE_AFTER_DAYS || (since - NUDGE_AFTER_DAYS) % 2 !== 0) return null;
+  const nudgeIndex = (since - NUDGE_AFTER_DAYS) / 2;
+
+  const stale = context.musclesLastTrained
+    .map((muscle) => ({ label: muscle.label, days: daysBetween(new Date(muscle.at), day) }))
+    .filter((muscle) => muscle.days >= STALE_MUSCLE_DAYS)
+    .sort((a, b) => b.days - a.days)[0];
+  const next = context.nextWorkout;
+  const lastLine = last
+    ? `It's been ${since} days since your last workout.`
+    : 'Your first workout is a tap away.';
+
+  const upNext = next
+    ? {
+        title: `Up next: ${next.name}`,
+        body: `${next.muscles ? `${next.muscles}. ` : ''}${lastLine}`,
+      }
+    : null;
+  const muscle = stale
+    ? {
+        title: `Time for some ${stale.label.toLowerCase()}?`,
+        body: `You haven't trained ${stale.label.toLowerCase()} in ${stale.days} days.`,
+      }
+    : null;
+  const first = nudgeIndex % 2 === 0 ? (upNext ?? muscle) : (muscle ?? upNext);
+  return first ?? { title: 'Ready when you are', body: `${lastLine} Tap to start one.` };
+}
 
 function dayKey(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -106,20 +168,8 @@ export function planReminders(
     const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
     const isToday = offset === 0;
 
-    if (
-      settings.workout.on &&
-      settings.workout.days.includes(day.getDay()) &&
-      !(isToday && context.workedOutToday)
-    ) {
-      const next = context.nextWorkout;
-      add('workout', day, settings.workout.time, {
-        title: next ? `${next.name} today` : 'Workout day',
-        body: next
-          ? `${next.muscles ? `${next.muscles}. ` : ''}Tap to start when you're ready.`
-          : "Time to train. Tap to start when you're ready.",
-        path: 'workouts/new',
-      });
-    }
+    const nudge = settings.workout.on ? trainingNudge(context, day) : null;
+    if (nudge) add('workout', day, NUDGE_TIME, { ...nudge, path: 'workouts/new' });
 
     if (context.nutrition && settings.meals.on && !(isToday && context.today.logged)) {
       add('meals', day, settings.meals.time, {

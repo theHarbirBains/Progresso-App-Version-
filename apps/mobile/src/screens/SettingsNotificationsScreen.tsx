@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import { AppHeader } from '../design/AppHeader';
 import { TextButton } from '../design/Button';
 import { Text } from '../design/Text';
@@ -8,7 +8,6 @@ import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
 import { Toggle } from '../design/Toggle';
-import { colors, spacing, typeScale } from '../design/theme';
 import { registerPushToken, unregisterPushToken } from '../lib/api';
 import { requestPushToken } from '../lib/pushNotifications';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -18,14 +17,12 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { settingsStyles as styles } from '../settings/settingsStyles';
 import { useMembership } from '../membership/useMembership';
 import { useReminders } from '../notifications/remindersContext';
-import { daysLabel, timeLabel, type ReminderSettings } from '../notifications/reminderSettings';
+import { timeLabel, type ReminderSettings } from '../notifications/reminderSettings';
 import { TimeChoiceSheet } from '../notifications/TimeChoiceSheet';
-import { WeekdayChips } from '../notifications/WeekdayChips';
 
-type TimedReminder = 'workout' | 'meals' | 'checkIn' | 'weekly';
+type TimedReminder = 'meals' | 'checkIn' | 'weekly';
 
 const TIME_TITLES: Record<TimedReminder, string> = {
-  workout: 'Workout Reminders',
   meals: 'Log Your Meals',
   checkIn: 'Protein & Calorie Check-in',
   weekly: 'Weekly Summary',
@@ -36,8 +33,7 @@ type Props = RootStackScreenProps<'SettingsNotifications'>;
 /**
  * Notifications: the two opt-in preferences as toggle rows, then the reminders -- scheduled on
  * this phone (notifications/RemindersProvider.tsx), each with its own toggle and, where it has
- * one, its time (and the workout reminder's days): Workouts' (workout days, PR cheers, the
- * weekly summary) for everyone, Nutrition's (log your meals, the protein and calorie check-in)
+ * one, its time: Workouts' (training nudges, PR cheers, the weekly summary) for everyone, Nutrition's (log your meals, the protein and calorie check-in)
  * only with a membership that includes it. They come only with Push Notifications on, and only
  * once the phone allows them -- if it doesn't, a line says so, with a way to its Settings.
  * Social notifications are still a visible "Coming Soon" row, never a toggle that does nothing.
@@ -248,27 +244,11 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
       <Section title="Workout Reminders">
         <ListRow
           testID="notif-workout"
-          icon="calendar"
-          title="Workout Days"
-          subtitle="Your next split day, on the days you train."
-          trailing={reminderToggle('workout', 'Workout Reminders')}
+          icon="compass"
+          title="Training Nudges"
+          subtitle="After a couple of days off: what's up next in your split, or a muscle you haven't trained in a while."
+          trailing={reminderToggle('workout', 'Training Nudges')}
         />
-        {settings?.workout.on ? (
-          <View style={localStyles.days}>
-            <WeekdayChips
-              testID="notif-workout-days"
-              days={settings.workout.days}
-              onChange={(days) => change({ workout: { ...settings.workout, days } })}
-              accentColor={theme.accent}
-              onAccentColor={theme.onAccent}
-              disabled={remindersOff}
-            />
-            <Text testID="notif-workout-days-label" style={localStyles.daysLabel}>
-              {daysLabel(settings.workout.days)}
-            </Text>
-          </View>
-        ) : null}
-        {timeRow('workout')}
         <ListRow
           testID="notif-prCheers"
           icon="award"
@@ -281,7 +261,7 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
           testID="notif-weekly"
           icon="bar-chart-2"
           title="Weekly Summary"
-          subtitle="Sundays, when your week's summary is ready."
+          subtitle="Every Sunday, your week's summary."
           divider
           trailing={reminderToggle('weekly', 'Weekly Summary')}
         />
@@ -384,14 +364,3 @@ export function SettingsNotificationsScreen({ navigation }: Props) {
     </Screen>
   );
 }
-
-const localStyles = StyleSheet.create({
-  days: {
-    gap: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  daysLabel: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-  },
-});

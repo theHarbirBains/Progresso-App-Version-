@@ -10,6 +10,8 @@ import { useProfile } from '../profile/ProfileProvider';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { musclesLabel } from '../workouts/nextWorkout';
 import { fetchNextWorkout } from '../workouts/nextWorkoutQueries';
+import type { WorkoutSummary } from '../workouts/workoutQueries';
+import { computeStaleMuscleGroups } from './muscleGroupFreshness';
 import { planReminders, type ReminderContext } from './reminderPlan';
 import {
   clearReminders,
@@ -27,13 +29,16 @@ import {
 /** How long after the last change the plan is made -- a burst of logging plans once. */
 const PLAN_DELAY_MS = 600;
 
-function isSameDay(iso: string, now: Date): boolean {
-  const at = new Date(iso);
-  return (
-    at.getFullYear() === now.getFullYear() &&
-    at.getMonth() === now.getMonth() &&
-    at.getDate() === now.getDate()
-  );
+/** When their latest finished workout was, or null before their first. */
+function lastWorkoutAt(workouts: WorkoutSummary[]): string | null {
+  let latest: string | null = null;
+  for (const workout of workouts) {
+    if (workout.completedAt === null) continue;
+    if (latest === null || Date.parse(workout.performedAt) > Date.parse(latest)) {
+      latest = workout.performedAt;
+    }
+  }
+  return latest;
 }
 
 /**
@@ -53,7 +58,7 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
   const { nutrition } = useMembership();
   const { logs, loading: logsLoading } = useFoodLog();
   const { goals } = useNutritionGoals();
-  const { allWorkouts } = useAllTimeStats();
+  const { allWorkouts, allSetHistory } = useAllTimeStats();
 
   const [settings, setSettings] = useState<ReminderSettings | null>(null);
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -65,19 +70,16 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
     showNotificationsInApp();
   }, []);
 
-  const workoutsAWeek = profile?.workoutFrequencyDays ?? null;
   useEffect(() => {
     setSettings(null);
     if (!userId) return;
     let current = true;
-    void loadReminderSettings(userId, workoutsAWeek).then((loaded) => {
+    void loadReminderSettings(userId).then((loaded) => {
       if (current) setSettings(loaded);
     });
     return () => {
       current = false;
     };
-    // The defaults only matter for the first read; a later change of frequency keeps the days.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   const refreshAllowed = useCallback(async () => {
@@ -135,9 +137,11 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         planReminders(settings, {
           now,
           nextWorkout,
-          workedOutToday: allWorkouts.some(
-            (workout) => workout.completedAt !== null && isSameDay(workout.performedAt, now),
-          ),
+          lastWorkoutAt: lastWorkoutAt(allWorkouts),
+          musclesLastTrained: computeStaleMuscleGroups(allSetHistory, now, 0).map((muscle) => ({
+            label: muscle.label,
+            at: muscle.lastTrainedAt,
+          })),
           nutrition,
           today: {
             logged: logs.length > 0,
@@ -163,6 +167,7 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
     logsLoading,
     goals,
     allWorkouts,
+    allSetHistory,
     nextWorkout,
     nutrition,
     wokenAt,

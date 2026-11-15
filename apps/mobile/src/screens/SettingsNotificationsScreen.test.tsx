@@ -56,7 +56,7 @@ const mockRefreshAllowed = jest.fn(async () => undefined);
 
 function reminders(overrides: Partial<RemindersContextValue> = {}): RemindersContextValue {
   return {
-    settings: defaultReminderSettings(3),
+    settings: defaultReminderSettings(),
     update: mockUpdateReminders,
     allowed: true,
     refreshAllowed: mockRefreshAllowed,
@@ -211,15 +211,18 @@ describe('SettingsNotificationsScreen -- reminders', () => {
     mockUpdateReminders.mockClear();
   });
 
-  it('shows each reminder with its toggle, time and the workout days', async () => {
+  it('shows each reminder with its toggle and time -- training nudges with neither days nor a time', async () => {
     renderScreen();
     await screen.findByTestId('notif-workout-toggle');
 
+    expect(screen.getByTestId('notif-workout')).toHaveTextContent(/Training Nudges/);
     expect(screen.getByTestId('notif-workout-toggle')).toHaveProp('value', true);
-    expect(screen.getByTestId('notif-workout-time')).toHaveTextContent(/5:00 PM/);
-    expect(screen.getByTestId('notif-workout-days-label')).toHaveTextContent('Mon, Wed, Fri');
+    expect(screen.queryByTestId('notif-workout-time')).toBeNull();
+    expect(screen.queryByTestId('notif-workout-days')).toBeNull();
+    expect(screen.queryByText('Workout Days')).toBeNull();
     expect(screen.getByTestId('notif-prCheers-toggle')).toHaveProp('value', true);
-    expect(screen.getByTestId('notif-weekly-time')).toHaveTextContent(/6:00 PM/);
+    // The weekly summary as Sunday starts.
+    expect(screen.getByTestId('notif-weekly-time')).toHaveTextContent(/12:00 AM/);
     expect(screen.getByTestId('notif-meals-time')).toHaveTextContent(/12:30 PM/);
     expect(screen.getByTestId('notif-checkIn-time')).toHaveTextContent(/8:00 PM/);
     expectNoBareText();
@@ -236,14 +239,14 @@ describe('SettingsNotificationsScreen -- reminders', () => {
     );
   });
 
-  it('changes the workout days from the chips', async () => {
+  it('turns training nudges off', async () => {
     renderScreen();
     await waitFor(() => expect(screen.getByTestId('notif-push-toggle')).toHaveProp('value', true));
 
-    fireEvent.press(screen.getByTestId('notif-workout-days-6'));
+    fireEvent(screen.getByTestId('notif-workout-toggle'), 'valueChange', false);
 
     expect(mockUpdateReminders).toHaveBeenCalledWith(
-      expect.objectContaining({ workout: { on: true, time: 17 * 60, days: [1, 3, 5, 6] } }),
+      expect.objectContaining({ workout: { on: false } }),
     );
   });
 

@@ -5,8 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // another phone has its own. A time is minutes after midnight; a day is 0 (Sunday) to 6.
 
 export interface ReminderSettings {
-  /** On the days they train: their next split day. */
-  workout: { on: boolean; time: number; days: number[] };
+  /** Training nudges: after a couple of days without a workout, what's up next in their split
+   * or a muscle they haven't trained in a while (reminderPlan.ts) -- no days or time to set. */
+  workout: { on: boolean };
   /** Nutrition only: log the day's meals, unless something's logged already. */
   meals: { on: boolean; time: number };
   /** Nutrition only: the day's calories and protein against the targets. */
@@ -17,30 +18,17 @@ export interface ReminderSettings {
   prCheers: { on: boolean };
 }
 
-/** The days a reminder starts on for someone who trains this many days a week (Monday first). */
-const DAYS_FOR_FREQUENCY: Record<number, number[]> = {
-  1: [1],
-  2: [1, 4],
-  3: [1, 3, 5],
-  4: [1, 2, 4, 5],
-  5: [1, 2, 3, 4, 5],
-  6: [1, 2, 3, 4, 5, 6],
-  7: [0, 1, 2, 3, 4, 5, 6],
-};
-
 /**
  * Every reminder on, at sensible times -- once someone has said yes to notifications, they get
- * the ones their membership covers, and can turn any off. The workout days follow how often
- * they said they train (three a week if they didn't say).
+ * the ones their membership covers, and can turn any off. The weekly summary comes as Sunday
+ * starts, at 12:00 AM.
  */
-export function defaultReminderSettings(workoutsAWeek: number | null): ReminderSettings {
-  const frequency =
-    workoutsAWeek && workoutsAWeek >= 1 ? Math.min(7, Math.round(workoutsAWeek)) : 3;
+export function defaultReminderSettings(): ReminderSettings {
   return {
-    workout: { on: true, time: 17 * 60, days: DAYS_FOR_FREQUENCY[frequency] },
+    workout: { on: true },
     meals: { on: true, time: 12 * 60 + 30 },
     checkIn: { on: true, time: 20 * 60 },
-    weekly: { on: true, time: 18 * 60 },
+    weekly: { on: true, time: 0 },
     prCheers: { on: true },
   };
 }
@@ -68,16 +56,11 @@ export function readStoredSettings(
   if (!stored || typeof stored !== 'object') return defaults;
   const on = (kind: keyof ReminderSettings) =>
     typeof stored[kind]?.on === 'boolean' ? (stored[kind]!.on as boolean) : defaults[kind].on;
-  const time = (kind: 'workout' | 'meals' | 'checkIn' | 'weekly') =>
+  const time = (kind: 'meals' | 'checkIn' | 'weekly') =>
     isTime(stored[kind]?.time) ? (stored[kind]!.time as number) : defaults[kind].time;
-  const storedDays = stored.workout?.days;
-  const days =
-    Array.isArray(storedDays) &&
-    storedDays.every((day) => Number.isInteger(day) && day >= 0 && day <= 6)
-      ? Array.from(new Set(storedDays as number[])).sort((a, b) => a - b)
-      : defaults.workout.days;
+  // A workout reminder's days and time, saved before nudges replaced it, are left behind.
   return {
-    workout: { on: on('workout'), time: time('workout'), days },
+    workout: { on: on('workout') },
     meals: { on: on('meals'), time: time('meals') },
     checkIn: { on: on('checkIn'), time: time('checkIn') },
     weekly: { on: on('weekly'), time: time('weekly') },
@@ -85,11 +68,8 @@ export function readStoredSettings(
   };
 }
 
-export async function loadReminderSettings(
-  userId: string,
-  workoutsAWeek: number | null,
-): Promise<ReminderSettings> {
-  const defaults = defaultReminderSettings(workoutsAWeek);
+export async function loadReminderSettings(userId: string): Promise<ReminderSettings> {
+  const defaults = defaultReminderSettings();
   try {
     return readStoredSettings(await AsyncStorage.getItem(storageKey(userId)), defaults);
   } catch {
@@ -110,18 +90,4 @@ export function timeLabel(minutes: number): string {
   const minute = minutes % 60;
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
   return `${hour12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
-}
-
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-/** "Mon, Wed, Fri", "Every day", "Weekdays", or "No days". Monday first. */
-export function daysLabel(days: number[]): string {
-  if (days.length === 7) return 'Every day';
-  if (days.length === 0) return 'No days';
-  const set = new Set(days);
-  if (days.length === 5 && [1, 2, 3, 4, 5].every((day) => set.has(day))) return 'Weekdays';
-  return [1, 2, 3, 4, 5, 6, 0]
-    .filter((day) => set.has(day))
-    .map((day) => DAY_NAMES[day])
-    .join(', ');
 }

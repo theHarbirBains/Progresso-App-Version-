@@ -51,7 +51,13 @@ function setUp({
   jest.mocked(useNutritionGoals).mockReturnValue({
     goals: { calories: 2200, proteinG: 160, carbsG: 200, fatG: 60 },
   } as never);
-  jest.mocked(useAllTimeStats).mockReturnValue({ allWorkouts: [] } as never);
+  // Last trained Thursday the 12th: two days ago, so a nudge is due today.
+  jest.mocked(useAllTimeStats).mockReturnValue({
+    allWorkouts: [
+      { id: 'w1', performedAt: '2026-11-12T18:00:00', completedAt: '2026-11-12T19:00:00' },
+    ],
+    allSetHistory: [{ muscleGroup: 'chest', performedAt: '2026-11-12T18:00:00' }],
+  } as never);
 }
 
 async function renderProvider() {
@@ -84,14 +90,15 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-it("schedules the week's reminders from what the app knows: the next split day, today's food", async () => {
+it("schedules the week's reminders from what the app knows: what's up next, today's food", async () => {
   setUp();
   await renderProvider();
 
   const requests = scheduled();
   const today = (kind: string) =>
     requests.find((request) => request.identifier === `progresso-reminder-${kind}-2026-11-14`);
-  expect(today('workout')?.content.title).toBe('Push Day today');
+  // Two days since the last workout: what's up next in the split.
+  expect(today('workout')?.content.title).toBe('Up next: Push Day');
   // Something is logged today: no meal reminder, and the check-in has the day's figures.
   expect(today('meals')).toBeUndefined();
   expect(today('checkIn')?.content.body).toBe(
