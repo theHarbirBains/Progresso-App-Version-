@@ -161,6 +161,54 @@ describe('AchievementsScreen', () => {
     expect(screen.getByTestId('achievements-ahead')).toHaveTextContent(/Not Started \(2\)/);
   });
 
+  it('lists every level and the AP each pays when one is tapped', () => {
+    renderScreen();
+
+    fireEvent.press(screen.getByTestId('achievement-iron-regular'));
+
+    const sheet = screen.getByTestId('achievement-levels');
+    expect(sheet).toHaveTextContent(/Iron Regular.*Level 2 of 3.*Finish workouts/);
+    expect(screen.getByTestId('achievement-levels-total')).toHaveTextContent(
+      '125 of 250 AP earned',
+    );
+    expect(screen.getByTestId('achievement-levels-level-1').props.accessibilityLabel).toBe(
+      'Level 1: 5 workouts, 50 AP. Reached',
+    );
+    expect(screen.getByTestId('achievement-levels-level-2').props.accessibilityLabel).toBe(
+      'Level 2: 10 workouts, 75 AP. Reached',
+    );
+    expect(screen.getByTestId('achievement-levels-level-3').props.accessibilityLabel).toBe(
+      'Level 3: 25 workouts, 125 AP. Next -- 12 / 25 so far',
+    );
+    expect(screen.getByTestId('achievement-levels-level-3')).toHaveTextContent(
+      /Level 3.*25 workouts.*12 \/ 25.*\+125 AP/,
+    );
+  });
+
+  it("shows a weight achievement's levels in your unit", () => {
+    renderScreen();
+
+    fireEvent.press(screen.getByTestId('achievement-guns-blazin'));
+
+    expect(screen.getByTestId('achievement-levels-level-1')).toHaveTextContent(
+      /Level 1.*1,000 lb lifted on biceps.*661 \/ 1,000 lb.*\+20 AP/,
+    );
+    expect(screen.getByTestId('achievement-levels-level-2').props.accessibilityLabel).toBe(
+      'Level 2: 10,000 lb lifted on biceps, 40 AP. Not reached yet',
+    );
+    expect(screen.getByTestId('achievement-levels-total')).toHaveTextContent('0 of 60 AP earned');
+  });
+
+  it('shows a single unlock as one unlock', () => {
+    renderScreen();
+
+    fireEvent.press(screen.getByTestId('achievement-first-steps'));
+
+    expect(screen.getByTestId('achievement-levels-level-1').props.accessibilityLabel).toBe(
+      'Unlock: Finish your first workout, 25 AP. Reached',
+    );
+  });
+
   it('says when every level is reached', () => {
     renderScreen('everything', {
       awards: [1, 2, 3].map((level) => ({

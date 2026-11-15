@@ -25,6 +25,7 @@ import {
 import type { AchievementCategory } from '../achievements/achievementQueries';
 import { useAchievements } from '../achievements/achievementsContext';
 import { AchievementEmblem } from '../achievements/AchievementEmblem';
+import { AchievementLevelsSheet } from '../achievements/AchievementLevelsSheet';
 import { RankEmblem } from '../achievements/RankEmblem';
 import { nextRankLabel, rankForPoints } from '../achievements/ranks';
 import { formatCardDate } from '../workouts/workoutFormat';
@@ -39,14 +40,17 @@ type Filter = 'all' | AchievementCategory;
  * filter (All, each kind) and the achievements -- the ones you've started, the most recently
  * levelled first, then the ones not started -- each with its emblem (a ring of its levels), its
  * level, the bar to its next level, what that level takes and its AP, and the AP it's brought.
- * Nutrition ones only with Nutrition in your membership; only you ever see them. Asks the server
- * to award anything new each time it opens.
+ * Tapping one lists every level -- what it takes and the AP it pays. Nutrition ones only with
+ * Nutrition in your membership; only you ever see them. Asks the server to award anything new
+ * each time it opens.
  */
 export function AchievementsScreen({ navigation }: Props) {
   const { definitions, awards, progress, points, loading, error, evaluate } = useAchievements();
   const { theme, weightUnit } = useProgressTheme();
   const { nutrition } = useMembership();
   const [filter, setFilter] = useState<Filter>('all');
+  // The achievement whose levels are open.
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => void evaluate());
@@ -86,11 +90,13 @@ export function AchievementsScreen({ navigation }: Props) {
   function renderRow(status: AchievementStatus, index: number) {
     const { definition } = status;
     return (
-      <View
+      <TouchableOpacity
         key={definition.id}
         testID={`achievement-${definition.id}`}
         style={[styles.row, index > 0 && styles.rowDivider]}
-        accessible
+        onPress={() => setOpenId(definition.id)}
+        accessibilityRole="button"
+        accessibilityHint="Shows every level and the AP each pays"
         accessibilityLabel={`${definition.title}, ${levelText(status)}. ${definition.description}. ${
           status.next
             ? `${status.progressLabel}; next, ${status.nextGoalLabel} for ${status.next.ap} AP`
@@ -144,7 +150,8 @@ export function AchievementsScreen({ navigation }: Props) {
             </Text>
           ) : null}
         </View>
-      </View>
+        <Feather name="chevron-right" size={16} color={colors.textMuted} />
+      </TouchableOpacity>
     );
   }
 
@@ -233,6 +240,12 @@ export function AchievementsScreen({ navigation }: Props) {
           ) : null}
         </>
       )}
+      <AchievementLevelsSheet
+        status={shown.find((status) => status.definition.id === openId) ?? null}
+        weightUnit={weightUnit}
+        accentColor={theme.accent}
+        onClose={() => setOpenId(null)}
+      />
     </Screen>
   );
 }
