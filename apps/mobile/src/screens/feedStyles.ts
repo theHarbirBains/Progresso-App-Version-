@@ -61,9 +61,8 @@ export const feedStyles = StyleSheet.create({
     marginTop: spacing.lg,
   },
 
-  // The byline: a small avatar, the account's own name, and a quiet
-  // icon+timestamp line underneath -- Strava's "who, when" row, without the
-  // social graph (it's always the signed-in user).
+  // The byline: the author's photo (44pt, big enough to tell who it is at a glance), their name,
+  // and a quiet icon+timestamp line underneath -- Strava's "who, when" row.
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -78,16 +77,16 @@ export const feedStyles = StyleSheet.create({
     gap: spacing.md,
   },
   avatarWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   avatarInitial: {
-    ...typeScale.label,
+    ...typeScale.cardTitle,
     color: colors.textSecondary,
   },
   metaBody: {

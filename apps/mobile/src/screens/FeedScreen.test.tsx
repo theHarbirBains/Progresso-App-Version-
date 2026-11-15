@@ -1,6 +1,7 @@
 import { Alert, StyleSheet } from 'react-native';
 import { fetchActiveWorkout } from '../workouts/workoutQueries';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { Avatar } from '../design/Avatar';
 import * as backdrop from '../design/AppBackgroundLayer';
 import { Card } from '../design/Card';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
@@ -805,6 +806,16 @@ const oneDaySplit = {
   name: 'PPL',
   days: [{ id: 'day-push', name: 'Push', orderIndex: 1, muscleGroups: ['chest' as const] }],
 };
+
+describe('FeedScreen -- workout cards', () => {
+  it("shows the author's photo big enough to tell who it is", async () => {
+    mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
+    renderScreen();
+
+    const author = await screen.findByTestId('feed-item-workout-w1-author');
+    expect(within(author).UNSAFE_getByType(Avatar).props.size).toBe(44);
+  });
+});
 
 describe('FeedScreen -- shows all at once', () => {
   const api = () =>

@@ -84,8 +84,8 @@ export function WorkoutFeedCard({
             <Avatar
               uri={avatarUrl ?? null}
               initial={authorName.charAt(0).toUpperCase()}
-              size={32}
-              iconSize={16}
+              size={44}
+              iconSize={20}
               iconColor={colors.textSecondary}
               initialStyle={styles.avatarInitial}
             />

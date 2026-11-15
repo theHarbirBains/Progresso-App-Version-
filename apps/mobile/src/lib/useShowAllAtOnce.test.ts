@@ -11,9 +11,12 @@ afterEach(() => {
 
 describe('useShowAllAtOnce', () => {
   it('shows once every part is in, and stays shown when a part refreshes', () => {
-    const { result, rerender } = renderHook(({ ready }) => useShowAllAtOnce(ready), {
-      initialProps: { ready: false },
-    });
+    const { result, rerender } = renderHook(
+      ({ ready }: { ready: boolean }) => useShowAllAtOnce(ready),
+      {
+        initialProps: { ready: false },
+      },
+    );
     expect(result.current).toBe(false);
 
     rerender({ ready: true });
