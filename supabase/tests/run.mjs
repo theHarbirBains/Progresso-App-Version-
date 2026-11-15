@@ -4856,7 +4856,9 @@ async function main() {
       JSON.stringify({ followersSee, ownSee }),
     );
     await expectThrows(
-      asUser(fan, (c) => c.query('select * from public.person_profile_totals($1, false)', [lifter])),
+      asUser(fan, (c) =>
+        c.query('select * from public.person_profile_totals($1, false)', [lifter]),
+      ),
       "A person cannot read someone's profile totals directly",
       /permission denied/i,
     );
@@ -5242,7 +5244,8 @@ async function main() {
     const mine = (zone) =>
       asUser(
         athlete,
-        async (c) => (await c.query('select * from public.my_nutrition_totals($1)', [zone])).rows[0],
+        async (c) =>
+          (await c.query('select * from public.my_nutrition_totals($1)', [zone])).rows[0],
       );
     const tokyo = await mine('Asia/Tokyo');
     const unknown = await mine('Not/AZone');
@@ -5256,6 +5259,382 @@ async function main() {
         tokyo.recipes === 1 &&
         tokyo.saved_meals === 1,
       JSON.stringify({ tokyo, unknown }),
+    );
+  }
+
+  // ---- achievement points: awarding, idempotency, periods, time zones, integrity ----
+  {
+    const ath = randomUUID();
+    const friend = randomUUID();
+    const lurker = randomUUID();
+    const other = randomUUID();
+    await admin.query(
+      `insert into auth.users (id, email) values
+         ($1, 'ap-athlete@test.local'), ($2, 'ap-friend@test.local'),
+         ($3, 'ap-lurker@test.local'), ($4, 'ap-other@test.local')`,
+      [ath, friend, lurker, other],
+    );
+    await admin.query('update public.users set workout_frequency_days = 2 where id = $1', [ath]);
+    const lift = async (
+      owner,
+      name,
+      type = 'weight_reps',
+      muscle = 'chest',
+      movement = 'bilateral',
+    ) =>
+      (
+        await admin.query(
+          'insert into public.exercises (name, muscle_group, created_by, measurement_type, movement_type) values ($1, $2, $3, $4, $5) returning id',
+          [name, muscle, owner, type, movement],
+        )
+      ).rows[0].id;
+    const press = await lift(ath, 'AP Press');
+    const row = await lift(ath, 'AP Row', 'weight_reps', 'back');
+
+    // A workout at `at` (ISO), with sets of [weight, reps] on one exercise.
+    const workout = async (
+      owner,
+      exerciseId,
+      at,
+      sets,
+      { completed = true, deleted = false } = {},
+    ) => {
+      const w = (
+        await admin.query(
+          `insert into public.workouts (user_id, name, performed_at, completed_at, deleted_at)
+           values ($1, 'AP Check', $2, $3, $4) returning id`,
+          [owner, at, completed ? at : null, deleted ? at : null],
+        )
+      ).rows[0].id;
+      const we = (
+        await admin.query(
+          'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+          [w, exerciseId],
+        )
+      ).rows[0].id;
+      let index = 0;
+      for (const [weight, reps, done = true] of sets) {
+        index += 1;
+        await admin.query(
+          'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, $2, $3, $4, $5)',
+          [we, index, weight, reps, done ? at : null],
+        );
+      }
+      return w;
+    };
+    const award = (user, zone = 'UTC') =>
+      asUserCommitted(
+        user,
+        async (c) => (await c.query('select * from public.award_my_achievements($1)', [zone])).rows,
+      );
+    const ids = (rows) => rows.map((r) => `${r.achievement_id}@${r.period_key}`).sort();
+    const points = async (user) =>
+      (await admin.query('select * from public.achievement_summary($1)', [user])).rows[0];
+
+    const catalogue = (
+      await admin.query(
+        'select id, repeats, visibility, category from public.achievement_definitions',
+      )
+    ).rows;
+    record(
+      'The catalogue holds every achievement once, nutrition ones private',
+      catalogue.length === 57 &&
+        new Set(catalogue.map((d) => d.id)).size === 57 &&
+        catalogue.filter((d) => d.repeats !== 'once').length === 4 &&
+        catalogue
+          .filter((d) => d.category === 'nutrition')
+          .every((d) => d.visibility === 'private') &&
+        catalogue.filter((d) => d.visibility === 'private').length === 9,
+      String(catalogue.length),
+    );
+
+    record('Nothing is awarded before anything is done', (await award(ath)).length === 0);
+
+    // An unfinished workout, a deleted one and one with no finished set are no workout at all.
+    await workout(ath, press, '2026-09-01T10:00:00Z', [[40, 5]], { completed: false });
+    await workout(ath, press, '2026-09-01T11:00:00Z', [[40, 5]], { deleted: true });
+    await workout(ath, press, '2026-09-01T12:00:00Z', [[40, 5, false]]);
+    record(
+      'An unfinished, deleted or empty workout earns nothing',
+      (await award(ath)).every((r) => r.achievement_id !== 'first-steps'),
+    );
+
+    // The first real workout: Tuesday Sep 1 2026, 100 kg x 5 -- First Steps, a first PR, the
+    // first 1,000 lb (500 kg lifted), all at once.
+    await workout(ath, press, '2026-09-01T13:00:00Z', [[100, 5]]);
+    const first = ids(await award(ath));
+    record(
+      'A first workout unlocks several achievements together',
+      first.includes('first-steps@once') &&
+        first.includes('first-pr@once') &&
+        first.includes('first-1000@once') &&
+        !first.includes('first-week@once'),
+      JSON.stringify(first),
+    );
+    record('Running it again awards nothing twice', (await award(ath)).length === 0);
+    const afterFirst = await points(ath);
+    record(
+      "Lifetime AP is the sum of a person's awards",
+      afterFirst.points === 25 + 50 + 50 && afterFirst.awards === 3,
+      JSON.stringify(afterFirst),
+    );
+
+    // Their goal is 2 a week: a second workout that week (Thursday) meets it.
+    await workout(ath, press, '2026-09-03T13:00:00Z', [[110, 5]]);
+    const week = ids(await award(ath));
+    record(
+      "Meeting the weekly goal awards First Week and that week's Weekly Warrior",
+      week.includes('first-week@once') && week.includes('weekly-warrior@W:2026-08-31'),
+      JSON.stringify(week),
+    );
+    record(
+      'Lifting 10% more for the same reps on one exercise is an improvement',
+      week.includes('first-improvement@once') && week.includes('level-up@once'),
+      JSON.stringify(week),
+    );
+
+    // Another exercise, lighter: never compared with the press.
+    await workout(ath, row, '2026-09-04T13:00:00Z', [[50, 5]]);
+    record(
+      'A different exercise is never compared as an improvement',
+      !ids(await award(ath)).includes('major-breakthrough@once'),
+    );
+
+    // Time zones: Sunday Sep 13, 11:30pm in Tokyo is Sunday 14:30 UTC -- the same Monday week
+    // either way -- but Monday Sep 14 00:30 in Tokyo is still Sunday in UTC.
+    const zoneUser = randomUUID();
+    await admin.query("insert into auth.users (id, email) values ($1, 'ap-zone@test.local')", [
+      zoneUser,
+    ]);
+    await admin.query('update public.users set workout_frequency_days = 2 where id = $1', [
+      zoneUser,
+    ]);
+    const zonePress = await lift(zoneUser, 'Zone Press');
+    await workout(zoneUser, zonePress, '2026-09-13T10:00:00Z', [[60, 5]]); // Sun 19:00 Tokyo
+    await workout(zoneUser, zonePress, '2026-09-13T15:30:00Z', [[60, 5]]); // Mon 00:30 Tokyo
+    const inTokyo = ids(await award(zoneUser, 'Asia/Tokyo'));
+    record(
+      "Weeks are the person's own: two workouts a UTC week apart in Tokyo's eyes",
+      !inTokyo.some((id) => id.startsWith('weekly-warrior')),
+      JSON.stringify(inTokyo),
+    );
+    record(
+      "A person's time zone is kept for them",
+      (await admin.query('select time_zone from public.users where id = $1', [zoneUser])).rows[0]
+        .time_zone === 'Asia/Tokyo',
+    );
+    const zoneUser2 = randomUUID();
+    await admin.query("insert into auth.users (id, email) values ($1, 'ap-zone2@test.local')", [
+      zoneUser2,
+    ]);
+    await admin.query('update public.users set workout_frequency_days = 2 where id = $1', [
+      zoneUser2,
+    ]);
+    const zonePress2 = await lift(zoneUser2, 'Zone Press');
+    await workout(zoneUser2, zonePress2, '2026-09-13T10:00:00Z', [[60, 5]]);
+    await workout(zoneUser2, zonePress2, '2026-09-13T15:30:00Z', [[60, 5]]);
+    const inUtc = ids(await award(zoneUser2, 'UTC'));
+    record(
+      'The same two workouts in UTC fall in one week and meet the goal',
+      inUtc.includes('weekly-warrior@W:2026-09-07'),
+      JSON.stringify(inUtc),
+    );
+
+    // A full month: October 2026's weeks start on the 5th, 12th, 19th and 26th; two workouts
+    // in each meets the goal every week -- Monthly Dedication -- and 8 in the month is a
+    // Training Champion month too.
+    for (const day of [5, 6, 12, 13, 19, 20, 26, 27]) {
+      await workout(ath, press, `2026-10-${String(day).padStart(2, '0')}T13:00:00Z`, [[80, 8]]);
+    }
+    const october = ids(await award(ath));
+    record(
+      'Meeting the goal every week of a month awards Monthly Dedication, once that month',
+      october.includes('monthly-dedication@M:2026-10') &&
+        october.includes('training-champion@M:2026-10') &&
+        october.filter((id) => id.startsWith('weekly-warrior')).length === 4,
+      JSON.stringify(october),
+    );
+    record(
+      'September, with weeks short of the goal, is no Monthly Dedication',
+      !october.includes('monthly-dedication@M:2026-09'),
+    );
+    record(
+      'Repeatable achievements are never awarded twice for one period',
+      (await award(ath)).length === 0,
+    );
+
+    // Two runs at once never award twice.
+    await workout(ath, press, '2026-11-02T13:00:00Z', [[85, 8]]);
+    await workout(ath, press, '2026-11-03T13:00:00Z', [[85, 8]]);
+    const [runA, runB] = await Promise.all([award(ath), award(ath)]);
+    const together = [...runA, ...runB].filter((r) => r.achievement_id === 'weekly-warrior');
+    record('Two runs at once award a week once', together.length === 1, JSON.stringify(together));
+
+    // Nutrition: seven days in one week.
+    for (let day = 2; day <= 8; day += 1) {
+      await admin.query(
+        `insert into public.food_logs (user_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, logged_at)
+         values ($1, $2, 100, 'g', 1, 300, 20, 30, 10, $3)`,
+        [ath, day % 2 ? 'Oats' : 'Eggs', `2026-11-${String(day).padStart(2, '0')}T12:00:00Z`],
+      );
+    }
+    const food = ids(await award(ath));
+    record(
+      'Food on all seven days of a week: First Bite, Food Tracker and Nutrition Focus',
+      food.includes('first-bite@once') &&
+        food.includes('food-tracker@once') &&
+        food.includes('nutrition-focus@W:2026-11-02') &&
+        !food.includes('food-explorer@once'),
+      JSON.stringify(food),
+    );
+
+    // Social: a friend follows each other; likes only count from people who train, at most 10
+    // each; one-way follows and a lurker's likes don't.
+    await admin.query(
+      "insert into public.follows (follower_id, followee_id, status) values ($1, $2, 'accepted'), ($2, $1, 'accepted'), ($3, $1, 'accepted')",
+      [ath, friend, lurker],
+    );
+    const friendPress = await lift(friend, 'Friend Press');
+    await workout(friend, friendPress, '2026-11-01T10:00:00Z', [[50, 5]]);
+    const athWorkouts = (
+      await admin.query(
+        'select id from public.workouts where user_id = $1 and completed_at is not null and deleted_at is null order by performed_at limit 15',
+        [ath],
+      )
+    ).rows.map((r) => r.id);
+    for (const w of athWorkouts) {
+      await admin.query(
+        'insert into public.workout_likes (workout_id, user_id) values ($1, $2), ($1, $3)',
+        [w, friend, lurker],
+      );
+    }
+    const metrics = (await admin.query("select public.achievement_metrics($1, 'UTC') as m", [ath]))
+      .rows[0].m;
+    record(
+      'Friends follow each other; likes count only from people who train, at most 10 each',
+      metrics.friends === 1 && metrics.likes_received === 10 && athWorkouts.length >= 12,
+      JSON.stringify({ friends: metrics.friends, likes: metrics.likes_received }),
+    );
+    record(
+      'A mutual follow is a First Connection',
+      ids(await award(ath)).includes('first-connection@once'),
+    );
+
+    // Splits: an empty one isn't a split yet.
+    const split = (
+      await admin.query(
+        "insert into public.workout_splits (user_id, name) values ($1, 'AP Split') returning id",
+        [ath],
+      )
+    ).rows[0].id;
+    record('An empty split earns nothing', !ids(await award(ath)).includes('split-creator@once'));
+    await admin.query(
+      "insert into public.workout_split_days (workout_split_id, name, order_index) values ($1, 'Push', 1)",
+      [split],
+    );
+    record(
+      'A split with a day is a Split Creator',
+      ids(await award(ath)).includes('split-creator@once'),
+    );
+
+    // AP never goes down: delete every workout, and the awards stand.
+    const before = await points(ath);
+    await admin.query('update public.workouts set deleted_at = now() where user_id = $1', [ath]);
+    const after = await points(ath);
+    record(
+      'Deleting workouts later never takes AP back',
+      after.points === before.points && after.points > 0,
+      JSON.stringify({ before, after }),
+    );
+    const audit = (await admin.query('select * from public.audit_achievements($1)', [ath])).rows;
+    record(
+      'The audit lists every award, says which are no longer reached, and totals the AP',
+      audit.length === before.awards &&
+        audit.at(-1).running_points === before.points &&
+        audit.some((r) => r.achievement_id === 'first-steps' && r.still_reached === false) &&
+        audit.filter((r) => r.period_key !== 'once').every((r) => r.still_reached === true),
+      JSON.stringify(audit.slice(0, 3)),
+    );
+
+    // Integrity: awards are never changed, and never written or removed from the app.
+    await expectThrows(
+      admin.query('update public.achievement_awards set ap = 9999 where user_id = $1', [ath]),
+      'An award is never changed',
+      /never changed/i,
+    );
+    await expectThrows(
+      asUser(ath, (c) =>
+        c.query(
+          "insert into public.achievement_awards (user_id, achievement_id, ap) values ($1, 'veteran', 1000)",
+          [ath],
+        ),
+      ),
+      'Nobody awards themselves from the app',
+      /permission denied/i,
+    );
+    await expectThrows(
+      asUser(ath, (c) =>
+        c.query('delete from public.achievement_awards where user_id = $1', [ath]),
+      ),
+      'Nobody removes an award from the app',
+      /permission denied/i,
+    );
+    await expectThrows(
+      asUser(ath, (c) => c.query("select * from public.award_achievements($1, 'UTC')", [other])),
+      "Nobody runs someone else's awarding",
+      /permission denied/i,
+    );
+    await expectThrows(
+      (async () => {
+        const c = connect();
+        await c.connect();
+        try {
+          await c.query('begin');
+          await c.query('set local role anon');
+          return await c.query("select * from public.award_my_achievements('UTC')");
+        } finally {
+          await c.query('rollback').catch(() => {});
+          await c.end();
+        }
+      })(),
+      'Signed out, nothing is awarded',
+      /permission denied/i,
+    );
+    const seenByOther = await asUser(other, (c) =>
+      c.query('select count(*)::int as n from public.achievement_awards'),
+    );
+    const seenByOwn = await asUser(ath, (c) =>
+      c.query('select count(*)::int as n from public.achievement_awards'),
+    );
+    record(
+      'A person reads only their own awards',
+      seenByOther.rows[0].n === 0 && seenByOwn.rows[0].n === before.awards,
+      JSON.stringify({ other: seenByOther.rows[0].n, own: seenByOwn.rows[0].n }),
+    );
+    await expectThrows(
+      asUser(ath, (c) => c.query("select public.achievement_metrics($1, 'UTC')", [other])),
+      "Nobody reads someone else's figures",
+      /permission denied/i,
+    );
+    record(
+      'Anyone signed in reads the catalogue',
+      (
+        await asUser(other, (c) =>
+          c.query('select count(*)::int as n from public.achievement_definitions'),
+        )
+      ).rows[0].n === 57,
+    );
+
+    // An account's awards go with it.
+    await admin.query('delete from auth.users where id = $1', [zoneUser2]);
+    record(
+      "A deleted account's awards go with it",
+      (
+        await admin.query(
+          'select count(*)::int as n from public.achievement_awards where user_id = $1',
+          [zoneUser2],
+        )
+      ).rows[0].n === 0,
     );
   }
 

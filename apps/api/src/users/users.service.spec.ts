@@ -106,6 +106,16 @@ describe('UsersService', () => {
       expect(client.updateEq).toHaveBeenCalledWith('id', 'user-1');
     });
 
+    it('saves whether people who open the profile see the rank', async () => {
+      const client = createMockClient({ updateData: { show_rank: false } });
+      const service = serviceWith(client);
+
+      const profile = await service.updateProfile('user-1', { showRank: false });
+
+      expect(client.update).toHaveBeenCalledWith({ show_rank: false });
+      expect(profile.showRank).toBe(false);
+    });
+
     it('updates the workout and nutrition accent colors independently', async () => {
       const client = createMockClient({
         updateData: {

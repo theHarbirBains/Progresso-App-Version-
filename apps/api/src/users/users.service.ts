@@ -49,6 +49,8 @@ export interface UserProfile {
   notifyComments: boolean;
   /** Whether people with this person's email in their contacts can find them. */
   findableByEmail: boolean;
+  /** Whether people who open their profile see their achievement rank. */
+  showRank: boolean;
 }
 
 const USERNAME_UNIQUE_VIOLATION = '23505';
@@ -62,7 +64,7 @@ const PROFILE_COLUMNS =
   'apple_health_preference, onboarding_completed_at, activity_level, ' +
   'referral_source, country, average_workout_length, training_comfort, rep_range_min, ' +
   'rep_range_max, progression_cues_enabled, fitness_goals, membership_tier, ' +
-  'notify_follows, notify_likes, notify_comments, findable_by_email, bio';
+  'notify_follows, notify_likes, notify_comments, findable_by_email, bio, show_rank';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProfile(data: any): UserProfile {
@@ -103,6 +105,7 @@ function toProfile(data: any): UserProfile {
     notifyLikes: data.notify_likes,
     notifyComments: data.notify_comments,
     findableByEmail: data.findable_by_email,
+    showRank: data.show_rank,
   };
 }
 
@@ -205,6 +208,7 @@ export class UsersService {
     if (dto.notifyLikes !== undefined) updatePayload.notify_likes = dto.notifyLikes;
     if (dto.notifyComments !== undefined) updatePayload.notify_comments = dto.notifyComments;
     if (dto.findableByEmail !== undefined) updatePayload.findable_by_email = dto.findableByEmail;
+    if (dto.showRank !== undefined) updatePayload.show_rank = dto.showRank;
 
     if (Object.keys(updatePayload).length === 0) {
       return this.getProfile(userId);

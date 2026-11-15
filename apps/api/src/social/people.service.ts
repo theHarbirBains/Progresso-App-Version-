@@ -93,6 +93,27 @@ export interface TopSet {
   durationSeconds: number | null;
 }
 
+/** Their lifetime Achievement Points and how many awards make them up. */
+export interface PersonRank {
+  points: number;
+  awards: number;
+}
+
+/** An achievement they've earned, as their profile lists it -- never a nutrition one. */
+export interface EarnedAchievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: string;
+  ap: number;
+  repeats: 'once' | 'weekly' | 'monthly';
+  /** How many times: 1 for a one-time achievement, the weeks or months for a repeatable one. */
+  times: number;
+  firstAwardedAt: string;
+  lastAwardedAt: string;
+}
+
 /** One exercise of theirs: each workout's top set, newest first, and the records they hold. */
 export interface PersonExercise {
   exercise: ExerciseSummary;
@@ -139,6 +160,13 @@ export interface PersonProfile {
   bestLifts: BestLift[] | null;
   /** Every exercise they've done, with its best set, the most-done first. Null when hidden. */
   exercises: ExerciseBest[] | null;
+  /**
+   * Their lifetime AP, for their rank -- shown to anyone who can open their profile unless they
+   * hide it (Settings > Privacy); always on their own.
+   */
+  rank: PersonRank | null;
+  /** The achievements they've earned, the latest first -- only when the viewer can see activity. */
+  achievements: EarnedAchievement[] | null;
 }
 
 /**
@@ -175,7 +203,7 @@ export class PeopleService {
         .select('id', { count: 'exact', head: true })
         .eq('follower_id', personId)
         .eq('status', 'accepted'),
-      client.from('users').select('bio').eq('id', personId).maybeSingle(),
+      client.from('users').select('bio, show_rank').eq('id', personId).maybeSingle(),
       relationship.isSelf
         ? Promise.resolve({ count: 0, people: [] })
         : this.mutualFriends(viewerId, personId),
@@ -184,15 +212,16 @@ export class PeopleService {
       throw new InternalServerErrorException('Failed to load follow counts');
     }
     if (about.error) throw new InternalServerErrorException('Failed to load profile');
-    const aboutRow = about.data as { bio: string | null } | null;
+    const aboutRow = about.data as { bio: string | null; show_rank: boolean | null } | null;
 
     const visible = canSeeActivity(relationship);
-    const [stats, exercises] = visible
-      ? await Promise.all([
-          this.workoutStats(personId, relationship.isSelf),
-          this.exerciseBests(personId, relationship.isSelf),
-        ])
-      : [null, null];
+    const showsRank = relationship.isSelf || aboutRow?.show_rank !== false;
+    const [stats, exercises, achievements, rank] = await Promise.all([
+      visible ? this.workoutStats(personId, relationship.isSelf) : null,
+      visible ? this.exerciseBests(personId, relationship.isSelf) : null,
+      visible ? this.earnedAchievements(personId) : null,
+      showsRank ? this.rankOf(personId) : null,
+    ]);
 
     return {
       user,
@@ -205,6 +234,8 @@ export class PeopleService {
       stats,
       bestLifts: exercises ? heaviestLifts(exercises) : null,
       exercises,
+      rank,
+      achievements,
     };
   }
 
@@ -493,6 +524,69 @@ export class PeopleService {
       likesReceived: row?.likes_received ?? 0,
       likesGiven: row?.likes_given ?? 0,
     };
+  }
+
+  /** Their lifetime AP: the sum of their awards (achievement_summary). */
+  private async rankOf(personId: string): Promise<PersonRank> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .rpc('achievement_summary', { p_user: personId });
+    if (error) throw new InternalServerErrorException('Failed to load rank');
+    const row = ((data ?? []) as { points: number; awards: number }[])[0];
+    return { points: row?.points ?? 0, awards: row?.awards ?? 0 };
+  }
+
+  /**
+   * The achievements they've earned, the latest first, a repeatable one once with how many times
+   * -- only public ones: nutrition achievements are only ever their own to see.
+   */
+  private async earnedAchievements(personId: string): Promise<EarnedAchievement[]> {
+    const client = this.supabaseService.getClient();
+    const [definitions, awards] = await Promise.all([
+      client
+        .from('achievement_definitions')
+        .select('id, title, description, icon, category, ap, repeats')
+        .eq('visibility', 'public'),
+      client
+        .from('achievement_awards')
+        .select('achievement_id, awarded_at')
+        .eq('user_id', personId)
+        .order('awarded_at', { ascending: true }),
+    ]);
+    if (definitions.error || awards.error) {
+      throw new InternalServerErrorException('Failed to load achievements');
+    }
+    const byId = new Map(
+      (
+        (definitions.data ?? []) as {
+          id: string;
+          title: string;
+          description: string;
+          icon: string;
+          category: string;
+          ap: number;
+          repeats: 'once' | 'weekly' | 'monthly';
+        }[]
+      ).map((definition) => [definition.id, definition]),
+    );
+    const earned = new Map<string, EarnedAchievement>();
+    for (const award of (awards.data ?? []) as { achievement_id: string; awarded_at: string }[]) {
+      const definition = byId.get(award.achievement_id);
+      if (!definition) continue;
+      const seen = earned.get(definition.id);
+      if (seen) {
+        seen.times += 1;
+        seen.lastAwardedAt = award.awarded_at;
+      } else {
+        earned.set(definition.id, {
+          ...definition,
+          times: 1,
+          firstAwardedAt: award.awarded_at,
+          lastAwardedAt: award.awarded_at,
+        });
+      }
+    }
+    return [...earned.values()].sort((a, b) => b.lastAwardedAt.localeCompare(a.lastAwardedAt));
   }
 
   /** Every exercise they've done, with its best set, the most-done first. */

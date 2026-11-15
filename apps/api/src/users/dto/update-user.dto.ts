@@ -250,6 +250,11 @@ export class UpdateUserDto {
   @IsBoolean()
   findableByEmail?: boolean;
 
+  /** Settings > Account & Security > Privacy: show my rank on my profile. */
+  @IsOptional()
+  @IsBoolean()
+  showRank?: boolean;
+
   @IsOptional()
   @IsBoolean()
   emailOptIn?: boolean;

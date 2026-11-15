@@ -168,6 +168,42 @@ describe('PeopleService', () => {
         ],
         error: null,
       });
+      client.queue('achievement_definitions', {
+        data: [
+          {
+            id: 'first-steps',
+            title: 'First Steps',
+            description: 'Finish your first workout',
+            icon: 'play',
+            category: 'workouts',
+            ap: 25,
+            repeats: 'once',
+          },
+          {
+            id: 'weekly-warrior',
+            title: 'Weekly Warrior',
+            description: 'Meet your weekly workout goal',
+            icon: 'check-circle',
+            category: 'consistency',
+            ap: 25,
+            repeats: 'weekly',
+          },
+        ],
+        error: null,
+      });
+      client.queue('achievement_awards', {
+        data: [
+          { achievement_id: 'first-steps', awarded_at: '2026-01-02T10:00:00Z' },
+          { achievement_id: 'first-bite', awarded_at: '2026-01-03T10:00:00Z' },
+          { achievement_id: 'weekly-warrior', awarded_at: '2026-01-04T10:00:00Z' },
+          { achievement_id: 'weekly-warrior', awarded_at: '2026-01-11T10:00:00Z' },
+        ],
+        error: null,
+      });
+      client.queue('rpc:achievement_summary', {
+        data: [{ points: 1250, awards: 14 }],
+        error: null,
+      });
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, SAM);
@@ -250,6 +286,39 @@ describe('PeopleService', () => {
             lastPerformedAt: '2026-11-02',
           },
         ],
+        rank: { points: 1250, awards: 14 },
+        // The latest first, a repeatable one once with its count -- never a nutrition one.
+        achievements: [
+          {
+            id: 'weekly-warrior',
+            title: 'Weekly Warrior',
+            description: 'Meet your weekly workout goal',
+            icon: 'check-circle',
+            category: 'consistency',
+            ap: 25,
+            repeats: 'weekly',
+            times: 2,
+            firstAwardedAt: '2026-01-04T10:00:00Z',
+            lastAwardedAt: '2026-01-11T10:00:00Z',
+          },
+          {
+            id: 'first-steps',
+            title: 'First Steps',
+            description: 'Finish your first workout',
+            icon: 'play',
+            category: 'workouts',
+            ap: 25,
+            repeats: 'once',
+            times: 1,
+            firstAwardedAt: '2026-01-02T10:00:00Z',
+            lastAwardedAt: '2026-01-02T10:00:00Z',
+          },
+        ],
+      });
+      expect(client.calls).toContainEqual({
+        table: 'achievement_definitions',
+        method: 'eq',
+        args: ['visibility', 'public'],
       });
       // Followers see what their followers can: no trainer-logged workouts in the counts.
       expect(client.calls).toContainEqual({
@@ -277,11 +346,12 @@ describe('PeopleService', () => {
       client.queue('follows', { data: null, error: null, count: 12 });
       client.queue('follows', { data: null, error: null, count: 3 });
       client.queue('users', { data: { bio: null }, error: null });
+      client.queue('rpc:achievement_summary', { data: [{ points: 640, awards: 9 }], error: null });
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, SAM);
 
-      // Who they are -- bio and goals too -- but nothing of their training.
+      // Who they are and their rank -- but nothing of their training.
       expect(profile).toMatchObject({
         followStatus: 'pending',
         bio: null,
@@ -290,9 +360,30 @@ describe('PeopleService', () => {
         stats: null,
         bestLifts: null,
         exercises: null,
+        rank: { points: 640, awards: 9 },
+        achievements: null,
       });
-      expect(client.rpc).not.toHaveBeenCalled();
+      expect(client.rpc).toHaveBeenCalledTimes(1);
       expect(client.from).not.toHaveBeenCalledWith('workouts');
+      expect(client.from).not.toHaveBeenCalledWith('achievement_awards');
+    });
+
+    it('hides the rank of someone who chose to hide it', async () => {
+      const client = createMockClient();
+      queueRelationship(client, [
+        { id: 'f1', follower_id: ME, followee_id: SAM, status: 'pending' },
+      ]);
+      client.queue('users', { data: [user(SAM, 'Sam')], error: null });
+      client.queue('follows', { data: [], error: null });
+      client.queue('follows', { data: null, error: null, count: 12 });
+      client.queue('follows', { data: null, error: null, count: 3 });
+      client.queue('users', { data: { bio: null, show_rank: false }, error: null });
+      const service = serviceWith(client);
+
+      const profile = await service.getProfile(ME, SAM);
+
+      expect(profile.rank).toBeNull();
+      expect(client.rpc).not.toHaveBeenCalled();
     });
 
     it("counts a trainer's logging on your own profile, with no mutual friends", async () => {
@@ -300,11 +391,14 @@ describe('PeopleService', () => {
       client.queue('users', { data: [user(ME, 'Me')], error: null });
       client.queue('follows', { data: null, error: null, count: 2 });
       client.queue('follows', { data: null, error: null, count: 5 });
-      client.queue('users', { data: { bio: null }, error: null });
+      client.queue('users', { data: { bio: null, show_rank: false }, error: null });
       client.queue('workouts', { data: null, error: null, count: 3 });
       client.queue('workouts', { data: null, error: null, count: 1 });
       client.queue('rpc:person_profile_totals', { data: [], error: null });
       client.queue('rpc:person_exercise_bests', { data: [], error: null });
+      client.queue('achievement_definitions', { data: [], error: null });
+      client.queue('achievement_awards', { data: [], error: null });
+      client.queue('rpc:achievement_summary', { data: [{ points: 75, awards: 2 }], error: null });
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, ME);
@@ -314,6 +408,9 @@ describe('PeopleService', () => {
         mutuals: { count: 0, people: [] },
         stats: { workouts: 3, totalVolumeKg: 0, prCount: 0, bestMonthWorkouts: 0, totalSets: 0 },
         exercises: [],
+        // Your own rank shows to you, even hidden from others.
+        rank: { points: 75, awards: 2 },
+        achievements: [],
       });
       expect(client.rpc).toHaveBeenCalledWith('person_profile_totals', {
         p_owner: ME,
