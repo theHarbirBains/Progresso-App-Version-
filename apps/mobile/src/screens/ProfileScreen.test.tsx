@@ -439,21 +439,24 @@ describe('ProfileScreen Stats tab -- yours alone, under the six figures', () => 
     await openTab('stats');
 
     expect(screen.getByTestId('person-profile-stats-month')).toHaveTextContent(/14.*Busiest Month/);
-    expect(screen.getByTestId('profile-nutrition-calories')).toHaveTextContent(/400 \/ 2,200/);
-    expect(screen.getByTestId('profile-nutrition-protein')).toHaveTextContent(/40g \/ 180g/);
-    expect(screen.getByTestId('profile-nutrition-carbs')).toHaveTextContent(/10g \/ 200g/);
-    expect(screen.getByTestId('profile-nutrition-fat')).toHaveTextContent(/8g \/ 70g/);
+    expect(screen.getByTestId('profile-nutrition-calories')).toHaveTextContent(
+      /^400of 2,200 Calories$/,
+    );
+    expect(screen.getByTestId('profile-nutrition-protein')).toHaveTextContent(
+      /^40gof 180g Protein$/,
+    );
+    expect(screen.getByTestId('profile-nutrition-carbs')).toHaveTextContent(/^10gof 200g Carbs$/);
+    expect(screen.getByTestId('profile-nutrition-fat')).toHaveTextContent(/^8gof 70g Fat$/);
 
     fireEvent.press(screen.getByTestId('profile-nutrition'));
     expect(mockNavigate).toHaveBeenCalledWith('Nutrition');
   });
 
-  it('shows just the consumed amount, with no "/ goal", when no goal is set', async () => {
+  it('shows just the amount eaten, with no "of" a target, when no target is set', async () => {
     renderProfile();
     await openTab('stats');
 
-    expect(screen.getByTestId('profile-nutrition-calories')).toHaveTextContent(/^0/);
-    expect(screen.getByTestId('profile-nutrition-calories')).not.toHaveTextContent('/');
+    expect(screen.getByTestId('profile-nutrition-calories')).toHaveTextContent(/^0Calories$/);
   });
 
   it('has no calories card when Nutrition is not in your membership', async () => {
@@ -473,8 +476,8 @@ describe('ProfileScreen Stats tab -- yours alone, under the six figures', () => 
     expect(screen.getByTestId('person-profile-name')).toBeTruthy();
   });
 
-  it('shows your total sets, this week, the weekly trends and your most-trained muscle groups', async () => {
-    // Performed "now" so the weekly bucketing always lands inside the trend window.
+  it('shows your total sets, this week and your most-trained muscle groups -- no charts', async () => {
+    // Performed "now" so it always lands in this week.
     const now = new Date();
     mockFetchAllCompletedWorkouts.mockResolvedValue([
       {
@@ -491,22 +494,21 @@ describe('ProfileScreen Stats tab -- yours alone, under the six figures', () => 
     expect(within(screen.getByTestId('profile-stat-tile-sets')).getByText('2')).toBeTruthy();
     expect(screen.getByTestId('profile-stat-tile-time')).toBeTruthy();
     expect(screen.getByTestId('profile-this-week-workouts')).toHaveTextContent(/^1/);
-    expect(screen.getByTestId('profile-trend-workouts-total')).toHaveTextContent(/1 workout/);
-    expect(screen.getByTestId('profile-trend-volume-total')).toBeTruthy();
-    expect(screen.getByTestId('profile-trend-sets-total')).toBeTruthy();
     // One chest set and one quadriceps set.
-    expect(screen.getByTestId('profile-muscle-group-chest')).toBeTruthy();
+    expect(screen.getByTestId('profile-muscle-group-chest')).toHaveTextContent(/Chest1 set/);
     expect(screen.getByTestId('profile-muscle-group-quadriceps')).toBeTruthy();
+    expect(screen.queryByText('Weekly Workouts')).toBeNull();
+    expect(screen.queryByText('Volume Over Time')).toBeNull();
+    expect(screen.queryByText('Sets Over Time')).toBeNull();
   });
 
-  it('shows an empty message instead of an empty chart with no training at all', async () => {
+  it('says where your muscle groups will show with no training at all', async () => {
     mockFetchAllCompletedWorkouts.mockResolvedValue([]);
     mockFetchAllExerciseHistory.mockResolvedValue([]);
     renderProfile();
     await openTab('stats');
 
-    expect(screen.getByTestId('profile-trend-workouts-empty')).toBeTruthy();
-    expect(screen.queryByTestId('profile-trend-workouts-chart')).toBeNull();
+    expect(screen.getByText('Your most-trained muscle groups will appear here.')).toBeTruthy();
   });
 
   it('shows an error without crashing when your history cannot be read', async () => {

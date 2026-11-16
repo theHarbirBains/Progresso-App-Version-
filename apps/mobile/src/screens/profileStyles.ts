@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, radii, spacing, typeScale, widgetGap } from '../design/theme';
+import { colors, spacing, typeScale, widgetGap } from '../design/theme';
 
 // The You tab's own parts only (screens/ProfileScreen.tsx) -- the profile
 // itself is PersonProfilePage's (personProfileStyles.ts). Each part is its own
@@ -19,11 +19,20 @@ export const profileStyles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
-  // Calories & Macros widget, on Overview.
+  // Calories & Macros widget, atop Stats: its four StatBlocks two to a row,
+  // like the Stats tab's own figures (personProfileStyles' statGrid).
   nutritionTitle: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
     marginBottom: spacing.md,
+  },
+  statBlockGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: widgetGap,
+  },
+  statBlockCell: {
+    width: '48.5%',
   },
 
   // Stats tab's "This Week" row, above the lifetime StatTile grid.
@@ -57,22 +66,17 @@ export const profileStyles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
 
-  // Stats tab -- "Most Trained Muscle Groups" bar list, same recipe
-  // StrengthSection's own muscle-group bars use (progressStyles.ts),
-  // kept here rather than a cross-screen import per the established
-  // per-screen-stylesheet convention.
+  // Stats tab -- "Most Trained Muscle Groups": each group and its sets, a
+  // plain list (no bars).
   muscleGroupsTitle: {
     ...typeScale.cardTitle,
     color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   muscleGroupRow: {
-    marginBottom: spacing.md,
-  },
-  muscleGroupLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.md,
   },
   muscleGroupLabel: {
     ...typeScale.body,
@@ -81,16 +85,6 @@ export const profileStyles = StyleSheet.create({
   muscleGroupCount: {
     ...typeScale.secondary,
     color: colors.textSecondary,
-  },
-  muscleGroupBarTrack: {
-    height: 6,
-    borderRadius: radii.sm,
-    backgroundColor: colors.surfaceRaised,
-    overflow: 'hidden',
-  },
-  muscleGroupBarFill: {
-    height: '100%',
-    borderRadius: radii.sm,
   },
 
   // Profile picture BottomSheet (Choose Photo / Remove Photo).

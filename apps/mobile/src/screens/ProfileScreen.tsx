@@ -27,7 +27,6 @@ import {
   computeWeeklyWorkoutCounts,
 } from '../progress/trainingOverTime';
 import { useProgressTheme } from '../progress/useProgressTheme';
-import { WeeklyTrendChart } from '../progress/WeeklyTrendChart';
 import { formatTotalTime } from '../workouts/workoutMonthSummary';
 import { PersonProfilePage } from './PersonProfileScreen';
 import { profileStyles as styles } from './profileStyles';
@@ -35,22 +34,17 @@ import { wholeFigureText } from '../nutrition/wholeFigures';
 
 type Props = RootStackScreenProps<'Profile'>;
 
-const TREND_WEEKS = 12;
 const TOP_MUSCLE_GROUPS_LIMIT = 5;
 
 function formatCount(n: number): string {
   return Math.round(n).toLocaleString();
 }
 
-/** "1,850 / 2,200 cal" when a goal is set, else just "1,850 cal". Shared by every macro in the Calories & Macros widget. */
-function formatMacro(consumed: number, goal: number | null, unit: string): string {
-  const consumedText = `${wholeFigureText(consumed)}${unit}`;
-  return goal !== null ? `${consumedText} / ${wholeFigureText(goal)}${unit}` : consumedText;
-}
-
 // Today's calories and macros against your targets, atop Stats -- real data
 // from the shared food log and goals, the same NutritionToday itself uses.
-// Tapping it opens Nutrition Today.
+// Each is a block like Stats' own figures: what's eaten as the figure, "of
+// 2,200 Calories" under it (just "Calories" with no target). Tapping it opens
+// Nutrition Today.
 function TodaysNutritionCard({ navigation }: { navigation: Props['navigation'] }) {
   const { nutritionTheme } = useProgressTheme();
   const { goals, loading: goalsLoading, error: goalsError } = useNutritionGoals();
@@ -58,6 +52,12 @@ function TodaysNutritionCard({ navigation }: { navigation: Props['navigation'] }
   const totals = useMemo(() => sumDailyTotals(logs), [logs]);
   if (goalsLoading || logsLoading) return <SkeletonCards heights={[150]} />;
   const error = goalsError ?? logsError;
+  const figures = [
+    { id: 'calories', label: 'Calories', unit: '', eaten: totals.calories, goal: goals?.calories },
+    { id: 'protein', label: 'Protein', unit: 'g', eaten: totals.proteinG, goal: goals?.proteinG },
+    { id: 'carbs', label: 'Carbs', unit: 'g', eaten: totals.carbsG, goal: goals?.carbsG },
+    { id: 'fat', label: 'Fat', unit: 'g', eaten: totals.fatG, goal: goals?.fatG },
+  ];
 
   return (
     <AppCard
@@ -71,65 +71,47 @@ function TodaysNutritionCard({ navigation }: { navigation: Props['navigation'] }
           {error}
         </Text>
       ) : null}
-      <View style={styles.statTileGrid}>
-        <StatTile
-          testID="profile-nutrition-calories"
-          label="Calories"
-          value={formatMacro(totals.calories, goals?.calories ?? null, '')}
-        />
-        <StatTile
-          testID="profile-nutrition-protein"
-          label="Protein"
-          value={formatMacro(totals.proteinG, goals?.proteinG ?? null, 'g')}
-        />
-        <StatTile
-          testID="profile-nutrition-carbs"
-          label="Carbs"
-          value={formatMacro(totals.carbsG, goals?.carbsG ?? null, 'g')}
-        />
-        <StatTile
-          testID="profile-nutrition-fat"
-          label="Fat"
-          value={formatMacro(totals.fatG, goals?.fatG ?? null, 'g')}
-        />
+      <View style={styles.statBlockGrid}>
+        {figures.map((figure) => (
+          <View key={figure.id} style={styles.statBlockCell}>
+            <StatBlock
+              testID={`profile-nutrition-${figure.id}`}
+              value={`${wholeFigureText(figure.eaten)}${figure.unit}`}
+              label={
+                figure.goal != null
+                  ? `of ${wholeFigureText(figure.goal)}${figure.unit} ${figure.label}`
+                  : figure.label
+              }
+            />
+          </View>
+        ))}
       </View>
     </AppCard>
   );
 }
 
 // Your own training, under Stats' six figures: this week, your total sets and
-// time, the 12-week trends and your most-trained muscle groups -- all worked
-// out from the shared history (AllTimeStatsProvider) with the same functions
-// Progress uses, and only while the Stats tab is open.
+// time, and your most-trained muscle groups -- all worked out from the shared
+// history (AllTimeStatsProvider) with the same functions Progress uses, and
+// only while the Stats tab is open.
 function YourTraining() {
-  const { theme, weightUnit } = useProgressTheme();
+  const { weightUnit } = useProgressTheme();
   const { allWorkouts, allSetHistory, statsLoading, statsError } = useAllTimeStats();
 
-  const figures = useMemo(() => {
-    const muscleGroupCounts = computeMuscleGroupSetCounts(allSetHistory).slice(
-      0,
-      TOP_MUSCLE_GROUPS_LIMIT,
-    );
-    const weeklyWorkoutPoints = computeWeeklyWorkoutCounts(allWorkouts, TREND_WEEKS);
-    const weeklyVolumePoints = computeWeeklyVolumeKg(allSetHistory, TREND_WEEKS).map((p) => ({
-      ...p,
-      value: fromKg(p.value, weightUnit),
-    }));
-    const weeklySetPoints = computeWeeklySetCounts(allSetHistory, TREND_WEEKS);
-    // computeWeekly*'s own contract: oldest first, always including the
-    // current week -- so the last point is "this week".
-    return {
+  const figures = useMemo(
+    () => ({
       totalMinutes: computeLifetimeStats(allWorkouts).totalMinutes,
-      muscleGroupCounts,
-      maxMuscleGroupCount: muscleGroupCounts[0]?.count ?? 0,
-      weeklyWorkoutPoints,
-      weeklyVolumePoints,
-      weeklySetPoints,
-      thisWeekWorkouts: weeklyWorkoutPoints[weeklyWorkoutPoints.length - 1]?.value ?? 0,
-      thisWeekSets: weeklySetPoints[weeklySetPoints.length - 1]?.value ?? 0,
-      thisWeekVolume: weeklyVolumePoints[weeklyVolumePoints.length - 1]?.value ?? 0,
-    };
-  }, [allWorkouts, allSetHistory, weightUnit]);
+      muscleGroupCounts: computeMuscleGroupSetCounts(allSetHistory).slice(
+        0,
+        TOP_MUSCLE_GROUPS_LIMIT,
+      ),
+      // computeWeekly*'s own contract: one week asked for is this week.
+      thisWeekWorkouts: computeWeeklyWorkoutCounts(allWorkouts, 1)[0]?.value ?? 0,
+      thisWeekSets: computeWeeklySetCounts(allSetHistory, 1)[0]?.value ?? 0,
+      thisWeekVolume: fromKg(computeWeeklyVolumeKg(allSetHistory, 1)[0]?.value ?? 0, weightUnit),
+    }),
+    [allWorkouts, allSetHistory, weightUnit],
+  );
 
   if (statsLoading) return <SkeletonCards heights={[320]} />;
 
@@ -172,68 +154,23 @@ function YourTraining() {
         />
       </View>
 
-      <WeeklyTrendChart
-        testID="profile-trend-workouts"
-        label="Weekly Workouts"
-        points={figures.weeklyWorkoutPoints}
-        accentColor={theme.accent}
-        formatTotal={(total) =>
-          `${formatCount(total)} ${total === 1 ? 'workout' : 'workouts'} · last ${TREND_WEEKS} weeks`
-        }
-        emptyMessage="Log a workout to see your weekly trend."
-      />
-
-      <WeeklyTrendChart
-        testID="profile-trend-volume"
-        label="Volume Over Time"
-        points={figures.weeklyVolumePoints}
-        accentColor={theme.accent}
-        formatTotal={(total) => `${formatCount(total)} ${weightUnit} · last ${TREND_WEEKS} weeks`}
-        emptyMessage="Log some sets to see your volume trend."
-      />
-
-      <WeeklyTrendChart
-        testID="profile-trend-sets"
-        label="Sets Over Time"
-        points={figures.weeklySetPoints}
-        accentColor={theme.accent}
-        formatTotal={(total) =>
-          `${formatCount(total)} ${total === 1 ? 'set' : 'sets'} · last ${TREND_WEEKS} weeks`
-        }
-        emptyMessage="Log some sets to see your sets trend."
-      />
-
       <View style={styles.section}>
         <Text style={styles.muscleGroupsTitle}>Most Trained Muscle Groups</Text>
         {figures.muscleGroupCounts.length === 0 ? (
           <Text style={styles.emptyText}>Your most-trained muscle groups will appear here.</Text>
         ) : (
-          figures.muscleGroupCounts.map((mg) => {
-            const percent =
-              figures.maxMuscleGroupCount > 0 ? mg.count / figures.maxMuscleGroupCount : 0;
-            return (
-              <View
-                key={mg.group}
-                testID={`profile-muscle-group-${mg.group}`}
-                style={styles.muscleGroupRow}
-              >
-                <View style={styles.muscleGroupLabelRow}>
-                  <Text style={styles.muscleGroupLabel}>{mg.label}</Text>
-                  <Text style={styles.muscleGroupCount}>
-                    {mg.count} {mg.count === 1 ? 'set' : 'sets'}
-                  </Text>
-                </View>
-                <View style={styles.muscleGroupBarTrack}>
-                  <View
-                    style={[
-                      styles.muscleGroupBarFill,
-                      { width: `${percent * 100}%`, backgroundColor: theme.accent },
-                    ]}
-                  />
-                </View>
-              </View>
-            );
-          })
+          figures.muscleGroupCounts.map((mg) => (
+            <View
+              key={mg.group}
+              testID={`profile-muscle-group-${mg.group}`}
+              style={styles.muscleGroupRow}
+            >
+              <Text style={styles.muscleGroupLabel}>{mg.label}</Text>
+              <Text style={styles.muscleGroupCount}>
+                {mg.count} {mg.count === 1 ? 'set' : 'sets'}
+              </Text>
+            </View>
+          ))
         )}
       </View>
     </AppCard>
@@ -272,8 +209,8 @@ function YourRecords({ navigation }: { navigation: Props['navigation'] }) {
 // name, bio, counts, Edit Profile and Share, the four figures, and
 // Achievements / Workouts / PRs / Stats -- plus what's yours alone, inside
 // the same tabs: your full records under PRs, and under Stats today's
-// calories and macros (with Nutrition in your membership), your weekly
-// trends and your muscle groups. The header has Find People, your
+// calories and macros (with Nutrition in your membership), this week and
+// your muscle groups. The header has Find People, your
 // @username and Settings,
 // and tapping your photo chooses, changes or removes it (useAvatarPhoto).
 export function ProfileScreen({ navigation }: Props) {
