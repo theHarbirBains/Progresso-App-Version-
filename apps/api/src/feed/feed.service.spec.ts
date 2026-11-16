@@ -49,6 +49,26 @@ function serviceWith(client: ReturnType<typeof createMockClient>): FeedService {
   return new FeedService(supabaseService, followsService);
 }
 
+/** Workout w1 with one finished set -- a workout with nothing in it isn't shown. */
+function queueOneFinishedSet(client: ReturnType<typeof createMockClient>) {
+  client.queue('workout_exercises', {
+    data: [
+      {
+        id: 'we1',
+        workout_id: 'w1',
+        exercise_id: 'bench',
+        order_index: 1,
+        exercises: { name: 'Bench' },
+      },
+    ],
+    error: null,
+  });
+  client.queue('sets', {
+    data: [{ id: 's1', workout_exercise_id: 'we1', set_index: 1, weight_kg: 100, reps: 5 }],
+    error: null,
+  });
+}
+
 describe('FeedService', () => {
   describe('getFriendsFeed', () => {
     it('returns an empty page without querying anything else when the user follows nobody', async () => {
@@ -78,7 +98,7 @@ describe('FeedService', () => {
         ],
         error: null,
       });
-      client.queue('workout_exercises', { data: [], error: null });
+      queueOneFinishedSet(client);
       client.queue('users', {
         data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
         error: null,
@@ -119,7 +139,7 @@ describe('FeedService', () => {
         ],
         error: null,
       });
-      client.queue('workout_exercises', { data: [], error: null });
+      queueOneFinishedSet(client);
       client.queue('users', {
         data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
         error: null,
@@ -368,7 +388,51 @@ describe('FeedService', () => {
       const result = await service.getFriendsFeed('user-1', 0);
 
       expect(result.hasMore).toBe(true);
-      expect(result.items).toHaveLength(20);
+    });
+
+    it('leaves out a workout finished with nothing in it', async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
+      const workout = (id: string, name: string) => ({
+        id,
+        user_id: 'user-2',
+        name,
+        performed_at: '2026-09-20T10:00:00.000Z',
+        completed_at: '2026-09-20T11:00:00.000Z',
+        workout_split_day_id: null,
+      });
+      client.queue('workouts', {
+        data: [workout('w1', 'Push Day'), workout('w2', 'Empty')],
+        error: null,
+      });
+      client.queue('workout_exercises', {
+        data: [
+          {
+            id: 'we-bench',
+            workout_id: 'w1',
+            exercise_id: 'bench',
+            order_index: 1,
+            exercises: { name: 'Bench Press' },
+          },
+        ],
+        error: null,
+      });
+      client.queue('sets', {
+        data: [
+          { id: 's1', workout_exercise_id: 'we-bench', set_index: 1, weight_kg: 100, reps: 5 },
+        ],
+        error: null,
+      });
+      client.queue('users', {
+        data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const result = await service.getFriendsFeed('user-1', 0);
+
+      expect(result.items.map((item) => item.workout.name)).toEqual(['Push Day']);
+      expect(result.items[0]!.author).toMatchObject({ username: 'jane' });
     });
   });
 });

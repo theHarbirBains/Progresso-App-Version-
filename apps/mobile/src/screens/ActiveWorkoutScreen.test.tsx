@@ -123,6 +123,34 @@ const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockCreateExercise = createExercise as jest.Mock;
 const mockFetchExercises = fetchAllExercises as jest.Mock;
 const mockFetchWorkoutDetail = fetchWorkoutDetail as jest.Mock;
+
+/** From here, the workout as saved has a finished set -- what Finish reads before saving it. */
+function savedWithAFinishedSet() {
+  mockFetchWorkoutDetail.mockResolvedValue({
+    ...baseWorkout,
+    exercises: [
+      {
+        id: 'we-done',
+        exerciseId: 'ex-done',
+        exerciseName: 'Bench Press',
+        photoUrl: null,
+        muscleGroup: 'chest',
+        movementType: 'bilateral',
+        loggingStyle: null,
+        orderIndex: 1,
+        sets: [
+          {
+            id: 's-done',
+            setIndex: 1,
+            weightKg: 100,
+            reps: 5,
+            completedAt: '2026-01-01T00:10:00Z',
+          },
+        ],
+      },
+    ],
+  });
+}
 const mockCreateSet = createSet as jest.Mock;
 const mockUpdateSet = updateSet as jest.Mock;
 const mockAddExerciseToWorkout = addExerciseToWorkout as jest.Mock;
@@ -248,6 +276,26 @@ async function pastTheSaveDelay() {
 }
 
 describe('ActiveWorkoutScreen', () => {
+  it('never saves a workout with nothing finished in it -- Finish offers to discard it', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({ ...baseWorkout, exercises: [] });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((title, _message, buttons) => {
+      if (title === 'Nothing logged yet') {
+        buttons?.find((button) => button.text === 'Discard Workout')?.onPress?.();
+      }
+    });
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('complete-workout');
+
+    fireEvent.press(screen.getByTestId('complete-workout'));
+
+    await waitFor(() => expect(mockCancelWorkout).toHaveBeenCalledWith('w1'));
+    expect(alert).toHaveBeenCalledWith('Nothing logged yet', expect.any(String), expect.any(Array));
+    expect(mockCompleteWorkout).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
   it('loads the workout for the given workoutId (resuming the correct session)', async () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
@@ -1083,6 +1131,7 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
     expect(mockUpdateSet).not.toHaveBeenCalledWith('s-right', expect.anything());
 
     const alert = removeEmptySetsOnFinish();
+    savedWithAFinishedSet();
     fireEvent.press(screen.getByTestId('complete-workout'));
 
     await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
@@ -2185,6 +2234,7 @@ describe('ActiveWorkoutScreen -- timing a timed set', () => {
 
     fireEvent.press(timer());
     now += 75_400;
+    savedWithAFinishedSet();
     fireEvent.press(screen.getByTestId('complete-workout'));
 
     await waitFor(() =>

@@ -573,6 +573,25 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         setCompleting(false);
         return;
       }
+      // A workout with nothing finished in it is never saved -- it would only be an empty card in
+      // history and in friends' feeds. Discarding it is offered instead.
+      const saved = await fetchWorkoutDetail(workout.id);
+      const finishedSets = saved.exercises.reduce(
+        (count, exercise) => count + exercise.sets.filter((set) => set.completedAt).length,
+        0,
+      );
+      if (finishedSets === 0) {
+        setCompleting(false);
+        Alert.alert(
+          'Nothing logged yet',
+          "This workout has no finished sets, so there's nothing to save. Discard it?",
+          [
+            { text: 'Keep Going', style: 'cancel' },
+            { text: 'Discard Workout', style: 'destructive', onPress: () => void performCancel() },
+          ],
+        );
+        return;
+      }
       await completeWorkout(workout.id);
       void clearLiveWorkoutDraft(workout.id);
       void clearSetTimers(workout.id);

@@ -146,6 +146,8 @@ export class FeedService {
     if (workoutRows && workoutRows.length > 0) {
       const enriched = await this.enrichWorkouts(client, workoutRows);
       for (const workout of enriched) {
+        // A workout finished with nothing in it isn't one to show anyone.
+        if (workout.completedSetCount === 0) continue;
         items.push({
           kind: 'workout',
           id: `workout-${workout.id}`,
