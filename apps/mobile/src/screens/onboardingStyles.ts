@@ -4,8 +4,8 @@ import { colors, spacing, typeScale } from '../design/theme';
 export const onboardingStyles = StyleSheet.create({
   screen: {
     flex: 1,
-    // Transparent like every other screen, so onboarding sits on the warm
-    // background photo that AppBackgroundLayer paints before sign-in.
+    // Transparent like every other screen, so onboarding sits on the plain
+    // background AppBackgroundLayer paints before sign-in.
     backgroundColor: 'transparent',
   },
   keyboardAvoiding: {

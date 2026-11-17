@@ -224,40 +224,26 @@ function Root() {
   // background glow when its mode is Workout); nutritionMenuTheme is its
   // Nutrition counterpart, for the same per-screen glow purpose. Both are
   // the one fixed amber accent (useProgressTheme).
-  // Every screen gets an opaque, themed backdrop that is part of the screen
-  // itself, so a push/pop never depends on JS to paint what's behind the
-  // incoming page in time (see ScreenBackdrop). Its soft glow follows the
-  // mode of the screen it sits under: the mode-agnostic roots (Feed,
-  // Progress, You) follow the shared mode, everything else its own route's
-  // mode. Memoized (rather than a plain inline function) since it's passed
+  // Every screen gets an opaque backdrop -- the plain background fill -- that
+  // is part of the screen itself, so a push/pop never depends on JS to paint
+  // what's behind the incoming page in time (see ScreenBackdrop). Memoized (rather than a plain inline function) since it's passed
   // as Stack.Navigator's `screenLayout` prop, which re-wraps every currently
   // mounted screen's children whenever its identity changes -- and this
   // component re-renders on every navigation event (see onStateChange
   // below), so a fresh function each time would do that needlessly.
   const renderScreenLayout = useCallback(
     ({
-      route,
       navigation,
       children,
     }: {
-      route: { name: string };
       navigation: Parameters<typeof PageArrival>[0]['navigation'];
       children: ReactNode;
-    }) => {
-      const screenMode = MODE_AGNOSTIC_ROUTES.has(route.name)
-        ? sharedMode
-        : isNutritionRoute(route.name)
-          ? 'nutrition'
-          : 'workout';
-      return (
-        <ScreenBackdrop
-          accentColor={screenMode === 'nutrition' ? nutritionMenuTheme.accent : menuTheme.accent}
-        >
-          <PageArrival navigation={navigation}>{children}</PageArrival>
-        </ScreenBackdrop>
-      );
-    },
-    [sharedMode, menuTheme.accent, nutritionMenuTheme.accent],
+    }) => (
+      <ScreenBackdrop>
+        <PageArrival navigation={navigation}>{children}</PageArrival>
+      </ScreenBackdrop>
+    ),
+    [],
   );
   // The persistent bottom nav (BottomNavBar) is mounted here for the same
   // reason AppSideMenu is: as a sibling of the navigator so it survives
@@ -635,7 +621,7 @@ function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
           Every signed-in screen paints its own opaque ScreenBackdrop over
           this now (see Root's screenLayout), so it is only ever actually
           *seen* pre-sign-in -- a plain flat theme fill, no glow, no mode. */}
-      <AppBackgroundLayer showAtmosphere={false} />
+      <AppBackgroundLayer />
       {ready ? <Root /> : null}
       {/* Over every screen through the holidays; touches pass straight through it. */}
       {ready && snowing ? <Snowfall /> : null}

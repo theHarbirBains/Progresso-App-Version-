@@ -1,13 +1,11 @@
-// The looks Progresso can wear (Settings > Appearance, and onboarding). Each is a photo behind the
-// top of every screen and one accent; everything else -- surfaces, text, charts, forms, the live
-// workout -- stays the same warm dark in every theme, so a theme never costs readability. Golden
-// Hour Gym is the default. Every photo is Progresso's own: a gym open onto its scene (a mountain
-// lake at sunset, a waterfall, snowy peaks, the sea, blossom, palms, autumn woods, snow -- and a
-// gym dressed for Christmas at night, its tree and garlands lit, Holiday Gym), cut to
-// the same proportions and drawn under the same darkening layers (design/AppBackgroundLayer.tsx);
-// each theme's `heroDarkness` is how dark its photo stays behind Feed's Next Workout, measured so
-// hero text keeps at least the contrast it had over the original gym photo at 10% -- over the
-// photo's brightest specks and over its broad bright areas alike.
+// The looks Progresso can wear (Settings > Appearance). Each is one accent, and a photo that's
+// the picture on the launch screen, the share card and the home-screen widgets -- never behind
+// a screen: every screen is the plain warm fill (design/AppBackgroundLayer.tsx). Everything
+// else -- surfaces, text, charts, forms, the live workout -- stays the same warm dark in every
+// theme, so a theme never costs readability. Every photo is Progresso's own: a gym open onto its
+// scene (a mountain lake at sunset, a waterfall, snowy peaks, the sea, blossom, palms, autumn
+// woods, snow -- and a gym dressed for Christmas at night, its tree and garlands lit, Holiday
+// Gym), cut to the same proportions.
 
 export type AppThemeId =
   | 'golden-hour-gym'
@@ -27,10 +25,8 @@ export interface AppTheme {
   name: string;
   /** The theme's one accent -- buttons, the active tab, selected states, key figures. */
   accent: string;
-  /** The bundled photo (a `require`). */
+  /** The bundled photo (a `require`): the launch screen's, the share card's and the widgets'. */
   photo: number;
-  /** How dark the photo stays through its upper part behind Feed's hero (0-1). */
-  heroDarkness: number;
 }
 
 // What someone who hasn't chosen a look sees -- a new download among them.
@@ -45,56 +41,48 @@ export const APP_THEMES: readonly AppTheme[] = [
     name: 'Golden Hour Gym',
     accent: '#D99A50',
     photo: require('../../assets/background-gym-sunset.jpg'),
-    heroDarkness: 0.2,
   },
   {
     id: 'forest',
     name: 'Forest',
     accent: '#9DBF7A',
     photo: require('../../assets/themes/forest.jpg'),
-    heroDarkness: 0.1,
   },
   {
     id: 'alpine',
     name: 'Alpine',
     accent: '#8DB8D6',
     photo: require('../../assets/themes/alpine.jpg'),
-    heroDarkness: 0.15,
   },
   {
     id: 'coast',
     name: 'Coast',
     accent: '#6FC2B8',
     photo: require('../../assets/themes/coast.jpg'),
-    heroDarkness: 0.25,
   },
   {
     id: 'spring',
     name: 'Spring',
     accent: '#E8A0B4',
     photo: require('../../assets/themes/spring.jpg'),
-    heroDarkness: 0.2,
   },
   {
     id: 'summer',
     name: 'Summer',
     accent: '#E8B84A',
     photo: require('../../assets/themes/summer.jpg'),
-    heroDarkness: 0.25,
   },
   {
     id: 'autumn',
     name: 'Autumn',
     accent: '#D9774A',
     photo: require('../../assets/themes/autumn.jpg'),
-    heroDarkness: 0.1,
   },
   {
     id: 'winter',
     name: 'Winter',
     accent: '#A9C4E0',
     photo: require('../../assets/themes/winter.jpg'),
-    heroDarkness: 0.1,
   },
   {
     // A gym dressed for Christmas at night. The darkest photo of all, its brightest specks (the
@@ -104,7 +92,6 @@ export const APP_THEMES: readonly AppTheme[] = [
     name: 'Holiday Gym',
     accent: '#EBC27C',
     photo: require('../../assets/themes/holiday-gym.jpg'),
-    heroDarkness: 0.1,
   },
 ];
 

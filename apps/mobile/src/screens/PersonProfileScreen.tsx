@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Share, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
-import { useHeroBackdrop } from '../design/AppBackgroundLayer';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { Avatar } from '../design/Avatar';
@@ -254,9 +253,6 @@ export function PersonProfilePage({
           bio: identity.bio,
         }
       : fetchedProfile;
-
-  // The photo glows through the top of the page, as behind Feed's hero.
-  useHeroBackdrop(profile !== null);
 
   const social = useSocialSummaries(
     workouts.map((item) => item.workout.id),

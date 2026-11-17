@@ -3,7 +3,7 @@ import { View, type ViewInstance } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BACKGROUND_ASPECT } from '../design/AppBackgroundLayer';
+import { THEME_PHOTO_ASPECT } from '../theme/appThemes';
 import { Avatar } from '../design/Avatar';
 import { Text } from '../design/Text';
 import { colors } from '../design/theme';
@@ -52,7 +52,7 @@ const PHOTO_STYLE = {
   left: 0,
   top: cardPt(-120),
   width: PHOTO_WIDTH,
-  height: PHOTO_WIDTH / BACKGROUND_ASPECT,
+  height: PHOTO_WIDTH / THEME_PHOTO_ASPECT,
 } as const;
 const STAT_ICON_SIZE = cardPt(18);
 // The logo the app opens with (LaunchScreen's mark), cropped tight to the

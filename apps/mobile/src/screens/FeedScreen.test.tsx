@@ -2,7 +2,6 @@ import { Alert, StyleSheet } from 'react-native';
 import { fetchActiveWorkout } from '../workouts/workoutQueries';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Avatar } from '../design/Avatar';
-import * as backdrop from '../design/AppBackgroundLayer';
 import { Card } from '../design/Card';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
@@ -949,7 +948,6 @@ describe('FeedScreen -- Next Workout widget', () => {
       avatarUrl: null,
       activeWorkoutSplitId: null,
     });
-    const hero = jest.spyOn(backdrop, 'useHeroBackdrop');
     renderScreen();
 
     const card = await screen.findByTestId('feed-start-workout');
@@ -957,10 +955,9 @@ describe('FeedScreen -- Next Workout widget', () => {
     expect(card.props.accessibilityLabel).toBe('Start a workout. No split chosen yet');
     expect(screen.queryByTestId('feed-next-workout')).toBeNull();
     expect(mockFetchWorkoutSplitDetail).not.toHaveBeenCalled();
-    // The same hero: see-through over the brightened photo, with the cream button.
-    expect(hero).toHaveBeenLastCalledWith(true);
+    // The same hero: the warm hero fill, with the cream button.
+    expect(StyleSheet.flatten(card.props.style).backgroundColor).toBe(colors.surfaceHero);
     expect(screen.UNSAFE_getByType(PrimaryButton).props.accentColor).toBe(colors.heroAction);
-    hero.mockRestore();
 
     fireEvent.press(card);
     expect(mockNavigate).toHaveBeenCalledWith('NewWorkout');
@@ -1017,25 +1014,16 @@ describe('FeedScreen -- Next Workout widget', () => {
     expect(await screen.findByTestId('feed-next-workout')).toBeTruthy();
   });
 
-  it('brightens the sunset photo behind Feed while it shows, and only then', async () => {
-    const hero = jest.spyOn(backdrop, 'useHeroBackdrop');
-    mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
-    mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
-    renderScreen();
-
-    expect(hero).toHaveBeenLastCalledWith(false);
-    await screen.findByTestId('feed-next-workout');
-    expect(hero).toHaveBeenLastCalledWith(true);
-    hero.mockRestore();
-  });
-
-  it('is the one hero card, see-through over the background photo, with a cream Start Workout button', async () => {
+  it('is the one hero card, on the warm hero fill with its warmer edge, with a cream Start Workout button', async () => {
     mockFetchWorkoutSplitDetail.mockResolvedValue(oneDaySplit);
     mockFetchLastWorkoutSplitDayId.mockResolvedValue(null);
     renderScreen();
 
     const card = await screen.findByTestId('feed-next-workout');
-    expect(StyleSheet.flatten(card.props.style).backgroundColor).toBeUndefined();
+    expect(StyleSheet.flatten(card.props.style).backgroundColor).toBe(colors.surfaceHero);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('feed-next-workout-edge').props.style).borderColor,
+    ).toBe(colors.borderHero);
     const button = screen.UNSAFE_getByType(PrimaryButton);
     expect(button.props.accentColor).toBe(colors.heroAction);
     expect(button.props.onAccentColor).toBe(colors.onAccent);
@@ -1152,7 +1140,7 @@ describe('FeedScreen live workout', () => {
 
     const hero = await screen.findByTestId('feed-live-workout');
     expect(hero).toHaveTextContent(/Workout in Progress.*Leg Day.*Your workout · started/);
-    expect(StyleSheet.flatten(hero.props.style).backgroundColor).toBeUndefined();
+    expect(StyleSheet.flatten(hero.props.style).backgroundColor).toBe(colors.surfaceHero);
     const button = screen.UNSAFE_getByType(PrimaryButton);
     expect(button.props.label).toBe('Resume Workout');
     expect(button.props.accentColor).toBe(colors.heroAction);

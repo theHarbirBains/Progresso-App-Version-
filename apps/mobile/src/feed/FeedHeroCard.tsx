@@ -45,7 +45,7 @@ export function FeedHeroCard({
       ) : null}
       <Text style={[styles.nextWorkoutMeta, { color: colors.textPrimary }]}>{meta}</Text>
       {/* A solid warm-cream pill with dark text, so it reads as a real button against the
-          photo rather than disappearing into it. */}
+          warm hero fill. */}
       <View
         style={styles.nextWorkoutAction}
         pointerEvents="none"

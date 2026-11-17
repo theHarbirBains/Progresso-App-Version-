@@ -15,11 +15,11 @@ import { InsideCardContext } from './insideCard';
 interface Props {
   children: ReactNode;
   /**
-   * The one hero card on a screen (e.g. Feed's Next Workout): no fill and no
-   * edge, so its content sits straight on the warm gym photo behind the top
-   * of every screen (AppBackgroundLayer), the way Option 4's hero does. Pair
-   * with light text inside and a `colors.heroAction` button (the caller's
-   * job, same as AppCard's hero convention).
+   * The one hero card on a screen (e.g. Feed's Next Workout): the warm hero
+   * fill (`colors.surfaceHero`) with its warmer edge (`colors.borderHero`),
+   * AppCard's hero treatment, so it stands out from every other card on the
+   * plain background. Pair with light text inside and a `colors.heroAction`
+   * button (the caller's job, same as AppCard's hero convention).
    */
   hero?: boolean;
   onPress?: () => void;
@@ -34,8 +34,8 @@ interface Props {
 // The redesign's card: a flat surface -- no blur, no glow -- raised above
 // the page by being a visibly lighter fill (`colors.surfaceRaised`) than the
 // near-black background, the same way elevation reads in a dark OS theme.
-// The fill is translucent (`widgetFillAlpha`), so the background photo stays
-// faintly visible through the card. A faint warm hairline traces its edge,
+// The fill is translucent (`widgetFillAlpha`) over the plain background. A
+// faint warm hairline traces its edge,
 // drawn as an absolutely positioned layer so it never changes the card's
 // size or where its content sits. Bigger, softer corners than AppCard.
 export function Card({
@@ -48,18 +48,16 @@ export function Card({
   accessibilityLabel,
   accessibilityState,
 }: Props) {
-  const cardStyle = [styles.card, hero ? null : styles.surface, style];
+  const cardStyle = [styles.card, hero ? styles.heroSurface : styles.surface, style];
   const content = (
     <InsideCardContext.Provider value={true}>
       {children}
       {/* Drawn last, so nothing inside the card can cover its edge. */}
-      {hero ? null : (
-        <View
-          testID={testID ? `${testID}-edge` : undefined}
-          style={[styles.layer, styles.edge]}
-          pointerEvents="none"
-        />
-      )}
+      <View
+        testID={testID ? `${testID}-edge` : undefined}
+        style={[styles.layer, styles.edge, hero && styles.heroEdge]}
+        pointerEvents="none"
+      />
     </InsideCardContext.Provider>
   );
 
@@ -95,6 +93,9 @@ const styles = StyleSheet.create({
   surface: {
     backgroundColor: withAlpha(colors.surfaceRaised, widgetFillAlpha),
   },
+  heroSurface: {
+    backgroundColor: colors.surfaceHero,
+  },
   layer: {
     position: 'absolute',
     top: 0,
@@ -106,5 +107,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.glassBorder,
+  },
+  heroEdge: {
+    borderColor: colors.borderHero,
   },
 });

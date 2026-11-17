@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
-import { useHeroBackdrop } from '../design/AppBackgroundLayer';
 import { recallShown, rememberShown } from '../lib/lastShown';
 import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import { AppHeader } from '../design/AppHeader';
@@ -612,9 +611,6 @@ export function FeedScreen({ navigation }: Props) {
   const settled =
     startsKnown || (!initialLoading && liveKnown && nextDone && stepsKnown && social.loaded);
   const showPage = useShowAllAtOnce(settled);
-  // The hero has no fill of its own; while it shows, the sunset photo behind Feed is
-  // brightened so it shows through the hero (see AppBackgroundLayer).
-  useHeroBackdrop(showPage && (showNextWorkout || showStartWorkout || liveHero !== undefined));
   // Graceful degradation, same philosophy as feedQueries.ts's own
   // degrade-to-empty-page on failure: a failure on one source only blocks
   // the whole screen if there's genuinely nothing else to show; otherwise

@@ -75,7 +75,7 @@ describe('Card', () => {
     expect(edge.borderColor).toBe(colors.glassBorder);
   });
 
-  it('leaves a hero card see-through, so its content sits on the background photo', () => {
+  it('gives a hero card the warm hero fill and its warmer edge, so it stands out on the plain background', () => {
     render(
       <Card testID="card" hero>
         <Text>Content</Text>
@@ -83,9 +83,11 @@ describe('Card', () => {
     );
 
     const style = StyleSheet.flatten(screen.getByTestId('card').props.style);
-    expect(style.backgroundColor).toBeUndefined();
+    expect(style.backgroundColor).toBe(colors.surfaceHero);
     expect(style.padding).toBe(16);
-    expect(screen.queryByTestId('card-edge')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('card-edge').props.style).borderColor).toBe(
+      colors.borderHero,
+    );
     expect(screen.getByText('Content')).toBeTruthy();
   });
 });

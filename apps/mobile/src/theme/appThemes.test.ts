@@ -46,13 +46,6 @@ describe('app themes', () => {
     }
   });
 
-  it('darkens every photo behind Feed’s hero at least as much as the measured gym photo', () => {
-    for (const theme of APP_THEMES) {
-      expect(theme.heroDarkness).toBeGreaterThanOrEqual(0.1);
-      expect(theme.heroDarkness).toBeLessThan(0.62);
-    }
-  });
-
   it('falls back to the default for a theme it doesn’t know', () => {
     expect(themeById('obsidian').id).toBe('golden-hour-gym');
     expect(themeById(null).id).toBe('golden-hour-gym');

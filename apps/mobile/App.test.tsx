@@ -755,61 +755,37 @@ describe('App background', () => {
     await screen.findByTestId('app-bottom-nav');
   }
 
-  // There is no photograph anywhere any more, and no screen treated
-  // specially: every screen, Feed included, paints its own opaque
-  // ScreenBackdrop with a soft glow in the current mode's accent (see
-  // App.tsx's screenLayout). A previous screen can still be mounted
-  // underneath during a transition, so this always reads the *last*
-  // (topmost/current) glow, matching the order screens mount in.
-  function currentGlowColor() {
-    const glows = screen.getAllByTestId('screen-backdrop-glow');
-    return glows[glows.length - 1].props.colors[0] as string;
-  }
-
-  it('shows no glow at all before sign-in', async () => {
+  // Every screen is one plain colour -- the warm near-black the text was chosen against -- with
+  // no photo, glow or shade: the signed-out screens on AppBackgroundLayer, every signed-in one on
+  // its own opaque ScreenBackdrop (see App.tsx's screenLayout).
+  it('shows the plain background, and nothing over it, before sign-in', async () => {
     render(<App />);
     await screen.findByTestId('sign-in-email');
 
+    expect(
+      StyleSheet.flatten(screen.getByTestId('app-background-layer').props.style).backgroundColor,
+    ).toBe('#12110F');
     expect(screen.queryByTestId('app-background-glow')).toBeNull();
+    expect(screen.queryByTestId('app-background-photo')).toBeNull();
+  });
+
+  it('gives every screen an opaque backdrop of the same plain fill, Feed included', async () => {
+    await signIn();
+
+    const backdrops = screen.getAllByTestId('screen-backdrop');
+    expect(backdrops.length).toBeGreaterThan(0);
+    for (const backdrop of backdrops) {
+      expect(StyleSheet.flatten(backdrop.props.style).backgroundColor).toBe('#12110F');
+    }
     expect(screen.queryByTestId('screen-backdrop-glow')).toBeNull();
-  });
+    expect(screen.queryByTestId('screen-backdrop-photo')).toBeNull();
 
-  it('gives every screen an opaque backdrop, Feed included', async () => {
-    await signIn();
-
-    expect(screen.getAllByTestId('screen-backdrop').length).toBeGreaterThan(0);
-  });
-
-  // Workout and Nutrition share the same accent -- the default theme's, Holiday
-  // Gym's gold -- so the glow no longer changes color between modes -- these
-  // confirm it stays the one gold throughout, rather than testing a color
-  // difference that no longer exists.
-  it("glows in the default theme's accent on Feed", async () => {
-    await signIn();
-
-    expect(currentGlowColor()).toBe('rgba(235, 194, 124, 0.08)');
-  });
-
-  it('keeps glowing in the same accent after visiting Nutrition, even back on Feed', async () => {
-    await signIn();
     fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
     await screen.findByTestId('nutrition-today-open-menu');
-    expect(currentGlowColor()).toBe('rgba(235, 194, 124, 0.08)');
-
-    fireEvent.press(screen.getByTestId('bottom-nav-feed'));
-    await screen.findByTestId('feed-screen');
-    expect(currentGlowColor()).toBe('rgba(235, 194, 124, 0.08)');
-  });
-
-  it('keeps glowing in the same accent once back on a Train screen', async () => {
-    await signIn();
-    fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
-    await screen.findByTestId('nutrition-today-open-menu');
-
-    fireEvent.press(screen.getByTestId('bottom-nav-train'));
-    await screen.findByTestId('workout-history-open-menu');
-
-    expect(currentGlowColor()).toBe('rgba(235, 194, 124, 0.08)');
+    const nutrition = screen.getAllByTestId('screen-backdrop');
+    expect(StyleSheet.flatten(nutrition[nutrition.length - 1].props.style).backgroundColor).toBe(
+      '#12110F',
+    );
   });
 });
 
