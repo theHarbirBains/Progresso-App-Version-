@@ -25,7 +25,8 @@
     "build:api": "npm run build --workspace apps/api",
     "test:api": "npm run test --workspace apps/api",
     "db:test": "node supabase/tests/run.mjs",
-    "db:simulate": "node supabase/tests/simulate-achievements.mjs"
+    "db:simulate": "node supabase/tests/simulate-achievements.mjs",
+    "db:catalog": "node supabase/catalog/generate.mjs"
   },
   "devDependencies": {
     "@emnapi/core": "1.10.0",

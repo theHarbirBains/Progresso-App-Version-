@@ -180,10 +180,10 @@ async function main() {
   // Used only by the additional PR edge-case tests below, kept separate from
   // squat/benchPress for the same reason: no cross-contamination between
   // assertions that all read global per-user-per-exercise PR state.
-  const deadlift = (await admin.query("select id from public.exercises where name = 'Deadlift'"))
+  const deadlift = (await admin.query("select id from public.exercises where name = 'Conventional Barbell Deadlift'"))
     .rows[0].id;
   const overheadPress = (
-    await admin.query("select id from public.exercises where name = 'Overhead Press'")
+    await admin.query("select id from public.exercises where name = 'Standing Barbell Overhead Press'")
   ).rows[0].id;
   const testFood = (
     await admin.query(
@@ -1940,7 +1940,7 @@ async function main() {
 
     const bulgarianSplitSquat = (
       await admin.query(
-        "select id, movement_type, logging_style from public.exercises where name = 'Bulgarian Split Squat'",
+        "select id, movement_type, logging_style from public.exercises where name = 'Dumbbell Bulgarian Split Squat'",
       )
     ).rows[0];
     record(
@@ -6066,6 +6066,100 @@ async function main() {
           )
         ).rows[0].n === 0,
     );
+  }
+
+  // ---- the built-in dumbbell and barbell library (20261128100000) ----
+  {
+    const builtins = (
+      await admin.query(
+        `select id, name, slug, equipment, muscle_group::text as muscle, is_active,
+                secondary_muscle_groups::text[] as secondary, movement_pattern, instructions,
+                setup_steps, execution_steps, common_mistakes, search_aliases
+         from public.exercises where created_by is null`,
+      )
+    ).rows;
+    const active = builtins.filter((r) => r.is_active);
+    const count = (equipment) => active.filter((r) => r.equipment === equipment && r.slug).length;
+    record(
+      'The library has 97 dumbbell and 88 barbell built-ins, each active',
+      count('dumbbell') === 97 && count('barbell') === 88,
+      JSON.stringify({ dumbbell: count('dumbbell'), barbell: count('barbell') }),
+    );
+    const unguided = active.filter(
+      (r) =>
+        !r.slug ||
+        !r.instructions ||
+        r.setup_steps.length === 0 ||
+        r.execution_steps.length === 0 ||
+        r.common_mistakes.length === 0 ||
+        !r.movement_pattern,
+    );
+    record(
+      'Every active built-in has a slug, a movement pattern and a full guide',
+      unguided.length === 0,
+      unguided.map((r) => r.name).join(', '),
+    );
+    record(
+      "No built-in lists its own muscle group among the ones it also works",
+      builtins.every((r) => !r.secondary.includes(r.muscle)),
+    );
+    const renamed = {
+      Deadlift: 'Conventional Barbell Deadlift',
+      'Dumbbell Curl': 'Standing Dumbbell Bicep Curl',
+      'Bulgarian Split Squat': 'Dumbbell Bulgarian Split Squat',
+      'Hip Thrust': 'Barbell Hip Thrust',
+    };
+    const byName = new Map(builtins.map((r) => [r.name, r]));
+    record(
+      'Built-ins renamed to say their equipment keep their old name as a search alias, and the old name is gone',
+      Object.entries(renamed).every(
+        ([old, now]) => !byName.has(old) && byName.get(now)?.search_aliases.includes(old),
+      ),
+    );
+    const bulgarian = byName.get('Dumbbell Bulgarian Split Squat');
+    record(
+      'A renamed built-in keeps its muscle group and sides',
+      bulgarian?.muscle === 'quadriceps' &&
+        (
+          await admin.query('select movement_type::text, logging_style::text from public.exercises where id = $1', [
+            bulgarian.id,
+          ])
+        ).rows[0].logging_style === 'alternating',
+    );
+    record(
+      'The machine and cable built-ins hidden before stay hidden, with no guide',
+      builtins
+        .filter((r) => ['Cable Fly', 'Leg Press', 'Lat Pulldown'].includes(r.name))
+        .every((r) => !r.is_active && !r.slug),
+    );
+    const guideAsUser = await asUser(userA, (c) =>
+      c.query(
+        "select slug, execution_steps from public.exercises where slug = 'db-bench-press'",
+      ),
+    );
+    record(
+      "Anyone signed in can read a built-in's guide",
+      guideAsUser.rows.length === 1 && guideAsUser.rows[0].execution_steps.length > 0,
+    );
+    let slugRefused = false;
+    try {
+      await asUser(userA, (c) =>
+        c.query(
+          "insert into public.exercises (created_by, name, muscle_group, slug) values ($1, 'My Press', 'chest', 'my-press')",
+          [userA],
+        ),
+      );
+    } catch (err) {
+      slugRefused = /exercises_slug_builtin_only/.test(String(err.message));
+    }
+    record("A person's own exercise can never take a slug", slugRefused);
+    let patternRefused = false;
+    try {
+      await admin.query("update public.exercises set movement_pattern = 'juggling' where slug = 'db-bench-press'");
+    } catch (err) {
+      patternRefused = /exercises_movement_pattern_known/.test(String(err.message));
+    }
+    record('Only known movement patterns are accepted', patternRefused);
   }
 
   await admin.end();
