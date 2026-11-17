@@ -3392,7 +3392,20 @@ async function main() {
   const trackedWorkoutId = trackedLog.rows[0].id;
 
   // Rep ranges the trainer set for the tracked client: on their copy of a custom
-  // exercise, and on a built-in one.
+  // exercise, and on a built-in one. And the profile the trainer entered for them,
+  // beside the claimant's own -- which has no height or weight yet.
+  await admin.query(
+    `update public.users set display_name = 'Tracked Name', birthday = '1990-01-01',
+       height_value = 180, height_unit = 'cm', weight_value = 80, weight_unit = 'kg'
+     where id = $1`,
+    [placeholder],
+  );
+  await admin.query(
+    `update public.users set display_name = 'Own Name', birthday = '2000-05-05',
+       height_value = null, weight_value = null
+     where id = $1`,
+    [trackedClaimant],
+  );
   const placeholderCopy = await admin.query(
     'select id from public.exercises where created_by = $1 limit 1',
     [placeholder],
@@ -3459,20 +3472,30 @@ async function main() {
   );
   record('PRs are rebuilt for the client from the moved sets', clientPrs.rows[0].count > 0);
 
-  const movedSettings = await admin.query(
-    `select s.exercise_id, s.rep_range_min, e.created_by
-     from public.exercise_progression_settings s join public.exercises e on e.id = s.exercise_id
-     where s.user_id = $1 order by s.rep_range_min`,
+  const ranges = await admin.query(
+    `select
+       (select count(*)::int from public.exercise_progression_settings where user_id = $1) as client,
+       (select count(*)::int from public.exercise_progression_settings where user_id = $2) as placeholder`,
+    [trackedClaimant, placeholder],
+  );
+  record(
+    "Only workouts move: the trainer's rep ranges for the tracked client stay behind",
+    ranges.rows[0].client === 0 && ranges.rows[0].placeholder === 0,
+    JSON.stringify(ranges.rows[0]),
+  );
+
+  const claimantProfile = await admin.query(
+    `select display_name, birthday::text, height_value, weight_value
+     from public.users where id = $1`,
     [trackedClaimant],
   );
   record(
-    "The trainer's rep ranges move to the client, on their own exercise and a built-in one",
-    movedSettings.rows.length === 2 &&
-      movedSettings.rows[0].rep_range_min === 6 &&
-      movedSettings.rows[0].created_by === trackedClaimant &&
-      movedSettings.rows[1].rep_range_min === 10 &&
-      movedSettings.rows[1].created_by === null,
-    JSON.stringify(movedSettings.rows),
+    "The client's profile stays exactly as they made it -- not even a blank is filled",
+    claimantProfile.rows[0].display_name === 'Own Name' &&
+      claimantProfile.rows[0].birthday === '2000-05-05' &&
+      claimantProfile.rows[0].height_value === null &&
+      claimantProfile.rows[0].weight_value === null,
+    JSON.stringify(claimantProfile.rows[0]),
   );
 
   const links = await admin.query(
@@ -5304,19 +5327,16 @@ async function main() {
     const follower = randomUUID();
     const stranger = randomUUID();
     const blocked = randomUUID();
-    await admin.query(
-      'insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6),($7,$8)',
-      [
-        maker,
-        'shared-maker@test.local',
-        follower,
-        'shared-follower@test.local',
-        stranger,
-        'shared-stranger@test.local',
-        blocked,
-        'shared-blocked@test.local',
-      ],
-    );
+    await admin.query('insert into auth.users (id, email) values ($1,$2),($3,$4),($5,$6),($7,$8)', [
+      maker,
+      'shared-maker@test.local',
+      follower,
+      'shared-follower@test.local',
+      stranger,
+      'shared-stranger@test.local',
+      blocked,
+      'shared-blocked@test.local',
+    ]);
     const shared = (
       await admin.query(
         `insert into public.exercises (created_by, name, muscle_group, movement_type, gym, attachment)
@@ -5401,9 +5421,10 @@ async function main() {
     );
     record("Only its maker changes a friend's exercise", followerEdit.rowCount === 0);
     await asUserCommitted(maker, (c) =>
-      c.query("update public.exercises set name = 'Friend Row (Wide)', attachment = 'Wide bar' where id = $1", [
-        shared,
-      ]),
+      c.query(
+        "update public.exercises set name = 'Friend Row (Wide)', attachment = 'Wide bar' where id = $1",
+        [shared],
+      ),
     );
     record(
       "Its maker's change reaches everyone using it",
