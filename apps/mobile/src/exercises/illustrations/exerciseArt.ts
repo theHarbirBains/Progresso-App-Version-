@@ -48,6 +48,7 @@ export function thumbnailFor(slug: string | null | undefined): RenderedScene | n
     scene = renderScene(
       { ...spec, motion: undefined, frames: [spec.frames[spec.frames.length - 1]] },
       BUILTIN_CATALOG[slug].highlight,
+      { flat: true },
     );
     thumbs.set(slug, scene);
   }

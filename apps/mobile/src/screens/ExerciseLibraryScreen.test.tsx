@@ -250,6 +250,23 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
+  it('keeps the list on screen while a filter changes -- no placeholders after the first load', async () => {
+    renderScreen();
+    await screen.findByTestId('exercise-item-ex-builtin');
+    // The next read takes a moment: the list it replaces stays put meanwhile, never rebuilt.
+    let finish: (rows: unknown[]) => void = () => undefined;
+    mockFetchAllExercises.mockImplementationOnce(
+      () => new Promise((resolve) => (finish = resolve)),
+    );
+
+    fireEvent.press(screen.getByTestId('exercise-source-mine'));
+
+    expect(screen.queryByTestId('exercise-library-loading')).toBeNull();
+    expect(screen.getByTestId('exercise-item-ex-builtin')).toBeTruthy();
+    await act(async () => finish([]));
+    await settle();
+  });
+
   it('shows the real, independent total for each source category, never a fabricated count', async () => {
     renderScreen();
 

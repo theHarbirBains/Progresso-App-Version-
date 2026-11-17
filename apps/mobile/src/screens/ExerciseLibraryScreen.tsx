@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { Screen } from '../design/Screen';
@@ -64,6 +64,9 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   const [source, setSource] = useState<ExerciseSource>('all');
   const [rows, setRows] = useState<ExerciseRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // Once the list has shown, a change of filter keeps it on screen until the new rows are in (they
+  // come from memory, at once) -- swapping it for placeholders would rebuild every row and picture.
+  const listShown = useRef(false);
   const [error, setError] = useState<string | null>(null);
   // Real, independent per-source totals for the "All / Built-in / Mine"
   // category cards (see fetchExerciseSourceCounts) -- never fabricated, and
@@ -78,7 +81,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
+    if (!listShown.current) setLoading(true);
     setError(null);
     try {
       const result = await fetchAllExercises({
@@ -91,7 +94,9 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         withSecondary: true,
       });
       setRows(result);
+      listShown.current = true;
     } catch (err) {
+      listShown.current = false;
       setError(err instanceof Error ? err.message : 'Failed to load exercises');
     } finally {
       setLoading(false);

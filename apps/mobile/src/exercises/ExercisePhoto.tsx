@@ -40,6 +40,9 @@ export function ExercisePhoto({ uri, name, size = 44, testID, onEdit, exerciseId
   const extras = useBuiltinExtras(!uri && !slug ? exerciseId : null);
   const artSlug = uri ? null : (slug ?? extras?.slug ?? null);
   const [guideOpen, setGuideOpen] = useState(false);
+  // Made the first time it's opened, then kept (so it can slide away): a list of rows never makes
+  // one each.
+  const [guideMade, setGuideMade] = useState(false);
 
   if (hasIllustration(artSlug)) {
     const art = (
@@ -69,19 +72,24 @@ export function ExercisePhoto({ uri, name, size = 44, testID, onEdit, exerciseId
       <>
         <TouchableOpacity
           testID={testID ? `${testID}-guide` : undefined}
-          onPress={() => setGuideOpen(true)}
+          onPress={() => {
+            setGuideMade(true);
+            setGuideOpen(true);
+          }}
           accessibilityRole="imagebutton"
           accessibilityLabel={`How to do ${name}`}
         >
           {art}
         </TouchableOpacity>
-        <ExerciseGuideSheet
-          testID={testID ? `${testID}-guide-sheet` : undefined}
-          visible={guideOpen}
-          onClose={() => setGuideOpen(false)}
-          exerciseId={exerciseId}
-          exerciseName={name}
-        />
+        {guideMade ? (
+          <ExerciseGuideSheet
+            testID={testID ? `${testID}-guide-sheet` : undefined}
+            visible={guideOpen}
+            onClose={() => setGuideOpen(false)}
+            exerciseId={exerciseId}
+            exerciseName={name}
+          />
+        ) : null}
       </>
     );
   }

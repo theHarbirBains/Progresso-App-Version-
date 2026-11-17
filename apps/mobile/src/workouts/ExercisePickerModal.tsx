@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { updateExercise } from '../lib/api';
 import { Alert, Modal, View } from 'react-native';
@@ -83,6 +83,9 @@ export function ExercisePickerModal({
   const [source, setSource] = useState<ExerciseSource>('all');
   const [rows, setRows] = useState<ExerciseRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // Once the list has shown, a change of filter keeps it on screen until the new rows are in (they
+  // come from memory, at once) -- swapping it for placeholders would rebuild every row and picture.
+  const listShown = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceCounts, setSourceCounts] = useState<ExerciseSourceCounts | null>(null);
   const accessToken = useAuth().session?.access_token;
@@ -110,7 +113,7 @@ export function ExercisePickerModal({
   useEffect(() => {
     if (!visible || !userId) return;
     let cancelled = false;
-    setLoading(true);
+    if (!listShown.current) setLoading(true);
     setError(null);
     fetchAllExercises({
       userId,
@@ -122,10 +125,14 @@ export function ExercisePickerModal({
       withSecondary: true,
     })
       .then((result) => {
-        if (!cancelled) setRows(result);
+        if (cancelled) return;
+        setRows(result);
+        listShown.current = true;
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load exercises');
+        if (cancelled) return;
+        listShown.current = false;
+        setError(err instanceof Error ? err.message : 'Failed to load exercises');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { memo, useId, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Svg, { ClipPath, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
@@ -220,8 +220,12 @@ export function ExerciseIllustration({
   );
 }
 
-/** The end position alone, fitted into a circle `size` across -- a list row's picture. */
-export function ExerciseThumbnail({
+/**
+ * The end position alone, fitted into a circle `size` across -- a list row's picture. Drawn flat
+ * (thumbnailFor), and only drawn again when its exercise or size changes, never because the list
+ * around it did.
+ */
+export const ExerciseThumbnail = memo(function ExerciseThumbnail({
   slug,
   size,
   testID,
@@ -247,7 +251,7 @@ export function ExerciseThumbnail({
       <Frame frame={scene.frames[0]} viewBox={square} width={size} height={size} prefix={prefix} />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: {

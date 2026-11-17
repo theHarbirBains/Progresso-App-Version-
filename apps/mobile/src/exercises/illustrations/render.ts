@@ -153,6 +153,11 @@ export interface RenderOptions {
   anatomy?: boolean;
   /** Draw an arrow for the scene's `motion` between frames. */
   arrows?: boolean;
+  /**
+   * Flat colours with no rims or floor shadow -- for a list row's small picture, where the shading
+   * can't be seen and the fewer, simpler shapes draw much faster.
+   */
+  flat?: boolean;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1018,6 +1023,14 @@ export function renderScene(
       const from = cam.toScreen(scene.motion(skeletons[index - 1]));
       const to = cam.toScreen(scene.motion(skeleton));
       shapes.push(...motionShapes(from, to, cam.toScreen(skeleton.pelvis)));
+    }
+    if (options.flat) {
+      return {
+        shapes: shapes
+          .filter((shape) => shape.fill !== ART.rim && shape.fill !== ART.shadow)
+          .map(({ gradient: _gradient, ...shape }) => shape),
+        clips,
+      };
     }
     return { shapes, clips };
   });
