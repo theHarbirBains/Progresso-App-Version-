@@ -108,10 +108,13 @@ export class FollowsService {
 
     const client = this.supabaseService.getClient();
 
+    // Only someone with an account: a trainer's tracked client or a group's guest (a stand-in
+    // account no one signs in to) never finished signing up, and looks like no one at all.
     const { data: followee, error: followeeError } = await client
       .from('users')
       .select('id')
       .eq('id', followeeId)
+      .not('onboarding_completed_at', 'is', null)
       .maybeSingle();
     if (followeeError) {
       throw new InternalServerErrorException('Failed to look up user');
@@ -503,19 +506,23 @@ export class FollowsService {
 
     // Two separate ilike queries rather than a single .or(...) filter string
     // -- a display name can contain commas/parentheses, which would corrupt
-    // PostgREST's .or() filter syntax if interpolated into it directly.
+    // PostgREST's .or() filter syntax if interpolated into it directly. Only
+    // people who finished signing up: a trainer's tracked client or a group's
+    // guest has a name but no account of their own.
     const [byUsername, byDisplayName, blocks] = await Promise.all([
       client
         .from('users')
         .select('id, username, display_name, avatar_url')
         .ilike('username', pattern)
         .neq('id', userId)
+        .not('onboarding_completed_at', 'is', null)
         .limit(SEARCH_RESULT_LIMIT),
       client
         .from('users')
         .select('id, username, display_name, avatar_url')
         .ilike('display_name', pattern)
         .neq('id', userId)
+        .not('onboarding_completed_at', 'is', null)
         .limit(SEARCH_RESULT_LIMIT),
       loadBlocks(client, userId),
     ]);
@@ -579,10 +586,12 @@ export class FollowsService {
     // PostgREST .not('id', 'in', ...) filter -- simpler and avoids that
     // filter's fragile parenthesized-list string format for a set that's
     // typically small anyway.
+    // Only people with an account (see search).
     const { data, error } = await client
       .from('users')
       .select('id, username, display_name, avatar_url')
       .neq('id', userId)
+      .not('onboarding_completed_at', 'is', null)
       .order('created_at', { ascending: false })
       .limit(SUGGESTED_LIMIT + excluded.size);
     if (error) throw new InternalServerErrorException('Failed to load suggested users');

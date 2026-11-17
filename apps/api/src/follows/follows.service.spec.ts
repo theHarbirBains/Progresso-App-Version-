@@ -109,6 +109,22 @@ describe('FollowsService', () => {
       );
     });
 
+    it('treats someone with no account (a tracked client, a guest) as no one', async () => {
+      const client = createMockClient();
+      // They never finished signing up, so the account lookup finds no one.
+      client.queue('users', { data: null, error: null });
+      const service = serviceWith(client);
+
+      await expect(service.sendRequest('user-1', 'placeholder')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(client.calls).toContainEqual({
+        table: 'users',
+        method: 'not',
+        args: ['onboarding_completed_at', 'is', null],
+      });
+    });
+
     it('creates a pending request when none exists yet', async () => {
       const client = createMockClient();
       client.queue('users', { data: { id: 'user-2' }, error: null });
@@ -271,6 +287,25 @@ describe('FollowsService', () => {
   });
 
   describe('search', () => {
+    it('finds only people with an account -- never a tracked client or a guest', async () => {
+      const client = createMockClient();
+      client.queue('users', { data: [], error: null });
+      client.queue('users', { data: [], error: null });
+      const service = serviceWith(client);
+
+      await expect(service.search('user-1', 'john')).resolves.toEqual([]);
+      // Both the username and the display-name search.
+      expect(
+        client.calls.filter(
+          (c) =>
+            c.table === 'users' &&
+            c.method === 'not' &&
+            c.args[0] === 'onboarding_completed_at' &&
+            c.args[2] === null,
+        ),
+      ).toHaveLength(2);
+    });
+
     it('excludes the caller and reports follow status per result', async () => {
       const client = createMockClient();
       client.queue('users', {
@@ -555,6 +590,12 @@ describe('FollowsService', () => {
           status: 'none',
         },
       ]);
+      // Only people with an account -- never a tracked client or a guest.
+      expect(client.calls).toContainEqual({
+        table: 'users',
+        method: 'not',
+        args: ['onboarding_completed_at', 'is', null],
+      });
     });
 
     it('overfetches by the excluded count so the final list can still reach the limit', async () => {
