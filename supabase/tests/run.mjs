@@ -2499,6 +2499,40 @@ async function main() {
     );
   });
 
+  // 20261126100000_builtin_serving_weights: a built-in's serving says what it weighs, from USDA,
+  // and nothing else about it changes.
+  await asUser(userA, async (client) => {
+    const res = await client.query(
+      `select name, serving_size, serving_unit, serving_label, calories, protein_g
+         from public.foods
+        where created_by is null and name in ('Egg White, Large', 'Butter', 'Avocado', 'Chicken Breast (cooked)')
+        order by name`,
+    );
+    const byName = Object.fromEntries(res.rows.map((r) => [r.name, r]));
+    const egg = byName['Egg White, Large'];
+    record(
+      "Egg White, Large's serving says its USDA weight (1 large · 33 g), its figures unchanged",
+      Boolean(egg) &&
+        egg.serving_label === '1 large · 33 g' &&
+        Number(egg.serving_size) === 1 &&
+        egg.serving_unit === 'large' &&
+        Number(egg.calories) === 17 &&
+        Number(egg.protein_g) === 3.6,
+      JSON.stringify(egg),
+    );
+    record(
+      'A decimal weight is kept as USDA gives it (Butter: 1 tbsp · 14.2 g)',
+      byName.Butter?.serving_label === '1 tbsp · 14.2 g',
+      JSON.stringify(byName.Butter),
+    );
+    record(
+      'A built-in with no closely matching USDA weight, or a weighed serving, is left without wording',
+      byName.Avocado?.serving_label === null &&
+        byName['Chicken Breast (cooked)']?.serving_label === null,
+      JSON.stringify([byName.Avocado, byName['Chicken Breast (cooked)']]),
+    );
+  });
+
   await asUser(userA, async (client) => {
     const res = await client.query(
       'select name from public.foods where created_by is null and is_active = true and name ilike $1 order by name',
