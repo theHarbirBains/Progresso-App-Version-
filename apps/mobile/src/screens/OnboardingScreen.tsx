@@ -45,6 +45,7 @@ import {
 } from '../onboarding/onboardingDraftStorage';
 import { MembershipCards } from '../membership/MembershipCards';
 import { RankExplainerPage } from '../achievements/RankExplainerPage';
+import { RankLadder } from '../achievements/RankLadder';
 import { askForSteps, stepsAccess } from '../health/steps';
 import { ACTIVITY_LEVELS } from '../nutrition/calorieEstimationInput';
 import { NutritionTargetsStep } from '../onboarding/NutritionTargetsStep';
@@ -645,6 +646,8 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 Everything you do in Progresso earns points toward a rank that&apos;s yours for
                 life, from Bronze to Legacy.
               </Text>
+              {/* The nine ranks to climb, at a glance. */}
+              <RankLadder testID="onboarding-rank-ladder" />
               {/* The full explanation is a page of its own, opened from here. */}
               <SecondaryButton
                 testID="onboarding-ranks-open"

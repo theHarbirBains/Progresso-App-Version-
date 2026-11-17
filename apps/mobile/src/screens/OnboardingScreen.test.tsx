@@ -1220,6 +1220,13 @@ describe('OnboardingScreen -- finding your way', () => {
       'Name your own days and choose every exercise. It opens as soon as your account is made.',
     );
     expect(screen.getByTestId('onboarding-step-workout-split-create-own-selected')).toBeTruthy();
+    // On to How ranks work: the nine ranks as a ladder, with the full explanation a tap away.
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+    await screen.findByTestId('onboarding-step-ranks');
+    expect(screen.getByTestId('onboarding-rank-ladder')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-ranks-open')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('onboarding-back'));
+    await screen.findByTestId('onboarding-step-workout-split');
     // Already answered when reached: Continue goes on without choosing again.
     fireEvent.press(screen.getByTestId('onboarding-continue'));
     expect(await screen.findByTestId('onboarding-step-ranks')).toBeTruthy();
