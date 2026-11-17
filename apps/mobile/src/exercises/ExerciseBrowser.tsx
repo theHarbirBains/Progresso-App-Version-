@@ -14,6 +14,8 @@ import { colors } from '../design/theme';
 import { RiseInStack } from '../design/RiseIn';
 import { exerciseLibraryStyles as styles } from '../screens/exerciseLibraryStyles';
 import { groupExercisesByLetter } from './exerciseLibraryGrouping';
+import type { Equipment } from './equipment';
+import { EquipmentChips } from './EquipmentChips';
 import { ExercisePhoto } from './ExercisePhoto';
 import type { ExerciseRow, ExerciseSource, ExerciseSourceCounts } from './exerciseQueries';
 import { FriendPicker } from './FriendPicker';
@@ -41,6 +43,9 @@ interface Props {
   onSearchChange: (text: string) => void;
   muscleGroup: MuscleGroup | null;
   onMuscleGroupChange: (group: MuscleGroup | null) => void;
+  /** What it's done with; the equipment row only shows when the caller can change it. */
+  equipment?: Equipment | null;
+  onEquipmentChange?: (equipment: Equipment | null) => void;
   source: ExerciseSource;
   onSourceChange: (source: ExerciseSource) => void;
   sourceCounts: ExerciseSourceCounts | null;
@@ -93,6 +98,8 @@ export function ExerciseBrowser({
   onSearchChange,
   muscleGroup,
   onMuscleGroupChange,
+  equipment = null,
+  onEquipmentChange,
   source,
   onSourceChange,
   sourceCounts,
@@ -158,15 +165,31 @@ export function ExerciseBrowser({
     [onDeleteMine],
   );
 
-  const sections = useMemo(() => groupExercisesByLetter(shownRows), [shownRows]);
-  const listSections = useMemo(
-    () => sections.map((section) => ({ title: section.letter, data: section.data })),
-    [sections],
+  // With a muscle chosen, the exercises for it come first, A-Z; then, under their own heading, the
+  // built-ins that also work it (a press under Triceps) -- so one exercise is never listed twice.
+  const ownRows = useMemo(
+    () => (muscleGroup ? shownRows.filter((row) => row.muscleGroup === muscleGroup) : shownRows),
+    [shownRows, muscleGroup],
   );
+  const alsoRows = useMemo(
+    () => (muscleGroup ? shownRows.filter((row) => row.muscleGroup !== muscleGroup) : []),
+    [shownRows, muscleGroup],
+  );
+  const listSections = useMemo(() => {
+    const lettered = groupExercisesByLetter(ownRows).map((section) => ({
+      title: section.letter,
+      data: section.data,
+    }));
+    return alsoRows.length > 0 && muscleGroup
+      ? [...lettered, { title: `Also Works ${MUSCLE_GROUP_LABELS[muscleGroup]}`, data: alsoRows }]
+      : lettered;
+  }, [ownRows, alsoRows, muscleGroup]);
 
   const renderSectionHeader = useCallback(
     ({ section }: { section: SectionListData<ExerciseRow, { title: string }> }) => (
-      <View testID={`exercise-library-section-${section.title}`}>
+      <View
+        testID={`exercise-library-section-${section.title.startsWith('Also Works') ? 'also-works' : section.title}`}
+      >
         <SectionHeader label={section.title} />
       </View>
     ),
@@ -199,7 +222,7 @@ export function ExerciseBrowser({
           ? 'Mine'
           : 'Built-in';
       const photo =
-        onPhotoPress !== undefined ? (
+        onPhotoPress !== undefined && item.photoUrl ? (
           <TouchableOpacity
             testID={`exercise-item-${item.id}-photo`}
             onPress={() => item.photoUrl && onPhotoPress(item)}
@@ -215,6 +238,8 @@ export function ExerciseBrowser({
             uri={item.photoUrl}
             name={item.name}
             onEdit={isMine && onOpenMine ? () => onOpenMine(item) : undefined}
+            exerciseId={item.createdBy === null ? item.id : undefined}
+            slug={item.slug}
           />
         );
       const row = (
@@ -327,6 +352,17 @@ export function ExerciseBrowser({
           />
         </View>
 
+        {onEquipmentChange ? (
+          <View testID="exercise-library-equipment-wrap" style={styles.chipsWrap}>
+            <EquipmentChips
+              value={equipment}
+              onChange={onEquipmentChange}
+              accentColor={accent.color}
+              onAccentColor={accent.onColor}
+            />
+          </View>
+        ) : null}
+
         <View style={styles.sourceTabs}>
           {SOURCE_OPTIONS.map((option) => {
             const selected = option.value === source;
@@ -378,7 +414,7 @@ export function ExerciseBrowser({
         ) : (
           <View style={styles.countSortRow}>
             <Text testID="exercise-library-count" style={styles.countText}>
-              {rows.length} {rows.length === 1 ? 'exercise' : 'exercises'}
+              {ownRows.length} {ownRows.length === 1 ? 'exercise' : 'exercises'}
             </Text>
           </View>
         )}
@@ -398,7 +434,10 @@ export function ExerciseBrowser({
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={listHeader ? <>{listHeader}</> : undefined}
               ListEmptyComponent={
-                source === 'friends' && !searchInput.trim() && muscleGroup === null ? (
+                source === 'friends' &&
+                !searchInput.trim() &&
+                muscleGroup === null &&
+                equipment === null ? (
                   <EmptyState
                     testID="exercise-library-empty"
                     title="Nothing from friends yet"

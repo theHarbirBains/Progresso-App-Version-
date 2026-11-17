@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
+import { TextButton } from '../design/Button';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
+import { useBuiltinExtras } from './builtinExtras';
+import { ExerciseGuideSheet } from './ExerciseGuideSheet';
 import { ExercisePhoto } from './ExercisePhoto';
+import { hasIllustration } from './illustrations/exerciseArt';
 import { fetchExerciseDetails, type ExerciseDetails } from './exerciseQueries';
 import { machineLine } from './machineDetails';
 import { MOVEMENT_TYPE_LABELS } from './movementTypes';
@@ -43,18 +47,25 @@ export function useExerciseDetails(exerciseId: string): ExerciseDetails | null {
 /**
  * The top of an exercise's own pages, as its row in the Exercise Library shows it: its photo
  * (tap to see it full size; its first letter when it has none) and "Muscle · Movement · Gym ·
- * Handle", so it's clear which machine the figures below are for. Nothing until it's read.
+ * Handle", so it's clear which machine the figures below are for. A built-in shows its
+ * illustrated instructor instead, with How to Do It under the line. Nothing until it's read.
  */
 export function ExerciseDetailsCard({
   details,
   exerciseName,
   testID,
+  exerciseId,
 }: {
   details: ExerciseDetails | null;
   exerciseName: string;
   testID: string;
+  /** The exercise itself, for a built-in's illustration and guide. */
+  exerciseId?: string;
 }) {
+  const extras = useBuiltinExtras(exerciseId);
+  const [guideOpen, setGuideOpen] = useState(false);
   if (!details) return null;
+  const guided = !!exerciseId && !details.photoUrl && hasIllustration(extras?.slug);
   const line = machineLine(
     details,
     MUSCLE_GROUP_LABELS[details.muscleGroup],
@@ -68,11 +79,33 @@ export function ExerciseDetailsCard({
           uri={details.photoUrl}
           name={exerciseName}
           size={56}
+          exerciseId={exerciseId}
+          slug={extras?.slug}
         />
-        <Text testID={`${testID}-line`} style={styles.line} numberOfLines={2}>
-          {line}
-        </Text>
+        <View style={styles.flex}>
+          <Text testID={`${testID}-line`} style={styles.line} numberOfLines={2}>
+            {line}
+          </Text>
+          {guided ? (
+            <View style={styles.howTo}>
+              <TextButton
+                testID={`${testID}-how-to`}
+                label="How to Do It"
+                onPress={() => setGuideOpen(true)}
+              />
+            </View>
+          ) : null}
+        </View>
       </View>
+      {guided && exerciseId ? (
+        <ExerciseGuideSheet
+          testID={`${testID}-guide`}
+          visible={guideOpen}
+          onClose={() => setGuideOpen(false)}
+          exerciseId={exerciseId}
+          exerciseName={exerciseName}
+        />
+      ) : null}
     </AppCard>
   );
 }
@@ -83,9 +116,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
+  flex: {
+    flex: 1,
+  },
   line: {
     ...typeScale.secondary,
     color: colors.textSecondary,
-    flex: 1,
+  },
+  howTo: {
+    alignSelf: 'flex-start',
   },
 });

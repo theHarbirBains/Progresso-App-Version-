@@ -13,6 +13,7 @@ import {
 import { ExerciseBrowser } from '../exercises/ExerciseBrowser';
 import { sharingFriends } from '../exercises/sharingFriends';
 import { useSharedExercises } from '../exercises/useSharedExercises';
+import type { Equipment } from '../exercises/equipment';
 import { type MuscleGroup } from '../exercises/muscleGroups';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { updateExercise } from '../lib/api';
@@ -59,6 +60,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   const [searchInput, setSearchInput] = useState('');
   const search = useDebouncedValue(searchInput);
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(null);
+  const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [source, setSource] = useState<ExerciseSource>('all');
   const [rows, setRows] = useState<ExerciseRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +87,8 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         muscleGroup,
         source,
         shared: sharedRows,
+        equipment,
+        withSecondary: true,
       });
       setRows(result);
     } catch (err) {
@@ -92,7 +96,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [userId, search, muscleGroup, source, sharedRows]);
+  }, [userId, search, muscleGroup, source, sharedRows, equipment]);
 
   useEffect(() => {
     void load();
@@ -189,6 +193,8 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         onSearchChange={setSearchInput}
         muscleGroup={muscleGroup}
         onMuscleGroupChange={setMuscleGroup}
+        equipment={equipment}
+        onEquipmentChange={setEquipment}
         source={source}
         onSourceChange={setSource}
         sourceCounts={sourceCounts}

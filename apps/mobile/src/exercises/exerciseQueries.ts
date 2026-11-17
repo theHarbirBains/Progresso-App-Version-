@@ -3,6 +3,9 @@ import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
 import { MACHINE_COLUMNS, machineDetailsOf, type MachineDetails } from './machineDetails';
 import type { Equipment } from './equipment';
+import { loadBuiltinExtras } from './builtinExtras';
+// Plugs the built-in guides' Supabase reads into builtinExtras.ts.
+import './exerciseGuide';
 import type { LoadType, Pulley, PulleyPosition } from './machineLoad';
 import type { LoggingStyle, MeasurementType, MovementType } from './movementTypes';
 import type { MuscleGroup } from './muscleGroups';
@@ -39,6 +42,12 @@ export interface ExerciseRow {
   setupDetails?: string | null;
   isActive: boolean;
   createdBy: string | null;
+  /** A built-in's illustration (exerciseGuide.ts's extras), once read. */
+  slug?: string | null;
+  /** The muscle groups a built-in also works -- it's listed under them too, after the ones it's for. */
+  secondaryMuscleGroups?: MuscleGroup[];
+  /** Other names a built-in is found by ("Deadlift" for Conventional Barbell Deadlift). */
+  searchAliases?: string[];
   /**
    * Someone else's exercise, shared with this person (lib/exercisesApi's fetchSharedExercises):
    * whose, how, and whether they already have their own by that name at that gym. Using it makes
@@ -212,6 +221,13 @@ export interface FetchAllExercisesParams {
   ascending?: boolean;
   /** The exercises shared with this person (sharedExerciseRow), for All and Friends. */
   shared?: ExerciseRow[];
+  /** Only what's done with this equipment. */
+  equipment?: Equipment | null;
+  /**
+   * With a muscle chosen, the exercises that also work it too (after its own, which the caller
+   * tells apart by their muscle group).
+   */
+  withSecondary?: boolean;
 }
 
 /**
@@ -239,9 +255,69 @@ async function fetchFullExerciseList(userId: string): Promise<ExerciseRow[]> {
     .order('name', { ascending: true });
   if (error) throw new Error(error.message);
 
-  const rows = ((data ?? []) as ExerciseDbRow[]).map(toExerciseRow);
+  const rows = withBuiltinExtras(
+    ((data ?? []) as ExerciseDbRow[]).map(toExerciseRow),
+    await loadBuiltinExtras(),
+  );
   fullExerciseListCache.set(userId, rows);
   return rows;
+}
+
+/** Built-ins with their slug, the muscles they also work and their other names (when they could be read). */
+function withBuiltinExtras(
+  rows: ExerciseRow[],
+  extras: Awaited<ReturnType<typeof loadBuiltinExtras>>,
+): ExerciseRow[] {
+  if (extras.size === 0) return rows;
+  return rows.map((row) => {
+    const extra = row.createdBy === null ? extras.get(row.id) : undefined;
+    return extra
+      ? {
+          ...row,
+          slug: extra.slug,
+          secondaryMuscleGroups: extra.secondaryMuscleGroups,
+          searchAliases: extra.searchAliases,
+        }
+      : row;
+  });
+}
+
+/** Lower case, letters and digits only, single-spaced: "Farmer's Bent-Over Carry" -> "farmers bent over carry". */
+function normalize(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/** Shorthand people type for equipment. */
+const SHORTHAND: Record<string, string> = {
+  db: 'dumbbell',
+  bb: 'barbell',
+  kb: 'kettlebell',
+  ez: 'ez',
+};
+
+/**
+ * Whether an exercise matches what's typed: the text anywhere in its name (as always), or every
+ * word typed starting a word of its name or one of its other names, in any order -- so "dumbbell
+ * curl" finds Standing Dumbbell Bicep Curl and "db row" finds Dumbbell Bent-Over Row.
+ */
+export function matchesExerciseSearch(
+  row: Pick<ExerciseRow, 'name' | 'searchAliases'>,
+  search: string,
+): boolean {
+  const query = normalize(search);
+  if (!query) return true;
+  const names = [row.name, ...(row.searchAliases ?? [])].map(normalize);
+  if (names.some((name) => name.includes(query))) return true;
+  const words = new Set(names.join(' ').split(' '));
+  return query.split(' ').every((token) => {
+    const wanted = SHORTHAND[token] ?? token;
+    for (const word of words) if (word.startsWith(wanted) || word.startsWith(token)) return true;
+    return false;
+  });
 }
 
 /**
@@ -265,13 +341,21 @@ function filterExerciseRows(
     search: string;
     muscleGroup: MuscleGroup | null;
     source: ExerciseSource;
+    equipment?: Equipment | null;
+    withSecondary?: boolean;
   },
 ): ExerciseRow[] {
-  const { userId, search, muscleGroup, source } = params;
-  const trimmedSearch = search.trim().toLowerCase();
+  const { userId, search, muscleGroup, source, equipment, withSecondary } = params;
   return rows.filter((row) => {
-    if (trimmedSearch && !row.name.toLowerCase().includes(trimmedSearch)) return false;
-    if (muscleGroup && row.muscleGroup !== muscleGroup) return false;
+    if (!matchesExerciseSearch(row, search)) return false;
+    if (
+      muscleGroup &&
+      row.muscleGroup !== muscleGroup &&
+      !(withSecondary && row.secondaryMuscleGroups?.includes(muscleGroup))
+    ) {
+      return false;
+    }
+    if (equipment && row.equipment !== equipment) return false;
     if (source === 'builtin' && row.createdBy !== null) return false;
     if (source === 'mine' && row.createdBy !== userId) return false;
     return true;
@@ -287,10 +371,26 @@ function filterExerciseRows(
  * rather than a fresh Supabase query every time.
  */
 export async function fetchAllExercises(params: FetchAllExercisesParams): Promise<ExerciseRow[]> {
-  const { userId, search, muscleGroup, source, ascending = true, shared = [] } = params;
+  const {
+    userId,
+    search,
+    muscleGroup,
+    source,
+    ascending = true,
+    shared = [],
+    equipment,
+    withSecondary,
+  } = params;
 
   const pool = libraryPool(await fetchFullExerciseList(userId), shared, userId, source);
-  const filtered = filterExerciseRows(pool, { userId, search, muscleGroup, source });
+  const filtered = filterExerciseRows(pool, {
+    userId,
+    search,
+    muscleGroup,
+    source,
+    equipment,
+    withSecondary,
+  });
   return ascending ? filtered : [...filtered].reverse();
 }
 

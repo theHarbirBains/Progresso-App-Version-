@@ -479,6 +479,7 @@ export function GroupWorkoutEditor({
             <ExerciseCard
               {...(ownTab ? progression.cardPropsFor(row, prior?.sets) : null)}
               key={row.exerciseId}
+              exerciseId={row.exerciseId}
               testID={`${testID}-exercise-${row.exerciseId}`}
               exerciseName={row.exerciseName}
               muscleGroup={row.muscleGroup}

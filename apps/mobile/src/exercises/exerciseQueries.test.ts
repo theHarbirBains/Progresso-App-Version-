@@ -1,10 +1,12 @@
 import { supabase } from '../lib/supabase';
+import { forgetBuiltinExtras, setBuiltinSources, type BuiltinExtras } from './builtinExtras';
 import {
   fetchAllExercises,
   fetchExerciseDetails,
   fetchExerciseSourceCounts,
   fetchExercises,
   invalidateExerciseCache,
+  matchesExerciseSearch,
 } from './exerciseQueries';
 
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
@@ -62,6 +64,10 @@ const baseParams = {
 
 beforeEach(() => {
   mockFrom.mockReset();
+  // The built-in guides' extras are their own read (builtinExtras.ts); these tests count only
+  // the library's -- the ones below that need extras plug in their own.
+  forgetBuiltinExtras();
+  setBuiltinSources(null);
   // fetchAllExercises/fetchExerciseSourceCounts share a per-user cache that outlives a
   // single test otherwise (see exerciseQueries.ts) -- clear it for every userId any test
   // below uses, so each test starts from a cold cache regardless of run order.
@@ -518,5 +524,139 @@ describe('fetchExerciseSourceCounts', () => {
     mockQueryBuilder({ data: null, error: { message: 'network error' } });
 
     await expect(fetchExerciseSourceCounts('user-1')).rejects.toThrow('network error');
+  });
+});
+
+describe('the built-in library: extras, search and filters', () => {
+  const builtin = (over: Record<string, unknown>) => ({
+    movement_type: 'bilateral',
+    logging_style: null,
+    measurement_type: 'weight_reps',
+    photo_url: null,
+    gym: null,
+    feel_notes: null,
+    attachment: null,
+    load_type: null,
+    pulley: null,
+    grip: null,
+    pulley_position: null,
+    setup_details: null,
+    is_active: true,
+    created_by: null,
+    ...over,
+  });
+  const rows = [
+    builtin({
+      id: 'curl',
+      name: 'Standing Dumbbell Bicep Curl',
+      muscle_group: 'biceps',
+      equipment: 'dumbbell',
+    }),
+    builtin({
+      id: 'bench',
+      name: 'Barbell Bench Press',
+      muscle_group: 'chest',
+      equipment: 'barbell',
+    }),
+    builtin({
+      id: 'row',
+      name: 'Dumbbell Bent-Over Row',
+      muscle_group: 'back',
+      equipment: 'dumbbell',
+    }),
+    builtin({
+      id: 'mine',
+      name: 'My Cable Press',
+      muscle_group: 'chest',
+      equipment: null,
+      created_by: 'user-1',
+    }),
+  ];
+  const extras = new Map<string, BuiltinExtras>([
+    [
+      'curl',
+      {
+        slug: 'db-curl',
+        secondaryMuscleGroups: ['forearms'],
+        searchAliases: ['dumbbell curl', 'Dumbbell Curl'],
+        movementPattern: 'curl',
+        illustrationUrl: null,
+      },
+    ],
+    [
+      'bench',
+      {
+        slug: 'bb-bench-press',
+        secondaryMuscleGroups: ['shoulders', 'triceps'],
+        searchAliases: ['bench'],
+        movementPattern: 'horizontal_push',
+        illustrationUrl: null,
+      },
+    ],
+    [
+      'row',
+      {
+        slug: 'db-bent-over-row',
+        secondaryMuscleGroups: ['biceps', 'shoulders'],
+        searchAliases: ['db row'],
+        movementPattern: 'horizontal_pull',
+        illustrationUrl: null,
+      },
+    ],
+  ]);
+
+  beforeEach(() => {
+    mockQueryBuilder({ data: rows, error: null });
+    setBuiltinSources({ extras: async () => extras, guide: async () => null });
+  });
+
+  const all = (over: Partial<Parameters<typeof fetchAllExercises>[0]> = {}) =>
+    fetchAllExercises({ userId: 'user-1', search: '', muscleGroup: null, source: 'all', ...over });
+
+  it("gives built-ins their slug, the muscles they also work and their other names -- never a person's own", async () => {
+    const result = await all();
+    const curl = result.find((r) => r.id === 'curl');
+    expect(curl?.slug).toBe('db-curl');
+    expect(curl?.secondaryMuscleGroups).toEqual(['forearms']);
+    expect(result.find((r) => r.id === 'mine')?.slug).toBeUndefined();
+  });
+
+  it('shows everything as before when the extras cannot be read', async () => {
+    setBuiltinSources({
+      extras: async () => Promise.reject(new Error('column does not exist')),
+      guide: async () => null,
+    });
+    const result = await all();
+    expect(result.map((r) => r.id).sort()).toEqual(['bench', 'curl', 'mine', 'row']);
+    expect(result.every((r) => r.slug === undefined)).toBe(true);
+  });
+
+  it('finds an exercise by its words in any order, by an old name, and by db/bb shorthand', async () => {
+    expect((await all({ search: 'dumbbell curl' })).map((r) => r.id)).toEqual(['curl']);
+    expect((await all({ search: 'curl dumbbell' })).map((r) => r.id)).toEqual(['curl']);
+    expect((await all({ search: 'db row' })).map((r) => r.id)).toEqual(['row']);
+    expect((await all({ search: 'bench' })).map((r) => r.id)).toEqual(['bench']);
+    expect((await all({ search: 'cable' })).map((r) => r.id)).toEqual(['mine']);
+  });
+
+  it('matches text anywhere in a name, as search always has', () => {
+    expect(matchesExerciseSearch({ name: 'Barbell Bench Press' }, 'ench pre')).toBe(true);
+    expect(matchesExerciseSearch({ name: "Dumbbell Farmer's Carry" }, 'farmers')).toBe(true);
+    expect(matchesExerciseSearch({ name: 'Barbell Bench Press' }, 'squat')).toBe(false);
+  });
+
+  it('filters by equipment', async () => {
+    expect((await all({ equipment: 'dumbbell' })).map((r) => r.id).sort()).toEqual(['curl', 'row']);
+    expect((await all({ equipment: 'barbell' })).map((r) => r.id)).toEqual(['bench']);
+  });
+
+  it("lists a muscle's own exercises, and with withSecondary the built-ins that also work it", async () => {
+    expect((await all({ muscleGroup: 'biceps' })).map((r) => r.id)).toEqual(['curl']);
+    expect(
+      (await all({ muscleGroup: 'biceps', withSecondary: true })).map((r) => r.id).sort(),
+    ).toEqual(['curl', 'row']);
+    expect((await all({ muscleGroup: 'triceps', withSecondary: true })).map((r) => r.id)).toEqual([
+      'bench',
+    ]);
   });
 });

@@ -17,6 +17,7 @@ import {
 import { ExerciseBrowser } from '../exercises/ExerciseBrowser';
 import { sharingFriends } from '../exercises/sharingFriends';
 import { useSharedExercises } from '../exercises/useSharedExercises';
+import type { Equipment } from '../exercises/equipment';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
@@ -78,6 +79,7 @@ export function ExercisePickerModal({
   const [searchInput, setSearchInput] = useState('');
   const search = useDebouncedValue(searchInput);
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup | null>(null);
+  const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [source, setSource] = useState<ExerciseSource>('all');
   const [rows, setRows] = useState<ExerciseRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,7 +112,15 @@ export function ExercisePickerModal({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchAllExercises({ userId, search, muscleGroup, source, shared: sharedRows })
+    fetchAllExercises({
+      userId,
+      search,
+      muscleGroup,
+      source,
+      shared: sharedRows,
+      equipment,
+      withSecondary: true,
+    })
       .then((result) => {
         if (!cancelled) setRows(result);
       })
@@ -123,7 +133,7 @@ export function ExercisePickerModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, userId, search, muscleGroup, source, attempt, sharedRows]);
+  }, [visible, userId, search, muscleGroup, source, attempt, sharedRows, equipment]);
 
   // The tab counts are independent of the search and filter, so they load once per opening.
   useEffect(() => {
@@ -161,13 +171,20 @@ export function ExercisePickerModal({
     return ids;
   }, [recentHistory]);
   const recent = useMemo(() => {
-    if (recentIds.length === 0 || searchInput.trim() || muscleGroup || source !== 'all') return [];
+    if (
+      recentIds.length === 0 ||
+      searchInput.trim() ||
+      muscleGroup ||
+      equipment ||
+      source !== 'all'
+    )
+      return [];
     const byId = new Map([...rows, ...sharedRows].map((row) => [row.id, row]));
     return recentIds
       .map((id) => byId.get(id))
       .filter((row): row is ExerciseRow => row !== undefined && !alreadyAddedIdSet.has(row.id))
       .slice(0, RECENT_COUNT);
-  }, [recentIds, searchInput, muscleGroup, source, rows, sharedRows, alreadyAddedIdSet]);
+  }, [recentIds, searchInput, muscleGroup, equipment, source, rows, sharedRows, alreadyAddedIdSet]);
 
   // A friend's exercise is used as it is -- its creator's changes reach everyone using it. A
   // trainer's or client's is made theirs first (a copy in their library, or their own of the very
@@ -229,6 +246,8 @@ export function ExercisePickerModal({
             onSearchChange={setSearchInput}
             muscleGroup={muscleGroup}
             onMuscleGroupChange={setMuscleGroup}
+            equipment={equipment}
+            onEquipmentChange={setEquipment}
             source={source}
             onSourceChange={setSource}
             sourceCounts={sourceCounts}
@@ -272,7 +291,13 @@ export function ExercisePickerModal({
                           testID={`exercise-picker-recent-${exercise.id}`}
                           divider={index > 0}
                           leading={
-                            <ExercisePhoto uri={exercise.photoUrl} name={exercise.name} size={40} />
+                            <ExercisePhoto
+                              uri={exercise.photoUrl}
+                              name={exercise.name}
+                              size={40}
+                              exerciseId={exercise.createdBy === null ? exercise.id : undefined}
+                              slug={exercise.slug}
+                            />
                           }
                           title={exercise.name}
                           subtitle={

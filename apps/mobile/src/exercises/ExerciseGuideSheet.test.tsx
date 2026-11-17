@@ -1,0 +1,252 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  forgetBuiltinExtras,
+  setBuiltinSources,
+  type BuiltinExtras,
+  type ExerciseGuide,
+} from './builtinExtras';
+import { ExerciseDetailsCard } from './ExerciseDetailsCard';
+import { ExerciseGuideSheet } from './ExerciseGuideSheet';
+import { ExercisePhoto } from './ExercisePhoto';
+
+jest.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
+jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
+
+const benchGuide: ExerciseGuide = {
+  name: 'Dumbbell Bench Press',
+  muscleGroup: 'chest',
+  equipment: 'dumbbell',
+  movementType: 'bilateral',
+  measurementType: 'weight_reps',
+  slug: 'db-bench-press',
+  secondaryMuscleGroups: ['shoulders', 'triceps'],
+  movementPattern: 'horizontal_push',
+  summary: 'A flat-bench press that lets each arm move freely.',
+  setupSteps: ['Lie back with the dumbbells at your chest.'],
+  executionSteps: ['Press them up.', 'Lower them slowly.'],
+  commonMistakes: ['Flaring the elbows.'],
+  illustrationUrl: null,
+};
+
+const extras = new Map<string, BuiltinExtras>([
+  [
+    'bench-id',
+    {
+      slug: 'db-bench-press',
+      secondaryMuscleGroups: ['shoulders', 'triceps'],
+      searchAliases: [],
+      movementPattern: 'horizontal_push',
+      illustrationUrl: null,
+    },
+  ],
+]);
+
+let guideReads = 0;
+beforeEach(() => {
+  forgetBuiltinExtras();
+  guideReads = 0;
+  setBuiltinSources({
+    extras: async () => extras,
+    guide: async (id) => {
+      guideReads += 1;
+      return id === 'bench-id' ? benchGuide : null;
+    },
+  });
+});
+
+afterAll(() => setBuiltinSources(null));
+
+describe('ExerciseGuideSheet', () => {
+  it('shows how to do the exercise: the illustration, the muscles, setup, steps and mistakes', async () => {
+    render(
+      <ExerciseGuideSheet
+        visible
+        onClose={jest.fn()}
+        exerciseId="bench-id"
+        exerciseName="Dumbbell Bench Press"
+      />,
+    );
+
+    expect(await screen.findByTestId('exercise-guide-illustration')).toBeTruthy();
+    // The frames are drawn once their width is known.
+    fireEvent(screen.getByTestId('exercise-guide-illustration-frames'), 'layout', {
+      nativeEvent: { layout: { width: 320, height: 240, x: 0, y: 0 } },
+    });
+    expect(screen.getByTestId('exercise-guide-line')).toHaveTextContent(
+      'Dumbbell · Horizontal Push · Weight and reps',
+    );
+    expect(screen.getByTestId('exercise-guide-primary')).toHaveTextContent(/Chest/);
+    expect(screen.getByTestId('exercise-guide-secondary')).toHaveTextContent(/Shoulders/);
+    expect(screen.getByTestId('exercise-guide-secondary')).toHaveTextContent(/Triceps/);
+    expect(screen.getByTestId('exercise-guide-setup')).toHaveTextContent(
+      /Lie back with the dumbbells/,
+    );
+    expect(screen.getByTestId('exercise-guide-steps')).toHaveTextContent(/Press them up/);
+    expect(screen.getByTestId('exercise-guide-mistakes')).toHaveTextContent(/Flaring the elbows/);
+    // Start and Finish, under the frames.
+    expect(screen.getByTestId('exercise-guide-illustration-label-0')).toHaveTextContent('Start');
+    expect(screen.getByTestId('exercise-guide-illustration-label-1')).toHaveTextContent('Finish');
+  });
+
+  it("says when the guide can't be read, and Retry reads it again", async () => {
+    let fail = true;
+    setBuiltinSources({
+      extras: async () => extras,
+      guide: async () => {
+        if (fail) throw new Error('offline');
+        return benchGuide;
+      },
+    });
+    render(
+      <ExerciseGuideSheet
+        visible
+        onClose={jest.fn()}
+        exerciseId="bench-id"
+        exerciseName="Dumbbell Bench Press"
+      />,
+    );
+
+    expect(await screen.findByTestId('exercise-guide-error')).toBeTruthy();
+    fail = false;
+    fireEvent.press(screen.getByTestId('exercise-guide-error-retry'));
+    expect(await screen.findByTestId('exercise-guide-steps')).toBeTruthy();
+  });
+
+  it('closes with its X', async () => {
+    const onClose = jest.fn();
+    render(
+      <ExerciseGuideSheet
+        visible
+        onClose={onClose}
+        exerciseId="bench-id"
+        exerciseName="Dumbbell Bench Press"
+      />,
+    );
+    await screen.findByTestId('exercise-guide-steps');
+    fireEvent.press(screen.getByTestId('exercise-guide-close'));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('reads a guide once a session', async () => {
+    const { unmount } = render(
+      <ExerciseGuideSheet
+        visible
+        onClose={jest.fn()}
+        exerciseId="bench-id"
+        exerciseName="Dumbbell Bench Press"
+      />,
+    );
+    await screen.findByTestId('exercise-guide-steps');
+    unmount();
+    render(
+      <ExerciseGuideSheet
+        visible
+        onClose={jest.fn()}
+        exerciseId="bench-id"
+        exerciseName="Dumbbell Bench Press"
+      />,
+    );
+    await screen.findByTestId('exercise-guide-steps');
+    expect(guideReads).toBe(1);
+  });
+});
+
+describe('ExercisePhoto for a built-in', () => {
+  it('shows the illustrated instructor in place of the first letter, and opens the guide when tapped', async () => {
+    render(
+      <ExercisePhoto
+        testID="photo"
+        uri={null}
+        name="Dumbbell Bench Press"
+        exerciseId="bench-id"
+        slug="db-bench-press"
+      />,
+    );
+
+    expect(screen.getByTestId('photo-illustration')).toBeTruthy();
+    expect(screen.getByTestId('photo-guide').props.accessibilityLabel).toBe(
+      'How to do Dumbbell Bench Press',
+    );
+    fireEvent.press(screen.getByTestId('photo-guide'));
+    expect(await screen.findByTestId('photo-guide-sheet-steps')).toBeTruthy();
+  });
+
+  it("looks the illustration up by the exercise's id when it isn't given one", async () => {
+    render(
+      <ExercisePhoto testID="photo" uri={null} name="Dumbbell Bench Press" exerciseId="bench-id" />,
+    );
+    expect(await screen.findByTestId('photo-illustration')).toBeTruthy();
+  });
+
+  it("keeps a machine photo, and a person's own exercise its first letter", async () => {
+    render(
+      <ExercisePhoto
+        testID="photo"
+        uri="https://example.com/m.jpg"
+        name="Dumbbell Bench Press"
+        exerciseId="bench-id"
+      />,
+    );
+    expect(screen.queryByTestId('photo-illustration')).toBeNull();
+    expect(screen.getByTestId('photo-zoom')).toBeTruthy();
+
+    render(<ExercisePhoto testID="own" uri={null} name="My Press" exerciseId="someone-elses-id" />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId('own-illustration')).toBeNull();
+    expect(screen.queryByTestId('own-guide')).toBeNull();
+  });
+
+  it('shows everything as before when nothing has plugged in the guides', () => {
+    setBuiltinSources(null);
+    render(
+      <ExercisePhoto testID="photo" uri={null} name="Dumbbell Bench Press" exerciseId="bench-id" />,
+    );
+    expect(screen.queryByTestId('photo-illustration')).toBeNull();
+  });
+});
+
+describe('ExerciseDetailsCard for a built-in', () => {
+  const details = {
+    muscleGroup: 'chest' as const,
+    movementType: 'bilateral' as const,
+    photoUrl: null,
+    gym: null,
+    equipment: 'dumbbell' as const,
+    grip: null,
+    attachment: null,
+    loadType: null,
+    pulleyPosition: null,
+    pulley: null,
+  };
+
+  it('offers How to Do It beside the illustration', async () => {
+    render(
+      <ExerciseDetailsCard
+        details={details}
+        exerciseName="Dumbbell Bench Press"
+        testID="card"
+        exerciseId="bench-id"
+      />,
+    );
+    const howTo = await screen.findByTestId('card-how-to');
+    fireEvent.press(howTo);
+    await waitFor(() => expect(screen.getByTestId('card-guide-steps')).toBeTruthy());
+  });
+
+  it("offers nothing more for a person's own exercise", async () => {
+    render(
+      <ExerciseDetailsCard
+        details={details}
+        exerciseName="My Press"
+        testID="card"
+        exerciseId="mine"
+      />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId('card-how-to')).toBeNull();
+  });
+});

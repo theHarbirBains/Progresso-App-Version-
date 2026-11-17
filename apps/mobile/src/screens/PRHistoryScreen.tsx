@@ -97,6 +97,7 @@ export function PRHistoryScreen({ route, navigation }: Props) {
             details={details}
             exerciseName={exerciseName}
             testID="pr-history-details"
+            exerciseId={exerciseId}
           />
 
           <AppCard>

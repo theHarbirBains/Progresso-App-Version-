@@ -132,6 +132,7 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
         details={details}
         exerciseName={exerciseName}
         testID="progress-exercise-detail-details"
+        exerciseId={exerciseId}
       />
 
       {allTimePoints.length === 0 ? (

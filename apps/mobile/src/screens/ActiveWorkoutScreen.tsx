@@ -782,6 +782,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                   previousPerformance[exercise.exerciseId]?.sets,
                 )}
                 key={exercise.id}
+                exerciseId={exercise.exerciseId}
                 testID={`exercise-card-${exercise.id}`}
                 exerciseName={exercise.exerciseName}
                 muscleGroup={exercise.muscleGroup}

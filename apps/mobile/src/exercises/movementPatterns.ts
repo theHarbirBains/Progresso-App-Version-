@@ -1,0 +1,27 @@
+// Mirrors exercises_movement_pattern_known (20261128100000_builtin_exercise_library.sql): the kind
+// of movement a built-in exercise is, as its guide names it.
+export const MOVEMENT_PATTERN_LABELS: Record<string, string> = {
+  horizontal_push: 'Horizontal Push',
+  vertical_push: 'Vertical Push',
+  horizontal_pull: 'Horizontal Pull',
+  vertical_pull: 'Vertical Pull',
+  hinge: 'Hip Hinge',
+  squat: 'Squat',
+  lunge: 'Lunge',
+  hip_extension: 'Hip Extension',
+  fly: 'Fly',
+  pullover: 'Pullover',
+  raise: 'Raise',
+  shrug: 'Shrug',
+  curl: 'Curl',
+  triceps_extension: 'Triceps Extension',
+  wrist: 'Wrist & Grip',
+  calf_raise: 'Calf Raise',
+  carry: 'Carry',
+  core_flexion: 'Core Flexion',
+  core_rotation: 'Rotation',
+  anti_extension: 'Anti-Extension',
+  lateral_flexion: 'Side Bend',
+  get_up: 'Get-Up',
+  hold: 'Static Hold',
+};

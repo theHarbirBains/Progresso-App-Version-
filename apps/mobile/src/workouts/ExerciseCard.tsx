@@ -68,6 +68,8 @@ export interface UnilateralExerciseCardSet {
 
 interface Props {
   exerciseName: string;
+  /** The exercise itself: a built-in shows its illustrated instructor, opening how to do it. */
+  exerciseId?: string;
   muscleGroup: MuscleGroup;
   movementType: MovementType;
   /** What the exercise is logged as: weight and reps, reps only, or a time. Defaults to weight and reps. */
@@ -210,6 +212,7 @@ function slideValue(set: PreviousSessionSet, type: MeasurementType): string {
 // - today's sets to log, as rows that never move, and Add Set.
 function ExerciseCardComponent({
   exerciseName,
+  exerciseId,
   muscleGroup,
   movementType,
   measurementType = 'weight_reps',
@@ -260,7 +263,13 @@ function ExerciseCardComponent({
   return (
     <Card testID={testID}>
       <View style={styles.exerciseHeader}>
-        <ExercisePhoto testID={id('photo')} uri={photoUrl} name={exerciseName} size={PHOTO_SIZE} />
+        <ExercisePhoto
+          testID={id('photo')}
+          uri={photoUrl}
+          name={exerciseName}
+          size={PHOTO_SIZE}
+          exerciseId={exerciseId}
+        />
         <View style={styles.exerciseTitleBlock}>
           <Text style={styles.exerciseName}>{exerciseName}</Text>
           <Text testID={id('muscle-group')} style={styles.exerciseMuscle}>
@@ -598,6 +607,7 @@ function allTimeBestEqual(a: AllTimeBest | null, b: AllTimeBest | null): boolean
 export function arePropsEqual(prev: Props, next: Props): boolean {
   return (
     prev.exerciseName === next.exerciseName &&
+    prev.exerciseId === next.exerciseId &&
     prev.muscleGroup === next.muscleGroup &&
     prev.movementType === next.movementType &&
     prev.measurementType === next.measurementType &&

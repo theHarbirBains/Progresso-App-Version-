@@ -157,6 +157,7 @@ export function ExerciseProgressScreen({ route, navigation }: Props) {
             details={details}
             exerciseName={exerciseName}
             testID="exercise-progress-details"
+            exerciseId={exerciseId}
           />
 
           <SegmentedControl
