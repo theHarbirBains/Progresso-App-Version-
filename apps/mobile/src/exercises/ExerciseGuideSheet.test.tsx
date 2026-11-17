@@ -75,9 +75,14 @@ describe('ExerciseGuideSheet', () => {
     expect(screen.getByTestId('exercise-guide-line')).toHaveTextContent(
       'Dumbbell · Horizontal Push · Weight and reps',
     );
-    expect(screen.getByTestId('exercise-guide-primary')).toHaveTextContent(/Chest/);
-    expect(screen.getByTestId('exercise-guide-secondary')).toHaveTextContent(/Shoulders/);
-    expect(screen.getByTestId('exercise-guide-secondary')).toHaveTextContent(/Triceps/);
+    // The anatomy figure's key names the muscles.
+    expect(screen.getByTestId('exercise-guide-illustration-primary')).toHaveTextContent(
+      'Primary: Chest',
+    );
+    expect(screen.getByTestId('exercise-guide-illustration-secondary')).toHaveTextContent(
+      'Secondary: Shoulders, Triceps',
+    );
+    expect(screen.queryByTestId('exercise-guide-muscles')).toBeNull();
     expect(screen.getByTestId('exercise-guide-setup')).toHaveTextContent(
       /Lie back with the dumbbells/,
     );

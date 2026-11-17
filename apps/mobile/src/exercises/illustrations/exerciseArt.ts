@@ -4,6 +4,8 @@ import { LEGS_ART } from './art/legs';
 import { LYING_ART } from './art/lying';
 import { UPPER_ART } from './art/upper';
 import { BUILTIN_CATALOG } from './builtinCatalog.generated';
+import type { MuscleGroup } from '../muscleGroups';
+import { legendGroups, renderMuscleMap, type MuscleMapView } from './muscleMap';
 import { renderScene, type RenderedScene, type SceneSpec } from './render';
 
 // Every built-in exercise's illustration, by its slug (`exercises.slug`): its poses and equipment
@@ -59,4 +61,28 @@ export function frameLabels(count: number): string[] {
   return Array.from({ length: count }, (_, i) =>
     i === 0 ? 'Start' : i === count - 1 ? 'Finish' : `Step ${i + 1}`,
   );
+}
+
+export interface MuscleMap {
+  views: MuscleMapView[];
+  /** The muscle groups its key names, primary and secondary. */
+  primary: MuscleGroup[];
+  secondary: MuscleGroup[];
+}
+
+const maps = new Map<string, MuscleMap>();
+
+/** The grey anatomy figure with the exercise's worked muscles coloured, and its key. */
+export function muscleMapFor(slug: string | null | undefined): MuscleMap | null {
+  if (!hasIllustration(slug)) return null;
+  let map = maps.get(slug);
+  if (!map) {
+    const entry = BUILTIN_CATALOG[slug];
+    map = {
+      views: renderMuscleMap(entry.highlight),
+      ...legendGroups(entry.highlight, entry.muscle as MuscleGroup),
+    };
+    maps.set(slug, map);
+  }
+  return map;
 }

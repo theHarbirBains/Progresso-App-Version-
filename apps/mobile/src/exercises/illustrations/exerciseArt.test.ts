@@ -4,6 +4,7 @@ import {
   frameLabels,
   hasIllustration,
   illustrationFor,
+  muscleMapFor,
   thumbnailFor,
 } from './exerciseArt';
 import { MUSCLE_REGIONS, REGION_GROUP } from './muscles';
@@ -28,9 +29,16 @@ describe('the built-in exercise illustrations', () => {
       for (const value of Object.values(scene.viewBox)) expect(Number.isFinite(value)).toBe(true);
       for (const frame of scene.frames) {
         for (const shape of frame.shapes) expect(shape.d).not.toMatch(/NaN|Infinity/);
-        // The primary muscles show in every frame.
-        expect(frame.shapes.some((shape) => shape.fill === ART.primary)).toBe(true);
+        // The instructor is drawn plain: the muscles are on the anatomy figure beside it.
+        expect(frame.shapes.some((shape) => shape.fill === ART.primary)).toBe(false);
       }
+      // The anatomy figure shows every primary muscle group, in red, in at least one view.
+      const map = muscleMapFor(slug);
+      expect(map?.views.length).toBeGreaterThan(0);
+      expect(
+        map?.views.some((view) => view.frame.shapes.some((shape) => shape.fill === ART.primary)),
+      ).toBe(true);
+      expect(map?.primary[0]).toBe(BUILTIN_CATALOG[slug].muscle);
     },
   );
 

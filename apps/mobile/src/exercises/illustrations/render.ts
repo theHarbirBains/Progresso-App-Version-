@@ -20,12 +20,22 @@ import {
   type MuscleHighlight,
   type MusclePatch,
 } from './muscles';
-import { ART, OUTLINE_WIDTH } from './palette';
+import { ART, MATERIALS, OUTLINE_WIDTH, type Material } from './palette';
 import { BODY, solvePose, type Limb, type PoseSpec, type Skeleton } from './rig';
+import {
+  cylinderGradient,
+  materialOf,
+  midTone,
+  sphereGradient,
+  verticalGradient,
+  type Gradient,
+} from './shading';
 
-// Draws a scene -- one exercise's poses, the equipment, the highlighted muscles -- as flat shapes,
-// back to front. Everything is projected straight onto the page (no perspective), from a camera
-// turned `yaw` degrees around the figure and tilted `tilt` degrees down.
+// Draws a scene -- one exercise's poses and its equipment -- as softly shaded shapes, back to
+// front. Everything is projected straight onto the page (no perspective), from a camera turned
+// `yaw` degrees around the figure and tilted `tilt` degrees down. The instructor is drawn dressed;
+// the same body drawn bare and grey, with the worked muscles coloured on it, is the anatomy figure
+// beside the drawing (muscleMap.ts).
 
 export interface ViewSpec {
   /** 0 sees the figure side-on facing right; -90 face-on; in between, three-quarters. */
@@ -38,7 +48,10 @@ export const DEFAULT_VIEW: ViewSpec = { yaw: -28, tilt: 9 };
 
 export interface Shape {
   d: string;
+  /** The flat colour; with a `gradient`, what's shown where gradients can't be. */
   fill: string;
+  /** Soft shading across the shape (shading.ts). */
+  gradient?: Gradient;
   stroke?: string;
   strokeWidth?: number;
   opacity?: number;
@@ -128,8 +141,18 @@ export interface FrameSpec {
 export interface SceneSpec {
   view?: Partial<ViewSpec>;
   frames: readonly FrameSpec[];
-  /** A point that moves between frames, drawn as an arrow (the dumbbell, the bar, the hips). */
+  /** A point that moves between frames, drawn as an arrow when asked (the dumbbell, the bar, the hips). */
   motion?: (s: Skeleton) => V3;
+}
+
+export interface RenderOptions {
+  /**
+   * The bare grey anatomy figure with its worked muscles coloured, instead of the dressed
+   * instructor (no clothes, hair or shoes).
+   */
+  anatomy?: boolean;
+  /** Draw an arrow for the scene's `motion` between frames. */
+  arrows?: boolean;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -142,27 +165,37 @@ interface ProfileSample {
   off: number;
 }
 
+// Each limb's cross-sections from its root joint to its end: how thick it is and how far its
+// surface swells toward its front (negative: its back) -- the deltoid's cap, the biceps' peak, the
+// forearm's belly, the quads' sweep and the calf -- narrowing at every joint.
 const PROFILES: Record<Exclude<BodyPartKey, 'torso'>, readonly ProfileSample[]> = {
   upperArm: [
-    { t: -0.07, r: 6.1, off: 0 },
-    { t: 0.05, r: 5.8, off: 0 },
-    { t: 0.48, r: 5.2, off: 0.5 },
-    { t: 1, r: 4.1, off: 0 },
+    { t: -0.08, r: 6.4, off: 0.2 },
+    { t: 0.06, r: 7.0, off: 0.5 },
+    { t: 0.24, r: 6.1, off: 0.2 },
+    { t: 0.52, r: 5.9, off: 0.9 },
+    { t: 0.78, r: 5.0, off: 0.4 },
+    { t: 1, r: 4.2, off: 0 },
   ],
   forearm: [
-    { t: 0, r: 4.5, off: 0 },
-    { t: 0.28, r: 4.5, off: 0.4 },
-    { t: 0.84, r: 2.9, off: 0 },
+    { t: 0, r: 4.4, off: 0 },
+    { t: 0.16, r: 5.2, off: 0.4 },
+    { t: 0.42, r: 4.5, off: 0.2 },
+    { t: 0.84, r: 3.0, off: 0 },
   ],
   thigh: [
-    { t: 0, r: 8.9, off: 0 },
-    { t: 0.38, r: 7.9, off: 0.7 },
+    { t: 0, r: 9.4, off: 0 },
+    { t: 0.2, r: 9.4, off: 0.6 },
+    { t: 0.5, r: 8.4, off: 1.1 },
+    { t: 0.8, r: 6.7, off: 0.6 },
     { t: 1, r: 5.5, off: 0 },
   ],
   shin: [
-    { t: 0, r: 5.3, off: 0 },
-    { t: 0.3, r: 5.6, off: -1.4 },
-    { t: 1, r: 3.5, off: 0 },
+    { t: 0, r: 5.3, off: 0.3 },
+    { t: 0.14, r: 5.9, off: -0.8 },
+    { t: 0.32, r: 6.3, off: -1.8 },
+    { t: 0.6, r: 4.6, off: -0.6 },
+    { t: 1, r: 3.4, off: 0 },
   ],
 };
 
@@ -175,18 +208,19 @@ interface TorsoRing {
   off: number;
 }
 
+// The torso's cross-sections from the seat (below the hip joints) to the top of the traps.
 const TORSO_RINGS: readonly TorsoRing[] = [
-  { h: -0.2, w: 11, d: 8.2, off: -2.8 },
-  { h: -0.06, w: 15, d: 10.6, off: -1.5 },
-  { h: 0.13, w: 14.4, d: 9.4, off: 0 },
-  { h: 0.4, w: 13.1, d: 8.8, off: 0.6 },
-  { h: 0.68, w: 16.4, d: 10.4, off: 1.8 },
-  { h: 0.88, w: 18.4, d: 9.8, off: 1.1 },
-  { h: 1.03, w: 13.5, d: 7.4, off: -0.6 },
+  { h: -0.2, w: 11.2, d: 8.6, off: -3.0 },
+  { h: -0.08, w: 15.2, d: 10.8, off: -1.8 },
+  { h: 0.06, w: 14.8, d: 9.8, off: -0.4 },
+  { h: 0.2, w: 13.6, d: 9.0, off: 0.2 },
+  { h: 0.36, w: 13.4, d: 8.9, off: 0.6 },
+  { h: 0.52, w: 15.2, d: 9.8, off: 1.4 },
+  { h: 0.68, w: 17.4, d: 10.9, off: 2.1 },
+  { h: 0.84, w: 19.4, d: 10.4, off: 1.6 },
+  { h: 0.95, w: 17.6, d: 9.0, off: 0.2 },
+  { h: 1.05, w: 11.5, d: 7.2, off: -1.0 },
 ];
-
-/** Where the shorts stop, up the torso. */
-const WAISTBAND = 0.13;
 
 function interpolate<T extends Record<keyof T, number>>(
   samples: readonly T[],
@@ -298,7 +332,7 @@ function patchPolygon(
   for (let i = 0; i <= rows; i += 1) {
     const s = i / rows;
     const at = t[0] + (t[1] - t[0]) * s;
-    const k = 0.3 + 0.7 * Math.sqrt(Math.sin(Math.PI * Math.min(0.97, Math.max(0.03, s))));
+    const k = 0.42 + 0.58 * Math.sqrt(Math.sin(Math.PI * Math.min(0.97, Math.max(0.03, s))));
     const from = center - halfSpan * k;
     const to = center + halfSpan * k;
     const steps = Math.max(8, Math.ceil((to - from) / 3));
@@ -356,18 +390,79 @@ function capPolygon(cam: Camera, center: V3, r: number, axis: V3, angle: number)
   return flat.sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
 }
 
+/** A thin dark rim under a part's fills, so parts of the same colour read apart where they overlap. */
 function outlineShapes(polys: readonly P2[][]): Shape[] {
   return polys.map((poly) => ({
     d: smoothPath(poly),
-    fill: ART.outline,
-    stroke: ART.outline,
+    fill: ART.rim,
+    stroke: ART.rim,
     strokeWidth: OUTLINE_WIDTH * 2,
   }));
 }
 
-function fillShapes(polys: readonly P2[][], color: string): Shape[] {
-  return polys.map((poly) => ({ d: smoothPath(poly), fill: color }));
+/** Fills shaded along an axis on the page (a limb's, the torso's), or as a ball. */
+function shadedShapes(polys: readonly P2[][], material: Material, axis: [P2, P2] | null): Shape[] {
+  const all = polys.flat();
+  const c = centroid(all);
+  return polys.map((poly) => ({
+    d: smoothPath(poly),
+    fill: midTone(material),
+    gradient: axis
+      ? cylinderGradient(all, axis[0], axis[1], material)
+      : sphereGradient(c, radiusAbout(all, c), material),
+  }));
 }
+
+function centroid(points: readonly P2[]): P2 {
+  let x = 0;
+  let y = 0;
+  for (const p of points) {
+    x += p[0];
+    y += p[1];
+  }
+  return [x / Math.max(1, points.length), y / Math.max(1, points.length)];
+}
+
+function radiusAbout(points: readonly P2[], c: P2): number {
+  let r = 1;
+  for (const p of points) r = Math.max(r, Math.hypot(p[0] - c[0], p[1] - c[1]));
+  return r;
+}
+
+/** What a body is drawn in: the dressed instructor, or the grey anatomy figure. */
+interface Look {
+  skin: Material;
+  skinFar: Material;
+  /** The tee and shorts; null for the anatomy figure. */
+  cloth: Material | null;
+  clothFar: Material | null;
+  shoe: Material | null;
+  shoeFar: Material | null;
+  hair: Material | null;
+  muscles: boolean;
+}
+
+const DRESSED: Look = {
+  skin: MATERIALS.skin,
+  skinFar: MATERIALS.skinFar,
+  cloth: MATERIALS.shirt,
+  clothFar: MATERIALS.shirtFar,
+  shoe: MATERIALS.shoe,
+  shoeFar: MATERIALS.shoeFar,
+  hair: MATERIALS.hair,
+  muscles: false,
+};
+
+const ANATOMY: Look = {
+  skin: MATERIALS.anatomy,
+  skinFar: MATERIALS.anatomyFar,
+  cloth: null,
+  clothFar: null,
+  shoe: null,
+  shoeFar: null,
+  hair: null,
+  muscles: true,
+};
 
 const MUSCLE_COLORS = { primary: ART.primary, secondary: ART.secondary } as const;
 
@@ -392,15 +487,22 @@ function muscleShapes(
   surface: Surface,
   clipId: string,
   muscles: MuscleHighlight,
+  shade: { points: readonly P2[]; axis: [P2, P2] },
 ): Shape[] {
   const shapes: Shape[] = [];
   for (const { patch, tone } of musclesFor(part, muscles)) {
     const poly = patchPolygon(cam, surface, patch.t, patch.theta);
     if (poly) {
+      // Shaded like the part it's on, in its own colour.
       shapes.push({
         d: smoothPath(poly),
         fill: MUSCLE_COLORS[tone],
-        opacity: tone === 'primary' ? 0.92 : 0.86,
+        gradient: cylinderGradient(
+          shade.points,
+          shade.axis[0],
+          shade.axis[1],
+          materialOf(MUSCLE_COLORS[tone]),
+        ),
         clipId,
       });
     }
@@ -410,123 +512,263 @@ function muscleShapes(
 
 let clipCounter = 0;
 
-function limbPiece(
+/** Points along an arc of a circle on the page, its two ends left out. */
+function arc(c: P2, r: number, from: number, to: number, steps = 7): P2[] {
+  const out: P2[] = [];
+  for (let i = 1; i < steps; i += 1) {
+    const a = from + ((to - from) * i) / steps;
+    out.push([c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r]);
+  }
+  return out;
+}
+
+/**
+ * Something long and round's outline on the page: its cross-sections swept along it, so it can
+ * curve in and out with its muscles and narrow at its joints, rounded off at both ends. Seen nearly
+ * end-on, it's the outline of its cross-sections instead.
+ */
+function sweepOutline(cam: Camera, spheres: readonly { c: V3; r: number }[]): P2[] {
+  const centers = spheres.map((s) => cam.toScreen(s.c));
+  const first = centers[0];
+  const last = centers[centers.length - 1];
+  const len = Math.hypot(last[0] - first[0], last[1] - first[1]);
+  const widest = Math.max(...spheres.map((s) => s.r));
+  if (len < widest * 0.8) return sphereHull(cam, spheres);
+  const ux = (last[0] - first[0]) / len;
+  const uy = (last[1] - first[1]) / len;
+  // Across it: +90 degrees from along it.
+  const px = -uy;
+  const py = ux;
+  const left = centers.map((c, i): P2 => [c[0] + px * spheres[i].r, c[1] + py * spheres[i].r]);
+  const right = centers.map((c, i): P2 => [c[0] - px * spheres[i].r, c[1] - py * spheres[i].r]);
+  const across = Math.atan2(py, px);
+  const rLast = spheres[spheres.length - 1].r;
+  return [
+    ...left,
+    // Round the far end, through the direction it points...
+    ...arc(last, rLast, across, across - Math.PI),
+    ...right.reverse(),
+    // ...and the near end, through the other way.
+    ...arc(first, spheres[0].r, across - Math.PI, across - 2 * Math.PI),
+  ];
+}
+
+/** One part of a limb, drawn: its rim, its shaded fill, its muscles (on the anatomy figure). */
+interface PartDrawing {
+  depth: number;
+  rims: Shape[];
+  fills: Shape[];
+  muscles: Shape[];
+  clips: ClipDef[];
+  points: P2[];
+}
+
+function limbDrawing(
   cam: Camera,
   limb: Limb,
   part: Exclude<BodyPartKey, 'torso'>,
   length: number,
-  far: boolean,
-  muscles: MuscleHighlight,
-  extra?: { overlay?: { from: number; to: number; grow: number; color: string } },
-): Piece {
+  material: Material,
+  muscles: MuscleHighlight | null,
+  overlay?: { from: number; to: number; grow: number; material: Material },
+): PartDrawing {
   const profile = PROFILES[part];
   const axis = normalize(sub(limb.joint, limb.root));
-  const spheres = profile.map((s) => ({
-    c: add(add(limb.root, scale(axis, s.t * length)), scale(limb.front, s.off)),
-    r: s.r,
-  }));
-  const hull = sphereHull(cam, spheres);
-  const polys = [hull];
-  const shapesFill: Shape[] = fillShapes([hull], far ? ART.skinFar : ART.skin);
-  const outlinePolys = [hull];
-  if (extra?.overlay) {
-    const { from, to, grow, color } = extra.overlay;
+  const at = (p: ProfileSample) =>
+    add(add(limb.root, scale(axis, p.t * length)), scale(limb.front, p.off));
+  const outline = sweepOutline(
+    cam,
+    profile.map((p) => ({ c: at(p), r: p.r })),
+  );
+  const axis2: [P2, P2] = [cam.toScreen(limb.root), cam.toScreen(limb.joint)];
+  const fills: Shape[] = shadedShapes([outline], material, axis2);
+  const polys = [outline];
+  if (overlay) {
     const samples = [
-      ...profile.filter((p) => p.t >= from && p.t < to),
-      interpolate(profile, 't', to),
+      ...profile.filter((p) => p.t >= overlay.from && p.t < overlay.to),
+      interpolate(profile, 't', overlay.to),
     ];
-    const sleeve = sphereHull(
+    const sleeve = sweepOutline(
       cam,
-      samples.map((p) => ({
-        c: add(add(limb.root, scale(axis, p.t * length)), scale(limb.front, p.off)),
-        r: p.r + grow,
-      })),
+      samples.map((p) => ({ c: at(p), r: p.r + overlay.grow })),
     );
-    shapesFill.push(...fillShapes([sleeve], color));
-    outlinePolys.push(sleeve);
+    fills.push(...shadedShapes([sleeve], overlay.material, axis2));
     polys.push(sleeve);
   }
   const clipId = `c${(clipCounter += 1)}`;
   const surface = limbSurface(limb, profile, length);
-  const z = (cam.toView(limb.root)[2] + cam.toView(limb.joint)[2]) / 2;
   return {
-    depth: z,
-    layer: 1,
-    shapes: [
-      ...outlineShapes(outlinePolys),
-      ...shapesFill,
-      ...muscleShapes(cam, part, surface, clipId, muscles),
-    ],
+    depth: (cam.toView(limb.root)[2] + cam.toView(limb.joint)[2]) / 2,
+    rims: outlineShapes(polys),
+    fills,
+    muscles: muscles
+      ? muscleShapes(cam, part, surface, clipId, muscles, { points: outline, axis: axis2 })
+      : [],
     clips: [{ id: clipId, paths: polys.map((p) => smoothPath(p)) }],
-    points: outlinePolys.flat(),
+    points: polys.flat(),
   };
 }
 
-function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight): Piece[] {
+/**
+ * A whole arm or leg as one piece, so its elbow or knee has no seam: both parts' rims first, then
+ * their fills, the nearer part last. Folded hard (a curl's top), the nearer part keeps its own rim,
+ * so it reads apart from the part behind it.
+ */
+function jointedPiece(upper: PartDrawing, lower: PartDrawing, folded: boolean): Piece {
+  const [back, front] = lower.depth >= upper.depth ? [upper, lower] : [lower, upper];
+  const shapes = folded
+    ? [
+        ...back.rims,
+        ...back.fills,
+        ...back.muscles,
+        ...front.rims,
+        ...front.fills,
+        ...front.muscles,
+      ]
+    : [
+        ...back.rims,
+        ...front.rims,
+        ...back.fills,
+        ...back.muscles,
+        ...front.fills,
+        ...front.muscles,
+      ];
+  return {
+    depth: (upper.depth + lower.depth) / 2,
+    layer: 1,
+    shapes,
+    clips: [...upper.clips, ...lower.clips],
+    points: [...upper.points, ...lower.points],
+  };
+}
+
+/** Whether a limb is bent past ~55 degrees at its middle joint. */
+function isFolded(limb: Limb): boolean {
+  const a = normalize(sub(limb.joint, limb.root));
+  const b = normalize(sub(limb.end, limb.joint));
+  return dot(a, b) < 0.57;
+}
+
+/** The torso's outline: its rings' outer edges swept from the seat to the traps, and both ends. */
+function torsoOutline(cam: Camera, s: Skeleton, surface: Surface): P2[][] {
+  const rings = TORSO_RINGS.map((r) =>
+    Array.from({ length: 28 }, (_, i) => cam.toScreen(surface(r.h, (i / 28) * 360).p)),
+  );
+  const ends = [
+    convexHull([...rings[0], ...rings[1]]),
+    convexHull([...rings[rings.length - 2], ...rings[rings.length - 1]]),
+  ];
+  const a = cam.toScreen(s.pelvis);
+  const b = cam.toScreen(s.shoulderCenter);
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (len < 14) {
+    // Seen end-on: each pair of neighbouring rings' outline.
+    return rings.slice(1).map((ring, i) => convexHull([...rings[i], ...ring]));
+  }
+  const px = -(b[1] - a[1]) / len;
+  const py = (b[0] - a[0]) / len;
+  const left: P2[] = [];
+  const right: P2[] = [];
+  for (const ring of rings) {
+    let hi = ring[0];
+    let lo = ring[0];
+    for (const p of ring) {
+      if (p[0] * px + p[1] * py > hi[0] * px + hi[1] * py) hi = p;
+      if (p[0] * px + p[1] * py < lo[0] * px + lo[1] * py) lo = p;
+    }
+    left.push(hi);
+    right.push(lo);
+  }
+  return [[...left, ...right.reverse()], ...ends];
+}
+
+function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight, look: Look): Piece[] {
+  const shown = look.muscles ? muscles : null;
   const pieces: Piece[] = [];
   const midArms = cam.toView(s.shoulderCenter)[2];
   const midLegs = cam.toView(s.pelvis)[2];
   const isFar = (root: V3, mid: number) => cam.toView(root)[2] < mid - 3;
 
-  // Torso: rings up the body, each neighbouring pair's hull together making its outline.
   const surface = torsoSurface(s);
-  const rings = TORSO_RINGS.map((r) =>
-    Array.from({ length: 24 }, (_, i) => cam.toScreen(surface(r.h, (i / 24) * 360).p)),
-  );
-  const pairHulls = (from: number, to: number) => {
-    const out: P2[][] = [];
-    for (let i = from; i < to; i += 1) out.push(convexHull([...rings[i], ...rings[i + 1]]));
-    return out;
-  };
-  const allTorso = pairHulls(0, rings.length - 1);
-  const waistIndex = TORSO_RINGS.findIndex((r) => r.h >= WAISTBAND);
-  const shortsTorso = pairHulls(0, waistIndex);
+  const torso = torsoOutline(cam, s, surface);
   const torsoClip = `c${(clipCounter += 1)}`;
+  const torsoAxis: [P2, P2] = [cam.toScreen(s.pelvis), cam.toScreen(s.shoulderCenter)];
   // A little behind its middle, so arms and legs at the body's own depth draw over it.
   const torsoDepth = cam.toView(lerp3(s.pelvis, s.shoulderCenter, 0.5))[2];
   pieces.push({
-    depth: torsoDepth - 4,
+    // The standing anatomy figure's hips and seat cover the tops of its thighs (its glutes show).
+    depth: torsoDepth + (look.muscles ? 6 : -4),
     layer: 1,
     shapes: [
-      ...outlineShapes(allTorso),
-      ...fillShapes(allTorso, ART.skin),
-      ...fillShapes(shortsTorso, ART.shorts),
-      ...muscleShapes(cam, 'torso', surface, torsoClip, muscles),
+      ...outlineShapes(torso),
+      // Dressed, the tee and shorts cover the torso; bare, it's the figure's own grey.
+      ...shadedShapes(torso, look.cloth ?? look.skin, torsoAxis),
+      ...(shown
+        ? muscleShapes(cam, 'torso', surface, torsoClip, shown, {
+            points: torso.flat(),
+            axis: torsoAxis,
+          })
+        : []),
     ],
-    clips: [{ id: torsoClip, paths: allTorso.map((p) => smoothPath(p)) }],
-    points: allTorso.flat(),
+    clips: [{ id: torsoClip, paths: torso.map((p) => smoothPath(p)) }],
+    points: torso.flat(),
   });
 
-  // Arms and legs: upper and lower parts drawn separately, so a bent limb overlaps itself right.
   for (const side of ['r', 'l'] as const) {
     const arm = s.arms[side];
     lateralHints.set(arm, sub(s.shoulders[side], s.shoulderCenter));
     const farArm = isFar(arm.root, midArms);
-    pieces.push(limbPiece(cam, arm, 'upperArm', BODY.upperArm, farArm, muscles));
-    const fore = lowerLimb(arm);
-    pieces.push(limbPiece(cam, fore, 'forearm', BODY.forearm, farArm, muscles));
-    // The fist, around the handle.
-    const fist = cam.toScreen(arm.end);
-    const fistHull = circlePoints(fist, 4.6, 18);
+    const armSkin = farArm ? look.skinFar : look.skin;
+    const sleeve = farArm ? look.clothFar : look.cloth;
+    pieces.push(
+      jointedPiece(
+        limbDrawing(
+          cam,
+          arm,
+          'upperArm',
+          BODY.upperArm,
+          armSkin,
+          shown,
+          // The tee's short sleeve.
+          sleeve ? { from: -0.08, to: 0.32, grow: 0.3, material: sleeve } : undefined,
+        ),
+        limbDrawing(cam, lowerLimb(arm), 'forearm', BODY.forearm, armSkin, shown),
+        isFolded(arm),
+      ),
+    );
+    // The hand closed around the handle: a mitten along the forearm.
+    const along = normalize(sub(arm.end, arm.joint));
+    const hand = sphereHull(cam, [
+      { c: add(arm.end, scale(along, -2.4)), r: 3.6 },
+      { c: add(arm.end, scale(along, 1.2)), r: 4.3 },
+    ]);
     pieces.push({
       depth: cam.toView(arm.end)[2] + 0.8,
       layer: 1,
-      shapes: [
-        ...outlineShapes([fistHull]),
-        ...fillShapes([fistHull], farArm ? ART.skinFar : ART.skin),
-      ],
-      points: fistHull,
+      shapes: [...outlineShapes([hand]), ...shadedShapes([hand], armSkin, null)],
+      points: hand,
     });
 
     const leg = s.legs[side];
     lateralHints.set(leg, sub(s.hips[side], s.pelvis));
     const farLeg = isFar(leg.root, midLegs);
+    const legSkin = farLeg ? look.skinFar : look.skin;
+    const shorts = farLeg ? look.clothFar : look.cloth;
     pieces.push(
-      limbPiece(cam, leg, 'thigh', BODY.thigh, farLeg, muscles, {
-        overlay: { from: 0, to: 0.42, grow: 0.7, color: farLeg ? ART.shortsFar : ART.shorts },
-      }),
+      jointedPiece(
+        limbDrawing(
+          cam,
+          leg,
+          'thigh',
+          BODY.thigh,
+          legSkin,
+          shown,
+          shorts ? { from: 0, to: 0.4, grow: 0.35, material: shorts } : undefined,
+        ),
+        limbDrawing(cam, lowerLimb(leg), 'shin', BODY.shin, legSkin, shown),
+        isFolded(leg),
+      ),
     );
-    pieces.push(limbPiece(cam, lowerLimb(leg), 'shin', BODY.shin, farLeg, muscles));
     const foot = s.feet[side];
     const shoe = sphereHull(cam, [
       { c: foot.heel, r: 3.7 },
@@ -534,34 +776,53 @@ function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight): Piece[]
       { c: lerp3(foot.heel, foot.toe, 0.66), r: 4.1 },
       { c: foot.toe, r: 3.1 },
     ]);
+    const shoeMaterial = (farLeg ? look.shoeFar : look.shoe) ?? legSkin;
     pieces.push({
       depth: (cam.toView(leg.end)[2] + cam.toView(foot.toe)[2]) / 2 + 0.5,
       layer: 1,
-      shapes: [...outlineShapes([shoe]), ...fillShapes([shoe], farLeg ? ART.shoeFar : ART.shoe)],
+      shapes: [
+        ...outlineShapes([shoe]),
+        {
+          d: smoothPath(shoe),
+          fill: midTone(shoeMaterial),
+          gradient: verticalGradient(shoe, shoeMaterial),
+        },
+      ],
       points: shoe,
       floor: [foot.heel, foot.toe],
     });
   }
 
-  // Neck and head.
+  // The neck rises from behind the top of the torso.
   const neckTop = add(s.neckBase, scale(s.headFrame.up, BODY.neck));
-  const neck = sphereHull(cam, [
-    { c: s.neckBase, r: 5.6 },
+  const neck = sweepOutline(cam, [
+    { c: s.neckBase, r: 5.8 },
     { c: neckTop, r: 4.9 },
   ]);
   pieces.push({
-    depth: cam.toView(s.neckBase)[2] - 3,
+    depth: torsoDepth - 5,
     layer: 1,
-    shapes: [...outlineShapes([neck]), ...fillShapes([neck], ART.skin)],
+    shapes: [
+      ...outlineShapes([neck]),
+      ...shadedShapes([neck], look.skin, [cam.toScreen(s.neckBase), cam.toScreen(neckTop)]),
+    ],
     points: neck,
   });
-  const headCenter = cam.toScreen(s.head);
-  const headPoly = circlePoints(headCenter, BODY.headRadius, 28);
+
+  // The head: a rounded cranium with a jaw, chin and nose -- a face's profile when seen side-on.
   const { up, forward, right } = s.headFrame;
+  const at = (f: number, u: number): V3 => add(add(s.head, scale(forward, f)), scale(up, u));
+  const headPoly = sphereHull(cam, [
+    { c: s.head, r: BODY.headRadius },
+    { c: at(3.6, -5.2), r: 7.4 },
+    { c: at(6.2, -8.6), r: 3.6 },
+    { c: at(10.1, -2.4), r: 1.6 },
+  ]);
+  const headCenter = cam.toScreen(s.head);
   const hair = capPolygon(
     cam,
     s.head,
-    BODY.headRadius,
+    BODY.headRadius + 0.4,
     normalize(add(scale(up, 0.86), scale(forward, -0.52))),
     80,
   );
@@ -582,9 +843,29 @@ function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight): Piece[]
     layer: 1,
     shapes: [
       ...outlineShapes([headPoly]),
-      ...fillShapes([headPoly], ART.skin),
-      ...ears.map((ear) => ({ d: smoothPath(ear), fill: ART.skinShade, clipId: headClip })),
-      ...(hair ? [{ d: smoothPath(hair), fill: ART.hair, clipId: headClip }] : []),
+      {
+        d: smoothPath(headPoly),
+        fill: midTone(look.skin),
+        gradient: sphereGradient(headCenter, BODY.headRadius * 1.15, look.skin),
+      },
+      ...(look.hair
+        ? ears.map((ear) => ({
+            d: smoothPath(ear),
+            fill: ART.ear,
+            opacity: 0.85,
+            clipId: headClip,
+          }))
+        : []),
+      ...(hair && look.hair
+        ? [
+            {
+              d: smoothPath(hair),
+              fill: midTone(look.hair),
+              gradient: sphereGradient(headCenter, BODY.headRadius, look.hair),
+              clipId: headClip,
+            },
+          ]
+        : []),
     ],
     clips: [{ id: headClip, paths: [smoothPath(headPoly)] }],
     points: headPoly,
@@ -609,19 +890,18 @@ function shadowPiece(cam: Camera, floor: V3[]): Piece | null {
   }
   const cx = (minX + maxX) / 2;
   const cz = (minZ + maxZ) / 2;
-  const rx = (maxX - minX) / 2 + 14;
-  const rz = (maxZ - minZ) / 2 + 12;
-  const pts: P2[] = [];
-  for (let i = 0; i < 32; i += 1) {
-    const a = (i / 32) * Math.PI * 2;
-    pts.push(cam.toScreen([cx + Math.cos(a) * rx, 0, cz + Math.sin(a) * rz]));
-  }
-  return {
-    depth: -Infinity,
-    layer: 0,
-    shapes: [{ d: smoothPath(pts), fill: ART.shadow }],
-    points: [],
-  };
+  // A soft shadow: three ellipses, each smaller and darker toward the middle.
+  const shapes = [1.25, 1, 0.72].map((k): Shape => {
+    const rx = ((maxX - minX) / 2 + 14) * k;
+    const rz = ((maxZ - minZ) / 2 + 12) * k;
+    const pts: P2[] = [];
+    for (let i = 0; i < 32; i += 1) {
+      const a = (i / 32) * Math.PI * 2;
+      pts.push(cam.toScreen([cx + Math.cos(a) * rx, 0, cz + Math.sin(a) * rz]));
+    }
+    return { d: smoothPath(pts), fill: ART.shadow, opacity: 0.32 };
+  });
+  return { depth: -Infinity, layer: 0, shapes, points: [] };
 }
 
 function motionShapes(from: P2, to: P2, away: P2): Shape[] {
@@ -669,7 +949,12 @@ function motionShapes(from: P2, to: P2, away: P2): Shape[] {
 }
 
 /** Draws every frame of a scene at one scale, inside one shared view box. */
-export function renderScene(scene: SceneSpec, muscles: MuscleHighlight): RenderedScene {
+export function renderScene(
+  scene: SceneSpec,
+  muscles: MuscleHighlight,
+  options: RenderOptions = {},
+): RenderedScene {
+  const look = options.anatomy ? ANATOMY : DRESSED;
   const view = { ...DEFAULT_VIEW, ...scene.view };
   const cam = makeCamera(view);
   const warnings: string[] = [];
@@ -694,7 +979,7 @@ export function renderScene(scene: SceneSpec, muscles: MuscleHighlight): Rendere
       }
     }
     const pieces = [
-      ...bodyPieces(cam, skeleton, muscles),
+      ...bodyPieces(cam, skeleton, muscles, look),
       ...(frame.props ?? []).flatMap((build) => build({ cam, skeleton })),
     ];
     // Equipment behind the body's middle and within its width (a bar across the upper back) goes
@@ -729,7 +1014,7 @@ export function renderScene(scene: SceneSpec, muscles: MuscleHighlight): Rendere
         maxY = Math.max(maxY, p[1]);
       }
     }
-    if (scene.motion && index > 0) {
+    if (options.arrows && scene.motion && index > 0) {
       const from = cam.toScreen(scene.motion(skeletons[index - 1]));
       const to = cam.toScreen(scene.motion(skeleton));
       shapes.push(...motionShapes(from, to, cam.toScreen(skeleton.pelvis)));

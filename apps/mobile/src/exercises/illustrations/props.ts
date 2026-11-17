@@ -15,18 +15,23 @@ import {
   type P2,
   type V3,
 } from './geometry';
-import { ART } from './palette';
+import { ART, MATERIALS, type Material } from './palette';
 import type { Camera, Piece, PropBuilder, Shape } from './render';
 import type { Side, Skeleton } from './rig';
+import { cylinderGradient, midTone } from './shading';
 
 // The equipment in the illustrations, built from two shaded solids -- cylinders (handles, bars,
-// plates, posts) and boxes (benches, boxes, platforms) -- and drawn in depth order with the body.
+// plates, posts), lit like the body, and boxes (benches, boxes, platforms), a tone per face -- and
+// drawn in depth order with the body.
 
-const EDGE = 0.9;
+const EDGE = 0.5;
 
 function edgeStyle(fill: string): Shape {
-  return { d: '', fill, stroke: ART.outline, strokeWidth: EDGE };
+  return { d: '', fill, stroke: ART.rim, strokeWidth: EDGE };
 }
+
+/** The tone of a bar's end as it faces the viewer. */
+const METAL_END = '#D9DCE0';
 
 /** A solid cylinder from `a` to `b`. */
 function cylinder(
@@ -34,7 +39,7 @@ function cylinder(
   a: V3,
   b: V3,
   r: number,
-  side: string,
+  side: Material,
   cap: string,
   opts: { layer?: 0 | 1; bias?: number; hub?: number; floor?: boolean } = {},
 ): Piece {
@@ -45,7 +50,13 @@ function cylinder(
   const ringA = ring(a, u, w, r, samples).map(cam.toScreen);
   const ringB = ring(b, u, w, r, samples).map(cam.toScreen);
   const hull = convexHull([...ringA, ...ringB]);
-  const shapes: Shape[] = [{ ...edgeStyle(side), d: polygonPath(hull) }];
+  const shapes: Shape[] = [
+    {
+      ...edgeStyle(midTone(side)),
+      d: polygonPath(hull),
+      gradient: cylinderGradient(hull, cam.toScreen(a), cam.toScreen(b), side),
+    },
+  ];
   const facingB = cam.facing(axis);
   const face =
     facingB > 0.12 ? { ring: ringB, at: b } : facingB < -0.12 ? { ring: ringA, at: a } : null;
@@ -144,7 +155,9 @@ function dumbbellPieces(cam: Camera, grip: V3, axis: V3, plateR = 6.8): Piece[] 
   const half = 6.4;
   const thick = 4.6;
   const end = (sign: number) => add(grip, scale(axis, sign * half));
-  const out: Piece[] = [cylinder(cam, end(-1), end(1), 1.5, ART.metal, ART.metal, { bias: -0.4 })];
+  const out: Piece[] = [
+    cylinder(cam, end(-1), end(1), 1.5, MATERIALS.metal, METAL_END, { bias: -0.4 }),
+  ];
   for (const sign of [-1, 1]) {
     out.push(
       cylinder(
@@ -152,7 +165,7 @@ function dumbbellPieces(cam: Camera, grip: V3, axis: V3, plateR = 6.8): Piece[] 
         end(sign),
         add(grip, scale(axis, sign * (half + thick))),
         plateR,
-        ART.plate,
+        MATERIALS.iron,
         ART.plateFace,
         {
           hub: 1.6,
@@ -239,8 +252,8 @@ export function barbell(opts: BarOptions = {}): PropBuilder {
             at(a, scale(bendDir, kink(a))),
             at(b, scale(bendDir, kink(b))),
             1.4,
-            ART.metal,
-            ART.metal,
+            MATERIALS.metal,
+            METAL_END,
             { bias: -0.4 },
           ),
         );
@@ -248,21 +261,23 @@ export function barbell(opts: BarOptions = {}): PropBuilder {
     } else {
       for (let i = 0; i < stops.length - 1; i += 1) {
         pieces.push(
-          cylinder(cam, at(stops[i]), at(stops[i + 1]), 1.4, ART.metal, ART.metal, { bias: -0.4 }),
+          cylinder(cam, at(stops[i]), at(stops[i + 1]), 1.4, MATERIALS.metal, METAL_END, {
+            bias: -0.4,
+          }),
         );
       }
     }
     for (const sign of [-1, 1]) {
       pieces.push(
-        cylinder(cam, at(sign * sleeveFrom), at(sign * half), 2.5, ART.metalDark, ART.metal),
+        cylinder(cam, at(sign * sleeveFrom), at(sign * half), 2.5, MATERIALS.metal, METAL_END),
       );
       const p0 = sign * (sleeveFrom + 2);
       const p1 = sign * (sleeveFrom + (ez ? 5.5 : 7));
       pieces.push(
-        cylinder(cam, at(p0), at(p1), plateR, ART.plate, ART.plateFace, { hub: ez ? 2.2 : 3 }),
+        cylinder(cam, at(p0), at(p1), plateR, MATERIALS.iron, ART.plateFace, { hub: ez ? 2.2 : 3 }),
       );
       pieces.push(
-        cylinder(cam, at(p1), at(sign * (Math.abs(p1) + 1.6)), 3.6, ART.metalDark, ART.metal),
+        cylinder(cam, at(p1), at(sign * (Math.abs(p1) + 1.6)), 3.6, MATERIALS.metal, METAL_END),
       );
     }
     return pieces;
@@ -291,23 +306,25 @@ export function landmine(
           lerp3(anchor, hands, i / n),
           lerp3(anchor, hands, (i + 1) / n),
           1.6,
-          ART.metal,
-          ART.metal,
+          MATERIALS.metal,
+          METAL_END,
           { bias: -0.4 },
         ),
       );
     }
     pieces.push(
-      cylinder(cam, hands, add(hands, scale(dir, 5)), 1.6, ART.metal, ART.metal, { bias: -0.4 }),
+      cylinder(cam, hands, add(hands, scale(dir, 5)), 1.6, MATERIALS.metal, METAL_END, {
+        bias: -0.4,
+      }),
     );
-    pieces.push(cylinder(cam, add(hands, scale(dir, 5)), tip, 2.5, ART.metalDark, ART.metal));
+    pieces.push(cylinder(cam, add(hands, scale(dir, 5)), tip, 2.5, MATERIALS.metal, METAL_END));
     pieces.push(
       cylinder(
         cam,
         add(hands, scale(dir, 7)),
         add(hands, scale(dir, 11)),
         17,
-        ART.plate,
+        MATERIALS.iron,
         ART.plateFace,
         { hub: 2.4 },
       ),
@@ -441,7 +458,7 @@ export function bench(opts: BenchOptions): PropBuilder {
 /** A padded roller to hook the legs under (a decline bench's leg hold), running across at `at`. */
 export function legRoller(at: V3): PropBuilder {
   return ({ cam }) => [
-    cylinder(cam, [at[0], at[1], -16], [at[0], at[1], 16], 4.5, ART.pad, ART.padTop, {
+    cylinder(cam, [at[0], at[1], -16], [at[0], at[1], 16], 4.5, MATERIALS.iron, ART.padTop, {
       layer: 0,
       bias: 4,
     }),
@@ -536,8 +553,8 @@ export function rackPins(height: number, x: number, halfSpan = 58): PropBuilder 
           [x - 22, height - 2, z],
           [x + 22, height - 2, z],
           1.6,
-          ART.metalDark,
-          ART.metal,
+          MATERIALS.metal,
+          METAL_END,
           { bias: -1 },
         ),
       );
@@ -557,16 +574,32 @@ export function abWheel(): PropBuilder {
         add(center, [0, 0, -3.5]),
         add(center, [0, 0, 3.5]),
         9,
-        ART.plate,
+        MATERIALS.iron,
         ART.plateFace,
         { hub: 2.5, floor: true },
       ),
-      cylinder(cam, skeleton.arms.l.end, add(center, [0, 0, -3.5]), 1.3, ART.metal, ART.metal, {
-        bias: -0.3,
-      }),
-      cylinder(cam, add(center, [0, 0, 3.5]), skeleton.arms.r.end, 1.3, ART.metal, ART.metal, {
-        bias: -0.3,
-      }),
+      cylinder(
+        cam,
+        skeleton.arms.l.end,
+        add(center, [0, 0, -3.5]),
+        1.3,
+        MATERIALS.metal,
+        METAL_END,
+        {
+          bias: -0.3,
+        },
+      ),
+      cylinder(
+        cam,
+        add(center, [0, 0, 3.5]),
+        skeleton.arms.r.end,
+        1.3,
+        MATERIALS.metal,
+        METAL_END,
+        {
+          bias: -0.3,
+        },
+      ),
     ];
   };
 }
@@ -585,7 +618,9 @@ export function post(at: V3, height = 190): PropBuilder {
 /** A pull-up bar overhead, running across the figure. */
 export function pullUpBar(height: number, x = 0): PropBuilder {
   return ({ cam }) => [
-    cylinder(cam, [x, height, -60], [x, height, 60], 1.6, ART.metal, ART.metal, { bias: -0.5 }),
+    cylinder(cam, [x, height, -60], [x, height, 60], 1.6, MATERIALS.metal, METAL_END, {
+      bias: -0.5,
+    }),
     box(cam, [x, height / 2, -62], [2.4, 0, 0], [0, height / 2, 0], [0, 0, 2.4], FRAME, {
       layer: 1,
       bias: -60,

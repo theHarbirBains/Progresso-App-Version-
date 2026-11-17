@@ -121,23 +121,27 @@ export function ExerciseGuideSheet({
                 </AppCard>
               ) : null}
 
-              <AppCard testID={`${testID}-muscles`} style={styles.card}>
-                <MuscleLine
-                  label="Primary"
-                  groups={[shown.muscleGroup]}
-                  color={accent}
-                  strong
-                  testID={`${testID}-primary`}
-                />
-                {shown.secondaryMuscleGroups.length > 0 ? (
+              {/* The drawn illustration names its muscles beside its anatomy figure; anything else
+                  (a hosted image, or none) has them here. */}
+              {shown.illustrationUrl || !shown.slug ? (
+                <AppCard testID={`${testID}-muscles`} style={styles.card}>
                   <MuscleLine
-                    label="Also Works"
-                    groups={shown.secondaryMuscleGroups}
-                    color={colors.textSecondaryBright}
-                    testID={`${testID}-secondary`}
+                    label="Primary"
+                    groups={[shown.muscleGroup]}
+                    color={accent}
+                    strong
+                    testID={`${testID}-primary`}
                   />
-                ) : null}
-              </AppCard>
+                  {shown.secondaryMuscleGroups.length > 0 ? (
+                    <MuscleLine
+                      label="Also Works"
+                      groups={shown.secondaryMuscleGroups}
+                      color={colors.textSecondaryBright}
+                      testID={`${testID}-secondary`}
+                    />
+                  ) : null}
+                </AppCard>
+              ) : null}
 
               {shown.summary ? (
                 <Text testID={`${testID}-summary`} style={styles.summary}>

@@ -1,15 +1,50 @@
 import { useId, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import Svg, { ClipPath, Defs, Path } from 'react-native-svg';
+import { Feather } from '@expo/vector-icons';
+import Svg, { ClipPath, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { Text } from '../../design/Text';
 import { colors, radii, spacing, typeScale } from '../../design/theme';
+import { MUSCLE_GROUP_LABELS } from '../muscleGroups';
 import { BUILTIN_CATALOG } from './builtinCatalog.generated';
-import { frameLabels, illustrationFor, thumbnailFor } from './exerciseArt';
+import { frameLabels, illustrationFor, muscleMapFor, thumbnailFor } from './exerciseArt';
 import { ART } from './palette';
 import type { RenderedFrame, ViewBox } from './render';
+import type { Gradient } from './shading';
 
-// The illustrated instructor on screen: one frame (react-native-svg), the full start-to-finish
-// illustration with its labels and muscle key, and the small thumbnail a list row shows.
+// The illustrated instructor on screen: the positions side by side with an arrow between them,
+// each named in a pill underneath; beside them, the grey anatomy figure with the worked muscles in
+// red (primary) and yellow (secondary) and a key naming them; and the small thumbnail a list row
+// shows. Every frame is react-native-svg, drawn from the shapes render.ts works out.
+
+function GradientDef({ gradient, id }: { gradient: Gradient; id: string }) {
+  const stops = gradient.stops.map(([offset, color], i) => (
+    <Stop key={i} offset={offset} stopColor={color} />
+  ));
+  return gradient.kind === 'linear' ? (
+    <LinearGradient
+      id={id}
+      gradientUnits="userSpaceOnUse"
+      x1={gradient.x1}
+      y1={gradient.y1}
+      x2={gradient.x2 ?? gradient.x1}
+      y2={gradient.y2 ?? gradient.y1}
+    >
+      {stops}
+    </LinearGradient>
+  ) : (
+    <RadialGradient
+      id={id}
+      gradientUnits="userSpaceOnUse"
+      cx={gradient.x1}
+      cy={gradient.y1}
+      fx={gradient.x1}
+      fy={gradient.y1}
+      r={gradient.r ?? 1}
+    >
+      {stops}
+    </RadialGradient>
+  );
+}
 
 function Frame({
   frame,
@@ -38,12 +73,17 @@ function Frame({
             ))}
           </ClipPath>
         ))}
+        {frame.shapes.map((shape, i) =>
+          shape.gradient ? (
+            <GradientDef key={`g${i}`} gradient={shape.gradient} id={`${prefix}g${i}`} />
+          ) : null,
+        )}
       </Defs>
       {frame.shapes.map((shape, i) => (
         <Path
           key={i}
           d={shape.d}
-          fill={shape.fill}
+          fill={shape.gradient ? `url(#${prefix}g${i})` : shape.fill}
           stroke={shape.stroke}
           strokeWidth={shape.strokeWidth}
           strokeLinejoin={shape.stroke ? 'round' : undefined}
@@ -57,17 +97,21 @@ function Frame({
   );
 }
 
-/** A unique, SVG-safe prefix for one drawing's clip paths. */
+/** A unique, SVG-safe prefix for one drawing's clip paths and gradients. */
 function usePrefix(): string {
   return `ill${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 }
 
-/** The tallest the full illustration draws, so a standing figure never fills the screen. */
-const MAX_FRAME_HEIGHT = 230;
+/** The tallest the positions draw, so a standing figure never fills the screen. */
+const MAX_FRAME_HEIGHT = 220;
+/** The arrow between two positions. */
+const ARROW_WIDTH = 22;
+/** How tall the anatomy figure stands beside its key. */
+const MAP_HEIGHT = 128;
 
 /**
- * The full illustration: every position side by side at one scale, each named under it (Start,
- * Finish), the movement arrowed between them, and a key to the highlighted muscles. Null for an
+ * The full illustration: the positions side by side at one scale with an arrow between them, each
+ * named in a pill under it (Start, Finish), then the anatomy figure and its key. Null for an
  * exercise without one.
  */
 export function ExerciseIllustration({
@@ -80,65 +124,97 @@ export function ExerciseIllustration({
   const prefix = usePrefix();
   const [width, setWidth] = useState(0);
   const scene = illustrationFor(slug);
-  if (!scene || !slug) return null;
+  const map = muscleMapFor(slug);
+  if (!scene || !map || !slug) return null;
   const entry = BUILTIN_CATALOG[slug];
   const count = scene.frames.length;
-  const gap = spacing.sm;
+  const arrows = count - 1;
   const aspect = scene.viewBox.height / scene.viewBox.width;
-  const frameWidth = width > 0 ? Math.floor((width - gap * (count - 1)) / count) : 0;
+  const frameWidth =
+    width > 0 ? Math.floor((width - arrows * (ARROW_WIDTH + spacing.xs * 2)) / count) : 0;
   const frameHeight = Math.min(MAX_FRAME_HEIGHT, Math.round(frameWidth * aspect));
   const drawWidth = Math.round(frameHeight / aspect);
   const labels = frameLabels(count);
-  const hasSecondary = entry.highlight.secondary.length > 0;
+  const names = (groups: readonly string[]) =>
+    groups.map((g) => MUSCLE_GROUP_LABELS[g as keyof typeof MUSCLE_GROUP_LABELS]).join(', ');
   return (
-    <View
-      testID={testID}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={`How ${entry.name} is done: ${labels.join(', then ').toLowerCase()} position${count > 1 ? 's' : ''}`}
-    >
+    <View testID={testID} style={styles.wrap}>
       <View
         testID={testID ? `${testID}-frames` : undefined}
-        style={[styles.frames, { gap }]}
+        style={styles.frames}
         onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={`How ${entry.name} is done: ${labels.join(', then ').toLowerCase()} position${count > 1 ? 's' : ''}`}
       >
         {frameWidth > 0
           ? scene.frames.map((frame, i) => (
-              <View key={i} style={[styles.frame, { width: frameWidth }]}>
-                <View style={[styles.frameArt, { height: frameHeight }]}>
-                  <Frame
-                    frame={frame}
-                    viewBox={scene.viewBox}
-                    width={drawWidth}
-                    height={frameHeight}
-                    prefix={`${prefix}f${i}`}
-                  />
+              <View key={i} style={styles.frameRow}>
+                {i > 0 ? (
+                  <View style={[styles.arrow, { height: frameHeight }]}>
+                    <Feather name="arrow-right" size={18} color={colors.textMuted} />
+                  </View>
+                ) : null}
+                <View style={[styles.frame, { width: frameWidth }]}>
+                  <View style={[styles.frameArt, { height: frameHeight }]}>
+                    <Frame
+                      frame={frame}
+                      viewBox={scene.viewBox}
+                      width={drawWidth}
+                      height={frameHeight}
+                      prefix={`${prefix}f${i}`}
+                    />
+                  </View>
+                  <View style={styles.pill}>
+                    <Text
+                      testID={testID ? `${testID}-label-${i}` : undefined}
+                      style={styles.pillText}
+                    >
+                      {labels[i]}
+                    </Text>
+                  </View>
                 </View>
-                <Text
-                  testID={testID ? `${testID}-label-${i}` : undefined}
-                  style={styles.frameLabel}
-                >
-                  {labels[i]}
-                </Text>
               </View>
             ))
           : null}
       </View>
-      <View
-        style={styles.key}
-        importantForAccessibility="no-hide-descendants"
-        accessibilityElementsHidden
-      >
-        <View style={styles.keyItem}>
-          <View style={[styles.keyDot, { backgroundColor: ART.primary }]} />
-          <Text style={styles.keyText}>Primary</Text>
+
+      <View style={styles.muscles}>
+        <View
+          style={styles.map}
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={`Muscles worked: ${names(map.primary)}${map.secondary.length ? `, and ${names(map.secondary)}` : ''}`}
+        >
+          {map.views.map((view, i) => (
+            <Frame
+              key={view.side}
+              frame={view.frame}
+              viewBox={view.viewBox}
+              width={Math.round((MAP_HEIGHT * view.viewBox.width) / view.viewBox.height)}
+              height={MAP_HEIGHT}
+              prefix={`${prefix}m${i}`}
+            />
+          ))}
         </View>
-        {hasSecondary ? (
-          <View style={styles.keyItem}>
-            <View style={[styles.keyDot, { backgroundColor: ART.secondary }]} />
-            <Text style={styles.keyText}>Secondary</Text>
+        <View style={styles.key}>
+          <View testID={testID ? `${testID}-primary` : undefined} style={styles.keyRow}>
+            <View style={[styles.keyDot, { backgroundColor: ART.primary }]} />
+            <Text style={styles.keyText}>
+              <Text style={styles.keyLabel}>Primary: </Text>
+              {names(map.primary)}
+            </Text>
           </View>
-        ) : null}
+          {map.secondary.length > 0 ? (
+            <View testID={testID ? `${testID}-secondary` : undefined} style={styles.keyRow}>
+              <View style={[styles.keyDot, { backgroundColor: ART.secondary }]} />
+              <Text style={styles.keyText}>
+                <Text style={styles.keyLabel}>Secondary: </Text>
+                {names(map.secondary)}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -174,12 +250,26 @@ export function ExerciseThumbnail({
 }
 
 const styles = StyleSheet.create({
+  wrap: {
+    gap: spacing.lg,
+  },
   frames: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
+  },
+  frameRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  arrow: {
+    width: ARROW_WIDTH,
+    marginHorizontal: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   frame: {
     alignItems: 'center',
+    gap: spacing.sm,
   },
   frameArt: {
     width: '100%',
@@ -189,29 +279,54 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     overflow: 'hidden',
   },
-  frameLabel: {
-    ...typeScale.caption,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+  pill: {
+    borderRadius: radii.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 3,
   },
-  key: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    marginTop: spacing.sm,
+  pillText: {
+    ...typeScale.label,
+    color: colors.textPrimary,
   },
-  keyItem: {
+  muscles: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  map: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     gap: spacing.xs,
+  },
+  key: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  keyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
   },
   keyDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
+    marginTop: 5,
   },
   keyText: {
-    ...typeScale.caption,
-    color: colors.textSecondary,
+    ...typeScale.secondary,
+    color: colors.textSecondaryBright,
+    flex: 1,
+  },
+  keyLabel: {
+    ...typeScale.secondary,
+    color: colors.textPrimary,
+    fontWeight: '700',
   },
 });
