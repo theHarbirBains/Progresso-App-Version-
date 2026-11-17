@@ -29,8 +29,8 @@ describe('sharingFriends', () => {
         row('d', 'friend', 'sam', 'Sam'),
       ]),
     ).toEqual([
-      { id: 'lisa', name: 'Lisa' },
-      { id: 'sam', name: 'Sam' },
+      { id: 'lisa', name: 'Lisa', count: 1 },
+      { id: 'sam', name: 'Sam', count: 2 },
     ]);
   });
 });

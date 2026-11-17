@@ -4,7 +4,6 @@ import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
-import { FilterChips } from '../design/FilterChips';
 import { IconButton } from '../design/IconButton';
 import { ListRow } from '../design/ListRow';
 import { SectionHeader } from '../design/SectionHeader';
@@ -17,7 +16,9 @@ import { exerciseLibraryStyles as styles } from '../screens/exerciseLibraryStyle
 import { groupExercisesByLetter } from './exerciseLibraryGrouping';
 import { ExercisePhoto } from './ExercisePhoto';
 import type { ExerciseRow, ExerciseSource, ExerciseSourceCounts } from './exerciseQueries';
+import { FriendPicker } from './FriendPicker';
 import { MuscleGroupChips } from './MuscleGroupChips';
+import type { SharingFriend } from './sharingFriends';
 import { machineLine } from './machineDetails';
 import { MOVEMENT_TYPE_LABELS } from './movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
@@ -31,7 +32,6 @@ const SOURCE_OPTIONS: { value: ExerciseSource; label: string }[] = [
 ];
 
 /** The Friends tab's filter value for every friend at once. */
-const ALL_FRIENDS = 'all-friends';
 
 /** The word on a shared exercise's row: whose it is. */
 const SHARED_LABELS = { trainer: 'Trainer', client: 'Client', friend: 'Friend' } as const;
@@ -72,10 +72,10 @@ interface Props {
    */
   onDeleteMine?: (exercise: ExerciseRow) => Promise<void>;
   /**
-   * The people you follow who share exercises (sharingFriends) -- in Friends, a chip each to show
-   * only theirs. Whatever's searched, so a friend picked never goes from the row.
+   * The people you follow who share exercises (sharingFriends) -- in Friends, one row opening a
+   * sheet to search them by name and show only one's exercises (FriendPicker).
    */
-  friends?: { id: string; name: string }[];
+  friends?: SharingFriend[];
   /** A row shown first in the list, above the exercises (the picker's Create Custom). */
   listHeader?: ReactNode;
   testID?: string;
@@ -86,7 +86,7 @@ interface Props {
  * a browse card (search, muscle filter, and All / Built-in / Mine with real counts), then
  * a list card with the count and the exercises A-Z under letter headings, each with its
  * photo, name, muscle and movement, and a Built-in or Mine marker. In Friends the count gives way
- * to a filter by friend.
+ * to a choice of friend (FriendPicker).
  */
 export function ExerciseBrowser({
   searchInput,
@@ -367,16 +367,12 @@ export function ExerciseBrowser({
       <AppCard testID="exercise-library-list" style={styles.listCard}>
         {inFriends ? (
           friends.length > 0 ? (
-            <FilterChips
+            <FriendPicker
               testID="exercise-friend-filter"
-              options={[
-                { value: ALL_FRIENDS, label: 'All Friends' },
-                ...friends.map((friend) => ({ value: friend.id, label: friend.name })),
-              ]}
-              value={friendId ?? ALL_FRIENDS}
-              onChange={(value) => setFriendId(value === ALL_FRIENDS ? null : value)}
+              friends={friends}
+              value={friendId}
+              onChange={setFriendId}
               accentColor={accent.color}
-              onAccentColor={accent.onColor}
             />
           ) : null
         ) : (

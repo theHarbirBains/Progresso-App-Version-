@@ -634,7 +634,7 @@ describe('ExerciseLibraryScreen -- shared libraries', () => {
     expect(mockShared.makeOwn).not.toHaveBeenCalled();
   });
 
-  it('filters Friends by friend in place of a count, and keeps the count elsewhere', async () => {
+  it('picks one friend from a searchable list in place of a count, and keeps the count elsewhere', async () => {
     const lisasRow = {
       ...friendsRow,
       id: 'ex-lisas',
@@ -651,19 +651,34 @@ describe('ExerciseLibraryScreen -- shared libraries', () => {
 
     await screen.findByTestId('exercise-item-ex-lisas');
     expect(screen.queryByTestId('exercise-library-count')).toBeNull();
-    // Only the people you follow -- not your trainer -- A-Z, after All Friends.
-    const filter = screen.getByTestId('exercise-friend-filter');
-    expect(filter).toHaveTextContent(/All Friends.*Lisa.*Sam/);
-    expect(filter).not.toHaveTextContent(/Coach/);
+    // One row, not a chip a friend: everyone's, until one is picked.
+    expect(screen.getByTestId('exercise-friend-filter')).toHaveTextContent(/All Friends/);
     expect(screen.getByTestId('exercise-item-ex-sams')).toBeTruthy();
 
+    fireEvent.press(screen.getByTestId('exercise-friend-filter'));
+    // Only the people you follow -- not your trainer -- A-Z, each with what they share.
+    const list = screen.getByTestId('exercise-friend-filter-list');
+    expect(list).toHaveTextContent(/All Friends.*2 friends.*Lisa.*1 exercise.*Sam.*1 exercise/);
+    expect(list).not.toHaveTextContent(/Coach/);
+
+    // Searched by name, as it's typed.
+    fireEvent.changeText(screen.getByTestId('exercise-friend-filter-search'), 'SAM');
+    expect(screen.queryByTestId('exercise-friend-filter-lisa')).toBeNull();
     fireEvent.press(screen.getByTestId('exercise-friend-filter-sam'));
 
+    expect(screen.getByTestId('exercise-friend-filter')).toHaveTextContent(/Sam/);
     expect(screen.getByTestId('exercise-item-ex-sams')).toBeTruthy();
     expect(screen.queryByTestId('exercise-item-ex-lisas')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('exercise-friend-filter-all-friends'));
+    // A name nobody has says so.
+    fireEvent.press(screen.getByTestId('exercise-friend-filter'));
+    fireEvent.changeText(screen.getByTestId('exercise-friend-filter-search'), 'zed');
+    expect(screen.getByTestId('exercise-friend-filter-no-match')).toHaveTextContent(
+      'No friends named "zed"',
+    );
 
+    // Show All brings everyone's back in one tap.
+    fireEvent.press(screen.getByTestId('exercise-friend-filter-clear'));
     expect(screen.getByTestId('exercise-item-ex-lisas')).toBeTruthy();
   });
 
