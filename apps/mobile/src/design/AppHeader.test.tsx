@@ -25,6 +25,19 @@ describe('AppHeader', () => {
     );
   });
 
+  it('keeps a one-word title on one line, shrinking to fit; several words still wrap', () => {
+    const { rerender } = render(<AppHeader title="Progresso" />);
+    expect(screen.getByText('Progresso').props).toMatchObject({
+      numberOfLines: 1,
+      adjustsFontSizeToFit: true,
+    });
+
+    rerender(<AppHeader title="Profile & Personal Information" />);
+    const long = screen.getByText('Profile & Personal Information').props;
+    expect(long.numberOfLines).toBeUndefined();
+    expect(long.adjustsFontSizeToFit).toBeUndefined();
+  });
+
   describe('holiday decorations', () => {
     const hidden = { includeHiddenElements: true };
 
@@ -38,6 +51,7 @@ describe('AppHeader', () => {
       expect(screen.getByTestId('santa-hat', hidden)).toBeTruthy();
       // The title reads and centres as ever.
       expect(StyleSheet.flatten(screen.getByText('Workouts').props.style).textAlign).toBe('center');
+      expect(screen.getByText('Workouts').props.numberOfLines).toBe(1);
       expect(screen.getByText('Your history')).toBeTruthy();
     });
 

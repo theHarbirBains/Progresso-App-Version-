@@ -76,6 +76,14 @@ export function AppHeader({
   // (rightAction, the loading spinner, or a spacer) regardless.
   const showLeftSecondary = Boolean(left && leftAction2);
   const showRightSecondary = Boolean(rightAction2);
+  // A one-word title ("Progresso", "@username") stays on one line, shrinking
+  // to fit rather than breaking mid-word ("Progres / so") -- at the larger
+  // iOS text sizes with four icons beside it, it can't fit at full size. A
+  // title of several words still wraps between them.
+  const titleFit =
+    title && !/\s/.test(title.trim())
+      ? { numberOfLines: 1, adjustsFontSizeToFit: true }
+      : undefined;
 
   return (
     <View testID={testID} style={[styles.row, safeArea && { paddingTop: insets.top + spacing.md }]}>
@@ -116,11 +124,15 @@ export function AppHeader({
               // Through the holidays, a Santa hat on the title's first letter (Settings >
               // Appearance > Holiday Decorations).
               <View style={styles.hatted}>
-                <Text style={styles.title}>{title}</Text>
+                <Text style={styles.title} {...titleFit}>
+                  {title}
+                </Text>
                 <SantaHat style={styles.hat} />
               </View>
             ) : title ? (
-              <Text style={styles.title}>{title}</Text>
+              <Text style={styles.title} {...titleFit}>
+                {title}
+              </Text>
             ) : null}
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </>
