@@ -47,6 +47,8 @@ A user creates a workout split (or starts from a preset), logs sets during a liv
 - Unilateral exercises are logged per side, left and right
 - Group workouts: start a group before the workout begins (Start Workout › Working Out as a Group); each person has their own tab of sets, and anyone in the group can enter them
 - Custom exercises alongside a shared default exercise library, each tagged with a muscle group (the legs as Quadriceps, Hamstrings, Adductors, Glutes and Calves), with optional equipment profiles and machine photos
+- Create Exercise asks only what fits the equipment (dumbbell, barbell, kettlebell, cable, machine, bodyweight or other): a dumbbell curl is a name, a muscle and an optional photo; a cable exercise documents its gym, grip, attachment / handle, weight type, pulley position (high, mid, low, adjustable) and setup notes; a machine its gym, grip, weight type and setup notes (seat height, backrest, pads -- started with a tap). Grip (how it's held) and attachment (what's held) are separate. Each setup is its own exercise with its own records; changing the setup of an exercise with history asks first and offers to save it as a new exercise, and a second exercise with the very same setup is flagged before it's made
+- The Exercise Library's Friends tab picks one friend's exercises from a searchable list of the people you follow
 - Workout history with a month calendar view and per-day/per-workout detail; past workouts can be logged and completed ones edited
 - Workout sharing: a story-sized (9:16) workout card, shared to Instagram, TikTok and other apps through the share sheet
 
