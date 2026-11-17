@@ -9,6 +9,14 @@ jest.mock('../auth/AuthProvider', () => ({ useAuth: jest.fn() }));
 jest.mock('../profile/ProfileProvider', () => ({ useProfile: jest.fn() }));
 jest.mock('../nutrition/NutritionGoalsProvider', () => ({ useNutritionGoals: jest.fn() }));
 jest.mock('../profile/useAvatarPhoto', () => ({ useAvatarPhoto: jest.fn() }));
+const mockRefetchAllTimeStats = jest.fn(async () => true);
+jest.mock('../progress/AllTimeStatsProvider', () => ({
+  useAllTimeStats: () => ({ refetch: mockRefetchAllTimeStats }),
+}));
+const mockInvalidateExerciseCache = jest.fn();
+jest.mock('../exercises/exerciseQueries', () => ({
+  invalidateExerciseCache: (userId: string) => mockInvalidateExerciseCache(userId),
+}));
 // The contacts part has its own tests (FindPeopleScreen's Suggested).
 jest.mock('../social/ContactSuggestions', () => {
   const { Text } = jest.requireActual('react-native');
@@ -40,12 +48,17 @@ beforeEach(() => {
 });
 
 describe('WelcomeScreen', () => {
-  it('reads the profile and daily targets again, so the app opens on what onboarding saved', async () => {
+  it('reads the profile, daily targets and history again, so the app opens on what onboarding saved', async () => {
+    mockRefetchAllTimeStats.mockClear();
+    mockInvalidateExerciseCache.mockClear();
     render(<WelcomeScreen onDone={jest.fn()} />);
     await act(async () => {});
 
     expect(refetchProfile).toHaveBeenCalledTimes(1);
     expect(refetchGoals).toHaveBeenCalledTimes(1);
+    // A trainer's history claimed with their code moved after the account's first, empty read.
+    expect(mockRefetchAllTimeStats).toHaveBeenCalledTimes(1);
+    expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');
   });
 
   it('offers a profile photo first, which can wait', async () => {

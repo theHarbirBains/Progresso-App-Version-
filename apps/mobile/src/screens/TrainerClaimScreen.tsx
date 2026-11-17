@@ -11,6 +11,8 @@ import { Card } from '../design/Card';
 import { claimTrainerHistory } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAchievements } from '../achievements/achievementsContext';
+import { invalidateExerciseCache } from '../exercises/exerciseQueries';
+import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 
 type Props = RootStackScreenProps<'TrainerClaim'>;
 
@@ -18,11 +20,14 @@ const CODE_PATTERN = /^[A-Za-z0-9 -]{8,12}$/;
 
 /**
  * The client's side of a tracked history: they enter the code their trainer gave
- * them, and the workouts logged for them move onto their own account.
+ * them, and the workouts logged for them move onto their own account -- their
+ * trainer stays linked. The history, records and exercises read once per sign-in
+ * are read again, so Progress and the profile show the claimed workouts at once.
  */
 export function TrainerClaimScreen({ navigation }: Props) {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const accessToken = session?.access_token;
+  const { refetch: refetchAllTimeStats } = useAllTimeStats();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -40,13 +45,13 @@ export function TrainerClaimScreen({ navigation }: Props) {
     setError(null);
     try {
       const { workouts } = await claimTrainerHistory(accessToken, entered);
+      // The claimed workouts, records and custom exercises are theirs now.
+      void refetchAllTimeStats();
+      if (user?.id) invalidateExerciseCache(user.id);
       // The claimed history counts toward their achievements: show what it's earned.
       void evaluate();
       const count = workouts === 1 ? '1 workout is' : `${workouts} workouts are`;
-      Alert.alert(
-        'History linked',
-        `${count} now on your account. Accept your trainer’s request in Trainer Access to keep them coaching you.`,
-      );
+      Alert.alert('History linked', `${count} now on your account.`);
       navigation.goBack();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not link this history');

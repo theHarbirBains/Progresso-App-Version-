@@ -383,7 +383,7 @@ async function claimTrainerCode(accessToken: string, code: string): Promise<void
   } catch (error) {
     Alert.alert(
       "Your trainer's code didn't work",
-      `${error instanceof Error ? error.message : String(error)}\n\nYou can enter it again in Trainer Access.`,
+      `${error instanceof Error ? error.message : String(error)}\n\nYou can enter it again in Settings > Trainer Code.`,
     );
   }
 }

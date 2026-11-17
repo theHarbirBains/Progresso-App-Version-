@@ -13,6 +13,16 @@ jest.mock('../lib/api', () => ({
   claimTrainerHistory: jest.fn(),
 }));
 
+const mockRefetchAllTimeStats = jest.fn(async () => true);
+jest.mock('../progress/AllTimeStatsProvider', () => ({
+  useAllTimeStats: () => ({ refetch: mockRefetchAllTimeStats }),
+}));
+
+const mockInvalidateExerciseCache = jest.fn();
+jest.mock('../exercises/exerciseQueries', () => ({
+  invalidateExerciseCache: (userId: string) => mockInvalidateExerciseCache(userId),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockClaim = claimTrainerHistory as jest.Mock;
 
@@ -33,8 +43,10 @@ function renderScreen() {
 }
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' } });
+  mockUseAuth.mockReturnValue({ session: { access_token: 'token-1' }, user: { id: 'user-1' } });
   mockClaim.mockReset();
+  mockRefetchAllTimeStats.mockClear();
+  mockInvalidateExerciseCache.mockClear();
   mockGoBack.mockClear();
   mockEvaluate.mockClear();
 });
@@ -50,12 +62,13 @@ describe('TrainerClaimScreen', () => {
 
     await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
     expect(mockClaim).toHaveBeenCalledWith('token-1', 'abcd-2345');
-    expect(alert).toHaveBeenCalledWith(
-      'History linked',
-      expect.stringContaining('3 workouts are now on your account'),
-    );
+    // Their trainer stays linked: nothing to accept.
+    expect(alert).toHaveBeenCalledWith('History linked', '3 workouts are now on your account.');
     // The claimed history counts toward their achievements at once.
     expect(mockEvaluate).toHaveBeenCalled();
+    // Progress, records and the library show the claimed workouts and exercises at once.
+    expect(mockRefetchAllTimeStats).toHaveBeenCalled();
+    expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');
     alert.mockRestore();
   });
 
@@ -80,5 +93,7 @@ describe('TrainerClaimScreen', () => {
 
     expect(await screen.findByText(/That code has expired/)).toBeTruthy();
     expect(mockGoBack).not.toHaveBeenCalled();
+    // Nothing moved: nothing read again.
+    expect(mockRefetchAllTimeStats).not.toHaveBeenCalled();
   });
 });

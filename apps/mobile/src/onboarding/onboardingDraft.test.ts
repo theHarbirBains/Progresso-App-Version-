@@ -185,7 +185,7 @@ describe("submitOnboardingDraft -- a trainer's code", () => {
       "Your trainer's code didn't work",
       expect.stringContaining('That code has expired.'),
     );
-    expect(alert.mock.calls[0][1]).toContain('Trainer Access');
+    expect(alert.mock.calls[0][1]).toContain('Settings > Trainer Code');
     alert.mockRestore();
   });
 

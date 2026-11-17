@@ -758,7 +758,7 @@ export class TrainerService {
 
   /**
    * The client enters the code their trainer gave them. Their tracked history moves
-   * onto their own account. Their trainer link then waits for them to accept it.
+   * onto their own account, and their trainer stays linked, active (claim_keeps_trainer).
    */
   async claimHistory(userId: string, rawCode: string): Promise<{ workouts: number }> {
     this.enforceClaimLimit(userId);

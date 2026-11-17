@@ -5,8 +5,10 @@ import { Avatar } from '../design/Avatar';
 import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { Text } from '../design/Text';
 import { colors, radii, spacing } from '../design/theme';
+import { invalidateExerciseCache } from '../exercises/exerciseQueries';
 import { useNutritionGoals } from '../nutrition/NutritionGoalsProvider';
 import { useProfile } from '../profile/ProfileProvider';
+import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useAvatarPhoto } from '../profile/useAvatarPhoto';
 import { ContactSuggestions } from '../social/ContactSuggestions';
 import { useAppTheme } from '../theme/appThemeContext';
@@ -18,13 +20,15 @@ type Step = 'photo' | 'friends';
 /**
  * A new account's welcome, right after onboarding's answers are saved (App.tsx shows it in place
  * of the app, onboarding/welcomeStage.ts): a profile photo, then the people in their contacts
- * already on Progresso, to follow -- each skippable. It first reads the profile and daily targets
- * again, so the app opens on everything onboarding just saved.
+ * already on Progresso, to follow -- each skippable. It first reads the profile, daily targets and
+ * training history again, so the app opens on everything onboarding just saved -- a trainer's
+ * history claimed with their code among it (it moved after the account's first, empty read).
  */
 export function WelcomeScreen({ onDone }: { onDone: () => void }) {
   const { user } = useAuth();
   const { profile, refetch: refetchProfile } = useProfile();
   const { refetch: refetchGoals } = useNutritionGoals();
+  const { refetch: refetchAllTimeStats } = useAllTimeStats();
   const { accent } = useAppTheme();
   const avatar = useAvatarPhoto(user?.id);
   const [step, setStep] = useState<Step>('photo');
@@ -32,6 +36,8 @@ export function WelcomeScreen({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     void refetchProfile();
     void refetchGoals();
+    void refetchAllTimeStats();
+    if (user?.id) invalidateExerciseCache(user.id);
     // Once, as the welcome opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
