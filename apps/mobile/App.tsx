@@ -1,6 +1,9 @@
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Fraunces_700Bold, Fraunces_800ExtraBold } from '@expo-google-fonts/fraunces';
 import { JetBrainsMono_500Medium, JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
+import { Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
+import { Oswald_600SemiBold, Oswald_700Bold } from '@expo-google-fonts/oswald';
 import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_500Medium,
@@ -17,7 +20,6 @@ import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 import { AppBackgroundLayer, ScreenBackdrop } from './src/design/AppBackgroundLayer';
 import { AppSideMenu } from './src/design/AppSideMenu';
 import { BottomNavBar } from './src/design/BottomNavBar';
-import { colors } from './src/design/theme';
 import { wrapApp } from './src/lib/sentry';
 import { AppMenuContext } from './src/navigation/AppMenuContext';
 import {
@@ -82,6 +84,7 @@ import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
 import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { LaunchScreen, useHolidayLaunchHeld } from './src/screens/LaunchScreen';
+import { HolidayGarland } from './src/design/HolidayDecorations';
 import { Snowfall } from './src/design/Snowfall';
 import { EditWorkoutScreen } from './src/screens/EditWorkoutScreen';
 import { LogPastWorkoutScreen } from './src/screens/LogPastWorkoutScreen';
@@ -170,6 +173,7 @@ const NUTRITION_SCREENS = {
 
 function Root() {
   const { status, session, user } = useAuth();
+  const { theme: appTheme } = useAppTheme();
   const { profile, loading: profileLoading } = useProfile();
   // A new account between onboarding and the app: saving, then its welcome.
   const welcomeStage = useWelcomeStage();
@@ -519,10 +523,9 @@ function Root() {
             </View>
 
             {showGlobalBottomNav ? (
-              // The strip behind the bar is opaque flat theme colour -- every
-              // screen paints its own opaque backdrop now, so nothing behind
-              // the bar is ever a photograph.
-              <View style={{ backgroundColor: colors.background }}>
+              // The strip behind the bar is the theme's plain background colour,
+              // as behind every screen.
+              <View style={{ backgroundColor: appTheme.background }}>
                 <BottomNavBar
                   testID="app-bottom-nav"
                   active={routeToBottomNavTab(currentRouteName)}
@@ -625,6 +628,8 @@ function AppShell({ fontsLoaded }: { fontsLoaded: boolean }) {
       {ready ? <Root /> : null}
       {/* Over every screen through the holidays; touches pass straight through it. */}
       {ready && snowing ? <Snowfall /> : null}
+      {/* Lights strung across the top of every screen, with Holiday Decorations on. */}
+      {ready && decorating ? <HolidayGarland /> : null}
       <LaunchScreen
         ready={ready && (!holidayLaunch || held)}
         theme={themeLoaded ? theme : null}
@@ -643,6 +648,13 @@ function App() {
     PlusJakartaSans_800ExtraBold,
     JetBrainsMono_500Medium,
     JetBrainsMono_700Bold,
+    // The themes' heading faces (design/headingFont.ts): only the two weights each one uses.
+    Fraunces_700Bold,
+    Fraunces_800ExtraBold,
+    Oswald_600SemiBold,
+    Oswald_700Bold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
   });
 
   return (

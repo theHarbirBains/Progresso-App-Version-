@@ -1,10 +1,10 @@
 import { StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
+import { BackgroundPattern } from '../design/BackgroundPattern';
 import { ChoiceTile } from '../design/ChoiceTile';
+import { HEADING_FONTS } from '../design/headingFont';
 import { Text } from '../design/Text';
 import { colors, radii, spacing, typeScale } from '../design/theme';
-import { buildAccentTheme, withAlpha } from './accentColor';
+import { buildAccentTheme } from './accentColor';
 import { APP_THEMES, type AppTheme, type AppThemeId } from './appThemes';
 
 function ThemeTile({
@@ -18,8 +18,10 @@ function ThemeTile({
   onPress: () => void;
   testID: string;
 }) {
-  // Each tile shows its own accent when chosen, so the choice previews itself.
+  // Each tile is a small screen of its theme: its background and design, a heading in its face,
+  // and its accent -- and, chosen, its own accent's edge and check, so a choice previews itself.
   const accent = buildAccentTheme(theme.accent);
+  const font = HEADING_FONTS[theme.font];
   return (
     <ChoiceTile
       testID={testID}
@@ -27,21 +29,24 @@ function ThemeTile({
       onPress={onPress}
       accentColor={accent.accent}
       onAccentColor={accent.onAccent}
-      accessibilityLabel={`${theme.name} theme`}
+      accessibilityLabel={`${theme.name} theme, ${font.name} headings`}
       style={styles.tile}
     >
-      <View style={styles.preview}>
-        <Image
-          source={theme.photo}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          contentPosition="top"
+      <View style={[styles.preview, { backgroundColor: theme.background }]}>
+        <BackgroundPattern
+          pattern={theme.pattern}
+          color={accent.accent}
+          background={theme.background}
+          fade={false}
         />
-        <LinearGradient
-          colors={[withAlpha(colors.background, 0), withAlpha(colors.background, 0.85)]}
-          locations={[0.45, 1]}
-          style={StyleSheet.absoluteFill}
-        />
+        {/* The theme's heading face, named in its own family so the current theme's never applies. */}
+        <Text
+          testID={`theme-sample-${theme.id}`}
+          style={[styles.sample, { fontFamily: font.displayHeavy }]}
+        >
+          Aa
+        </Text>
+        <View style={[styles.bar, { backgroundColor: accent.accent }]} />
         <View style={styles.caption}>
           <View style={[styles.dot, { backgroundColor: accent.accent }]} />
           <Text style={styles.name} numberOfLines={1}>
@@ -54,8 +59,8 @@ function ThemeTile({
 }
 
 /**
- * The eight themes as a two-column grid of tiles -- each the top of its photo with a fade, a dot
- * of its accent and its name -- for Settings > Appearance and onboarding alike. A tile is
+ * The themes as a two-column grid of tiles -- each its background and design, "Aa" in its heading
+ * face, a bar and a dot of its accent and its name -- for Settings > Appearance. A tile is
  * `${testIDPrefix}-${theme id}`.
  */
 export function ThemeChoices({
@@ -108,12 +113,24 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     overflow: 'hidden',
     justifyContent: 'flex-end',
+    padding: spacing.sm,
+  },
+  sample: {
+    ...typeScale.display,
+    color: colors.textPrimary,
+  },
+  // A swatch of the accent, the way a button would wear it.
+  bar: {
+    height: 6,
+    width: '45%',
+    borderRadius: radii.pill,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
   },
   caption: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    padding: spacing.sm,
   },
   dot: {
     width: 12,

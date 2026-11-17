@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { HeadingFontContext, headingFamilyMap } from '../design/headingFont';
 import { useProfile } from '../profile/ProfileProvider';
 import { buildAccentTheme } from './accentColor';
 import { AppThemeContext, type AppThemeValue } from './appThemeContext';
@@ -95,5 +96,11 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
     };
   }, [saved, country, loaded, save]);
 
-  return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;
+  // The theme's heading face, for the shared Text (design/headingFont.ts).
+  const headings = useMemo(() => headingFamilyMap(value.theme.font), [value.theme.font]);
+  return (
+    <AppThemeContext.Provider value={value}>
+      <HeadingFontContext.Provider value={headings}>{children}</HeadingFontContext.Provider>
+    </AppThemeContext.Provider>
+  );
 }

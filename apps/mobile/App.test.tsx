@@ -755,36 +755,34 @@ describe('App background', () => {
     await screen.findByTestId('app-bottom-nav');
   }
 
-  // Every screen is one plain colour -- the warm near-black the text was chosen against -- with
-  // no photo, glow or shade: the signed-out screens on AppBackgroundLayer, every signed-in one on
-  // its own opaque ScreenBackdrop (see App.tsx's screenLayout).
-  it('shows the plain background, and nothing over it, before sign-in', async () => {
+  // Every screen is the theme's plain colour with its design -- Holiday Gym's evergreen for anyone
+  // who hasn't chosen -- and never a photo: the signed-out screens on AppBackgroundLayer, every
+  // signed-in one on its own opaque ScreenBackdrop (see App.tsx's screenLayout).
+  it("shows the theme's plain background before sign-in, with no photo", async () => {
     render(<App />);
     await screen.findByTestId('sign-in-email');
 
     expect(
       StyleSheet.flatten(screen.getByTestId('app-background-layer').props.style).backgroundColor,
-    ).toBe('#12110F');
-    expect(screen.queryByTestId('app-background-glow')).toBeNull();
+    ).toBe('#0D1511');
     expect(screen.queryByTestId('app-background-photo')).toBeNull();
   });
 
-  it('gives every screen an opaque backdrop of the same plain fill, Feed included', async () => {
+  it("gives every screen an opaque backdrop in the theme's plain colour, Feed included", async () => {
     await signIn();
 
     const backdrops = screen.getAllByTestId('screen-backdrop');
     expect(backdrops.length).toBeGreaterThan(0);
     for (const backdrop of backdrops) {
-      expect(StyleSheet.flatten(backdrop.props.style).backgroundColor).toBe('#12110F');
+      expect(StyleSheet.flatten(backdrop.props.style).backgroundColor).toBe('#0D1511');
     }
-    expect(screen.queryByTestId('screen-backdrop-glow')).toBeNull();
     expect(screen.queryByTestId('screen-backdrop-photo')).toBeNull();
 
     fireEvent.press(screen.getByTestId('bottom-nav-nutrition'));
     await screen.findByTestId('nutrition-today-open-menu');
     const nutrition = screen.getAllByTestId('screen-backdrop');
     expect(StyleSheet.flatten(nutrition[nutrition.length - 1].props.style).backgroundColor).toBe(
-      '#12110F',
+      '#0D1511',
     );
   });
 });

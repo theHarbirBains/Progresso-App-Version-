@@ -23,7 +23,7 @@ describe('app themes', () => {
     expect(APP_THEMES[0].accent).toBe(colors.accent);
   });
 
-  it('has the nine themes, each with its own photo', () => {
+  it('has the nine themes, each with its own photo (for the launch screen, share card and widgets)', () => {
     expect(APP_THEMES.map((t) => t.name)).toEqual([
       'Golden Hour Gym',
       'Forest',
@@ -38,9 +38,31 @@ describe('app themes', () => {
     expect(new Set(APP_THEMES.map((t) => t.photo)).size).toBe(9);
   });
 
-  it('keeps every accent readable: as text on the dark, and with its ink on it', () => {
+  it('gives every theme a plain background, a design and a heading face -- no two alike', () => {
+    expect(new Set(APP_THEMES.map((t) => t.background)).size).toBe(9);
+    expect(APP_THEMES[0]).toMatchObject({
+      background: colors.background,
+      pattern: 'none',
+      font: 'jakarta',
+    });
+    expect(themeById('holiday-gym')).toMatchObject({ pattern: 'sparkles', font: 'fraunces' });
+    expect(new Set(APP_THEMES.map((t) => t.font))).toEqual(
+      new Set(['jakarta', 'fraunces', 'oswald', 'nunito']),
+    );
+  });
+
+  it("keeps the app's text as readable on every background as on the original fill", () => {
     for (const theme of APP_THEMES) {
-      expect(contrast(theme.accent, colors.background)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(colors.textPrimary, theme.background)).toBeGreaterThanOrEqual(16);
+      expect(contrast(colors.textSecondary, theme.background)).toBeGreaterThanOrEqual(8);
+      // Muted text: within a hair of the original fill's 4.17.
+      expect(contrast(colors.textMuted, theme.background)).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('keeps every accent readable: as text on its own background, and with its ink on it', () => {
+    for (const theme of APP_THEMES) {
+      expect(contrast(theme.accent, theme.background)).toBeGreaterThanOrEqual(4.5);
       const accent = buildAccentTheme(theme.accent);
       expect(contrast(accent.onAccent, theme.accent)).toBeGreaterThanOrEqual(4.5);
     }

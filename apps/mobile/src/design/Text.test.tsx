@@ -1,6 +1,7 @@
 import { createRef } from 'react';
 import { StyleSheet, Text as RNText } from 'react-native';
 import { render, screen } from '@testing-library/react-native';
+import { HeadingFontContext, headingFamilyMap } from './headingFont';
 import { Text, resolveTextStyle } from './Text';
 import { fonts, typeScale } from './theme';
 
@@ -126,5 +127,61 @@ describe('type scale', () => {
       .sort();
 
     expect(mono).toEqual(['statLarge', 'statMedium', 'statSmall']);
+  });
+});
+
+describe("Text in a theme's heading face", () => {
+  function fontOf(testID: string) {
+    return StyleSheet.flatten(screen.getByTestId(testID).props.style).fontFamily;
+  }
+
+  it('sets titles and bold text in the heading face, and leaves body, labels and mono alone', () => {
+    render(
+      <HeadingFontContext.Provider value={headingFamilyMap('fraunces')}>
+        <Text testID="title" style={typeScale.screenTitle}>
+          Title
+        </Text>
+        <Text testID="card" style={typeScale.cardTitle}>
+          Card
+        </Text>
+        <Text testID="bold" style={{ fontWeight: '700' }}>
+          Bold
+        </Text>
+        <Text testID="body" style={typeScale.body}>
+          Body
+        </Text>
+        <Text testID="label" style={typeScale.label}>
+          Label
+        </Text>
+        <Text testID="mono" style={typeScale.statSmall}>
+          12
+        </Text>
+      </HeadingFontContext.Provider>,
+    );
+
+    expect(fontOf('title')).toBe('Fraunces_800ExtraBold');
+    expect(fontOf('card')).toBe('Fraunces_700Bold');
+    expect(fontOf('bold')).toBe('Fraunces_700Bold');
+    expect(fontOf('body')).toBe(fonts.body);
+    expect(fontOf('label')).toBe(fonts.displayMedium);
+    expect(fontOf('mono')).toBe(fonts.monoBold);
+  });
+
+  it("keeps the app's own face for the classic theme, and without a theme", () => {
+    expect(headingFamilyMap('jakarta')).toBeNull();
+    render(
+      <Text testID="title" style={typeScale.screenTitle}>
+        Title
+      </Text>,
+    );
+    expect(fontOf('title')).toBe(fonts.displayHeavy);
+  });
+
+  it("never changes a face named for itself (a theme tile's own sample)", () => {
+    expect(
+      StyleSheet.flatten(
+        resolveTextStyle({ fontFamily: 'Oswald_700Bold' }, false, headingFamilyMap('nunito')),
+      )?.fontFamily,
+    ).toBe('Oswald_700Bold');
   });
 });

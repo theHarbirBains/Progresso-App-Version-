@@ -2,6 +2,7 @@ import { AppHeader } from '../design/AppHeader';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { Section } from '../design/Section';
+import { Text } from '../design/Text';
 import { Toggle } from '../design/Toggle';
 import type { RootStackScreenProps } from '../navigation/types';
 import { settingsStyles } from '../settings/settingsStyles';
@@ -11,9 +12,10 @@ import { ThemeChoices } from '../theme/ThemeChoices';
 type Props = RootStackScreenProps<'SettingsAppearance'>;
 
 /**
- * Settings > Appearance: how Progresso looks on this phone. Eight themes, each a photo behind the
- * top of every screen and one accent -- Golden Hour Gym, the default, first -- as tiles in a grid
- * (theme/ThemeChoices, which onboarding shows too); and Change with the seasons, off unless the
+ * Settings > Appearance: how Progresso looks on this phone. Nine themes, each a plain background
+ * colour with a quiet design over its top, a heading face and one accent -- Golden Hour Gym, the
+ * plain classic, first -- as tiles in a grid that preview themselves (theme/ThemeChoices), with one
+ * line on what a theme changes; and Change with the seasons, off unless the
  * person turns it on, which shows Spring, Summer, Autumn or Winter by the date where they live. Picking a theme turns the seasons off,
  * so a pick always shows. Through the holidays, Snowfall too -- light snow over the app -- and
  * Holiday Decorations, each on unless turned off. Applied at once, and kept on the phone.
@@ -46,6 +48,10 @@ export function SettingsAppearanceScreen({ navigation }: Props) {
       }
     >
       <Section title="Theme">
+        <Text testID="appearance-themes-note" style={settingsStyles.intro}>
+          Each theme has its own background, design and heading font. Your widgets and share card
+          use its photo.
+        </Text>
         <ThemeChoices selectedId={theme.id} onChoose={choose} testIDPrefix="appearance-theme" />
       </Section>
 

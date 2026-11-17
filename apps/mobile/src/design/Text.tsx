@@ -1,5 +1,6 @@
 import { createContext, forwardRef, useContext, type ComponentRef } from 'react';
 import { StyleSheet, Text as RNText, type TextProps, type TextStyle } from 'react-native';
+import { useHeadingFamilies } from './headingFont';
 import { fonts } from './theme';
 
 // The one Text primitive for the whole app. It is a drop-in replacement for
@@ -22,6 +23,10 @@ import { fonts } from './theme';
 // its own is left completely alone, so it keeps inheriting its parent's face
 // instead of being reset to Regular (e.g. an unstyled span inside a bold
 // sentence stays bold).
+//
+// Last, the theme's heading face (design/headingFont.ts): a heading family
+// -- named, or resolved from a weight -- becomes the theme's own, when the
+// theme has one.
 
 const WEIGHT_FAMILY: Record<string, string> = {
   '100': fonts.body,
@@ -40,14 +45,24 @@ const WEIGHT_FAMILY: Record<string, string> = {
 const NestedTextContext = createContext(false);
 
 /** Exported for tests and for the rare non-`Text` consumer (e.g. a TextInput) that needs the same resolution. */
-export function resolveTextStyle(style: TextProps['style'], nested = false): TextProps['style'] {
+export function resolveTextStyle(
+  style: TextProps['style'],
+  nested = false,
+  headings: Readonly<Record<string, string>> | null = null,
+): TextProps['style'] {
   const flat = (StyleSheet.flatten(style) ?? {}) as TextStyle;
-  if (flat.fontFamily) return style;
+  if (flat.fontFamily) {
+    const heading = headings?.[flat.fontFamily];
+    if (!heading) return style;
+    const themed: TextStyle = { fontFamily: heading };
+    return Array.isArray(style) ? [...style, themed] : [style, themed];
+  }
 
   const weight = flat.fontWeight === undefined ? undefined : String(flat.fontWeight);
   if (nested && weight === undefined) return style;
 
-  const family = weight === undefined ? fonts.body : (WEIGHT_FAMILY[weight] ?? fonts.body);
+  const resolved = weight === undefined ? fonts.body : (WEIGHT_FAMILY[weight] ?? fonts.body);
+  const family = headings?.[resolved] ?? resolved;
   // The caller's style is passed through untouched (its array shape included)
   // with one override appended: the resolved family, and an explicit
   // `fontWeight: undefined` -- a later `undefined` wins in RN's style
@@ -62,9 +77,10 @@ export const Text = forwardRef<ComponentRef<typeof RNText>, TextProps>(function 
   ref,
 ) {
   const nested = useContext(NestedTextContext);
+  const headings = useHeadingFamilies();
   return (
     <NestedTextContext.Provider value={true}>
-      <RNText ref={ref} style={resolveTextStyle(style, nested)} {...rest}>
+      <RNText ref={ref} style={resolveTextStyle(style, nested, headings)} {...rest}>
         {children}
       </RNText>
     </NestedTextContext.Provider>

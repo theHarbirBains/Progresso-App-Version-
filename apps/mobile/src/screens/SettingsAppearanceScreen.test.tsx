@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { Image, StyleSheet, Text } from 'react-native';
 import { useProfile } from '../profile/ProfileProvider';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAppTheme } from '../theme/appThemeContext';
@@ -52,6 +52,23 @@ describe('SettingsAppearanceScreen', () => {
       expect.objectContaining({ selected: true }),
     );
     expect(screen.getByTestId('shown-theme')).toHaveTextContent('holiday-gym');
+  });
+
+  it('previews each theme in its own background, design, heading face and accent -- never a photo', async () => {
+    await renderScreen();
+
+    expect(screen.getByTestId('appearance-themes-note')).toHaveTextContent(
+      /^Each theme has its own background, design and heading font\. Your widgets and share card use its photo\.$/,
+    );
+    const forest = screen.getByTestId('appearance-theme-forest');
+    expect(forest.props.accessibilityLabel).toBe('Forest theme, Fraunces headings');
+    expect(
+      StyleSheet.flatten(screen.getByTestId('theme-sample-forest').props.style).fontFamily,
+    ).toBe('Fraunces_800ExtraBold');
+    expect(
+      StyleSheet.flatten(screen.getByTestId('theme-sample-alpine').props.style).fontFamily,
+    ).toBe('Oswald_700Bold');
+    expect(screen.UNSAFE_queryAllByType(Image)).toHaveLength(0);
   });
 
   it('can wear Holiday Gym, its accent the gold of the lights', async () => {
