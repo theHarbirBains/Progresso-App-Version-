@@ -217,6 +217,10 @@ describe('SharedExercisesService', () => {
             attachment: 'V-handle',
             load_type: 'single_stack',
             pulley: 'heavier',
+            equipment: null,
+            grip: null,
+            pulley_position: null,
+            setup_details: null,
           },
         },
       ]);

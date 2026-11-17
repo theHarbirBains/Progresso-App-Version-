@@ -2,16 +2,20 @@ import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { MUSCLE_GROUPS, type MuscleGroup } from '../muscle-group';
 import {
+  EQUIPMENT,
   LOAD_TYPES,
   LOGGING_STYLES,
   MEASUREMENT_TYPES,
   MOVEMENT_TYPES,
+  PULLEY_POSITIONS,
   PULLEYS,
+  type Equipment,
   type LoadType,
   type LoggingStyle,
   type MeasurementType,
   type MovementType,
   type Pulley,
+  type PulleyPosition,
 } from '../movement-type';
 
 /** A typed detail: trimmed, and null when nothing is left -- so a blank box clears it. */
@@ -85,4 +89,26 @@ export class CreateExerciseDto {
   @IsOptional()
   @IsIn(PULLEYS)
   pulley?: Pulley | null;
+
+  // The setup (exercises.equipment, grip, pulley_position, setup_details) -- each optional, null
+  // or a blank clears it. Grip is how it's held; attachment, what's held.
+  @IsOptional()
+  @IsIn(EQUIPMENT)
+  equipment?: Equipment | null;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => trimmedOrNull(value))
+  @IsString()
+  @MaxLength(60)
+  grip?: string | null;
+
+  @IsOptional()
+  @IsIn(PULLEY_POSITIONS)
+  pulleyPosition?: PulleyPosition | null;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => trimmedOrNull(value))
+  @IsString()
+  @MaxLength(300)
+  setupDetails?: string | null;
 }

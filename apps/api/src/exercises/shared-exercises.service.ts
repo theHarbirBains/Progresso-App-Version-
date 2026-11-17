@@ -23,26 +23,33 @@ export interface SharedExercise extends Omit<ExerciseRecord, 'feelNotes'> {
 const UNIQUE_VIOLATION = '23505';
 
 /**
- * One machine in a library: its name, gym and grip (case and spaces aside), its photo, how it's
- * loaded and its pulley -- as the database's exercise_machine_key has it. Two of a person's
- * exercises may share a name, told apart by these.
+ * One machine in a library: its name, gym, grip and attachment (case and spaces aside), its photo,
+ * how it's loaded, its pulley, where its cable starts and its equipment -- as the database's
+ * exercise_machine_key has it. Setup notes aren't part of it. Two of a person's exercises may
+ * share a name, told apart by these.
  */
 function libraryKey(row: {
   name: string;
   gym: string | null;
+  grip: string | null;
   attachment: string | null;
   photoUrl: string | null;
   loadType: string | null;
   pulley: string | null;
+  pulleyPosition: string | null;
+  equipment: string | null;
 }): string {
   const text = (value: string | null) => (value ?? '').trim().toLowerCase();
   return [
     text(row.name),
     text(row.gym),
+    text(row.grip),
     text(row.attachment),
     row.photoUrl ?? '',
     row.loadType ?? '',
     row.pulley ?? '',
+    row.pulleyPosition ?? '',
+    row.equipment ?? '',
   ].join('\u001f');
 }
 
@@ -163,10 +170,10 @@ export class SharedExercisesService {
   }
 
   /**
-   * Makes a shared exercise this user's own: their own of the very same machine (its name, gym,
-   * grip, photo, loading and pulley) if they have one, otherwise a copy of it in their library --
-   * its name, muscle, movement, what it measures, photo, gym, grip, loading and pulley. A built-in, or one already theirs, is
-   * returned as it is.
+   * Makes a shared exercise this user's own: their own of the very same machine (libraryKey) if
+   * they have one, otherwise a copy of it in their library -- its name, muscle, movement, what it
+   * measures, photo, gym, equipment, grip, attachment, loading, pulley and setup notes. A built-in,
+   * or one already theirs, is returned as it is.
    */
   async copy(userId: string, exerciseId: string): Promise<ExerciseRecord> {
     const client = this.supabaseService.getClient();
@@ -203,6 +210,10 @@ export class SharedExercisesService {
         attachment: source.attachment,
         load_type: source.loadType,
         pulley: source.pulley,
+        equipment: source.equipment,
+        grip: source.grip,
+        pulley_position: source.pulleyPosition,
+        setup_details: source.setupDetails,
       })
       .select('*')
       .single();

@@ -50,6 +50,7 @@ export interface WorkoutForViewer {
     measurementType: string;
     photoUrl: string | null;
     gym: string | null;
+    grip: string | null;
     attachment: string | null;
     orderIndex: number;
     sets: WorkoutSet[];
@@ -107,7 +108,7 @@ export class WorkoutSocialService {
     const { data: exercises, error } = await client
       .from('workout_exercises')
       .select(
-        'id, exercise_id, order_index, measurement_type, exercises(name, muscle_group, movement_type, photo_url, gym, attachment)',
+        'id, exercise_id, order_index, measurement_type, exercises(name, muscle_group, movement_type, photo_url, gym, grip, attachment)',
       )
       .eq('workout_id', workoutId)
       .is('deleted_at', null)
@@ -124,6 +125,7 @@ export class WorkoutSocialService {
         movement_type: string;
         photo_url: string | null;
         gym: string | null;
+        grip: string | null;
         attachment: string | null;
       } | null;
     }[];
@@ -181,6 +183,7 @@ export class WorkoutSocialService {
         measurementType: row.measurement_type ?? 'weight_reps',
         photoUrl: row.exercises?.photo_url ?? null,
         gym: row.exercises?.gym ?? null,
+        grip: row.exercises?.grip ?? null,
         attachment: row.exercises?.attachment ?? null,
         orderIndex: row.order_index,
         sets: setsByExercise.get(row.id) ?? [],

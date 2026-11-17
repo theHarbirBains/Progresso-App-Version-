@@ -15,6 +15,7 @@ export interface FeedTopSet {
   photoUrl: string | null;
   /** The gym it's at and its handle, when its owner gave them: with the photo, which machine. */
   gym: string | null;
+  grip: string | null;
   attachment: string | null;
   measurementType: MeasurementType;
   /** Weight and reps only. */
@@ -216,7 +217,7 @@ export class FeedService {
       client
         .from('workout_exercises')
         .select(
-          'id, workout_id, exercise_id, order_index, measurement_type, exercises(name, photo_url, gym, attachment)',
+          'id, workout_id, exercise_id, order_index, measurement_type, exercises(name, photo_url, gym, grip, attachment)',
         )
         .in('workout_id', workoutIds)
         .is('deleted_at', null),
@@ -246,6 +247,7 @@ export class FeedService {
         exerciseName: string;
         photoUrl: string | null;
         gym: string | null;
+        grip: string | null;
         attachment: string | null;
         orderIndex: number;
         measurementType: MeasurementType;
@@ -257,6 +259,7 @@ export class FeedService {
         name: string;
         photo_url: string | null;
         gym: string | null;
+        grip: string | null;
         attachment: string | null;
       } | null;
       exerciseInfoById.set(we.id as string, {
@@ -264,6 +267,7 @@ export class FeedService {
         exerciseName: embedded?.name ?? '',
         photoUrl: embedded?.photo_url ?? null,
         gym: embedded?.gym ?? null,
+        grip: embedded?.grip ?? null,
         attachment: embedded?.attachment ?? null,
         orderIndex: we.order_index as number,
         // What the exercise was logged as (snapshotted per logged exercise).
@@ -350,6 +354,7 @@ export class FeedService {
           exerciseName: row.info.exerciseName,
           photoUrl: row.info.photoUrl,
           gym: row.info.gym,
+          grip: row.info.grip,
           attachment: row.info.attachment,
           measurementType: type,
           weightKg: type === 'weight_reps' ? top.weightKg : null,

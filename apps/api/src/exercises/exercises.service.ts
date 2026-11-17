@@ -9,12 +9,15 @@ import { SupabaseService } from '../supabase/supabase.service';
 import type { CreateExerciseDto } from './dto/create-exercise.dto';
 import type { UpdateExerciseDto } from './dto/update-exercise.dto';
 import type { MuscleGroup } from './muscle-group';
-import type {
-  LoadType,
-  LoggingStyle,
-  MeasurementType,
-  MovementType,
-  Pulley,
+import {
+  isLegacyGrip,
+  type Equipment,
+  type LoadType,
+  type LoggingStyle,
+  type MeasurementType,
+  type MovementType,
+  type Pulley,
+  type PulleyPosition,
 } from './movement-type';
 
 export interface ExerciseRecord {
@@ -29,9 +32,14 @@ export interface ExerciseRecord {
   gym: string | null;
   feelNotes: string | null;
   attachment: string | null;
-  /** How it's loaded (one stack, two, or plates) and whether its pulley feels heavier or lighter. */
+  /** How it's loaded (one stack, two, or plates); the old heavier or lighter pulley, if it has one. */
   loadType: LoadType | null;
   pulley: Pulley | null;
+  /** What it's done with, how it's held, where its cable starts, and notes on its setup. */
+  equipment: Equipment | null;
+  grip: string | null;
+  pulleyPosition: PulleyPosition | null;
+  setupDetails: string | null;
   isActive: boolean;
   createdBy: string | null;
   createdAt: string;
@@ -54,11 +62,29 @@ export function toExerciseRecord(row: Record<string, unknown>): ExerciseRecord {
     attachment: (row.attachment as string | null) ?? null,
     loadType: (row.load_type as LoadType | null) ?? null,
     pulley: (row.pulley as Pulley | null) ?? null,
+    equipment: (row.equipment as Equipment | null) ?? null,
+    grip: (row.grip as string | null) ?? null,
+    pulleyPosition: (row.pulley_position as PulleyPosition | null) ?? null,
+    setupDetails: (row.setup_details as string | null) ?? null,
     isActive: row.is_active as boolean,
     createdBy: (row.created_by as string | null) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
+}
+
+/**
+ * Grip and attachment as they're saved. An older app version sends a grip it offered ("Wide
+ * grip") as the attachment, with no grip of its own: that's the grip.
+ */
+function gripAndAttachment(dto: { grip?: string | null; attachment?: string | null }): {
+  grip?: string | null;
+  attachment?: string | null;
+} {
+  if (dto.grip === undefined && isLegacyGrip(dto.attachment)) {
+    return { grip: dto.attachment, attachment: null };
+  }
+  return { grip: dto.grip, attachment: dto.attachment };
 }
 
 @Injectable()
@@ -69,6 +95,7 @@ export class ExercisesService {
   // client cannot create a built-in exercise (created_by null) or attribute
   // a custom exercise to another user.
   async createCustom(userId: string, dto: CreateExerciseDto): Promise<ExerciseRecord> {
+    const held = gripAndAttachment(dto);
     const { data, error } = await this.supabaseService
       .getClient()
       .from('exercises')
@@ -86,9 +113,13 @@ export class ExercisesService {
         photo_url: dto.photoUrl ?? null,
         gym: dto.gym ?? null,
         feel_notes: dto.feelNotes ?? null,
-        attachment: dto.attachment ?? null,
+        attachment: held.attachment ?? null,
         load_type: dto.loadType ?? null,
         pulley: dto.pulley ?? null,
+        equipment: dto.equipment ?? null,
+        grip: held.grip ?? null,
+        pulley_position: dto.pulleyPosition ?? null,
+        setup_details: dto.setupDetails ?? null,
       })
       .select('*')
       .single();
@@ -130,9 +161,14 @@ export class ExercisesService {
     if (dto.photoUrl !== undefined) updatePayload.photo_url = dto.photoUrl;
     if (dto.gym !== undefined) updatePayload.gym = dto.gym;
     if (dto.feelNotes !== undefined) updatePayload.feel_notes = dto.feelNotes;
-    if (dto.attachment !== undefined) updatePayload.attachment = dto.attachment;
+    const held = gripAndAttachment(dto);
+    if (held.attachment !== undefined) updatePayload.attachment = held.attachment;
+    if (held.grip !== undefined) updatePayload.grip = held.grip;
     if (dto.loadType !== undefined) updatePayload.load_type = dto.loadType;
     if (dto.pulley !== undefined) updatePayload.pulley = dto.pulley;
+    if (dto.equipment !== undefined) updatePayload.equipment = dto.equipment;
+    if (dto.pulleyPosition !== undefined) updatePayload.pulley_position = dto.pulleyPosition;
+    if (dto.setupDetails !== undefined) updatePayload.setup_details = dto.setupDetails;
     if (dto.measurementType !== undefined) updatePayload.measurement_type = dto.measurementType;
 
     if (Object.keys(updatePayload).length === 0) {

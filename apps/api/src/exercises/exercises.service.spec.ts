@@ -89,6 +89,10 @@ describe('ExercisesService', () => {
         attachment: null,
         load_type: null,
         pulley: null,
+        equipment: null,
+        grip: null,
+        pulley_position: null,
+        setup_details: null,
       });
       expect(result).toEqual({
         id: 'ex-mine',
@@ -103,6 +107,10 @@ describe('ExercisesService', () => {
         attachment: null,
         loadType: null,
         pulley: null,
+        equipment: null,
+        grip: null,
+        pulleyPosition: null,
+        setupDetails: null,
         isActive: true,
         createdBy: 'user-1',
         createdAt: '2026-01-02T00:00:00.000Z',
@@ -140,6 +148,10 @@ describe('ExercisesService', () => {
         attachment: null,
         load_type: null,
         pulley: null,
+        equipment: null,
+        grip: null,
+        pulley_position: null,
+        setup_details: null,
       });
       expect(result.movementType).toBe('unilateral');
       expect(result.loggingStyle).toBe('single_side');
@@ -297,6 +309,69 @@ describe('ExercisesService', () => {
         feel_notes: 'Lighter now the cable was fixed',
         attachment: null,
       });
+    });
+  });
+
+  describe('createCustom -- the setup', () => {
+    it('saves the equipment, grip, attachment, pulley position and setup notes', async () => {
+      const client = createMockClient({ insertData: ownCustomRow });
+      const service = serviceWith(client);
+
+      await service.createCustom('user-1', {
+        name: 'Triceps Pushdown',
+        muscleGroup: 'triceps',
+        movementType: 'bilateral',
+        equipment: 'cable',
+        grip: 'Neutral grip',
+        attachment: 'Rope',
+        loadType: 'single_stack',
+        pulleyPosition: 'high',
+        setupDetails: 'Pin at 12',
+      });
+
+      expect(client.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          equipment: 'cable',
+          grip: 'Neutral grip',
+          attachment: 'Rope',
+          load_type: 'single_stack',
+          pulley_position: 'high',
+          setup_details: 'Pin at 12',
+          pulley: null,
+        }),
+      );
+    });
+
+    it("keeps an older app's grip, sent as the attachment, as the grip", async () => {
+      const client = createMockClient({ insertData: ownCustomRow });
+      const service = serviceWith(client);
+
+      await service.createCustom('user-1', {
+        name: 'Lat Pulldown',
+        muscleGroup: 'back',
+        movementType: 'bilateral',
+        attachment: ' Wide grip ',
+      });
+
+      expect(client.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ grip: ' Wide grip ', attachment: null }),
+      );
+    });
+
+    it('leaves a real attachment where it is', async () => {
+      const client = createMockClient({ insertData: ownCustomRow });
+      const service = serviceWith(client);
+
+      await service.createCustom('user-1', {
+        name: 'Lat Pulldown',
+        muscleGroup: 'back',
+        movementType: 'bilateral',
+        attachment: 'Lat pulldown bar',
+      });
+
+      expect(client.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ grip: null, attachment: 'Lat pulldown bar' }),
+      );
     });
   });
 

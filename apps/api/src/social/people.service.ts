@@ -66,6 +66,7 @@ export interface ExerciseSummary {
   exerciseName: string;
   photoUrl: string | null;
   gym: string | null;
+  grip: string | null;
   attachment: string | null;
   measurementType: MeasurementType;
 }
@@ -133,6 +134,7 @@ export interface BestLift {
   exerciseName: string;
   photoUrl: string | null;
   gym: string | null;
+  grip: string | null;
   attachment: string | null;
   weightKg: number;
   reps: number;
@@ -698,7 +700,7 @@ export class PeopleService {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('exercises')
-      .select('id, name, photo_url, gym, attachment')
+      .select('id, name, photo_url, gym, grip, attachment')
       .in(
         'id',
         wanted.map((exercise) => exercise.id),
@@ -711,6 +713,7 @@ export class PeopleService {
           name: string;
           photo_url: string | null;
           gym: string | null;
+          grip: string | null;
           attachment: string | null;
         }[]
       ).map((exercise) => [exercise.id, exercise]),
@@ -722,6 +725,7 @@ export class PeopleService {
         exerciseName: exercise?.name ?? 'Exercise',
         photoUrl: exercise?.photo_url ?? null,
         gym: exercise?.gym ?? null,
+        grip: exercise?.grip ?? null,
         attachment: exercise?.attachment ?? null,
         measurementType,
       };
@@ -745,6 +749,7 @@ function heaviestLifts(exercises: ExerciseBest[]): BestLift[] {
       exerciseName: exercise.exerciseName,
       photoUrl: exercise.photoUrl,
       gym: exercise.gym,
+      grip: exercise.grip,
       attachment: exercise.attachment,
       weightKg: exercise.weightKg,
       reps: exercise.reps,
