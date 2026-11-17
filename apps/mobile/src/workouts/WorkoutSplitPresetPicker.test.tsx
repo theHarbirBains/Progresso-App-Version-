@@ -74,7 +74,7 @@ describe('WorkoutSplitPresetPicker', () => {
     expect(onPresetActivated).not.toHaveBeenCalled();
   });
 
-  it('calls onCreateOwn when Create Custom Split is pressed', () => {
+  it('calls onCreateOwn when Build My Own Split is pressed', () => {
     const onCreateOwn = jest.fn();
     render(
       <WorkoutSplitPresetPicker
@@ -91,7 +91,7 @@ describe('WorkoutSplitPresetPicker', () => {
     expect(onCreateOwn).toHaveBeenCalled();
   });
 
-  it('shows no helper caption under Create Custom Split by default', () => {
+  it('makes building your own a choice of its own, under its own heading, saying what it means', () => {
     render(
       <WorkoutSplitPresetPicker
         testID="picker"
@@ -99,13 +99,19 @@ describe('WorkoutSplitPresetPicker', () => {
         theme={DEFAULT_WORKOUT_THEME}
         onPresetActivated={jest.fn()}
         onCreateOwn={jest.fn()}
+        presetsLabel="Start From a Preset"
       />,
     );
 
-    expect(screen.queryByTestId('picker-create-own-helper')).toBeNull();
+    expect(screen.getByTestId('picker-presets-heading')).toHaveTextContent('Start From a Preset');
+    expect(screen.getByTestId('picker-create-own-heading')).toHaveTextContent('Or Build Your Own');
+    expect(screen.getByTestId('picker-create-own')).toHaveTextContent(/Build My Own Split/);
+    expect(screen.getByTestId('picker-create-own-description')).toHaveTextContent(
+      'Name your own days and choose every exercise.',
+    );
   });
 
-  it('shows a helper caption under Create Custom Split when given one', () => {
+  it('says what building your own means here, inside its card, when given that', () => {
     render(
       <WorkoutSplitPresetPicker
         testID="picker"
@@ -113,13 +119,41 @@ describe('WorkoutSplitPresetPicker', () => {
         theme={DEFAULT_WORKOUT_THEME}
         onPresetActivated={jest.fn()}
         onCreateOwn={jest.fn()}
-        createOwnHelperText="You'll build this right after your account is created"
+        createOwnHelperText="It opens as soon as your account is made."
       />,
     );
 
-    expect(screen.getByTestId('picker-create-own-helper')).toHaveTextContent(
-      "You'll build this right after your account is created",
+    expect(screen.getByTestId('picker-create-own-description')).toHaveTextContent(
+      'It opens as soon as your account is made.',
     );
+  });
+
+  it('shows the choice made before as ticked, in select-only mode', () => {
+    const { rerender } = render(
+      <WorkoutSplitPresetPicker
+        testID="picker"
+        theme={DEFAULT_WORKOUT_THEME}
+        materializeImmediately={false}
+        onPresetActivated={jest.fn()}
+        onCreateOwn={jest.fn()}
+        selectedPresetId="ppl"
+      />,
+    );
+    expect(screen.getByTestId('picker-preset-ppl-selected')).toBeTruthy();
+    expect(screen.queryByTestId('picker-create-own-selected')).toBeNull();
+
+    rerender(
+      <WorkoutSplitPresetPicker
+        testID="picker"
+        theme={DEFAULT_WORKOUT_THEME}
+        materializeImmediately={false}
+        onPresetActivated={jest.fn()}
+        onCreateOwn={jest.fn()}
+        createOwnSelected
+      />,
+    );
+    expect(screen.queryByTestId('picker-preset-ppl-selected')).toBeNull();
+    expect(screen.getByTestId('picker-create-own-selected')).toBeTruthy();
   });
 
   it('shows a concise day-name chip per day instead of the full structured muscle-group list', () => {

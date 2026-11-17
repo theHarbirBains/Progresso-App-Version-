@@ -94,6 +94,7 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { AddPhoneNumberScreen } from './src/screens/AddPhoneNumberScreen';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { LoadingState } from './src/design/LoadingState';
+import { takeCustomSplitBuilder } from './src/onboarding/customSplitAfterSignUp';
 import { getWelcomeStage, setWelcomeStage, useWelcomeStage } from './src/onboarding/welcomeStage';
 import { PRHistoryScreen } from './src/screens/PRHistoryScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
@@ -405,7 +406,13 @@ function Root() {
               <NavigationContainer
                 ref={navigationRef}
                 linking={linking}
-                onReady={() => setCurrentRouteName(navigationRef.current?.getCurrentRoute()?.name)}
+                onReady={() => {
+                  setCurrentRouteName(navigationRef.current?.getCurrentRoute()?.name);
+                  // A new account that chose Build My Own Split in onboarding builds it now.
+                  if (takeCustomSplitBuilder()) {
+                    navigationRef.current?.navigate('WorkoutSplitForm', { activateOnCreate: true });
+                  }
+                }}
                 onStateChange={() =>
                   setCurrentRouteName(navigationRef.current?.getCurrentRoute()?.name)
                 }

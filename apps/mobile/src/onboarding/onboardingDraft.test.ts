@@ -11,9 +11,13 @@ import {
   nextStepIndex,
   stepApplies,
   STEP_ORDER,
+  STEP_SECTIONS,
+  stepPlace,
+  stepsAsked,
   submitOnboardingDraft,
   type OnboardingDraft,
 } from './onboardingDraft';
+import { takeCustomSplitBuilder } from './customSplitAfterSignUp';
 
 jest.mock('../lib/api', () => ({
   updateMyProfile: jest.fn(),
@@ -338,5 +342,54 @@ describe('submitOnboardingDraft', () => {
       submitOnboardingDraft('token-123', 'user-1', { ...FULL_DRAFT, pushNotificationsOptIn: true }),
     ).resolves.toEqual({ id: 'user-1' });
     expect(mockUpdateMyProfile).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('onboarding in named parts', () => {
+  it('puts every step in exactly one part, in the same order as the steps', () => {
+    const inParts = STEP_SECTIONS.flatMap((part) => part.steps);
+    expect(inParts).toEqual([...STEP_ORDER]);
+  });
+
+  it('says where a step sits among the steps asked, by part', () => {
+    const asked = stepsAsked(
+      { ...EMPTY_DRAFT, membershipTier: 'workouts' },
+      { healthAvailable: false },
+    );
+    // Without Nutrition, Your Plan is the membership, the split and ranks.
+    expect(stepPlace('workoutSplit', asked)).toEqual({
+      section: 'Your Plan',
+      stepInSection: 2,
+      stepsInSection: 3,
+      progress: [
+        { steps: 6, done: 6 },
+        { steps: 4, done: 4 },
+        { steps: 3, done: 2 },
+        { steps: 2, done: 0 },
+        { steps: 2, done: 0 },
+      ],
+    });
+    expect(stepPlace('referralSource', asked)).toMatchObject({
+      section: 'About You',
+      stepInSection: 1,
+      stepsInSection: 6,
+    });
+  });
+});
+
+describe('submitOnboardingDraft -- Build My Own Split', () => {
+  it('has the split builder open as the app shows, only when building their own was chosen', async () => {
+    takeCustomSplitBuilder();
+    await submitOnboardingDraft('token-123', 'user-1', {
+      ...EMPTY_DRAFT,
+      wantsCustomSplit: true,
+      selectedSplitPresetId: null,
+    });
+    expect(takeCustomSplitBuilder()).toBe(true);
+    // Once.
+    expect(takeCustomSplitBuilder()).toBe(false);
+
+    await submitOnboardingDraft('token-123', 'user-1', { ...EMPTY_DRAFT, skippedSplit: true });
+    expect(takeCustomSplitBuilder()).toBe(false);
   });
 });

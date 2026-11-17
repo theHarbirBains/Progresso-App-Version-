@@ -30,6 +30,7 @@ import {
   MIN_SIGNUP_AGE,
   nextStepIndex,
   STEP_ORDER,
+  stepPlace,
   stepsAsked,
   submitOnboardingDraft,
   MAX_FITNESS_GOALS,
@@ -77,6 +78,16 @@ const CONTINUE_STEPS = new Set<OnboardingStep>([
   'trainerCode',
   // How ranks work is read, then moved on from.
   'ranks',
+]);
+
+// Steps with a button of their own that moves on (Allow / Not Now, Use These Targets, Create
+// Account) never add Continue, even once answered: one filled button a screen. Every other step
+// come back to with its answer shows Continue, so going back never means answering again.
+const OWN_FORWARD_STEPS = new Set<OnboardingStep>([
+  'nutritionTargets',
+  'pushNotifications',
+  'appleHealth',
+  'createAccount',
 ]);
 
 // How long a tapped answer shows as chosen before the next question takes its place.
@@ -200,6 +211,10 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
   function stepFrom(index: number, direction: 1 | -1): number {
     return nextStepIndex(index, direction, latest.current.draft, latest.current.context);
   }
+
+  // Whether the step showing already had its answer when it was reached -- come back to with Back,
+  // or picked up from a saved draft -- so Continue can take it forward again.
+  const arrival = useRef<{ index: number; answered: boolean } | null>(null);
 
   // A tapped answer's move to the next question, waiting out CHOSEN_PAUSE_MS.
   const pendingAdvance = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -355,8 +370,17 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
 
   const step = STEP_ORDER[stepIndex];
   const isNoScrollStep = NO_OUTER_SCROLL_STEPS.has(step);
-  // The progress bar counts only the steps asked.
+  // The progress bar and "About You · 2 of 6" count only the steps asked.
   const asked = stepsAsked(draft, context);
+  const place = stepPlace(step, asked);
+  if (arrival.current?.index !== stepIndex) {
+    arrival.current = { index: stepIndex, answered: isStepAnswered(step, draft) };
+  }
+  // A question answered as it shows moves on by itself; one already answered when it was reached
+  // has Continue, so going back to look never means answering again to go forward.
+  const showContinue =
+    CONTINUE_STEPS.has(step) ||
+    (!OWN_FORWARD_STEPS.has(step) && arrival.current.answered && isStepAnswered(step, draft));
 
   const content = (
     <>
@@ -370,13 +394,18 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
           />
         ) : null}
         <View style={styles.progress}>
-          <OnboardingProgress
-            testID="onboarding-progress"
-            currentIndex={Math.max(0, asked.indexOf(step))}
-            totalSteps={asked.length}
-          />
+          <OnboardingProgress testID="onboarding-progress" sections={place.progress} />
         </View>
       </View>
+
+      {/* Where this question is, in words: which part, and how far through it. */}
+      <Text
+        testID="onboarding-section"
+        style={styles.sectionLabel}
+        accessibilityLabel={`${place.section}, step ${place.stepInSection} of ${place.stepsInSection}`}
+      >
+        {place.section} · {place.stepInSection} of {place.stepsInSection}
+      </Text>
 
       {error ? (
         <Text testID="onboarding-error" style={styles.errorText}>
@@ -388,6 +417,11 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
         {step === 'referralSource' ? (
           <>
             <Text style={styles.stepTitle}>Where did you hear about us?</Text>
+            {/* The very first screen: what's ahead, and that nothing here is final. */}
+            <Text testID="onboarding-intro" style={styles.stepExplanation}>
+              A few quick questions to set up Progresso. You can change any answer later in
+              Settings.
+            </Text>
             <View testID="onboarding-step-referral-source">
               {REFERRAL_SOURCE_OPTIONS.map((option) => (
                 <OnboardingOptionCard
@@ -626,6 +660,9 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
         {step === 'workoutSplit' ? (
           <>
             <Text style={styles.stepTitle}>Choose your workout split</Text>
+            <Text style={styles.stepExplanation}>
+              Start from a ready-made split, or build your own.
+            </Text>
             {/* select-only: no account exists yet to own a real split
                 against, so picking a preset only records which one was
                 chosen -- see submitOnboardingDraft, which materializes it
@@ -640,6 +677,9 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
               testID="onboarding-step-workout-split"
               theme={accent}
               materializeImmediately={false}
+              presetsLabel="Start From a Preset"
+              selectedPresetId={draft.selectedSplitPresetId}
+              createOwnSelected={draft.wantsCustomSplit}
               onPresetActivated={(presetId) => {
                 updateDraft({
                   selectedSplitPresetId: presetId,
@@ -656,7 +696,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 });
                 advance();
               }}
-              createOwnHelperText="You'll build this right after your account is created"
+              createOwnHelperText="Name your own days and choose every exercise. It opens as soon as your account is made."
             />
             {/* No split for now: Start Workout asks for one the first time it's needed. */}
             <View style={styles.footer}>
@@ -766,18 +806,11 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
                 autoCapitalize="characters"
                 maxLength={12}
               />
+              {/* One way past it: "no" and "later" did the same thing. */}
               <View style={styles.footer}>
                 <TextButton
                   testID="onboarding-no-trainer-code"
-                  label="No, I don't have one"
-                  onPress={() => {
-                    updateDraft({ hasTrainerCode: false, trainerCode: null });
-                    advance();
-                  }}
-                />
-                <TextButton
-                  testID="onboarding-trainer-code-later"
-                  label="Do this later"
+                  label="Skip: I Don't Have One"
                   onPress={() => {
                     updateDraft({ hasTrainerCode: false, trainerCode: null });
                     advance();
@@ -826,7 +859,7 @@ export function OnboardingScreen({ onSwitchToSignIn }: Props) {
         ) : null}
       </View>
 
-      {CONTINUE_STEPS.has(step) ? (
+      {showContinue ? (
         <View style={styles.footer}>
           <PrimaryButton
             testID="onboarding-continue"

@@ -19,6 +19,7 @@ import { includesNutrition } from '../membership/membershipTiers';
 import { ageFromBirthday } from '../nutrition/calorieEstimationInput';
 import { saveNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import type { TargetValues } from '../nutrition/targetMath';
+import { openCustomSplitBuilderSoon } from './customSplitAfterSignUp';
 import { toDateStringUTC } from './dateWheelValues';
 import { materializeWorkoutSplitPreset } from '../workouts/workoutSplitQueries';
 import { WORKOUT_SPLIT_PRESETS } from '../workouts/workoutSplitPresets';
@@ -65,14 +66,13 @@ export interface OnboardingDraft {
    * user-owned split row (that needs a real user id, so it only happens
    * inside submitOnboardingDraft, after the account exists). */
   selectedSplitPresetId: string | null;
-  /** Set when the user picks "Create Your Own" instead of a preset --
+  /** Set when the user picks "Build My Own Split" instead of a preset --
    * building a real custom split (naming days, adding exercises) needs a
    * real account the same way materializing a preset does, so this only
-   * records the intent. submitOnboardingDraft does nothing with it: with no
-   * selectedSplitPresetId, the new profile simply has no active split yet,
-   * the same already-supported state NewWorkoutScreen's own "no active
-   * split" gate sends a user to ChooseWorkoutSplitScreen's real, working
-   * "Create Custom Split" from -- no separate post-signup routing needed. */
+   * records the intent. submitOnboardingDraft then has the split builder
+   * open as the app first shows (customSplitAfterSignUp.ts); until a split
+   * is saved the new profile has no active split, the same already-supported
+   * state NewWorkoutScreen's own "no active split" gate handles. */
   wantsCustomSplit: boolean;
   /** Skipped choosing a split for now: like Create Your Own, the account starts with no split --
    * Start Workout asks for one the first time it's needed. */
@@ -167,6 +167,59 @@ export const STEP_ORDER = [
   'trainerCode',
   'createAccount',
 ] as const;
+
+/**
+ * The parts onboarding is grouped into, each named, so every step says where it is ("About You
+ * · 2 of 6") and the progress bar has a part for each instead of a dash per question. Every step
+ * of STEP_ORDER is in exactly one, in the same order.
+ */
+export const STEP_SECTIONS: readonly { title: string; steps: readonly OnboardingStep[] }[] = [
+  {
+    title: 'About You',
+    steps: ['referralSource', 'country', 'gender', 'birthday', 'weight', 'height'],
+  },
+  {
+    title: 'Your Training',
+    steps: ['fitnessGoal', 'trainingComfort', 'workoutFrequency', 'averageWorkoutLength'],
+  },
+  {
+    title: 'Your Plan',
+    steps: ['membership', 'activityLevel', 'nutritionTargets', 'workoutSplit', 'ranks'],
+  },
+  { title: 'Staying in Touch', steps: ['emailPreference', 'pushNotifications', 'appleHealth'] },
+  { title: 'Your Account', steps: ['trainerCode', 'createAccount'] },
+];
+
+/** Where a step sits: its part, its place in that part, and how far through each part it is. */
+export interface StepPlace {
+  section: string;
+  /** 1-based, among the steps of its part that are asked. */
+  stepInSection: number;
+  stepsInSection: number;
+  /** One per part with a step asked: how many it asks, and how many are done or showing. */
+  progress: { steps: number; done: number }[];
+}
+
+/** Where `step` sits among the steps asked, by part. */
+export function stepPlace(step: OnboardingStep, asked: readonly OnboardingStep[]): StepPlace {
+  const askedSet = new Set(asked);
+  const parts = STEP_SECTIONS.map((part) => ({
+    title: part.title,
+    steps: part.steps.filter((s) => askedSet.has(s)),
+  })).filter((part) => part.steps.length > 0);
+  const current = parts.findIndex((part) => part.steps.includes(step));
+  const here = parts[Math.max(0, current)]!;
+  return {
+    section: here.title,
+    stepInSection: here.steps.indexOf(step) + 1,
+    stepsInSection: here.steps.length,
+    progress: parts.map((part, index) => ({
+      steps: part.steps.length,
+      done:
+        index < current ? part.steps.length : index === current ? part.steps.indexOf(step) + 1 : 0,
+    })),
+  };
+}
 
 /** Progresso is for people this old and up (the Privacy Policy says so). */
 export const MIN_SIGNUP_AGE = 13;
@@ -369,6 +422,8 @@ export async function submitOnboardingDraft(
   if (draft.pushNotificationsOptIn) await registerThisDevice(accessToken);
   if (draft.hasTrainerCode && draft.trainerCode)
     await claimTrainerCode(accessToken, draft.trainerCode);
+  // Build My Own Split: the builder opens as the app does (customSplitAfterSignUp.ts).
+  if (draft.wantsCustomSplit && !draft.selectedSplitPresetId) openCustomSplitBuilderSoon();
   return profile;
 }
 

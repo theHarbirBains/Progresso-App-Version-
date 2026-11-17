@@ -25,9 +25,17 @@ export const onboardingStyles = StyleSheet.create({
   progress: {
     flex: 1,
   },
+  // Every question starts at the same height, so moving on never shifts where to look; the body
+  // still fills the screen, which keeps Continue at its foot.
   body: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+  },
+  // "About You · 2 of 6", over each question.
+  sectionLabel: {
+    ...typeScale.label,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
   stepTitle: {
     ...typeScale.screenTitle,

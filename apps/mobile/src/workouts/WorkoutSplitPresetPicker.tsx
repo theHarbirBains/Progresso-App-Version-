@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { Badge } from '../design/Badge';
+import { SectionHeader } from '../design/SectionHeader';
 import { colors } from '../design/theme';
 import type { AccentTheme } from '../theme/accentColor';
 import { materializeWorkoutSplitPreset } from './workoutSplitQueries';
@@ -21,10 +22,16 @@ interface Props {
    * mode: called with the preset's own (local) id instead -- nothing is
    * written yet. */
   onPresetActivated: (id: string) => void;
-  /** Omit to hide "Create Custom Split" entirely -- see materializeImmediately. */
+  /** Omit to hide "Build My Own Split" entirely -- see materializeImmediately. */
   onCreateOwn?: () => void;
-  /** A small muted caption under the "Create Custom Split" button -- e.g. onboarding's own "after your account is created", since the button itself can't build a real split yet in select-only mode. Ignored when onCreateOwn is omitted. */
+  /** What building your own means, inside its card -- e.g. onboarding's own "it opens as soon as your account is made", since the card itself can't build a real split yet in select-only mode. Ignored when onCreateOwn is omitted. */
   createOwnHelperText?: string;
+  /** Select-only mode: the preset already chosen, shown ticked when the step is come back to. */
+  selectedPresetId?: string | null;
+  /** Select-only mode: building their own was chosen, shown ticked when the step is come back to. */
+  createOwnSelected?: boolean;
+  /** A heading over the presets ("Start From a Preset") -- with onCreateOwn, the two choices are told apart by their headings, not by a caption. */
+  presetsLabel?: string;
   /** Default true: pressing a preset immediately creates a real, user-owned
    * split (the existing behavior -- ChooseWorkoutSplitScreen). false: just
    * reports the preset's id locally, no network call and no userId needed
@@ -37,8 +44,10 @@ interface Props {
   materializeImmediately?: boolean;
 }
 
+const CREATE_OWN_DESCRIPTION = 'Name your own days and choose every exercise.';
+
 /**
- * The preset-list + "Create Custom Split" picker shared by
+ * The preset-list + "Build My Own Split" picker shared by
  * ChooseWorkoutSplitScreen (reached from Settings/the tracking gate) and
  * the onboarding split step -- extracted so both use the exact same
  * materialize-and-activate logic rather than two copies of it. Visual
@@ -53,6 +62,9 @@ export function WorkoutSplitPresetPicker({
   onPresetActivated,
   onCreateOwn,
   createOwnHelperText,
+  selectedPresetId = null,
+  createOwnSelected = false,
+  presetsLabel,
   materializeImmediately = true,
 }: Props) {
   const [busyPresetId, setBusyPresetId] = useState<string | null>(null);
@@ -84,10 +96,14 @@ export function WorkoutSplitPresetPicker({
         </Text>
       ) : null}
 
+      {presetsLabel ? (
+        <SectionHeader testID={`${testID}-presets-heading`} label={presetsLabel} />
+      ) : null}
       <View style={styles.presetList}>
         {WORKOUT_SPLIT_PRESETS.map((preset) => {
-          const busy = busyPresetId === preset.id;
-          const disabled = busyPresetId !== null && !busy;
+          // Being applied now, or (select-only) the one chosen before.
+          const busy = busyPresetId === preset.id || selectedPresetId === preset.id;
+          const disabled = busyPresetId !== null && busyPresetId !== preset.id;
           return (
             <AppCard
               key={preset.id}
@@ -139,25 +155,49 @@ export function WorkoutSplitPresetPicker({
         })}
       </View>
 
+      {/* A choice like the presets, not a button: its own heading, card and description say what
+          it does, so it reads as "your own split" rather than as the way to the next step. */}
       {onCreateOwn ? (
         <>
-          <TouchableOpacity
+          <SectionHeader testID={`${testID}-create-own-heading`} label="Or Build Your Own" />
+          <AppCard
             testID={`${testID}-create-own`}
-            style={[styles.createSplitButton, { backgroundColor: theme.accent }]}
             onPress={onCreateOwn}
-            accessibilityRole="button"
-            accessibilityLabel="Create Custom Split"
+            accessibilityLabel={`Build My Own Split. ${createOwnHelperText ?? CREATE_OWN_DESCRIPTION}${
+              createOwnSelected ? '. Selected' : ''
+            }`}
+            style={[
+              styles.presetCard,
+              createOwnSelected && { borderColor: theme.accent, borderWidth: 1.5 },
+            ]}
           >
-            <Feather name="edit-2" size={18} color={theme.onAccent} />
-            <Text style={[styles.createSplitButtonText, { color: theme.onAccent }]}>
-              Create Custom Split
+            <View style={styles.cardTopRow}>
+              <View
+                style={[
+                  styles.iconCircle,
+                  createOwnSelected && { backgroundColor: theme.accentBg },
+                ]}
+              >
+                <Feather name="edit-2" size={18} color={colors.textPrimary} />
+              </View>
+              <Text style={styles.presetName} numberOfLines={1}>
+                Build My Own Split
+              </Text>
+              {createOwnSelected ? (
+                <Feather
+                  testID={`${testID}-create-own-selected`}
+                  name="check-circle"
+                  size={20}
+                  color={theme.accent}
+                />
+              ) : (
+                <Feather name="chevron-right" size={20} color={colors.textMuted} />
+              )}
+            </View>
+            <Text testID={`${testID}-create-own-description`} style={styles.createOwnDescription}>
+              {createOwnHelperText ?? CREATE_OWN_DESCRIPTION}
             </Text>
-          </TouchableOpacity>
-          {createOwnHelperText ? (
-            <Text testID={`${testID}-create-own-helper`} style={styles.createOwnHelperText}>
-              {createOwnHelperText}
-            </Text>
-          ) : null}
+          </AppCard>
         </>
       ) : null}
     </View>

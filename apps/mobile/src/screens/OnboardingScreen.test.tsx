@@ -1099,12 +1099,17 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     expect(screen.queryByTestId('onboarding-step-apple-health')).toBeNull();
   });
 
-  it("lets the trainer's code wait, saying where to enter it later", async () => {
+  it("lets the trainer's code wait, with one way past it, saying where to enter it later", async () => {
     await startAt('trainerCode', { hasTrainerCode: null });
     await screen.findByTestId('onboarding-step-trainer-code');
 
     expect(screen.getByText('You can enter it any time in Settings > Trainer Code.')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('onboarding-trainer-code-later'));
+    // "No" and "Do this later" did the same thing: there's one way past it now.
+    expect(screen.queryByTestId('onboarding-trainer-code-later')).toBeNull();
+    expect(screen.getByTestId('onboarding-no-trainer-code')).toHaveTextContent(
+      "Skip: I Don't Have One",
+    );
+    fireEvent.press(screen.getByTestId('onboarding-no-trainer-code'));
 
     expect(await screen.findByTestId('onboarding-step-create-account')).toBeTruthy();
   });
@@ -1131,5 +1136,92 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
       'value',
       'harbirbains',
     );
+  });
+});
+
+describe('OnboardingScreen -- finding your way', () => {
+  const ANSWERED: OnboardingDraft = {
+    ...EMPTY_DRAFT,
+    referralSource: 'tiktok',
+    country: 'CA',
+    gender: 'male',
+    birthday: '2000-06-15',
+    weightValue: 80,
+    heightValue: 180,
+    fitnessGoals: ['lose_fat'],
+    trainingComfort: 'knows_basics',
+    workoutFrequencyDays: 4,
+    averageWorkoutLength: '45_60',
+    membershipTier: 'workouts',
+  };
+
+  async function startAt(step: OnboardingStep, draft: Partial<OnboardingDraft> = {}) {
+    await AsyncStorage.setItem(
+      '@progresso/onboardingDraft',
+      JSON.stringify({ stepIndex: STEP_ORDER.indexOf(step), draft: { ...ANSWERED, ...draft } }),
+    );
+    renderScreen();
+  }
+
+  it('says which part each question is in, and how far through it, from the first', async () => {
+    renderScreen();
+    await screen.findByTestId('onboarding-step-referral-source');
+
+    expect(screen.getByTestId('onboarding-section')).toHaveTextContent('About You · 1 of 6');
+    expect(screen.getByTestId('onboarding-intro')).toHaveTextContent(
+      /A few quick questions to set up Progresso/,
+    );
+    // A bar per part, not a dash per question.
+    expect(
+      screen.getAllByTestId(/^onboarding-progress-section-\d+$/, { includeHiddenElements: true }),
+    ).toHaveLength(5);
+  });
+
+  it('takes an answered question forward with Continue after going back to it', async () => {
+    await startAt('trainingComfort', { trainingComfort: null });
+    await screen.findByTestId('onboarding-step-training-comfort');
+    expect(screen.getByTestId('onboarding-section')).toHaveTextContent('Your Training · 2 of 4');
+
+    fireEvent.press(screen.getByTestId('onboarding-back'));
+    await screen.findByTestId('onboarding-step-fitness-goal');
+    fireEvent.press(screen.getByTestId('onboarding-back'));
+    await screen.findByTestId('onboarding-step-height');
+    fireEvent.press(screen.getByTestId('onboarding-back'));
+    // A pick-one question, already answered: Continue, rather than answering again.
+    await screen.findByTestId('onboarding-step-weight');
+    fireEvent.press(screen.getByTestId('onboarding-back'));
+    await screen.findByTestId('onboarding-step-birthday');
+    fireEvent.press(screen.getByTestId('onboarding-back'));
+    await screen.findByTestId('onboarding-step-gender');
+    expect(screen.getByTestId('onboarding-gender-male').props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+    expect(await screen.findByTestId('onboarding-step-birthday')).toBeTruthy();
+  });
+
+  it('tells a preset apart from building your own, and shows the one chosen on coming back', async () => {
+    // Picked up at How ranks work, then back to the split chosen before.
+    await startAt('ranks', { wantsCustomSplit: true });
+    await screen.findByTestId('onboarding-step-ranks');
+    fireEvent.press(screen.getByTestId('onboarding-back'));
+    await screen.findByTestId('onboarding-step-workout-split');
+
+    expect(screen.getByTestId('onboarding-step-workout-split-presets-heading')).toHaveTextContent(
+      'Start From a Preset',
+    );
+    expect(
+      screen.getByTestId('onboarding-step-workout-split-create-own-heading'),
+    ).toHaveTextContent('Or Build Your Own');
+    expect(
+      screen.getByTestId('onboarding-step-workout-split-create-own-description'),
+    ).toHaveTextContent(
+      'Name your own days and choose every exercise. It opens as soon as your account is made.',
+    );
+    expect(screen.getByTestId('onboarding-step-workout-split-create-own-selected')).toBeTruthy();
+    // Already answered when reached: Continue goes on without choosing again.
+    fireEvent.press(screen.getByTestId('onboarding-continue'));
+    expect(await screen.findByTestId('onboarding-step-ranks')).toBeTruthy();
   });
 });

@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors, fonts, radii, spacing, typeScale } from '../design/theme';
+import { colors, radii, spacing, typeScale } from '../design/theme';
 
 // Local to WorkoutSplitPresetPicker only -- mirrors chooseWorkoutSplitStyles
 // (same card/chip/button visual language) without touching workoutSplitStyles.ts,
@@ -47,23 +47,8 @@ export const workoutSplitPresetPickerStyles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  createSplitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md + 2,
-    marginTop: spacing.sm,
-  },
-  createSplitButtonText: {
-    ...typeScale.cardTitle,
-    fontFamily: fonts.display,
-  },
-  createOwnHelperText: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.sm,
+  createOwnDescription: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
   },
 });
