@@ -350,6 +350,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
         width={width}
         onChooseDay={() => navigation.navigate('NutritionHistory', { date: day })}
         onAdjust={(direction) => dayTurn.turnTo(direction)}
+        accentColor={nutritionTheme.accent}
       />
     </View>
   );
