@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { useReduceMotionPreference } from '../navigation/navigationTransitions';
+import { useAppTheme } from '../theme/appThemeContext';
+import { CandyStripes } from './HolidayDecorations';
 import { colors } from './theme';
 
 interface Props {
@@ -25,6 +27,8 @@ const SPRING = { stiffness: 110, damping: 20, mass: 1, overshootClamping: true }
  */
 export function AnimatedBar({ fraction, color, height = 4, testID }: Props) {
   const reduceMotion = useReduceMotionPreference();
+  // Through the holidays, a candy cane's stripes.
+  const { decorating } = useAppTheme();
   const target = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
   const length = useRef(new Animated.Value(0)).current;
   const [trackWidth, setTrackWidth] = useState(0);
@@ -71,7 +75,9 @@ export function AnimatedBar({ fraction, color, height = 4, testID }: Props) {
             ],
           },
         ]}
-      />
+      >
+        {decorating ? <CandyStripes radius={radius} /> : null}
+      </Animated.View>
     </View>
   );
 }

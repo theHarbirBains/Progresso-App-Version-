@@ -1,3 +1,5 @@
+import { SnowCap } from '../design/HolidayDecorations';
+import { useAppTheme } from '../theme/appThemeContext';
 import { View } from 'react-native';
 import { PrimaryButton } from '../design/Button';
 import { Card } from '../design/Card';
@@ -36,8 +38,11 @@ export function FeedHeroCard({
   onPress,
   accessibilityLabel,
 }: Props) {
+  const { decorating } = useAppTheme();
   return (
     <Card hero testID={testID} onPress={onPress} accessibilityLabel={accessibilityLabel}>
+      {/* Through the holidays, snow lying along its top. */}
+      {decorating ? <SnowCap testID={`${testID}-snow`} /> : null}
       <Text style={[styles.nextWorkoutEyebrow, { color: colors.textPrimary }]}>{eyebrow}</Text>
       <Text style={[styles.nextWorkoutDayName, { color: colors.textPrimary }]}>{title}</Text>
       {muscles ? (

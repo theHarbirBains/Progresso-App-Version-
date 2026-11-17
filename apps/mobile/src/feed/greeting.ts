@@ -1,13 +1,38 @@
 // Feed's greeting (FeedGreeting): a line that changes with the time of day -- "Good morning,
 // Harbir", "Can't sleep, Harbir?" -- and a short push under it. Each part of the day has a few;
 // which one shows changes from day to day but stays put through the day, so it never flickers
-// between screens.
+// between screens. Through the holidays, with Holiday Decorations on, it's festive instead:
+// "Merry Christmas" on December 24 and 25, "Happy New Year" on December 31 and January 1, and
+// "Happy holidays" the rest of the season.
 
 export interface Greeting {
   /** "Good morning, Harbir" -- or "Good morning", with no name to use. */
   headline: string;
   /** "Let's make today count." */
   line: string;
+  /** A holiday greeting, which Feed marks with a small star. */
+  festive?: boolean;
+}
+
+// The holiday season's lines, one a day in turn.
+const HOLIDAY_LINES = [
+  'Train now, feast later.',
+  'Stay strong through the season.',
+  'A quick session still counts.',
+  'Give yourself the gift of a good workout.',
+];
+
+/** The festive greeting for this day: its words, and its line. */
+function holidayOption(now: Date, day: number): Option {
+  const month = now.getMonth();
+  const date = now.getDate();
+  if (month === 11 && (date === 24 || date === 25)) {
+    return { lead: 'Merry Christmas', line: 'Enjoy the day. The gym will be here tomorrow.' };
+  }
+  if (month === 11 && date === 31)
+    return { lead: 'Happy New Year', line: 'Finish the year strong.' };
+  if (month === 0 && date === 1) return { lead: 'Happy New Year', line: 'New year, new PRs.' };
+  return { lead: 'Happy holidays', line: HOLIDAY_LINES[day % HOLIDAY_LINES.length]! };
 }
 
 /** A headline: its words, then the name (after a comma), then how it ends ("?" or nothing). */
@@ -81,17 +106,21 @@ export function firstName(displayName: string | null | undefined): string | null
   return first ? first : null;
 }
 
-/** The greeting for this moment, for someone called `name` (or no one in particular). */
-export function greetingFor(now: Date, name: string | null): Greeting {
+/**
+ * The greeting for this moment, for someone called `name` (or no one in particular) -- festive
+ * when `holidays` (it's the season, with Holiday Decorations on).
+ */
+export function greetingFor(now: Date, name: string | null, holidays = false): Greeting {
   const hour = now.getHours();
   const part = [...PARTS].reverse().find((p) => hour >= p.from) ?? PARTS[0];
   // The same one all day, a different one (mostly) the next: the day's number, counted locally.
   const day = Math.floor(
     Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / (24 * 60 * 60 * 1000),
   );
-  const option = part.options[day % part.options.length];
+  const option = holidays ? holidayOption(now, day) : part.options[day % part.options.length];
   return {
     headline: `${option.lead}${name ? `, ${name}` : ''}${option.end ?? ''}`,
     line: option.line,
+    ...(holidays ? { festive: true } : {}),
   };
 }

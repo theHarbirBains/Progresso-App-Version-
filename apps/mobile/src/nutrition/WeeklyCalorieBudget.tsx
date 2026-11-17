@@ -13,6 +13,8 @@ import {
 } from './nutritionCalculations';
 import { estimatedWeekSoFar, weekdayNames, type WeekLogging } from './weekLogging';
 import { wholeFigureText } from './wholeFigures';
+import { CandyStripes } from '../design/HolidayDecorations';
+import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
   /** "This Week", or another week's name ("Week of October 18"). */
@@ -72,6 +74,7 @@ export function WeeklyCalorieBudget({
   onSetTarget,
 }: Props) {
   const [estimateOpen, setEstimateOpen] = useState(false);
+  const { decorating } = useAppTheme();
   const summary = consumed === null ? null : computeWeeklyCalorieSummary(consumed, dailyTarget);
   const unlogged = logging?.unloggedBefore ?? [];
   const estimate = summary && logging ? estimatedWeekSoFar(summary.consumed, logging) : null;
@@ -154,7 +157,10 @@ export function WeeklyCalorieBudget({
                   styles.fill,
                   { width: `${(summary?.percent ?? 0) * 100}%`, backgroundColor: accentColor },
                 ]}
-              />
+              >
+                {/* Through the holidays, a candy cane's stripes. */}
+                {decorating ? <CandyStripes radius={4} /> : null}
+              </View>
             </View>
             {remainingText ? (
               <Text testID="weekly-budget-remaining" style={styles.caption}>

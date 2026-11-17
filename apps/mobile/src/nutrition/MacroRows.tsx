@@ -1,7 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
+import { CandyStripes } from '../design/HolidayDecorations';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
+import { useAppTheme } from '../theme/appThemeContext';
 import { wholeFigure } from './wholeFigures';
 
 export type MacroKey = 'protein' | 'carbs' | 'fat';
@@ -43,6 +45,7 @@ interface Props {
  * Progress's average day.
  */
 export function MacroRows({ macros, accentColor, testIDPrefix = '', spokenSuffix }: Props) {
+  const { decorating } = useAppTheme();
   return (
     <View style={styles.column}>
       {macros.map((macro, index) => {
@@ -87,7 +90,10 @@ export function MacroRows({ macros, accentColor, testIDPrefix = '', spokenSuffix
                       styles.barFill,
                       { width: `${fraction * 100}%`, backgroundColor: accentColor },
                     ]}
-                  />
+                  >
+                    {/* Through the holidays, a candy cane's stripes. */}
+                    {decorating ? <CandyStripes radius={2} /> : null}
+                  </View>
                 </View>
               ) : null}
             </View>

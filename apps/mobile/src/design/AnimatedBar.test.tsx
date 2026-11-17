@@ -1,6 +1,8 @@
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Decorated } from '../testUtils/decorated';
 import { AnimatedBar } from './AnimatedBar';
+import { CandyStripes } from './HolidayDecorations';
 import { colors } from './theme';
 
 // The bar is hidden from screen readers, so it's only found by asking for hidden elements too.
@@ -34,5 +36,20 @@ describe('AnimatedBar', () => {
 
     rerender(<AnimatedBar testID="bar" fraction={1} color="#D99A50" height={8} />);
     expect(StyleSheet.flatten(screen.getByTestId('bar-track', HIDDEN).props.style).height).toBe(8);
+  });
+});
+
+describe('AnimatedBar through the holidays', () => {
+  it("fills with a candy cane's stripes, with Holiday Decorations on -- and plainly otherwise", () => {
+    const { unmount } = render(
+      <Decorated>
+        <AnimatedBar testID="bar" fraction={0.5} color={colors.accent} />
+      </Decorated>,
+    );
+    expect(screen.UNSAFE_getAllByType(CandyStripes)).toHaveLength(1);
+    unmount();
+
+    render(<AnimatedBar testID="bar" fraction={0.5} color={colors.accent} />);
+    expect(screen.UNSAFE_queryAllByType(CandyStripes)).toHaveLength(0);
   });
 });

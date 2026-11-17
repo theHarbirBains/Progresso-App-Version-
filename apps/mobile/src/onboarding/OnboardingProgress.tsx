@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { colors, radii, spacing } from '../design/theme';
+import { CandyStripes } from '../design/HolidayDecorations';
 import { useAppTheme } from '../theme/appThemeContext';
 
 interface Props {
@@ -14,7 +15,8 @@ interface Props {
  * Hidden from VoiceOver: the step's own "About You · 2 of 6" line says the same in words.
  */
 export function OnboardingProgress({ testID, sections }: Props) {
-  const accent = useAppTheme().accent.accent;
+  const { accent: theme, decorating } = useAppTheme();
+  const accent = theme.accent;
   return (
     <View
       testID={testID}
@@ -33,7 +35,10 @@ export function OnboardingProgress({ testID, sections }: Props) {
                 backgroundColor: accent,
               },
             ]}
-          />
+          >
+            {/* Through the holidays, a candy cane's stripes. */}
+            {decorating ? <CandyStripes radius={radii.pill} /> : null}
+          </View>
         </View>
       ))}
     </View>

@@ -23,8 +23,15 @@ export const feedStyles = StyleSheet.create({
     paddingTop: spacing.xs,
     paddingBottom: spacing.sm,
   },
+  // The headline, and the holidays' star beside it.
+  greetingHeadlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   greetingHeadline: {
     ...typeScale.screenTitle,
+    flexShrink: 1,
   },
   greetingLine: {
     ...typeScale.body,
