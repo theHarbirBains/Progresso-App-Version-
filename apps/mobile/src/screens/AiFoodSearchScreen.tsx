@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { BottomSheet } from '../design/BottomSheet';
-import { PrimaryButton } from '../design/Button';
+import { PrimaryButton, TextButton } from '../design/Button';
 import { RiseIn } from '../design/RiseIn';
 import { Screen } from '../design/Screen';
 import { TextInput } from '../design/TextInput';
@@ -341,7 +341,8 @@ export function AiFoodSearchScreen({ navigation, route }: Props) {
             {interpretation ? null : (
               <PrimaryButton
                 testID="ai-food-search-submit"
-                label={loading ? 'Reading…' : 'Get Estimate'}
+                // After a failure the same button tries again: nothing was saved, nothing is lost.
+                label={loading ? 'Reading…' : error ? 'Try Again' : 'Get Estimate'}
                 loading={loading}
                 disabled={!canEstimate}
                 onPress={handleInterpret}
@@ -349,6 +350,19 @@ export function AiFoodSearchScreen({ navigation, route }: Props) {
                 onAccentColor={theme.onAccent}
               />
             )}
+            {/* A way on that doesn't depend on AI Food Search working. */}
+            {error && !interpretation ? (
+              <TextButton
+                testID="ai-food-search-use-search"
+                label="Search Food Instead"
+                onPress={() =>
+                  navigation.navigate('FoodSearch', {
+                    day: route.params?.day,
+                    query: foodName.trim() || undefined,
+                  })
+                }
+              />
+            ) : null}
           </View>
         </AppCard>
       </RiseIn>

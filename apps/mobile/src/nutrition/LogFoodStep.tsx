@@ -3,7 +3,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { Text } from '../design/Text';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { PrimaryButton } from '../design/Button';
+import { PrimaryButton, TextButton } from '../design/Button';
 import { Screen } from '../design/Screen';
 import { SegmentedControl } from '../design/SegmentedControl';
 import { StatValue } from '../design/StatValue';
@@ -23,7 +23,8 @@ import {
 import { defaultMealTypeForTime } from './mealTypes';
 import type { EnteredAmount } from './foodLogQueries';
 import { calculateLogTotals } from './nutritionCalculations';
-import type { FoodRow } from './foodQueries';
+import type { FoodProvenance, FoodRow } from './foodQueries';
+import { foodSourceText } from './foodSource';
 import { wholeFigure } from './wholeFigures';
 
 export type LoggableFood = Pick<
@@ -36,6 +37,10 @@ export type LoggableFood = Pick<
   servingLabel?: string | null;
   /** Set for a recipe: how many servings it makes. */
   recipeServings?: number | null;
+  /** Where its figures came from, when recorded -- shown so a figure someone doubts can be traced. */
+  provenance?: FoodProvenance | null;
+  /** The provider a shared food was cached from ('usda_fdc', 'open_food_facts'); null for a built-in. */
+  provider?: string | null;
 };
 
 interface LogFoodStepProps {
@@ -61,6 +66,12 @@ interface LogFoodStepProps {
   chooseLabel?: string;
   /** The day to log to ("YYYY-MM-DD"), when it's a past day the Nutrition screen was showing. */
   day?: string;
+  /** Opens Search Food on this food's name, to pick another entry for it. */
+  onOtherMatches?: () => void;
+  /** Opens the food's own form -- for a food in the person's library, whose figures are theirs to change. */
+  onEdit?: () => void;
+  /** Opens a report about this food's figures (Feedback & Suggestions). */
+  onReportProblem?: () => void;
 }
 
 function capitalize(text: string): string {
@@ -102,6 +113,9 @@ export function LogFoodStep({
   onChoose,
   chooseLabel = 'Add',
   day,
+  onOtherMatches,
+  onEdit,
+  onReportProblem,
 }: LogFoodStepProps) {
   const { logs, logFoodEntry } = useFoodLog();
   const { servingMl, pieces, ...known } = servingMeasures(food);
@@ -143,6 +157,7 @@ export function LogFoodStep({
   const validAmount = Number.isFinite(servings) && servings > 0;
   const canLog = validAmount && !saving;
   const totals = validAmount ? calculateLogTotals(food, servings) : null;
+  const source = foodSourceText(food);
 
   const unitOptions: { label: string; value: QuantityUnit; accessibilityLabel?: string }[] = [
     { label: 'Servings', value: 'servings' },
@@ -314,6 +329,10 @@ export function LogFoodStep({
         <Text testID="log-food-attribution" style={styles.attribution}>
           Data from Open Food Facts
         </Text>
+      ) : source ? (
+        <Text testID="log-food-source" style={styles.attribution}>
+          Source: {source}
+        </Text>
       ) : null}
 
       {error ? (
@@ -331,6 +350,27 @@ export function LogFoodStep({
         accentColor={accentColor}
         onAccentColor={onAccentColor}
       />
+
+      {/* Figures that look wrong: another entry for the food, the person's own copy, or a report. */}
+      {onOtherMatches || onEdit || onReportProblem ? (
+        <View testID="log-food-actions" style={styles.actions}>
+          {onOtherMatches ? (
+            <TextButton
+              testID="log-food-other-matches"
+              label="Other Matches"
+              onPress={onOtherMatches}
+            />
+          ) : null}
+          {onEdit ? <TextButton testID="log-food-edit" label="Edit Food" onPress={onEdit} /> : null}
+          {onReportProblem ? (
+            <TextButton
+              testID="log-food-report"
+              label="Report a Problem"
+              onPress={onReportProblem}
+            />
+          ) : null}
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -366,6 +406,12 @@ const styles = StyleSheet.create({
   attribution: {
     ...typeScale.caption,
     color: colors.textMuted,
+  },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    columnGap: spacing.lg,
   },
   error: {
     ...typeScale.callout,

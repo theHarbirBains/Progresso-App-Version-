@@ -464,3 +464,73 @@ describe('LogFoodStep -- a recipe', () => {
     expect(screen.getByTestId('log-food-unit-g')).toBeTruthy();
   });
 });
+
+describe('LogFoodStep: where the figures come from, and what to do when they look wrong', () => {
+  const eggWhite: LoggableFood = {
+    id: 'food-egg-white',
+    name: 'Egg White, Large',
+    servingSize: 1,
+    servingUnit: 'large',
+    servingLabel: '1 large · 33 g',
+    calories: 17,
+    proteinG: 3.6,
+    carbsG: 0.2,
+    fatG: 0.1,
+    provider: null,
+  };
+
+  it("shows the serving's weight, and logs by weight without asking for one", () => {
+    renderStep(eggWhite);
+
+    expect(screen.getByTestId('log-food-serving')).toHaveTextContent('1 serving: 1 large · 33 g');
+    expect(screen.getByTestId('log-food-amount')).toHaveTextContent('1 serving · 33 g');
+    fireEvent(screen.getByTestId('log-food-unit'), 'onChange', 'g');
+    // The weight is known, so there's nothing to weigh first: 1 serving is 33 g.
+    expect(screen.queryByTestId('log-food-serving-weight')).toBeNull();
+    expect(screen.getByTestId('log-food-quantity')).toHaveProp('value', '33');
+    fireEvent.changeText(screen.getByTestId('log-food-quantity'), '99');
+    expect(screen.getByTestId('log-food-amount')).toHaveTextContent('99 g · 3 servings');
+    expect(screen.getByTestId('log-food-calories')).toHaveTextContent('51 cal');
+  });
+
+  it('names the source of a built-in and a USDA food', () => {
+    renderStep(eggWhite);
+    expect(screen.getByTestId('log-food-source')).toHaveTextContent(
+      "Source: Progresso's built-in foods",
+    );
+    screen.unmount();
+
+    renderStep({ ...rice, provider: 'usda_fdc' });
+    expect(screen.getByTestId('log-food-source')).toHaveTextContent(
+      'Source: USDA FoodData Central',
+    );
+  });
+
+  it('offers Other Matches, Edit Food and Report a Problem only where the screen gives them', () => {
+    const onOtherMatches = jest.fn();
+    const onEdit = jest.fn();
+    const onReportProblem = jest.fn();
+    render(
+      <LogFoodStep
+        food={eggWhite}
+        accentColor="#3DDC97"
+        onAccentColor="#000000"
+        onCancel={jest.fn()}
+        onOtherMatches={onOtherMatches}
+        onEdit={onEdit}
+        onReportProblem={onReportProblem}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('log-food-other-matches'));
+    fireEvent.press(screen.getByTestId('log-food-edit'));
+    fireEvent.press(screen.getByTestId('log-food-report'));
+    expect(onOtherMatches).toHaveBeenCalled();
+    expect(onEdit).toHaveBeenCalled();
+    expect(onReportProblem).toHaveBeenCalled();
+    screen.unmount();
+
+    renderStep(eggWhite);
+    expect(screen.queryByTestId('log-food-actions')).toBeNull();
+  });
+});

@@ -13,6 +13,7 @@ import { Screen } from '../design/Screen';
 import { getFoodByBarcode, type FoodSearchResult } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { goToSection } from '../navigation/sectionNavigation';
+import { foodPageActions } from '../nutrition/foodPageActions';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { barcodeScannerStyles as styles } from './barcodeScannerStyles';
@@ -170,6 +171,7 @@ export function BarcodeScannerScreen({ navigation, route }: Props) {
           carbsG: product.carbsG ?? 0,
           fatG: product.fatG ?? 0,
           imageUrl: product.imageUrl,
+          provider: product.provider,
         }}
         subtitle={product.brand ?? undefined}
         showAttribution={product.provider === 'open_food_facts'}
@@ -178,6 +180,18 @@ export function BarcodeScannerScreen({ navigation, route }: Props) {
         day={day}
         onDone={() => goToSection(navigation, 'Nutrition')}
         onCancel={resetToScanning}
+        onReportProblem={
+          foodPageActions(
+            navigation,
+            {
+              ...product,
+              proteinG: product.proteinG ?? 0,
+              carbsG: product.carbsG ?? 0,
+              fatG: product.fatG ?? 0,
+            },
+            day,
+          ).onReportProblem
+        }
       />
     );
   }

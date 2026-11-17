@@ -181,19 +181,27 @@ describe('FoodSearchScreen', () => {
     await typeSearch('zzz');
 
     expect(screen.getByTestId('food-search-empty-results')).toHaveTextContent(
-      'No foods found for "zzz"',
+      /No foods found for "zzz"/,
     );
+    // The other ways in, for a food no database has.
+    fireEvent.press(screen.getByTestId('food-search-try-ai'));
+    expect(mockNavigate).toHaveBeenCalledWith('AiFoodSearch', { day: undefined });
+    fireEvent.press(screen.getByTestId('food-search-enter-own'));
+    expect(mockNavigate).toHaveBeenCalledWith('QuickFoodEntry', { day: undefined });
   });
 
   it('shows an error state with a working retry', async () => {
-    mockSearchFoods.mockRejectedValueOnce(new Error('network error'));
+    // Both the quick answer and the full one fail.
+    mockSearchFoods
+      .mockRejectedValueOnce(new Error('network error'))
+      .mockRejectedValueOnce(new Error('network error'));
     render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
 
     await typeSearch('chicken');
 
     expect(screen.getByTestId('food-search-error')).toHaveTextContent('network error');
 
-    mockSearchFoods.mockResolvedValueOnce({ foods: [chickenBreast], hasMore: false });
+    mockSearchFoods.mockResolvedValue({ foods: [chickenBreast], hasMore: false });
     await act(async () => {
       fireEvent.press(screen.getByTestId('food-search-error-retry'));
       await Promise.resolve();
@@ -288,6 +296,7 @@ describe('FoodSearchScreen', () => {
         proteinG: 31,
         carbsG: 0,
         fatG: 3.6,
+        provider: null,
       },
       1,
       // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
@@ -419,5 +428,154 @@ describe('FoodSearchScreen -- rows, shared nutrition view, one primary action', 
     fireEvent.press(screen.getByTestId('food-search-log-button'));
     await screen.findByTestId('log-food-quantity');
     expectNoBareText();
+  });
+});
+
+describe('FoodSearchScreen: quick results first, the latest search only', () => {
+  const onionsRaw = {
+    ...chickenBreast,
+    id: 'food-onion',
+    name: 'Onions, raw',
+    calories: 40,
+    provider: 'usda_fdc',
+    servingLabel: '100 g · 1 medium ≈ 110 g',
+  };
+
+  /** A search answer that waits until it's let go. */
+  function deferred<T>() {
+    let resolve: (value: T) => void = () => {};
+    let reject: (error: Error) => void = () => {};
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  it('shows the quick answer at once, then the full one with branded products', async () => {
+    const quick = deferred<unknown>();
+    const full = deferred<unknown>();
+    mockSearchFoods.mockImplementation(
+      (
+        _token: string,
+        _query: string,
+        _page?: number,
+        _size?: number,
+        options?: { branded?: boolean },
+      ) => (options?.branded === false ? quick.promise : full.promise),
+    );
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+
+    await typeSearch('onion');
+    expect(mockSearchFoods).toHaveBeenCalledWith('token-123', 'onion', 0, 30, { branded: false });
+    expect(mockSearchFoods).toHaveBeenCalledWith('token-123', 'onion');
+
+    await act(async () => {
+      quick.resolve({ foods: [onionsRaw], hasMore: false });
+    });
+    expect(screen.getByTestId('food-search-result-food-onion')).toHaveTextContent(/USDA · 100 g/);
+    expect(screen.getByTestId('food-search-finding-more')).toHaveTextContent(
+      'Looking for branded products…',
+    );
+
+    await act(async () => {
+      full.resolve({ foods: [onionsRaw, oreoOriginal], hasMore: false });
+    });
+    expect(screen.getByTestId('food-search-result-food-2')).toBeTruthy();
+    expect(screen.queryByTestId('food-search-finding-more')).toBeNull();
+  });
+
+  it('keeps the quick answer, and offers to try again, when the branded products fail', async () => {
+    mockSearchFoods.mockImplementation(
+      (
+        _token: string,
+        _query: string,
+        _page?: number,
+        _size?: number,
+        options?: { branded?: boolean },
+      ) =>
+        options?.branded === false
+          ? Promise.resolve({ foods: [onionsRaw], hasMore: false })
+          : Promise.reject(new Error('Open Food Facts is down')),
+    );
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+
+    await typeSearch('onion');
+    await flush();
+
+    expect(screen.getByTestId('food-search-result-food-onion')).toBeTruthy();
+    expect(screen.queryByTestId('food-search-error')).toBeNull();
+    expect(screen.getByTestId('food-search-products-failed')).toHaveTextContent(
+      /Branded products couldn't be loaded\./,
+    );
+    expect(screen.getByTestId('food-search-products-retry')).toBeTruthy();
+  });
+
+  it('never lets an older, slower search replace a newer one', async () => {
+    const slow = deferred<unknown>();
+    mockSearchFoods.mockImplementation((_token: string, query: string) =>
+      query === 'on' ? slow.promise : Promise.resolve({ foods: [onionsRaw], hasMore: false }),
+    );
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+
+    await typeSearch('on');
+    await typeSearch('onion');
+    await flush();
+    expect(screen.getByTestId('food-search-result-food-onion')).toBeTruthy();
+
+    await act(async () => {
+      slow.resolve({ foods: [oreoOriginal], hasMore: false });
+    });
+    expect(screen.queryByTestId('food-search-result-food-2')).toBeNull();
+    expect(screen.getByTestId('food-search-result-food-onion')).toBeTruthy();
+  });
+
+  it('says what was searched for when a misspelling was put right', async () => {
+    mockSearchFoods.mockResolvedValue({
+      foods: [{ ...onionsRaw, id: 'food-broccoli', name: 'Broccoli, raw' }],
+      hasMore: false,
+      correctedQuery: 'broccoli',
+    });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+
+    await typeSearch('brocoli');
+    await flush();
+
+    expect(screen.getByTestId('food-search-corrected')).toHaveTextContent(
+      'Showing results for “broccoli”',
+    );
+  });
+
+  it("starts from a food's name, asked for from that food's page", async () => {
+    mockSearchFoods.mockResolvedValue({ foods: [onionsRaw], hasMore: false });
+    render(
+      <FoodSearchScreen
+        navigation={navigation}
+        route={{ params: { query: 'Egg White, Large' } } as never}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    expect(screen.getByTestId('food-search-input')).toHaveProp('value', 'Egg White, Large');
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+    expect(mockSearchFoods).toHaveBeenCalledWith('token-123', 'Egg White, Large');
+  });
+
+  it("shows a USDA food's own serving wording and its source", async () => {
+    mockSearchFoods.mockResolvedValue({ foods: [onionsRaw], hasMore: false });
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    await typeSearch('onion');
+
+    fireEvent.press(await screen.findByTestId('food-search-result-food-onion'));
+
+    expect(screen.getByTestId('food-search-detail-serving')).toHaveTextContent(
+      'Serving: 100 g · 1 medium ≈ 110 g',
+    );
+    expect(screen.getByTestId('food-search-detail-source')).toHaveTextContent(
+      'Source: USDA FoodData Central',
+    );
   });
 });

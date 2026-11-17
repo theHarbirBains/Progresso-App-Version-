@@ -52,6 +52,7 @@ import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { CopyYesterdaySheet, SaveAsMealSheet } from '../nutrition/TodayShortcutSheets';
 import { readAheadDayLogs, readDayLogs, useDayLogs } from '../nutrition/useDayLogs';
 import { WeeklyCalorieBudget } from '../nutrition/WeeklyCalorieBudget';
+import { weekLogging, weekRangeText } from '../nutrition/weekLogging';
 import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import { wholeFigure } from '../nutrition/wholeFigures';
 
@@ -282,6 +283,9 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
       earlier,
       title: thisWeek ? 'This Week' : weekOfLabel(dayKey(start)),
       daysLeft: daysLeftInWeek(shown),
+      rangeText: weekRangeText(start),
+      // Which of the week's days before this one have nothing logged -- missing, never 0 eaten.
+      logging: weekLogs?.start === start.getTime() ? weekLogging(weekLogs.rows, start, day) : null,
     };
   }, [day, weekLogs]);
   const remaining = useMemo(() => calculateRemaining(consumed, goals), [consumed, goals]);
@@ -293,12 +297,24 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
 
   // A log's amount is edited the way it was typed -- "2" cookies, "150" g -- and turned into
   // servings from the log's own serving snapshot. A log from before amounts were kept is in
-  // servings.
+  // servings. Zero takes the food off the day, the same as its Delete: a log is only ever of
+  // some amount (food_logs keeps quantities above zero), and only this entry goes -- the food
+  // stays in the library and every other day's log of it stays as it was. Anything that isn't
+  // an amount (blank, negative, not a number) puts back the one there was.
   async function handleUpdateQuantity(log: FoodLogRow) {
-    const amount = Number(quantityInputs[log.id]);
+    const typed = (quantityInputs[log.id] ?? '').trim().replace(',', '.');
+    const amount = Number(typed);
     const unit = log.enteredUnit ?? 'servings';
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    if (amount === (log.enteredAmount ?? log.quantity)) return;
+    const current = log.enteredAmount ?? log.quantity;
+    if (typed !== '' && amount === 0) {
+      await handleDelete(log.id);
+      return;
+    }
+    if (typed === '' || !Number.isFinite(amount) || amount < 0) {
+      setQuantityInputs((prev) => ({ ...prev, [log.id]: String(current) }));
+      return;
+    }
+    if (amount === current) return;
     const servings = servingsFor(amount, unit, logMeasures(log));
     if (!(servings > 0)) return;
     setError(null);
@@ -423,6 +439,8 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
               daysLeft={week.daysLeft}
               goal={calorieGoal}
               failed={weekFailed}
+              rangeText={week.rangeText}
+              logging={week.logging}
               accentColor={accent}
               onSetTarget={() => navigation.navigate('NutritionGoals')}
             />
@@ -548,6 +566,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
                                 log.enteredUnit ?? 'servings',
                                 servingMeasures(log).pieces,
                               )}`}
+                              accessibilityHint="Enter 0 to take it off the day."
                               keyboardType="decimal-pad"
                               returnKeyType="done"
                               inputAccessoryViewID={AMOUNT_DONE_ID}

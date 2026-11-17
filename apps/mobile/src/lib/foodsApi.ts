@@ -27,7 +27,7 @@ export interface FoodSearchResult {
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
-  /** Null for Progresso's own generic/seeded foods; the source provider's id (e.g. 'open_food_facts') for a cached branded product. */
+  /** Null for Progresso's own generic/seeded foods; the source it was cached from otherwise: 'open_food_facts' for a branded product, 'usda_fdc' for a USDA reference food. */
   provider: string | null;
   barcode: string | null;
 }
@@ -35,15 +35,24 @@ export interface FoodSearchResult {
 export interface FoodSearchResponse {
   foods: FoodSearchResult[];
   hasMore: boolean;
+  /** What was searched for instead, when the query as typed found nothing. Missing from an older API. */
+  correctedQuery?: string | null;
 }
 
+/**
+ * Search Food. `branded: false` leaves out Open Food Facts' branded products -- an answer in a
+ * fraction of the time, from Progresso's own catalog and USDA's reference foods, which Search
+ * Food shows first while the full search (with the products) is still on its way.
+ */
 export function searchFoods(
   accessToken: string,
   query: string,
   page = 0,
   pageSize = 30,
+  options: { branded?: boolean } = {},
 ): Promise<FoodSearchResponse> {
   const params = new URLSearchParams({ query, page: String(page), pageSize: String(pageSize) });
+  if (options.branded === false) params.set('branded', '0');
   return request<FoodSearchResponse>(`/api/v1/foods/search?${params.toString()}`, accessToken);
 }
 

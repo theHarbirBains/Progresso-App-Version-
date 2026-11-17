@@ -14,6 +14,7 @@ interface FoodFactsTestIDs {
   carbs?: string;
   fat?: string;
   attribution?: string;
+  source?: string;
 }
 
 interface Props {
@@ -23,6 +24,8 @@ interface Props {
   imageUrl?: string | null;
   servingSize: number;
   servingUnit: string;
+  /** The serving as its source words it ("100 g · 1 medium ≈ 110 g"); shown instead of size and unit. */
+  servingLabel?: string | null;
   calories: number;
   /** null = the provider genuinely didn't report it -- shown as "—", never a fabricated 0. */
   proteinG: number | null;
@@ -30,6 +33,8 @@ interface Props {
   fatG: number | null;
   /** Open Food Facts' ODbL license asks integrations to credit the source. */
   showAttribution: boolean;
+  /** Where the figures come from (foodSource.ts), shown when there's no Open Food Facts credit. */
+  sourceText?: string | null;
   /** The Nutrition accent -- used only for the calorie number, the one that matters most. */
   accentColor: string;
   testIDs?: FoodFactsTestIDs;
@@ -86,11 +91,13 @@ export function FoodFacts({
   imageUrl,
   servingSize,
   servingUnit,
+  servingLabel,
   calories,
   proteinG,
   carbsG,
   fatG,
   showAttribution,
+  sourceText,
   accentColor,
   testIDs = {},
 }: Props) {
@@ -101,7 +108,7 @@ export function FoodFacts({
           <FoodImage testID="food-facts-image" uri={imageUrl} name={name} size={88} zoomable />
           <View style={styles.summaryBody}>
             <Text testID={testIDs.serving} style={styles.serving}>
-              Serving: {servingSize} {servingUnit}
+              Serving: {servingLabel?.trim() || `${servingSize} ${servingUnit}`}
             </Text>
             <StatValue
               testID={testIDs.calories}
@@ -118,6 +125,10 @@ export function FoodFacts({
       {showAttribution ? (
         <Text testID={testIDs.attribution} style={styles.attribution}>
           Data from Open Food Facts
+        </Text>
+      ) : sourceText ? (
+        <Text testID={testIDs.source} style={styles.attribution}>
+          Source: {sourceText}
         </Text>
       ) : null}
     </View>

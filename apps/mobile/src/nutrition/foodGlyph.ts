@@ -31,7 +31,19 @@ const RULES: { glyph: FoodGlyphName; words: string[] }[] = [
   { glyph: 'fruit-grapes', words: ['grape', 'berry', 'berries', 'cherry', 'cherries'] },
   {
     glyph: 'carrot',
-    words: ['carrot', 'broccoli', 'spinach', 'pepper', 'tomato', 'cucumber', 'potato', 'lettuce'],
+    words: [
+      'carrot',
+      'broccoli',
+      'spinach',
+      'pepper',
+      'tomato',
+      'cucumber',
+      'potato',
+      'lettuce',
+      'onion',
+      'garlic',
+      'celery',
+    ],
   },
   { glyph: 'sprout', words: ['tofu', 'tempeh', 'soy', 'vegetable', 'salad', 'kale', 'cabbage'] },
   { glyph: 'cookie', words: ['cookie', 'biscuit', 'cake', 'chocolate', 'candy', 'sweet', 'bar'] },
@@ -39,13 +51,14 @@ const RULES: { glyph: FoodGlyphName; words: string[] }[] = [
 ];
 
 function matches(word: string, ruleWord: string): boolean {
-  if (word === ruleWord || word === `${ruleWord}s`) return true;
+  // "potatoes", "tomatoes" and "peaches" take -es.
+  if (word === ruleWord || word === `${ruleWord}s` || word === `${ruleWord}es`) return true;
   return ruleWord.length >= 5 && (word.endsWith(ruleWord) || word.endsWith(`${ruleWord}s`));
 }
 
 const FALLBACK: FoodGlyphName = 'silverware-fork-knife';
 
-/** Matches a rule word as a whole word, its plural, or (for longer words) the end of a compound ("strawberries" ends in "berries"). */
+/** Matches a rule word as a whole word, its plural (-s or -es), or (for longer words) the end of a compound ("strawberries" ends in "berries"). */
 export function foodGlyph(name: string): FoodGlyphName {
   const words = name
     .toLowerCase()

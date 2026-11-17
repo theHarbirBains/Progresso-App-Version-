@@ -405,6 +405,31 @@ describe('AiFoodSearchScreen', () => {
       'AI food search failed. Please try again.',
     );
     expect(screen.queryByTestId('ai-food-review')).toBeNull();
+    // Nothing was saved; the same button tries again, and Search Food is a way on regardless.
+    expect(mockCreateFood).not.toHaveBeenCalled();
+    expect(screen.getByTestId('ai-food-search-submit')).toHaveTextContent('Try Again');
+    fireEvent.press(screen.getByTestId('ai-food-search-use-search'));
+    expect(mockNavigate).toHaveBeenCalledWith('FoodSearch', { day: undefined, query: '100g rice' });
+  });
+
+  it('tries again from the same button, and shows the review once it works', async () => {
+    mockInterpret.mockRejectedValueOnce(
+      new Error(
+        "AI Food Search isn't available right now. Search Food and Scan Barcode still work.",
+      ),
+    );
+    renderScreen();
+    describeFood('100 grams of air fried potatoes with no oil');
+    expect(await screen.findByTestId('ai-food-search-error')).toHaveTextContent(
+      /isn't available right now/,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('ai-food-search-submit'));
+    });
+
+    expect(await screen.findByTestId('ai-food-review')).toBeTruthy();
+    expect(screen.queryByTestId('ai-food-search-error')).toBeNull();
   });
 
   it('adds the complete food to the Food Library with its serving, totals and provenance, then returns there', async () => {

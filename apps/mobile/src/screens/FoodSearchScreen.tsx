@@ -1,23 +1,26 @@
-import { useCallback, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
-import { PrimaryButton } from '../design/Button';
+import { PrimaryButton, SecondaryButton, TextButton } from '../design/Button';
 import { EmptyState } from '../design/EmptyState';
 import { ErrorState } from '../design/ErrorState';
 import { ListRow } from '../design/ListRow';
 import { Screen } from '../design/Screen';
 import { SectionHeader } from '../design/SectionHeader';
+import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors } from '../design/theme';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
-import { searchFoods, type FoodSearchResult } from '../lib/api';
+import { searchFoods, type FoodSearchResponse, type FoodSearchResult } from '../lib/api';
 import type { RootStackScreenProps } from '../navigation/types';
 import { goToSection } from '../navigation/sectionNavigation';
 import { FoodFacts } from '../nutrition/FoodFacts';
 import { FoodImage } from '../nutrition/FoodImage';
+import { foodPageActions } from '../nutrition/foodPageActions';
+import { foodSourceText } from '../nutrition/foodSource';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { foodSearchStyles as styles } from './foodSearchStyles';
@@ -26,22 +29,32 @@ import { wholeFigure } from '../nutrition/wholeFigures';
 
 type Props = RootStackScreenProps<'FoodSearch'>;
 
-// Searches Progresso's food database (generic foods plus real branded
-// grocery products cached from an external provider -- see
-// apps/api/src/foods/) via the backend's /foods/search endpoint, never
-// direct-to-Supabase, since the external-provider orchestration is real
-// business logic. Selecting a result shows its nutrition info and serving
-// size, then reuses the same LogFoodStep every other "found a food" flow
-// (Food Library, Scan Barcode) logs through -- one normalized food model,
-// one logging pipeline. A provider-reported macro Open Food Facts genuinely
-// didn't supply (null, shown as "—" on this screen) becomes 0 only at the
-// point of logging, since food_logs' own columns are NOT NULL -- never
-// displayed as a fabricated 0 beforehand.
+// Searches Progresso's food database (generic foods, USDA FoodData Central's
+// reference whole foods, plus real branded grocery products cached from an
+// external provider -- see apps/api/src/foods/) via the backend's
+// /foods/search endpoint, never direct-to-Supabase, since the
+// external-provider orchestration is real business logic. Selecting a result
+// shows its nutrition info and serving size, then reuses the same LogFoodStep
+// every other "found a food" flow (Food Library, Scan Barcode) logs through --
+// one normalized food model, one logging pipeline. A provider-reported macro
+// Open Food Facts genuinely didn't supply (null, shown as "—" on this screen)
+// becomes 0 only at the point of logging, since food_logs' own columns are
+// NOT NULL -- never displayed as a fabricated 0 beforehand.
 //
 // Layout: the search field is pinned under the header; the results sit in
-// one widget as rows (the food's picture, name, "brand · serving", calories as
-// a mono value) separated by hairlines; the detail is the shared FoodFacts
-// widgets with one filled Log Food button.
+// one widget as rows (the food's picture, name, "brand · serving" -- "USDA ·
+// 100 g" for a USDA reference food -- calories as a mono value) separated by
+// hairlines; the detail is the shared FoodFacts widgets with one filled Log
+// Food button.
+//
+// Each search asks twice at once: a quick answer without Open Food Facts'
+// branded products (Progresso's catalog and USDA's whole foods, a fraction of
+// a second), shown as soon as it comes, and the full one, which replaces it
+// when it arrives -- a line at the foot says products are still being looked
+// for meanwhile. An answer to anything but the latest search is dropped, so a
+// slow early search never overwrites a later one, and what was found stays on
+// screen while the next search runs instead of flashing back to placeholders.
+// Nothing found offers the other ways in: AI Food Search and Quick Macro Entry.
 export function FoodSearchScreen({ navigation, route }: Props) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
@@ -52,29 +65,77 @@ export function FoodSearchScreen({ navigation, route }: Props) {
   // rather than introducing a new color.
   const { nutritionTheme: theme } = useProgressTheme();
 
-  const [searchInput, setSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState(route.params?.query ?? '');
   const search = useDebouncedValue(searchInput.trim());
   const [results, setResults] = useState<FoodSearchResult[]>([]);
+  // The search the results on screen answer, and what it was put right to, if anything.
+  const [shownFor, setShownFor] = useState<string | null>(null);
+  const [correctedQuery, setCorrectedQuery] = useState<string | null>(null);
   const [selected, setSelected] = useState<FoodSearchResult | null>(null);
   const [loading, setLoading] = useState(false);
+  // The quick answer is showing; the full one, with branded products, is still coming.
+  const [findingMore, setFindingMore] = useState(false);
+  // The quick answer came but the full one failed: the branded products are missing.
+  const [productsFailed, setProductsFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const latestSearch = useRef(0);
+
+  // Another entry for a food, asked for from a food's page.
+  const askedQuery = route.params?.query;
+  useEffect(() => {
+    if (!askedQuery) return;
+    setSearchInput(askedQuery);
+    setSelected(null);
+    setLogging(false);
+  }, [askedQuery]);
 
   const runSearch = useCallback(async () => {
+    const searchId = ++latestSearch.current;
+    const isLatest = () => searchId === latestSearch.current;
+    setError(null);
+    setProductsFailed(false);
     if (!search) {
       setResults([]);
-      setError(null);
+      setShownFor(null);
+      setCorrectedQuery(null);
+      setLoading(false);
+      setFindingMore(false);
       return;
     }
     if (!accessToken) return;
     setLoading(true);
-    setError(null);
+    setFindingMore(true);
+
+    let fullShown = false;
+    let quickShown = false;
+    const show = (response: FoodSearchResponse) => {
+      setResults(response.foods);
+      setCorrectedQuery(response.correctedQuery ?? null);
+      setShownFor(search);
+      setLoading(false);
+    };
+    const quick = searchFoods(accessToken, search, 0, 30, { branded: false })
+      .then((response) => {
+        if (!isLatest() || fullShown) return;
+        quickShown = true;
+        show(response);
+      })
+      .catch(() => undefined);
     try {
       const response = await searchFoods(accessToken, search);
-      setResults(response.foods);
+      if (!isLatest()) return;
+      fullShown = true;
+      show(response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to search foods');
+      await quick;
+      if (!isLatest()) return;
+      if (quickShown) setProductsFailed(true);
+      else setError(err instanceof Error ? err.message : 'Failed to search foods');
     } finally {
-      setLoading(false);
+      if (isLatest()) {
+        setLoading(false);
+        setFindingMore(false);
+      }
     }
   }, [search, accessToken]);
 
@@ -83,29 +144,33 @@ export function FoodSearchScreen({ navigation, route }: Props) {
   }, [runSearch]);
 
   if (selected && logging) {
+    const food = {
+      id: selected.id,
+      name: selected.name,
+      servingSize: selected.servingSize,
+      servingUnit: selected.servingUnit,
+      servingLabel: selected.servingLabel,
+      calories: selected.calories,
+      // A macro the provider genuinely didn't report becomes 0 only
+      // here, at the point of logging -- food_logs' own columns are
+      // NOT NULL, so this is the one honest numeric default; the
+      // detail view above still shows "—", never a fabricated 0.
+      proteinG: selected.proteinG ?? 0,
+      carbsG: selected.carbsG ?? 0,
+      fatG: selected.fatG ?? 0,
+      imageUrl: selected.imageUrl,
+      provider: selected.provider,
+    };
     return (
       <LogFoodStep
-        food={{
-          id: selected.id,
-          name: selected.name,
-          servingSize: selected.servingSize,
-          servingUnit: selected.servingUnit,
-          servingLabel: selected.servingLabel,
-          calories: selected.calories,
-          // A macro the provider genuinely didn't report becomes 0 only
-          // here, at the point of logging -- food_logs' own columns are
-          // NOT NULL, so this is the one honest numeric default; the
-          // detail view above still shows "—", never a fabricated 0.
-          proteinG: selected.proteinG ?? 0,
-          carbsG: selected.carbsG ?? 0,
-          fatG: selected.fatG ?? 0,
-          imageUrl: selected.imageUrl,
-        }}
+        food={food}
+        showAttribution={selected.provider === 'open_food_facts'}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
         day={route.params?.day}
         onDone={() => goToSection(navigation, 'Nutrition')}
         onCancel={() => setLogging(false)}
+        onReportProblem={foodPageActions(navigation, food, route.params?.day).onReportProblem}
       />
     );
   }
@@ -129,11 +194,13 @@ export function FoodSearchScreen({ navigation, route }: Props) {
             imageUrl={selected.imageUrl}
             servingSize={selected.servingSize}
             servingUnit={selected.servingUnit}
+            servingLabel={selected.servingLabel}
             calories={selected.calories}
             proteinG={selected.proteinG}
             carbsG={selected.carbsG}
             fatG={selected.fatG}
             showAttribution={selected.provider === 'open_food_facts'}
+            sourceText={foodSourceText({ provider: selected.provider })}
             accentColor={theme.accent}
             testIDs={{
               serving: 'food-search-detail-serving',
@@ -142,6 +209,7 @@ export function FoodSearchScreen({ navigation, route }: Props) {
               carbs: 'food-search-detail-carbs',
               fat: 'food-search-detail-fat',
               attribution: 'food-search-detail-attribution',
+              source: 'food-search-detail-source',
             }}
           />
         </View>
@@ -198,33 +266,81 @@ export function FoodSearchScreen({ navigation, route }: Props) {
               void runSearch();
             }}
           />
-        ) : loading ? (
-          <SkeletonRows testID="food-search-loading" count={6} />
         ) : search === '' ? (
           <EmptyState
             testID="food-search-empty-initial"
             title="Search for a food to see its nutrition info"
           />
+        ) : results.length === 0 && shownFor === search && !loading ? (
+          <View testID="food-search-empty-results">
+            <EmptyState
+              title={`No foods found for "${search}"`}
+              description="Try its plainest name, like “onion” or “chicken breast”."
+            />
+            {/* The other ways in, for a food no database has. */}
+            <View style={styles.noResultsActions}>
+              <SecondaryButton
+                testID="food-search-try-ai"
+                label="Describe It With AI"
+                onPress={() => navigation.navigate('AiFoodSearch', { day: route.params?.day })}
+              />
+              <TextButton
+                testID="food-search-enter-own"
+                label="Enter the Figures Yourself"
+                onPress={() => navigation.navigate('QuickFoodEntry', { day: route.params?.day })}
+              />
+            </View>
+          </View>
         ) : results.length === 0 ? (
-          <EmptyState testID="food-search-empty-results" title={`No foods found for "${search}"`} />
+          <SkeletonRows testID="food-search-loading" count={6} />
         ) : (
           <>
             <SectionHeader label="Results" />
+            {correctedQuery ? (
+              <Text testID="food-search-corrected" style={styles.correctedText}>
+                Showing results for “{correctedQuery}”
+              </Text>
+            ) : null}
             {results.map((food, index) => (
               <ListRow
                 key={food.id}
                 testID={`food-search-result-${food.id}`}
                 leading={<FoodImage uri={food.imageUrl} name={food.name} size={44} />}
                 title={food.name}
-                subtitle={`${food.brand ? `${food.brand} · ` : ''}${food.servingSize} ${food.servingUnit}`}
+                subtitle={resultSubtitle(food)}
                 value={`${wholeFigure(food.calories)} cal`}
                 divider={index > 0}
                 onPress={() => setSelected(food)}
               />
             ))}
+            {findingMore ? (
+              <View testID="food-search-finding-more" style={styles.footerRow}>
+                <ActivityIndicator size="small" color={colors.textMuted} />
+                <Text style={styles.footerText}>Looking for branded products…</Text>
+              </View>
+            ) : productsFailed ? (
+              <View testID="food-search-products-failed" style={styles.footerRow}>
+                <Text style={styles.footerText}>Branded products couldn&apos;t be loaded.</Text>
+                <TextButton
+                  testID="food-search-products-retry"
+                  label="Try Again"
+                  onPress={() => {
+                    void runSearch();
+                  }}
+                />
+              </View>
+            ) : null}
           </>
         )}
       </AppCard>
     </Screen>
   );
+}
+
+/** "Brand · 30 g", or "USDA · 100 g" for a USDA reference food, so its source shows in the list. */
+function resultSubtitle(food: FoodSearchResult): string {
+  const serving = `${food.servingSize} ${food.servingUnit}`;
+  if (food.brand) return `${food.brand} · ${serving}`;
+  if (food.provider === 'usda_fdc') return `USDA · ${serving}`;
+  return serving;
 }

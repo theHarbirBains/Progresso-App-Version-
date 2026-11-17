@@ -20,6 +20,16 @@ describe('foodGlyph', () => {
     ['Sweet Potato (baked)', 'carrot'],
     ['Black Beans (cooked)', 'seed'],
     ['Olive Oil', 'oil'],
+    // USDA reference foods' names, as Search Food now finds them.
+    ['Onions, raw', 'carrot'],
+    ['Potatoes, flesh and skin, raw', 'carrot'],
+    ['Tomatoes, red, ripe, raw', 'carrot'],
+    ['Peaches, yellow, raw', 'food-apple'],
+    ['Bananas, raw', 'food-apple'],
+    ['Chicken, broilers or fryers, breast, meat only, cooked, roasted', 'food-drumstick'],
+    ['Egg, whole, raw, fresh', 'egg'],
+    ['Oats, raw', 'rice'],
+    ['Assorted Green Peas', 'seed'],
   ])('gives %s the %s glyph', (name, glyph) => {
     expect(foodGlyph(name)).toBe(glyph);
   });

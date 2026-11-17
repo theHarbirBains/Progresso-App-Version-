@@ -43,15 +43,18 @@ const PROMPTS: Record<FeedbackCategory, string> = {
  * you. A screenshot uploads first, into the person's own folder; if the send then fails it's taken
  * back. Nothing sent can be changed or withdrawn afterwards.
  */
-export function FeedbackFormScreen({ navigation }: Props) {
+export function FeedbackFormScreen({ navigation, route }: Props) {
   const { user, session } = useAuth();
   const userId = user?.id;
   const accessToken = session?.access_token;
   const { accent } = useAppTheme();
   const device = useMemo(() => sentFrom(), []);
-  const [category, setCategory] = useState<FeedbackCategory>('bug');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  // A report started from somewhere else (a food's page) arrives filled in, still all editable.
+  const [category, setCategory] = useState<FeedbackCategory>(route.params?.category ?? 'bug');
+  const [title, setTitle] = useState((route.params?.title ?? '').slice(0, TITLE_MAX));
+  const [description, setDescription] = useState(
+    (route.params?.description ?? '').slice(0, DESCRIPTION_MAX),
+  );
   const [screenshotUri, setScreenshotUri] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);

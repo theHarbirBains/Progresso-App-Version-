@@ -357,6 +357,65 @@ describe('NutritionTodayScreen', () => {
     );
   });
 
+  it('takes a food off the day when its amount is set to 0, and re-sums the totals', async () => {
+    const banana = {
+      ...sampleLog,
+      id: 'log-2',
+      foodId: 'food-2',
+      foodNameSnapshot: 'Banana',
+      quantity: 1,
+      calories: 105,
+      proteinG: 1.3,
+      carbsG: 27,
+      fatG: 0.4,
+    };
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog, banana]);
+    mockDeleteFoodLog.mockResolvedValue(undefined);
+
+    renderScreen();
+    await screen.findByTestId('food-log-row-log-1');
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('nutrition-today-calorie-ring-value', includeHidden),
+      ).toHaveTextContent('435'),
+    );
+
+    fireEvent.changeText(screen.getByTestId('food-log-quantity-log-1'), '0');
+    await act(async () => {
+      fireEvent(screen.getByTestId('food-log-quantity-log-1'), 'endEditing');
+    });
+
+    // Only this entry goes -- never an update to a quantity of nothing, never the food itself.
+    expect(mockDeleteFoodLog).toHaveBeenCalledWith('log-1');
+    expect(mockUpdateFoodLogQuantity).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByTestId('food-log-row-log-1')).toBeNull());
+    expect(screen.getByTestId('food-log-row-log-2')).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('nutrition-today-calorie-ring-value', includeHidden),
+      ).toHaveTextContent('105'),
+    );
+  });
+
+  it('puts the amount back for a blank, negative or unreadable one, changing nothing', async () => {
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+
+    renderScreen();
+    await screen.findByTestId('food-log-row-log-1');
+    const field = () => screen.getByTestId('food-log-quantity-log-1');
+    expect(field().props.accessibilityHint).toBe('Enter 0 to take it off the day.');
+
+    for (const typed of ['', '-1', 'abc']) {
+      fireEvent.changeText(field(), typed);
+      await act(async () => {
+        fireEvent(field(), 'endEditing');
+      });
+      expect(field()).toHaveProp('value', '2');
+    }
+    expect(mockDeleteFoodLog).not.toHaveBeenCalled();
+    expect(mockUpdateFoodLogQuantity).not.toHaveBeenCalled();
+  });
+
   it('deletes a food log and removes it from the list', async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     mockDeleteFoodLog.mockResolvedValue(undefined);
@@ -832,14 +891,93 @@ describe("NutritionTodayScreen -- the week's calorie budget", () => {
     });
     mockFetchNutritionGoals.mockResolvedValue(goals);
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    // Sunday to Tuesday each logged, under the target.
+    mockFetchFoodLogsForRange.mockResolvedValue(
+      [18, 19, 20].map((date) => ({
+        ...sampleLog,
+        id: `oct-${date}`,
+        calories: 1500,
+        loggedAt: new Date(2026, 9, date, 12).toISOString(),
+      })),
+    );
     renderScreen();
 
     expect(await screen.findByTestId('weekly-budget-goal-label')).toHaveTextContent(
       /^Cutting · [\d,]+ below maintenance$/,
     );
+    expect(screen.getByTestId('weekly-budget-logging')).toHaveTextContent(
+      'Food logged on every day so far.',
+    );
     expect(screen.getByTestId('weekly-budget-goal-note')).toHaveTextContent(
       'Under your target so far: on track for your cut.',
     );
+  });
+
+  it('says which dates the week covers and when it starts over', async () => {
+    setToday(new Date(2026, 9, 21, 12, 0));
+    mockFetchNutritionGoals.mockResolvedValue(goals);
+    renderScreen();
+
+    expect(await screen.findByTestId('weekly-budget-range')).toHaveTextContent(
+      'Oct 18 – 24 · starts over Sunday at 12:00 AM',
+    );
+  });
+
+  it('never counts a day with nothing logged as 0 eaten, and offers a labelled estimate for it', async () => {
+    // A Wednesday: Sunday and Tuesday logged, Monday not.
+    setToday(new Date(2026, 9, 21, 12, 0));
+    (fetchMyProfile as jest.Mock).mockResolvedValueOnce({
+      id: 'user-1',
+      displayName: null,
+      username: null,
+      weightUnit: 'kg',
+      gender: 'male',
+      birthday: '1995-01-01',
+      heightValue: 180,
+      heightUnit: 'cm',
+      weightValue: 80,
+      activityLevel: 'moderately_active',
+    });
+    mockFetchNutritionGoals.mockResolvedValue(goals);
+    mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
+    mockFetchFoodLogsForRange.mockResolvedValue([
+      {
+        ...sampleLog,
+        id: 'sun',
+        calories: 1800,
+        loggedAt: new Date(2026, 9, 18, 12).toISOString(),
+      },
+      {
+        ...sampleLog,
+        id: 'tue',
+        calories: 2000,
+        loggedAt: new Date(2026, 9, 20, 12).toISOString(),
+      },
+    ]);
+    renderScreen();
+
+    // What was logged stays what was logged: 1,800 + 2,000 + today's 330.
+    expect(await screen.findByTestId('weekly-budget-consumed')).toHaveTextContent('4,130');
+    expect(screen.getByTestId('weekly-budget-logging')).toHaveTextContent(
+      'Nothing logged on Mon: that day counts as missing, not as 0 eaten.',
+    );
+    // Under the target only because Monday is missing: the week isn't read as a cut.
+    expect(screen.getByTestId('weekly-budget-goal-note')).toHaveTextContent(
+      'Log the missing days to see how the week sits with your goal.',
+    );
+
+    // The estimate shows only when asked for, labelled, with how it's worked out.
+    expect(screen.queryByTestId('weekly-budget-estimate')).toBeNull();
+    fireEvent.press(screen.getByTestId('weekly-budget-estimate-toggle'));
+    expect(screen.getByTestId('weekly-budget-estimate-value')).toHaveTextContent(
+      'About 6,030 of 14,000 cal, had the unlogged day been like the rest.',
+    );
+    expect(screen.getByTestId('weekly-budget-estimate-how')).toHaveTextContent(
+      "Each day with nothing logged is counted as your logged days' average, 1,900 cal. What you've logged is still 4,130 cal.",
+    );
+    expect(screen.getByTestId('weekly-budget-consumed')).toHaveTextContent('4,130');
+    fireEvent.press(screen.getByTestId('weekly-budget-estimate-toggle'));
+    expect(screen.queryByTestId('weekly-budget-estimate')).toBeNull();
   });
 
   it('offers to set a target when there is none', async () => {

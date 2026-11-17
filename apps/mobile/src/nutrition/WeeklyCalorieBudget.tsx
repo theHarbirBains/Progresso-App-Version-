@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AppCard } from '../design/AppCard';
 import { TextButton } from '../design/Button';
@@ -10,6 +11,7 @@ import {
   weekGoalNote,
   type CalorieGoalReading,
 } from './nutritionCalculations';
+import { estimatedWeekSoFar, weekdayNames, type WeekLogging } from './weekLogging';
 import { wholeFigureText } from './wholeFigures';
 
 interface Props {
@@ -33,6 +35,10 @@ interface Props {
   goal?: CalorieGoalReading | null;
   /** The week's earlier days couldn't be read. */
   failed?: boolean;
+  /** The week's dates, "Nov 15 – 21" (weekRangeText). */
+  rangeText?: string;
+  /** How the week's days before the day shown were logged (weekLogging); null while it's read. */
+  logging?: WeekLogging | null;
   accentColor: string;
   onSetTarget: () => void;
 }
@@ -44,6 +50,13 @@ interface Props {
  * on a day in another week, that week by its Sunday. Eating under the target one day leaves more for
  * another, and this is where that shows. Over budget is said plainly, never as an error. With
  * no daily target there's no budget to show, only a way to set one.
+ *
+ * Under the title, the week's dates and when it starts over (Sunday at 12:00 AM, on the phone's
+ * clock). A day before the one shown with nothing logged is named as unlogged, never counted as a
+ * day of eating nothing; while there is one, the week isn't read for the goal (it would look
+ * like a cut that isn't). Estimate the Missing Days shows, on a tap and labelled as an estimate,
+ * the week had those days been like the logged ones -- with how it's worked out -- and never
+ * changes the logged total or the bar.
  */
 export function WeeklyCalorieBudget({
   title = 'This Week',
@@ -53,10 +66,23 @@ export function WeeklyCalorieBudget({
   daysLeft,
   goal = null,
   failed = false,
+  rangeText,
+  logging = null,
   accentColor,
   onSetTarget,
 }: Props) {
+  const [estimateOpen, setEstimateOpen] = useState(false);
   const summary = consumed === null ? null : computeWeeklyCalorieSummary(consumed, dailyTarget);
+  const unlogged = logging?.unloggedBefore ?? [];
+  const estimate = summary && logging ? estimatedWeekSoFar(summary.consumed, logging) : null;
+  const loggingText =
+    logging && logging.daysBefore > 0
+      ? unlogged.length === 0
+        ? `Food logged on every day so far.`
+        : `Nothing logged on ${weekdayNames(unlogged)}: ${
+            unlogged.length === 1 ? 'that day counts' : 'those days count'
+          } as missing, not as 0 eaten.`
+      : null;
   const days = `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} to go, ${today ? 'today' : 'this day'} included`;
   const remainingText = summary
     ? summary.remaining >= 0
@@ -64,15 +90,23 @@ export function WeeklyCalorieBudget({
       : `${wholeFigureText(-summary.remaining)} cal over ${today ? "this week's" : "the week's"} budget`
     : null;
   // The week so far, read for the goal: its days up to the day shown, that day included.
+  // A day with nothing logged would read as eating under the target: the week isn't read then.
   const goalNote =
     summary && goal && dailyTarget !== null
-      ? weekGoalNote(goal.goal, summary.consumed, dailyTarget, 8 - daysLeft)
+      ? unlogged.length > 0
+        ? 'Log the missing days to see how the week sits with your goal.'
+        : weekGoalNote(goal.goal, summary.consumed, dailyTarget, 8 - daysLeft)
       : null;
   const goalLabel = goal ? calorieGoalLabel(goal) : null;
 
   return (
     <AppCard testID="nutrition-today-week">
       <Section title={title}>
+        {rangeText ? (
+          <Text testID="weekly-budget-range" style={styles.range}>
+            {rangeText} · starts over Sunday at 12:00 AM
+          </Text>
+        ) : null}
         {dailyTarget === null ? (
           <View style={styles.noTarget}>
             <Text testID="weekly-budget-no-target" style={styles.caption}>
@@ -96,6 +130,7 @@ export function WeeklyCalorieBudget({
                 ? [
                     `${title}, ${wholeFigureText(summary.consumed)} of ${wholeFigureText(summary.target)} calories.`,
                     remainingText,
+                    loggingText,
                     goalLabel,
                     goalNote,
                   ]
@@ -126,6 +161,11 @@ export function WeeklyCalorieBudget({
                 {remainingText}
               </Text>
             ) : null}
+            {loggingText ? (
+              <Text testID="weekly-budget-logging" style={styles.caption}>
+                {loggingText}
+              </Text>
+            ) : null}
             {goalLabel && goalNote ? (
               <View testID="weekly-budget-goal" style={styles.goal}>
                 <Text testID="weekly-budget-goal-label" style={styles.goalLabel}>
@@ -138,6 +178,40 @@ export function WeeklyCalorieBudget({
             ) : null}
           </View>
         )}
+        {/* Apart from the figures above, and only on a tap: never read as what was eaten. */}
+        {dailyTarget !== null &&
+        !failed &&
+        estimate !== null &&
+        logging?.averageLoggedDay != null ? (
+          estimateOpen ? (
+            <View testID="weekly-budget-estimate" style={styles.goal}>
+              <Text style={styles.goalLabel}>Estimate</Text>
+              <Text testID="weekly-budget-estimate-value" style={styles.goalNote}>
+                About {wholeFigureText(estimate)} of {wholeFigureText(dailyTarget * 7)} cal, had{' '}
+                {unlogged.length === 1 ? 'the unlogged day' : 'the unlogged days'} been like the
+                rest.
+              </Text>
+              <Text testID="weekly-budget-estimate-how" style={styles.goalNote}>
+                Each day with nothing logged is counted as your logged days&apos; average,{' '}
+                {wholeFigureText(logging.averageLoggedDay)} cal. What you&apos;ve logged is still{' '}
+                {wholeFigureText(summary!.consumed)} cal.
+              </Text>
+              <TextButton
+                testID="weekly-budget-estimate-toggle"
+                label="Hide Estimate"
+                onPress={() => setEstimateOpen(false)}
+              />
+            </View>
+          ) : (
+            <View style={styles.estimateToggle}>
+              <TextButton
+                testID="weekly-budget-estimate-toggle"
+                label="Estimate the Missing Days"
+                onPress={() => setEstimateOpen(true)}
+              />
+            </View>
+          )
+        ) : null}
       </Section>
     </AppCard>
   );
@@ -176,6 +250,15 @@ const styles = StyleSheet.create({
   },
   noTarget: {
     alignItems: 'flex-start',
+  },
+  range: {
+    ...typeScale.secondary,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
+  estimateToggle: {
+    alignItems: 'flex-start',
+    marginTop: spacing.xs,
   },
   // What the target is for, and how the week so far sits with it.
   goal: {

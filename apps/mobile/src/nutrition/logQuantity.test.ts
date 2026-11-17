@@ -135,6 +135,30 @@ describe('a serving by weight, whatever its unit', () => {
     expect(servingMeasures({ servingSize: 1, servingUnit: 'cup' }).servingGrams).toBeNull();
   });
 
+  it("weighs a built-in's serving by its USDA weight, without naming pieces to count in", () => {
+    // The built-ins' wording (20261126100000_builtin_serving_weights.sql).
+    expect(
+      servingMeasures({ servingSize: 1, servingUnit: 'large', servingLabel: '1 large · 33 g' }),
+    ).toEqual({ servingGrams: 33, servingMl: null, pieces: null });
+    expect(
+      servingMeasures({ servingSize: 1, servingUnit: 'tbsp', servingLabel: '1 tbsp · 14.2 g' })
+        .servingGrams,
+    ).toBe(14.2);
+    expect(servingPieces('2 tbsp · 32 g')).toBeNull();
+    // A USDA reference food is per 100 g, with the measure most people count it in.
+    expect(
+      servingMeasures({
+        servingSize: 100,
+        servingUnit: 'g',
+        servingLabel: '100 g · 1 medium ≈ 110 g',
+      }),
+    ).toEqual({ servingGrams: 100, servingMl: null, pieces: null });
+    // So 2 egg whites by weight (66 g) is 2 servings, and 0.5 of a 100 g serving is 50 g.
+    expect(toServings(66, 'g', 33)).toBe(2);
+    expect(fromServings(0.5, 'g', 100)).toBe('50');
+    expect(fromServings(1, 'oz', 33)).toBe('1.16');
+  });
+
   it('works out the weight of a serving from an amount typed by weight', () => {
     expect(entryServingGrams({ amount: 250, unit: 'g' }, 2.5)).toBe(100);
     expect(entryServingGrams({ amount: 1, unit: 'oz' }, 1)).toBeCloseTo(28.35, 2);

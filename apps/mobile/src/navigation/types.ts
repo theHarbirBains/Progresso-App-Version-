@@ -25,7 +25,14 @@ export type RootStackParamList = {
   SettingsSupport: undefined;
   /** Feedback & Suggestions: what the person has sent, each with its status, and sending more. */
   Feedback: undefined;
-  FeedbackForm: undefined;
+  /** A report can start filled in -- a food's figures, from that food's page. */
+  FeedbackForm:
+    | {
+        category?: 'bug' | 'feature' | 'usability' | 'general';
+        title?: string;
+        description?: string;
+      }
+    | undefined;
   FeedbackDetail: { id: string };
   /** The feedback inbox, for support and full admins (the API refuses anyone else). */
   AdminFeedbackInbox: undefined;
@@ -97,7 +104,8 @@ export type RootStackParamList = {
   /** `openCreate`/`barcode`: set by the Scan Barcode "Product not found" fallback so Food Library opens straight into creating a custom food, prefilled with the scanned barcode -- see BarcodeScannerScreen. */
   /** `day` (here and in the other ways to log) logs to that past day; today when absent. */
   FoodLibrary: { openCreate?: boolean; barcode?: string; day?: string } | undefined;
-  FoodSearch: { day?: string } | undefined;
+  /** `query` starts the search -- another entry for a food, from its page. */
+  FoodSearch: { day?: string; query?: string } | undefined;
   AiFoodSearch: { day?: string } | undefined;
   BarcodeScanner: { day?: string } | undefined;
   /** Logging figures the person knows, without a food behind them. */

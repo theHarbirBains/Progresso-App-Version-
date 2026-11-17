@@ -25,6 +25,7 @@ import { groupTotals, itemAmountText } from '../nutrition/foodGroups';
 import { groupFoodsByLetter } from '../nutrition/foodLibraryGrouping';
 import type { EnteredAmount } from '../nutrition/foodLogQueries';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
+import { foodPageActions } from '../nutrition/foodPageActions';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
 import { defaultMealTypeForTime } from '../nutrition/mealTypes';
 import {
@@ -495,6 +496,12 @@ export function FoodLibraryScreen({ navigation, route }: Props) {
         day={route.params?.day}
         onDone={() => (mode.fromScan ? goToSection(navigation, 'Nutrition') : navigation.goBack())}
         onCancel={() => setMode({ type: 'list' })}
+        // Every food here is the person's own (a recipe is edited as a recipe): its figures are
+        // theirs to change, and editing it never changes what was logged before.
+        onEdit={
+          mode.food.recipeServings ? undefined : () => setMode({ type: 'edit', food: mode.food })
+        }
+        {...foodPageActions(navigation, mode.food, route.params?.day)}
       />
     );
   }

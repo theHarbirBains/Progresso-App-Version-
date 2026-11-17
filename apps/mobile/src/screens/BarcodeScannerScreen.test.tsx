@@ -360,6 +360,7 @@ describe('BarcodeScannerScreen logging', () => {
         proteinG: 1.6,
         carbsG: 25,
         fatG: 0,
+        provider: 'open_food_facts',
       },
       0.67,
       // Time-of-day default (see defaultMealTypeForTime) -- any valid meal.
