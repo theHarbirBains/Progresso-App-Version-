@@ -13,6 +13,7 @@ export interface ExerciseSummary {
   exerciseName: string;
   photoUrl: string | null;
   gym: string | null;
+  grip: string | null;
   attachment: string | null;
   measurementType: MeasurementType;
 }
@@ -195,6 +196,7 @@ export interface FriendWorkout {
     measurementType: string;
     photoUrl: string | null;
     gym: string | null;
+    grip: string | null;
     attachment: string | null;
     orderIndex: number;
     sets: FriendWorkoutSet[];

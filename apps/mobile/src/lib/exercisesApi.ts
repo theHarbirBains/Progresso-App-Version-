@@ -1,4 +1,5 @@
-import type { LoadType, Pulley } from '../exercises/machineLoad';
+import type { Equipment } from '../exercises/equipment';
+import type { LoadType, Pulley, PulleyPosition } from '../exercises/machineLoad';
 import type { LoggingStyle, MeasurementType, MovementType } from '../exercises/movementTypes';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import { request } from './apiClient';
@@ -19,9 +20,14 @@ export interface ExerciseResponse {
   gym: string | null;
   feelNotes: string | null;
   attachment: string | null;
-  /** How it's loaded and its pulley (exercises/machineLoad.ts). */
+  /** How it's loaded and an old heavier/lighter pulley (exercises/machineLoad.ts). */
   loadType: LoadType | null;
   pulley: Pulley | null;
+  /** What it's done with, how it's held, where its cable starts and setup notes. Missing from an older API. */
+  equipment?: Equipment | null;
+  grip?: string | null;
+  pulleyPosition?: PulleyPosition | null;
+  setupDetails?: string | null;
   isActive: boolean;
   createdBy: string | null;
   createdAt: string;
@@ -42,6 +48,10 @@ export interface CreateExerciseInput {
   attachment?: string | null;
   loadType?: LoadType | null;
   pulley?: Pulley | null;
+  equipment?: Equipment | null;
+  grip?: string | null;
+  pulleyPosition?: PulleyPosition | null;
+  setupDetails?: string | null;
 }
 
 export interface UpdateExerciseInput {
@@ -60,6 +70,10 @@ export interface UpdateExerciseInput {
   attachment?: string | null;
   loadType?: LoadType | null;
   pulley?: Pulley | null;
+  equipment?: Equipment | null;
+  grip?: string | null;
+  pulleyPosition?: PulleyPosition | null;
+  setupDetails?: string | null;
 }
 
 export function createExercise(

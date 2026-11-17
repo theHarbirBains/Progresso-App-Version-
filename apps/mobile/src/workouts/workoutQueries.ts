@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { MACHINE_COLUMNS, machineDetailsOf } from '../exercises/machineDetails';
-import type { LoadType, Pulley } from '../exercises/machineLoad';
+import type { LoadType, Pulley, PulleyPosition } from '../exercises/machineLoad';
 import type { LoggingStyle, MeasurementType, MovementType } from '../exercises/movementTypes';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 
@@ -83,8 +83,10 @@ export interface WorkoutExerciseWithSets {
   photoUrl: string | null;
   /** Its gym, handle, loading and pulley, when it has them: with the photo, which machine it is. */
   gym?: string | null;
+  grip?: string | null;
   attachment?: string | null;
   loadType?: LoadType | null;
+  pulleyPosition?: PulleyPosition | null;
   pulley?: Pulley | null;
   muscleGroup: MuscleGroup;
   movementType: MovementType;
@@ -270,6 +272,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
       logging_style: LoggingStyle | null;
       photo_url: string | null;
       gym: string | null;
+      grip: string | null;
       attachment: string | null;
       load_type: LoadType | null;
       pulley: Pulley | null;

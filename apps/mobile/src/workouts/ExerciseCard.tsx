@@ -10,7 +10,7 @@ import { Text } from '../design/Text';
 import { colors } from '../design/theme';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import { machineLine } from '../exercises/machineDetails';
-import type { LoadType, Pulley } from '../exercises/machineLoad';
+import type { LoadType, Pulley, PulleyPosition } from '../exercises/machineLoad';
 import type { MeasurementType, MovementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
@@ -77,8 +77,10 @@ interface Props {
   /** Its gym, handle, loading and pulley, when it has them: after its muscle, as in the
    * Exercise Library. */
   gym?: string | null;
+  grip?: string | null;
   attachment?: string | null;
   loadType?: LoadType | null;
+  pulleyPosition?: PulleyPosition | null;
   pulley?: Pulley | null;
   /** The unit the all-time best is shown in. */
   weightUnit?: 'kg' | 'lb';
@@ -213,8 +215,10 @@ function ExerciseCardComponent({
   measurementType = 'weight_reps',
   photoUrl = null,
   gym = null,
+  grip = null,
   attachment = null,
   loadType = null,
+  pulleyPosition = null,
   pulley = null,
   weightUnit = 'lb',
   previousSession = null,
@@ -260,7 +264,10 @@ function ExerciseCardComponent({
         <View style={styles.exerciseTitleBlock}>
           <Text style={styles.exerciseName}>{exerciseName}</Text>
           <Text testID={id('muscle-group')} style={styles.exerciseMuscle}>
-            {machineLine({ gym, attachment, loadType, pulley }, MUSCLE_GROUP_LABELS[muscleGroup])}
+            {machineLine(
+              { gym, grip, attachment, loadType, pulleyPosition, pulley },
+              MUSCLE_GROUP_LABELS[muscleGroup],
+            )}
           </Text>
           {ownRangeText ? (
             <Text testID={id('own-range')} style={[styles.ownRange, { color: accentColor }]}>
@@ -597,8 +604,10 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     Boolean(prev.setTimers) === Boolean(next.setTimers) &&
     (prev.photoUrl ?? null) === (next.photoUrl ?? null) &&
     (prev.gym ?? null) === (next.gym ?? null) &&
+    (prev.grip ?? null) === (next.grip ?? null) &&
     (prev.attachment ?? null) === (next.attachment ?? null) &&
     (prev.loadType ?? null) === (next.loadType ?? null) &&
+    (prev.pulleyPosition ?? null) === (next.pulleyPosition ?? null) &&
     (prev.pulley ?? null) === (next.pulley ?? null) &&
     prev.weightUnit === next.weightUnit &&
     prev.accentColor === next.accentColor &&

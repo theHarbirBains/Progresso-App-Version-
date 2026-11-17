@@ -14,6 +14,7 @@ export interface PRFeedRow {
   photoUrl: string | null;
   /** Its gym and handle, when it has them: with the photo, which machine the record is on. */
   gym?: string | null;
+  grip?: string | null;
   attachment?: string | null;
   /** What the record measures: a weight (a rep PR or 1RM), the most reps, or the longest time. */
   measurementType: MeasurementType;
@@ -48,6 +49,7 @@ export function mergeAndSortPRs(
     exerciseName: pr.exerciseName,
     photoUrl: pr.exercisePhotoUrl ?? null,
     gym: pr.exerciseGym ?? null,
+    grip: pr.exerciseGrip ?? null,
     attachment: pr.exerciseAttachment ?? null,
     measurementType: 'weight_reps',
     weightKg: pr.bestWeightKg,
@@ -63,6 +65,7 @@ export function mergeAndSortPRs(
     exerciseName: orm.exerciseName,
     photoUrl: orm.exercisePhotoUrl ?? null,
     gym: orm.exerciseGym ?? null,
+    grip: orm.exerciseGrip ?? null,
     attachment: orm.exerciseAttachment ?? null,
     measurementType: 'weight_reps',
     weightKg: orm.weightKg,
@@ -78,6 +81,7 @@ export function mergeAndSortPRs(
     exerciseName: record.exerciseName,
     photoUrl: record.exercisePhotoUrl ?? null,
     gym: record.exerciseGym ?? null,
+    grip: record.exerciseGrip ?? null,
     attachment: record.exerciseAttachment ?? null,
     measurementType: record.measurementType,
     weightKg: null,

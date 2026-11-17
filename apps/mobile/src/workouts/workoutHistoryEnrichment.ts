@@ -84,6 +84,7 @@ export async function enrichWorkoutSummaries(
       exerciseName: string;
       photoUrl: string | null;
       gym: string | null;
+      grip: string | null;
       attachment: string | null;
       orderIndex: number;
       measurementType: MeasurementType;
@@ -95,6 +96,7 @@ export async function enrichWorkoutSummaries(
       name: string;
       photo_url: string | null;
       gym: string | null;
+      grip: string | null;
       attachment: string | null;
     } | null;
     exerciseInfoById.set(we.id, {
@@ -166,6 +168,7 @@ export async function enrichWorkoutSummaries(
       exerciseName: string;
       photoUrl: string | null;
       gym: string | null;
+      grip: string | null;
       attachment: string | null;
       sets: SetRecord[];
       orderIndex: number;

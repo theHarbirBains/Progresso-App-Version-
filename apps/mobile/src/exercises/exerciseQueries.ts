@@ -2,7 +2,8 @@ import type { ExerciseResponse, SharedExerciseResponse, ShareSource } from '../l
 import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
 import { MACHINE_COLUMNS, machineDetailsOf, type MachineDetails } from './machineDetails';
-import type { LoadType, Pulley } from './machineLoad';
+import type { Equipment } from './equipment';
+import type { LoadType, Pulley, PulleyPosition } from './machineLoad';
 import type { LoggingStyle, MeasurementType, MovementType } from './movementTypes';
 import type { MuscleGroup } from './muscleGroups';
 
@@ -28,9 +29,14 @@ export interface ExerciseRow {
   gym?: string | null;
   feelNotes?: string | null;
   attachment?: string | null;
-  /** How it's loaded and its pulley (exercises/machineLoad.ts) -- optional too. */
+  /** How it's loaded and an old heavier/lighter pulley (exercises/machineLoad.ts) -- optional too. */
   loadType?: LoadType | null;
   pulley?: Pulley | null;
+  /** What it's done with, how it's held, where its cable starts and setup notes (all optional). */
+  equipment?: Equipment | null;
+  grip?: string | null;
+  pulleyPosition?: PulleyPosition | null;
+  setupDetails?: string | null;
   isActive: boolean;
   createdBy: string | null;
   /**
@@ -56,6 +62,10 @@ export function exerciseRowFromResponse(exercise: ExerciseResponse): ExerciseRow
     attachment: exercise.attachment ?? null,
     loadType: exercise.loadType ?? null,
     pulley: exercise.pulley ?? null,
+    equipment: exercise.equipment ?? null,
+    grip: exercise.grip ?? null,
+    pulleyPosition: exercise.pulleyPosition ?? null,
+    setupDetails: exercise.setupDetails ?? null,
     isActive: exercise.isActive,
     createdBy: exercise.createdBy,
   };
@@ -105,6 +115,10 @@ interface ExerciseDbRow {
   attachment: string | null;
   load_type: LoadType | null;
   pulley: Pulley | null;
+  equipment?: Equipment | null;
+  grip?: string | null;
+  pulley_position?: PulleyPosition | null;
+  setup_details?: string | null;
   is_active: boolean;
   created_by: string | null;
 }
@@ -123,6 +137,10 @@ function toExerciseRow(row: ExerciseDbRow): ExerciseRow {
     attachment: row.attachment ?? null,
     loadType: row.load_type ?? null,
     pulley: row.pulley ?? null,
+    equipment: row.equipment ?? null,
+    grip: row.grip ?? null,
+    pulleyPosition: row.pulley_position ?? null,
+    setupDetails: row.setup_details ?? null,
     isActive: row.is_active,
     createdBy: row.created_by,
   };
@@ -141,7 +159,7 @@ function buildExerciseQuery(params: {
   let query = supabase
     .from('exercises')
     .select(
-      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, load_type, pulley, is_active, created_by',
+      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, load_type, pulley, equipment, grip, pulley_position, setup_details, is_active, created_by',
       count ? { count } : undefined,
     )
     .eq('is_active', true)
@@ -215,7 +233,7 @@ async function fetchFullExerciseList(userId: string): Promise<ExerciseRow[]> {
   const { data, error } = await supabase
     .from('exercises')
     .select(
-      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, load_type, pulley, is_active, created_by',
+      'id, name, muscle_group, movement_type, logging_style, measurement_type, photo_url, gym, feel_notes, attachment, load_type, pulley, equipment, grip, pulley_position, setup_details, is_active, created_by',
     )
     .eq('is_active', true)
     .order('name', { ascending: true });
@@ -358,6 +376,9 @@ export async function fetchExerciseDetails(
       attachment: cached.attachment ?? null,
       loadType: cached.loadType ?? null,
       pulley: cached.pulley ?? null,
+      equipment: cached.equipment ?? null,
+      grip: cached.grip ?? null,
+      pulleyPosition: cached.pulleyPosition ?? null,
     };
   }
   const { data, error } = await supabase
@@ -375,10 +396,27 @@ export async function fetchExerciseDetails(
     attachment: string | null;
     load_type: LoadType | null;
     pulley: Pulley | null;
+    equipment: Equipment | null;
+    grip: string | null;
+    pulley_position: PulleyPosition | null;
   };
   return {
     muscleGroup: row.muscle_group,
     movementType: row.movement_type,
     ...machineDetailsOf(row),
   };
+}
+
+/**
+ * How many workouts this person has logged an exercise in -- before changing its setup, so they
+ * can keep that history on the setup it was logged with.
+ */
+export async function countLoggedWorkouts(userId: string, exerciseId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('workout_exercises')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('exercise_id', exerciseId);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
 }

@@ -61,6 +61,7 @@ export function computeTopSets(history: HistoricalSetWithExercise[]): TopSetRow[
         performedAt: s.performedAt,
         photoUrl: s.photoUrl ?? null,
         gym: s.gym ?? null,
+        grip: s.grip ?? null,
         attachment: s.attachment ?? null,
       });
     }

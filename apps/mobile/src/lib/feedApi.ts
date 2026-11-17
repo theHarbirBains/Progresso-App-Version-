@@ -30,6 +30,7 @@ export type FriendsFeedItem = {
       photoUrl: string | null;
       /** Its gym and handle, when the friend gave them. Absent from an API before them. */
       gym?: string | null;
+      grip?: string | null;
       attachment?: string | null;
       /** Absent from an API before measurement types: weight and reps. */
       measurementType?: MeasurementType;

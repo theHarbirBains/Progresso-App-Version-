@@ -544,6 +544,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                   exerciseName: exercise.name,
                   photoUrl: exercise.photoUrl,
                   gym: exercise.gym ?? null,
+                  grip: exercise.grip ?? null,
                   attachment: exercise.attachment ?? null,
                   muscleGroup: exercise.muscleGroup,
                   movementType: exercise.movementType,
@@ -788,8 +789,10 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 measurementType={measurementTypeOf(exercise)}
                 photoUrl={exercise.photoUrl}
                 gym={exercise.gym}
+                grip={exercise.grip}
                 attachment={exercise.attachment}
                 loadType={exercise.loadType}
+                pulleyPosition={exercise.pulleyPosition}
                 pulley={exercise.pulley}
                 weightUnit={weightUnit}
                 previousSession={buildPreviousSessionDisplay(

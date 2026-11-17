@@ -21,6 +21,7 @@ export function friendWorkoutDetail(workout: FriendWorkout): WorkoutDetail {
       exerciseName: exercise.exerciseName,
       photoUrl: exercise.photoUrl,
       gym: exercise.gym,
+      grip: exercise.grip,
       attachment: exercise.attachment,
       muscleGroup: exercise.muscleGroup as MuscleGroup,
       movementType: exercise.movementType as MovementType,

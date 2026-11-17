@@ -183,6 +183,7 @@ export function ProgressExerciseDetailScreen({ route, navigation }: Props) {
                       setId: point.setId,
                       exerciseName,
                       gym: details?.gym,
+                      grip: details?.grip,
                       attachment: details?.attachment,
                       performedAt: point.performedAt,
                       weightKg: point.weightKg,

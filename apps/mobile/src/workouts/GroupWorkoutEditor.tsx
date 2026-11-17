@@ -486,6 +486,7 @@ export function GroupWorkoutEditor({
               measurementType={type}
               photoUrl={row.photoUrl}
               gym={row.gym}
+              grip={row.grip}
               attachment={row.attachment}
               weightUnit={weightUnit}
               previousSession={previousSession}

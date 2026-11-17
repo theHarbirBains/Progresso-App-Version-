@@ -192,6 +192,7 @@ describe('computeWeeklySummary -- strength', () => {
             reps: 5,
             photoUrl: 'https://example.com/bench.jpg',
             gym: 'Fit4Less Downtown',
+            grip: null,
             attachment: 'Wide grip bar',
           }),
           set({ performedAt: at(21), weightKg: 85, reps: 6 }),
@@ -209,6 +210,7 @@ describe('computeWeeklySummary -- strength', () => {
         // Which machine the lift was on, from its sets.
         photoUrl: 'https://example.com/bench.jpg',
         gym: 'Fit4Less Downtown',
+        grip: null,
         attachment: 'Wide grip bar',
         top: { weightKg: 85, reps: 6 },
         previousBest: { weightKg: 82.5, reps: 8 },

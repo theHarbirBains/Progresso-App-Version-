@@ -16,6 +16,7 @@ export interface TopSetToEdit {
   exerciseName: string;
   /** Its exercise's gym and handle, when it has them: which machine the set was on. */
   gym?: string | null;
+  grip?: string | null;
   attachment?: string | null;
   performedAt: string;
   weightKg: number;

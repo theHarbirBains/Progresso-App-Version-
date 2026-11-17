@@ -84,6 +84,7 @@ describe('enrichWorkoutSummaries', () => {
               name: 'Bench Press',
               photo_url: 'https://example.com/bench.jpg',
               gym: 'Fit4Less Downtown',
+              grip: null,
               attachment: 'Wide grip bar',
             },
           },
@@ -156,6 +157,7 @@ describe('enrichWorkoutSummaries', () => {
             photoUrl: 'https://example.com/bench.jpg',
             // Which machine it was, for the card to say.
             gym: 'Fit4Less Downtown',
+            grip: null,
             attachment: 'Wide grip bar',
             measurementType: 'weight_reps',
             weightKg: 100,
@@ -167,6 +169,7 @@ describe('enrichWorkoutSummaries', () => {
             exerciseName: 'Curl',
             photoUrl: null,
             gym: null,
+            grip: null,
             attachment: null,
             measurementType: 'weight_reps',
             weightKg: 60,

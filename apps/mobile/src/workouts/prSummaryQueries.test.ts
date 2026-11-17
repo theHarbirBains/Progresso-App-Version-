@@ -46,6 +46,7 @@ describe('fetchAllRepPRs', () => {
             muscle_group: 'chest',
             photo_url: 'https://example.com/bench.jpg',
             gym: 'Fit4Less Downtown',
+            grip: null,
             attachment: 'Wide grip bar',
           },
         },
@@ -67,6 +68,7 @@ describe('fetchAllRepPRs', () => {
         exercisePhotoUrl: 'https://example.com/bench.jpg',
         // Which machine the record is on.
         exerciseGym: 'Fit4Less Downtown',
+        exerciseGrip: null,
         exerciseAttachment: 'Wide grip bar',
       },
     ]);
@@ -131,6 +133,7 @@ describe('fetchAllOneRepMaxes', () => {
         exerciseName: 'Squat',
         exercisePhotoUrl: null,
         exerciseGym: null,
+        exerciseGrip: null,
         exerciseAttachment: null,
       },
     ]);
@@ -191,6 +194,7 @@ describe('fetchAllExerciseRecords', () => {
         exerciseName: 'Exercise',
         exercisePhotoUrl: null,
         exerciseGym: null,
+        exerciseGrip: null,
         exerciseAttachment: null,
       },
       {
@@ -202,6 +206,7 @@ describe('fetchAllExerciseRecords', () => {
         exerciseName: 'Push-Up',
         exercisePhotoUrl: null,
         exerciseGym: null,
+        exerciseGrip: null,
         exerciseAttachment: null,
       },
     ]);

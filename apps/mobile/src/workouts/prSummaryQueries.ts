@@ -21,6 +21,7 @@ export interface RepPRWithExercise extends RepPR {
   exercisePhotoUrl?: string | null;
   /** Its gym and handle, when it has them -- with the photo, which machine the record is on. */
   exerciseGym?: string | null;
+  exerciseGrip?: string | null;
   exerciseAttachment?: string | null;
 }
 
@@ -31,6 +32,7 @@ export interface OneRepMaxWithExercise extends OneRepMax {
   exercisePhotoUrl?: string | null;
   /** Its gym and handle, when it has them -- with the photo, which machine the record is on. */
   exerciseGym?: string | null;
+  exerciseGrip?: string | null;
   exerciseAttachment?: string | null;
 }
 
@@ -45,6 +47,7 @@ interface RepPRRow {
     muscle_group: MuscleGroup;
     photo_url: string | null;
     gym: string | null;
+    grip: string | null;
     attachment: string | null;
   } | null;
 }
@@ -74,6 +77,7 @@ export async function fetchAllRepPRs(userId: string): Promise<RepPRWithExercise[
     muscleGroup: row.exercises?.muscle_group ?? 'other',
     exercisePhotoUrl: row.exercises?.photo_url ?? null,
     exerciseGym: row.exercises?.gym ?? null,
+    exerciseGrip: row.exercises?.grip ?? null,
     exerciseAttachment: row.exercises?.attachment ?? null,
   }));
 }
@@ -87,6 +91,7 @@ interface OneRepMaxRow {
     name: string;
     photo_url: string | null;
     gym: string | null;
+    grip: string | null;
     attachment: string | null;
   } | null;
 }
@@ -115,6 +120,7 @@ export async function fetchAllOneRepMaxes(userId: string): Promise<OneRepMaxWith
     exerciseName: row.exercises?.name ?? 'Exercise',
     exercisePhotoUrl: row.exercises?.photo_url ?? null,
     exerciseGym: row.exercises?.gym ?? null,
+    exerciseGrip: row.exercises?.grip ?? null,
     exerciseAttachment: row.exercises?.attachment ?? null,
   }));
 }
@@ -132,6 +138,7 @@ export interface ExerciseRecordWithExercise extends ExerciseRecord {
   exercisePhotoUrl?: string | null;
   /** Its gym and handle, when it has them -- with the photo, which machine the record is on. */
   exerciseGym?: string | null;
+  exerciseGrip?: string | null;
   exerciseAttachment?: string | null;
 }
 
@@ -143,6 +150,7 @@ interface RecordRow {
     name: string;
     photo_url: string | null;
     gym: string | null;
+    grip: string | null;
     attachment: string | null;
   } | null;
 }
@@ -161,6 +169,7 @@ function toExerciseRecord(
     exerciseName: row.exercises?.name ?? 'Exercise',
     exercisePhotoUrl: row.exercises?.photo_url ?? null,
     exerciseGym: row.exercises?.gym ?? null,
+    exerciseGrip: row.exercises?.grip ?? null,
     exerciseAttachment: row.exercises?.attachment ?? null,
   };
 }

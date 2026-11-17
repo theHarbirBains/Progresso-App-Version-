@@ -36,6 +36,7 @@ export async function fetchAllExerciseHistory(
       movement_type: MovementType;
       photo_url: string | null;
       gym: string | null;
+      grip: string | null;
       attachment: string | null;
     } | null;
     workouts: {
@@ -94,6 +95,7 @@ export async function fetchAllExerciseHistory(
         movementType: info.movementType,
         photoUrl: info.photoUrl,
         gym: info.gym,
+        grip: info.grip,
         attachment: info.attachment,
       };
     })

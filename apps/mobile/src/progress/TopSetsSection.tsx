@@ -118,6 +118,7 @@ export function TopSetsSection({
               muscleGroupLabel={MUSCLE_GROUP_LABELS[item.muscleGroup]}
               photoUrl={item.photoUrl}
               gym={item.gym}
+              grip={item.grip}
               attachment={item.attachment}
               weightDisplay={roundWeight(fromKg(item.weightKg, weightUnit))}
               reps={item.reps}

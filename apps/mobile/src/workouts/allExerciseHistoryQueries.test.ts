@@ -52,6 +52,7 @@ describe('fetchAllExerciseHistory', () => {
               movement_type: 'bilateral',
               photo_url: 'https://example.com/bench.jpg',
               gym: 'Fit4Less Downtown',
+              grip: null,
               attachment: 'Wide grip bar',
             },
             workouts: {
@@ -101,6 +102,7 @@ describe('fetchAllExerciseHistory', () => {
         movementType: 'bilateral',
         photoUrl: null,
         gym: null,
+        grip: null,
         attachment: null,
       },
       {
@@ -115,6 +117,7 @@ describe('fetchAllExerciseHistory', () => {
         movementType: 'bilateral',
         photoUrl: 'https://example.com/bench.jpg',
         gym: 'Fit4Less Downtown',
+        grip: null,
         attachment: 'Wide grip bar',
       },
     ]);

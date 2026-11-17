@@ -36,6 +36,7 @@ describe('computeWorkoutTopSets', () => {
       {
         ...exercise('bench', 'Bench Press', [set('a', 200, 5), set('b', 225, 8), set('c', 215, 6)]),
         gym: 'Fit4Less Downtown',
+        grip: null,
         attachment: 'Wide grip bar',
       },
       exercise('pulldown', 'Lat Pulldown', [set('d', 150, 10), set('e', 160, 10)]),
@@ -48,6 +49,7 @@ describe('computeWorkoutTopSets', () => {
         // Which machine it was, for the card to say.
         photoUrl: null,
         gym: 'Fit4Less Downtown',
+        grip: null,
         attachment: 'Wide grip bar',
         measurementType: 'weight_reps',
         weightKg: 225,
@@ -59,6 +61,7 @@ describe('computeWorkoutTopSets', () => {
         exerciseName: 'Lat Pulldown',
         photoUrl: null,
         gym: null,
+        grip: null,
         attachment: null,
         measurementType: 'weight_reps',
         weightKg: 160,
@@ -79,6 +82,7 @@ describe('computeWorkoutTopSets', () => {
         exerciseName: 'Bench Press',
         photoUrl: null,
         gym: null,
+        grip: null,
         attachment: null,
         measurementType: 'weight_reps',
         weightKg: 100,

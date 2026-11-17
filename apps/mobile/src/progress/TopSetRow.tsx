@@ -34,6 +34,7 @@ export function TopSetRow({
   muscleGroupLabel,
   photoUrl,
   gym,
+  grip,
   attachment,
   weightDisplay,
   reps,
@@ -43,7 +44,7 @@ export function TopSetRow({
   onEdit,
   testID,
 }: Props) {
-  const line = machineLine({ gym, attachment }, muscleGroupLabel);
+  const line = machineLine({ gym, grip, attachment }, muscleGroupLabel);
   return (
     <TouchableOpacity
       testID={testID}

@@ -16,6 +16,7 @@ interface Props {
   photoUrl?: string | null;
   /** Its gym and handle, under its name as in the Exercise Library: which machine it's on. */
   gym?: string | null;
+  grip?: string | null;
   attachment?: string | null;
   weightDisplay: number;
   /** null for a true-1RM record (a 1RM isn't described by a rep count the way a rep-count PR is). */
@@ -37,6 +38,7 @@ export function PRRow({
   exerciseName,
   photoUrl,
   gym,
+  grip,
   attachment,
   weightDisplay,
   reps,
@@ -49,7 +51,7 @@ export function PRRow({
   showDivider,
   testID,
 }: Props) {
-  const machine = machineLine({ gym, attachment });
+  const machine = machineLine({ gym, grip, attachment });
   return (
     <TouchableOpacity
       testID={testID}
@@ -141,6 +143,7 @@ export function PRFeedRecordRow({
       exerciseName={item.exerciseName}
       photoUrl={item.photoUrl}
       gym={item.gym}
+      grip={item.grip}
       attachment={item.attachment}
       weightDisplay={roundWeight(fromKg(item.weightKg ?? 0, weightUnit))}
       reps={item.reps}

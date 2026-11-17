@@ -270,6 +270,9 @@ describe('ProgressExerciseDetailScreen -- which machine', () => {
       attachment: 'V-handle',
       loadType: 'double_stack',
       pulley: 'lighter',
+      equipment: null,
+      grip: null,
+      pulleyPosition: null,
     });
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
     render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {
@@ -294,6 +297,9 @@ describe('ProgressExerciseDetailScreen -- which machine', () => {
       attachment: null,
       loadType: null,
       pulley: null,
+      equipment: null,
+      grip: null,
+      pulleyPosition: null,
     });
     mockFetchExerciseSetHistory.mockResolvedValue(twoSessionHistory);
     render(<ProgressExerciseDetailScreen navigation={navigation} route={route} />, {

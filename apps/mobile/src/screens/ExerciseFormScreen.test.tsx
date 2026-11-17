@@ -3,7 +3,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../auth/AuthProvider';
 import { createExercise, updateExercise } from '../lib/api';
-import { invalidateExerciseCache } from '../exercises/exerciseQueries';
+import {
+  countLoggedWorkouts,
+  fetchAllExercises,
+  invalidateExerciseCache,
+} from '../exercises/exerciseQueries';
 import { uploadEquipmentPhoto } from '../lib/equipmentPhotoUpload';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { ExerciseFormScreen } from './ExerciseFormScreen';
@@ -19,6 +23,8 @@ jest.mock('../lib/api', () => ({
 
 jest.mock('../exercises/exerciseQueries', () => ({
   invalidateExerciseCache: jest.fn(),
+  fetchAllExercises: jest.fn(),
+  countLoggedWorkouts: jest.fn(),
 }));
 
 jest.mock('../lib/equipmentPhotoUpload', () => ({
@@ -35,6 +41,8 @@ const mockCreateExercise = createExercise as jest.Mock;
 const mockUpdateExercise = updateExercise as jest.Mock;
 const mockInvalidateExerciseCache = invalidateExerciseCache as jest.Mock;
 const mockUploadEquipmentPhoto = uploadEquipmentPhoto as jest.Mock;
+const mockFetchAllExercises = fetchAllExercises as jest.Mock;
+const mockCountLoggedWorkouts = countLoggedWorkouts as jest.Mock;
 
 const ownedExercise = {
   id: 'ex-mine',
@@ -62,7 +70,29 @@ beforeEach(() => {
   mockUpdateExercise.mockReset().mockResolvedValue({});
   mockInvalidateExerciseCache.mockClear();
   mockUploadEquipmentPhoto.mockReset().mockResolvedValue('https://example.com/uploaded.jpg');
+  mockFetchAllExercises.mockReset().mockResolvedValue([]);
+  mockCountLoggedWorkouts.mockReset().mockResolvedValue(0);
 });
+
+const SETUP_FIELDS = [
+  'exercise-form-gym',
+  'exercise-form-grip',
+  'exercise-form-attachment',
+  'exercise-form-load-type',
+  'exercise-form-pulley-position',
+  'exercise-form-setup-details',
+];
+
+/** Which setup fields are on screen now. */
+function shownSetupFields(): string[] {
+  return SETUP_FIELDS.filter((id) => screen.queryByTestId(id) !== null);
+}
+
+function startExercise(name: string, group: string, equipment?: string) {
+  fireEvent.changeText(screen.getByTestId('exercise-form-name'), name);
+  selectMuscleGroup('exercise-form-muscle-group', group);
+  if (equipment) fireEvent.press(screen.getByTestId(`exercise-form-equipment-${equipment}`));
+}
 
 describe('ExerciseFormScreen (create mode)', () => {
   it('disables Save until a name and muscle group are chosen', () => {
@@ -101,135 +131,326 @@ describe('ExerciseFormScreen (create mode)', () => {
     expect(onDone).toHaveBeenCalled();
   });
 
-  it("saves what sets the machine apart -- only what's filled in, trimmed", async () => {
+  it('keeps a dumbbell exercise quick: its photo, and the rest behind More Details', async () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    startExercise('Dumbbell Curl', 'biceps', 'dumbbell');
 
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Seated Row');
-    selectMuscleGroup('exercise-form-muscle-group', 'back');
-    fireEvent.changeText(screen.getByTestId('exercise-form-gym'), ' Downtown ');
-    fireEvent.changeText(screen.getByTestId('exercise-form-attachment'), ' Wide grip ');
+    expect(shownSetupFields()).toEqual([]);
+    expect(screen.getByTestId('exercise-form-photo-add')).toBeTruthy();
+    expect(screen.getByTestId('exercise-form-more-hint')).toHaveTextContent(
+      'Add a gym, grip or setup notes, if it matters.',
+    );
+
     fireEvent.press(screen.getByTestId('exercise-form-save'));
-
     await waitFor(() =>
       expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
-        name: 'Seated Row',
-        muscleGroup: 'back',
+        name: 'Dumbbell Curl',
+        muscleGroup: 'biceps',
         movementType: 'bilateral',
         measurementType: 'weight_reps',
-        gym: 'Downtown',
-        attachment: 'Wide grip',
+        equipment: 'dumbbell',
       }),
     );
   });
 
-  it('saves how it is loaded and its pulley -- a pulley only on a weight stack', async () => {
+  it("opens a free-weight exercise's optional details only when asked -- never a machine's", () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    startExercise('Dumbbell Curl', 'biceps', 'dumbbell');
 
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Cable Crossover');
-    selectMuscleGroup('exercise-form-muscle-group', 'chest');
-    fireEvent.press(screen.getByTestId('exercise-form-load-type-double_stack'));
-    fireEvent.press(screen.getByTestId('exercise-form-pulley-lighter'));
+    fireEvent.press(screen.getByTestId('exercise-form-more'));
+
+    expect(shownSetupFields()).toEqual([
+      'exercise-form-gym',
+      'exercise-form-grip',
+      'exercise-form-setup-details',
+    ]);
+    expect(screen.queryByTestId('exercise-form-more')).toBeNull();
+  });
+
+  it('asks a barbell exercise for its grip, and nothing of a machine', async () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    startExercise('Bench Press', 'chest', 'barbell');
+
+    expect(shownSetupFields()).toEqual(['exercise-form-grip']);
+    fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Wide grip'));
     fireEvent.press(screen.getByTestId('exercise-form-save'));
 
     await waitFor(() =>
       expect(mockCreateExercise).toHaveBeenCalledWith(
         'token-123',
-        expect.objectContaining({ loadType: 'double_stack', pulley: 'lighter' }),
+        expect.objectContaining({ equipment: 'barbell', grip: 'Wide grip' }),
+      ),
+    );
+    expect(mockCreateExercise.mock.calls[0][1]).not.toHaveProperty('attachment');
+  });
+
+  it('documents a cable exercise with a rope: its gym, grip, attachment, weight type, pulley position and setup', async () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    startExercise('Triceps Pushdown', 'triceps', 'cable');
+
+    expect(shownSetupFields()).toEqual(SETUP_FIELDS);
+    expect(screen.queryByTestId('exercise-form-more')).toBeNull();
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-gym'), ' Downtown ');
+    fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Neutral grip'));
+    fireEvent.press(screen.getByTestId('exercise-form-attachment-choices-Rope'));
+    fireEvent.press(screen.getByTestId('exercise-form-load-type-single_stack'));
+    fireEvent.press(screen.getByTestId('exercise-form-pulley-position-high'));
+    fireEvent.changeText(screen.getByTestId('exercise-form-setup-details'), ' Pin at 12 ');
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith('token-123', {
+        name: 'Triceps Pushdown',
+        muscleGroup: 'triceps',
+        movementType: 'bilateral',
+        measurementType: 'weight_reps',
+        equipment: 'cable',
+        gym: 'Downtown',
+        grip: 'Neutral grip',
+        attachment: 'Rope',
+        loadType: 'single_stack',
+        pulleyPosition: 'high',
+        setupDetails: 'Pin at 12',
+      }),
+    );
+  });
+
+  it('documents a cable row with a V-handle, held close, from a low pulley', async () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    startExercise('Seated Cable Row', 'back', 'cable');
+
+    fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Close grip'));
+    fireEvent.press(screen.getByTestId('exercise-form-attachment-choices-V-handle'));
+    fireEvent.press(screen.getByTestId('exercise-form-pulley-position-low'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith(
+        'token-123',
+        expect.objectContaining({
+          grip: 'Close grip',
+          attachment: 'V-handle',
+          pulleyPosition: 'low',
+        }),
       ),
     );
   });
 
-  it('asks nothing about a pulley on a plate-loaded machine, and clears a choice tapped again', async () => {
+  it('documents a machine: weight type and setup lines started with a tap, no pulley', async () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    startExercise('Chest Press', 'chest', 'machine');
 
-    fireEvent.changeText(screen.getByTestId('exercise-form-name'), 'Chest Press');
-    selectMuscleGroup('exercise-form-muscle-group', 'chest');
-    fireEvent.press(screen.getByTestId('exercise-form-load-type-single_stack'));
-    fireEvent.press(screen.getByTestId('exercise-form-pulley-heavier'));
+    expect(shownSetupFields()).toEqual([
+      'exercise-form-gym',
+      'exercise-form-grip',
+      'exercise-form-load-type',
+      'exercise-form-setup-details',
+    ]);
+    // The handles are the machine's own: an attachment only when asked for.
+    expect(screen.getByTestId('exercise-form-more-hint')).toHaveTextContent(
+      'Add a attachment, if it matters.',
+    );
+
     fireEvent.press(screen.getByTestId('exercise-form-load-type-plate_loaded'));
-    expect(screen.queryByTestId('exercise-form-pulley')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-form-setup-prompts-Seat height'));
+    expect(screen.getByTestId('exercise-form-setup-details').props.value).toBe('Seat height: ');
+    fireEvent.changeText(screen.getByTestId('exercise-form-setup-details'), 'Seat height: 4');
+    fireEvent.press(screen.getByTestId('exercise-form-setup-prompts-Backrest'));
+    expect(screen.getByTestId('exercise-form-setup-details').props.value).toBe(
+      'Seat height: 4\nBackrest: ',
+    );
+    // A line already there isn't started twice.
+    fireEvent.press(screen.getByTestId('exercise-form-setup-prompts-Seat height'));
+    fireEvent.changeText(
+      screen.getByTestId('exercise-form-setup-details'),
+      'Seat height: 4\nBackrest: 2',
+    );
     fireEvent.press(screen.getByTestId('exercise-form-save'));
 
-    await waitFor(() => expect(mockCreateExercise).toHaveBeenCalled());
-    const sent = mockCreateExercise.mock.calls[0][1];
-    expect(sent.loadType).toBe('plate_loaded');
-    expect(sent).not.toHaveProperty('pulley');
-
-    // Tapped again, it's cleared.
-    fireEvent.press(screen.getByTestId('exercise-form-load-type-plate_loaded'));
-    expect(screen.getByTestId('exercise-form-pulley')).toBeTruthy();
-  });
-
-  it('says why the setup matters, right before the optional details', () => {
-    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-
-    const note = screen.getByTestId('exercise-form-setup-note');
-    expect(note).toHaveTextContent(/Why the following details can matter\?/);
-    expect(note).toHaveTextContent(/Your equipment setup is part of the exercise\./);
-    expect(note).toHaveTextContent(/create a separate exercise rather than logging it under/);
-    expect(note).toHaveTextContent(/These fields are optional, but filling them in/);
-    // Before the section it's about.
-    const page = JSON.stringify(screen.toJSON());
-    expect(page.indexOf('Why the following details can matter?')).toBeLessThan(
-      page.indexOf('Tell This Machine Apart (Optional)'),
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith(
+        'token-123',
+        expect.objectContaining({
+          equipment: 'machine',
+          loadType: 'plate_loaded',
+          setupDetails: 'Seat height: 4\nBackrest: 2',
+        }),
+      ),
     );
+    expect(mockCreateExercise.mock.calls[0][1]).not.toHaveProperty('pulleyPosition');
   });
 
-  it('explains each box plainly, and only the name is required -- with no note on how it feels', () => {
+  it('asks where the cable starts only on a cable exercise -- and never heavier or lighter', () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    startExercise('Fly', 'chest');
 
-    expect(screen.getByText('The only thing you have to fill in.')).toBeTruthy();
-    expect(screen.getByText('Tell This Machine Apart (Optional)')).toBeTruthy();
-    expect(
-      screen.getByText(/Two machines can do the same thing but feel heavier or lighter/),
-    ).toBeTruthy();
-    expect(screen.getByText(/The easiest way to tell it apart/)).toBeTruthy();
-    expect(screen.getByTestId('exercise-form-attachment')).toBeTruthy();
-    expect(screen.queryByTestId('exercise-form-feel')).toBeNull();
-    expect(screen.queryByText(/How It Feels/)).toBeNull();
+    for (const equipment of [
+      'dumbbell',
+      'barbell',
+      'kettlebell',
+      'machine',
+      'bodyweight',
+      'other',
+    ]) {
+      fireEvent.press(screen.getByTestId(`exercise-form-equipment-${equipment}`));
+      if (screen.queryByTestId('exercise-form-more')) {
+        fireEvent.press(screen.getByTestId('exercise-form-more'));
+      }
+      expect(screen.queryByTestId('exercise-form-pulley-position')).toBeNull();
+    }
+    fireEvent.press(screen.getByTestId('exercise-form-equipment-cable'));
+    expect(screen.getByTestId('exercise-form-pulley-position')).toBeTruthy();
+    expect(screen.getByText('Where the cable starts on the machine.')).toBeTruthy();
+    for (const label of ['High', 'Mid', 'Low', 'Adjustable', 'Other / Unknown']) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+    expect(screen.queryByText('Heavier')).toBeNull();
+    expect(screen.queryByText('Lighter')).toBeNull();
   });
 
-  it('offers common grips to tap -- and says why a grip matters, and what neutral means', () => {
+  it('asks no weight type of an exercise with no weight', () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-    selectMuscleGroup('exercise-form-muscle-group', 'back');
+    startExercise('Plank Hold', 'core', 'machine');
+    expect(screen.getByTestId('exercise-form-load-type')).toBeTruthy();
 
-    expect(screen.getByText('Grip or Handle')).toBeTruthy();
-    expect(screen.getByText(/a wide grip works your upper back more/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('exercise-form-measurement-timed'));
+
+    expect(screen.queryByTestId('exercise-form-load-type')).toBeNull();
+  });
+
+  it('keeps grip and attachment apart -- how it is held, and what is held', () => {
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    startExercise('Lat Pulldown', 'back', 'cable');
+
+    expect(screen.getByText('Grip')).toBeTruthy();
+    expect(screen.getByText(/How your hands hold it/)).toBeTruthy();
     expect(screen.getByTestId('exercise-form-grip-glossary')).toHaveTextContent(
-      /Neutral: palms face each other/,
+      /Neutral: palms face each other\. Overhand: palms down\. Underhand: palms up\. Mixed: one of each\./,
     );
-
-    fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Neutral grip'));
-    expect(screen.getByTestId('exercise-form-attachment').props.value).toBe('Neutral grip');
+    expect(screen.getByText('Attachment / Handle')).toBeTruthy();
     expect(
-      screen.getByTestId('exercise-form-grip-choices-Neutral grip').props.accessibilityState
+      screen.getByText(
+        /What you hold -- the bar or handle clipped on\. Your grip is how you hold it\./,
+      ),
+    ).toBeTruthy();
+    for (const grip of [
+      'Wide grip',
+      'Close grip',
+      'Neutral grip',
+      'Overhand',
+      'Underhand',
+      'Mixed grip',
+    ]) {
+      expect(screen.getByTestId(`exercise-form-grip-choices-${grip}`)).toBeTruthy();
+    }
+    for (const handle of [
+      'Straight bar',
+      'EZ bar',
+      'Rope',
+      'D-handle',
+      'V-handle',
+      'Lat pulldown bar',
+    ]) {
+      expect(screen.getByTestId(`exercise-form-attachment-choices-${handle}`)).toBeTruthy();
+    }
+
+    // A tapped choice is chosen; tapped again, it's cleared; typed, it shows as chosen too.
+    fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Neutral grip'));
+    expect(screen.getByTestId('exercise-form-grip').props.value).toBe('Neutral grip');
+    fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Neutral grip'));
+    expect(screen.getByTestId('exercise-form-grip').props.value).toBe('');
+    fireEvent.changeText(screen.getByTestId('exercise-form-attachment'), 'v-handle');
+    expect(
+      screen.getByTestId('exercise-form-attachment-choices-V-handle').props.accessibilityState
         .selected,
     ).toBe(true);
-
-    // Tapping it again clears it.
-    fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Neutral grip'));
-    expect(screen.getByTestId('exercise-form-attachment').props.value).toBe('');
+    // Anything else can be typed.
+    fireEvent.changeText(
+      screen.getByTestId('exercise-form-attachment'),
+      'Single handle with strap',
+    );
+    expect(screen.getByTestId('exercise-form-attachment').props.value).toBe(
+      'Single handle with strap',
+    );
   });
 
-  it('asks where the feet go for a leg machine, with its own choices', () => {
+  it('asks where the feet go for a leg exercise, with its own choices', () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
-    selectMuscleGroup('exercise-form-muscle-group', 'quadriceps');
+    startExercise('Leg Press', 'quadriceps', 'machine');
 
     expect(screen.getByText('Foot Position')).toBeTruthy();
     expect(screen.getByText(/feet high works your glutes and hamstrings more/)).toBeTruthy();
-    expect(screen.queryByTestId('exercise-form-grip-glossary')).toBeNull();
     fireEvent.press(screen.getByTestId('exercise-form-grip-choices-Feet high'));
-    expect(screen.getByTestId('exercise-form-attachment').props.value).toBe('Feet high');
+    expect(screen.getByTestId('exercise-form-grip').props.value).toBe('Feet high');
   });
 
-  it('shows a typed grip that is one of the choices as chosen', () => {
+  it('says why the setup matters, at the top of the setup', () => {
     render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
 
-    fireEvent.changeText(screen.getByTestId('exercise-form-attachment'), 'v-handle');
+    const note = screen.getByTestId('exercise-form-setup-note');
+    expect(note).toHaveTextContent(/Keep your setup consistent/);
+    expect(note).toHaveTextContent(
+      /Your equipment and setup directly affect how an exercise feels and how much you can lift\./,
+    );
+    expect(note).toHaveTextContent(
+      /If you switch to equipment or a configuration that meaningfully changes the exercise, create a separate entry\./,
+    );
+    expect(note).toHaveTextContent(
+      /These fields are optional, but the more accurately you describe your setup, the more meaningful your progress tracking becomes\./,
+    );
+    expect(screen.getByText('Your Setup (Optional)')).toBeTruthy();
+    expect(screen.getByText('Equipment (Optional)')).toBeTruthy();
+    expect(screen.getByText('The only thing you have to fill in.')).toBeTruthy();
+    expect(screen.queryByText(/How It Feels/)).toBeNull();
+  });
 
-    expect(
-      screen.getByTestId('exercise-form-grip-choices-V-handle').props.accessibilityState.selected,
-    ).toBe(true);
+  it('says so before saving the very same setup a second time', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    alert.mockClear();
+    mockFetchAllExercises.mockResolvedValue([
+      {
+        ...ownedExercise,
+        id: 'ex-pushdown',
+        name: 'Triceps Pushdown',
+        muscleGroup: 'triceps',
+        equipment: 'cable',
+        attachment: 'Rope',
+      },
+    ]);
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    startExercise('triceps pushdown ', 'triceps', 'cable');
+    fireEvent.press(screen.getByTestId('exercise-form-attachment-choices-Rope'));
+
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() => expect(alert).toHaveBeenCalled());
+    expect(alert.mock.calls[0][0]).toBe('You already have this exercise');
+    expect(mockCreateExercise).not.toHaveBeenCalled();
+    const buttons = alert.mock.calls[0][2] as { text: string; onPress?: () => void }[];
+    buttons.find((button) => button.text === 'Save Another')?.onPress?.();
+    await waitFor(() => expect(mockCreateExercise).toHaveBeenCalled());
+  });
+
+  it('saves without asking when the setup differs -- another attachment is another exercise', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    alert.mockClear();
+    mockFetchAllExercises.mockResolvedValue([
+      {
+        ...ownedExercise,
+        name: 'Triceps Pushdown',
+        equipment: 'cable',
+        attachment: 'Rope',
+      },
+    ]);
+    render(<ExerciseFormScreen mode="create" onDone={jest.fn()} onCancel={jest.fn()} />);
+    startExercise('Triceps Pushdown', 'triceps', 'cable');
+    fireEvent.press(screen.getByTestId('exercise-form-attachment-choices-V-handle'));
+
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() => expect(mockCreateExercise).toHaveBeenCalled());
+    expect(alert).not.toHaveBeenCalled();
   });
 
   it('creates a unilateral exercise with logging_style set automatically -- never asked as its own question', async () => {
@@ -461,14 +682,181 @@ describe('ExerciseFormScreen (edit mode)', () => {
         movementType: 'bilateral',
         measurementType: 'weight_reps',
         isActive: true,
+        equipment: null,
         gym: null,
+        grip: null,
         attachment: null,
         loadType: null,
-        pulley: null,
+        pulleyPosition: null,
+        setupDetails: null,
       }),
     );
+    // A rename isn't a new setup: nothing asked.
+    expect(mockCountLoggedWorkouts).not.toHaveBeenCalled();
     expect(mockInvalidateExerciseCache).toHaveBeenCalledWith('user-1');
     expect(onDone).toHaveBeenCalled();
+  });
+
+  const cableRow = {
+    ...ownedExercise,
+    name: 'Seated Cable Row',
+    muscleGroup: 'back' as const,
+    equipment: 'cable' as const,
+    grip: 'Wide grip',
+    attachment: 'Straight bar',
+    pulleyPosition: 'low' as const,
+    setupDetails: 'Seat: 3',
+    pulley: 'heavier' as const,
+  };
+
+  it('shows every saved detail, whatever the equipment, and never sends an old pulley back', async () => {
+    render(
+      <ExerciseFormScreen
+        mode="edit"
+        exercise={{ ...cableRow, equipment: 'dumbbell' }}
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    // A dumbbell wouldn't ask these, but they have values: nothing saved is out of sight.
+    expect(screen.getByTestId('exercise-form-attachment').props.value).toBe('Straight bar');
+    expect(screen.getByTestId('exercise-form-pulley-position')).toBeTruthy();
+    expect(screen.getByTestId('exercise-form-setup-details').props.value).toBe('Seat: 3');
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-setup-details'), 'Seat: 4');
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+    await waitFor(() => expect(mockUpdateExercise).toHaveBeenCalled());
+    expect(mockUpdateExercise.mock.calls[0][2]).not.toHaveProperty('pulley');
+  });
+
+  it('changes setup notes without asking: a seat moved a notch is the same exercise', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    alert.mockClear();
+    mockCountLoggedWorkouts.mockResolvedValue(12);
+    render(
+      <ExerciseFormScreen
+        mode="edit"
+        exercise={cableRow}
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByTestId('exercise-form-setup-details'), 'Seat: 4');
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockUpdateExercise).toHaveBeenCalledWith(
+        'token-123',
+        'ex-mine',
+        expect.objectContaining({ setupDetails: 'Seat: 4' }),
+      ),
+    );
+    expect(alert).not.toHaveBeenCalled();
+  });
+
+  it('asks before changing the setup of an exercise with history -- and can save it as a new one instead', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    alert.mockClear();
+    mockCountLoggedWorkouts.mockResolvedValue(12);
+    const onDone = jest.fn();
+    render(
+      <ExerciseFormScreen
+        mode="edit"
+        exercise={{ ...cableRow, photoUrl: 'https://example.com/row.jpg' }}
+        onDone={onDone}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('exercise-form-attachment-choices-V-handle'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() => expect(alert).toHaveBeenCalled());
+    expect(mockCountLoggedWorkouts).toHaveBeenCalledWith('user-1', 'ex-mine');
+    expect(alert.mock.calls[0][0]).toBe('Change the setup?');
+    expect(alert.mock.calls[0][1]).toMatch(/Seated Cable Row has 12 logged workouts/);
+    expect(mockUpdateExercise).not.toHaveBeenCalled();
+
+    const buttons = alert.mock.calls[0][2] as { text: string; onPress?: () => void }[];
+    expect(buttons.map((button) => button.text)).toEqual([
+      'Cancel',
+      'Change This One',
+      'Save as New Exercise',
+    ]);
+    buttons.find((button) => button.text === 'Save as New Exercise')?.onPress?.();
+
+    // The old one -- and its history -- stays as it was; the new setup is its own exercise.
+    await waitFor(() =>
+      expect(mockCreateExercise).toHaveBeenCalledWith(
+        'token-123',
+        expect.objectContaining({
+          name: 'Seated Cable Row',
+          attachment: 'V-handle',
+          grip: 'Wide grip',
+          // Same machine, another handle: it keeps the photo.
+          photoUrl: 'https://example.com/row.jpg',
+        }),
+      ),
+    );
+    expect(mockUpdateExercise).not.toHaveBeenCalled();
+    expect(onDone).toHaveBeenCalled();
+  });
+
+  it('changes the setup of the same exercise when the person says so', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    alert.mockClear();
+    mockCountLoggedWorkouts.mockResolvedValue(3);
+    render(
+      <ExerciseFormScreen
+        mode="edit"
+        exercise={cableRow}
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('exercise-form-pulley-position-high'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+    await waitFor(() => expect(alert).toHaveBeenCalled());
+    (alert.mock.calls[0][2] as { text: string; onPress?: () => void }[])
+      .find((button) => button.text === 'Change This One')
+      ?.onPress?.();
+
+    await waitFor(() =>
+      expect(mockUpdateExercise).toHaveBeenCalledWith(
+        'token-123',
+        'ex-mine',
+        expect.objectContaining({ pulleyPosition: 'high' }),
+      ),
+    );
+    expect(mockCreateExercise).not.toHaveBeenCalled();
+  });
+
+  it('changes the setup of an exercise with no history without asking', async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    alert.mockClear();
+    render(
+      <ExerciseFormScreen
+        mode="edit"
+        exercise={cableRow}
+        onDone={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('exercise-form-equipment-machine'));
+    fireEvent.press(screen.getByTestId('exercise-form-save'));
+
+    await waitFor(() =>
+      expect(mockUpdateExercise).toHaveBeenCalledWith(
+        'token-123',
+        'ex-mine',
+        expect.objectContaining({ equipment: 'machine' }),
+      ),
+    );
+    expect(alert).not.toHaveBeenCalled();
   });
 
   it('deletes an active exercise once the person confirms, and leaves the library', async () => {

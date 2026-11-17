@@ -224,7 +224,7 @@ export function computeWeeklySummary(input: WeeklySummaryInput): WeeklySummary {
     if (!weighted(set)) continue;
     const entry = liftSets.get(set.exerciseId) ?? {
       name: set.exerciseName,
-      machine: { photoUrl: set.photoUrl, gym: set.gym, attachment: set.attachment },
+      machine: { photoUrl: set.photoUrl, gym: set.gym, grip: set.grip, attachment: set.attachment },
       count: 0,
     };
     entry.count += 1;
@@ -249,6 +249,7 @@ export function computeWeeklySummary(input: WeeklySummaryInput): WeeklySummary {
       exerciseName: entry.name,
       photoUrl: entry.machine.photoUrl ?? null,
       gym: entry.machine.gym ?? null,
+      grip: entry.machine.grip ?? null,
       attachment: entry.machine.attachment ?? null,
       top: best(weekSets, exerciseId)!,
       previousBest: best(earlierSets, exerciseId),

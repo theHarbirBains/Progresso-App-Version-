@@ -28,6 +28,29 @@ describe('machineLine', () => {
   });
 });
 
+describe('machineLine with the setup', () => {
+  it('reads equipment, gym, grip, attachment, weight type and pulley position in turn', () => {
+    expect(
+      machineLine(
+        {
+          equipment: 'cable',
+          gym: 'Downtown',
+          grip: 'Neutral grip',
+          attachment: 'Rope',
+          loadType: 'single_stack',
+          pulleyPosition: 'high',
+        },
+        'Triceps',
+      ),
+    ).toBe('Triceps · Cable · Downtown · Neutral grip · Rope · Single stack · High pulley');
+  });
+
+  it('says nothing for an other or unknown pulley, and keeps an old heavier or lighter one', () => {
+    expect(machineLine({ pulleyPosition: 'other' })).toBeNull();
+    expect(machineLine({ pulley: 'lighter' })).toBe('Lighter pulley');
+  });
+});
+
 describe('machineDetailsOf', () => {
   it("reads an embedded exercise's photo, gym and handle", () => {
     expect(
@@ -36,13 +59,19 @@ describe('machineDetailsOf', () => {
         gym: 'Home',
         attachment: null,
         load_type: 'single_stack',
+        equipment: 'cable',
+        grip: 'Wide grip',
+        pulley_position: 'high',
         pulley: 'heavier',
       }),
     ).toEqual({
       photoUrl: 'https://example.com/a.jpg',
       gym: 'Home',
+      grip: 'Wide grip',
       attachment: null,
       loadType: 'single_stack',
+      equipment: 'cable',
+      pulleyPosition: 'high',
       pulley: 'heavier',
     });
   });
@@ -51,8 +80,11 @@ describe('machineDetailsOf', () => {
     expect(machineDetailsOf(null)).toEqual({
       photoUrl: null,
       gym: null,
+      grip: null,
       attachment: null,
       loadType: null,
+      equipment: null,
+      pulleyPosition: null,
       pulley: null,
     });
   });
