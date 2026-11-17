@@ -1,4 +1,10 @@
-import { Inject, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import {
   AnthropicNutritionProvider,
@@ -12,7 +18,10 @@ import { cookingWordsIn, withoutCookingWords } from '../nutrition-resolution/coo
 import { CatalogNutritionSource } from './sources/catalog.source';
 import { OpenFoodFactsNutritionSource } from './sources/open-food-facts.source';
 import { timeLimited } from './sources/time-limited.source';
-import { UsdaNutritionSource } from './sources/usda.source';
+import { USDA_CITATION, UsdaNutritionSource } from './sources/usda.source';
+import { rankFoods, type RankableFood } from './search-ranking';
+import { correctWord, searchTermsFor, type SearchTerms } from './search-terms';
+import { SearchVocabulary } from './search-vocabulary';
 import {
   buildInterpretation,
   requestsFromParsed,
@@ -45,6 +54,190 @@ export interface FoodRecord {
 export interface FoodSearchResponse {
   foods: FoodRecord[];
   hasMore: boolean;
+  /** What was searched for instead, when the query as typed found nothing ("broccoli" for "brocoli"). */
+  correctedQuery?: string | null;
+}
+
+/** The provider name a USDA reference food is cached under, its FDC id as provider_food_id. */
+export const USDA_PROVIDER = 'usda_fdc';
+
+// How long Search Food waits for Open Food Facts' branded products before answering without them.
+export const BRANDED_SEARCH_BUDGET_MS = 2_000;
+// How many of each database source's matches are ranked.
+// Plenty, since the database returns matches in no particular order: a plain food must not be
+// left out of the ranking because forty prepared ones happened to come back first.
+const CATALOG_CANDIDATES = 150;
+const REFERENCE_CANDIDATES = 250;
+// USDA's plain reference foods; Branded and FNDDS are not imported.
+const REFERENCE_DATA_TYPES = ['Foundation', 'SR Legacy'] as const;
+const REFERENCE_COLUMNS =
+  'fdc_id, description, data_type, gtin_upc, calories_per_100g, protein_g_per_100g, carbs_g_per_100g, fat_g_per_100g, data_version';
+// The household measure a reference food's serving wording names, in this order of preference.
+const PREFERRED_MEASURES = ['medium', 'large', 'small', 'cup', 'slice', 'piece', 'tbsp', 'oz'];
+
+interface ReferenceFoodRow {
+  fdc_id: number;
+  description: string;
+  data_type: string;
+  gtin_upc: string | null;
+  calories_per_100g: number | string;
+  protein_g_per_100g: number | string;
+  carbs_g_per_100g: number | string;
+  fat_g_per_100g: number | string;
+  data_version: string;
+}
+
+interface ReferenceMeasureRow {
+  fdc_id: number;
+  unit: string;
+  amount: number | string;
+  grams: number | string;
+}
+
+/** A catalog row as found, with its provider id kept for telling cached reference foods apart. */
+type CatalogRecord = FoodRecord & { providerFoodId: string | null };
+
+type SearchCandidate = RankableFood &
+  ({ kind: 'record'; record: CatalogRecord } | { kind: 'reference'; reference: ReferenceFoodRow });
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toCatalogRecord(row: any): CatalogRecord {
+  return { ...toFoodRecord(row), providerFoodId: row.provider_food_id ?? null };
+}
+
+function stripProviderFoodId(record: CatalogRecord): FoodRecord {
+  const food: Partial<CatalogRecord> = { ...record };
+  delete food.providerFoodId;
+  return food as FoodRecord;
+}
+
+/** Whether a catalog food is one of Progresso's built-ins, a USDA reference food, or a product. */
+function rankable(record: FoodRecord): RankableFood {
+  const source =
+    record.provider === null ? 'builtin' : record.provider === USDA_PROVIDER ? 'usda' : 'branded';
+  return { name: record.name, brand: record.brand, source };
+}
+
+/**
+ * Each food once. What a person would see twice -- the same name, brand, serving and figures --
+ * keeps only its first. A reference food is also left out when a shared food already has its
+ * name (USDA lists some foods under both Foundation and SR Legacy), since the catalog holds one
+ * shared food per name and brand.
+ */
+function withoutRepeats(candidates: SearchCandidate[]): SearchCandidate[] {
+  const seen = new Set<string>();
+  const names = new Set<string>();
+  for (const candidate of candidates) {
+    if (candidate.kind === 'record') {
+      names.add(`${candidate.record.name}|${candidate.record.brand ?? ''}`.toLowerCase());
+    }
+  }
+  return candidates.filter((candidate) => {
+    if (candidate.kind === 'reference') {
+      const name = `${candidate.reference.description}|`.toLowerCase();
+      if (names.has(name)) return false;
+      names.add(name);
+      return true;
+    }
+    const { record } = candidate;
+    const key = [
+      record.name,
+      record.brand ?? '',
+      record.servingSize,
+      record.servingUnit,
+      Math.round(record.calories),
+    ]
+      .join('|')
+      .toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * Each word as a stem in the column, every word required; a word's spellings are alternatives.
+ * Stems are letters and digits only (matchStem), so they need no escaping in either form.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function matchingEveryWord(request: any, column: string, terms: SearchTerms): any {
+  let filtered = request;
+  for (const stems of terms.stems) {
+    filtered =
+      stems.length === 1
+        ? filtered.ilike(column, `%${stems[0]}%`)
+        : filtered.or(stems.map((stem) => `${column}.ilike.%${stem}%`).join(','));
+  }
+  return filtered;
+}
+
+function shortAmount(value: number): string {
+  return String(Number(value.toFixed(2)));
+}
+
+/**
+ * A reference food's serving wording: its 100 g basis, and the household measure most people
+ * count it in -- "100 g · 1 medium ≈ 110 g" -- so its weight is plain. Empty when USDA lists no
+ * measure. The weight comes first, so the log step reads the serving as 100 g.
+ */
+export function referenceServingLabel(
+  measures: { unit: string; amount: number; grams: number }[],
+): string {
+  const usable = measures
+    .map((measure) => ({
+      ...measure,
+      // "medium (2-1/2" dia)" is worded "medium".
+      wording: measure.unit.replace(/\s*\([^)]*\)/g, '').trim(),
+    }))
+    .filter(
+      (measure) =>
+        measure.amount > 0 &&
+        measure.grams > 0 &&
+        measure.wording.length > 0 &&
+        !/nlea|serving/i.test(measure.wording),
+    );
+  const preferred =
+    PREFERRED_MEASURES.map((word) =>
+      usable.find((measure) => measure.wording.toLowerCase().startsWith(word)),
+    ).find((measure) => measure !== undefined) ?? usable[0];
+  if (!preferred) return '';
+  return `100 g · ${shortAmount(preferred.amount)} ${preferred.wording} ≈ ${Math.round(preferred.grams)} g`;
+}
+
+/** A USDA reference food as a catalog row: per 100 g, verified, with USDA's own citation. */
+function referenceFoodRow(food: ReferenceFoodRow, measureRows: ReferenceMeasureRow[]) {
+  const measures = measureRows
+    .filter((measure) => Number(measure.fdc_id) === food.fdc_id)
+    .map((measure) => ({
+      unit: String(measure.unit),
+      amount: Number(measure.amount),
+      grams: Number(measure.grams),
+    }));
+  return {
+    name: food.description,
+    brand: null,
+    image_url: null,
+    serving_size: 100,
+    serving_unit: 'g',
+    serving_label: referenceServingLabel(measures),
+    calories: Number(food.calories_per_100g),
+    protein_g: Number(food.protein_g_per_100g),
+    carbs_g: Number(food.carbs_g_per_100g),
+    fat_g: Number(food.fat_g_per_100g),
+    provider: USDA_PROVIDER,
+    provider_food_id: String(food.fdc_id),
+    barcode: food.gtin_upc ?? null,
+    created_by: null,
+    is_active: true,
+    nutrition_confidence: 'verified',
+    nutrition_source_kind: 'usda_fdc',
+    nutrition_source_id: String(food.fdc_id),
+    nutrition_matched_name: food.description,
+    nutrition_data_version: food.data_version,
+    nutrition_retrieved_at: new Date().toISOString(),
+    nutrition_licence: 'public_domain',
+    nutrition_attribution: `${USDA_CITATION} ${food.data_version}. https://fdc.nal.usda.gov/`,
+  };
 }
 
 /** A parser question about how much was eaten: a missing amount, not a missing food. */
@@ -121,14 +314,23 @@ function toFoodRecord(row: any): FoodRecord {
  * FoodRow type never see the difference.
  */
 @Injectable()
-export class FoodsService {
+export class FoodsService implements OnModuleInit {
   private readonly logger = new Logger(FoodsService.name);
+  private readonly vocabulary: SearchVocabulary;
 
   constructor(
     private readonly supabaseService: SupabaseService,
     @Inject(FOOD_PROVIDER) private readonly provider: FoodProvider,
     private readonly nutritionProvider: AnthropicNutritionProvider,
-  ) {}
+  ) {
+    this.vocabulary = new SearchVocabulary(supabaseService);
+  }
+
+  // The words a misspelt search is put right with are read as the server starts, so the first
+  // search with a typo doesn't wait for them.
+  onModuleInit(): void {
+    void this.vocabulary.get();
+  }
 
   /**
    * AI Food Search. Claude parses the description into its parts. The resolver then matches
@@ -340,79 +542,241 @@ export class FoodsService {
     }
   }
 
-  async search(query: string, page: number, pageSize: number): Promise<FoodSearchResponse> {
+  /**
+   * Search Food. Three sources are read at the same time: Progresso's shared catalog (its
+   * built-in foods, and every product and reference food already cached), USDA FoodData
+   * Central's reference foods (plain whole foods: "Onions, raw"), and, on the first page, Open
+   * Food Facts' branded products. Everything found is ranked together (search-ranking.ts), so
+   * the plain food comes before products that only mention it. Open Food Facts is a public
+   * service that is often slow: the search waits for it at most BRANDED_SEARCH_BUDGET_MS, and
+   * products still arriving after that are cached for the next search. `branded: false` skips
+   * it altogether -- the app asks that way first, to show the quick results at once.
+   *
+   * A reference food is cached into the catalog (on its USDA id, never twice) only when it's
+   * shown, so it has a row to be logged against, with where its figures came from. When the
+   * query as typed finds nothing, its misspelt words are put right ("brocoli") and the search
+   * runs once more; the response then says what was searched for.
+   */
+  async search(
+    query: string,
+    page: number,
+    pageSize: number,
+    options: { branded?: boolean } = {},
+  ): Promise<FoodSearchResponse> {
     const trimmed = query.trim();
     if (!trimmed) return { foods: [], hasMore: false };
+    const branded = (options.branded ?? true) && page === 0;
 
-    const local = await this.searchLocal(trimmed, page, pageSize);
-
-    // External results only fetched on the first page -- once cached, they
-    // become part of the local catalog for any later page, and this keeps
-    // v1 from needing to track the external provider's own page cursor
-    // across requests.
-    let externalRecords: FoodRecord[] = [];
-    if (page === 0) {
-      externalRecords = await this.fetchAndCacheExternal(trimmed, pageSize);
-    }
-
-    const seen = new Set<string>();
-    const merged: FoodRecord[] = [];
-    for (const food of [...local, ...externalRecords]) {
-      if (seen.has(food.id)) continue;
-      seen.add(food.id);
-      merged.push(food);
-      if (merged.length >= pageSize) break;
-    }
-
-    return { foods: merged, hasMore: merged.length >= pageSize };
-  }
-
-  // Two plain, separately-parameterized ilike() calls rather than a single
-  // .or('name.ilike....,brand.ilike....') -- PostgREST's .or() takes a raw
-  // filter-expression string, so a search term containing a comma or
-  // parenthesis would need its own escaping for that mini-language on top
-  // of ILIKE's; two ordinary calls sidestep that entirely (same reasoning
-  // as the mobile app's searchDefaultFoods).
-  private async searchLocal(query: string, page: number, pageSize: number): Promise<FoodRecord[]> {
-    const pattern = `%${escapeIlike(query)}%`;
-    const limit = (page + 1) * pageSize;
-
-    const [byName, byBrand] = await Promise.all([
-      this.queryLocalFoods('name', pattern, limit),
-      this.queryLocalFoods('brand', pattern, limit),
-    ]);
-
-    const seen = new Set<string>();
-    const merged: FoodRecord[] = [];
-    for (const food of [...byName, ...byBrand].sort((a, b) => a.name.localeCompare(b.name))) {
-      if (seen.has(food.id)) continue;
-      seen.add(food.id);
-      merged.push(food);
+    let terms = searchTermsFor(trimmed);
+    let found = await this.findFoods(trimmed, terms, branded, pageSize);
+    let correctedQuery: string | null = null;
+    if (found.length === 0) {
+      const corrected = await this.correctedTerms(terms);
+      if (corrected) {
+        terms = corrected.terms;
+        found = await this.findFoods(corrected.query, terms, branded, pageSize);
+        if (found.length > 0) correctedQuery = corrected.query;
+      }
     }
 
     const from = page * pageSize;
-    return merged.slice(from, from + pageSize);
+    const foods = await this.withReferenceFoodsCached(found.slice(from, from + pageSize));
+    return { foods, hasMore: found.length > from + pageSize, correctedQuery };
   }
 
-  private async queryLocalFoods(
-    column: 'name' | 'brand',
-    pattern: string,
-    limit: number,
-  ): Promise<FoodRecord[]> {
-    const { data, error } = await this.supabaseService
+  /** Every source's foods for the query, ranked, with each food once. */
+  private async findFoods(
+    query: string,
+    terms: SearchTerms,
+    branded: boolean,
+    pageSize: number,
+  ): Promise<SearchCandidate[]> {
+    if (terms.words.length === 0) return [];
+    const [byName, byBrand, reference, products] = await Promise.all([
+      this.queryCatalogByName(terms),
+      this.queryCatalogByBrand(query),
+      this.queryReferenceFoods(terms),
+      branded ? this.brandedWithinBudget(query, pageSize) : Promise.resolve([]),
+    ]);
+
+    const cachedReferenceIds = new Set<string>();
+    const candidates: SearchCandidate[] = [];
+    for (const record of [...byName, ...byBrand]) {
+      if (record.provider === USDA_PROVIDER && record.providerFoodId) {
+        cachedReferenceIds.add(record.providerFoodId);
+      }
+      candidates.push({ kind: 'record', record, ...rankable(record) });
+    }
+    const productCandidates: SearchCandidate[] = products.map((record) => ({
+      kind: 'record',
+      record,
+      ...rankable(record),
+    }));
+    for (const food of reference) {
+      if (cachedReferenceIds.has(String(food.fdc_id))) continue;
+      candidates.push({
+        kind: 'reference',
+        reference: food,
+        name: food.description,
+        brand: null,
+        source: 'usda',
+      });
+    }
+    const ranked = rankFoods(terms, [...candidates, ...productCandidates]);
+    // Open Food Facts matches on more than a product's name (its category, its ingredients), so
+    // a product it found that names none of the query's words ("Coca-Cola" for "coke") still
+    // comes, after everything that does, in its own order.
+    const shown = new Set(ranked);
+    const unnamed = productCandidates.filter((candidate) => !shown.has(candidate));
+    return withoutRepeats([...ranked, ...unnamed]);
+  }
+
+  /** The query with its misspelt words put right, or null when none could be. */
+  private async correctedTerms(
+    terms: SearchTerms,
+  ): Promise<{ query: string; terms: SearchTerms } | null> {
+    const vocabulary = await this.vocabulary.get();
+    if (!vocabulary) return null;
+    let changed = false;
+    const words = terms.words.map((word) => {
+      const corrected = correctWord(word, vocabulary);
+      if (corrected) changed = true;
+      return corrected ?? word;
+    });
+    if (!changed) return null;
+    const query = words.join(' ');
+    return { query, terms: searchTermsFor(query) };
+  }
+
+  private async queryCatalogByName(terms: SearchTerms): Promise<CatalogRecord[]> {
+    const request = this.supabaseService
       .getClient()
       .from('foods')
-      .select(FOOD_COLUMNS)
+      .select(FOOD_COLUMNS_WITH_PROVIDER_ID)
       .is('created_by', null)
-      .eq('is_active', true)
-      .ilike(column, pattern)
-      .order('name', { ascending: true })
-      .limit(limit);
-
+      .eq('is_active', true);
+    const { data, error } = await matchingEveryWord(request, 'name', terms).limit(
+      CATALOG_CANDIDATES,
+    );
     if (error) {
       throw new InternalServerErrorException('Failed to search foods');
     }
-    return (data ?? []).map(toFoodRecord);
+    return (data ?? []).map(toCatalogRecord);
+  }
+
+  // A brand is matched as the whole query, so "Kirkland" finds Kirkland's products. A plain
+  // ilike() rather than .or(): a brand pattern is the user's own text, which .or()'s filter
+  // language would need its own escaping for.
+  private async queryCatalogByBrand(query: string): Promise<CatalogRecord[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('foods')
+      .select(FOOD_COLUMNS_WITH_PROVIDER_ID)
+      .is('created_by', null)
+      .eq('is_active', true)
+      .ilike('brand', `%${escapeIlike(query)}%`)
+      .limit(CATALOG_CANDIDATES);
+    if (error) {
+      throw new InternalServerErrorException('Failed to search foods');
+    }
+    return (data ?? []).map(toCatalogRecord);
+  }
+
+  /** USDA reference foods matching every word, with their household measures. Empty if unreadable. */
+  private async queryReferenceFoods(terms: SearchTerms): Promise<ReferenceFoodRow[]> {
+    const request = this.supabaseService
+      .getClient()
+      .from('usda_food_reference')
+      .select(REFERENCE_COLUMNS)
+      .in('data_type', [...REFERENCE_DATA_TYPES]);
+    const { data, error } = await matchingEveryWord(request, 'description', terms).limit(
+      REFERENCE_CANDIDATES,
+    );
+    if (error) {
+      // Reference foods add to the search; the catalog's results still stand without them.
+      this.logger.warn(`USDA reference search failed: ${error.message}`);
+      return [];
+    }
+    return (data ?? []) as unknown as ReferenceFoodRow[];
+  }
+
+  /** The household measures of the reference foods about to be cached; none if unreadable. */
+  private async referenceMeasures(fdcIds: number[]): Promise<ReferenceMeasureRow[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('usda_food_measure')
+      .select('fdc_id, unit, amount, grams')
+      .in('fdc_id', fdcIds)
+      .order('seq', { ascending: true });
+    if (error) {
+      // The serving is still 100 g; only the household measure's wording is missing.
+      this.logger.warn(`USDA measure lookup failed: ${error.message}`);
+      return [];
+    }
+    return (data ?? []) as unknown as ReferenceMeasureRow[];
+  }
+
+  /** Open Food Facts' products, cached, if they come within the budget; the caching carries on regardless. */
+  private async brandedWithinBudget(query: string, pageSize: number): Promise<CatalogRecord[]> {
+    // Caught here, not only by the race below: work still going after the budget must never
+    // reject with no one waiting for it.
+    const work = this.fetchAndCacheExternal(query, pageSize).catch((err: unknown) => {
+      this.logger.warn(
+        `Caching Open Food Facts products failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return [] as FoodRecord[];
+    });
+    const products = await withinBudget(work, BRANDED_SEARCH_BUDGET_MS);
+    if (products === null) {
+      this.logger.warn(
+        `Open Food Facts took longer than ${BRANDED_SEARCH_BUDGET_MS} ms; answered without it`,
+      );
+      return [];
+    }
+    return products.map((record) => ({ ...record, providerFoodId: null }));
+  }
+
+  /**
+   * The foods to answer with, each a catalog row: a USDA reference food not cached yet is
+   * cached now, in one upsert, so it can be logged. One that can't be cached is left out rather
+   * than shown with nothing to log it against.
+   */
+  private async withReferenceFoodsCached(found: SearchCandidate[]): Promise<FoodRecord[]> {
+    const uncached = found.filter(
+      (candidate): candidate is Extract<SearchCandidate, { kind: 'reference' }> =>
+        candidate.kind === 'reference',
+    );
+    const cached = new Map<string, FoodRecord>();
+    if (uncached.length > 0) {
+      const measures = await this.referenceMeasures(uncached.map((c) => c.reference.fdc_id));
+      const rows = uncached.map((candidate) => referenceFoodRow(candidate.reference, measures));
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('foods')
+        .upsert(rows, { onConflict: 'provider,provider_food_id' })
+        .select(FOOD_COLUMNS_WITH_PROVIDER_ID);
+      if (!error && data) {
+        for (const row of data) cached.set(String(row.provider_food_id), toFoodRecord(row));
+      } else {
+        this.logger.warn(`Caching USDA reference foods failed, one by one: ${error?.message}`);
+        for (const row of rows) {
+          const { data: one, error: oneError } = await this.supabaseService
+            .getClient()
+            .from('foods')
+            .upsert(row, { onConflict: 'provider,provider_food_id' })
+            .select(FOOD_COLUMNS_WITH_PROVIDER_ID)
+            .maybeSingle();
+          if (one && !oneError) cached.set(String(one.provider_food_id), toFoodRecord(one));
+        }
+      }
+    }
+    return found
+      .map((candidate) =>
+        candidate.kind === 'record'
+          ? stripProviderFoodId(candidate.record)
+          : cached.get(String(candidate.reference.fdc_id)),
+      )
+      .filter((record): record is FoodRecord => record !== undefined);
   }
 
   /**
@@ -543,6 +907,17 @@ export class FoodsService {
       barcode: food.barcode,
       created_by: null,
       is_active: true,
+      // Where the figures came from, as the provenance migration recorded it for products cached
+      // before: so a product logged now carries it into the person's copy and their log too.
+      ...(food.provider === 'open_food_facts'
+        ? {
+            nutrition_confidence: 'verified',
+            nutrition_source_kind: 'open_food_facts',
+            nutrition_source_id: food.providerFoodId,
+            nutrition_licence: 'odbl',
+            nutrition_attribution: 'Open Food Facts contributors (ODbL)',
+          }
+        : {}),
     };
   }
 

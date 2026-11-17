@@ -1,7 +1,7 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import type { SupabaseService } from '../supabase/supabase.service';
 import type { FoodProvider, NormalizedFood } from './food-provider.interface';
-import { BARCODE_REFRESH_BUDGET_MS, FoodsService } from './foods.service';
+import { BARCODE_REFRESH_BUDGET_MS, BRANDED_SEARCH_BUDGET_MS, FoodsService } from './foods.service';
 import type { AnthropicNutritionProvider } from './providers/anthropic-nutrition.provider';
 import type { InterpretFoodResponse } from './interpretation';
 
@@ -120,172 +120,242 @@ const normalizedOreo: NormalizedFood = {
   fatG: 7,
 };
 
-describe('FoodsService', () => {
+/**
+ * A database for Search Food's reads, answered by table and filter rather than by call order --
+ * the search reads its sources at the same time. `foods` reads answer `byName` (a name filter)
+ * or `byBrand` (a brand filter); each upsert into `foods` takes the next of `upserts`. A read of
+ * USDA descriptions page by page (the search vocabulary) answers `vocabulary`.
+ */
+function mockSearchDatabase(tables: {
+  byName?: Result;
+  byBrand?: Result;
+  reference?: Result | ((filters: unknown[][]) => Result);
+  measures?: Result;
+  upserts?: Result[];
+  vocabulary?: Result;
+}) {
+  const empty: Result = { data: [], error: null };
+  const upserts = [...(tables.upserts ?? [])];
+  const builders: { table: string; calls: Record<string, unknown[][]> }[] = [];
+  const from = jest.fn((table: string) => {
+    const calls: Record<string, unknown[][]> = {};
+    const builder: Record<string, unknown> = {};
+    const answer = (): Result => {
+      if (calls.range) return tables.vocabulary ?? empty;
+      if (table === 'usda_food_reference') {
+        const reference = tables.reference ?? empty;
+        return typeof reference === 'function' ? reference(calls.ilike ?? []) : reference;
+      }
+      if (table === 'usda_food_measure') return tables.measures ?? empty;
+      if (calls.upsert) return upserts.shift() ?? empty;
+      const brandFilter = (calls.ilike ?? []).some((args) => args[0] === 'brand');
+      return (brandFilter ? tables.byBrand : tables.byName) ?? empty;
+    };
+    for (const m of [
+      'select',
+      'is',
+      'eq',
+      'ilike',
+      'or',
+      'in',
+      'order',
+      'limit',
+      'upsert',
+      'range',
+    ]) {
+      builder[m] = jest.fn((...args: unknown[]) => {
+        (calls[m] ??= []).push(args);
+        return builder;
+      });
+    }
+    builder.maybeSingle = jest.fn(() => {
+      const result = answer();
+      const rows = result.data;
+      return Promise.resolve({
+        data: Array.isArray(rows) ? (rows[0] ?? null) : rows,
+        error: result.error,
+      });
+    });
+    builder.then = (resolve: (v: Result) => unknown, reject: (e: unknown) => unknown) =>
+      Promise.resolve(answer()).then(resolve, reject);
+    builders.push({ table, calls });
+    return builder;
+  });
+  const supabaseService = { getClient: () => ({ from }) } as unknown as SupabaseService;
+  const upsertCalls = () =>
+    builders.filter((b) => b.table === 'foods' && b.calls.upsert).map((b) => b.calls.upsert![0]!);
+  return { supabaseService, from, builders, upsertCalls };
+}
+
+const onionsRaw = {
+  fdc_id: 170000,
+  description: 'Onions, raw',
+  data_type: 'SR Legacy',
+  gtin_upc: null,
+  calories_per_100g: '40.00',
+  protein_g_per_100g: '1.10',
+  carbs_g_per_100g: '9.34',
+  fat_g_per_100g: '0.10',
+  data_version: 'SR Legacy 2018-04',
+};
+
+const onionChips = {
+  ...onionsRaw,
+  fdc_id: 167963,
+  description: 'Snacks, potato chips, sour-cream-and-onion-flavor',
+  calories_per_100g: '531.00',
+};
+
+const onionMeasures = [
+  { fdc_id: 170000, unit: 'cup, chopped', amount: '1.000', grams: '160.00' },
+  { fdc_id: 170000, unit: 'medium (2-1/2" dia)', amount: '1.000', grams: '110.00' },
+];
+
+/** The catalog row an upserted reference food comes back as. */
+function cachedReference(food: { fdc_id: number; description: string }, id: string) {
+  return {
+    id,
+    name: food.description,
+    brand: null,
+    image_url: null,
+    serving_size: '100.00',
+    serving_unit: 'g',
+    serving_label: '',
+    calories: '40.00',
+    protein_g: '1.10',
+    carbs_g: '9.34',
+    fat_g: '0.10',
+    provider: 'usda_fdc',
+    barcode: null,
+    provider_food_id: String(food.fdc_id),
+  };
+}
+
+const brandedOnionRings = {
+  ...cachedExternalFoodRow,
+  id: 'food-rings',
+  name: 'Onion rings',
+  brand: 'Cavendish Farms',
+  barcode: '0000000000001',
+  provider_food_id: '0000000000001',
+};
+
+describe('FoodsService.search', () => {
   it('returns an empty result for a blank query without touching the database or the provider', async () => {
-    const { supabaseService } = mockSupabaseSequence([]);
+    const { supabaseService, from } = mockSearchDatabase({});
     const provider = mockProvider();
     const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
     const result = await service.search('   ', 0, 20);
 
     expect(result).toEqual({ foods: [], hasMore: false });
+    expect(from).not.toHaveBeenCalled();
     expect(provider.searchFoods).not.toHaveBeenCalled();
   });
 
-  it('returns local (cached/generic) results merged with freshly-cached external results, deduplicated', async () => {
-    const { supabaseService, instances } = mockSupabaseSequence([
-      { data: [localFoodRow], error: null }, // local search by name
-      { data: [], error: null }, // local search by brand
-      { data: [cachedExternalFoodRow], error: null }, // batch upsert of the external results
+  it('finds the plain whole food first: USDA "Onions, raw" before products that only mention onion', async () => {
+    const { supabaseService, upsertCalls } = mockSearchDatabase({
+      byName: { data: [brandedOnionRings], error: null },
+      reference: { data: [onionChips, onionsRaw], error: null },
+      measures: { data: onionMeasures, error: null },
+      upserts: [
+        {
+          data: [
+            cachedReference(onionsRaw, 'food-onion'),
+            cachedReference(onionChips, 'food-chips'),
+          ],
+          error: null,
+        },
+      ],
+    });
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
+
+    const result = await service.search('onions', 0, 20);
+
+    expect(result.foods.map((food) => food.name)).toEqual([
+      'Onions, raw',
+      'Onion rings',
+      'Snacks, potato chips, sour-cream-and-onion-flavor',
     ]);
-    const provider = mockProvider({
-      searchFoods: jest.fn().mockResolvedValue({ foods: [normalizedOreo], hasMore: false }),
-    });
-    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
-
-    const result = await service.search('food', 0, 20);
-
-    expect(result.foods.map((f) => f.id)).toEqual(['food-1', 'food-2']);
-    expect(result.foods[1]).toMatchObject({
-      name: 'Oreo Original',
-      brand: 'Oreo',
-      imageUrl: 'https://images.openfoodfacts.org/oreo-front.jpg',
-      provider: 'open_food_facts',
-      barcode: '0066721016123',
-    });
-    // The upsert call is the 3rd builder in the sequence; the batch upsert's
-    // first argument is the whole page of rows, not one row.
-    const upsertArgs: unknown[] = instances[2]!.calls.upsert?.[0] ?? [];
-    const upsertRows = upsertArgs[0] as unknown[];
-    expect(upsertRows[0]).toMatchObject({
-      provider: 'open_food_facts',
-      provider_food_id: '0066721016123',
-      image_url: 'https://images.openfoodfacts.org/oreo-front.jpg',
-    });
-  });
-
-  it('upserts on (provider, provider_food_id) so re-searching never creates a duplicate row', async () => {
-    const { supabaseService, instances } = mockSupabaseSequence([
-      { data: [], error: null },
-      { data: [], error: null },
-      { data: [cachedExternalFoodRow], error: null },
-    ]);
-    const provider = mockProvider({
-      searchFoods: jest.fn().mockResolvedValue({ foods: [normalizedOreo], hasMore: false }),
-    });
-    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
-
-    await service.search('oreo', 0, 20);
-
-    const upsertBuilder = instances[2]!.builder as { upsert: jest.Mock };
-    expect(upsertBuilder.upsert).toHaveBeenCalledWith(
-      [expect.objectContaining({ provider_food_id: '0066721016123' })],
-      { onConflict: 'provider,provider_food_id' },
-    );
-  });
-
-  it("preserves the provider's own relevance order, even when the batch upsert returns rows in a different order", async () => {
-    const normalizedChicken: NormalizedFood = {
-      ...normalizedOreo,
-      providerFoodId: 'chicken-id',
-      barcode: null,
-      name: 'Chicken Breast (cooked)',
+    expect(result.foods[0]).toMatchObject({ id: 'food-onion', provider: 'usda_fdc' });
+    // Cached once each, on USDA's id, per 100 g, verified, with USDA's citation.
+    const [rows, options] = upsertCalls()[0]! as [Record<string, unknown>[], unknown];
+    expect(options).toEqual({ onConflict: 'provider,provider_food_id' });
+    expect(rows.map((row) => row.provider_food_id)).toEqual(['170000', '167963']);
+    expect(rows[0]).toMatchObject({
+      name: 'Onions, raw',
       brand: null,
-    };
-    const chickenRow = {
-      ...cachedExternalFoodRow,
-      id: 'food-3',
-      name: 'Chicken Breast (cooked)',
-      brand: null,
-      provider_food_id: 'chicken-id',
-    };
-    // Postgres/PostgREST gives no ordering guarantee for a multi-row
-    // upsert's returned rows -- deliberately returned here in the OPPOSITE
-    // order from the provider's own result (normalizedOreo first, then
-    // normalizedChicken) to prove the service re-orders by input, not by
-    // whatever order the database happened to hand back.
-    const { supabaseService } = mockSupabaseSequence([
-      { data: [], error: null },
-      { data: [], error: null },
-      { data: [chickenRow, cachedExternalFoodRow], error: null },
-    ]);
-    const provider = mockProvider({
-      searchFoods: jest
-        .fn()
-        .mockResolvedValue({ foods: [normalizedOreo, normalizedChicken], hasMore: false }),
+      serving_size: 100,
+      serving_unit: 'g',
+      serving_label: '100 g · 1 medium ≈ 110 g',
+      calories: 40,
+      provider: 'usda_fdc',
+      created_by: null,
+      nutrition_confidence: 'verified',
+      nutrition_source_kind: 'usda_fdc',
+      nutrition_source_id: '170000',
+      nutrition_licence: 'public_domain',
     });
-    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
-
-    const result = await service.search('food', 0, 20);
-
-    expect(result.foods.map((f) => f.id)).toEqual(['food-2', 'food-3']);
+    expect(String(rows[0]!.nutrition_attribution)).toContain('FoodData Central');
+    // USDA lists no measure for the chips: the serving is 100 g, with no wording.
+    expect(rows[1]!.serving_label).toBe('');
   });
 
-  it('only calls the external provider on the first page', async () => {
-    const { supabaseService } = mockSupabaseSequence([
-      { data: [], error: null },
-      { data: [], error: null },
+  it('matches every word as a stem, singular and plural alike, with spelling variants', async () => {
+    const { supabaseService, builders } = mockSearchDatabase({});
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
+
+    await service.search('Greek yoghurt berries', 0, 20, { branded: false });
+
+    const catalog = builders.find(
+      (b) => b.table === 'foods' && b.calls.ilike?.some((args) => args[0] === 'name'),
+    )!;
+    expect(catalog.calls.ilike).toEqual([
+      ['name', '%greek%'],
+      ['name', '%berr%'],
     ]);
-    const provider = mockProvider();
-    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
-
-    await service.search('food', 1, 20);
-
-    expect(provider.searchFoods).not.toHaveBeenCalled();
+    expect(catalog.calls.or).toEqual([
+      ['name.ilike.%yogurt%,name.ilike.%yoghurt%,name.ilike.%yogourt%'],
+    ]);
+    const reference = builders.find((b) => b.table === 'usda_food_reference')!;
+    expect(reference.calls.in).toEqual([['data_type', ['Foundation', 'SR Legacy']]]);
   });
 
-  it('degrades to local-only results when the external provider throws', async () => {
-    const { supabaseService } = mockSupabaseSequence([
-      { data: [localFoodRow], error: null },
-      { data: [], error: null },
-    ]);
-    const provider = mockProvider({
-      searchFoods: jest.fn().mockRejectedValue(new Error('provider down')),
+  it('never caches a reference food that is already in the catalog, and shows it once', async () => {
+    const { supabaseService, upsertCalls } = mockSearchDatabase({
+      byName: { data: [cachedReference(onionsRaw, 'food-onion')], error: null },
+      reference: { data: [onionsRaw], error: null },
     });
-    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
 
-    const result = await service.search('food', 0, 20);
+    const result = await service.search('onion', 0, 20, { branded: false });
 
-    expect(result.foods.map((f) => f.id)).toEqual(['food-1']);
+    expect(result.foods.map((food) => food.id)).toEqual(['food-onion']);
+    expect(upsertCalls()).toEqual([]);
   });
 
-  it('falls back to one upsert per food when the batch upsert itself fails, keeping whichever ones succeed', async () => {
-    const normalizedChicken: NormalizedFood = {
-      ...normalizedOreo,
-      providerFoodId: 'chicken-id',
-      barcode: null,
-      name: 'Chicken Breast (cooked)',
-      brand: null,
+  it("puts Progresso's own built-in food first when it matches", async () => {
+    const roasted = {
+      ...onionsRaw,
+      fdc_id: 1,
+      description: 'Chicken, broilers or fryers, breast, meat only, cooked, roasted',
     };
-    const { supabaseService, instances } = mockSupabaseSequence([
-      { data: [], error: null }, // local search by name
-      { data: [], error: null }, // local search by brand
-      { data: null, error: { message: 'batch db error' } }, // the batch upsert itself
-      { data: cachedExternalFoodRow, error: null }, // fallback: oreo succeeds
-      { data: null, error: { message: 'db error' } }, // fallback: chicken fails
-    ]);
-    const provider = mockProvider({
-      searchFoods: jest
-        .fn()
-        .mockResolvedValue({ foods: [normalizedOreo, normalizedChicken], hasMore: false }),
+    const { supabaseService } = mockSearchDatabase({
+      byName: { data: [localFoodRow], error: null },
+      reference: { data: [roasted], error: null },
+      upserts: [{ data: [cachedReference(roasted, 'food-usda-chicken')], error: null }],
     });
-    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
 
-    const result = await service.search('food', 0, 20);
+    const result = await service.search('chicken breast', 0, 20, { branded: false });
 
-    expect(result.foods.map((f) => f.id)).toEqual(['food-2']);
-    // Both fallback upserts go through the per-item path (a single object,
-    // not the batch's array), unlike the batch upsert itself.
-    expect(instances[3]!.calls.upsert?.[0]?.[0]).not.toBeInstanceOf(Array);
-    expect(instances[4]!.calls.upsert?.[0]?.[0]).not.toBeInstanceOf(Array);
+    expect(result.foods.map((food) => food.id)).toEqual(['food-1', 'food-usda-chicken']);
   });
 
-  it('skips caching a food whose upsert fails, without failing the whole search', async () => {
-    const { supabaseService } = mockSupabaseSequence([
-      { data: [], error: null },
-      { data: [], error: null },
-      { data: null, error: { message: 'db error' } },
-    ]);
+  it('merges freshly-cached branded products, upserting them on (provider, provider_food_id)', async () => {
+    const { supabaseService, upsertCalls } = mockSearchDatabase({
+      upserts: [{ data: [cachedExternalFoodRow], error: null }],
+    });
     const provider = mockProvider({
       searchFoods: jest.fn().mockResolvedValue({ foods: [normalizedOreo], hasMore: false }),
     });
@@ -293,30 +363,188 @@ describe('FoodsService', () => {
 
     const result = await service.search('oreo', 0, 20);
 
-    expect(result.foods).toEqual([]);
+    expect(result.foods.map((food) => food.id)).toEqual(['food-2']);
+    expect(result.foods[0]).toMatchObject({
+      name: 'Oreo Original',
+      brand: 'Oreo',
+      imageUrl: 'https://images.openfoodfacts.org/oreo-front.jpg',
+      provider: 'open_food_facts',
+      barcode: '0066721016123',
+    });
+    const [rows, options] = upsertCalls()[0]! as [Record<string, unknown>[], unknown];
+    expect(options).toEqual({ onConflict: 'provider,provider_food_id' });
+    // Where the figures came from goes with every product cached, as the provenance migration did.
+    expect(rows[0]).toMatchObject({
+      provider: 'open_food_facts',
+      provider_food_id: '0066721016123',
+      nutrition_confidence: 'verified',
+      nutrition_source_kind: 'open_food_facts',
+      nutrition_licence: 'odbl',
+    });
   });
 
-  it('caps merged results to pageSize', async () => {
-    const rows = Array.from({ length: 15 }, (_, i) => ({ ...localFoodRow, id: `food-${i}` }));
-    const { supabaseService } = mockSupabaseSequence([
-      { data: rows, error: null },
-      { data: [], error: null },
-    ]);
+  it('keeps a branded product the provider found by more than its name, after the ones that name the query', async () => {
+    const cola = {
+      ...cachedExternalFoodRow,
+      id: 'food-cola',
+      name: 'Coca-Cola',
+      brand: 'Coca-Cola',
+      provider_food_id: 'cola',
+    };
+    const cokeZero = {
+      ...cachedExternalFoodRow,
+      id: 'food-coke',
+      name: 'Coke Zero',
+      brand: 'Coca-Cola',
+      provider_food_id: 'coke',
+    };
+    const { supabaseService } = mockSearchDatabase({
+      upserts: [{ data: [cola, cokeZero], error: null }],
+    });
+    const provider = mockProvider({
+      searchFoods: jest.fn().mockResolvedValue({
+        foods: [
+          { ...normalizedOreo, providerFoodId: 'cola', name: 'Coca-Cola', brand: 'Coca-Cola' },
+          { ...normalizedOreo, providerFoodId: 'coke', name: 'Coke Zero', brand: 'Coca-Cola' },
+        ],
+        hasMore: false,
+      }),
+    });
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+    const result = await service.search('coke', 0, 20);
+
+    expect(result.foods.map((food) => food.id)).toEqual(['food-coke', 'food-cola']);
+  });
+
+  it('answers without branded products when the provider is slow, and still caches them', async () => {
+    jest.useFakeTimers();
+    try {
+      let resolveSearch: (value: { foods: NormalizedFood[]; hasMore: boolean }) => void = () => {};
+      const { supabaseService, upsertCalls } = mockSearchDatabase({
+        byName: { data: [localFoodRow], error: null },
+        upserts: [{ data: [cachedExternalFoodRow], error: null }],
+      });
+      const provider = mockProvider({
+        searchFoods: jest.fn(
+          () =>
+            new Promise<{ foods: NormalizedFood[]; hasMore: boolean }>((resolve) => {
+              resolveSearch = resolve;
+            }),
+        ),
+      });
+      const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+      const searching = service.search('chicken', 0, 20);
+      await jest.advanceTimersByTimeAsync(BRANDED_SEARCH_BUDGET_MS);
+      const result = await searching;
+
+      expect(result.foods.map((food) => food.id)).toEqual(['food-1']);
+      // The products arriving later are still cached for the next search.
+      resolveSearch({ foods: [normalizedOreo], hasMore: false });
+      await jest.advanceTimersByTimeAsync(0);
+      expect(upsertCalls()).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("skips Open Food Facts when asked to (the app's quick first answer), and on later pages", async () => {
+    const { supabaseService } = mockSearchDatabase({});
     const provider = mockProvider();
     const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
 
-    const result = await service.search('food', 0, 10);
+    await service.search('food', 0, 20, { branded: false });
+    await service.search('food', 1, 20);
+
+    expect(provider.searchFoods).not.toHaveBeenCalled();
+  });
+
+  it('degrades to the catalog when the external provider throws, or the USDA read fails', async () => {
+    const { supabaseService } = mockSearchDatabase({
+      byName: { data: [localFoodRow], error: null },
+      reference: { data: null, error: { message: 'usda down' } },
+    });
+    const provider = mockProvider({
+      searchFoods: jest.fn().mockRejectedValue(new Error('provider down')),
+    });
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+    const result = await service.search('chicken', 0, 20);
+
+    expect(result.foods.map((f) => f.id)).toEqual(['food-1']);
+  });
+
+  it('caches reference foods one at a time when the batch fails, leaving out one that cannot be', async () => {
+    const { supabaseService, upsertCalls } = mockSearchDatabase({
+      reference: { data: [onionsRaw, onionChips], error: null },
+      upserts: [
+        { data: null, error: { message: 'batch failed' } },
+        { data: [cachedReference(onionsRaw, 'food-onion')], error: null },
+        { data: null, error: { message: 'name taken' } },
+      ],
+    });
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
+
+    const result = await service.search('onion', 0, 20, { branded: false });
+
+    expect(result.foods.map((food) => food.id)).toEqual(['food-onion']);
+    expect(upsertCalls()).toHaveLength(3);
+  });
+
+  it('puts a misspelt query right when it finds nothing as typed, and says so', async () => {
+    const broccoli = { ...onionsRaw, fdc_id: 2, description: 'Broccoli, raw' };
+    const { supabaseService } = mockSearchDatabase({
+      vocabulary: { data: [{ description: 'Broccoli, raw' }], error: null },
+      reference: (filters) =>
+        filters.some((args) => String(args[1]).includes('broccoli'))
+          ? { data: [broccoli], error: null }
+          : { data: [], error: null },
+      upserts: [{ data: [cachedReference(broccoli, 'food-broccoli')], error: null }],
+    });
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
+
+    const result = await service.search('brocoli', 0, 20, { branded: false });
+
+    expect(result.correctedQuery).toBe('broccoli');
+    expect(result.foods.map((food) => food.id)).toEqual(['food-broccoli']);
+  });
+
+  it('leaves a query that finds something as it is', async () => {
+    const { supabaseService, builders } = mockSearchDatabase({
+      byName: { data: [localFoodRow], error: null },
+    });
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
+
+    const result = await service.search('chicken', 0, 20, { branded: false });
+
+    expect(result.correctedQuery).toBeNull();
+    // No vocabulary read: nothing needed putting right.
+    expect(builders.some((b) => b.calls.range)).toBe(false);
+  });
+
+  it('caps results to pageSize and says there are more', async () => {
+    const rows = Array.from({ length: 15 }, (_, i) => ({
+      ...localFoodRow,
+      id: `food-${i}`,
+      name: `Chicken Breast ${i}`,
+    }));
+    const { supabaseService } = mockSearchDatabase({ byName: { data: rows, error: null } });
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
+
+    const result = await service.search('chicken', 0, 10, { branded: false });
 
     expect(result.foods).toHaveLength(10);
     expect(result.hasMore).toBe(true);
   });
 
-  it('throws when the local search query itself errors', async () => {
-    const { supabaseService } = mockSupabaseSequence([{ data: null, error: { message: 'boom' } }]);
-    const provider = mockProvider();
-    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+  it('throws when the catalog search itself errors', async () => {
+    const { supabaseService } = mockSearchDatabase({
+      byName: { data: null, error: { message: 'boom' } },
+    });
+    const service = new FoodsService(supabaseService, mockProvider(), mockNutritionProvider());
 
-    await expect(service.search('food', 0, 20)).rejects.toBeInstanceOf(
+    await expect(service.search('food', 0, 20, { branded: false })).rejects.toBeInstanceOf(
       InternalServerErrorException,
     );
   });

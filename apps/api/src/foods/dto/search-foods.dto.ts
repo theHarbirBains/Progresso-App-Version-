@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsInt, IsString, Max, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 
 const MAX_PAGE_SIZE = 30;
 
@@ -19,4 +19,12 @@ export class SearchFoodsDto {
   @Min(1)
   @Max(MAX_PAGE_SIZE)
   pageSize: number = MAX_PAGE_SIZE;
+
+  /** "0" skips Open Food Facts' branded products, for the app's quick first answer. Default: included. */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === '0' || value === 'false' ? false : value === '1' || value === 'true' ? true : value,
+  )
+  @IsBoolean()
+  branded?: boolean;
 }

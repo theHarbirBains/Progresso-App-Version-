@@ -16,6 +16,7 @@ export function escapeLike(value: string): string {
 /**
  * The Progresso catalog: built-in foods (created_by is null), seeded and cached. Matched word
  * by word, so "baked potato" finds "Potato (baked)". Its values are per serving as recorded.
+ * USDA reference foods cached by Search Food are left to the USDA source.
  */
 export class CatalogNutritionSource implements NutritionSource {
   readonly kind = 'progresso_catalog' as const;
@@ -32,7 +33,7 @@ export class CatalogNutritionSource implements NutritionSource {
       .getClient()
       .from('foods')
       .select(
-        'id, name, brand, barcode, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g',
+        'id, name, brand, barcode, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, provider',
       )
       .is('created_by', null)
       .eq('is_active', true)
@@ -44,29 +45,34 @@ export class CatalogNutritionSource implements NutritionSource {
     if (error) throw new Error(`Catalog search failed: ${error.message}`);
 
     const retrievedAt = new Date().toISOString();
-    return (data ?? [])
-      .filter((row) => row.protein_g !== null && row.carbs_g !== null && row.fat_g !== null)
-      .map((row) => ({
-        sourceKind: 'progresso_catalog' as const,
-        sourceId: String(row.id),
-        matchedName: String(row.name),
-        brand: (row.brand as string | null) ?? null,
-        barcode: (row.barcode as string | null) ?? null,
-        basis: {
-          kind: 'per_serving' as const,
-          size: Number(row.serving_size),
-          unit: String(row.serving_unit),
-          nutrients: {
-            calories: Number(row.calories),
-            proteinG: Number(row.protein_g),
-            carbsG: Number(row.carbs_g),
-            fatG: Number(row.fat_g),
+    return (
+      (data ?? [])
+        .filter((row) => row.protein_g !== null && row.carbs_g !== null && row.fat_g !== null)
+        // A USDA reference food Search Food cached is USDA's, not the catalog's: the USDA source
+        // finds it with its own provenance and household measures.
+        .filter((row) => row.provider !== 'usda_fdc')
+        .map((row) => ({
+          sourceKind: 'progresso_catalog' as const,
+          sourceId: String(row.id),
+          matchedName: String(row.name),
+          brand: (row.brand as string | null) ?? null,
+          barcode: (row.barcode as string | null) ?? null,
+          basis: {
+            kind: 'per_serving' as const,
+            size: Number(row.serving_size),
+            unit: String(row.serving_unit),
+            nutrients: {
+              calories: Number(row.calories),
+              proteinG: Number(row.protein_g),
+              carbsG: Number(row.carbs_g),
+              fatG: Number(row.fat_g),
+            },
           },
-        },
-        measures: [],
-        dataVersion: 'progresso-catalog',
-        retrievedAt,
-      }));
+          measures: [],
+          dataVersion: 'progresso-catalog',
+          retrievedAt,
+        }))
+    );
   }
 
   // The catalog's own provenance is captured on each result (see the resolver's catalog

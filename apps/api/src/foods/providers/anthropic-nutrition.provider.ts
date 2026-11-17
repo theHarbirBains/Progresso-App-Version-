@@ -22,6 +22,10 @@ const MAX_TOKENS = 1024;
 
 /** The one message a user sees when AI food search can't complete. */
 const AI_FAILURE_MESSAGE = 'AI food search failed. Please try again.';
+// When the API refuses the key itself, trying again can't help: say what still works instead.
+export const AI_UNAVAILABLE_MESSAGE =
+  "AI Food Search isn't available right now. Search Food and Scan Barcode still work.";
+const AI_BUSY_MESSAGE = 'AI Food Search is busy right now. Please try again in a minute.';
 
 const PARSE_TOOL_NAME = 'food_parse';
 const ESTIMATE_TOOL_NAME = 'nutrition_estimate';
@@ -365,7 +369,8 @@ export class AnthropicNutritionProvider {
   ): Promise<unknown> {
     const apiKey = this.configService.get('ANTHROPIC_API_KEY', { infer: true });
     if (!apiKey) {
-      throw new ServiceUnavailableException('AI food search is not configured');
+      this.logger.error('AI food search is not configured: ANTHROPIC_API_KEY is not set');
+      throw new ServiceUnavailableException(AI_UNAVAILABLE_MESSAGE);
     }
 
     const startedAt = Date.now();
@@ -420,8 +425,15 @@ export class AnthropicNutritionProvider {
 
     if (!response.ok) {
       if (response.status >= 500) throw new TransientError(`request failed: ${response.status}`);
+      if (response.status === 401 || response.status === 403) {
+        // The key is missing its permission or isn't a valid Console API key (sk-ant-api03-...).
+        this.logger.error(
+          `Anthropic refused the API key (${response.status}): check ANTHROPIC_API_KEY on the server`,
+        );
+        throw new ServiceUnavailableException(AI_UNAVAILABLE_MESSAGE);
+      }
       this.logger.warn(`Anthropic request failed: ${response.status}`);
-      throw new BadGatewayException(AI_FAILURE_MESSAGE);
+      throw new BadGatewayException(response.status === 429 ? AI_BUSY_MESSAGE : AI_FAILURE_MESSAGE);
     }
     return response;
   }

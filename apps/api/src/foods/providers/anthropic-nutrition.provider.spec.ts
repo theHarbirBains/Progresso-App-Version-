@@ -1,7 +1,7 @@
 import { BadGatewayException, ServiceUnavailableException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { EnvironmentVariables } from '../../config/env.validation';
-import { AnthropicNutritionProvider } from './anthropic-nutrition.provider';
+import { AI_UNAVAILABLE_MESSAGE, AnthropicNutritionProvider } from './anthropic-nutrition.provider';
 
 function mockConfigService(apiKey: string) {
   return {
@@ -145,6 +145,26 @@ describe('AnthropicNutritionProvider', () => {
 
     await expect(provider.estimate('anything')).rejects.toBeInstanceOf(BadGatewayException);
     expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('says AI Food Search is unavailable, without retrying, when the API refuses the key', async () => {
+    for (const status of [401, 403]) {
+      (global.fetch as jest.Mock).mockReset();
+      (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status });
+      const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));
+
+      const failure = provider.estimate('anything');
+      await expect(failure).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expect(failure).rejects.toThrow(AI_UNAVAILABLE_MESSAGE);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('says AI Food Search is busy when the API is rate limiting', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 429 });
+    const provider = new AnthropicNutritionProvider(mockConfigService('test-key'));
+
+    await expect(provider.estimate('anything')).rejects.toThrow(/busy/);
   });
 
   it('does not retry a non-5xx failure (e.g. a 400)', async () => {

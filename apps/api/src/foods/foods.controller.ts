@@ -25,7 +25,7 @@ export class FoodsController {
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Get('search')
   async search(@Query() dto: SearchFoodsDto) {
-    return this.foodsService.search(dto.query, dto.page, dto.pageSize);
+    return this.foodsService.search(dto.query, dto.page, dto.pageSize, { branded: dto.branded });
   }
 
   // Scan Barcode's lookup step. Returns `null` (200 OK) rather than a 404
