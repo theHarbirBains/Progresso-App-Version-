@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
-import { listFollowNotifications, respondToFollowRequest } from '../lib/api';
+import { listFollowNotifications, respondToFollowRequest, sendFollowRequest } from '../lib/api';
 import { fetchNutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
@@ -15,6 +15,7 @@ jest.mock('../auth/AuthProvider', () => ({
 jest.mock('../lib/api', () => ({
   listFollowNotifications: jest.fn(),
   respondToFollowRequest: jest.fn(),
+  sendFollowRequest: jest.fn(),
 }));
 
 jest.mock('../profile/profileQueries', () => ({
@@ -83,6 +84,7 @@ const janeRequest = {
   followId: 'follow-1',
   at: '2026-01-01T00:00:00Z',
   user: { id: 'user-2', username: 'jane', displayName: 'Jane Doe', avatarUrl: null },
+  followingBack: 'none' as const,
 };
 
 const bobAccepted = {
@@ -222,18 +224,36 @@ describe('NotificationsScreen -- activity', () => {
     expect(screen.queryByTestId('notifications-activity-request-follow-2-accept')).toBeNull();
   });
 
-  it('accepting removes the item and calls the backend with "accept"', async () => {
+  it('accepting keeps the item as a new follower, to follow back right there', async () => {
     mockListFollowNotifications.mockResolvedValue([janeRequest]);
+    jest.mocked(sendFollowRequest).mockResolvedValue({ status: 'pending' });
     renderScreen();
     await screen.findByTestId('notifications-activity-request-follow-1');
 
     fireEvent.press(screen.getByTestId('notifications-activity-request-follow-1-accept'));
 
     expect(mockRespondToFollowRequest).toHaveBeenCalledWith('token-123', 'follow-1', 'accept');
-    await act(async () => {
-      await Promise.resolve();
-    });
+    const follower = await screen.findByTestId('notifications-activity-follower-follow-1');
+    expect(follower).toHaveTextContent(/Jane Doe started following you/);
     expect(screen.queryByTestId('notifications-activity-request-follow-1')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('notifications-activity-follower-follow-1-follow-back'));
+
+    expect(sendFollowRequest).toHaveBeenCalledWith('token-123', 'user-2');
+    expect(
+      await screen.findByTestId('notifications-activity-follower-follow-1-requested'),
+    ).toHaveTextContent('Requested');
+  });
+
+  it('a new follower you already follow has no Follow Back', async () => {
+    mockListFollowNotifications.mockResolvedValue([
+      { ...janeRequest, kind: 'follower', followingBack: 'accepted' },
+    ]);
+    renderScreen();
+
+    await screen.findByTestId('notifications-activity-follower-follow-1');
+    expect(screen.queryByTestId('notifications-activity-follower-follow-1-follow-back')).toBeNull();
+    expect(screen.queryByTestId('notifications-activity-follower-follow-1-requested')).toBeNull();
   });
 
   it('rejecting removes the item and calls the backend with "reject"', async () => {

@@ -1,4 +1,6 @@
-import * as Contacts from 'expo-contacts';
+// expo-contacts' class-based API: since SDK 58 the old functions (getContactsAsync and the
+// rest) imported from 'expo-contacts' only throw.
+import { Contact, ContactField, getPermissionsAsync, requestPermissionsAsync } from 'expo-contacts';
 import * as Crypto from 'expo-crypto';
 import type { CountryCode } from 'libphonenumber-js';
 import { toE164 } from '../lib/phoneNumbers';
@@ -9,6 +11,8 @@ export type ContactsAccess = 'granted' | 'denied' | 'undetermined';
 /** What the contacts came to: each email and phone number in them, hashed. */
 export interface ContactHashes {
   access: ContactsAccess;
+  /** iPhone let Progresso see only the contacts picked (iOS 18's "Select Contacts"), not all. */
+  limited: boolean;
   emailHashes: string[];
   phoneHashes: string[];
 }
@@ -23,7 +27,7 @@ export function normalizeEmail(email: string): string {
 
 /** Whether Progresso may read the contacts -- without asking. */
 export async function contactsAccess(): Promise<ContactsAccess> {
-  const { status } = await Contacts.getPermissionsAsync();
+  const { status } = await getPermissionsAsync();
   return status === 'granted' ? 'granted' : status === 'denied' ? 'denied' : 'undetermined';
 }
 
@@ -47,28 +51,29 @@ export async function contactHashes(
   country: CountryCode | undefined,
   { ask }: { ask: boolean },
 ): Promise<ContactHashes> {
-  const status = ask ? (await Contacts.requestPermissionsAsync()).status : await contactsAccess();
+  const { status, accessPrivileges } = ask
+    ? await requestPermissionsAsync()
+    : await getPermissionsAsync();
   if (status !== 'granted') {
     return {
       access: status === 'denied' ? 'denied' : 'undetermined',
+      limited: false,
       emailHashes: [],
       phoneHashes: [],
     };
   }
-  const { data } = await Contacts.getContactsAsync({
-    fields: [Contacts.Fields.Emails, Contacts.Fields.PhoneNumbers],
-  });
+  const contacts = await Contact.getAllDetails([ContactField.EMAILS, ContactField.PHONES]);
   const emails = new Set<string>();
   const phones = new Set<string>();
-  for (const contact of data) {
+  for (const contact of contacts) {
     for (const entry of contact.emails ?? []) {
-      if (entry.email && entry.email.includes('@')) emails.add(normalizeEmail(entry.email));
+      if (entry.address && entry.address.includes('@')) emails.add(normalizeEmail(entry.address));
     }
-    for (const entry of contact.phoneNumbers ?? []) {
+    for (const entry of contact.phones ?? []) {
       const e164 = toE164(entry.number ?? '', country);
       if (e164) phones.add(e164);
     }
   }
   const [emailHashes, phoneHashes] = await Promise.all([sha256(emails), sha256(phones)]);
-  return { access: 'granted', emailHashes, phoneHashes };
+  return { access: 'granted', limited: accessPrivileges === 'limited', emailHashes, phoneHashes };
 }

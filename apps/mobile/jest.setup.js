@@ -274,10 +274,25 @@ jest.mock('@kingstinct/react-native-healthkit', () => ({
 }));
 
 // The phone's contacts (Find People > Suggested): none, and not asked about yet, unless a test
-// says otherwise.
-jest.mock('expo-contacts', () => ({
-  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'undetermined' }),
-  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
-  getContactsAsync: jest.fn().mockResolvedValue({ data: [] }),
-  Fields: { Emails: 'emails', PhoneNumbers: 'phoneNumbers' },
-}));
+// says otherwise. As in the real package since SDK 58, the old functions imported from
+// 'expo-contacts' only throw -- so a test fails on one, not just the phone (builds up to 43
+// shipped getContactsAsync, and finding friends from contacts never worked).
+jest.mock('expo-contacts', () => {
+  const removed = (name) =>
+    jest.fn(async () => {
+      throw new Error(`expo-contacts' ${name} only throws since SDK 58 -- use the Contact class`);
+    });
+  return {
+    getPermissionsAsync: jest
+      .fn()
+      .mockResolvedValue({ status: 'undetermined', accessPrivileges: 'none' }),
+    requestPermissionsAsync: jest
+      .fn()
+      .mockResolvedValue({ status: 'granted', accessPrivileges: 'all' }),
+    Contact: { getAllDetails: jest.fn().mockResolvedValue([]) },
+    ContactField: { EMAILS: 'emails', PHONES: 'phones' },
+    getContactsAsync: removed('getContactsAsync'),
+    getPagedContactsAsync: removed('getPagedContactsAsync'),
+    presentAccessPickerAsync: removed('presentAccessPickerAsync'),
+  };
+});

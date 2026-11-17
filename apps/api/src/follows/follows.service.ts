@@ -31,8 +31,23 @@ export interface FollowSearchResult {
 }
 
 export type FollowNotification =
-  | { kind: 'request'; followId: string; user: FollowUserSummary; at: string }
+  | {
+      kind: 'request';
+      followId: string;
+      user: FollowUserSummary;
+      at: string;
+      /** Whether this user follows the requester already -- for Follow Back once accepted. */
+      followingBack: FollowStatus;
+    }
   | { kind: 'accepted'; followId: string; user: FollowUserSummary; at: string }
+  | {
+      /** Someone whose request this user accepted: "started following you", with Follow Back. */
+      kind: 'follower';
+      followId: string;
+      user: FollowUserSummary;
+      at: string;
+      followingBack: FollowStatus;
+    }
   | {
       kind: 'like';
       /** One per person per workout. */
@@ -221,18 +236,28 @@ export class FollowsService {
 
   /**
    * Everything the notifications bell shows: incoming requests still
-   * awaiting a response, plus requests this user sent that were accepted
-   * within the last `RECENTLY_ACCEPTED_WINDOW_DAYS` days, merged and sorted
-   * newest first. Muscle-group staleness (the bell's other section) is
+   * awaiting a response, the requests this user accepted (each a new
+   * follower, with whether they follow back), plus requests this user sent
+   * that were accepted -- both within the last `RECENTLY_ACCEPTED_WINDOW_DAYS`
+   * days -- merged and sorted newest first. New followers only when asked
+   * for (`followers`): an app that can't show them would show them wrong. Muscle-group staleness (the bell's other section) is
    * computed entirely client-side from the user's own workout history --
    * see apps/mobile/src/notifications -- since that's a same-user read with
    * no cross-user trust concern, unlike everything here.
    */
-  async listNotifications(userId: string): Promise<FollowNotification[]> {
-    const [pending, accepted, activity] = await Promise.all([
+  async listNotifications(
+    userId: string,
+    { followers: withFollowers = false }: { followers?: boolean } = {},
+  ): Promise<FollowNotification[]> {
+    const [pending, accepted, activity, followers] = await Promise.all([
       this.listPendingRequests(userId),
       this.listRecentlyAccepted(userId),
       this.listRecentActivity(userId),
+      withFollowers ? this.listRecentFollowers(userId) : Promise.resolve([]),
+    ]);
+    const followingBack = await this.followStatusesToward(userId, [
+      ...pending.map((r) => r.user.id),
+      ...followers.map((r) => r.user.id),
     ]);
 
     const items: FollowNotification[] = [
@@ -241,6 +266,14 @@ export class FollowsService {
         followId: r.followId,
         user: r.user,
         at: r.createdAt,
+        followingBack: followingBack.get(r.user.id) ?? 'none',
+      })),
+      ...followers.map((r) => ({
+        kind: 'follower' as const,
+        followId: r.followId,
+        user: r.user,
+        at: r.createdAt,
+        followingBack: followingBack.get(r.user.id) ?? 'none',
       })),
       ...accepted.map((r) => ({
         kind: 'accepted' as const,
@@ -353,6 +386,55 @@ export class FollowsService {
             body: `${name} accepted your follow request.`,
             path: `people/${fromId}`,
           },
+    );
+  }
+
+  /** The people whose requests this user accepted recently -- their newest followers. */
+  private async listRecentFollowers(userId: string): Promise<FollowRequestSummary[]> {
+    const client = this.supabaseService.getClient();
+    const since = new Date(
+      Date.now() - RECENTLY_ACCEPTED_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const { data: rows, error } = await client
+      .from('follows')
+      .select('id, follower_id, responded_at')
+      .eq('followee_id', userId)
+      .eq('status', 'accepted')
+      .gte('responded_at', since)
+      .order('responded_at', { ascending: false });
+    if (error) throw new InternalServerErrorException('Failed to load your new followers');
+    if (!rows || rows.length === 0) return [];
+
+    const users = await this.fetchUserSummaries(
+      client,
+      rows.map((r) => r.follower_id as string),
+    );
+    return rows.map((r) => ({
+      followId: r.id as string,
+      createdAt: r.responded_at as string,
+      user: users.get(r.follower_id as string) ?? unknownUser(r.follower_id as string),
+    }));
+  }
+
+  /** How this user follows each of these people: pending or accepted (absent is none). */
+  private async followStatusesToward(
+    userId: string,
+    ids: string[],
+  ): Promise<Map<string, FollowStatus>> {
+    if (ids.length === 0) return new Map();
+    const { data: rows, error } = await this.supabaseService
+      .getClient()
+      .from('follows')
+      .select('followee_id, status')
+      .eq('follower_id', userId)
+      .in('followee_id', Array.from(new Set(ids)));
+    if (error) throw new InternalServerErrorException('Failed to load who you follow');
+    return new Map(
+      ((rows ?? []) as { followee_id: string; status: FollowStatus }[]).map((r) => [
+        r.followee_id,
+        r.status,
+      ]),
     );
   }
 

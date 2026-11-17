@@ -37,12 +37,20 @@ export function listFollowing(accessToken: string): Promise<FollowUser[]> {
   return request<FollowUser[]>('/api/v1/follows/following', accessToken);
 }
 
-// The notifications bell's Activity section: pending requests plus follows
-// you sent that were accepted recently, merged and sorted server-side (see
-// FollowsService.listNotifications) -- distinct from listFollowRequests,
+// The notifications bell's Activity section: pending requests, the ones you
+// accepted recently (new followers, with whether you follow them back), and
+// follows you sent that were accepted recently, merged and sorted server-side
+// (see FollowsService.listNotifications) -- distinct from listFollowRequests,
 // which stays the full management list for Find People's Requests tab.
 export type FollowNotification =
-  | { kind: 'request'; followId: string; user: FollowUser; at: string }
+  | { kind: 'request'; followId: string; user: FollowUser; at: string; followingBack: FollowStatus }
+  | {
+      kind: 'follower';
+      followId: string;
+      user: FollowUser;
+      at: string;
+      followingBack: FollowStatus;
+    }
   | { kind: 'accepted'; followId: string; user: FollowUser; at: string }
   | {
       kind: 'like';
@@ -63,7 +71,8 @@ export type FollowNotification =
     };
 
 export function listFollowNotifications(accessToken: string): Promise<FollowNotification[]> {
-  return request<FollowNotification[]>('/api/v1/follows/notifications', accessToken);
+  // `followers=1`: this app shows the requests you accepted, as new followers.
+  return request<FollowNotification[]>('/api/v1/follows/notifications?followers=1', accessToken);
 }
 
 export function sendFollowRequest(

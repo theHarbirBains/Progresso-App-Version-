@@ -15,6 +15,7 @@ import { colors } from '../design/theme';
 import {
   listFollowNotifications,
   respondToFollowRequest,
+  sendFollowRequest,
   type FollowNotification,
   type FollowUser,
 } from '../lib/api';
@@ -38,7 +39,7 @@ function displayName(user: FollowUser): string {
 
 /** One activity row's own key: the follow it's about, or the like or comment. */
 function activityKey(item: FollowNotification): string {
-  return item.kind === 'request' || item.kind === 'accepted' ? item.followId : item.id;
+  return item.kind === 'like' || item.kind === 'comment' ? item.id : item.followId;
 }
 
 /** What happened, in a line. */
@@ -47,6 +48,8 @@ function activityTitle(item: FollowNotification): string {
   switch (item.kind) {
     case 'request':
       return `${who} wants to follow you`;
+    case 'follower':
+      return `${who} started following you`;
     case 'accepted':
       return `${who} accepted your follow request`;
     case 'like':
@@ -67,10 +70,12 @@ function activityTitle(item: FollowNotification): string {
  * useProgressTheme -- the same source WorkoutSplitsScreen reads) and no
  * nutrition goals saved yet (fetchNutritionGoals returning a null calories
  * field, i.e. no row) -- each tapping straight into the screen that fixes
- * it. "Activity" is the follows backend's merged pending-requests +
- * recently-accepted feed (see FollowsService.listNotifications) -- the
- * quick/recent view; Find People's Requests tab is the full management
- * list, same underlying data.
+ * it. "Activity" is the follows backend's merged feed (see
+ * FollowsService.listNotifications): pending requests, requests you
+ * accepted -- each stays as "started following you", with Follow Back until
+ * you do -- your own requests accepted, and likes and comments. It's the
+ * quick/recent view; Find People's Requests tab is the full management list,
+ * same underlying data.
  *
  * Each item is its own full AppCard (Feed's own activity-card anatomy --
  * icon/avatar + title + subtitle, an accent band on top) rather than
@@ -142,9 +147,42 @@ export function NotificationsScreen({ navigation }: Props) {
     setPending((p) => ({ ...p, [followId]: true }));
     try {
       await respondToFollowRequest(accessToken, followId, 'accept');
-      setActivity((prev) => prev.filter((item) => activityKey(item) !== followId));
+      // The request stays, now a new follower -- to follow back from right here.
+      setActivity((prev) =>
+        prev.map((item) =>
+          item.kind === 'request' && item.followId === followId
+            ? {
+                kind: 'follower',
+                followId,
+                user: item.user,
+                at: new Date().toISOString(),
+                followingBack: item.followingBack,
+              }
+            : item,
+        ),
+      );
     } catch (err) {
       setActivityError(err instanceof Error ? err.message : 'Failed to accept request');
+    } finally {
+      setPending((p) => ({ ...p, [followId]: false }));
+    }
+  }
+
+  async function handleFollowBack(followId: string, followerId: string) {
+    if (!accessToken) return;
+    setPending((p) => ({ ...p, [followId]: true }));
+    try {
+      const { status } = await sendFollowRequest(accessToken, followerId);
+      setActivity((prev) =>
+        prev.map((item) =>
+          item.kind === 'follower' && item.followId === followId
+            ? { ...item, followingBack: status }
+            : item,
+        ),
+      );
+    } catch (err) {
+      setActivityError(err instanceof Error ? err.message : 'Failed to follow back');
+    } finally {
       setPending((p) => ({ ...p, [followId]: false }));
     }
   }
@@ -335,6 +373,24 @@ export function NotificationsScreen({ navigation }: Props) {
                             onPress={() => handleAccept(key)}
                           />
                         </View>
+                      </View>
+                    ) : item.kind === 'follower' && item.followingBack !== 'accepted' ? (
+                      <View style={styles.itemActionWrap}>
+                        {item.followingBack === 'pending' ? (
+                          <SecondaryButton
+                            testID={`notifications-activity-follower-${key}-requested`}
+                            label="Requested"
+                            disabled
+                            onPress={() => {}}
+                          />
+                        ) : (
+                          <PrimaryButton
+                            testID={`notifications-activity-follower-${key}-follow-back`}
+                            label="Follow Back"
+                            loading={isPending}
+                            onPress={() => handleFollowBack(key, item.user.id)}
+                          />
+                        )}
                       </View>
                     ) : null}
                   </AppCard>

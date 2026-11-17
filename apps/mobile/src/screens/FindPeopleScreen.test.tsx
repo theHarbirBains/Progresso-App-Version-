@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Share } from 'react-native';
+import { Linking, Share } from 'react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import {
@@ -328,30 +328,56 @@ describe('FindPeopleScreen -- Your Friends and Suggested (shown when search is e
     expect(await screen.findByTestId('find-people-friend-user-2')).toBeTruthy();
   });
 
-  it('suggests the people in your contacts you do not follow yet, read without asking once allowed', async () => {
+  it('lists everyone in your contacts on Progresso -- those to follow first -- read without asking once allowed', async () => {
     const { matchContacts } = jest.requireMock('../lib/api') as { matchContacts: jest.Mock };
     mockContactHashes.mockResolvedValue({
       access: 'granted',
+      limited: false,
       emailHashes: ['a'.repeat(64)],
       phoneHashes: ['b'.repeat(64)],
     });
-    matchContacts.mockResolvedValue([{ ...bobResult }, sam]);
+    matchContacts.mockResolvedValue([sam, { ...bobResult }]);
     renderScreen();
     await screen.findByTestId('find-people-friends-empty');
 
     fireEvent.press(screen.getByTestId('find-people-subtab-suggested'));
 
     expect(await screen.findByTestId('contact-suggestions-found')).toHaveTextContent(
-      /1 contact on Progresso/,
+      /2 contacts on Progresso.*Bob Smith.*Sam Lee/,
     );
     // Their own country reads a number without its code; nothing asked.
     expect(mockContactHashes).toHaveBeenCalledWith('CA', { ask: false });
     expect(matchContacts).toHaveBeenCalledWith('token-123', ['a'.repeat(64)], ['b'.repeat(64)]);
-    // Sam, whom you already follow, isn't a suggestion.
-    expect(screen.queryByTestId('contact-suggestions-person-user-4')).toBeNull();
+    // Sam, whom you already follow, shows as followed; Bob, to follow.
+    expect(screen.getByTestId('contact-suggestions-person-user-4-following')).toBeTruthy();
     expect(screen.getByTestId('contact-suggestions-person-user-3-follow')).toBeTruthy();
+    expect(screen.queryByTestId('contact-suggestions-limited')).toBeNull();
     fireEvent.press(screen.getByTestId('contact-suggestions-person-user-3'));
     expect(mockNavigate).toHaveBeenCalledWith('PersonProfile', { userId: 'user-3' });
+  });
+
+  it('says how to let Progresso see every contact when iPhone shows it only some', async () => {
+    const { matchContacts } = jest.requireMock('../lib/api') as { matchContacts: jest.Mock };
+    mockContactHashes.mockResolvedValue({
+      access: 'granted',
+      limited: true,
+      emailHashes: ['a'.repeat(64)],
+      phoneHashes: [],
+    });
+    matchContacts.mockResolvedValue([{ ...bobResult }]);
+    const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
+    renderScreen();
+    await screen.findByTestId('find-people-friends-empty');
+
+    fireEvent.press(screen.getByTestId('find-people-subtab-suggested'));
+
+    expect(await screen.findByTestId('contact-suggestions-limited')).toHaveTextContent(
+      /only see the contacts you picked.*Full Access/,
+    );
+    expect(screen.getByTestId('contact-suggestions-found')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('contact-suggestions-limited-settings'));
+    expect(openSettings).toHaveBeenCalled();
+    openSettings.mockRestore();
   });
 
   it('asks before reading the contacts the first time', async () => {
@@ -360,9 +386,14 @@ describe('FindPeopleScreen -- Your Friends and Suggested (shown when search is e
     fireEvent.press(screen.getByTestId('find-people-subtab-suggested'));
 
     expect(await screen.findByTestId('contact-suggestions-ask')).toHaveTextContent(
-      /nothing is kept/,
+      /Allow Progresso to see your contacts.*Nothing from your contacts is kept.*Allow Contacts/,
     );
-    mockContactHashes.mockResolvedValue({ access: 'granted', emailHashes: [], phoneHashes: [] });
+    mockContactHashes.mockResolvedValue({
+      access: 'granted',
+      limited: false,
+      emailHashes: [],
+      phoneHashes: [],
+    });
     fireEvent.press(screen.getByTestId('contact-suggestions-find'));
 
     expect(await screen.findByTestId('contact-suggestions-none')).toBeTruthy();
@@ -370,7 +401,12 @@ describe('FindPeopleScreen -- Your Friends and Suggested (shown when search is e
   });
 
   it('says how to allow contacts when Progresso may not see them', async () => {
-    mockContactHashes.mockResolvedValue({ access: 'denied', emailHashes: [], phoneHashes: [] });
+    mockContactHashes.mockResolvedValue({
+      access: 'denied',
+      limited: false,
+      emailHashes: [],
+      phoneHashes: [],
+    });
     renderScreen();
     await screen.findByTestId('find-people-friends-empty');
 

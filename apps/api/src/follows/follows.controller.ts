@@ -38,10 +38,16 @@ export class FollowsController {
   // Pending requests + recently-accepted requests merged -- the bell's
   // Activity section. `requests` above stays the full management list
   // (Find People's Requests tab); this is the quick/recent view.
+  // `?followers=1` adds the requests you accepted (new followers, with
+  // Follow Back) -- only for app versions that know how to show them: build
+  // 43 and before would show one as "commented on undefined".
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)
   @Get('notifications')
-  async notifications(@CurrentUser() user: AuthenticatedUser) {
-    return this.followsService.listNotifications(user.id);
+  async notifications(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('followers') followers?: string,
+  ) {
+    return this.followsService.listNotifications(user.id, { followers: followers === '1' });
   }
 
   @Roles(Role.USER, Role.SUPPORT_ADMIN, Role.FULL_ADMIN)

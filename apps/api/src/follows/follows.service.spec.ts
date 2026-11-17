@@ -354,6 +354,9 @@ describe('FollowsService', () => {
         data: [{ id: 'follow-2', followee_id: 'user-3', responded_at: '2026-01-05T00:00:00Z' }],
         error: null,
       });
+      // No new followers; and Jane, who asked, isn't followed back.
+      client.queue('follows', { data: [], error: null });
+      client.queue('follows', { data: [], error: null });
       client.queue('users', {
         data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
         error: null,
@@ -366,7 +369,7 @@ describe('FollowsService', () => {
       client.queue('workouts', { data: [], error: null });
       const service = serviceWith(client);
 
-      const result = await service.listNotifications('user-1');
+      const result = await service.listNotifications('user-1', { followers: true });
 
       expect(result).toEqual([
         {
@@ -380,11 +383,69 @@ describe('FollowsService', () => {
           followId: 'follow-1',
           at: '2026-01-01T00:00:00Z',
           user: { id: 'user-2', username: 'jane', displayName: 'Jane', avatarUrl: null },
+          followingBack: 'none',
         },
       ]);
     });
 
-    it('returns an empty list when there is nothing pending or recently accepted', async () => {
+    it('keeps a request you accepted as a new follower, saying whether you follow back', async () => {
+      const client = createMockClient();
+      // Jane is still asking -- and you already follow her; Bob and Ana you accepted.
+      client.queue('follows', {
+        data: [{ id: 'follow-1', follower_id: 'user-2', created_at: '2026-01-01T00:00:00Z' }],
+        error: null,
+      });
+      client.queue('follows', { data: [], error: null });
+      client.queue('follows', {
+        data: [
+          { id: 'follow-3', follower_id: 'user-3', responded_at: '2026-01-06T00:00:00Z' },
+          { id: 'follow-4', follower_id: 'user-4', responded_at: '2026-01-04T00:00:00Z' },
+        ],
+        error: null,
+      });
+      client.queue('follows', {
+        data: [
+          { followee_id: 'user-2', status: 'accepted' },
+          { followee_id: 'user-4', status: 'pending' },
+        ],
+        error: null,
+      });
+      client.queue('users', {
+        data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
+        error: null,
+      });
+      client.queue('users', {
+        data: [
+          { id: 'user-3', username: 'bob', display_name: 'Bob', avatar_url: null },
+          { id: 'user-4', username: 'ana', display_name: 'Ana', avatar_url: null },
+        ],
+        error: null,
+      });
+      client.queue('workouts', { data: [], error: null });
+      const service = serviceWith(client);
+
+      const result = await service.listNotifications('user-1', { followers: true });
+
+      expect(
+        result.map((item) => [
+          item.kind,
+          item.user.id,
+          'followingBack' in item ? item.followingBack : null,
+        ]),
+      ).toEqual([
+        ['follower', 'user-3', 'none'],
+        ['follower', 'user-4', 'pending'],
+        ['request', 'user-2', 'accepted'],
+      ]);
+      // Your new followers are the ones who follow you -- read by followee.
+      expect(client.calls).toContainEqual({
+        table: 'follows',
+        method: 'select',
+        args: ['id, follower_id, responded_at'],
+      });
+    });
+
+    it("leaves new followers out for an app that doesn't ask for them", async () => {
       const client = createMockClient();
       client.queue('follows', { data: [], error: null });
       client.queue('follows', { data: [], error: null });
@@ -392,10 +453,27 @@ describe('FollowsService', () => {
       const service = serviceWith(client);
 
       await expect(service.listNotifications('user-1')).resolves.toEqual([]);
+      expect(client.calls).not.toContainEqual({
+        table: 'follows',
+        method: 'select',
+        args: ['id, follower_id, responded_at'],
+      });
+    });
+
+    it('returns an empty list when there is nothing pending or recently accepted', async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [], error: null });
+      client.queue('follows', { data: [], error: null });
+      client.queue('follows', { data: [], error: null });
+      client.queue('workouts', { data: [], error: null });
+      const service = serviceWith(client);
+
+      await expect(service.listNotifications('user-1', { followers: true })).resolves.toEqual([]);
     });
 
     it("adds others' likes and comments on your workouts -- nothing from someone blocked", async () => {
       const client = createMockClient();
+      client.queue('follows', { data: [], error: null });
       client.queue('follows', { data: [], error: null });
       client.queue('follows', { data: [], error: null });
       client.queue('workouts', { data: [{ id: 'w1', name: 'Push Day' }], error: null });
@@ -431,7 +509,7 @@ describe('FollowsService', () => {
       });
       const service = serviceWith(client);
 
-      const result = await service.listNotifications('user-1');
+      const result = await service.listNotifications('user-1', { followers: true });
 
       expect(result).toEqual([
         expect.objectContaining({
