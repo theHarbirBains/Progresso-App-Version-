@@ -36,7 +36,7 @@ export default [
     measure: 'bodyweight',
     highlight: { primary: ['lats'], secondary: ['biceps', 'upperBack', 'rearDelts', 'forearms'] },
     pattern: 'vertical_pull',
-    aliases: ['pullup', 'chin-up'],
+    aliases: ['pullup', 'overhand pull up'],
     summary: 'Hanging from a bar and pulling the chin over it, the best bodyweight back builder.',
     setup: [
       'Hang from a bar with an overhand grip a little wider than your shoulders.',

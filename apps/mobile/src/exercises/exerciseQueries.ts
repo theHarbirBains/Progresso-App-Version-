@@ -2,13 +2,13 @@ import type { ExerciseResponse, SharedExerciseResponse, ShareSource } from '../l
 import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
 import { MACHINE_COLUMNS, machineDetailsOf, type MachineDetails } from './machineDetails';
-import type { Equipment } from './equipment';
+import { EQUIPMENT_LABELS, type Equipment } from './equipment';
 import { loadBuiltinExtras } from './builtinExtras';
 // Plugs the built-in guides' Supabase reads into builtinExtras.ts.
 import './exerciseGuide';
 import type { LoadType, Pulley, PulleyPosition } from './machineLoad';
 import type { LoggingStyle, MeasurementType, MovementType } from './movementTypes';
-import type { MuscleGroup } from './muscleGroups';
+import { MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
 
 // Reads go directly to Supabase (anon key + RLS), never through the
 // backend -- the existing exercises_select RLS policy already restricts
@@ -297,22 +297,34 @@ const SHORTHAND: Record<string, string> = {
   bb: 'barbell',
   kb: 'kettlebell',
   ez: 'ez',
+  sm: 'smith',
 };
 
 /**
  * Whether an exercise matches what's typed: the text anywhere in its name (as always), or every
- * word typed starting a word of its name or one of its other names, in any order -- so "dumbbell
- * curl" finds Standing Dumbbell Bicep Curl and "db row" finds Dumbbell Bent-Over Row.
+ * word typed starting a word of its name, one of its other names, its muscle group, its equipment
+ * or what it's held by (its attachment and grip), in any order -- so "dumbbell curl" finds
+ * Standing Dumbbell Bicep Curl, "db row" finds Dumbbell Bent-Over Row, "v handle row" the V-handle
+ * cable rows and "chest cable" every cable chest exercise.
  */
 export function matchesExerciseSearch(
-  row: Pick<ExerciseRow, 'name' | 'searchAliases'>,
+  row: Pick<ExerciseRow, 'name' | 'searchAliases'> &
+    Partial<Pick<ExerciseRow, 'muscleGroup' | 'equipment' | 'attachment' | 'grip'>>,
   search: string,
 ): boolean {
   const query = normalize(search);
   if (!query) return true;
   const names = [row.name, ...(row.searchAliases ?? [])].map(normalize);
   if (names.some((name) => name.includes(query))) return true;
-  const words = new Set(names.join(' ').split(' '));
+  const setup = [
+    row.muscleGroup ? MUSCLE_GROUP_LABELS[row.muscleGroup] : null,
+    row.equipment ? EQUIPMENT_LABELS[row.equipment] : null,
+    row.attachment,
+    row.grip,
+  ]
+    .filter((part): part is string => !!part)
+    .map(normalize);
+  const words = new Set([...names, ...setup].join(' ').split(' '));
   return query.split(' ').every((token) => {
     const wanted = SHORTHAND[token] ?? token;
     for (const word of words) if (word.startsWith(wanted) || word.startsWith(token)) return true;

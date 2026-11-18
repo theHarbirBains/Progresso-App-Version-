@@ -1,8 +1,13 @@
 import { actionLabels } from './actionLabels';
 import { BACK_ART } from './art/back';
+import { CABLE_ART } from './art/cable';
 import { CORE_ART } from './art/core';
+import { EXTRAS_ART } from './art/extras';
+import { KETTLEBELL_ART } from './art/kettlebell';
 import { LEGS_ART } from './art/legs';
 import { LYING_ART } from './art/lying';
+import { MACHINE_ART } from './art/machines';
+import { SMITH_ART } from './art/smith';
 import { UPPER_ART } from './art/upper';
 import { BUILTIN_CATALOG } from './builtinCatalog.generated';
 import type { MuscleGroup } from '../muscleGroups';
@@ -19,6 +24,11 @@ export const EXERCISE_ART: Record<string, SceneSpec> = {
   ...BACK_ART,
   ...LEGS_ART,
   ...CORE_ART,
+  ...CABLE_ART,
+  ...MACHINE_ART,
+  ...SMITH_ART,
+  ...KETTLEBELL_ART,
+  ...EXTRAS_ART,
 };
 
 const drawn = new Map<string, RenderedScene>();
@@ -59,7 +69,8 @@ export function thumbnailFor(slug: string | null | undefined): RenderedScene | n
 /** What each frame of an exercise's illustration is called under it ("Start", "Press"). */
 export function frameLabels(slug: string): string[] {
   if (!hasIllustration(slug)) return [];
-  return actionLabels(slug, BUILTIN_CATALOG[slug].pattern, EXERCISE_ART[slug].frames.length);
+  const entry = BUILTIN_CATALOG[slug];
+  return actionLabels(slug, entry.pattern, EXERCISE_ART[slug].frames.length, entry.action);
 }
 
 export interface MuscleMap {

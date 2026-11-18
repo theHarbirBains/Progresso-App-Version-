@@ -180,10 +180,15 @@ async function main() {
   // Used only by the additional PR edge-case tests below, kept separate from
   // squat/benchPress for the same reason: no cross-contamination between
   // assertions that all read global per-user-per-exercise PR state.
-  const deadlift = (await admin.query("select id from public.exercises where name = 'Conventional Barbell Deadlift'"))
-    .rows[0].id;
+  const deadlift = (
+    await admin.query(
+      "select id from public.exercises where name = 'Conventional Barbell Deadlift'",
+    )
+  ).rows[0].id;
   const overheadPress = (
-    await admin.query("select id from public.exercises where name = 'Standing Barbell Overhead Press'")
+    await admin.query(
+      "select id from public.exercises where name = 'Standing Barbell Overhead Press'",
+    )
   ).rows[0].id;
   const testFood = (
     await admin.query(
@@ -628,7 +633,11 @@ async function main() {
   );
   for (const [column, value, what] of [
     ['equipment', "'treadmill'", 'Equipment is one of the seven kinds -- nothing else'],
-    ['pulley_position', "'medium'", "A pulley's position is high, mid, low, adjustable or other -- nothing else"],
+    [
+      'pulley_position',
+      "'medium'",
+      "A pulley's position is high, mid, low, adjustable or other -- nothing else",
+    ],
     ['grip', `'${'x'.repeat(61)}'`, 'A grip is kept short'],
     ['setup_details', `'${'x'.repeat(301)}'`, 'Setup notes are kept to 300 characters'],
   ]) {
@@ -698,7 +707,7 @@ async function main() {
       "insert into public.exercises (name, muscle_group, created_by, pulley) values ('Pulley Check', 'back', $1, 'medium')",
       [userA],
     ),
-    "The old pulley column, kept for the exercises that have one, is heavier or lighter -- nothing else",
+    'The old pulley column, kept for the exercises that have one, is heavier or lighter -- nothing else',
     /violates check constraint/i,
   );
   await expectThrows(
@@ -6068,22 +6077,38 @@ async function main() {
     );
   }
 
-  // ---- the built-in dumbbell and barbell library (20261128100000) ----
+  // ---- the built-in library (20261128100000, completed by 20261129100000) ----
   {
     const builtins = (
       await admin.query(
         `select id, name, slug, equipment, muscle_group::text as muscle, is_active,
                 secondary_muscle_groups::text[] as secondary, movement_pattern, instructions,
-                setup_steps, execution_steps, common_mistakes, search_aliases
+                setup_steps, execution_steps, common_mistakes, search_aliases,
+                attachment, grip, pulley_position, load_type
          from public.exercises where created_by is null`,
       )
     ).rows;
     const active = builtins.filter((r) => r.is_active);
     const count = (equipment) => active.filter((r) => r.equipment === equipment && r.slug).length;
+    const counts = Object.fromEntries(
+      ['dumbbell', 'barbell', 'cable', 'machine', 'kettlebell', 'bodyweight', 'other'].map((e) => [
+        e,
+        count(e),
+      ]),
+    );
     record(
-      'The library has 97 dumbbell and 88 barbell built-ins, each active',
-      count('dumbbell') === 97 && count('barbell') === 88,
-      JSON.stringify({ dumbbell: count('dumbbell'), barbell: count('barbell') }),
+      'The library has 396 built-ins, each active: 97 dumbbell, 95 barbell, 62 cable, 62 machine, 13 kettlebell, 36 bodyweight, 31 other',
+      JSON.stringify(counts) ===
+        JSON.stringify({
+          dumbbell: 97,
+          barbell: 95,
+          cable: 62,
+          machine: 62,
+          kettlebell: 13,
+          bodyweight: 36,
+          other: 31,
+        }),
+      JSON.stringify(counts),
     );
     const unguided = active.filter(
       (r) =>
@@ -6100,7 +6125,7 @@ async function main() {
       unguided.map((r) => r.name).join(', '),
     );
     record(
-      "No built-in lists its own muscle group among the ones it also works",
+      'No built-in lists its own muscle group among the ones it also works',
       builtins.every((r) => !r.secondary.includes(r.muscle)),
     );
     const renamed = {
@@ -6121,21 +6146,87 @@ async function main() {
       'A renamed built-in keeps its muscle group and sides',
       bulgarian?.muscle === 'quadriceps' &&
         (
-          await admin.query('select movement_type::text, logging_style::text from public.exercises where id = $1', [
-            bulgarian.id,
-          ])
+          await admin.query(
+            'select movement_type::text, logging_style::text from public.exercises where id = $1',
+            [bulgarian.id],
+          )
         ).rows[0].logging_style === 'alternating',
     );
+    // The machine and cable built-ins hidden when the library was free weights only are back, each
+    // its own row still (so everything logged against it), named for its standard setup.
+    const backAgain = {
+      'Lat Pulldown': 'Lat Pulldown — Wide-Grip Straight Bar',
+      'Seated Cable Row': 'Seated Cable Row — Close-Grip V-Handle',
+      'Cable Triceps Pushdown': 'Cable Triceps Pushdown — Straight Bar',
+      'Leg Press': '45-Degree Leg Press',
+      'Cable Kickback': 'Cable Glute Kickback — Ankle Strap',
+      'Leg Extension': 'Leg Extension',
+    };
     record(
-      'The machine and cable built-ins hidden before stay hidden, with no guide',
-      builtins
-        .filter((r) => ['Cable Fly', 'Leg Press', 'Lat Pulldown'].includes(r.name))
-        .every((r) => !r.is_active && !r.slug),
+      'The machine and cable built-ins hidden before are back under their standard setup, the old name a search alias',
+      Object.entries(backAgain).every(([old, now]) => {
+        const row = byName.get(now);
+        return (
+          row?.is_active &&
+          row.slug &&
+          (old === now || (!byName.has(old) && row.search_aliases.includes(old)))
+        );
+      }),
+    );
+    const kickback = byName.get('Cable Glute Kickback — Ankle Strap');
+    record(
+      'A machine or cable built-in that was in use keeps its muscle group, weight and reps, and both sides together',
+      kickback?.muscle === 'glutes' &&
+        (
+          await admin.query(
+            'select measurement_type::text as m, movement_type::text as mv from public.exercises where id = $1',
+            [kickback.id],
+          )
+        ).rows[0].mv === 'bilateral',
+    );
+    const vRow = byName.get('Seated Cable Row — Close-Grip V-Handle');
+    const ropeRow = byName.get('Seated Cable Row — Rope Attachment');
+    record(
+      'Each cable attachment is its own built-in, saying what is clipped on, how it is held and where the pulley is',
+      vRow?.equipment === 'cable' &&
+        vRow.attachment === 'V-handle' &&
+        vRow.pulley_position === 'low' &&
+        ropeRow?.attachment === 'Rope' &&
+        ropeRow.id !== vRow.id &&
+        byName.get('Lat Pulldown — Wide-Grip Straight Bar')?.pulley_position === 'high',
+    );
+    record(
+      'Machines say how they are loaded: a weight stack or plates',
+      byName.get('Machine Chest Press')?.load_type === 'single_stack' &&
+        byName.get('Plate-Loaded Chest Press')?.load_type === 'plate_loaded' &&
+        byName.get('Smith Machine Squat')?.load_type === 'plate_loaded',
+    );
+    record(
+      'No two active built-ins share a name',
+      new Set(active.map((r) => r.name.toLowerCase())).size === active.length,
+    );
+    // Applying the library migration again changes nothing: no row is added, renamed or rewritten.
+    const snapshot = async () =>
+      (
+        await admin.query(
+          `select md5(string_agg(row(id, name, slug, equipment, attachment, grip, pulley_position, load_type,
+                                     search_aliases, is_active)::text, '|' order by id)) as h,
+                  count(*)::int as n
+           from public.exercises where created_by is null`,
+        )
+      ).rows[0];
+    const before = await snapshot();
+    await admin.query(
+      readFileSync(join(migrationsDir, '20261129100000_complete_exercise_library.sql'), 'utf8'),
+    );
+    const after = await snapshot();
+    record(
+      'The library migration can run again without changing anything',
+      before.h === after.h && before.n === after.n,
+      JSON.stringify({ before, after }),
     );
     const guideAsUser = await asUser(userA, (c) =>
-      c.query(
-        "select slug, execution_steps from public.exercises where slug = 'db-bench-press'",
-      ),
+      c.query("select slug, execution_steps from public.exercises where slug = 'db-bench-press'"),
     );
     record(
       "Anyone signed in can read a built-in's guide",
@@ -6155,7 +6246,9 @@ async function main() {
     record("A person's own exercise can never take a slug", slugRefused);
     let patternRefused = false;
     try {
-      await admin.query("update public.exercises set movement_pattern = 'juggling' where slug = 'db-bench-press'");
+      await admin.query(
+        "update public.exercises set movement_pattern = 'juggling' where slug = 'db-bench-press'",
+      );
     } catch (err) {
       patternRefused = /exercises_movement_pattern_known/.test(String(err.message));
     }

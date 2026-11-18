@@ -2,7 +2,8 @@
 // starts, the last what the movement does to get there ("Start", "Press"). Named by the exercise's
 // movement pattern (`exercises.movement_pattern`), and by the exercise itself where its frames go
 // the other way (a deadlift lifts from the floor, a Romanian deadlift hinges down to it) or there
-// are more than two.
+// are more than two -- in the catalogue (`action`, supabase/catalog) or, for the first built-ins,
+// below.
 
 /** What the last position does, by movement pattern. */
 const PATTERN_ACTIONS: Record<string, string> = {
@@ -10,17 +11,25 @@ const PATTERN_ACTIONS: Record<string, string> = {
   calf_raise: 'Raise',
   carry: 'Walk',
   core_flexion: 'Crunch',
+  conditioning: 'Go',
   core_rotation: 'Twist',
   curl: 'Curl',
+  // Every dip is drawn from the top, arms straight, down to the bottom.
+  dip: 'Lower',
   fly: 'Open',
   hinge: 'Hinge',
+  hip_abduction: 'Push Out',
+  hip_adduction: 'Squeeze',
   hip_extension: 'Thrust',
   horizontal_pull: 'Row',
   horizontal_push: 'Press',
+  knee_extension: 'Extend',
+  knee_flexion: 'Curl',
   lateral_flexion: 'Bend',
   lunge: 'Lower',
   pullover: 'Lower',
   raise: 'Raise',
+  shoulder_rotation: 'Rotate',
   shrug: 'Shrug',
   squat: 'Squat',
   // Every lying, seated and overhead extension starts with the arms straight and bends them.
@@ -30,7 +39,7 @@ const PATTERN_ACTIONS: Record<string, string> = {
   wrist: 'Curl',
 };
 
-/** Exercises whose positions aren't the pattern's: the last position's name, or every one's. */
+/** The first built-ins whose positions aren't the pattern's: the last position's name, or every one's. */
 const EXERCISE_LABELS: Record<string, string | readonly string[]> = {
   // Lifted from the floor (or the pins) to standing.
   'bb-deadlift': 'Lift',
@@ -81,12 +90,18 @@ const EXERCISE_LABELS: Record<string, string | readonly string[]> = {
 
 /**
  * What each of an exercise's `count` positions is called. One position is held; with more, the
- * first is the start and the last what the movement does, and any between (an exercise named above
- * always names them) is a step.
+ * first is the start and the last what the movement does -- the catalogue's `action` for it, or
+ * one named above, or its pattern's -- and any between (an exercise with three always names
+ * them) is a step.
  */
-export function actionLabels(slug: string, pattern: string, count: number): string[] {
+export function actionLabels(
+  slug: string,
+  pattern: string,
+  count: number,
+  catalogued?: string | readonly string[],
+): string[] {
   if (count <= 1) return ['Hold'];
-  const own = EXERCISE_LABELS[slug];
+  const own = catalogued ?? EXERCISE_LABELS[slug];
   if (Array.isArray(own) && own.length === count) return [...own];
   const action = typeof own === 'string' ? own : (PATTERN_ACTIONS[pattern] ?? 'Finish');
   return Array.from({ length: count }, (_, i) =>

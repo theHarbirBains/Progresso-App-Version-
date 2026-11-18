@@ -3,6 +3,9 @@
 // writes the migration that puts it in the database, and the app's generated catalogue (each
 // exercise's highlighted muscles, for its illustration). Checks the catalogue first and stops on
 // anything wrong. See README.md.
+//
+// 20261128100000_builtin_exercise_library.sql (the dumbbell and barbell library) is applied to
+// production and is never written again; MIGRATION is the one this writes now.
 import { readFileSync, writeFileSync } from 'node:fs';
 import * as prettier from 'prettier';
 import { dirname, join } from 'node:path';
@@ -10,9 +13,14 @@ import { fileURLToPath } from 'node:url';
 import dumbbell from './dumbbell.mjs';
 import barbell from './barbell.mjs';
 import bodyweight from './bodyweight.mjs';
+import cable from './cable.mjs';
+import machine from './machine.mjs';
+import smith from './smith.mjs';
+import kettlebell from './kettlebell.mjs';
+import accessories from './accessories.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const MIGRATION = join(here, '..', 'migrations', '20261128100000_builtin_exercise_library.sql');
+const MIGRATION = join(here, '..', 'migrations', '20261129100000_complete_exercise_library.sql');
 const APP_FILE = join(
   here,
   '..',
@@ -65,7 +73,16 @@ export const PATTERNS = [
   'lateral_flexion',
   'get_up',
   'hold',
+  'knee_extension',
+  'knee_flexion',
+  'hip_abduction',
+  'hip_adduction',
+  'shoulder_rotation',
+  'dip',
+  'conditioning',
 ];
+const PULLEYS = ['high', 'mid', 'low', 'adjustable'];
+const LOADS = ['single_stack', 'double_stack', 'plate_loaded'];
 // Mirrors REGION_GROUP in apps/mobile/src/exercises/illustrations/muscles.ts (a test checks they agree).
 const REGION_GROUP = {
   chest: 'chest',
@@ -87,6 +104,29 @@ const REGION_GROUP = {
   adductors: 'adductors',
   calves: 'calves',
   tibialis: 'calves',
+};
+// The machine and cable built-ins already in the library (and logged against) before they had a
+// guide: what each is, which a catalogue entry for it must keep -- its muscle group, weight and
+// reps, both sides together -- so nothing logged reads differently.
+const EXISTING_SHAPE = {
+  'Cable Fly': 'chest',
+  'Chest Press Machine': 'chest',
+  'Lat Pulldown': 'back',
+  'Seated Cable Row': 'back',
+  'Machine Shoulder Press': 'shoulders',
+  'Face Pull': 'shoulders',
+  'Cable Curl': 'biceps',
+  'Cable Triceps Pushdown': 'triceps',
+  'Leg Press': 'quadriceps',
+  'Hack Squat': 'quadriceps',
+  'Leg Extension': 'quadriceps',
+  'Seated Leg Curl': 'hamstrings',
+  'Lying Leg Curl': 'hamstrings',
+  'Glute Bridge': 'glutes',
+  'Cable Kickback': 'glutes',
+  'Standing Calf Raise': 'calves',
+  'Seated Calf Raise': 'calves',
+  'Cable Crunch': 'core',
 };
 // The built-ins already in the library before this catalogue (by their names then), so a rename
 // can only ever point at one that exists.
@@ -125,9 +165,20 @@ const EXISTING = [
   'Hanging Leg Raise',
   'Ab Wheel Rollout',
   'Sit-Up',
+  // The machine and cable built-ins, in the library from the start without a guide until now.
+  ...Object.keys(EXISTING_SHAPE),
 ];
 
-const all = [...dumbbell, ...barbell, ...bodyweight];
+const all = [
+  ...dumbbell,
+  ...barbell,
+  ...bodyweight,
+  ...cable,
+  ...machine,
+  ...smith,
+  ...kettlebell,
+  ...accessories,
+];
 const problems = [];
 const seenSlugs = new Set();
 const seenNames = new Set();
@@ -153,6 +204,28 @@ for (const ex of all) {
   need(
     ex.was === undefined || EXISTING.includes(ex.was),
     `"was" ${ex.was} is not an existing built-in`,
+  );
+  if (ex.was in EXISTING_SHAPE) {
+    need(ex.muscle === EXISTING_SHAPE[ex.was], `must keep ${ex.was}'s muscle group`);
+    need(
+      (ex.measure ?? 'weight_reps') === 'weight_reps' && ex.sides === undefined,
+      `must keep ${ex.was}'s weight and reps, both sides`,
+    );
+  }
+  // Its setup, as Create Exercise records a custom one's: what's held, how, the pulley, the load.
+  for (const field of ['attachment', 'grip']) {
+    need(
+      ex[field] === undefined || (typeof ex[field] === 'string' && ex[field].length <= 60),
+      `bad ${field}`,
+    );
+  }
+  need(ex.pulley === undefined || PULLEYS.includes(ex.pulley), `unknown pulley ${ex.pulley}`);
+  need(ex.load === undefined || LOADS.includes(ex.load), `unknown load ${ex.load}`);
+  need(
+    ex.action === undefined ||
+      typeof ex.action === 'string' ||
+      (Array.isArray(ex.action) && ex.action.every((a) => typeof a === 'string')),
+    'bad action',
   );
   for (const tone of ['primary', 'secondary']) {
     for (const region of ex.highlight?.[tone] ?? [])
@@ -195,6 +268,7 @@ const arr = (items) =>
 const renames = all.filter((e) => e.was && e.was !== e.name);
 const values = all.map((ex) => {
   const unilateral = ex.sides !== undefined;
+  const opt = (v) => (v === undefined ? 'null' : q(v));
   return `  (${[
     q(ex.name),
     q(ex.slug),
@@ -214,49 +288,44 @@ const values = all.map((ex) => {
         (a, i, list) => list.findIndex((b) => b.toLowerCase() === a.toLowerCase()) === i,
       ),
     ),
+    opt(ex.grip),
+    opt(ex.attachment),
+    opt(ex.pulley),
+    opt(ex.load),
   ].join(', ')})`;
 });
 
-const counts = {
-  dumbbell: all.filter((e) => e.equipment === 'dumbbell').length,
-  barbell: all.filter((e) => e.equipment === 'barbell').length,
-  other: all.filter((e) => !['dumbbell', 'barbell'].includes(e.equipment)).length,
-};
+const byEquipment = {};
+for (const ex of all) byEquipment[ex.equipment] = (byEquipment[ex.equipment] ?? 0) + 1;
+const attachmentVariants = all.filter((e) => e.attachment).length;
 
-const sql = `-- The built-in dumbbell and barbell exercise library (${counts.dumbbell} dumbbell and ${counts.barbell} barbell
--- exercises), with a guide for every built-in in use: secondary muscles, movement pattern, how to
--- set up and do it, the common mistakes, and other names to search by.
+const sql = `-- The complete built-in exercise library: ${all.length} exercises -- ${Object.entries(
+  byEquipment,
+)
+  .map(([k, n]) => `${n} ${k}`)
+  .join(', ')}. Cables with each handle or attachment its own exercise (${attachmentVariants} with
+-- an attachment), selectorized and plate-loaded machines, the Smith machine, kettlebells, more
+-- bodyweight work, bands, suspension trainers, medicine balls, battle ropes, sleds and specialty
+-- bars, each with its guide, its other names to search by, and its setup (equipment, grip,
+-- attachment, pulley, how it's loaded).
 --
 -- GENERATED by supabase/catalog/generate.mjs from the catalogue in supabase/catalog -- change the
 -- catalogue and run \`npm run db:catalog\`, never this file by hand once it's applied.
 --
 -- Safe for existing history: a built-in that was already here keeps its row (and so every
--- workout, set and record logged against it) and its muscle group, measurement and sides; at most
--- it's renamed to say what it's done with ("Dumbbell Curl" -> "Standing Dumbbell Bicep Curl"),
--- its old name kept as a search alias. Everything else is new rows. Nothing is deleted.
---
--- Each exercise's illustration is drawn in the app from its slug (apps/mobile/src/exercises/
--- illustrations); illustration_url lets a hosted image take its place later without an app update.
+-- workout, set and record logged against it), its muscle group, its measurement and its sides.
+-- The machine and cable built-ins that were here without a guide are renamed to say their
+-- standard setup ("Lat Pulldown" -> "Lat Pulldown — Wide-Grip Straight Bar"), the old name kept
+-- as a search alias. Everything else is new rows. Nothing is deleted, merged or moved, and no
+-- one's own exercise is touched.
 
+-- The new movement patterns: knee extension and flexion, hip abduction and adduction, shoulder
+-- rotation, dips and conditioning.
+alter table public.exercises drop constraint exercises_movement_pattern_known;
 alter table public.exercises
-  add column slug text,
-  add column secondary_muscle_groups public.muscle_group[] not null default '{}',
-  add column movement_pattern text,
-  add column instructions text,
-  add column setup_steps text[] not null default '{}',
-  add column execution_steps text[] not null default '{}',
-  add column common_mistakes text[] not null default '{}',
-  add column search_aliases text[] not null default '{}',
-  add column illustration_url text;
-
--- Only built-ins have a slug (the illustration's key); a person's own exercise never does.
-alter table public.exercises
-  add constraint exercises_slug_builtin_only check (slug is null or created_by is null),
   add constraint exercises_movement_pattern_known check (
     movement_pattern is null or movement_pattern in (${PATTERNS.map(q).join(', ')})
   );
-
-create unique index exercises_builtin_slug_unique on public.exercises (slug) where slug is not null;
 
 -- 1. The built-ins already here, renamed to say what they're done with.
 update public.exercises e
@@ -282,7 +351,7 @@ where not exists (
   where e.created_by is null and lower(e.name) = lower(v.name)
 );
 
--- 3. Every catalogue exercise's details and guide.
+-- 3. Every catalogue exercise's details, guide and setup.
 update public.exercises e
 set slug = v.slug,
     muscle_group = v.muscle::public.muscle_group,
@@ -297,10 +366,14 @@ set slug = v.slug,
     execution_steps = v.steps,
     common_mistakes = v.mistakes,
     search_aliases = v.aliases,
+    grip = v.grip,
+    attachment = v.attachment,
+    pulley_position = v.pulley,
+    load_type = v.load,
     is_active = true
 from (values
 ${values.join(',\n')}
-) as v(name, slug, muscle, equipment, measure, movement, logging, secondary, pattern, summary, setup, steps, mistakes, aliases)
+) as v(name, slug, muscle, equipment, measure, movement, logging, secondary, pattern, summary, setup, steps, mistakes, aliases, grip, attachment, pulley, load)
 where e.created_by is null
   and lower(e.name) = lower(v.name);
 `;
@@ -322,13 +395,15 @@ export interface BuiltinCatalogEntry {
   secondaryGroups: readonly string[];
   /** How it moves (\`exercises.movement_pattern\`): names what its illustration's last position does. */
   pattern: string;
+  /** What its last position does, or every position's name, where its pattern's doesn't fit. */
+  action?: string | readonly string[];
 }
 
 export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
 ${all
   .map(
     (ex) =>
-      `  '${ex.slug}': { name: ${JSON.stringify(ex.name)}, muscle: '${ex.muscle}', equipment: '${ex.equipment}', highlight: { primary: ${JSON.stringify(ex.highlight.primary)}, secondary: ${JSON.stringify(ex.highlight.secondary)} }, secondaryGroups: ${JSON.stringify(secondaryGroups(ex))}, pattern: '${ex.pattern}' },`,
+      `  '${ex.slug}': { name: ${JSON.stringify(ex.name)}, muscle: '${ex.muscle}', equipment: '${ex.equipment}', highlight: { primary: ${JSON.stringify(ex.highlight.primary)}, secondary: ${JSON.stringify(ex.highlight.secondary)} }, secondaryGroups: ${JSON.stringify(secondaryGroups(ex))}, pattern: '${ex.pattern}'${ex.action ? `, action: ${JSON.stringify(ex.action)}` : ''} },`,
   )
   .join('\n')}
 };
@@ -337,6 +412,8 @@ ${all
 const prettierConfig = JSON.parse(readFileSync(join(here, '..', '..', '.prettierrc.json'), 'utf8'));
 writeFileSync(APP_FILE, await prettier.format(app, { ...prettierConfig, filepath: APP_FILE }));
 console.log(
-  `catalogue: ${all.length} exercises (${counts.dumbbell} dumbbell, ${counts.barbell} barbell, ${counts.other} other); ${renames.length} renamed`,
+  `catalogue: ${all.length} exercises (${Object.entries(byEquipment)
+    .map(([k, n]) => `${n} ${k}`)
+    .join(', ')}); ${attachmentVariants} with an attachment; ${renames.length} renamed`,
 );
 console.log(`wrote ${MIGRATION}\nwrote ${APP_FILE}`);

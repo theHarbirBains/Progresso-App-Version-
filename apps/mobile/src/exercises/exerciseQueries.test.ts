@@ -639,6 +639,29 @@ describe('the built-in library: extras, search and filters', () => {
     expect((await all({ search: 'cable' })).map((r) => r.id)).toEqual(['mine']);
   });
 
+  it("finds a handle's own exercise by the handle, and any exercise by its muscle group or equipment", () => {
+    const vRow = {
+      name: 'Seated Cable Row — Close-Grip V-Handle',
+      searchAliases: ['seated row', 'low cable row'],
+      muscleGroup: 'back' as const,
+      equipment: 'cable' as const,
+      attachment: 'V-handle',
+      grip: 'Close neutral',
+    };
+    const ropeRow = {
+      ...vRow,
+      name: 'Seated Cable Row — Rope Attachment',
+      attachment: 'Rope',
+      grip: 'Neutral',
+    };
+    expect(matchesExerciseSearch(vRow, 'V handle row')).toBe(true);
+    expect(matchesExerciseSearch(ropeRow, 'V handle row')).toBe(false);
+    expect(matchesExerciseSearch(ropeRow, 'rope row')).toBe(true);
+    expect(matchesExerciseSearch(vRow, 'back cable')).toBe(true);
+    expect(matchesExerciseSearch(vRow, 'chest')).toBe(false);
+    expect(matchesExerciseSearch({ name: 'Smith Machine Squat' }, 'sm squat')).toBe(true);
+  });
+
   it('matches text anywhere in a name, as search always has', () => {
     expect(matchesExerciseSearch({ name: 'Barbell Bench Press' }, 'ench pre')).toBe(true);
     expect(matchesExerciseSearch({ name: "Dumbbell Farmer's Carry" }, 'farmers')).toBe(true);

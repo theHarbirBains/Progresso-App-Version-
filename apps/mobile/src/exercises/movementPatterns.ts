@@ -1,4 +1,4 @@
-// Mirrors exercises_movement_pattern_known (20261128100000_builtin_exercise_library.sql): the kind
+// Mirrors exercises_movement_pattern_known (20261129100000_complete_exercise_library.sql): the kind
 // of movement a built-in exercise is, as its guide names it.
 export const MOVEMENT_PATTERN_LABELS: Record<string, string> = {
   horizontal_push: 'Horizontal Push',
@@ -24,4 +24,11 @@ export const MOVEMENT_PATTERN_LABELS: Record<string, string> = {
   lateral_flexion: 'Side Bend',
   get_up: 'Get-Up',
   hold: 'Static Hold',
+  knee_extension: 'Knee Extension',
+  knee_flexion: 'Knee Flexion',
+  hip_abduction: 'Hip Abduction',
+  hip_adduction: 'Hip Adduction',
+  shoulder_rotation: 'Shoulder Rotation',
+  dip: 'Dip',
+  conditioning: 'Conditioning',
 };

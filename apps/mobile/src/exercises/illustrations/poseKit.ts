@@ -149,6 +149,20 @@ export function scene(poses: readonly PoseSpec[], parts: SceneParts = {}): Scene
   };
 }
 
+/**
+ * The same poses with other equipment -- a kettlebell goblet squat is the dumbbell one's: the last
+ * `drop` props (the equipment, which the scene builders put last) replaced by `gear`.
+ */
+export function regear(base: SceneSpec, gear: readonly PropBuilder[], drop = 1): SceneSpec {
+  return {
+    ...base,
+    frames: base.frames.map((f) => {
+      const kept = f.props ?? [];
+      return { ...f, props: [...kept.slice(0, Math.max(0, kept.length - drop)), ...gear] };
+    }),
+  };
+}
+
 /** The usual motion cues: a hand (the right, nearest the viewer), both hands' middle, the hips. */
 export const motion = {
   hand: (s: Skeleton): V3 => s.arms.r.end,

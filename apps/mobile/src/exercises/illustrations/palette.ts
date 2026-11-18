@@ -23,6 +23,14 @@ export const MATERIALS = {
   definition: { light: '#D6D4D0', shadow: '#686662' },
   metal: { light: '#ECEEF1', shadow: '#7D828A' },
   iron: { light: '#4F5258', shadow: '#121315' },
+  /** A cable's rope attachment and battle ropes: black braided nylon. */
+  rope: { light: '#5E6168', shadow: '#141518' },
+  /** Resistance bands: a muted slate blue, never near the muscles' red or yellow. */
+  band: { light: '#8197A8', shadow: '#2B3843' },
+  /** Suspension trainer straps and sled harnesses. */
+  strap: { light: '#4A4C52', shadow: '#0E0F11' },
+  /** A medicine ball's rubber. */
+  medicineBall: { light: '#6E625A', shadow: '#1C1714' },
 } as const;
 
 export const ART = {

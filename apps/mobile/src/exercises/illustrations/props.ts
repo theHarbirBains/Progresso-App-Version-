@@ -31,10 +31,10 @@ function edgeStyle(fill: string): Shape {
 }
 
 /** The tone of a bar's end as it faces the viewer. */
-const METAL_END = '#D9DCE0';
+export const METAL_END = '#D9DCE0';
 
 /** A solid cylinder from `a` to `b`. */
-function cylinder(
+export function cylinder(
   cam: Camera,
   a: V3,
   b: V3,
@@ -78,7 +78,7 @@ function cylinder(
 }
 
 /** A solid box: `center` and three half-extent vectors at right angles. */
-function box(
+export function box(
   cam: Camera,
   center: V3,
   hx: V3,
@@ -135,7 +135,7 @@ function box(
 
 export type HandleAxis = 'lr' | 'fb' | 'ud' | ((s: Skeleton, side: Side) => V3);
 
-function handleDirection(s: Skeleton, side: Side, axis: HandleAxis): V3 {
+export function handleDirection(s: Skeleton, side: Side, axis: HandleAxis): V3 {
   const frame = s.frameAt(1);
   const raw =
     axis === 'lr'
@@ -347,8 +347,8 @@ export function landmine(
 // ---------------------------------------------------------------------------------------------
 // Benches, boxes and the rest
 
-const PAD = { top: ART.padTop, side: ART.padSide, front: ART.pad };
-const FRAME = { top: ART.frame, side: ART.frameDark, front: ART.frame };
+export const PAD = { top: ART.padTop, side: ART.padSide, front: ART.pad };
+export const FRAME = { top: ART.frame, side: ART.frameDark, front: ART.frame };
 const WOOD = { top: ART.woodTop, side: ART.wood, front: ART.wood };
 const PLATFORM = { top: ART.plateFace, side: ART.plate, front: ART.plate };
 
