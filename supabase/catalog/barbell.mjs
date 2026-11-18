@@ -153,7 +153,7 @@ export default [
   // ------------------------------------------------------------------------------------ Back
   {
     slug: 'bb-deadlift',
-    name: 'Conventional Barbell Deadlift',
+    name: 'Barbell Deadlift',
     was: 'Deadlift',
     equipment: 'barbell',
     muscle: 'back',
@@ -162,7 +162,7 @@ export default [
       secondary: ['quads', 'traps', 'lats', 'forearms'],
     },
     pattern: 'hinge',
-    aliases: ['deadlift', 'conventional deadlift'],
+    aliases: ['conventional deadlift'],
     summary:
       'Lifting a loaded bar from the floor to standing, with the feet hip-width and hands just outside the legs.',
     setup: [
@@ -261,7 +261,7 @@ export default [
   },
   {
     slug: 'bb-bent-over-row',
-    name: 'Bent-Over Barbell Row',
+    name: 'Barbell Row',
     was: 'Barbell Row',
     equipment: 'barbell',
     muscle: 'back',
@@ -270,7 +270,7 @@ export default [
       secondary: ['rearDelts', 'biceps', 'lowerBack', 'hamstrings'],
     },
     pattern: 'horizontal_pull',
-    aliases: ['barbell row', 'overhand barbell row', 'bent over row', 'bb row'],
+    aliases: ['overhand barbell row', 'bent over row', 'bb row', 'bent over barbell row'],
     summary:
       'Rowing a barbell to the stomach from a hinged position with an overhand grip, building the whole back.',
     setup: [
@@ -568,13 +568,13 @@ export default [
   // ------------------------------------------------------------------------------- Shoulders
   {
     slug: 'bb-overhead-press',
-    name: 'Standing Barbell Overhead Press',
+    name: 'Barbell Overhead Press',
     was: 'Overhead Press',
     equipment: 'barbell',
     muscle: 'shoulders',
     highlight: { primary: ['frontDelts', 'sideDelts'], secondary: ['triceps', 'traps', 'abs'] },
     pattern: 'vertical_push',
-    aliases: ['overhead press', 'ohp', 'military press', 'shoulder press'],
+    aliases: ['ohp', 'military press', 'shoulder press', 'standing barbell overhead press'],
     summary: 'Pressing a barbell from the shoulders to straight overhead while standing.',
     setup: [
       'Hold the bar at the front of your shoulders with a grip just outside shoulder-width.',
@@ -805,13 +805,13 @@ export default [
   // -------------------------------------------------------------------------------- Biceps
   {
     slug: 'bb-curl',
-    name: 'Standing Barbell Curl',
+    name: 'Barbell Curl',
     was: 'Barbell Curl',
     equipment: 'barbell',
     muscle: 'biceps',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     pattern: 'curl',
-    aliases: ['barbell curl', 'bb curl', 'straight bar curl'],
+    aliases: ['bb curl', 'straight bar curl', 'standing barbell curl'],
     summary:
       'Curling a straight barbell up with the palms facing forward, the classic biceps mass builder.',
     setup: [
@@ -1903,12 +1903,12 @@ export default [
   // -------------------------------------------------------------------------------- Calves
   {
     slug: 'bb-standing-calf-raise',
-    name: 'Standing Barbell Calf Raise',
+    name: 'Barbell Calf Raise',
     equipment: 'barbell',
     muscle: 'calves',
     highlight: { primary: ['calves'], secondary: [] },
     pattern: 'calf_raise',
-    aliases: ['barbell calf raise'],
+    aliases: ['standing barbell calf raise'],
     summary:
       'Rising onto the toes with a barbell across the upper back, balls of the feet on a plate or step.',
     setup: [

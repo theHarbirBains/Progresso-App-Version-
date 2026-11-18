@@ -7,14 +7,20 @@ bodyweight work, bands, the suspension trainer, medicine balls, battle ropes, th
 specialty bars, plates and the landmine). This is the source of truth -- `npm run db:catalog`
 (`generate.mjs`) checks it and writes:
 
-- the migration `../migrations/20261129100000_complete_exercise_library.sql`, and
+- the migration `../migrations/20261130100000_simpler_exercise_names.sql`, and
 - the app's `apps/mobile/src/exercises/illustrations/builtinCatalog.generated.ts` (each exercise's
   name, muscle group, the muscles its illustration highlights and what its positions are called).
 
-Never edit either by hand. `20261128100000_builtin_exercise_library.sql` (the dumbbell and barbell
-library) is applied to production and never written again. Once the current migration is applied
+Never edit either by hand. The migrations it wrote before (`20261128100000`, `20261129100000`) are
+applied to production and never written again. The migration finds a built-in by its `slug` to rename
+it, so a name can change without losing the row. Once the current migration is applied
 too, a later change to the catalogue needs a new one: point `MIGRATION` in `generate.mjs` at a new
 file name. The migration updates every catalogue row, so applying it twice changes nothing.
+
+**Simple names.** Leave out what the drawing already shows: "Leg Press", not "45-Degree Leg Press";
+"Dumbbell Curl", not "Standing Dumbbell Bicep Curl"; a cable exercise that only comes one way without
+its handle. Keep a handle in the name where the same movement comes with several, and a word where
+dropping it would leave two exercises one name.
 
 **One exercise per setup that changes the movement.** A cable attachment or a machine grip that
 changes the grip, the range or the path is its own exercise (a V-handle row and a rope row); a

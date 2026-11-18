@@ -557,12 +557,17 @@ export default [
   },
   {
     slug: 'db-standing-shoulder-press',
-    name: 'Standing Dumbbell Shoulder Press',
+    name: 'Dumbbell Shoulder Press',
     equipment: 'dumbbell',
     muscle: 'shoulders',
     highlight: { primary: ['frontDelts', 'sideDelts'], secondary: ['triceps', 'traps', 'abs'] },
     pattern: 'vertical_push',
-    aliases: ['standing dumbbell press', 'dumbbell overhead press', 'db ohp'],
+    aliases: [
+      'standing dumbbell press',
+      'dumbbell overhead press',
+      'db ohp',
+      'standing dumbbell shoulder press',
+    ],
     summary:
       'Pressing the dumbbells overhead while standing, which also asks the core to keep you upright.',
     setup: [
@@ -809,13 +814,19 @@ export default [
   // -------------------------------------------------------------------------------- Biceps
   {
     slug: 'db-curl',
-    name: 'Standing Dumbbell Bicep Curl',
+    name: 'Dumbbell Curl',
     was: 'Dumbbell Curl',
     equipment: 'dumbbell',
     muscle: 'biceps',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     pattern: 'curl',
-    aliases: ['dumbbell curl', 'dumbbell bicep curl', 'db curl', 'biceps curl'],
+    aliases: [
+      'dumbbell bicep curl',
+      'db curl',
+      'biceps curl',
+      'standing dumbbell bicep curl',
+      'bicep curl',
+    ],
     summary: 'Curling both dumbbells up with the palms facing up, the staple biceps exercise.',
     setup: [
       'Stand tall with a dumbbell in each hand, arms straight and palms facing forward.',
@@ -2093,12 +2104,12 @@ export default [
   // -------------------------------------------------------------------------------- Calves
   {
     slug: 'db-standing-calf-raise',
-    name: 'Standing Dumbbell Calf Raise',
+    name: 'Dumbbell Calf Raise',
     equipment: 'dumbbell',
     muscle: 'calves',
     highlight: { primary: ['calves'], secondary: [] },
     pattern: 'calf_raise',
-    aliases: ['dumbbell calf raise'],
+    aliases: ['standing dumbbell calf raise'],
     summary: 'Rising onto the toes with dumbbells at the sides, the balls of the feet on a step.',
     setup: [
       'Stand with the balls of your feet on a step or plate, heels hanging off.',

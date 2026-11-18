@@ -46,7 +46,7 @@ export interface ExerciseRow {
   slug?: string | null;
   /** The muscle groups a built-in also works -- it's listed under them too, after the ones it's for. */
   secondaryMuscleGroups?: MuscleGroup[];
-  /** Other names a built-in is found by ("Deadlift" for Conventional Barbell Deadlift). */
+  /** Other names a built-in is found by ("Deadlift" for Barbell Deadlift). */
   searchAliases?: string[];
   /**
    * Someone else's exercise, shared with this person (lib/exercisesApi's fetchSharedExercises):
@@ -303,8 +303,8 @@ const SHORTHAND: Record<string, string> = {
 /**
  * Whether an exercise matches what's typed: the text anywhere in its name (as always), or every
  * word typed starting a word of its name, one of its other names, its muscle group, its equipment
- * or what it's held by (its attachment and grip), in any order -- so "dumbbell curl" finds
- * Standing Dumbbell Bicep Curl, "db row" finds Dumbbell Bent-Over Row, "v handle row" the V-handle
+ * or what it's held by (its attachment and grip), in any order -- so "curl dumbbell" finds
+ * Dumbbell Curl, "db row" finds Dumbbell Bent-Over Row, "v handle row" the V-handle
  * cable rows and "chest cable" every cable chest exercise.
  */
 export function matchesExerciseSearch(

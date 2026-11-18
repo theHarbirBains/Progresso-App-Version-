@@ -181,14 +181,10 @@ async function main() {
   // squat/benchPress for the same reason: no cross-contamination between
   // assertions that all read global per-user-per-exercise PR state.
   const deadlift = (
-    await admin.query(
-      "select id from public.exercises where name = 'Conventional Barbell Deadlift'",
-    )
+    await admin.query("select id from public.exercises where name = 'Barbell Deadlift'")
   ).rows[0].id;
   const overheadPress = (
-    await admin.query(
-      "select id from public.exercises where name = 'Standing Barbell Overhead Press'",
-    )
+    await admin.query("select id from public.exercises where name = 'Barbell Overhead Press'")
   ).rows[0].id;
   const testFood = (
     await admin.query(
@@ -2158,12 +2154,14 @@ async function main() {
       'Every bodyweight and timed built-in, Weighted Pull-Up and Dead Hang are in the library',
       libraryNames.every((name) => activeInLibrary.includes(name)),
     );
-    const hiddenMachines = (
+    // Machines and cables were left out of the built-ins from 2026-10-05 until the complete library
+    // (20261129100000) brought them back, each on the row it always had.
+    const machinesBack = (
       await admin.query(
-        "select count(*)::int as n from public.exercises where created_by is null and is_active and name in ('Leg Press', 'Cable Fly', 'Lat Pulldown')",
+        "select count(*)::int as n from public.exercises where created_by is null and is_active and slug is not null and name in ('Leg Press', 'Cable Fly', 'Lat Pulldown — Wide-Grip Straight Bar')",
       )
     ).rows[0].n;
-    record('Machine and cable built-ins stay out of the library', hiddenMachines === 0);
+    record('Machine and cable built-ins are back in the library', machinesBack === 3);
 
     const bwUser = randomUUID();
     await admin.query('insert into auth.users (id, email) values ($1, $2)', [
@@ -6129,8 +6127,7 @@ async function main() {
       builtins.every((r) => !r.secondary.includes(r.muscle)),
     );
     const renamed = {
-      Deadlift: 'Conventional Barbell Deadlift',
-      'Dumbbell Curl': 'Standing Dumbbell Bicep Curl',
+      Deadlift: 'Barbell Deadlift',
       'Bulgarian Split Squat': 'Dumbbell Bulgarian Split Squat',
       'Hip Thrust': 'Barbell Hip Thrust',
     };
@@ -6158,8 +6155,8 @@ async function main() {
       'Lat Pulldown': 'Lat Pulldown — Wide-Grip Straight Bar',
       'Seated Cable Row': 'Seated Cable Row — Close-Grip V-Handle',
       'Cable Triceps Pushdown': 'Cable Triceps Pushdown — Straight Bar',
-      'Leg Press': '45-Degree Leg Press',
-      'Cable Kickback': 'Cable Glute Kickback — Ankle Strap',
+      'Leg Press': 'Leg Press',
+      'Cable Kickback': 'Cable Glute Kickback',
       'Leg Extension': 'Leg Extension',
     };
     record(
@@ -6173,7 +6170,7 @@ async function main() {
         );
       }),
     );
-    const kickback = byName.get('Cable Glute Kickback — Ankle Strap');
+    const kickback = byName.get('Cable Glute Kickback');
     record(
       'A machine or cable built-in that was in use keeps its muscle group, weight and reps, and both sides together',
       kickback?.muscle === 'glutes' &&
@@ -6201,6 +6198,20 @@ async function main() {
         byName.get('Plate-Loaded Chest Press')?.load_type === 'plate_loaded' &&
         byName.get('Smith Machine Squat')?.load_type === 'plate_loaded',
     );
+    // Named simply where the drawing shows the detail, found again by slug, history and all.
+    const slugOf = (name) => byName.get(name)?.slug;
+    record(
+      'Built-ins are named simply where the drawing shows the detail, each still its own row',
+      slugOf('Leg Press') === 'pl-leg-press' &&
+        slugOf('Pec Deck') === 'mc-pec-deck' &&
+        slugOf('Dumbbell Curl') === 'db-curl' &&
+        slugOf('Cable Face Pull') === 'cb-face-pull' &&
+        slugOf('Seated Cable Row — Close-Grip V-Handle') === 'cb-seated-row-v-handle' &&
+        ['45-Degree Leg Press', 'Pec Deck Machine', 'Standing Dumbbell Bicep Curl'].every(
+          (n) => !byName.has(n),
+        ) &&
+        byName.get('Dumbbell Curl')?.search_aliases.includes('standing dumbbell bicep curl'),
+    );
     record(
       'No two active built-ins share a name',
       new Set(active.map((r) => r.name.toLowerCase())).size === active.length,
@@ -6217,7 +6228,7 @@ async function main() {
       ).rows[0];
     const before = await snapshot();
     await admin.query(
-      readFileSync(join(migrationsDir, '20261129100000_complete_exercise_library.sql'), 'utf8'),
+      readFileSync(join(migrationsDir, '20261130100000_simpler_exercise_names.sql'), 'utf8'),
     );
     const after = await snapshot();
     record(

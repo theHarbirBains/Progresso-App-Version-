@@ -528,7 +528,7 @@ export default [
   },
   {
     slug: 'cb-overhead-extension-single-arm',
-    name: 'Single-Arm Overhead Cable Triceps Extension — D-Handle',
+    name: 'Single-Arm Overhead Cable Triceps Extension',
     equipment: 'cable',
     muscle: 'triceps',
     pattern: 'triceps_extension',
@@ -553,7 +553,7 @@ export default [
   },
   {
     slug: 'cb-triceps-kickback',
-    name: 'Cable Triceps Kickback — D-Handle',
+    name: 'Cable Triceps Kickback',
     equipment: 'cable',
     muscle: 'triceps',
     pattern: 'triceps_extension',
@@ -683,7 +683,7 @@ export default [
   },
   {
     slug: 'cb-high-cable-curl',
-    name: 'High Cable Curl — Dual D-Handles',
+    name: 'High Cable Curl',
     equipment: 'cable',
     muscle: 'biceps',
     pattern: 'curl',
@@ -711,7 +711,7 @@ export default [
   },
   curl({
     slug: 'cb-bayesian-curl',
-    name: 'Bayesian Cable Curl — D-Handle',
+    name: 'Bayesian Cable Curl',
     attachment: 'D-handle',
     grip: 'Underhand',
     sides: 'single_side',
@@ -736,11 +736,11 @@ export default [
   }),
   curl({
     slug: 'cb-preacher-curl',
-    name: 'Cable Preacher Curl — EZ-Bar',
+    name: 'Cable Preacher Curl',
     attachment: 'EZ bar',
     grip: 'Underhand',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
-    aliases: ['cable preacher curl', 'preacher cable curl'],
+    aliases: ['preacher cable curl'],
     summary: 'Curling an EZ-bar from a low pulley with the upper arms on a preacher pad.',
     setup: [
       'Set a preacher bench in front of a low pulley with an EZ-bar clipped on.',
@@ -777,7 +777,7 @@ export default [
   // ------------------------------------------------------------------ Chest
   {
     slug: 'cb-fly-mid',
-    name: 'Cable Fly — Mid Pulley',
+    name: 'Cable Fly',
     was: 'Cable Fly',
     equipment: 'cable',
     muscle: 'chest',
@@ -786,7 +786,7 @@ export default [
     pulley: 'mid',
     action: 'Squeeze',
     highlight: { primary: ['chest'], secondary: ['frontDelts', 'biceps'] },
-    aliases: ['cable fly', 'cable crossover', 'standing cable fly', 'cable chest fly'],
+    aliases: ['cable crossover', 'standing cable fly', 'cable chest fly'],
     summary: 'Bringing two cables together in front of the chest from pulleys at chest height.',
     setup: [
       'Set both pulleys of a crossover at about chest height and take a D-handle in each hand.',
@@ -859,7 +859,7 @@ export default [
   },
   {
     slug: 'cb-single-arm-fly',
-    name: 'Single-Arm Cable Fly — D-Handle',
+    name: 'Single-Arm Cable Fly',
     equipment: 'cable',
     muscle: 'chest',
     pattern: 'fly',
@@ -884,7 +884,7 @@ export default [
   },
   {
     slug: 'cb-chest-press',
-    name: 'Standing Cable Chest Press — Dual D-Handles',
+    name: 'Standing Cable Chest Press',
     equipment: 'cable',
     muscle: 'chest',
     pattern: 'horizontal_push',
@@ -912,7 +912,7 @@ export default [
   // ------------------------------------------------------------------ Shoulders
   {
     slug: 'cb-face-pull',
-    name: 'Cable Face Pull — Rope',
+    name: 'Cable Face Pull',
     was: 'Face Pull',
     equipment: 'cable',
     muscle: 'shoulders',
@@ -938,7 +938,7 @@ export default [
   },
   {
     slug: 'cb-lateral-raise',
-    name: 'Single-Arm Cable Lateral Raise — D-Handle',
+    name: 'Single-Arm Cable Lateral Raise',
     equipment: 'cable',
     muscle: 'shoulders',
     pattern: 'raise',
@@ -1013,7 +1013,7 @@ export default [
   },
   {
     slug: 'cb-rear-delt-fly',
-    name: 'Cable Rear Delt Fly — Crossover',
+    name: 'Cable Rear Delt Fly',
     equipment: 'cable',
     muscle: 'shoulders',
     pattern: 'fly',
@@ -1109,7 +1109,7 @@ export default [
   },
   {
     slug: 'cb-external-rotation',
-    name: 'Cable External Rotation — D-Handle',
+    name: 'Cable External Rotation',
     equipment: 'cable',
     muscle: 'shoulders',
     pattern: 'shoulder_rotation',
@@ -1117,7 +1117,7 @@ export default [
     pulley: 'mid',
     sides: 'single_side',
     highlight: { primary: ['rearDelts'], secondary: ['upperBack'] },
-    aliases: ['cable external rotation', 'rotator cuff cable', 'cable shoulder rotation'],
+    aliases: ['rotator cuff cable', 'cable shoulder rotation'],
     summary:
       'Rotating the forearm out from the stomach with the elbow at the side, for the rotator cuff.',
     setup: [
@@ -1185,7 +1185,7 @@ export default [
   },
   {
     slug: 'cb-shrug',
-    name: 'Cable Shrug — Straight Bar',
+    name: 'Cable Shrug',
     equipment: 'cable',
     muscle: 'back',
     pattern: 'shrug',
@@ -1193,7 +1193,7 @@ export default [
     grip: 'Overhand',
     pulley: 'low',
     highlight: { primary: ['traps'], secondary: ['forearms'] },
-    aliases: ['cable shrug'],
+    aliases: [],
     summary: 'Shrugging a straight bar from a low pulley, the traps under tension all the way.',
     setup: [
       'Clip a straight bar to a low pulley and grip it overhand at shoulder width.',
@@ -1208,7 +1208,7 @@ export default [
   },
   {
     slug: 'cb-standing-single-arm-row',
-    name: 'Standing Single-Arm Cable Row — D-Handle',
+    name: 'Standing Single-Arm Cable Row',
     equipment: 'cable',
     muscle: 'back',
     pattern: 'horizontal_pull',
@@ -1235,7 +1235,7 @@ export default [
   // ------------------------------------------------------------------ Legs and glutes
   {
     slug: 'cb-glute-kickback',
-    name: 'Cable Glute Kickback — Ankle Strap',
+    name: 'Cable Glute Kickback',
     was: 'Cable Kickback',
     equipment: 'cable',
     muscle: 'glutes',
@@ -1263,7 +1263,7 @@ export default [
   },
   {
     slug: 'cb-pull-through',
-    name: 'Cable Pull-Through — Rope',
+    name: 'Cable Pull-Through',
     equipment: 'cable',
     muscle: 'glutes',
     pattern: 'hinge',
@@ -1291,7 +1291,7 @@ export default [
   },
   {
     slug: 'cb-hip-abduction',
-    name: 'Standing Cable Hip Abduction — Ankle Strap',
+    name: 'Cable Hip Abduction',
     equipment: 'cable',
     muscle: 'glutes',
     pattern: 'hip_abduction',
@@ -1299,7 +1299,7 @@ export default [
     pulley: 'low',
     sides: 'single_side',
     highlight: { primary: ['glutes'], secondary: ['obliques'] },
-    aliases: ['cable hip abduction', 'cable leg abduction', 'standing abduction'],
+    aliases: ['cable leg abduction', 'standing abduction'],
     summary: 'Raising one leg out to the side against a low cable, for the side of the glutes.',
     setup: [
       'Strap the cuff to the ankle farther from a low pulley.',
@@ -1314,7 +1314,7 @@ export default [
   },
   {
     slug: 'cb-hip-adduction',
-    name: 'Standing Cable Hip Adduction — Ankle Strap',
+    name: 'Cable Hip Adduction',
     equipment: 'cable',
     muscle: 'adductors',
     pattern: 'hip_adduction',
@@ -1322,7 +1322,7 @@ export default [
     pulley: 'low',
     sides: 'single_side',
     highlight: { primary: ['adductors'], secondary: [] },
-    aliases: ['cable hip adduction', 'cable leg adduction', 'standing adduction'],
+    aliases: ['cable leg adduction', 'standing adduction'],
     summary: 'Pulling one leg in across the body against a low cable, for the inner thighs.',
     setup: [
       'Strap the cuff to the ankle nearer a low pulley.',
@@ -1337,7 +1337,7 @@ export default [
   },
   {
     slug: 'cb-romanian-deadlift',
-    name: 'Cable Romanian Deadlift — Straight Bar',
+    name: 'Cable Romanian Deadlift',
     equipment: 'cable',
     muscle: 'hamstrings',
     pattern: 'hinge',
@@ -1345,7 +1345,7 @@ export default [
     grip: 'Overhand',
     pulley: 'low',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },
-    aliases: ['cable rdl', 'cable romanian deadlift'],
+    aliases: ['cable rdl'],
     summary:
       'A Romanian deadlift with a straight bar from a low pulley, tension on the hamstrings all the way.',
     setup: [
@@ -1361,7 +1361,7 @@ export default [
   },
   {
     slug: 'cb-standing-leg-curl',
-    name: 'Standing Cable Leg Curl — Ankle Strap',
+    name: 'Cable Leg Curl',
     equipment: 'cable',
     muscle: 'hamstrings',
     pattern: 'knee_flexion',
@@ -1369,7 +1369,7 @@ export default [
     pulley: 'low',
     sides: 'single_side',
     highlight: { primary: ['hamstrings'], secondary: ['calves'] },
-    aliases: ['cable leg curl', 'standing hamstring curl cable'],
+    aliases: ['standing hamstring curl cable'],
     summary: 'Curling one heel up behind the body against a low cable on an ankle strap.',
     setup: [
       'Strap the cuff to one ankle and clip it to a low pulley.',
@@ -1386,7 +1386,7 @@ export default [
   // ------------------------------------------------------------------ Core
   {
     slug: 'cb-crunch',
-    name: 'Kneeling Cable Crunch — Rope',
+    name: 'Cable Crunch',
     was: 'Cable Crunch',
     equipment: 'cable',
     muscle: 'core',
@@ -1394,7 +1394,7 @@ export default [
     attachment: 'Rope',
     pulley: 'high',
     highlight: { primary: ['abs'], secondary: ['obliques'] },
-    aliases: ['cable crunch', 'rope crunch', 'kneeling crunch'],
+    aliases: ['rope crunch', 'kneeling crunch'],
     summary:
       'Kneeling under a high pulley and crunching a rope down toward the knees, weighted abs.',
     setup: [
@@ -1463,7 +1463,7 @@ export default [
   },
   {
     slug: 'cb-pallof-press',
-    name: 'Cable Pallof Press — D-Handle',
+    name: 'Cable Pallof Press',
     equipment: 'cable',
     muscle: 'core',
     pattern: 'core_rotation',

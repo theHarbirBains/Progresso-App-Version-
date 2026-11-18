@@ -192,11 +192,11 @@ export default [
   }),
   kb({
     slug: 'kb-front-squat',
-    name: 'Double Kettlebell Front Squat',
+    name: 'Kettlebell Front Squat',
     muscle: 'quadriceps',
     pattern: 'squat',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'abs', 'upperBack'] },
-    aliases: ['double kb front squat', 'kettlebell front squat', 'rack squat'],
+    aliases: ['double kb front squat', 'rack squat', 'double kettlebell front squat'],
     summary: 'Squatting with two kettlebells in the rack at the shoulders.',
     setup: [
       'Clean two kettlebells to the rack, the bells on the backs of your forearms.',
@@ -273,7 +273,7 @@ export default [
   }),
   kb({
     slug: 'kb-high-pull',
-    name: 'Kettlebell Sumo High Pull',
+    name: 'Kettlebell High Pull',
     muscle: 'shoulders',
     pattern: 'vertical_pull',
     action: 'Pull',

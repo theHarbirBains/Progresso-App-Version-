@@ -130,12 +130,12 @@ export default [
   }),
   stackMachine({
     slug: 'mc-pec-deck',
-    name: 'Pec Deck Machine',
+    name: 'Pec Deck',
     muscle: 'chest',
     pattern: 'fly',
     action: 'Squeeze',
     highlight: { primary: ['chest'], secondary: ['frontDelts'] },
-    aliases: ['pec deck', 'machine fly', 'butterfly', 'pec fly', 'chest fly machine'],
+    aliases: ['machine fly', 'butterfly', 'pec fly', 'chest fly machine'],
     summary:
       'Bringing the arms of a pec deck together in front of the chest, a fly with a fixed path.',
     setup: [
@@ -155,16 +155,11 @@ export default [
   }),
   stackMachine({
     slug: 'mc-reverse-pec-deck',
-    name: 'Reverse Pec Deck — Rear Delt Fly',
+    name: 'Reverse Pec Deck',
     muscle: 'shoulders',
     pattern: 'fly',
     highlight: { primary: ['rearDelts'], secondary: ['upperBack', 'traps'] },
-    aliases: [
-      'reverse pec deck',
-      'rear delt machine',
-      'reverse fly machine',
-      'machine rear delt fly',
-    ],
+    aliases: ['rear delt machine', 'reverse fly machine', 'machine rear delt fly'],
     summary: 'Sitting facing the pec deck and sweeping the arms back, for the rear delts.',
     setup: [
       'Sit facing the pad with the handles at shoulder height.',
@@ -309,7 +304,7 @@ export default [
   }),
   stackMachine({
     slug: 'mc-assisted-pull-up',
-    name: 'Assisted Pull-Up Machine',
+    name: 'Assisted Pull-Up',
     muscle: 'back',
     pattern: 'vertical_pull',
     measure: 'bodyweight',
@@ -441,7 +436,7 @@ export default [
   }),
   stackMachine({
     slug: 'mc-seated-dip',
-    name: 'Seated Dip Machine',
+    name: 'Seated Dip',
     muscle: 'triceps',
     pattern: 'dip',
     action: 'Press',
@@ -465,12 +460,12 @@ export default [
   }),
   stackMachine({
     slug: 'mc-assisted-dip',
-    name: 'Assisted Dip Machine',
+    name: 'Assisted Dip',
     muscle: 'triceps',
     pattern: 'dip',
     measure: 'bodyweight',
     highlight: { primary: ['triceps', 'chest'], secondary: ['frontDelts'] },
-    aliases: ['assisted dip', 'gravitron dip'],
+    aliases: ['gravitron dip'],
     summary:
       'A parallel-bar dip with a counterweight under the knees, to build up to the real thing.',
     setup: [
@@ -488,12 +483,12 @@ export default [
   // ------------------------------------------------------------------ Legs
   stackMachine({
     slug: 'mc-seated-leg-press',
-    name: 'Seated Leg Press Machine',
+    name: 'Seated Leg Press',
     muscle: 'quadriceps',
     pattern: 'squat',
     action: 'Press',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'hamstrings'] },
-    aliases: ['seated leg press', 'horizontal leg press', 'selectorized leg press'],
+    aliases: ['horizontal leg press', 'selectorized leg press'],
     summary: 'Pressing a foot plate away while seated, a selectorized leg press.',
     setup: [
       'Set the seat so your knees are bent about 90 degrees with your feet on the plate.',
@@ -585,12 +580,12 @@ export default [
   }),
   stackMachine({
     slug: 'mc-standing-leg-curl',
-    name: 'Standing Leg Curl Machine',
+    name: 'Standing Leg Curl',
     muscle: 'hamstrings',
     pattern: 'knee_flexion',
     sides: 'single_side',
     highlight: { primary: ['hamstrings'], secondary: ['calves'] },
-    aliases: ['standing leg curl', 'standing hamstring curl'],
+    aliases: ['standing hamstring curl'],
     summary: 'Standing in a leg curl machine and curling one heel up behind you.',
     setup: [
       'Stand with your thigh against the pad and the roller above one heel.',
@@ -605,7 +600,7 @@ export default [
   }),
   stackMachine({
     slug: 'mc-hip-abduction',
-    name: 'Hip Abduction Machine',
+    name: 'Hip Abduction',
     muscle: 'glutes',
     pattern: 'hip_abduction',
     highlight: { primary: ['glutes'], secondary: [] },
@@ -629,7 +624,7 @@ export default [
   }),
   stackMachine({
     slug: 'mc-hip-adduction',
-    name: 'Hip Adduction Machine',
+    name: 'Hip Adduction',
     muscle: 'adductors',
     pattern: 'hip_adduction',
     highlight: { primary: ['adductors'], secondary: [] },
@@ -645,7 +640,7 @@ export default [
   }),
   stackMachine({
     slug: 'mc-glute-kickback',
-    name: 'Glute Kickback Machine',
+    name: 'Glute Kickback',
     muscle: 'glutes',
     pattern: 'hip_extension',
     sides: 'single_side',
@@ -689,12 +684,12 @@ export default [
   }),
   stackMachine({
     slug: 'mc-standing-calf-raise',
-    name: 'Standing Calf Raise Machine',
+    name: 'Standing Calf Raise',
     was: 'Standing Calf Raise',
     muscle: 'calves',
     pattern: 'calf_raise',
     highlight: { primary: ['calves'], secondary: [] },
-    aliases: ['standing calf raise', 'calf raise machine', 'standing calf machine'],
+    aliases: ['calf raise machine', 'standing calf machine'],
     summary: 'Rising onto the toes under the shoulder pads of a standing calf raise machine.',
     setup: [
       'Stand with the pads on your shoulders and the balls of your feet on the edge of the block.',
@@ -728,13 +723,13 @@ export default [
   }),
   stackMachine({
     slug: 'mc-rotary-torso',
-    name: 'Rotary Torso Machine',
+    name: 'Rotary Torso',
     muscle: 'core',
     pattern: 'core_rotation',
     sides: 'single_side',
     action: 'Rotate',
     highlight: { primary: ['obliques'], secondary: ['abs'] },
-    aliases: ['torso rotation machine', 'rotary torso'],
+    aliases: ['torso rotation machine'],
     summary: 'Turning the torso against the pads of a rotary torso machine, for the obliques.',
     setup: [
       'Sit with your knees on either side of the pad and your chest against the chest pad.',
@@ -906,13 +901,13 @@ export default [
   }),
   plateMachine({
     slug: 'pl-leg-press',
-    name: '45-Degree Leg Press',
+    name: 'Leg Press',
     was: 'Leg Press',
     muscle: 'quadriceps',
     pattern: 'squat',
     action: 'Press',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'hamstrings'] },
-    aliases: ['leg press', 'incline leg press', 'sled leg press'],
+    aliases: ['incline leg press', 'sled leg press', '45 degree leg press'],
     summary:
       'Pressing the sled of a 45-degree leg press up and away, a heavy, back-friendly quad builder.',
     setup: [
@@ -949,12 +944,12 @@ export default [
   }),
   plateMachine({
     slug: 'pl-hack-squat',
-    name: 'Hack Squat Machine',
+    name: 'Hack Squat',
     was: 'Hack Squat',
     muscle: 'quadriceps',
     pattern: 'squat',
     highlight: { primary: ['quads'], secondary: ['glutes', 'adductors'] },
-    aliases: ['hack squat', 'machine hack squat'],
+    aliases: ['machine hack squat'],
     summary: 'Squatting in a hack squat machine with the back on its sled, for the quads.',
     setup: [
       'Stand with your back and shoulders against the pads, feet hip-width on the platform.',
@@ -1012,12 +1007,12 @@ export default [
   }),
   plateMachine({
     slug: 'pl-seated-calf-raise',
-    name: 'Seated Calf Raise Machine',
+    name: 'Seated Calf Raise',
     was: 'Seated Calf Raise',
     muscle: 'calves',
     pattern: 'calf_raise',
     highlight: { primary: ['calves'], secondary: [] },
-    aliases: ['seated calf raise', 'seated calf machine'],
+    aliases: ['seated calf machine'],
     summary: 'Raising the heels under the knee pad of a seated calf machine, for the lower calf.',
     setup: [
       'Sit with the pad on your lower thighs and the balls of your feet on the step.',

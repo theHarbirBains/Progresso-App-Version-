@@ -460,14 +460,14 @@ export default [
   },
   {
     slug: 'bw-back-extension',
-    name: '45-Degree Back Extension',
+    name: 'Back Extension',
     equipment: 'other',
     measure: 'bodyweight',
     muscle: 'back',
     pattern: 'hip_extension',
     action: 'Extend',
     highlight: { primary: ['lowerBack'], secondary: ['glutes', 'hamstrings'] },
-    aliases: ['hyperextension', 'back extension', 'roman chair'],
+    aliases: ['hyperextension', 'roman chair', '45 degree back extension'],
     summary:
       'Hinging down over a 45-degree back extension bench and raising the body back in line.',
     setup: [
@@ -1092,7 +1092,7 @@ export default [
   },
   {
     slug: 'sl-drag',
-    name: 'Backward Sled Drag',
+    name: 'Sled Drag',
     equipment: 'other',
     attachment: 'Sled',
     measure: 'timed',
