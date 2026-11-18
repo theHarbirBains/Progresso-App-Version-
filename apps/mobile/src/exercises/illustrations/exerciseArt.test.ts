@@ -1,13 +1,15 @@
 import { BUILTIN_CATALOG } from './builtinCatalog.generated';
+import { BUILTIN_GUIDES } from './builtinGuides.generated';
 import {
   EXERCISE_ART,
   frameLabels,
+  guidePhases,
   hasIllustration,
   illustrationFor,
   muscleMapFor,
   thumbnailFor,
 } from './exerciseArt';
-import { legendNames, mapSide } from './muscleMap';
+import { legendNames } from './muscleMap';
 import { MUSCLE_REGIONS, REGION_GROUP, REGION_NAMES } from './muscles';
 import { ART } from './palette';
 import { renderScene } from './render';
@@ -96,14 +98,42 @@ describe('the built-in exercise illustrations', () => {
     }
   });
 
-  it('shows the anatomy figure head to toe, from the side most of the primary muscles are on', () => {
-    expect(mapSide({ primary: ['chest'], secondary: ['triceps'] })).toBe('front');
-    expect(mapSide({ primary: ['hamstrings', 'glutes'], secondary: [] })).toBe('back');
-    expect(mapSide({ primary: ['quads', 'glutes'], secondary: ['adductors'] })).toBe('front');
-    expect(mapSide({ primary: ['quads', 'glutes'], secondary: ['hamstrings', 'lowerBack'] })).toBe(
+  it('shows every active built-in in exactly three phases, each with its row of How to Do It', () => {
+    // The setup, the movement and the way back -- from the first position again.
+    expect(guidePhases('bb-back-squat')).toEqual([
+      { label: 'Setup', frame: 0 },
+      { label: 'Squat', frame: 1, direction: 'down' },
+      { label: 'Stand', frame: 0, direction: 'up' },
+    ]);
+    expect(guidePhases('db-bench-press').map((p) => p.label)).toEqual(['Setup', 'Press', 'Lower']);
+    expect(guidePhases('cb-seated-row-v-handle').map((p) => p.label)).toEqual([
+      'Setup',
+      'Row',
+      'Return',
+    ]);
+    expect(guidePhases('bw-plank').map((p) => p.label)).toEqual(['Setup', 'Hold', 'Lower']);
+    // Drawn in three positions: each of them.
+    expect(guidePhases('bb-push-press').map((p) => [p.label, p.frame])).toEqual([
+      ['Setup', 0],
+      ['Dip', 1],
+      ['Press', 2],
+    ]);
+    const active = Object.keys(BUILTIN_GUIDES);
+    expect(active.length).toBeGreaterThan(300);
+    for (const slug of active) {
+      const phases = guidePhases(slug);
+      expect(phases).toHaveLength(3);
+      for (const phase of phases) expect(phase.label).not.toMatch(/^(Start|Step \d+)$/);
+      expect(BUILTIN_GUIDES[slug].rows.every((row) => row.length > 0)).toBe(true);
+      expect(BUILTIN_GUIDES[slug].tips).toHaveLength(3);
+    }
+  });
+
+  it('shows the anatomy figure head to toe, from the front and from behind', () => {
+    expect(muscleMapFor('db-romanian-deadlift')?.views.map((v) => v.side)).toEqual([
+      'front',
       'back',
-    );
-    expect(muscleMapFor('db-romanian-deadlift')?.views.map((v) => v.side)).toEqual(['back']);
+    ]);
   });
 
   it("names the key's muscles one per line, its own muscle group first", () => {

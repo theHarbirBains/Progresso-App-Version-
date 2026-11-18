@@ -1611,6 +1611,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     highlight: { primary: ['abs'], secondary: ['obliques', 'frontDelts', 'glutes'] },
     secondaryGroups: ['shoulders', 'glutes'],
     pattern: 'anti_extension',
+    action: 'Hold',
   },
   'bw-hanging-leg-raise': {
     name: 'Hanging Leg Raise',
@@ -3052,6 +3053,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     highlight: { primary: ['obliques'], secondary: ['abs', 'glutes'] },
     secondaryGroups: ['glutes'],
     pattern: 'hold',
+    action: 'Hold',
   },
   'bw-hollow-hold': {
     name: 'Hollow Body Hold',
@@ -3060,6 +3062,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     highlight: { primary: ['abs'], secondary: ['obliques', 'quads'] },
     secondaryGroups: ['quadriceps'],
     pattern: 'hold',
+    action: 'Hold',
   },
   'bw-mountain-climber': {
     name: 'Mountain Climber',

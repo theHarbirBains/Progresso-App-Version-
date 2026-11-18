@@ -57,7 +57,7 @@ beforeEach(() => {
 afterAll(() => setBuiltinSources(null));
 
 describe('ExerciseGuideSheet', () => {
-  it('shows how to do the exercise: the illustration, the muscles, setup, steps and mistakes', async () => {
+  it('shows how to do the exercise: its muscles, three phases, Key Tips and Common Mistakes', async () => {
     render(
       <ExerciseGuideSheet
         visible
@@ -68,32 +68,62 @@ describe('ExerciseGuideSheet', () => {
     );
 
     expect(await screen.findByTestId('exercise-guide-illustration')).toBeTruthy();
-    // The frames are drawn once their width is known.
-    fireEvent(screen.getByTestId('exercise-guide-illustration-frames'), 'layout', {
+    // The phases are drawn once their width is known.
+    fireEvent(screen.getByTestId('exercise-guide-illustration'), 'layout', {
       nativeEvent: { layout: { width: 320, height: 240, x: 0, y: 0 } },
     });
-    expect(screen.getByTestId('exercise-guide-line')).toHaveTextContent(
-      'Dumbbell · Horizontal Push · Weight and reps',
-    );
-    // What it targets, under its name.
+    // What it targets, under its name, then what it is.
     expect(screen.getByTestId('exercise-guide-target')).toHaveTextContent('Chest');
+    expect(screen.getByTestId('exercise-guide-summary')).toHaveTextContent(/each arm move freely/);
     // The anatomy figure's key names the muscles, one per line.
-    const primary = screen.getByTestId('exercise-guide-illustration-primary');
-    expect(within(primary).getByText('Primary:')).toBeTruthy();
+    const primary = screen.getByTestId('exercise-guide-muscles-primary');
+    expect(within(primary).getByText('Primary')).toBeTruthy();
     expect(within(primary).getByText('Chest')).toBeTruthy();
-    const secondary = screen.getByTestId('exercise-guide-illustration-secondary');
-    expect(within(secondary).getByText('Secondary:')).toBeTruthy();
+    const secondary = screen.getByTestId('exercise-guide-muscles-secondary');
+    expect(within(secondary).getByText('Secondary')).toBeTruthy();
     expect(within(secondary).getByText('Shoulders')).toBeTruthy();
     expect(within(secondary).getByText('Triceps')).toBeTruthy();
-    expect(screen.queryByTestId('exercise-guide-muscles')).toBeNull();
-    expect(screen.getByTestId('exercise-guide-setup')).toHaveTextContent(
-      /Lie back with the dumbbells/,
-    );
-    expect(screen.getByTestId('exercise-guide-steps')).toHaveTextContent(/Press them up/);
-    expect(screen.getByTestId('exercise-guide-mistakes')).toHaveTextContent(/Flaring the elbows/);
-    // Start, then what the movement does, under the frames.
-    expect(screen.getByTestId('exercise-guide-illustration-label-0')).toHaveTextContent('Start');
+    // Exactly three phases -- the setup, the movement, the way back -- each a numbered row.
+    expect(screen.getByTestId('exercise-guide-illustration-label-0')).toHaveTextContent('Setup');
     expect(screen.getByTestId('exercise-guide-illustration-label-1')).toHaveTextContent('Press');
+    expect(screen.getByTestId('exercise-guide-illustration-label-2')).toHaveTextContent('Lower');
+    expect(screen.queryByTestId('exercise-guide-illustration-label-3')).toBeNull();
+    expect(screen.getByTestId('exercise-guide-step-0')).toHaveTextContent(/Setup.*Sit on the end/);
+    expect(screen.getByTestId('exercise-guide-step-1')).toHaveTextContent(
+      /Press.*Press the dumbbells up/,
+    );
+    expect(screen.getByTestId('exercise-guide-step-2')).toHaveTextContent(
+      /Lower.*Lower them slowly/,
+    );
+    expect(screen.getByTestId('exercise-guide-tips')).toHaveTextContent(
+      /Key Tips.*shoulder blades back and down/,
+    );
+    expect(screen.getByTestId('exercise-guide-mistakes')).toHaveTextContent(/Flaring the elbows/);
+  });
+
+  it("falls back on the exercise's own steps when How to Do It has no phases for it", async () => {
+    setBuiltinSources({
+      extras: async () => extras,
+      guide: async () => ({ ...benchGuide, slug: null }),
+    });
+    render(
+      <ExerciseGuideSheet
+        visible
+        onClose={jest.fn()}
+        exerciseId="bench-id"
+        exerciseName="Dumbbell Bench Press"
+      />,
+    );
+
+    expect(await screen.findByTestId('exercise-guide-step-0')).toHaveTextContent(
+      /Setup.*Lie back with the dumbbells/,
+    );
+    expect(screen.getByTestId('exercise-guide-step-1')).toHaveTextContent(/Press them up/);
+    expect(screen.getByTestId('exercise-guide-step-2')).toHaveTextContent(/Lower them slowly/);
+    expect(screen.getByTestId('exercise-guide-muscle-groups')).toHaveTextContent(
+      'Chest · Shoulders · Triceps',
+    );
+    expect(screen.queryByTestId('exercise-guide-tips')).toBeNull();
   });
 
   it("says when the guide can't be read, and Retry reads it again", async () => {

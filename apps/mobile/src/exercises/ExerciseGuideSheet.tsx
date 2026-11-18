@@ -1,22 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { AppCard } from '../design/AppCard';
-import { AppHeader } from '../design/AppHeader';
 import { ErrorState } from '../design/ErrorState';
-import { SectionHeader } from '../design/SectionHeader';
 import { SkeletonRows } from '../design/Skeleton';
 import { Text } from '../design/Text';
-import { colors, radii, spacing, typeScale } from '../design/theme';
+import { colors, spacing, typeScale } from '../design/theme';
 import { useAppTheme } from '../theme/appThemeContext';
-import { EQUIPMENT_LABELS } from './equipment';
-import { Image } from 'expo-image';
+import { withAlpha } from '../theme/accentColor';
 import { readExerciseGuide, type ExerciseGuide } from './builtinExtras';
-import { ExerciseIllustration } from './illustrations/ExerciseIllustration';
-import { muscleMapFor } from './illustrations/exerciseArt';
-import { MOVEMENT_PATTERN_LABELS } from './movementPatterns';
-import { MEASUREMENT_TYPE_LABELS } from './movementTypes';
-import { MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
+import type { Equipment } from './equipment';
+import { BUILTIN_GUIDES } from './illustrations/builtinGuides.generated';
+import { ExercisePhases, MuscleFigures } from './illustrations/ExerciseIllustration';
+import { guidePhases, hasIllustration, muscleMapFor } from './illustrations/exerciseArt';
+import { MUSCLE_GROUP_LABELS } from './muscleGroups';
 
 interface Props {
   visible: boolean;
@@ -27,11 +25,43 @@ interface Props {
   testID?: string;
 }
 
+/** The icon in the ring beside the exercise's name, by its equipment. */
+const EQUIPMENT_ICONS: Record<Equipment, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  dumbbell: 'dumbbell',
+  barbell: 'weight-lifter',
+  kettlebell: 'kettlebell',
+  cable: 'arm-flex',
+  machine: 'seat-recline-normal',
+  bodyweight: 'human-handsup',
+  other: 'dumbbell',
+};
+
+/** The three phases' text: the bundled guide (howto.mjs), or for an exercise without one, its own. */
+function phaseRows(guide: ExerciseGuide): {
+  labels: string[];
+  rows: string[];
+  tips: readonly string[];
+} {
+  const own = guide.slug ? BUILTIN_GUIDES[guide.slug] : undefined;
+  const phases = guide.slug ? guidePhases(guide.slug) : [];
+  const labels =
+    phases.length === 3 ? phases.map((phase) => phase.label) : ['Setup', 'Movement', 'Finish'];
+  if (own) return { labels, rows: [...own.rows], tips: own.tips };
+  const steps = guide.executionSteps;
+  const rows = [
+    guide.setupSteps.join(' '),
+    (steps.length > 1 ? steps.slice(0, -1) : steps).join(' '),
+    steps.length > 1 ? steps[steps.length - 1] : '',
+  ];
+  return { labels, rows, tips: [] };
+}
+
 /**
  * How to do a built-in exercise, as a page of its own over whatever opened it -- an iPhone page
- * sheet, swiped down or closed with its X: its name and what it targets, the illustrated
- * instructor from start to finish, the muscles it works, then how to set up, how to do it and what
- * to avoid. Read when it opens.
+ * sheet, swiped down or closed with its X. Laid out like a coaching card: its name and what it
+ * targets, a line on what it is and the muscles it works (front and back, primary and secondary);
+ * the illustrated instructor through its three phases -- the setup, the movement and the way back
+ * -- with a numbered row for each; then its Key Tips beside its Common Mistakes. Read when it opens.
  */
 export function ExerciseGuideSheet({
   visible,
@@ -70,6 +100,7 @@ export function ExerciseGuideSheet({
   const target = shown
     ? (muscleMapFor(shown.slug)?.primaryNames.join(' / ') ?? MUSCLE_GROUP_LABELS[shown.muscleGroup])
     : null;
+  const drawn = shown && !shown.illustrationUrl && hasIllustration(shown.slug);
 
   return (
     <Modal
@@ -79,20 +110,33 @@ export function ExerciseGuideSheet({
       onRequestClose={onClose}
     >
       <View testID={testID} style={styles.page}>
-        <AppHeader
-          title="How to Do It"
-          safeArea={false}
-          rightAction={{
-            icon: 'x',
-            onPress: onClose,
-            accessibilityLabel: 'Close',
-            testID: `${testID}-close`,
-          }}
-        />
+        <View style={styles.header}>
+          <View style={styles.headerTitle}>
+            <View style={styles.headerRule} />
+            <Text style={styles.headerText} accessibilityRole="header">
+              HOW TO DO IT
+            </Text>
+            <View style={styles.headerRule} />
+          </View>
+          <TouchableOpacity
+            testID={`${testID}-close`}
+            onPress={onClose}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            style={styles.close}
+          >
+            <Feather name="x" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.titleRow}>
             <View style={[styles.titleIcon, { borderColor: accent }]}>
-              <MaterialCommunityIcons name="dumbbell" size={22} color={accent} />
+              <MaterialCommunityIcons
+                name={EQUIPMENT_ICONS[shown?.equipment ?? 'other']}
+                size={22}
+                color={accent}
+              />
             </View>
             <View style={styles.titleText}>
               <Text testID={`${testID}-name`} style={styles.name}>
@@ -105,100 +149,13 @@ export function ExerciseGuideSheet({
               ) : null}
             </View>
           </View>
-          {shown ? (
-            <Text testID={`${testID}-line`} style={styles.line}>
-              {[
-                shown.equipment ? EQUIPMENT_LABELS[shown.equipment] : null,
-                shown.movementPattern ? MOVEMENT_PATTERN_LABELS[shown.movementPattern] : null,
-                shown.movementType === 'unilateral' ? 'One side at a time' : null,
-                MEASUREMENT_TYPE_LABELS[shown.measurementType].spoken,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
-          ) : null}
 
           {error ? (
             <ErrorState testID={`${testID}-error`} message={error} onRetry={retry} />
           ) : !shown ? (
             <SkeletonRows testID={`${testID}-loading`} count={5} />
           ) : (
-            <>
-              {shown.illustrationUrl ? (
-                <AppCard testID={`${testID}-illustration-card`} style={styles.card}>
-                  <Image
-                    testID={`${testID}-illustration-image`}
-                    source={{ uri: shown.illustrationUrl }}
-                    style={styles.hostedImage}
-                    contentFit="contain"
-                    accessibilityLabel={`How ${shown.name} is done`}
-                  />
-                </AppCard>
-              ) : shown.slug ? (
-                <AppCard testID={`${testID}-illustration-card`} style={styles.card}>
-                  <ExerciseIllustration slug={shown.slug} testID={`${testID}-illustration`} />
-                </AppCard>
-              ) : null}
-
-              {/* The drawn illustration names its muscles beside its anatomy figure; anything else
-                  (a hosted image, or none) has them here. */}
-              {shown.illustrationUrl || !shown.slug ? (
-                <AppCard testID={`${testID}-muscles`} style={styles.card}>
-                  <MuscleLine
-                    label="Primary"
-                    groups={[shown.muscleGroup]}
-                    color={accent}
-                    strong
-                    testID={`${testID}-primary`}
-                  />
-                  {shown.secondaryMuscleGroups.length > 0 ? (
-                    <MuscleLine
-                      label="Also Works"
-                      groups={shown.secondaryMuscleGroups}
-                      color={colors.textSecondaryBright}
-                      testID={`${testID}-secondary`}
-                    />
-                  ) : null}
-                </AppCard>
-              ) : null}
-
-              {shown.summary ? (
-                <Text testID={`${testID}-summary`} style={styles.summary}>
-                  {shown.summary}
-                </Text>
-              ) : null}
-
-              <Steps
-                title="Starting Position"
-                steps={shown.setupSteps}
-                accent={accent}
-                testID={`${testID}-setup`}
-              />
-              <Steps
-                title="How to Do It"
-                steps={shown.executionSteps}
-                accent={accent}
-                testID={`${testID}-steps`}
-              />
-              {shown.commonMistakes.length > 0 ? (
-                <View testID={`${testID}-mistakes`} style={styles.section}>
-                  <SectionHeader label="Common Mistakes" />
-                  <AppCard>
-                    {shown.commonMistakes.map((mistake, i) => (
-                      <View key={i} style={[styles.row, i > 0 && styles.rowGap]}>
-                        <Feather
-                          name="x-circle"
-                          size={16}
-                          color={colors.textMuted}
-                          style={styles.rowIcon}
-                        />
-                        <Text style={styles.rowText}>{mistake}</Text>
-                      </View>
-                    ))}
-                  </AppCard>
-                </View>
-              ) : null}
-            </>
+            <HowToPage guide={shown} drawn={!!drawn} accent={accent} testID={testID} />
           )}
         </ScrollView>
       </View>
@@ -206,59 +163,143 @@ export function ExerciseGuideSheet({
   );
 }
 
-function MuscleLine({
-  label,
-  groups,
-  color,
-  strong,
+function HowToPage({
+  guide,
+  drawn,
+  accent,
   testID,
 }: {
-  label: string;
-  groups: MuscleGroup[];
-  color: string;
-  strong?: boolean;
+  guide: ExerciseGuide;
+  drawn: boolean;
+  accent: string;
   testID: string;
 }) {
+  const { labels, rows, tips } = phaseRows(guide);
+  const mistakes = guide.commonMistakes;
   return (
-    <View testID={testID} style={styles.muscleLine}>
-      <Text style={styles.muscleLabel}>{label}</Text>
-      <View style={styles.pills}>
-        {groups.map((group) => (
-          <View key={group} style={[styles.pill, { borderColor: color }]}>
-            <Text style={[styles.pillText, { color }, strong && styles.pillStrong]}>
-              {MUSCLE_GROUP_LABELS[group]}
-            </Text>
-          </View>
-        ))}
+    <View style={styles.sections}>
+      <View style={styles.intro}>
+        {guide.summary ? (
+          <Text testID={`${testID}-summary`} style={styles.summary}>
+            {guide.summary}
+          </Text>
+        ) : (
+          <View style={styles.summary} />
+        )}
+        {drawn ? (
+          <MuscleFigures slug={guide.slug} height={112} testID={`${testID}-muscles`} />
+        ) : null}
       </View>
+      {/* A hosted image or no drawing: the muscles in words. */}
+      {!drawn ? (
+        <Text testID={`${testID}-muscle-groups`} style={styles.muscleGroups}>
+          {[guide.muscleGroup, ...guide.secondaryMuscleGroups]
+            .map((group) => MUSCLE_GROUP_LABELS[group])
+            .join(' · ')}
+        </Text>
+      ) : null}
+
+      {guide.illustrationUrl ? (
+        <AppCard testID={`${testID}-illustration-card`}>
+          <Image
+            testID={`${testID}-illustration-image`}
+            source={{ uri: guide.illustrationUrl }}
+            style={styles.hostedImage}
+            contentFit="contain"
+            accessibilityLabel={`How ${guide.name} is done`}
+          />
+        </AppCard>
+      ) : drawn ? (
+        <AppCard testID={`${testID}-illustration-card`}>
+          <ExercisePhases slug={guide.slug} accent={accent} testID={`${testID}-illustration`} />
+        </AppCard>
+      ) : null}
+
+      <AppCard testID={`${testID}-steps`} style={styles.rowsCard}>
+        {rows.map((text, i) =>
+          text ? (
+            <View
+              key={i}
+              testID={`${testID}-step-${i}`}
+              style={[styles.stepRow, i > 0 && styles.stepDivider]}
+            >
+              <View style={[styles.stepNumber, { borderColor: accent }]}>
+                <Text style={[styles.stepNumberText, { color: accent }]}>{i + 1}</Text>
+              </View>
+              <Text style={styles.stepLabel} numberOfLines={2}>
+                {labels[i]}
+              </Text>
+              <View style={[styles.stepRule, { backgroundColor: withAlpha(accent, 0.45) }]} />
+              <Text style={styles.stepText}>{text}</Text>
+            </View>
+          ) : null,
+        )}
+      </AppCard>
+
+      {tips.length > 0 || mistakes.length > 0 ? (
+        <View style={styles.lists}>
+          {tips.length > 0 ? (
+            <CueList
+              title="Key Tips"
+              icon="check"
+              color={accent}
+              items={tips}
+              testID={`${testID}-tips`}
+            />
+          ) : null}
+          {mistakes.length > 0 ? (
+            <CueList
+              title="Common Mistakes"
+              icon="x"
+              color={colors.destructive}
+              items={mistakes}
+              testID={`${testID}-mistakes`}
+            />
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function Steps({
+/** Key Tips or Common Mistakes: a ringed icon and title over its items, each marked the same. */
+function CueList({
   title,
-  steps,
-  accent,
+  icon,
+  color,
+  items,
   testID,
 }: {
   title: string;
-  steps: string[];
-  accent: string;
+  icon: 'check' | 'x';
+  color: string;
+  items: readonly string[];
   testID: string;
 }) {
-  if (steps.length === 0) return null;
   return (
-    <View testID={testID} style={styles.section}>
-      <SectionHeader label={title} />
-      <AppCard>
-        {steps.map((step, i) => (
-          <View key={i} style={[styles.row, i > 0 && styles.rowGap]}>
-            <Text style={[styles.stepNumber, { color: accent }]}>{i + 1}</Text>
-            <Text style={styles.rowText}>{step}</Text>
+    <AppCard testID={testID} style={styles.listCard}>
+      <View style={styles.listHeader}>
+        <View
+          style={[
+            styles.listIcon,
+            { backgroundColor: withAlpha(color, 0.14), borderColor: withAlpha(color, 0.5) },
+          ]}
+        >
+          <Feather name={icon} size={14} color={color} />
+        </View>
+        <Text style={styles.listTitle} numberOfLines={2}>
+          {title}
+        </Text>
+      </View>
+      <View style={styles.listItems}>
+        {items.map((item, i) => (
+          <View key={i} style={styles.listItem}>
+            <Feather name={icon} size={14} color={color} style={styles.listMark} />
+            <Text style={styles.listText}>{item}</Text>
           </View>
         ))}
-      </AppCard>
-    </View>
+      </View>
+    </AppCard>
   );
 }
 
@@ -266,10 +307,45 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingTop: spacing.md,
+    paddingTop: spacing.lg,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    // Centred on the page, not on what the close button leaves.
+    marginLeft: 36 + spacing.md,
+  },
+  headerRule: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+  },
+  headerText: {
+    ...typeScale.caption,
+    letterSpacing: 3,
+    color: colors.textSecondaryBright,
+  },
+  close: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginLeft: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceLift,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorderStrong,
   },
   content: {
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxxl,
   },
@@ -279,9 +355,9 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   titleIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -294,73 +370,113 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   target: {
-    ...typeScale.label,
+    ...typeScale.callout,
     marginTop: 2,
   },
-  line: {
-    ...typeScale.secondary,
-    color: colors.textMuted,
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+  sections: {
+    gap: spacing.md,
+    marginTop: spacing.md,
   },
-  card: {
-    marginBottom: spacing.md,
+  intro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  summary: {
+    ...typeScale.callout,
+    color: colors.textSecondaryBright,
+    flex: 1,
+  },
+  muscleGroups: {
+    ...typeScale.secondary,
+    color: colors.textSecondary,
   },
   hostedImage: {
     width: '100%',
     aspectRatio: 16 / 9,
   },
-  muscleLine: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  muscleLabel: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-  },
-  pills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  pill: {
-    borderWidth: 1,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
+  rowsCard: {
     paddingVertical: spacing.xs,
   },
-  pillText: {
-    ...typeScale.label,
-  },
-  pillStrong: {
-    fontWeight: '700',
-  },
-  summary: {
-    ...typeScale.body,
-    color: colors.textSecondaryBright,
-    marginVertical: spacing.sm,
-  },
-  section: {
-    marginTop: spacing.lg,
-  },
-  row: {
+  stepRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.md,
+    paddingVertical: spacing.md,
   },
-  rowGap: {
-    marginTop: spacing.md,
+  stepDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
   },
   stepNumber: {
-    ...typeScale.statSmall,
-    width: 18,
-    textAlign: 'center',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  rowIcon: {
+  stepNumberText: {
+    ...typeScale.label,
+  },
+  stepLabel: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+    width: 72,
+  },
+  stepRule: {
+    width: 1,
+    alignSelf: 'stretch',
+    marginVertical: spacing.xs,
+  },
+  stepText: {
+    ...typeScale.secondary,
+    color: colors.textSecondaryBright,
+    flex: 1,
+  },
+  lists: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'stretch',
+  },
+  listCard: {
+    flex: 1,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingBottom: spacing.sm,
+    marginBottom: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
+  },
+  listIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  listItems: {
+    gap: spacing.sm,
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+  },
+  listMark: {
     marginTop: 2,
   },
-  rowText: {
-    ...typeScale.body,
+  listText: {
+    ...typeScale.secondary,
     color: colors.textPrimary,
     flex: 1,
   },

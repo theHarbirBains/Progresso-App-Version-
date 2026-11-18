@@ -573,6 +573,7 @@ export default [
   }),
   bw({
     slug: 'bw-side-plank',
+    action: 'Hold',
     name: 'Side Plank',
     muscle: 'core',
     pattern: 'hold',
@@ -591,6 +592,7 @@ export default [
   }),
   bw({
     slug: 'bw-hollow-hold',
+    action: 'Hold',
     name: 'Hollow Body Hold',
     muscle: 'core',
     pattern: 'hold',

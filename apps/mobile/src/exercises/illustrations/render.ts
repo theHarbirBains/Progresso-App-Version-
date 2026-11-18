@@ -80,6 +80,8 @@ export interface ViewBox {
 export interface RenderedScene {
   frames: RenderedFrame[];
   viewBox: ViewBox;
+  /** Where the scene's moving point (`motion`) is in each frame, on screen; none without one. */
+  motionPoints?: P2[];
   /** Hands or feet that couldn't reach where the pose put them -- a pose to fix. */
   warnings: string[];
 }
@@ -1161,8 +1163,10 @@ export function renderScene(
   });
 
   const pad = 7;
+  const moving = scene.motion;
   return {
     frames,
+    motionPoints: moving ? skeletons.map((skeleton) => cam.toScreen(moving(skeleton))) : undefined,
     viewBox: {
       x: minX - pad,
       y: minY - pad,

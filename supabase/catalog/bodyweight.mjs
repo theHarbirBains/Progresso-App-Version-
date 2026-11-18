@@ -126,6 +126,7 @@ export default [
   },
   {
     slug: 'bw-plank',
+    action: 'Hold',
     name: 'Plank',
     equipment: 'bodyweight',
     muscle: 'core',

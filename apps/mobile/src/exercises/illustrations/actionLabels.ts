@@ -89,6 +89,92 @@ const EXERCISE_LABELS: Record<string, string | readonly string[]> = {
 };
 
 /**
+ * What the way back to the start is called -- How to Do It's third phase, drawn from the first
+ * position again -- by what the movement does (`action`, from actionLabels) and how it moves.
+ */
+export function returnLabel(
+  slug: string,
+  pattern: string,
+  equipment: string,
+  action: string,
+): string {
+  // A cable or a selectorized or plate-loaded machine returns the handles; free weights lower.
+  const machine = equipment === 'cable' || slug.startsWith('mc-') || slug.startsWith('pl-');
+  switch (action) {
+    case 'Press':
+      return pattern === 'core_rotation' ||
+        pattern === 'dip' ||
+        (machine && pattern === 'horizontal_push')
+        ? 'Return'
+        : 'Lower';
+    case 'Lift':
+    case 'Shrug':
+    case 'Raise':
+    case 'Thrust':
+    case 'Bridge':
+    case 'Sit Up':
+    case 'Pull Up':
+    case 'Pike':
+    case 'Hold':
+      return 'Lower';
+    case 'Hinge':
+    case 'Squat':
+    case 'Bend':
+    case 'Reach':
+      return 'Stand';
+    case 'Row':
+    case 'Pull':
+    case 'Crunch':
+      return machine ? 'Return' : 'Lower';
+    case 'Curl':
+      return pattern === 'knee_flexion' && slug !== 'mc-lying-leg-curl' ? 'Return' : 'Lower';
+    case 'Lower':
+      return (
+        {
+          dip: 'Press Up',
+          triceps_extension: 'Extend',
+          pullover: 'Pull Over',
+          lunge: 'Stand',
+          horizontal_push: 'Push Up',
+          vertical_push: 'Push Up',
+          knee_flexion: 'Curl Up',
+        }[pattern] ?? 'Return'
+      );
+    case 'Extend':
+      return pattern === 'knee_extension' || pattern === 'hip_extension' ? 'Lower' : 'Return';
+    case 'Open':
+      return pattern === 'fly' && !/rear|reverse/.test(slug) ? 'Squeeze' : 'Return';
+    case 'Squeeze':
+      return pattern === 'fly' ? 'Open' : 'Return';
+    case 'Twist':
+      return 'Other Side';
+    case 'Rotate':
+      return machine ? 'Return' : 'Other Side';
+    case 'Roll Out':
+      return 'Roll Back';
+    case 'Walk':
+      return 'Finish';
+    case 'Step Up':
+      return 'Step Down';
+    case 'Step Back':
+      return 'Step In';
+    case 'Step Forward':
+      return 'Push Back';
+    case 'Turn':
+      return 'Turn Back';
+    case 'Drag':
+      return 'Plant';
+    case 'Swing':
+      return 'Swing Back';
+    case 'Clean':
+    case 'Snatch':
+      return 'Drop Back';
+    default:
+      return 'Return';
+  }
+}
+
+/**
  * What each of an exercise's `count` positions is called. One position is held; with more, the
  * first is the start and the last what the movement does -- the catalogue's `action` for it, or
  * one named above, or its pattern's -- and any between (an exercise with three always names

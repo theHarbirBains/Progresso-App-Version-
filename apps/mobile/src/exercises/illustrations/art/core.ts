@@ -145,16 +145,29 @@ function russianTwist(kind: 'dumbbell' | 'landmine'): SceneSpec {
 
 function plank(): SceneSpec {
   const s = torsoOf({ pelvis: [0, 27, 0], pitch: 84 });
+  const forearms = hands({ at: [s.shoulders.r[0] + 26, 4, 9], pole: [0, -1, 0.3] });
   return {
     view: { yaw: -24, tilt: 12 },
     frames: [
+      // Set up on the forearms with the knees down, shoulders where the plank holds them...
+      {
+        pose: {
+          pelvis: [2.7, 15, 0],
+          pitch: 70,
+          headPitch: -6,
+          feet: feet({ at: [-83, 9, 9], pole: [0, -1, 0], toe: [-1, -0.3, 0] }),
+          hands: forearms,
+        },
+        props: [mat([-14, 0, 0], { x: 190, z: 66 })],
+      },
+      // ...then the knees lift into the plank.
       {
         pose: {
           pelvis: [0, 27, 0],
           pitch: 84,
           headPitch: -6,
           feet: feet({ at: [-84, 9, 9], toe: [0.25, -1, 0] }),
-          hands: hands({ at: [s.shoulders.r[0] + 26, 4, 9], pole: [0, -1, 0.3] }),
+          hands: forearms,
         },
         props: [mat([-14, 0, 0], { x: 190, z: 66 })],
       },

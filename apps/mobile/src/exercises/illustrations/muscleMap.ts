@@ -6,8 +6,7 @@ import type { PoseSpec } from './rig';
 
 // The anatomy figure beside an exercise's drawing: the instructor's own body, bare and grey, head
 // to toe, standing easy with every muscle marked out and the worked ones coloured -- primary red,
-// secondary yellow. It's seen from the front or from behind, whichever shows more of the primary
-// muscles (a row or a Romanian deadlift from behind, a press or a squat from the front).
+// secondary yellow -- from the front and from behind, side by side.
 
 const STANDING: PoseSpec = {
   pelvis: [0, 94, 0],
@@ -15,30 +14,6 @@ const STANDING: PoseSpec = {
   feet: stance(11, 0, 6),
 };
 
-/** Muscles that face the front, and the back (the side delts and forearms show from either). */
-const FRONT: ReadonlySet<MuscleRegion> = new Set([
-  'chest',
-  'frontDelts',
-  'sideDelts',
-  'biceps',
-  'forearms',
-  'abs',
-  'obliques',
-  'quads',
-  'adductors',
-  'tibialis',
-]);
-const BACK: ReadonlySet<MuscleRegion> = new Set([
-  'rearDelts',
-  'triceps',
-  'traps',
-  'upperBack',
-  'lats',
-  'lowerBack',
-  'glutes',
-  'hamstrings',
-  'calves',
-]);
 export interface MuscleMapView {
   side: 'front' | 'back';
   frame: RenderedFrame;
@@ -46,26 +21,18 @@ export interface MuscleMapView {
 }
 
 /**
- * Which way the figure faces: the side more of the primary muscles are on, then more of the
- * secondary ones; the front when it's even.
+ * The anatomy figure for a set of highlighted muscles, head to toe: from the front and from behind,
+ * side by side, so every worked muscle shows on one or the other.
  */
-export function mapSide(highlight: MuscleHighlight): 'front' | 'back' {
-  const lean = (regions: readonly MuscleRegion[]) =>
-    regions.filter((r) => BACK.has(r)).length - regions.filter((r) => FRONT.has(r)).length;
-  const primary = lean(highlight.primary);
-  if (primary !== 0) return primary > 0 ? 'back' : 'front';
-  return lean(highlight.secondary) > 0 ? 'back' : 'front';
-}
-
-/** The anatomy figure for a set of highlighted muscles: one view, head to toe. */
 export function renderMuscleMap(highlight: MuscleHighlight): MuscleMapView[] {
-  const side = mapSide(highlight);
-  const drawn = renderScene(
-    { view: { yaw: side === 'front' ? -90 : 90, tilt: 0 }, frames: [{ pose: STANDING }] },
-    highlight,
-    { anatomy: true },
-  );
-  return [{ side, frame: drawn.frames[0], viewBox: drawn.viewBox }];
+  return (['front', 'back'] as const).map((side) => {
+    const drawn = renderScene(
+      { view: { yaw: side === 'front' ? -90 : 90, tilt: 0 }, frames: [{ pose: STANDING }] },
+      highlight,
+      { anatomy: true },
+    );
+    return { side, frame: drawn.frames[0], viewBox: drawn.viewBox };
+  });
 }
 
 /** The muscle groups the key names: the primary ones, then the secondary ones not already named. */

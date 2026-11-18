@@ -390,6 +390,20 @@ function sidePlank(): SceneSpec {
   return {
     view: FRONT,
     frames: [
+      // Set up lying on the side, propped on the elbow, hips down...
+      {
+        pose: {
+          pelvis: [0, 11, -8.6],
+          lean: -52,
+          feet: { r: { at: [0, 16, 75], toe: [1, 0, 0] }, l: { at: [0, 8, 72], toe: [1, 0, 0] } },
+          hands: {
+            r: { at: [4, 30, 0], pole: [-0.2, 1, 0.4] },
+            l: { at: [26, 4, -46], pole: [-0.3, -1, 0] },
+          },
+        },
+        props: [floorMat],
+      },
+      // ...then the hips lift into the hold.
       {
         pose: {
           pelvis: [0, 28, 0],
@@ -410,6 +424,17 @@ function hollowHold(): SceneSpec {
   return {
     view: THREE_QUARTER,
     frames: [
+      // Lying flat, arms overhead...
+      {
+        pose: {
+          pelvis: [8, 9, 0],
+          pitch: -88,
+          feet: feet({ at: [94, 8, 8], pole: [0, 1, 0], toe: [0.3, 1, 0] }),
+          hands: hands({ at: [-92, 7, 14], pole: [0, 1, 0.1] }),
+        },
+        props: [floorMat],
+      },
+      // ...then the shoulders and legs lift into the hollow.
       {
         pose: {
           pelvis: [8, 12, 0],

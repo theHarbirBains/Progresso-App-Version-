@@ -1,4 +1,4 @@
-import { actionLabels } from './actionLabels';
+import { actionLabels, returnLabel } from './actionLabels';
 import { BACK_ART } from './art/back';
 import { CABLE_ART } from './art/cable';
 import { CORE_ART } from './art/core';
@@ -71,6 +71,66 @@ export function frameLabels(slug: string): string[] {
   if (!hasIllustration(slug)) return [];
   const entry = BUILTIN_CATALOG[slug];
   return actionLabels(slug, entry.pattern, EXERCISE_ART[slug].frames.length, entry.action);
+}
+
+/** Which way a phase moves on screen, for the arrow beside it. */
+export type PhaseDirection = 'up' | 'down' | 'left' | 'right';
+
+export interface GuidePhase {
+  /** Its name in its pill ("Setup", "Lower", "Stand"). */
+  label: string;
+  /** Which of the illustration's frames shows it. */
+  frame: number;
+  /** Which way the movement goes to reach it; none for the setup, or a scene without motion. */
+  direction?: PhaseDirection;
+}
+
+function directionBetween(
+  from: readonly [number, number],
+  to: readonly [number, number],
+): PhaseDirection | undefined {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  if (Math.hypot(dx, dy) < 4) return undefined;
+  if (Math.abs(dy) >= Math.abs(dx) * 0.6) return dy > 0 ? 'down' : 'up';
+  return dx > 0 ? 'right' : 'left';
+}
+
+/**
+ * How to Do It's three phases: the setup, the movement and the way back -- drawn from the first
+ * position again -- or, for an exercise drawn in three positions, each of them.
+ */
+export function guidePhases(slug: string): GuidePhase[] {
+  if (!hasIllustration(slug)) return [];
+  const entry = BUILTIN_CATALOG[slug];
+  const labels = frameLabels(slug);
+  const points = illustrationFor(slug)?.motionPoints;
+  const towards = (from: number, to: number) =>
+    points ? directionBetween(points[from], points[to]) : undefined;
+  if (labels.length >= 3) {
+    return [
+      { label: 'Setup', frame: 0 },
+      { label: labels[1], frame: 1, direction: towards(0, 1) },
+      { label: labels[2], frame: 2, direction: towards(1, 2) },
+    ];
+  }
+  if (labels.length === 2) {
+    // A first position with a name of its own (a walking lunge's Lunge) is the way back too.
+    const back =
+      labels[0] === 'Start'
+        ? returnLabel(slug, entry.pattern, entry.equipment, labels[1])
+        : labels[0];
+    return [
+      { label: 'Setup', frame: 0 },
+      { label: labels[1], frame: 1, direction: towards(0, 1) },
+      { label: back, frame: 0, direction: towards(1, 0) },
+    ];
+  }
+  return [
+    { label: 'Setup', frame: 0 },
+    { label: 'Hold', frame: 0 },
+    { label: 'Finish', frame: 0 },
+  ];
 }
 
 export interface MuscleMap {
