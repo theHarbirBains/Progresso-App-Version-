@@ -1,9 +1,9 @@
 import { memo } from 'react';
 import { View } from 'react-native';
-import { Text } from '../design/Text';
 import type { MeasurementType } from '../exercises/movementTypes';
 import { formatDuration } from '../lib/duration';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { SetNumber } from './SetNumber';
 import { LiveSetActions } from './SetRowActions';
 import { stopSetTimer, useSetTimer } from './setTimers';
 import { SetValueFields } from './SetValueFields';
@@ -36,6 +36,10 @@ interface Props {
   onToggleComplete?: (setId: string, timed?: Record<string, string>) => void;
   /** Omitted where removing a set mid-workout isn't offered (see each caller). */
   onRemove?: (setId: string) => void;
+  /** A warm-up set, shown as W. */
+  warmup?: boolean;
+  /** Tapping the set's number marks or unmarks it as a warm-up (the live workout only). */
+  onToggleWarmup?: (setId: string) => void;
   /** A timed set gets a timer (the live workout only); its check then finishes the timer too. */
   timer?: boolean;
   accentColor: string;
@@ -65,6 +69,8 @@ function SetRowComponent({
   onChangeDuration,
   onToggleComplete,
   onRemove,
+  warmup = false,
+  onToggleWarmup,
   timer = false,
   accentColor,
   onAccentColor,
@@ -85,7 +91,13 @@ function SetRowComponent({
 
   return (
     <View testID={testID} style={styles.setRow}>
-      <Text style={styles.setIndex}>{setIndex}</Text>
+      <SetNumber
+        index={setIndex}
+        warmup={warmup}
+        onToggleWarmup={onToggleWarmup ? () => onToggleWarmup(setId) : undefined}
+        accentColor={accentColor}
+        testID={testID}
+      />
       <SetValueFields
         setId={setId}
         label={`Set ${setIndex}`}

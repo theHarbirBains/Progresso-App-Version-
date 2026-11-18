@@ -23,8 +23,16 @@ export function holdsMeasurement(set: SetRecord, type: MeasurementType): boolean
   }
 }
 
-/** The completed sets that hold what their exercise records, in the order given. */
+/**
+ * The completed working sets that hold what their exercise records, in the order given: what
+ * counts. A warm-up never does.
+ */
 export function loggedSets(sets: SetRecord[], type: MeasurementType): SetRecord[] {
+  return shownSets(sets, type).filter((set) => !set.isWarmup);
+}
+
+/** The completed sets a finished workout shows -- its warm-ups too, marked as such. */
+export function shownSets(sets: SetRecord[], type: MeasurementType): SetRecord[] {
   return sets.filter((set) => set.completedAt !== null && holdsMeasurement(set, type));
 }
 

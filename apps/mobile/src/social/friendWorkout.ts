@@ -36,6 +36,7 @@ export function friendWorkoutDetail(workout: FriendWorkout): WorkoutDetail {
         reps: set.reps,
         durationSeconds: set.durationSeconds,
         completedAt: set.completedAt,
+        isWarmup: set.isWarmup === true,
       })),
     })),
   };

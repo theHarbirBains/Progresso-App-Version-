@@ -4,6 +4,7 @@ import { Text } from '../design/Text';
 import type { MeasurementType } from '../exercises/movementTypes';
 import { formatDuration } from '../lib/duration';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { SetNumber } from './SetNumber';
 import { LiveSetActions, SIDES } from './SetRowActions';
 import { stopSetTimer, useSetTimer } from './setTimers';
 import { SetValueFields } from './SetValueFields';
@@ -46,6 +47,10 @@ interface Props {
   /** Removes both sides together -- a unilateral logical set is one unit, same as completion.
    * Receives the left side's id. Omitted where removing a set mid-workout isn't offered. */
   onRemove?: (setId: string) => void;
+  /** A warm-up set (both sides), shown as W. */
+  warmup?: boolean;
+  /** Tapping the set's number marks or unmarks it as a warm-up; receives the left side's id. */
+  onToggleWarmup?: (setId: string) => void;
   accentColor: string;
   onAccentColor: string;
   testID?: string;
@@ -74,6 +79,8 @@ function UnilateralSetRowComponent({
   measurementType = 'weight_reps',
   onToggleComplete,
   onRemove,
+  warmup = false,
+  onToggleWarmup,
   timer = false,
   accentColor,
   onAccentColor,
@@ -104,7 +111,13 @@ function UnilateralSetRowComponent({
 
   return (
     <View testID={testID} style={styles.unilateralSetRow}>
-      <Text style={styles.setIndex}>{setIndex}</Text>
+      <SetNumber
+        index={setIndex}
+        warmup={warmup}
+        onToggleWarmup={onToggleWarmup ? () => onToggleWarmup(left.id) : undefined}
+        accentColor={accentColor}
+        testID={testID}
+      />
 
       <View style={styles.unilateralSideRows}>
         {SIDES.map(({ key, tag, name }) => (

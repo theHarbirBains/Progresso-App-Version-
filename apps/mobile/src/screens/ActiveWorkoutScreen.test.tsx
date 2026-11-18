@@ -379,6 +379,24 @@ describe('ActiveWorkoutScreen', () => {
     expect(screen.queryByTestId('workout-summary-total-volume')).toBeNull();
   });
 
+  it('marks a set a warm-up from its number -- a W, saved at once -- and a working set again', async () => {
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    const number = screen.getByTestId('exercise-card-we1-set-s1-number');
+    expect(number).toHaveTextContent('1');
+    fireEvent.press(number);
+
+    expect(screen.getByTestId('exercise-card-we1-set-s1-number')).toHaveTextContent('W');
+    await waitFor(() => expect(mockUpdateSet).toHaveBeenCalledWith('s1', { isWarmup: true }));
+
+    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s1-number'));
+    expect(screen.getByTestId('exercise-card-we1-set-s1-number')).toHaveTextContent('1');
+    await waitFor(() => expect(mockUpdateSet).toHaveBeenCalledWith('s1', { isWarmup: false }));
+  });
+
   it('has no check to tap, and saves nothing until a set has a weight and reps', async () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,

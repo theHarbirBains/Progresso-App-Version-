@@ -564,6 +564,36 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     expect(await screen.findByTestId('workout-detail-stat-records')).toHaveTextContent(/^1/);
   });
 
+  it('shows a warm-up, labelled, but never counts it in the sets or the volume', async () => {
+    const withWarmup = {
+      ...twoExercises,
+      exercises: twoExercises.exercises.map((exercise, i) =>
+        i === 0
+          ? {
+              ...exercise,
+              sets: [
+                {
+                  id: 'w0',
+                  setIndex: 0,
+                  weightKg: 60,
+                  reps: 10,
+                  completedAt: '2026-01-01T12:01:00Z',
+                  isWarmup: true,
+                },
+                ...exercise.sets,
+              ],
+            }
+          : exercise,
+      ),
+    };
+    await ready(withWarmup);
+
+    expect(screen.getByTestId('set-label-w0')).toHaveTextContent('Warm-up');
+    // Still 3 sets and 2,360 kg: the 60 kg x 10 warm-up counts toward nothing.
+    expect(screen.getByTestId('workout-detail-stat-sets')).toHaveTextContent(/^3/);
+    expect(screen.getByTestId('workout-detail-stat-volume')).toHaveTextContent(/2,360 kg/);
+  });
+
   it('leaves Duration out of a workout logged with none, the other figures on one row', async () => {
     await ready({ ...twoExercises, completedAt: twoExercises.performedAt });
 

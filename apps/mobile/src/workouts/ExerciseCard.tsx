@@ -55,10 +55,14 @@ export interface ExerciseCardSet {
   duration?: string;
   completed: boolean;
   canComplete: boolean;
+  /** Marked a warm-up (shown as W). */
+  isWarmup?: boolean;
 }
 
 export interface UnilateralExerciseCardSet {
   setIndex: number;
+  /** Marked a warm-up (both sides together, shown as W). */
+  isWarmup?: boolean;
   /** Same shape/validity semantics as ExerciseCardSet -- computed by the
    * caller (ActiveWorkoutScreen's isValidDraft), never re-derived here from
    * raw weight/reps strings. */
@@ -120,6 +124,11 @@ interface Props {
   onAddSet: () => void;
   /** Omitted where removing a set mid-workout isn't offered (see each caller). */
   onRemoveSet?: (setId: string) => void;
+  /**
+   * Marks or unmarks a set as a warm-up by tapping its number (a unilateral set's left side id
+   * stands for both). Omitted where warm-ups aren't offered.
+   */
+  onToggleWarmup?: (setId: string) => void;
   onRemoveExercise: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -240,6 +249,7 @@ function ExerciseCardComponent({
   setTimers = false,
   onAddSet,
   onRemoveSet,
+  onToggleWarmup,
   onRemoveExercise,
   onMoveUp,
   onMoveDown,
@@ -444,6 +454,8 @@ function ExerciseCardComponent({
                 onChangeDuration={onChangeDuration}
                 onToggleComplete={onToggleComplete}
                 onRemove={onRemoveSet}
+                warmup={set.isWarmup}
+                onToggleWarmup={onToggleWarmup}
                 timer={setTimers}
                 accentColor={accentColor}
                 onAccentColor={onAccentColor}
@@ -466,6 +478,8 @@ function ExerciseCardComponent({
                 onChangeDuration={onChangeDuration}
                 onToggleComplete={onToggleComplete}
                 onRemove={onRemoveSet}
+                warmup={set.isWarmup}
+                onToggleWarmup={onToggleWarmup}
                 timer={setTimers}
                 accentColor={accentColor}
                 onAccentColor={onAccentColor}
@@ -515,7 +529,8 @@ function setsEqual(a: ExerciseCardSet[], b: ExerciseCardSet[]): boolean {
       set.reps === other.reps &&
       set.duration === other.duration &&
       set.completed === other.completed &&
-      set.canComplete === other.canComplete,
+      set.canComplete === other.canComplete &&
+      (set.isWarmup ?? false) === (other.isWarmup ?? false),
   );
 }
 
@@ -541,6 +556,7 @@ function unilateralSetsEqual(
     b,
     (set, other) =>
       set.setIndex === other.setIndex &&
+      (set.isWarmup ?? false) === (other.isWarmup ?? false) &&
       unilateralSideEqual(set.left, other.left) &&
       unilateralSideEqual(set.right, other.right),
   );
@@ -630,6 +646,7 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     (prev.sessionCue ?? null) === (next.sessionCue ?? null) &&
     (prev.ownRangeText ?? null) === (next.ownRangeText ?? null) &&
     prev.onEditProgression === next.onEditProgression &&
+    (prev.onToggleWarmup === undefined) === (next.onToggleWarmup === undefined) &&
     flagsEqual(prev.lastTimeFlags ?? null, next.lastTimeFlags ?? null) &&
     previousSessionEqual(prev.previousSession, next.previousSession) &&
     setsEqual(prev.sets, next.sets) &&

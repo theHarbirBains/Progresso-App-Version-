@@ -34,7 +34,13 @@ import {
   type OneRepMax,
   type RepPR,
 } from '../workouts/prQueries';
-import { bestLoggedSet, formatSetValues, loggedSets, setValuesOf } from '../workouts/setValues';
+import {
+  bestLoggedSet,
+  formatSetValues,
+  loggedSets,
+  setValuesOf,
+  shownSets,
+} from '../workouts/setValues';
 import { computeDurationMinutes } from '../workouts/topSetSummary';
 import {
   completedSetsOnly,
@@ -277,10 +283,15 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
       : null;
 
   // The workout as a whole, from the sets that were actually logged -- each holding what its
-  // exercise records (weight and reps; reps; a time).
+  // exercise records (weight and reps; reps; a time). Its warm-ups show, marked, but never count.
   const loggedByExercise = shown.exercises.map((exercise) => {
     const type = measurementTypeOf(exercise);
-    return { exercise, type, sets: loggedSets(exercise.sets, type) };
+    return {
+      exercise,
+      type,
+      sets: loggedSets(exercise.sets, type),
+      withWarmups: shownSets(exercise.sets, type),
+    };
   });
   // Volume is weight x reps: weighted exercises only.
   const weightedLogged = loggedByExercise
@@ -458,7 +469,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         />
       ) : null}
 
-      {shownExercises.map(({ exercise, type, sets: exerciseSets }) => {
+      {shownExercises.map(({ exercise, type, withWarmups: exerciseSets }) => {
         // A workout's history view only ever shows sets that were actually
         // logged -- a blank/incomplete set left over from a live session
         // that was completed anyway is not real performance data.
@@ -530,8 +541,10 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                   type === 'weight_reps' && oneRepMaxes[exercise.id]?.sourceSetId === set.id;
                 const record = isRecord(exercise.id, type, set);
                 return (
-                  <View key={set.id} style={styles.setRow}>
-                    <Text style={styles.setLabel}>Set {set.setIndex}</Text>
+                  <View key={set.id} style={[styles.setRow, set.isWarmup && styles.warmupRow]}>
+                    <Text testID={`set-label-${set.id}`} style={styles.setLabel}>
+                      {set.isWarmup ? 'Warm-up' : `Set ${set.setIndex}`}
+                    </Text>
                     <Text style={styles.setValue}>
                       {type === 'weight_reps'
                         ? `${formatWeightKg(set.weightKg ?? 0, weightUnit)}${weightUnit} × ${set.reps}`

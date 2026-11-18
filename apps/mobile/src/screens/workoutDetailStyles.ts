@@ -70,6 +70,10 @@ export const workoutDetailStyles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.divider,
   },
+  // A warm-up: shown, a little quieter, never counted.
+  warmupRow: {
+    opacity: 0.6,
+  },
   setLabel: {
     ...typeScale.caption,
     color: colors.textMuted,

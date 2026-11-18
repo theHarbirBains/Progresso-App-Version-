@@ -178,6 +178,8 @@ export interface FriendWorkoutSet {
   reps: number | null;
   durationSeconds: number | null;
   completedAt: string | null;
+  /** A warm-up: shown, marked W, counted toward nothing (older servers leave it out). */
+  isWarmup?: boolean;
 }
 
 /** A followed person's finished workout, to read. */

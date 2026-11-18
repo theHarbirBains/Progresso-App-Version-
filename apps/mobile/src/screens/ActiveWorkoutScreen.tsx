@@ -504,6 +504,47 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     }
   }, []);
 
+  // Tapping a set's number marks it a warm-up (or a working set again): shown at once, saved
+  // straight away, put back if the save fails. A unilateral set's two sides go together.
+  const toggleWarmup = useCallback((setId: string) => {
+    const current = workoutRef.current;
+    if (!current) return;
+    for (const exercise of current.exercises) {
+      const set = exercise.sets.find((candidate) => candidate.id === setId);
+      if (!set) continue;
+      const rows =
+        exercise.movementType === 'unilateral'
+          ? exercise.sets.filter((candidate) => candidate.setIndex === set.setIndex)
+          : [set];
+      const ids = new Set(rows.map((row) => row.id));
+      const next = !set.isWarmup;
+      const mark = (value: boolean) =>
+        setWorkout((prev) =>
+          prev
+            ? {
+                ...prev,
+                exercises: prev.exercises.map((ex) =>
+                  ex.id === exercise.id
+                    ? {
+                        ...ex,
+                        sets: ex.sets.map((s) => (ids.has(s.id) ? { ...s, isWarmup: value } : s)),
+                      }
+                    : ex,
+                ),
+              }
+            : prev,
+        );
+      mark(next);
+      void Promise.all(rows.map((row) => updateSet(row.id, { isWarmup: next }))).catch(
+        (err: unknown) => {
+          mark(!next);
+          setError(err instanceof Error ? err.message : 'Failed to mark the warm-up');
+        },
+      );
+      return;
+    }
+  }, []);
+
   const moveHandlersRef = useRef(new Map<string, () => void>());
   function getMoveHandler(index: number, target: number): () => void {
     const cacheKey = `${index}:${target}`;
@@ -838,6 +879,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 setTimers
                 onAddSet={() => handleAddSet(exercise)}
                 onRemoveSet={removeSet}
+                onToggleWarmup={toggleWarmup}
                 onRemoveExercise={() => handleRemoveExercise(exercise.id)}
                 onMoveUp={
                   shownAt > 0 ? getMoveHandler(index, shownExercises[shownAt - 1].index) : undefined

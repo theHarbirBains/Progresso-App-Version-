@@ -289,7 +289,9 @@ export class FeedService {
         .select('id, workout_exercise_id, set_index, weight_kg, reps, duration_seconds')
         .in('workout_exercise_id', workoutExerciseIds)
         .is('deleted_at', null)
-        .not('completed_at', 'is', null);
+        .not('completed_at', 'is', null)
+        // A card's figures and top sets count working sets only: a warm-up counts toward nothing.
+        .eq('is_warmup', false);
       if (setsError) throw new InternalServerErrorException('Failed to load friends feed');
 
       for (const set of sets ?? []) {

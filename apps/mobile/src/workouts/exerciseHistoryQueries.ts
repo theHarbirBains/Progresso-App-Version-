@@ -20,6 +20,8 @@ export function fetchCompletedSetValues<Reps extends number | null = number | nu
       .in('workout_exercise_id', ids)
       .is('deleted_at', null)
       .not('completed_at', 'is', null)
+      // Charts, records and weekly figures count working sets only.
+      .eq('is_warmup', false)
       .order('id')
       .range(from, to),
   );

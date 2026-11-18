@@ -14,8 +14,9 @@ export type CompletedSetRecord = SetRecord & { weightKg: number; reps: number };
  * performance, volume, or share cards should ever include.
  */
 export function completedSetsOnly(sets: SetRecord[]): CompletedSetRecord[] {
+  // A warm-up is real, but counted toward nothing.
   return sets.filter(
     (s): s is CompletedSetRecord =>
-      s.completedAt !== null && s.weightKg !== null && s.reps !== null,
+      s.completedAt !== null && s.weightKg !== null && s.reps !== null && !s.isWarmup,
   );
 }

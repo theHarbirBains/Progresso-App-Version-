@@ -3,6 +3,7 @@ import {
   formatSetValues,
   holdsMeasurement,
   loggedSets,
+  shownSets,
   setValuesOf,
 } from './setValues';
 import type { SetRecord } from './workoutQueries';
@@ -49,6 +50,14 @@ describe('loggedSets', () => {
     ];
 
     expect(loggedSets(sets, 'bodyweight').map((s) => s.id)).toEqual(['a', 'd']);
+  });
+
+  it('leaves warm-ups out of what counts, though a finished workout still shows them', () => {
+    const sets = [set('w', 1, { reps: 10, isWarmup: true }), set('a', 2, { reps: 8 })];
+
+    expect(loggedSets(sets, 'bodyweight').map((s) => s.id)).toEqual(['a']);
+    expect(shownSets(sets, 'bodyweight').map((s) => s.id)).toEqual(['w', 'a']);
+    expect(bestLoggedSet(sets, 'bodyweight')?.id).toBe('a');
   });
 });
 

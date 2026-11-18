@@ -13,7 +13,7 @@ interface Result {
 
 function createQueryBuilder(result: Result) {
   const calls: Record<string, unknown[][]> = {};
-  const methods = ['select', 'in', 'is', 'not'] as const;
+  const methods = ['select', 'in', 'is', 'not', 'eq'] as const;
   const builder: Record<string, unknown> = {};
   for (const m of methods) {
     calls[m] = [];

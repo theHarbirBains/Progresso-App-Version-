@@ -134,6 +134,7 @@ function cardSet(
     duration: setInputs[set.id]?.duration ?? '',
     completed: set.completedAt !== null,
     canComplete: isValidDraft(setInputs[set.id], type),
+    isWarmup: set.isWarmup === true,
   };
 }
 
@@ -209,6 +210,7 @@ export function computeUnilateralSets(
 ): UnilateralExerciseCardSet[] {
   return groupUnilateralSets(sets).map(({ setIndex, left, right }) => ({
     setIndex,
+    isWarmup: left.isWarmup === true,
     left: cardSet(left, setInputs, type),
     right: cardSet(right, setInputs, type),
   }));

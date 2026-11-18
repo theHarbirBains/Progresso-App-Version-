@@ -12,7 +12,8 @@ function fromDbSide(dbSide: 'none' | 'left' | 'right'): SetSide {
 }
 
 /** A set row's columns, as every read here selects them. */
-const SET_COLUMNS = 'id, set_index, side, weight_kg, reps, duration_seconds, completed_at';
+const SET_COLUMNS =
+  'id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_warmup';
 
 function toSetRecord(row: {
   id: string;
@@ -22,6 +23,7 @@ function toSetRecord(row: {
   reps: number | null;
   duration_seconds?: number | null;
   completed_at: string | null;
+  is_warmup?: boolean | null;
 }): SetRecord {
   return {
     id: row.id,
@@ -31,6 +33,8 @@ function toSetRecord(row: {
     reps: row.reps,
     durationSeconds: row.duration_seconds ?? null,
     completedAt: row.completed_at,
+    // Only a warm-up says so; a working set (nearly all of them) leaves it out.
+    ...(row.is_warmup === true ? { isWarmup: true } : {}),
   };
 }
 
@@ -62,6 +66,12 @@ export interface SetRecord {
   /** Null means "planned but not yet performed" -- the same nullable-
    * timestamp convention workouts.completed_at already uses. */
   completedAt: string | null;
+  /**
+   * A warm-up set (`sets.is_warmup`): shown with its workout, marked W, but counted toward
+   * nothing -- no record, top set, volume, set count or progression cue (loggedSets and
+   * completedSetsOnly leave it out). Absent means a working set.
+   */
+  isWarmup?: boolean;
   /** null for a bilateral exercise's set (the overwhelming majority). For a
    * unilateral exercise, a logical set is two SetRecords sharing the same
    * setIndex -- one 'left', one 'right' -- each with its own independent
@@ -247,7 +257,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
     const { data: sets, error: setsError } = await supabase
       .from('sets')
       .select(
-        'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at',
+        'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_warmup',
       )
       .in('workout_exercise_id', workoutExerciseIds)
       .is('deleted_at', null)
@@ -590,9 +600,11 @@ export async function updateSet(
     reps?: number | null;
     durationSeconds?: number | null;
     completedAt?: string | null;
+    isWarmup?: boolean;
   },
 ): Promise<SetRecord> {
   const payload: Record<string, unknown> = {};
+  if (updates.isWarmup !== undefined) payload.is_warmup = updates.isWarmup;
   if (updates.weightKg !== undefined) payload.weight_kg = updates.weightKg;
   if (updates.reps !== undefined) payload.reps = updates.reps;
   if (updates.durationSeconds !== undefined) payload.duration_seconds = updates.durationSeconds;
@@ -665,8 +677,9 @@ export async function fetchPreviousPerformance(
     )
     .is('deleted_at', null)
     // "Previous performance" only ever means real, logged history -- never
-    // a set that was left blank/incomplete in that past workout.
+    // a set that was left blank/incomplete in that past workout, nor a warm-up.
     .not('completed_at', 'is', null)
+    .eq('is_warmup', false)
     .order('set_index', { ascending: true });
   if (setsError) throw new Error(setsError.message);
 

@@ -126,7 +126,9 @@ export async function enrichWorkoutSummaries(
       )
       .in('workout_exercise_id', workoutExerciseIds)
       .is('deleted_at', null)
-      .not('completed_at', 'is', null);
+      .not('completed_at', 'is', null)
+      // A history row's figures and top sets count working sets only.
+      .eq('is_warmup', false);
     if (setsError) throw new Error(setsError.message);
     for (const set of sets ?? []) {
       const type = exerciseInfoById.get(set.workout_exercise_id)?.measurementType ?? 'weight_reps';
