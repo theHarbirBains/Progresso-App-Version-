@@ -4659,6 +4659,39 @@ async function main() {
     );
     record("Nobody else sees someone's exercise settings", settingsSeen.rows[0].n === 0);
 
+    // A photo of your own machine for a built-in (20261203100000_builtin_exercise_photos.sql).
+    await asUserCommitted(lifter, (c) =>
+      c.query(
+        "insert into public.exercise_user_photos (user_id, exercise_id, photo_url) values ($1, $2, 'https://example.com/mine.jpg')",
+        [lifter, builtIn],
+      ),
+    );
+    record('Someone can add a photo of their own machine to a built-in', true);
+    await expectThrows(
+      asUser(lifter, (c) =>
+        c.query(
+          "insert into public.exercise_user_photos (user_id, exercise_id, photo_url) values ($1, $2, 'https://example.com/x.jpg')",
+          [lifter, strangersExercise],
+        ),
+      ),
+      'Only a built-in takes a photo of your own',
+      /only a built-in exercise/,
+    );
+    await expectThrows(
+      asUser(stranger, (c) =>
+        c.query(
+          "insert into public.exercise_user_photos (user_id, exercise_id, photo_url) values ($1, $2, 'https://example.com/x.jpg')",
+          [lifter, builtIn],
+        ),
+      ),
+      "Nobody can add a photo as someone else",
+      /row-level security/,
+    );
+    const photosSeen = await asUser(stranger, (c) =>
+      c.query('select count(*)::int as n from public.exercise_user_photos'),
+    );
+    record("Nobody else sees someone's own machine photos", photosSeen.rows[0].n === 0);
+
     // A split day's plan.
     const day = await asUserCommitted(lifter, async (c) => {
       const split = (

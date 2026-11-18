@@ -9,7 +9,10 @@ import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
 import { colors } from '../design/theme';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
+import { useBuiltinExtras } from '../exercises/builtinExtras';
 import { HowToPill } from '../exercises/HowToPill';
+import { changeOwnPhoto } from '../exercises/ownPhotoActions';
+import { canKeepOwnPhotos, useOwnPhoto } from '../exercises/ownPhotos';
 import { machineLine } from '../exercises/machineDetails';
 import type { LoadType, Pulley, PulleyPosition } from '../exercises/machineLoad';
 import type { MeasurementType, MovementType } from '../exercises/movementTypes';
@@ -263,6 +266,9 @@ function ExerciseCardComponent({
   testID,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // A built-in takes a photo of the person's own machine, shown in place of its drawing.
+  const builtin = !!useBuiltinExtras(exerciseId);
+  const ownPhoto = useOwnPhoto(builtin ? exerciseId : null);
   const isUnilateral = movementType === 'unilateral';
   const hasRows = isUnilateral ? unilateralSets.length > 0 : sets.length > 0;
   const previousSets = previousSession?.sets ?? [];
@@ -355,6 +361,19 @@ function ExerciseCardComponent({
                 label="Rep Range"
                 accessibilityLabel={`Change the rep range for ${exerciseName}`}
                 onPress={fromMenu(onEditProgression)}
+              />
+            ) : null}
+            {builtin && exerciseId && canKeepOwnPhotos() ? (
+              <MenuAction
+                testID={id('photo')}
+                icon="camera"
+                label={ownPhoto ? 'Photo' : 'Add Photo'}
+                accessibilityLabel={
+                  ownPhoto
+                    ? `Change your machine photo for ${exerciseName}`
+                    : `Add a photo of your machine for ${exerciseName}`
+                }
+                onPress={fromMenu(() => changeOwnPhoto({ exerciseId, hasPhoto: !!ownPhoto }))}
               />
             ) : null}
             <MenuAction

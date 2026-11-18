@@ -6,6 +6,8 @@ import { TextButton } from '../design/Button';
 import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
 import { useBuiltinExtras } from './builtinExtras';
+import { changeOwnPhoto } from './ownPhotoActions';
+import { canKeepOwnPhotos, useOwnPhoto } from './ownPhotos';
 import { ExerciseGuideSheet } from './ExerciseGuideSheet';
 import { ExercisePhoto } from './ExercisePhoto';
 import { hasIllustration } from './illustrations/exerciseArt';
@@ -63,9 +65,12 @@ export function ExerciseDetailsCard({
   exerciseId?: string;
 }) {
   const extras = useBuiltinExtras(exerciseId);
+  const own = useOwnPhoto(exerciseId);
   const [guideOpen, setGuideOpen] = useState(false);
   if (!details) return null;
+  // A drawn built-in: its guide is always here, even once a photo of your own replaces the drawing.
   const guided = !!exerciseId && !details.photoUrl && hasIllustration(extras?.slug);
+  const builtin = !!exerciseId && !!extras;
   const line = machineLine(
     details,
     MUSCLE_GROUP_LABELS[details.muscleGroup],
@@ -86,15 +91,22 @@ export function ExerciseDetailsCard({
           <Text testID={`${testID}-line`} style={styles.line} numberOfLines={2}>
             {line}
           </Text>
-          {guided ? (
-            <View style={styles.howTo}>
+          <View style={styles.actions}>
+            {guided ? (
               <TextButton
                 testID={`${testID}-how-to`}
                 label="How to Do It"
                 onPress={() => setGuideOpen(true)}
               />
-            </View>
-          ) : null}
+            ) : null}
+            {builtin && exerciseId && canKeepOwnPhotos() ? (
+              <TextButton
+                testID={`${testID}-photo-action`}
+                label={own ? 'Change Photo' : 'Add Your Machine Photo'}
+                onPress={() => changeOwnPhoto({ exerciseId, hasPhoto: !!own })}
+              />
+            ) : null}
+          </View>
         </View>
       </View>
       {guided && exerciseId ? (
@@ -123,7 +135,10 @@ const styles = StyleSheet.create({
     ...typeScale.secondary,
     color: colors.textSecondary,
   },
-  howTo: {
-    alignSelf: 'flex-start',
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: spacing.lg,
   },
 });

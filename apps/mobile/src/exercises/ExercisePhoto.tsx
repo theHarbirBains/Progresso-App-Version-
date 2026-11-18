@@ -4,6 +4,7 @@ import { Avatar } from '../design/Avatar';
 import { ZoomablePhoto } from '../design/PhotoLightbox';
 import { colors, typeScale } from '../design/theme';
 import { useBuiltinExtras } from './builtinExtras';
+import { useOwnPhoto } from './ownPhotos';
 import { ExerciseGuideSheet } from './ExerciseGuideSheet';
 import { hasIllustration } from './illustrations/exerciseArt';
 import { ExerciseThumbnail } from './illustrations/ExerciseIllustration';
@@ -35,7 +36,19 @@ interface Props {
 // initial, which has nothing worth seeing bigger -- this inner touch never
 // also triggers the row it sits in (e.g. opening the exercise for editing),
 // since RN only ever hands a touch to the innermost responder that claims it.
-export function ExercisePhoto({ uri, name, size = 44, testID, onEdit, exerciseId, slug }: Props) {
+export function ExercisePhoto({
+  uri: storedUri,
+  name,
+  size = 44,
+  testID,
+  onEdit,
+  exerciseId,
+  slug,
+}: Props) {
+  // A built-in shows the person's own photo of their machine, when they've added one, in place of
+  // its drawing (ownPhotos.ts).
+  const own = useOwnPhoto(exerciseId);
+  const uri = own ?? storedUri;
   const frame = { width: size, height: size, borderRadius: size / 2 };
   const extras = useBuiltinExtras(!uri && !slug ? exerciseId : null);
   const artSlug = uri ? null : (slug ?? extras?.slug ?? null);

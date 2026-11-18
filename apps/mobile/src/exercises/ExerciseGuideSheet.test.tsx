@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import {
   forgetBuiltinExtras,
@@ -9,6 +10,7 @@ import { ExerciseDetailsCard } from './ExerciseDetailsCard';
 import { ExerciseGuideSheet } from './ExerciseGuideSheet';
 import { ExercisePhoto } from './ExercisePhoto';
 import { HowToPill } from './HowToPill';
+import { removeOwnPhoto, saveOwnPhoto, setOwnPhotoSource, type OwnPhotoSource } from './ownPhotos';
 
 jest.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
@@ -341,5 +343,85 @@ describe('ExerciseDetailsCard for a built-in', () => {
       await Promise.resolve();
     });
     expect(screen.queryByTestId('card-how-to')).toBeNull();
+  });
+});
+
+describe('a photo of your own machine for a built-in', () => {
+  const details = {
+    muscleGroup: 'chest' as const,
+    movementType: 'bilateral' as const,
+    photoUrl: null,
+    gym: null,
+    equipment: 'dumbbell' as const,
+    grip: null,
+    attachment: null,
+    loadType: null,
+    pulleyPosition: null,
+    pulley: null,
+  };
+  const saved = new Map<string, string>();
+  const stub: OwnPhotoSource = {
+    read: async () => new Map(saved),
+    save: async (exerciseId) => {
+      saved.set(exerciseId, 'https://example.test/my-machine.jpg');
+      return 'https://example.test/my-machine.jpg';
+    },
+    remove: async (exerciseId) => {
+      saved.delete(exerciseId);
+    },
+  };
+
+  beforeEach(() => {
+    saved.clear();
+    setOwnPhotoSource(stub);
+  });
+  afterEach(() => setOwnPhotoSource(null));
+
+  it('is offered on the exercise page, and How to Do It stays there once it replaces the drawing', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    render(
+      <ExerciseDetailsCard
+        details={details}
+        exerciseName="Dumbbell Bench Press"
+        testID="card"
+        exerciseId="bench-id"
+      />,
+    );
+    const action = await screen.findByTestId('card-photo-action');
+    expect(action).toHaveTextContent('Add Your Machine Photo');
+    fireEvent.press(action);
+    expect(alert).toHaveBeenCalledWith(
+      'Add Your Machine Photo',
+      expect.any(String),
+      expect.arrayContaining([expect.objectContaining({ text: 'Take Photo' })]),
+    );
+    alert.mockRestore();
+
+    await act(async () => {
+      await saveOwnPhoto('bench-id', 'file:///picked.jpg');
+    });
+    expect(screen.getByTestId('card-photo-action')).toHaveTextContent('Change Photo');
+    // The drawing gives way to the photo; the guide is still a tap away.
+    expect(screen.queryByTestId('card-photo-illustration')).toBeNull();
+    expect(screen.getByTestId('card-how-to')).toBeTruthy();
+  });
+
+  it('shows in place of the drawing wherever the exercise is, until it is removed', async () => {
+    saved.set('bench-id', 'https://example.test/my-machine.jpg');
+    render(
+      <ExercisePhoto
+        testID="photo"
+        uri={null}
+        name="Dumbbell Bench Press"
+        exerciseId="bench-id"
+        slug="db-bench-press"
+      />,
+    );
+    await waitFor(() => expect(screen.queryByTestId('photo-illustration')).toBeNull());
+
+    await act(async () => {
+      await removeOwnPhoto('bench-id');
+    });
+    expect(screen.getByTestId('photo-illustration')).toBeTruthy();
   });
 });

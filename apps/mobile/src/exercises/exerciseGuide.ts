@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { setBuiltinSources, type BuiltinExtras, type ExerciseGuide } from './builtinExtras';
+// The person's own machine photos for built-ins come with the guides.
+import './ownPhotoQueries';
 import type { Equipment } from './equipment';
 import type { MeasurementType, MovementType } from './movementTypes';
 import type { MuscleGroup } from './muscleGroups';
