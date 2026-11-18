@@ -1273,6 +1273,7 @@ export default [
   {
     slug: 'pt-pinch-hold',
     name: 'Plate Pinch Hold',
+    retired: true,
     equipment: 'other',
     attachment: 'Weight plates',
     measure: 'timed',

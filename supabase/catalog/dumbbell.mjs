@@ -1469,6 +1469,7 @@ export default [
   {
     slug: 'db-static-hold',
     name: 'Dumbbell Static Hold',
+    retired: true,
     equipment: 'dumbbell',
     muscle: 'forearms',
     measure: 'timed',
@@ -1495,6 +1496,7 @@ export default [
   {
     slug: 'db-finger-curl',
     name: 'Dumbbell Finger Curl',
+    retired: true,
     equipment: 'dumbbell',
     muscle: 'forearms',
     highlight: { primary: ['forearms'], secondary: [] },

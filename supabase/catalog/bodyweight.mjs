@@ -81,6 +81,7 @@ export default [
   {
     slug: 'bw-dead-hang',
     name: 'Dead Hang',
+    retired: true,
     equipment: 'bodyweight',
     muscle: 'forearms',
     measure: 'timed',

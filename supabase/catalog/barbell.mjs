@@ -1295,6 +1295,7 @@ export default [
   {
     slug: 'bb-finger-curl',
     name: 'Barbell Finger Curl',
+    retired: true,
     equipment: 'barbell',
     muscle: 'forearms',
     highlight: { primary: ['forearms'], secondary: [] },
@@ -1520,6 +1521,7 @@ export default [
   {
     slug: 'bb-hack-squat',
     name: 'Barbell Hack Squat',
+    retired: true,
     equipment: 'barbell',
     muscle: 'quadriceps',
     highlight: { primary: ['quads'], secondary: ['glutes', 'hamstrings', 'forearms'] },
