@@ -779,6 +779,7 @@ export default [
   {
     slug: 'bb-high-pull',
     name: 'Barbell High Pull',
+    retired: true,
     equipment: 'barbell',
     muscle: 'shoulders',
     highlight: {
