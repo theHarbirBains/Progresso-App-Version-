@@ -6,7 +6,7 @@ import pg from 'pg';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -6088,25 +6088,43 @@ async function main() {
     ).rows;
     const active = builtins.filter((r) => r.is_active);
     const count = (equipment) => active.filter((r) => r.equipment === equipment && r.slug).length;
-    const counts = Object.fromEntries(
-      ['dumbbell', 'barbell', 'cable', 'machine', 'kettlebell', 'bodyweight', 'other'].map((e) => [
-        e,
-        count(e),
-      ]),
-    );
+    // What the catalogue (supabase/catalog) says the library is: every exercise but the retired.
+    const catalogue = (
+      await Promise.all(
+        [
+          'dumbbell',
+          'barbell',
+          'bodyweight',
+          'cable',
+          'machine',
+          'smith',
+          'kettlebell',
+          'accessories',
+        ].map(
+          async (file) =>
+            (await import(pathToFileURL(join(__dirname, '..', 'catalog', `${file}.mjs`)).href))
+              .default,
+        ),
+      )
+    ).flat();
+    const expected = {};
+    for (const ex of catalogue.filter((e) => !e.retired)) {
+      expected[ex.equipment] = (expected[ex.equipment] ?? 0) + 1;
+    }
+    const counts = Object.fromEntries(Object.keys(expected).map((e) => [e, count(e)]));
     record(
-      'The library has 396 built-ins, each active: 97 dumbbell, 95 barbell, 62 cable, 62 machine, 13 kettlebell, 36 bodyweight, 31 other',
-      JSON.stringify(counts) ===
-        JSON.stringify({
-          dumbbell: 97,
-          barbell: 95,
-          cable: 62,
-          machine: 62,
-          kettlebell: 13,
-          bodyweight: 36,
-          other: 31,
-        }),
-      JSON.stringify(counts),
+      `The library has the catalogue's ${catalogue.filter((e) => !e.retired).length} built-ins, each active, by equipment`,
+      JSON.stringify(counts) === JSON.stringify(expected) &&
+        active.filter((r) => r.slug).length === catalogue.filter((e) => !e.retired).length,
+      JSON.stringify({ counts, expected }),
+    );
+    const retiredSlugs = catalogue.filter((e) => e.retired).map((e) => e.slug);
+    const retiredRows = builtins.filter((r) => retiredSlugs.includes(r.slug));
+    record(
+      'A retired built-in is hidden, never deleted: its row keeps its slug and guide for any workout that logged it',
+      retiredRows.length === retiredSlugs.length &&
+        retiredRows.every((r) => !r.is_active && r.instructions && r.execution_steps.length > 0),
+      retiredSlugs.join(', '),
     );
     const unguided = active.filter(
       (r) =>

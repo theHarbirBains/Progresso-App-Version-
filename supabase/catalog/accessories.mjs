@@ -631,6 +631,7 @@ export default [
   bw({
     slug: 'bw-burpee',
     name: 'Burpee',
+    retired: true,
     muscle: 'quadriceps',
     pattern: 'conditioning',
     action: ['Start', 'Plank', 'Jump'],
@@ -733,6 +734,7 @@ export default [
   band({
     slug: 'bd-row',
     name: 'Resistance Band Row',
+    retired: true,
     muscle: 'back',
     pattern: 'horizontal_pull',
     highlight: { primary: ['lats', 'upperBack'], secondary: ['biceps', 'rearDelts'] },
@@ -752,6 +754,7 @@ export default [
   band({
     slug: 'bd-chest-press',
     name: 'Resistance Band Chest Press',
+    retired: true,
     muscle: 'chest',
     pattern: 'horizontal_push',
     highlight: { primary: ['chest'], secondary: ['triceps', 'frontDelts'] },
@@ -846,6 +849,7 @@ export default [
   trx({
     slug: 'st-chest-press',
     name: 'Suspension Trainer Chest Press',
+    retired: true,
     muscle: 'chest',
     pattern: 'horizontal_push',
     action: 'Lower',
@@ -997,6 +1001,7 @@ export default [
   {
     slug: 'mb-chest-pass',
     name: 'Medicine Ball Chest Pass',
+    retired: true,
     equipment: 'other',
     attachment: 'Medicine ball',
     muscle: 'chest',
@@ -1209,6 +1214,7 @@ export default [
   {
     slug: 'sb-swiss-bar-bench',
     name: 'Swiss Bar Bench Press',
+    retired: true,
     equipment: 'barbell',
     attachment: 'Swiss bar',
     grip: 'Neutral',
@@ -1275,6 +1281,7 @@ export default [
   {
     slug: 'pt-svend-press',
     name: 'Svend Press',
+    retired: true,
     equipment: 'other',
     attachment: 'Weight plate',
     muscle: 'chest',

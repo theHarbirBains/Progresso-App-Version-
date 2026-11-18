@@ -102,6 +102,7 @@ export default [
   {
     slug: 'bb-floor-press',
     name: 'Barbell Floor Press',
+    retired: true,
     equipment: 'barbell',
     muscle: 'chest',
     highlight: { primary: ['chest', 'triceps'], secondary: ['frontDelts'] },
@@ -291,6 +292,7 @@ export default [
   {
     slug: 'bb-pendlay-row',
     name: 'Pendlay Row',
+    retired: true,
     equipment: 'barbell',
     muscle: 'back',
     highlight: { primary: ['lats', 'upperBack'], secondary: ['rearDelts', 'biceps', 'lowerBack'] },
@@ -491,6 +493,7 @@ export default [
   {
     slug: 'bb-deficit-deadlift',
     name: 'Deficit Deadlift',
+    retired: true,
     equipment: 'barbell',
     muscle: 'back',
     highlight: {

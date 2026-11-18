@@ -1288,6 +1288,7 @@ export default [
   {
     slug: 'db-tate-press',
     name: 'Dumbbell Tate Press',
+    retired: true,
     equipment: 'dumbbell',
     muscle: 'triceps',
     highlight: { primary: ['triceps'], secondary: ['chest'] },
