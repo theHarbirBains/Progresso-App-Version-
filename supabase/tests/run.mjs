@@ -4684,13 +4684,107 @@ async function main() {
           [lifter, builtIn],
         ),
       ),
-      "Nobody can add a photo as someone else",
+      'Nobody can add a photo as someone else',
       /row-level security/,
     );
     const photosSeen = await asUser(stranger, (c) =>
       c.query('select count(*)::int as n from public.exercise_user_photos'),
     );
     record("Nobody else sees someone's own machine photos", photosSeen.rows[0].n === 0);
+
+    // The one-off move of custom exercises onto their built-ins
+    // (20261204100000_custom_exercises_to_builtins.sql): staged here with one of production's
+    // ids, then the migration run again.
+    {
+      const mergedId = 'e53eded9-13e0-4887-ba3d-4f7248966c06'; // "Standing Calf Raises (BCC)"
+      const keptId = randomUUID(); // a custom exercise not on the list
+      await admin.query(
+        "insert into public.exercises (id, created_by, name, muscle_group, photo_url) values ($1, $2, 'Standing Calf Raises (BCC)', 'calves', 'https://example.test/bcc-calf.jpg'), ($3, $2, 'Calf Raise (Single Stack)', 'calves', null)",
+        [mergedId, lifter, keptId],
+      );
+      const calfWorkout = (
+        await admin.query(
+          "insert into public.workouts (user_id, name, completed_at) values ($1, 'Calves', now()) returning id",
+          [lifter],
+        )
+      ).rows[0].id;
+      const calfWe = (
+        await admin.query(
+          'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+          [calfWorkout, mergedId],
+        )
+      ).rows[0].id;
+      await admin.query(
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 120, 12, now())',
+        [calfWe],
+      );
+      const calfSplit = (
+        await admin.query(
+          "insert into public.workout_splits (user_id, name) values ($1, 'Legs') returning id",
+          [lifter],
+        )
+      ).rows[0].id;
+      const calfDay = (
+        await admin.query(
+          "insert into public.workout_split_days (workout_split_id, user_id, name, order_index) values ($1, $2, 'Calves', 1) returning id",
+          [calfSplit, lifter],
+        )
+      ).rows[0].id;
+      await admin.query(
+        'insert into public.workout_split_day_exercises (workout_split_day_id, exercise_id, position, target_sets) values ($1, $2, 0, 3)',
+        [calfDay, mergedId],
+      );
+      await admin.query(
+        readFileSync(
+          join(migrationsDir, '20261204100000_custom_exercises_to_builtins.sql'),
+          'utf8',
+        ),
+      );
+      const calfBuiltIn = (
+        await admin.query("select id from public.exercises where slug = 'mc-standing-calf-raise'")
+      ).rows[0].id;
+      const moved = await admin.query(
+        'select exercise_id from public.workout_exercises where id = $1',
+        [calfWe],
+      );
+      record(
+        'A custom exercise with a built-in twin hands its history to the built-in',
+        moved.rows[0]?.exercise_id === calfBuiltIn,
+      );
+      const calfPr = await admin.query(
+        'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 12',
+        [lifter, calfBuiltIn],
+      );
+      record(
+        "Its records are the built-in's, worked out again from the moved sets",
+        calfPr.rows[0]?.best_weight_kg === '120.00',
+        JSON.stringify(calfPr.rows),
+      );
+      const planned = await admin.query(
+        'select exercise_id from public.workout_split_day_exercises where workout_split_day_id = $1',
+        [calfDay],
+      );
+      record(
+        'Its split-day plan points at the built-in',
+        planned.rows[0]?.exercise_id === calfBuiltIn,
+      );
+      const photo = await admin.query(
+        'select photo_url from public.exercise_user_photos where user_id = $1 and exercise_id = $2',
+        [lifter, calfBuiltIn],
+      );
+      record(
+        "Its photo becomes its owner's photo of their machine for the built-in",
+        photo.rows[0]?.photo_url === 'https://example.test/bcc-calf.jpg',
+      );
+      const left = await admin.query('select id from public.exercises where id = any($1::uuid[])', [
+        [mergedId, keptId],
+      ]);
+      record(
+        'The custom exercise is deleted; one not on the list stays as it is',
+        left.rows.length === 1 && left.rows[0].id === keptId,
+        JSON.stringify(left.rows),
+      );
+    }
 
     // A split day's plan.
     const day = await asUserCommitted(lifter, async (c) => {
