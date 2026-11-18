@@ -51,7 +51,7 @@ function GradientDef({ gradient, id }: { gradient: Gradient; id: string }) {
   );
 }
 
-function Frame({
+export function Frame({
   frame,
   viewBox,
   width,
@@ -103,7 +103,7 @@ function Frame({
 }
 
 /** A unique, SVG-safe prefix for one drawing's clip paths and gradients. */
-function usePrefix(): string {
+export function usePrefix(): string {
   return `ill${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 }
 

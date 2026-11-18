@@ -8,6 +8,7 @@ import {
 import { ExerciseDetailsCard } from './ExerciseDetailsCard';
 import { ExerciseGuideSheet } from './ExerciseGuideSheet';
 import { ExercisePhoto } from './ExercisePhoto';
+import { HowToPill } from './HowToPill';
 
 jest.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
 jest.mock('../lib/supabase', () => ({ supabase: { from: jest.fn() } }));
@@ -56,6 +57,28 @@ beforeEach(() => {
 
 afterAll(() => setBuiltinSources(null));
 
+describe('HowToPill', () => {
+  it("offers a built-in's guide under its name, and nothing for a person's own exercise", async () => {
+    render(
+      <>
+        <HowToPill
+          testID="pill"
+          exerciseId="bench-id"
+          name="Dumbbell Bench Press"
+          accentColor="#D99A50"
+        />
+        <HowToPill testID="own-pill" exerciseId="own-id" name="My Press" accentColor="#D99A50" />
+      </>,
+    );
+
+    const pill = await screen.findByTestId('pill');
+    expect(pill).toHaveTextContent(/How to Do It/);
+    expect(screen.queryByTestId('own-pill')).toBeNull();
+    fireEvent.press(pill);
+    expect(await screen.findByTestId('pill-sheet-page-dots')).toBeTruthy();
+  });
+});
+
 describe('ExerciseGuideSheet', () => {
   it('shows how to do the exercise: its muscles, three phases, Key Tips and Common Mistakes', async () => {
     render(
@@ -101,6 +124,36 @@ describe('ExerciseGuideSheet', () => {
     expect(screen.getByTestId('exercise-guide-mistakes')).toHaveTextContent(/Flaring the elbows/);
   });
 
+  it('swipes to a second page, Technique & Setup, with dots that say which page is showing', async () => {
+    render(
+      <ExerciseGuideSheet
+        visible
+        onClose={jest.fn()}
+        exerciseId="bench-id"
+        exerciseName="Dumbbell Bench Press"
+      />,
+    );
+
+    expect(await screen.findByTestId('exercise-guide-page-1')).toBeTruthy();
+    expect(screen.getByTestId('exercise-guide-technique-target')).toHaveTextContent(
+      'Technique & Setup',
+    );
+    // What makes this exercise what it is: here, how the dumbbells are held.
+    expect(screen.getByTestId('exercise-guide-technique-card-0')).toHaveTextContent(
+      /Overhand Grip.*Palms facing toward your feet/,
+    );
+    const dots = screen.getByTestId('exercise-guide-page-dots');
+    expect(dots.props.accessibilityLabel).toBe('Page 1 of 2');
+    fireEvent.press(screen.getByTestId('exercise-guide-next'));
+    expect(screen.getByTestId('exercise-guide-page-dots').props.accessibilityLabel).toBe(
+      'Page 2 of 2',
+    );
+    fireEvent.press(screen.getByTestId('exercise-guide-previous'));
+    expect(screen.getByTestId('exercise-guide-page-dots').props.accessibilityLabel).toBe(
+      'Page 1 of 2',
+    );
+  });
+
   it("falls back on the exercise's own steps when How to Do It has no phases for it", async () => {
     setBuiltinSources({
       extras: async () => extras,
@@ -124,6 +177,8 @@ describe('ExerciseGuideSheet', () => {
       'Chest · Shoulders · Triceps',
     );
     expect(screen.queryByTestId('exercise-guide-tips')).toBeNull();
+    // Nothing drawn, so no second page.
+    expect(screen.queryByTestId('exercise-guide-page-dots')).toBeNull();
   });
 
   it("says when the guide can't be read, and Retry reads it again", async () => {

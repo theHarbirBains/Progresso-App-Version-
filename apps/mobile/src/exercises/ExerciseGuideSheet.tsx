@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Modal,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+  type ScrollViewInstance,
+} from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { AppCard } from '../design/AppCard';
@@ -11,7 +19,8 @@ import { useAppTheme } from '../theme/appThemeContext';
 import { withAlpha } from '../theme/accentColor';
 import { readExerciseGuide, type ExerciseGuide } from './builtinExtras';
 import type { Equipment } from './equipment';
-import { BUILTIN_GUIDES } from './illustrations/builtinGuides.generated';
+import { BUILTIN_GUIDES, type TechniqueCard } from './illustrations/builtinGuides.generated';
+import { TechniqueVisual } from './illustrations/TechniqueVisuals';
 import { ExercisePhases, MuscleFigures } from './illustrations/ExerciseIllustration';
 import { guidePhases, hasIllustration, muscleMapFor } from './illustrations/exerciseArt';
 import { MUSCLE_GROUP_LABELS } from './muscleGroups';
@@ -101,6 +110,8 @@ export function ExerciseGuideSheet({
     ? (muscleMapFor(shown.slug)?.primaryNames.join(' / ') ?? MUSCLE_GROUP_LABELS[shown.muscleGroup])
     : null;
   const drawn = shown && !shown.illustrationUrl && hasIllustration(shown.slug);
+  // Technique & Setup's cards: only a drawn built-in has them.
+  const technique = shown?.slug && drawn ? (BUILTIN_GUIDES[shown.slug]?.technique ?? []) : [];
 
   return (
     <Modal
@@ -129,37 +140,218 @@ export function ExerciseGuideSheet({
             <Feather name="x" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.titleRow}>
-            <View style={[styles.titleIcon, { borderColor: accent }]}>
-              <MaterialCommunityIcons
-                name={EQUIPMENT_ICONS[shown?.equipment ?? 'other']}
-                size={22}
-                color={accent}
-              />
-            </View>
-            <View style={styles.titleText}>
-              <Text testID={`${testID}-name`} style={styles.name}>
-                {shown?.name ?? exerciseName}
-              </Text>
-              {target ? (
-                <Text testID={`${testID}-target`} style={[styles.target, { color: accent }]}>
-                  {target}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-
-          {error ? (
-            <ErrorState testID={`${testID}-error`} message={error} onRetry={retry} />
-          ) : !shown ? (
-            <SkeletonRows testID={`${testID}-loading`} count={5} />
-          ) : (
-            <HowToPage guide={shown} drawn={!!drawn} accent={accent} testID={testID} />
-          )}
-        </ScrollView>
+        {shown && !error ? (
+          <Pager
+            testID={testID}
+            pages={[
+              <ScrollView key="how" contentContainerStyle={styles.content}>
+                <TitleRow
+                  name={shown.name}
+                  subtitle={target}
+                  equipment={shown.equipment}
+                  accent={accent}
+                  testID={testID}
+                />
+                <HowToPage guide={shown} drawn={!!drawn} accent={accent} testID={testID} />
+              </ScrollView>,
+              ...(technique.length > 0 && shown.slug
+                ? [
+                    <ScrollView key="technique" contentContainerStyle={styles.content}>
+                      <TitleRow
+                        name={shown.name}
+                        subtitle="Technique & Setup"
+                        equipment={shown.equipment}
+                        accent={accent}
+                        testID={`${testID}-technique`}
+                      />
+                      <TechniquePage
+                        slug={shown.slug}
+                        cards={technique}
+                        accent={accent}
+                        testID={`${testID}-technique`}
+                      />
+                    </ScrollView>,
+                  ]
+                : []),
+            ]}
+            accent={accent}
+          />
+        ) : (
+          <ScrollView contentContainerStyle={styles.content}>
+            <TitleRow
+              name={exerciseName}
+              subtitle={null}
+              equipment={shown?.equipment ?? null}
+              accent={accent}
+              testID={testID}
+            />
+            {error ? (
+              <ErrorState testID={`${testID}-error`} message={error} onRetry={retry} />
+            ) : (
+              <SkeletonRows testID={`${testID}-loading`} count={5} />
+            )}
+          </ScrollView>
+        )}
       </View>
     </Modal>
+  );
+}
+
+/** The ringed equipment icon beside the exercise's name, with a line in the accent under it. */
+function TitleRow({
+  name,
+  subtitle,
+  equipment,
+  accent,
+  testID,
+}: {
+  name: string;
+  subtitle: string | null;
+  equipment: Equipment | null;
+  accent: string;
+  testID: string;
+}) {
+  return (
+    <View style={styles.titleRow}>
+      <View style={[styles.titleIcon, { borderColor: accent }]}>
+        <MaterialCommunityIcons
+          name={EQUIPMENT_ICONS[equipment ?? 'other']}
+          size={22}
+          color={accent}
+        />
+      </View>
+      <View style={styles.titleText}>
+        <Text testID={`${testID}-name`} style={styles.name}>
+          {name}
+        </Text>
+        {subtitle ? (
+          <Text testID={`${testID}-target`} style={[styles.target, { color: accent }]}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The guide's pages side by side, swiped between (How to Do It, then Technique & Setup), with the
+ * page dots under them -- the current one in the accent -- and a chevron either side to step.
+ */
+function Pager({
+  pages,
+  accent,
+  testID,
+}: {
+  pages: React.ReactNode[];
+  accent: string;
+  testID: string;
+}) {
+  const { width: windowWidth } = useWindowDimensions();
+  const [measured, setMeasured] = useState(0);
+  const width = measured || windowWidth;
+  const [index, setIndex] = useState(0);
+  const scroller = useRef<ScrollViewInstance>(null);
+  const go = (to: number) => {
+    const next = Math.max(0, Math.min(pages.length - 1, to));
+    scroller.current?.scrollTo({ x: next * width, animated: true });
+    setIndex(next);
+  };
+  return (
+    <View style={styles.pager} onLayout={(e) => setMeasured(e.nativeEvent.layout.width)}>
+      <ScrollView
+        ref={scroller}
+        testID={`${testID}-pages`}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEnabled={pages.length > 1}
+        onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
+      >
+        {pages.map((page, i) => (
+          <View key={i} testID={`${testID}-page-${i}`} style={{ width }}>
+            {page}
+          </View>
+        ))}
+      </ScrollView>
+      {pages.length > 1 ? (
+        <View
+          testID={`${testID}-page-dots`}
+          style={styles.dots}
+          accessible
+          accessibilityRole="adjustable"
+          accessibilityLabel={`Page ${index + 1} of ${pages.length}`}
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+          onAccessibilityAction={(e) =>
+            go(index + (e.nativeEvent.actionName === 'increment' ? 1 : -1))
+          }
+        >
+          <TouchableOpacity
+            testID={`${testID}-previous`}
+            onPress={() => go(index - 1)}
+            disabled={index === 0}
+            hitSlop={12}
+            style={index === 0 && styles.dimmed}
+          >
+            <Feather name="chevron-left" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+          {pages.map((_, i) => (
+            <View
+              key={i}
+              testID={`${testID}-page-dot-${i}`}
+              style={[
+                styles.dot,
+                i === index ? [styles.dotActive, { backgroundColor: accent }] : null,
+              ]}
+            />
+          ))}
+          <TouchableOpacity
+            testID={`${testID}-next`}
+            onPress={() => go(index + 1)}
+            disabled={index === pages.length - 1}
+            hitSlop={12}
+            style={index === pages.length - 1 && styles.dimmed}
+          >
+            <Feather name="chevron-right" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** Technique & Setup: each card a picture beside its title and a line or two. */
+function TechniquePage({
+  slug,
+  cards,
+  accent,
+  testID,
+}: {
+  slug: string;
+  cards: readonly TechniqueCard[];
+  accent: string;
+  testID: string;
+}) {
+  return (
+    <View style={styles.sections}>
+      {cards.map((c, i) => (
+        <AppCard key={i} testID={`${testID}-card-${i}`}>
+          <View style={styles.techniqueRow}>
+            <TechniqueVisual
+              slug={slug}
+              visual={c.visual}
+              accent={accent}
+              size={TECHNIQUE_PICTURE}
+              testID={`${testID}-card-${i}-picture`}
+            />
+            <View style={styles.techniqueText}>
+              <Text style={styles.techniqueTitle}>{c.title}</Text>
+              <Text style={styles.techniqueBody}>{c.text}</Text>
+            </View>
+          </View>
+        </AppCard>
+      ))}
+    </View>
   );
 }
 
@@ -303,7 +495,52 @@ function CueList({
   );
 }
 
+/** A Technique & Setup card's picture, square. */
+const TECHNIQUE_PICTURE = 112;
+
 const styles = StyleSheet.create({
+  pager: {
+    flex: 1,
+  },
+  dots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: colors.textMuted,
+  },
+  dotActive: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+  },
+  dimmed: {
+    opacity: 0.3,
+  },
+  techniqueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  techniqueText: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  techniqueTitle: {
+    ...typeScale.cardTitle,
+    color: colors.textPrimary,
+  },
+  techniqueBody: {
+    ...typeScale.secondary,
+    color: colors.textSecondaryBright,
+  },
   page: {
     flex: 1,
     backgroundColor: colors.background,

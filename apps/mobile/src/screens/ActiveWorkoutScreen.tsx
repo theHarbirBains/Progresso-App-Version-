@@ -25,6 +25,7 @@ import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
 import { ExerciseCard } from '../workouts/ExerciseCard';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
+import { useWarmupHint } from '../workouts/WarmupHint';
 import { FoldedExercises, PlanDone, UpNextCard } from '../workouts/GuidedWorkoutParts';
 import { forgetGuided, isGuided, plannedSetsFor, remainingPlan } from '../workouts/guidedWorkout';
 import { fetchDayPlan, type PlannedExercise } from '../workouts/splitPlanQueries';
@@ -608,46 +609,55 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     }
   }, []);
 
+  // The one-time tip on how to mark a warm-up, on the first exercise shown (WarmupHint.tsx).
+  const { show: showWarmupHint, dismiss: dismissWarmupHint } = useWarmupHint();
+  const warmupHint = useMemo(() => ({ onDismiss: dismissWarmupHint }), [dismissWarmupHint]);
+
   // Tapping a set's number marks it a warm-up (or a working set again): shown at once, saved
   // straight away, put back if the save fails. A unilateral set's two sides go together.
-  const toggleWarmup = useCallback((setId: string) => {
-    const current = workoutRef.current;
-    if (!current) return;
-    for (const exercise of current.exercises) {
-      const set = exercise.sets.find((candidate) => candidate.id === setId);
-      if (!set) continue;
-      const rows =
-        exercise.movementType === 'unilateral'
-          ? exercise.sets.filter((candidate) => candidate.setIndex === set.setIndex)
-          : [set];
-      const ids = new Set(rows.map((row) => row.id));
-      const next = !set.isWarmup;
-      const mark = (value: boolean) =>
-        setWorkout((prev) =>
-          prev
-            ? {
-                ...prev,
-                exercises: prev.exercises.map((ex) =>
-                  ex.id === exercise.id
-                    ? {
-                        ...ex,
-                        sets: ex.sets.map((s) => (ids.has(s.id) ? { ...s, isWarmup: value } : s)),
-                      }
-                    : ex,
-                ),
-              }
-            : prev,
+  const toggleWarmup = useCallback(
+    (setId: string) => {
+      const current = workoutRef.current;
+      if (!current) return;
+      // Marked once, the tip on how has done its job.
+      dismissWarmupHint();
+      for (const exercise of current.exercises) {
+        const set = exercise.sets.find((candidate) => candidate.id === setId);
+        if (!set) continue;
+        const rows =
+          exercise.movementType === 'unilateral'
+            ? exercise.sets.filter((candidate) => candidate.setIndex === set.setIndex)
+            : [set];
+        const ids = new Set(rows.map((row) => row.id));
+        const next = !set.isWarmup;
+        const mark = (value: boolean) =>
+          setWorkout((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  exercises: prev.exercises.map((ex) =>
+                    ex.id === exercise.id
+                      ? {
+                          ...ex,
+                          sets: ex.sets.map((s) => (ids.has(s.id) ? { ...s, isWarmup: value } : s)),
+                        }
+                      : ex,
+                  ),
+                }
+              : prev,
+          );
+        mark(next);
+        void Promise.all(rows.map((row) => updateSet(row.id, { isWarmup: next }))).catch(
+          (err: unknown) => {
+            mark(!next);
+            setError(err instanceof Error ? err.message : 'Failed to mark the warm-up');
+          },
         );
-      mark(next);
-      void Promise.all(rows.map((row) => updateSet(row.id, { isWarmup: next }))).catch(
-        (err: unknown) => {
-          mark(!next);
-          setError(err instanceof Error ? err.message : 'Failed to mark the warm-up');
-        },
-      );
-      return;
-    }
-  }, []);
+        return;
+      }
+    },
+    [dismissWarmupHint],
+  );
 
   const moveHandlersRef = useRef(new Map<string, () => void>());
   function getMoveHandler(index: number, target: number): () => void {
@@ -859,6 +869,10 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const shownExercises = workout.exercises
     .map((exercise, index) => ({ exercise, index }))
     .filter(({ exercise }) => activeTab === 'all' || exercise.muscleGroup === activeTab);
+  // The warm-up tip sits on the first exercise on show (the one being done, in a guided workout).
+  const hintedExerciseId = guidedPlan
+    ? (focused?.id ?? null)
+    : (shownExercises[0]?.exercise.id ?? null);
   const totalSets = computeTotalSets(workout.exercises);
   // One exercise's card -- every exercise in the usual live workout, the one being done in a
   // guided one (no moving it up or down there: the plan sets the order).
@@ -917,6 +931,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       onAddSet={() => handleAddSet(exercise)}
       onRemoveSet={removeSet}
       onToggleWarmup={toggleWarmup}
+      warmupHint={showWarmupHint && exercise.id === hintedExerciseId ? warmupHint : null}
       onRemoveExercise={() => handleRemoveExercise(exercise.id)}
       onMoveUp={moveUp}
       onMoveDown={moveDown}

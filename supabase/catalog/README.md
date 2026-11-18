@@ -12,7 +12,8 @@ specialty bars, plates and the landmine). This is the source of truth -- `npm ru
   name, muscle group, the muscles its illustration highlights and what its positions are called).
 - the app's `apps/mobile/src/exercises/illustrations/builtinGuides.generated.ts`: How to Do It's
   three phase rows and three Key Tips for every active built-in, from `howto.mjs` (each step's phase
-  in `PHASES`, the tips from the `TIPS` library by `EXERCISE_TIPS`). A new exercise needs both.
+  in `PHASES`, the tips from the `TIPS` library by `EXERCISE_TIPS`), and its Technique & Setup cards
+  from `technique.mjs` (`techniqueFor`). A new exercise needs all three.
 
 Never edit either by hand. The migrations it wrote before (`20261128100000`, `20261129100000`) are
 applied to production and never written again. The migration finds a built-in by its `slug` to rename

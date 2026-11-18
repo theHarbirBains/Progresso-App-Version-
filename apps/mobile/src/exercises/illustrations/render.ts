@@ -78,9 +78,28 @@ export interface ViewBox {
   height: number;
 }
 
+/**
+ * Where the body is on the page in one frame -- for a close look at part of it (Technique & Setup):
+ * the hands, the feet, the nearer knee with the hip and ankle either side of it, the hips, the
+ * middle of the torso, the shoulders and the head.
+ */
+export interface SceneAnchors {
+  hands: P2;
+  feet: P2;
+  hip: P2;
+  knee: P2;
+  ankle: P2;
+  hips: P2;
+  torso: P2;
+  shoulders: P2;
+  head: P2;
+}
+
 export interface RenderedScene {
   frames: RenderedFrame[];
   viewBox: ViewBox;
+  /** Each frame's anchors, in the same order. */
+  anchors: SceneAnchors[];
   /** Where the scene's moving point (`motion`) is in each frame, on screen; none without one. */
   motionPoints?: P2[];
   /** Hands or feet that couldn't reach where the pose put them -- a pose to fix. */
@@ -1224,8 +1243,31 @@ export function renderScene(
 
   const pad = 7;
   const moving = scene.motion;
+  const anchors = skeletons.map((s): SceneAnchors => {
+    // The leg nearer the camera, whose knee shows.
+    const near = cam.toView(s.legs.r.joint)[2] >= cam.toView(s.legs.l.joint)[2] ? 'r' : 'l';
+    const leg = s.legs[near];
+    return {
+      hands: cam.toScreen(lerp3(s.arms.r.end, s.arms.l.end, 0.5)),
+      feet: cam.toScreen(
+        lerp3(
+          lerp3(s.feet.r.heel, s.feet.r.toe, 0.5),
+          lerp3(s.feet.l.heel, s.feet.l.toe, 0.5),
+          0.5,
+        ),
+      ),
+      hip: cam.toScreen(leg.root),
+      knee: cam.toScreen(leg.joint),
+      ankle: cam.toScreen(leg.end),
+      hips: cam.toScreen(s.pelvis),
+      torso: cam.toScreen(lerp3(s.pelvis, s.shoulderCenter, 0.5)),
+      shoulders: cam.toScreen(s.shoulderCenter),
+      head: cam.toScreen(s.head),
+    };
+  });
   return {
     frames,
+    anchors,
     motionPoints: moving ? skeletons.map((skeleton) => cam.toScreen(moving(skeleton))) : undefined,
     viewBox: {
       x: minX - pad,

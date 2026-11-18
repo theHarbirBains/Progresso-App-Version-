@@ -1,4 +1,5 @@
 import type { PropsWithChildren } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { fetchExerciseSettings, saveExerciseSetting } from '../workouts/exerciseSettingsQueries';
@@ -409,6 +410,29 @@ describe('ActiveWorkoutScreen', () => {
     fireEvent.press(screen.getByTestId('exercise-card-we1-set-s1-number'));
     expect(screen.getByTestId('exercise-card-we1-set-s1-number')).toHaveTextContent('1');
     await waitFor(() => expect(mockUpdateSet).toHaveBeenCalledWith('s1', { isWarmup: false }));
+  });
+
+  it('tells you once how to mark a warm-up, on the first exercise, until you do or dismiss it', async () => {
+    await AsyncStorage.removeItem('@progresso/warmupHintSeen');
+    const { unmount } = render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    expect(await screen.findByTestId('exercise-card-we1-warmup-hint')).toHaveTextContent(
+      /Tap a set’s number to mark it a warm-up/,
+    );
+
+    // Marking one is learning it: the tip goes, and stays gone.
+    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s1-number'));
+    expect(screen.queryByTestId('exercise-card-we1-warmup-hint')).toBeNull();
+    await waitFor(() => expect(mockUpdateSet).toHaveBeenCalledWith('s1', { isWarmup: true }));
+    unmount();
+
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+    expect(screen.queryByTestId('exercise-card-we1-warmup-hint')).toBeNull();
+    await AsyncStorage.removeItem('@progresso/warmupHintSeen');
   });
 
   it('has no check to tap, and saves nothing until a set has a weight and reps', async () => {

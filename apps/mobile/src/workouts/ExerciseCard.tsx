@@ -9,6 +9,7 @@ import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
 import { colors } from '../design/theme';
 import { ExercisePhoto } from '../exercises/ExercisePhoto';
+import { HowToPill } from '../exercises/HowToPill';
 import { machineLine } from '../exercises/machineDetails';
 import type { LoadType, Pulley, PulleyPosition } from '../exercises/machineLoad';
 import type { MeasurementType, MovementType } from '../exercises/movementTypes';
@@ -19,6 +20,7 @@ import { PER_SIDE_NOTE, SetColumnHeader } from './SetColumnHeader';
 import { SetRow } from './SetRow';
 import { formatSetValues } from './setValues';
 import { UnilateralSetRow, type UnilateralSideInput } from './UnilateralSetRow';
+import { WarmupHint } from './WarmupHint';
 import { formatShortDate } from './workoutFormat';
 
 const PHOTO_SIZE = 48;
@@ -129,6 +131,8 @@ interface Props {
    * stands for both). Omitted where warm-ups aren't offered.
    */
   onToggleWarmup?: (setId: string) => void;
+  /** Shows the one-time tip on how to mark a warm-up (the live workout's first exercise). */
+  warmupHint?: { onDismiss: () => void } | null;
   onRemoveExercise: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -250,6 +254,7 @@ function ExerciseCardComponent({
   onAddSet,
   onRemoveSet,
   onToggleWarmup,
+  warmupHint,
   onRemoveExercise,
   onMoveUp,
   onMoveDown,
@@ -288,6 +293,13 @@ function ExerciseCardComponent({
               MUSCLE_GROUP_LABELS[muscleGroup],
             )}
           </Text>
+          {/* A built-in's guide -- how it's done, its technique and setup -- one tap away. */}
+          <HowToPill
+            testID={id('how-to')}
+            exerciseId={exerciseId}
+            name={exerciseName}
+            accentColor={accentColor}
+          />
           {ownRangeText ? (
             <Text testID={id('own-range')} style={[styles.ownRange, { color: accentColor }]}>
               {ownRangeText}
@@ -435,6 +447,13 @@ function ExerciseCardComponent({
 
       <View style={styles.today}>
         <SectionHeader label="Today" />
+        {warmupHint && onToggleWarmup && hasRows ? (
+          <WarmupHint
+            testID={id('warmup-hint')}
+            accentColor={accentColor}
+            onDismiss={warmupHint.onDismiss}
+          />
+        ) : null}
         {hasRows ? <SetColumnHeader measurementType={measurementType} /> : null}
 
         {isUnilateral
@@ -647,6 +666,7 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     (prev.ownRangeText ?? null) === (next.ownRangeText ?? null) &&
     prev.onEditProgression === next.onEditProgression &&
     (prev.onToggleWarmup === undefined) === (next.onToggleWarmup === undefined) &&
+    (prev.warmupHint == null) === (next.warmupHint == null) &&
     flagsEqual(prev.lastTimeFlags ?? null, next.lastTimeFlags ?? null) &&
     previousSessionEqual(prev.previousSession, next.previousSession) &&
     setsEqual(prev.sets, next.sets) &&

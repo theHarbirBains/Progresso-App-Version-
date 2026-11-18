@@ -710,7 +710,8 @@ function legPress45(kind: 'press' | 'calf'): SceneSpec {
   // A horn out of each side of the carriage, with plates on it.
   const sledPlates: PropBuilder = ({ cam, skeleton }) =>
     [-1, 1].flatMap((sign) => {
-      const c = add(sled(skeleton), [10, -6, 0]);
+      // Up the sled, behind the plate, clear of the feet.
+      const c = add(sled(skeleton), [24, 4, 0]);
       return [
         cylinder(
           cam,
