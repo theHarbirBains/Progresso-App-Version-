@@ -513,11 +513,19 @@ export function pad(center: V3, half: V3, tilt = 0, layer: 0 | 1 = 0, bias = 1):
 /** A machine's seat on a post: `at` is the middle of its top. */
 export function seat(at: V3, half: { x: number; z: number } = { x: 18, z: 18 }): PropBuilder {
   return ({ cam }) => [
-    box(cam, add(at, [0, -3, 0]), [half.x, 0, 0], [0, 3, 0], [0, 0, half.z], PAD, {
+    box(cam, add(at, [0, -3.5, 0]), [half.x, 0, 0], [0, 3.5, 0], [0, 0, half.z], PAD, {
       layer: 0,
       bias: 1,
     }),
-    tube(cam, [at[0], 0, at[2]], [at[0], at[1] - 6, at[2]], 3.2, { floor: true }),
+    // The seat's carriage and its post, standing on a foot.
+    box(cam, add(at, [0, -8, 0]), [half.x * 0.7, 0, 0], [0, 1.2, 0], [0, 0, half.z * 0.7], FRAME, {
+      layer: 0,
+    }),
+    tube(cam, [at[0], 0, at[2]], [at[0], at[1] - 8, at[2]], 3.4, { floor: true }),
+    box(cam, [at[0], 1.2, at[2]], [14, 0, 0], [0, 1.2, 0], [0, 0, 12], FRAME, {
+      layer: 0,
+      floor: true,
+    }),
   ];
 }
 
@@ -551,47 +559,69 @@ export function frame(...points: V3[]): PropBuilder {
   return ({ cam }) =>
     points
       .slice(1)
-      .map((p, i) => tube(cam, points[i], p, 2.6, { floor: points[i][1] < 2 || p[1] < 2 }));
+      .map((p, i) => tube(cam, points[i], p, 3, { floor: points[i][1] < 2 || p[1] < 2 }));
 }
 
-/** A weight stack in its column (a selectorized machine's), standing at `at` with its face toward `face`. */
-export function stack(at: V3, face: V3 = [1, 0, 0], height = 170): PropBuilder {
+/**
+ * A selectorized machine's weight stack, standing at `at` with its face toward `face`, drawn the way
+ * the real towers are built: a base, four square uprights and a header with the pulley, the stack
+ * of plates on its two guide rods with the selector's top plate, and the cable rising from it.
+ */
+export function stack(at: V3, face: V3 = [1, 0, 0], height = 150): PropBuilder {
   return ({ cam }) => {
     const f = normalize([face[0], 0, face[2]]);
     const side = normalize(cross(Y, f));
     const pieces: Piece[] = [];
-    for (const sign of [-1, 1]) {
-      const foot = add(at, scale(side, sign * 13));
-      pieces.push(tube(cam, foot, add(foot, [0, height, 0]), 2.6, { floor: true }));
-    }
+    const point = (fwd: number, y: number, across_: number): V3 =>
+      add(add(at, scale(f, fwd)), add([0, y, 0], scale(side, across_)));
     pieces.push(
-      tube(
-        cam,
-        add(at, add(scale(side, -15), [0, height, 0])),
-        add(at, add(scale(side, 15), [0, height, 0])),
-        2.6,
-      ),
-    );
-    pieces.push(
-      box(
-        cam,
-        add(at, [0, 34, 0]),
-        scale(f, 6),
-        [0, 31, 0],
-        scale(side, 10),
-        { top: ART.plateFace, side: ART.plate, front: ART.plateFace },
-        { layer: 0 },
-      ),
-    );
-    for (const sign of [-1, 1]) {
-      const r0 = add(at, add(scale(side, sign * 6), [0, 65, 0]));
-      pieces.push(tube(cam, r0, add(r0, [0, height - 68, 0]), 0.8, { layer: 0 }));
-    }
-    pieces.push(
-      box(cam, add(at, [0, 1.2, 0]), scale(f, 16), [0, 1.2, 0], scale(side, 17), FRAME, {
+      box(cam, point(0, 2, 0), scale(f, 15), [0, 2, 0], scale(side, 20), FRAME, {
         layer: 0,
         floor: true,
       }),
+    );
+    for (const a of [-17, 17]) {
+      for (const fwd of [-9, 9]) {
+        pieces.push(tube(cam, point(fwd, 0, a), point(fwd, height, a), 2.2, { floor: true }));
+      }
+    }
+    pieces.push(
+      box(cam, point(0, height + 3, 0), scale(f, 12), [0, 3, 0], scale(side, 20), FRAME, {
+        layer: 0,
+      }),
+    );
+    const plateHeight = 2.5;
+    const gap = 0.7;
+    const count = 14;
+    for (let i = 0; i < count; i += 1) {
+      const y = 5 + i * (plateHeight + gap) + plateHeight / 2;
+      pieces.push(
+        box(cam, point(0, y, 0), scale(f, 7.5), [0, plateHeight / 2, 0], scale(side, 12), {
+          top: ART.plateFace,
+          side: ART.plate,
+          front: i % 2 ? ART.plateFace : ART.plate,
+        }),
+      );
+    }
+    const topPlate = 5 + count * (plateHeight + gap) + 1.6;
+    pieces.push(
+      box(cam, point(0, topPlate, 0), scale(f, 8), [0, 1.6, 0], scale(side, 12.5), FRAME, {
+        layer: 0,
+      }),
+    );
+    for (const a of [-8.5, 8.5]) {
+      pieces.push(...rod(cam, point(0, 4, a), point(0, height, a), 0.7, MATERIALS.metal, 3));
+    }
+    pieces.push(...rod(cam, point(0, topPlate, 0), point(0, height, 0), 0.45, MATERIALS.metal, 2));
+    pieces.push(
+      cylinder(
+        cam,
+        point(-2, height - 4, 0),
+        point(2, height - 4, 0),
+        4.2,
+        MATERIALS.iron,
+        ART.plateHub,
+      ),
     );
     return pieces;
   };
@@ -603,26 +633,51 @@ export interface LeverOptions {
   /** How far past `to` the lever runs. */
   beyond?: number;
   half?: number;
+  /**
+   * Whether the pivot stands on a post of its own (the default for one off the floor): false where
+   * the scene's own frame already carries it.
+   */
+  mount?: boolean;
 }
 
-/** A machine's arm, from its pivot to where the lifter moves it (a handle, a pad). */
+/**
+ * A machine's arm, from its pivot to where the lifter moves it (a handle, a pad): a heavy square
+ * tube on a bearing hub, the pivot carried on a post down to a foot on the floor -- set just
+ * outside the arm, with an axle across -- so no arm hangs in the air.
+ */
 export function lever(pivot: V3, to: At, opts: LeverOptions = {}): PropBuilder {
   return ({ cam, skeleton }) => {
     const end = resolve(to, skeleton);
     const dir = normalize(sub(end, pivot));
     const tip = add(end, scale(dir, opts.beyond ?? 0));
-    const pieces: Piece[] = [tube(cam, pivot, tip, opts.half ?? 2.4, { layer: 1, bias: -2 })];
+    const pieces: Piece[] = [tube(cam, pivot, tip, opts.half ?? 2.9, { layer: 1, bias: -2 })];
     pieces.push(
       cylinder(
         cam,
-        add(pivot, [0, 0, -4]),
-        add(pivot, [0, 0, 4]),
-        3.4,
+        add(pivot, [0, 0, -5]),
+        add(pivot, [0, 0, 5]),
+        4.6,
         MATERIALS.iron,
         ART.plateHub,
         { bias: -2 },
       ),
     );
+    if (opts.mount !== false && pivot[1] > 8) {
+      const out = pivot[2] === 0 ? 0 : Math.sign(pivot[2]) * 7;
+      const post: V3 = [pivot[0], 0, pivot[2] + out];
+      pieces.push(tube(cam, post, [post[0], pivot[1] + 5, post[2]], 2.8, { floor: true }));
+      pieces.push(
+        box(cam, add(post, [0, 1.2, 0]), [10, 0, 0], [0, 1.2, 0], [0, 0, 6], FRAME, {
+          layer: 0,
+          floor: true,
+        }),
+      );
+      if (out) {
+        pieces.push(
+          cylinder(cam, pivot, [pivot[0], pivot[1], post[2]], 2, MATERIALS.metal, METAL_END),
+        );
+      }
+    }
     if (opts.plates) {
       const sign =
         opts.plates === 'out' ? Math.sign(pivot[2] || 1) || 1 : -(Math.sign(pivot[2] || 1) || 1);

@@ -4,6 +4,7 @@ import {
   convexHull,
   cross,
   dot,
+  length,
   lerp3,
   normalize,
   polygonPath,
@@ -374,27 +375,48 @@ function patchPolygon(
 function capPolygon(cam: Camera, center: V3, r: number, axis: V3, angle: number): P2[] | null {
   const toCamera: V3 = [cam.facing([1, 0, 0]), cam.facing([0, 1, 0]), cam.facing([0, 0, 1])];
   const c0 = Math.cos(rad(angle));
-  const pts: V3[] = [];
   const u = anyPerpendicular(axis);
   const w = cross(axis, u);
   const rim = Math.sqrt(1 - c0 * c0);
-  for (let i = 0; i < 48; i += 1) {
+  const rimDirs = Array.from({ length: 48 }, (_, i): V3 => {
     const a = (i / 48) * Math.PI * 2;
-    const dir = add(scale(axis, c0), add(scale(u, Math.cos(a) * rim), scale(w, Math.sin(a) * rim)));
-    if (dot(dir, toCamera) >= 0) pts.push(add(center, scale(dir, r)));
-  }
+    return add(scale(axis, c0), add(scale(u, Math.cos(a) * rim), scale(w, Math.sin(a) * rim)));
+  });
   const s1 = anyPerpendicular(toCamera);
   const s2 = cross(toCamera, s1);
-  for (let i = 0; i < 64; i += 1) {
+  const edgeDirs = Array.from({ length: 64 }, (_, i): V3 => {
     const a = (i / 64) * Math.PI * 2;
-    const dir = add(scale(s1, Math.cos(a)), scale(s2, Math.sin(a)));
-    if (dot(dir, axis) >= c0) pts.push(add(center, scale(dir, r)));
+    return add(scale(s1, Math.cos(a)), scale(s2, Math.sin(a)));
+  });
+  // The cap's outline on the page: the part of its rim that faces the camera, then the part of the
+  // sphere's own silhouette inside the cap, each walked in order so a crescent stays a crescent.
+  const rimRun = run(rimDirs, (dir) => dot(dir, toCamera) >= 0);
+  const edgeRun = run(edgeDirs, (dir) => dot(dir, axis) >= c0);
+  const at = (dir: V3) => cam.toScreen(add(center, scale(dir, r)));
+  const rimPts = rimRun.map(at);
+  let edgePts = edgeRun.map(at);
+  if (rimPts.length > 0 && edgePts.length > 0) {
+    const last = rimPts[rimPts.length - 1];
+    const gap = (p: P2) => Math.hypot(p[0] - last[0], p[1] - last[1]);
+    if (gap(edgePts[edgePts.length - 1]) < gap(edgePts[0])) edgePts = [...edgePts].reverse();
   }
-  if (pts.length < 3) return null;
-  const flat = pts.map(cam.toScreen);
-  const cx = flat.reduce((acc, p) => acc + p[0], 0) / flat.length;
-  const cy = flat.reduce((acc, p) => acc + p[1], 0) / flat.length;
-  return flat.sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
+  const pts = [...rimPts, ...edgePts];
+  return pts.length < 3 ? null : pts;
+}
+
+/**
+ * The items that pass, in order around the circle they're sampled from, starting just after one
+ * that doesn't -- so a stretch that wraps past the first sample stays in one piece.
+ */
+function run<T>(items: readonly T[], keep: (item: T) => boolean): T[] {
+  const n = items.length;
+  const kept = items.map(keep);
+  if (kept.every(Boolean)) return [...items];
+  const start = kept.findIndex((k, i) => k && !kept[(i - 1 + n) % n]);
+  if (start < 0) return [];
+  const out: T[] = [];
+  for (let i = 0; i < n && kept[(start + i) % n]; i += 1) out.push(items[(start + i) % n]);
+  return out;
 }
 
 /** A thin dark rim under a part's fills, so parts of the same colour read apart where they overlap. */
@@ -812,6 +834,55 @@ function faceShapes(cam: Camera, s: Skeleton): Shape[] {
   return shapes;
 }
 
+/**
+ * The hand closed around its grip (the arm's end): the back of the hand from the wrist, four
+ * fingers curled around the handle side by side -- each outlined, so they read as fingers -- and
+ * the thumb wrapped over them on the inside of the hand.
+ */
+function fistPiece(cam: Camera, arm: Limb, skin: Material): Piece {
+  const along = normalize(sub(arm.end, arm.joint));
+  // The palm's side, square to the forearm; and across the knuckles, along the handle.
+  const raw = sub(arm.front, scale(along, dot(arm.front, along)));
+  const palm = length(raw) > 0.01 ? normalize(raw) : normalize(cross(along, [0, 0, 1]));
+  let knuckles = normalize(cross(along, palm));
+  // The thumb is on the inside of the hand, toward the body's middle.
+  if (dot(knuckles, sideHint(arm)) > 0) knuckles = scale(knuckles, -1);
+  const at = (a: number, p: number, k: number): V3 =>
+    add(add(add(arm.end, scale(along, a)), scale(palm, p)), scale(knuckles, k));
+  const back = sphereHull(cam, [
+    { c: at(-3.4, -0.2, 0), r: 2.5 },
+    { c: at(-0.6, -0.4, 2.1), r: 2.3 },
+    { c: at(-0.6, -0.4, -2.1), r: 2.3 },
+  ]);
+  const fingers = [-2.55, -0.85, 0.85, 2.55].map((k, i) => {
+    const r = i === 0 ? 1.0 : 1.15;
+    return {
+      poly: sphereHull(cam, [
+        { c: at(0.9, -0.6, k * 0.95), r },
+        { c: at(1.5, 1.2, k), r },
+        { c: at(0.4, 2.4, k * 0.95), r: r * 0.92 },
+      ]),
+      depth: cam.toView(at(1.0, 1.0, k))[2],
+    };
+  });
+  const thumb = {
+    poly: sphereHull(cam, [
+      { c: at(-2.6, 0.9, 2.9), r: 1.45 },
+      { c: at(-0.6, 2.2, 2.6), r: 1.2 },
+      { c: at(0.5, 2.8, 1.4), r: 1.0 },
+    ]),
+    depth: cam.toView(at(-0.6, 2.2, 2.6))[2],
+  };
+  const parts = [...fingers, thumb].sort((a, b) => b.depth - a.depth);
+  const shaded = (poly: P2[]) => [...outlineShapes([poly]), ...shadedShapes([poly], skin, null)];
+  return {
+    depth: cam.toView(arm.end)[2] + 0.8,
+    layer: 1,
+    shapes: [...shaded(back), ...parts.flatMap((part) => shaded(part.poly))],
+    points: [...back, ...parts.flatMap((part) => part.poly)],
+  };
+}
+
 function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight, look: Look): Piece[] {
   const shown = look.muscles ? muscles : null;
   const pieces: Piece[] = [];
@@ -866,18 +937,7 @@ function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight, look: Lo
         isFolded(arm),
       ),
     );
-    // The hand closed around the handle: a mitten along the forearm.
-    const along = normalize(sub(arm.end, arm.joint));
-    const hand = sphereHull(cam, [
-      { c: add(arm.end, scale(along, -2.4)), r: 3.6 },
-      { c: add(arm.end, scale(along, 1.2)), r: 4.3 },
-    ]);
-    pieces.push({
-      depth: cam.toView(arm.end)[2] + 0.8,
-      layer: 1,
-      shapes: [...outlineShapes([hand]), ...shadedShapes([hand], armSkin, null)],
-      points: hand,
-    });
+    pieces.push(fistPiece(cam, arm, armSkin));
 
     const leg = s.legs[side];
     lateralHints.set(leg, sub(s.hips[side], s.pelvis));
@@ -893,7 +953,7 @@ function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight, look: Lo
           BODY.thigh,
           legSkin,
           shown,
-          shorts ? { from: 0, to: 0.4, grow: 0.35, material: shorts } : undefined,
+          shorts ? { from: 0, to: 0.42, grow: 0.18, material: shorts } : undefined,
         ),
         limbDrawing(cam, lowerLimb(leg), 'shin', BODY.shin, legSkin, shown),
         isFolded(leg),
@@ -950,13 +1010,13 @@ function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight, look: Lo
   ]);
   const headCenter = cam.toScreen(s.head);
   // Short hair with some volume on top: a cap of a slightly larger ball, set up and back.
-  const hairCenter = add(add(s.head, scale(up, 0.9)), scale(forward, -0.7));
+  const hairCenter = add(add(s.head, scale(up, 1.2)), scale(forward, -0.9));
   const hair = capPolygon(
     cam,
     hairCenter,
-    BODY.headRadius + 0.9,
-    normalize(add(scale(up, 0.82), scale(forward, -0.5))),
-    74,
+    BODY.headRadius + 1.5,
+    normalize(add(scale(up, 0.8), scale(forward, -0.55))),
+    80,
   );
   const ears = [1, -1]
     .map((side) =>

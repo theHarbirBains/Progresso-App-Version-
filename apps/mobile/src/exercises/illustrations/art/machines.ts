@@ -25,7 +25,8 @@ import {
   toeOut,
   torsoOf,
 } from '../poseKit';
-import { bench, platform, preacherBench } from '../props';
+import { bench, cylinder, METAL_END, platform, preacherBench } from '../props';
+import { ART, MATERIALS } from '../palette';
 import type { PropBuilder, SceneSpec } from '../render';
 import type { FootTarget, PoseSpec, Side, Skeleton } from '../rig';
 
@@ -101,6 +102,9 @@ interface PressSpec {
   pole?: V3;
 }
 
+// Nearly side-on, so a chest press's arm reads from its pivot overhead down to the handles.
+const PRESS_SIDE = { yaw: -16, tilt: 8 };
+
 function press(load: Load, p: PressSpec, view = THREE_QUARTER): SceneSpec {
   const pole = p.pole ?? [-0.3, -0.7, 1];
   const extra = { pitch: p.pitch ?? -8 };
@@ -113,7 +117,8 @@ function press(load: Load, p: PressSpec, view = THREE_QUARTER): SceneSpec {
 }
 
 // Seated, the shoulders are about 106 cm up.
-const CHEST: PressSpec = { start: [8, 98, 24], end: [44, 100, 22], pivot: [-12, 170, 32] };
+// The arms hang from pivots high behind the shoulders and out past them, clear of the head.
+const CHEST: PressSpec = { start: [8, 98, 24], end: [44, 100, 22], pivot: [-26, 164, 42] };
 const INCLINE: PressSpec = {
   start: [-6, 110, 22],
   end: [6, 146, 20],
@@ -124,7 +129,7 @@ const INCLINE: PressSpec = {
 const DECLINE: PressSpec = {
   start: [12, 92, 24],
   end: [44, 84, 22],
-  pivot: [-18, 176, 32],
+  pivot: [-30, 170, 42],
   back: 4,
   pitch: -2,
 };
@@ -702,31 +707,81 @@ function legPress45(kind: 'press' | 'calf'): SceneSpec {
     const m = mid(s.legs.r.end, s.legs.l.end);
     return add(m, scale(SLED_DIR, 5));
   };
-  const sledPlates: PropBuilder = (ctx) =>
-    [-1, 1].flatMap((sign) =>
-      lever(
-        add(sled(ctx.skeleton), [8, -8, sign * 26]),
-        add(sled(ctx.skeleton), [8, -8, sign * 27]),
-        { plates: null },
-      )(ctx),
-    );
+  // A horn out of each side of the carriage, with plates on it.
+  const sledPlates: PropBuilder = ({ cam, skeleton }) =>
+    [-1, 1].flatMap((sign) => {
+      const c = add(sled(skeleton), [10, -6, 0]);
+      return [
+        cylinder(
+          cam,
+          add(c, [0, 0, sign * 24]),
+          add(c, [0, 0, sign * 42]),
+          2.4,
+          MATERIALS.metal,
+          METAL_END,
+        ),
+        cylinder(
+          cam,
+          add(c, [0, 0, sign * 28]),
+          add(c, [0, 0, sign * 32]),
+          15,
+          MATERIALS.iron,
+          ART.plateFace,
+          {
+            hub: 2.4,
+          },
+        ),
+        cylinder(
+          cam,
+          add(c, [0, 0, sign * 32.5]),
+          add(c, [0, 0, sign * 35.5]),
+          12,
+          MATERIALS.iron,
+          ART.plateFace,
+          {
+            hub: 2.4,
+          },
+        ),
+      ];
+    });
   // Feet flat on the plate, toes up along it; a calf press points them.
   const FLAT: V3 = [-0.6, 0.8, 0];
   const POINTED: V3 = [0.15, 1, 0];
   const start: [V3, V3] = kind === 'press' ? [[26, 74, 13], FLAT] : [[52, 97, 13], FLAT];
   const end: [V3, V3] = kind === 'press' ? [[53, 99, 13], FLAT] : [[50, 95, 13], POINTED];
+  // Built like the real ones: the seat low and reclined with a handle either side; the sled riding
+  // two rails that run under it (never through the legs) up to a rear post; the base frame along
+  // the floor joining them.
+  const RAIL_LOW: V3 = [6, 26, 0];
+  const RAIL_HIGH: V3 = [128, 148, 0];
+  const at = (p: V3, z: number): V3 => [p[0], p[1], z];
   return two(
     pose(...start),
     pose(...end),
     [
-      pad([-36, 44, 0], [28, 3, 18], 152),
-      pad([-2, 30, 0], [16, 3, 18], -14),
-      frame([-4, 1.5, 0], [-4, 26, 0]),
-      rail([10, 10, 32], [124, 124, 32]),
-      rail([10, 10, -32], [124, 124, -32]),
-      footPlate(sled, [-0.7071, -0.7071, 0], { w: 30, h: 26 }),
+      pad([-36, 44, 0], [28, 3.6, 19], 152),
+      pad([-2, 30, 0], [16, 3.6, 19], -14),
+      frame([-4, 1.5, 0], [-4, 25, 0]),
+      // The base along the floor, the rails' low mount and the rear post up to their top.
+      frame([-62, 1.5, 22], [140, 1.5, 22]),
+      frame([-62, 1.5, -22], [140, 1.5, -22]),
+      frame([-50, 1.5, 22], [-50, 1.5, -22]),
+      frame([140, 1.5, 22], [140, 1.5, -22]),
+      frame(at(RAIL_LOW, 16), [RAIL_LOW[0], 0, 16]),
+      frame(at(RAIL_LOW, -16), [RAIL_LOW[0], 0, -16]),
+      frame([RAIL_HIGH[0], 0, 16], at(RAIL_HIGH, 16)),
+      frame([RAIL_HIGH[0], 0, -16], at(RAIL_HIGH, -16)),
+      frame(at(RAIL_HIGH, 16), at(RAIL_HIGH, -16)),
+      rail(at(RAIL_LOW, 16), at(RAIL_HIGH, 16)),
+      rail(at(RAIL_LOW, -16), at(RAIL_HIGH, -16)),
+      // The handles beside the seat.
+      frame([0, 1.5, 30], [0, 36, 30]),
+      frame([0, 1.5, -30], [0, 36, -30]),
+      grips('fb'),
+      // The sled: its carriage on the rails, the plates on a horn either side, the foot plate.
+      movingPad((s) => add(sled(s), [10, -6, 0]), [6, 22, 26], 45),
       sledPlates,
-      movingPad((s) => add(sled(s), [14, -14, 0]), [4, 18, 30], 45),
+      footPlate(sled, [-0.7071, -0.7071, 0], { w: 32, h: 30 }),
     ],
     SIDE,
     motion.foot,
@@ -762,7 +817,19 @@ function squatMachine(kind: 'hack' | 'pendulum'): SceneSpec {
     movingPad(shoulderPad('l'), [7, 3, 6]),
   ];
   if (kind === 'hack') {
-    props.push(rail([30, 20, 34], [-76, 204, 34]), rail([30, 20, -34], [-76, 204, -34]));
+    // The angled rails the sled rides, on a base frame with a rear post and a brace across the top;
+    // the handles by the shoulder pads.
+    props.push(
+      rail([30, 20, 34], [-76, 204, 34]),
+      rail([30, 20, -34], [-76, 204, -34]),
+      frame([-76, 204, 34], [-76, 204, -34]),
+      frame([-76, 0, 34], [-76, 204, 34]),
+      frame([-76, 0, -34], [-76, 204, -34]),
+      frame([-76, 1.5, 34], [56, 1.5, 34]),
+      frame([-76, 1.5, -34], [56, 1.5, -34]),
+      movingPad((s) => add(shoulderPad('r')(s), [10, -4, 10]), [2, 2, 5]),
+      movingPad((s) => add(shoulderPad('l')(s), [10, -4, -10]), [2, 2, 5]),
+    );
   } else {
     props.push(
       lever([-70, 214, 30], backAt, { plates: 'out' }),
@@ -809,22 +876,30 @@ function gluteDrive(): SceneSpec {
 
 export const MACHINE_ART: Record<string, SceneSpec> = {
   // Chest
-  'mc-chest-press': press('stack', CHEST),
-  'mc-chest-press-neutral': press('stack', {
-    ...CHEST,
-    start: [8, 98, 20],
-    end: [44, 100, 19],
-    grip: 'neutral',
-    pole: [-0.6, -0.8, 0.5],
-  }),
+  'mc-chest-press': press('stack', CHEST, PRESS_SIDE),
+  'mc-chest-press-neutral': press(
+    'stack',
+    {
+      ...CHEST,
+      start: [8, 98, 20],
+      end: [44, 100, 19],
+      grip: 'neutral',
+      pole: [-0.6, -0.8, 0.5],
+    },
+    PRESS_SIDE,
+  ),
   'mc-incline-chest-press': press('stack', INCLINE),
-  'mc-decline-chest-press': press('stack', DECLINE),
-  'mc-converging-chest-press': press('stack', {
-    ...CHEST,
-    start: [6, 98, 34],
-    end: [44, 100, 10],
-    pivot: [-14, 172, 42],
-  }),
+  'mc-decline-chest-press': press('stack', DECLINE, PRESS_SIDE),
+  'mc-converging-chest-press': press(
+    'stack',
+    {
+      ...CHEST,
+      start: [6, 98, 34],
+      end: [44, 100, 10],
+      pivot: [-28, 164, 48],
+    },
+    PRESS_SIDE,
+  ),
   'mc-pec-deck': pecDeck(),
   'mc-reverse-pec-deck': reversePecDeck(),
   // Back
@@ -865,9 +940,9 @@ export const MACHINE_ART: Record<string, SceneSpec> = {
   'mc-ab-crunch': abCrunchMachine(),
   'mc-rotary-torso': rotaryTorso(),
   // Plate-loaded
-  'pl-chest-press': press('plates', { ...CHEST, pivot: [-14, 172, 34] }),
+  'pl-chest-press': press('plates', { ...CHEST, pivot: [-28, 164, 44] }, PRESS_SIDE),
   'pl-incline-press': press('plates', INCLINE),
-  'pl-decline-press': press('plates', DECLINE),
+  'pl-decline-press': press('plates', DECLINE, PRESS_SIDE),
   'pl-shoulder-press': press('plates', SHOULDER, FACING),
   'pl-high-row': highRow('plates'),
   'pl-low-row': machineRow('plates', [54, 82, 16], [8, 82, 22], [80, 12, 24]),
