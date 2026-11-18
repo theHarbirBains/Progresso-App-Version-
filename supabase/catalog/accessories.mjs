@@ -373,6 +373,7 @@ export default [
   bw({
     slug: 'bw-wall-sit',
     name: 'Wall Sit',
+    retired: true,
     muscle: 'quadriceps',
     pattern: 'hold',
     measure: 'timed',
