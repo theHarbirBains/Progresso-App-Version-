@@ -1210,6 +1210,7 @@ export default [
   {
     slug: 'sb-safety-squat',
     name: 'Safety Squat Bar Squat',
+    retired: true,
     equipment: 'barbell',
     attachment: 'Safety squat bar',
     muscle: 'quadriceps',
