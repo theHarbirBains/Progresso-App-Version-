@@ -1621,6 +1621,37 @@ async function main() {
       `got ${pr.rows[0]?.best_weight_kg}`,
     );
 
+    // A warm-up counts toward nothing: marking the 110kg set one drops the PR to 100kg, a heavier
+    // warm-up never becomes one, and unmarking puts the 110kg PR straight back.
+    await admin.query('update public.sets set is_warmup = true where id = $1', [set110.id]);
+    await admin.query(
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at, is_warmup) values ($1, 4, 130, 5, now(), true)',
+      [we.id],
+    );
+    pr = await admin.query(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 5',
+      [userA, squat],
+    );
+    record(
+      'A warm-up set is never a PR: marking the 110kg set a warm-up drops it to 100kg, and a 130kg warm-up never counts',
+      pr.rows[0]?.best_weight_kg === '100.00',
+      `got ${pr.rows[0]?.best_weight_kg}`,
+    );
+    await admin.query('update public.sets set is_warmup = false where id = $1', [set110.id]);
+    pr = await admin.query(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 5',
+      [userA, squat],
+    );
+    record(
+      'Unmarking the warm-up puts its PR straight back (110kg)',
+      pr.rows[0]?.best_weight_kg === '110.00',
+      `got ${pr.rows[0]?.best_weight_kg}`,
+    );
+    await admin.query(
+      'update public.sets set deleted_at = now() where workout_exercise_id = $1 and set_index = 4',
+      [we.id],
+    );
+
     await admin.query('update public.workouts set deleted_at = now() where id = $1', [w.id]);
     expectRowCount(
       await admin.query(
