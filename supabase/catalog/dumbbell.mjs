@@ -1826,6 +1826,7 @@ export default [
   {
     slug: 'db-cyclist-squat',
     name: 'Dumbbell Cyclist Squat',
+    retired: true,
     equipment: 'dumbbell',
     muscle: 'quadriceps',
     highlight: { primary: ['quads'], secondary: ['glutes'] },
