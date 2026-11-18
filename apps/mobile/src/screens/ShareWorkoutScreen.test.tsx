@@ -218,17 +218,48 @@ describe('ShareWorkoutScreen loading and preview', () => {
     await settle();
   });
 
-  it('past seven exercises, lists the first six and says how many more there are', async () => {
-    const nine = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'].map((n) => topSet(`Lift ${n}`));
-    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: nine });
+  it('fits up to twelve exercises on the compact card: a shorter photo and slimmer rows, every top set its own row', async () => {
+    const twelve = 'ABCDEFGHIJKL'.split('').map((n) => topSet(`Lift ${n}`));
+    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: twelve });
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
     await screen.findByTestId('share-card-top-sets');
 
-    expect(screen.getByTestId('share-card-top-set-5')).toBeTruthy();
-    expect(screen.queryByTestId('share-card-top-set-6')).toBeNull();
-    expect(screen.getByTestId('share-card-top-sets-more')).toHaveTextContent('+3 more');
+    expect(screen.getByTestId('share-card-top-set-11')).toBeTruthy();
+    expect(screen.queryByTestId('share-card-top-sets-more')).toBeNull();
+    const hero = StyleSheet.flatten(screen.getByTestId('share-card-hero').props.style);
+    expect(hero.height).toBe(120 * CARD_SCALE);
+    // Twelve rows and their gaps fit the list's room (270 + the 51 the photo gave up).
+    const row = StyleSheet.flatten(screen.getByTestId('share-card-top-set-row-0').props.style);
+    expect(12 * row.height + 11 * 3 * CARD_SCALE).toBeLessThanOrEqual(321 * CARD_SCALE + 0.001);
+    await settle();
+  });
+
+  it('keeps the full card for seven or fewer', async () => {
+    const seven = 'ABCDEFG'.split('').map((n) => topSet(`Lift ${n}`));
+    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: seven });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    await screen.findByTestId('share-card-top-sets');
+
+    const hero = StyleSheet.flatten(screen.getByTestId('share-card-hero').props.style);
+    expect(hero.height).toBe(171 * CARD_SCALE);
+    await settle();
+  });
+
+  it('past twelve exercises, lists the first eleven and says how many more there are', async () => {
+    const fifteen = 'ABCDEFGHIJKLMNO'.split('').map((n) => topSet(`Lift ${n}`));
+    mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: fifteen });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+    await screen.findByTestId('share-card-top-sets');
+
+    expect(screen.getByTestId('share-card-top-set-10')).toBeTruthy();
+    expect(screen.queryByTestId('share-card-top-set-11')).toBeNull();
+    expect(screen.getByTestId('share-card-top-sets-more')).toHaveTextContent('+4 more');
     await settle();
   });
 

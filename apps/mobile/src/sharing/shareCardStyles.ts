@@ -188,5 +188,16 @@ export const shareCardBodyStyles = StyleSheet.create(
       fontSize: typeScale.callout.fontSize,
       color: colors.textPrimary,
     },
+    // The compact card's slimmer rows (a long workout): no picture, a size smaller.
+    rowCompact: {
+      gap: spacing.sm,
+      borderRadius: radii.sm,
+    },
+    liftNameCompact: {
+      fontSize: typeScale.secondary.fontSize,
+    },
+    liftValueCompact: {
+      fontSize: typeScale.secondary.fontSize,
+    },
   }),
 );

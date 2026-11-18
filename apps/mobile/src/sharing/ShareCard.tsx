@@ -26,11 +26,19 @@ export {
 
 // The top-sets list fills the room left under the stats (design units): rows
 // shrink a little for a longer workout, so up to MAX_ROWS exercises each get
-// their own row; past that, the last row says how many more there are.
+// their own row. A long workout (COMPACT_FROM exercises or more) gets the compact
+// card -- a shorter photo and slimmer rows without pictures -- so up to
+// COMPACT_MAX_ROWS still each get their own; past that, the last row says how
+// many more there are.
 const TOP_SETS_SPACE = 270;
 const ROW_GAP = 5;
 const MAX_ROW_HEIGHT = 46;
 const MAX_ROWS = 7;
+const COMPACT_FROM = 8;
+const COMPACT_MAX_ROWS = 12;
+const HERO_HEIGHT = 171;
+const COMPACT_HERO_HEIGHT = 120;
+const COMPACT_ROW_GAP = 3;
 
 // The frame around the card: a gradient from the app theme's accent (soft
 // amber in the default) into the warm near-black, so the space Instagram or
@@ -184,19 +192,27 @@ const STORY_SAFE_AREA_STYLE = {
 export function ShareCard({ data, weightUnit, accentColor }: Props) {
   // The theme's photo -- the card looks like the app it came from.
   const { theme } = useAppTheme();
-  const overflow = data.topSets.length > MAX_ROWS;
-  const shown = overflow ? data.topSets.slice(0, MAX_ROWS - 1) : data.topSets;
+  const compact = data.topSets.length >= COMPACT_FROM;
+  const maxRows = compact ? COMPACT_MAX_ROWS : MAX_ROWS;
+  const overflow = data.topSets.length > maxRows;
+  const shown = overflow ? data.topSets.slice(0, maxRows - 1) : data.topSets;
   const hiddenCount = data.topSets.length - shown.length;
   const rowCount = shown.length + (overflow ? 1 : 0);
+  // The compact card's shorter photo gives its room to the list.
+  const space = TOP_SETS_SPACE + (compact ? HERO_HEIGHT - COMPACT_HERO_HEIGHT : 0);
+  const gap = compact ? COMPACT_ROW_GAP : ROW_GAP;
   const rowHeight = Math.min(
     MAX_ROW_HEIGHT,
-    (TOP_SETS_SPACE - (rowCount - 1) * ROW_GAP) / Math.max(rowCount, 1),
+    (space - (rowCount - 1) * gap) / Math.max(rowCount, 1),
   );
   const thumbSize = cardPt(Math.min(32, rowHeight - 14));
 
   return (
     <View testID="share-card" style={[card.card, { width: cardPt(CARD_WIDTH) }]}>
-      <View style={card.hero}>
+      <View
+        testID="share-card-hero"
+        style={[card.hero, compact && { height: cardPt(COMPACT_HERO_HEIGHT) }]}
+      >
         <Image
           testID="share-card-photo"
           source={theme.photo}
@@ -228,9 +244,9 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
           <Text
             testID="share-card-workout-name"
             style={card.workoutName}
-            numberOfLines={2}
+            numberOfLines={compact ? 1 : 2}
             adjustsFontSizeToFit
-            minimumFontScale={0.7}
+            minimumFontScale={compact ? 0.6 : 0.7}
           >
             {data.workoutName}
           </Text>
@@ -267,17 +283,17 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
       {shown.length > 0 ? (
         <View testID="share-card-top-sets" style={card.body}>
           <Text style={card.sectionLabel}>TOP SETS</Text>
-          <View style={card.rows}>
+          <View style={[card.rows, compact && { gap: cardPt(COMPACT_ROW_GAP) }]}>
             {shown.map((set, index) => {
               const isRecord = set.prLabel !== null;
               return (
                 <View
                   key={`${set.exerciseName}-${index}`}
                   testID={`share-card-top-set-row-${index}`}
-                  style={[card.row, { height: cardPt(rowHeight) }]}
+                  style={[card.row, compact && card.rowCompact, { height: cardPt(rowHeight) }]}
                 >
-                  <Thumb set={set} size={thumbSize} />
-                  <Text style={card.liftName} numberOfLines={1}>
+                  {compact ? null : <Thumb set={set} size={thumbSize} />}
+                  <Text style={[card.liftName, compact && card.liftNameCompact]} numberOfLines={1}>
                     {set.exerciseName}
                   </Text>
                   {/* A personal record: the same row, its value in the accent
@@ -294,7 +310,11 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
                   ) : null}
                   <Text
                     testID={`share-card-top-set-${index}`}
-                    style={[card.liftValue, isRecord && { color: accentColor }]}
+                    style={[
+                      card.liftValue,
+                      compact && card.liftValueCompact,
+                      isRecord && { color: accentColor },
+                    ]}
                     numberOfLines={1}
                   >
                     {setValue(set, weightUnit)}
@@ -304,7 +324,10 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
             })}
             {overflow ? (
               <View style={[card.moreRow, { height: cardPt(rowHeight) }]}>
-                <Text testID="share-card-top-sets-more" style={card.more}>
+                <Text
+                  testID="share-card-top-sets-more"
+                  style={[card.more, compact && card.liftNameCompact]}
+                >
                   {`+${hiddenCount} more`}
                 </Text>
               </View>
