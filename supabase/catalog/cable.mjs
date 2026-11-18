@@ -1110,6 +1110,7 @@ export default [
   {
     slug: 'cb-external-rotation',
     name: 'Cable External Rotation',
+    retired: true,
     equipment: 'cable',
     muscle: 'shoulders',
     pattern: 'shoulder_rotation',

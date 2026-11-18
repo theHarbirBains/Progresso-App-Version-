@@ -679,6 +679,7 @@ export default [
   {
     slug: 'bb-bradford-press',
     name: 'Bradford Press',
+    retired: true,
     equipment: 'barbell',
     muscle: 'shoulders',
     highlight: { primary: ['frontDelts', 'sideDelts'], secondary: ['triceps', 'traps'] },
