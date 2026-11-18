@@ -123,11 +123,14 @@ export function WorkoutFeedCard({
       ) : null}
 
       <View style={styles.statRow}>
-        <StatBlock
-          testID={`${idPrefix}-${workout.id}-duration`}
-          value={formatCardDuration(workout.durationMinutes)}
-          label="Duration"
-        />
+        {/* Logged with no duration (Log Past Workout's is optional): none shown. */}
+        {workout.durationMinutes !== null ? (
+          <StatBlock
+            testID={`${idPrefix}-${workout.id}-duration`}
+            value={formatCardDuration(workout.durationMinutes)}
+            label="Duration"
+          />
+        ) : null}
         <StatBlock
           testID={`${idPrefix}-${workout.id}-exercises`}
           value={String(workout.completedExerciseCount)}

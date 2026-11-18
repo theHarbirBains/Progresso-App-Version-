@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Linking, Share } from 'react-native';
+import { Alert, Linking, Share } from 'react-native';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
 import {
@@ -147,10 +147,31 @@ describe('FindPeopleScreen -- following tab', () => {
     renderScreen();
     fireEvent.press(await screen.findByTestId('find-people-tab-following'));
 
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.text === 'Unfollow')?.onPress?.();
+    });
     fireEvent.press(await screen.findByTestId('find-people-following-user-3-following'));
 
+    expect(alert).toHaveBeenCalledWith('Unfollow Bob?', expect.any(String), expect.any(Array));
     expect(await screen.findByTestId('find-people-following-user-3-follow')).toBeTruthy();
     expect(mockUnfollowUser).toHaveBeenCalledWith('token-123', 'user-3');
+    alert.mockRestore();
+  });
+
+  it('keeps following when the question is answered Keep Following', async () => {
+    mockListPersonFollowing.mockResolvedValue(following);
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('find-people-tab-following'));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.text === 'Keep Following')?.onPress?.();
+    });
+
+    fireEvent.press(await screen.findByTestId('find-people-following-user-3-following'));
+
+    expect(alert).toHaveBeenCalled();
+    expect(mockUnfollowUser).not.toHaveBeenCalled();
+    expect(screen.getByTestId('find-people-following-user-3-following')).toBeTruthy();
+    alert.mockRestore();
   });
 
   it('says so when you follow no one, with a way to find people', async () => {
@@ -480,10 +501,15 @@ describe('FindPeopleScreen -- search', () => {
     await typeSearch('bob');
     await screen.findByTestId('find-people-result-user-3-following');
 
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.text === 'Unfollow')?.onPress?.();
+    });
     fireEvent.press(screen.getByTestId('find-people-result-user-3-following'));
 
+    expect(alert).toHaveBeenCalledWith('Unfollow Bob?', expect.any(String), expect.any(Array));
     expect(mockUnfollowUser).toHaveBeenCalledWith('token-123', 'user-3');
     expect(await screen.findByTestId('find-people-result-user-3-follow')).toBeTruthy();
+    alert.mockRestore();
   });
 
   it('shows an empty state when no one matches', async () => {

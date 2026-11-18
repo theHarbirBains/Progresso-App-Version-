@@ -261,10 +261,21 @@ function exerciseList() {
   return lists[0];
 }
 
-/** Answers Finish's question about sets left empty: removes them and finishes. */
+/** Says yes to Finish's question, and answers the one about sets left empty: removes them and finishes. */
 function removeEmptySetsOnFinish() {
   return jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
-    buttons?.find((button) => /^Remove .* and Finish$/.test(button.text ?? ''))?.onPress?.();
+    buttons
+      ?.find((button) => /^(Finish Workout|Remove .* and Finish)$/.test(button.text ?? ''))
+      ?.onPress?.();
+  });
+}
+
+/** Says yes to Finish's question, "Finish Workout?". */
+function confirmFinish() {
+  return jest.spyOn(Alert, 'alert').mockImplementation((title, _message, buttons) => {
+    if (title === 'Finish Workout?') {
+      buttons?.find((button) => button.text === 'Finish Workout')?.onPress?.();
+    }
   });
 }
 
@@ -279,6 +290,9 @@ describe('ActiveWorkoutScreen', () => {
   it('never saves a workout with nothing finished in it -- Finish offers to discard it', async () => {
     mockFetchWorkoutDetail.mockResolvedValue({ ...baseWorkout, exercises: [] });
     const alert = jest.spyOn(Alert, 'alert').mockImplementation((title, _message, buttons) => {
+      if (title === 'Finish Workout?') {
+        buttons?.find((button) => button.text === 'Finish Workout')?.onPress?.();
+      }
       if (title === 'Nothing logged yet') {
         buttons?.find((button) => button.text === 'Discard Workout')?.onPress?.();
       }
@@ -293,6 +307,28 @@ describe('ActiveWorkoutScreen', () => {
     await waitFor(() => expect(mockCancelWorkout).toHaveBeenCalledWith('w1'));
     expect(alert).toHaveBeenCalledWith('Nothing logged yet', expect.any(String), expect.any(Array));
     expect(mockCompleteWorkout).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
+  it('asks before finishing, and Keep Going leaves the workout open', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Keep Going')?.onPress?.();
+    });
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('complete-workout'));
+
+    expect(alert).toHaveBeenCalledWith(
+      'Finish Workout?',
+      'Are you sure you want to finish this workout?',
+      expect.any(Array),
+    );
+    await pastTheSaveDelay();
+    expect(mockCompleteWorkout).not.toHaveBeenCalled();
+    expect(screen.getByTestId('complete-workout')).toHaveTextContent('Finish Workout');
     alert.mockRestore();
   });
 
@@ -1146,12 +1182,17 @@ describe('ActiveWorkoutScreen unilateral exercises', () => {
     });
     await screen.findByTestId('exercise-card-we-bss');
     const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
-      buttons?.find((button) => button.text === 'Fill In')?.onPress?.();
+      buttons?.find((button) => /^(Finish Workout|Fill In)$/.test(button.text ?? ''))?.onPress?.();
     });
 
     fireEvent.press(screen.getByTestId('complete-workout'));
 
-    expect(alert).toHaveBeenCalled();
+    expect(alert).toHaveBeenCalledWith(
+      'Some sets are missing values',
+      expect.any(String),
+      expect.any(Array),
+      expect.anything(),
+    );
     await pastTheSaveDelay();
     expect(mockCompleteWorkout).not.toHaveBeenCalled();
     expect(mockDeleteSet).not.toHaveBeenCalled();
@@ -2237,6 +2278,7 @@ describe('ActiveWorkoutScreen -- timing a timed set', () => {
     fireEvent.press(timer());
     now += 75_400;
     savedWithAFinishedSet();
+    const alert = confirmFinish();
     fireEvent.press(screen.getByTestId('complete-workout'));
 
     await waitFor(() =>
@@ -2246,6 +2288,7 @@ describe('ActiveWorkoutScreen -- timing a timed set', () => {
       ),
     );
     await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
+    alert.mockRestore();
   });
 
   it('keeps time while the page is away: a remount finds it still running', async () => {

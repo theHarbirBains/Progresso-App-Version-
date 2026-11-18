@@ -259,6 +259,16 @@ describe('FeedScreen', () => {
     expect(screen.getByTestId('feed-item-workout-w0-top-sets-empty')).toBeTruthy();
   });
 
+  it('leaves Duration off the card of a workout logged with none', async () => {
+    mockFetchFeedItems.mockResolvedValue(
+      feedPage([{ ...workoutItem, workout: { ...workoutItem.workout, durationMinutes: null } }]),
+    );
+    renderScreen();
+
+    expect(await screen.findByTestId('feed-item-workout-w1-sets')).toHaveTextContent(/12/);
+    expect(screen.queryByTestId('feed-item-workout-w1-duration')).toBeNull();
+  });
+
   it("shows each workout's own top sets, one slide per exercise with a real top set", async () => {
     mockFetchFeedItems.mockResolvedValue(feedPage([workoutItem]));
     renderScreen();

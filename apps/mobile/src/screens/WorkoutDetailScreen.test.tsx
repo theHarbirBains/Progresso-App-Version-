@@ -564,6 +564,15 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     expect(await screen.findByTestId('workout-detail-stat-records')).toHaveTextContent(/^1/);
   });
 
+  it('leaves Duration out of a workout logged with none, the other figures on one row', async () => {
+    await ready({ ...twoExercises, completedAt: twoExercises.performedAt });
+
+    expect(screen.queryByTestId('workout-detail-stat-duration')).toBeNull();
+    expect(screen.getByTestId('workout-detail-stat-sets')).toHaveTextContent(/^3/);
+    expect(screen.getByTestId('workout-detail-stat-volume')).toBeTruthy();
+    expect(await screen.findByTestId('workout-detail-stat-records')).toBeTruthy();
+  });
+
   it("shows the volume in the user's unit, without a trailing .0", async () => {
     mockFetchMyProfile.mockResolvedValue({
       id: 'user-1',

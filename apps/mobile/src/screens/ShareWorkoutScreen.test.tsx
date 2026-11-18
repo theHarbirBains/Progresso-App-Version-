@@ -132,14 +132,15 @@ describe('ShareWorkoutScreen loading and preview', () => {
     await settle();
   });
 
-  it('shows a dash for duration when it is unknown', async () => {
+  it('leaves Duration out when it is unknown (logged with none)', async () => {
     mockFetchShareCardData.mockResolvedValue({ ...cardData, durationMinutes: null });
 
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
 
-    expect(await screen.findByTestId('share-card-duration')).toHaveTextContent('—');
+    expect(await screen.findByTestId('share-card-exercises')).toBeTruthy();
+    expect(screen.queryByTestId('share-card-duration')).toBeNull();
     await settle();
   });
 

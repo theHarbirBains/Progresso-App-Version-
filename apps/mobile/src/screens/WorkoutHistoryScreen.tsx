@@ -77,7 +77,12 @@ export function WorkoutRow({ workout, divider, onPress }: WorkoutRowProps) {
       testID={`workout-item-${workout.id}`}
       title={workout.splitDayName ?? workout.name}
       subtitle={muscles || undefined}
-      detail={`${formatCardDate(workout.performedAt)} · ${formatCardDuration(workout.durationMinutes)} · ${workout.completedSetCount} sets`}
+      detail={[
+        formatCardDate(workout.performedAt),
+        // Logged with no duration: none shown.
+        ...(workout.durationMinutes !== null ? [formatCardDuration(workout.durationMinutes)] : []),
+        `${workout.completedSetCount} sets`,
+      ].join(' · ')}
       divider={divider}
       onPress={onPress}
     />

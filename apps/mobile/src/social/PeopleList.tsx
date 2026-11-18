@@ -11,6 +11,7 @@ import {
   type FollowSearchResult,
   type FollowStatus,
 } from '../lib/api';
+import { confirmUnfollow, unfollowName } from './confirmUnfollow';
 import { FollowButton } from './FollowButton';
 
 /** "Sam Lee" over "@sam", or "@sam" alone, or "Someone". */
@@ -99,7 +100,13 @@ export function PeopleList({
                   status={status[id] ?? person.status}
                   loading={Boolean(pending[id])}
                   onFollow={() => void change(id, true)}
-                  onUnfollow={() => void change(id, false)}
+                  onUnfollow={() => {
+                    if ((status[id] ?? person.status) === 'accepted') {
+                      confirmUnfollow(unfollowName(person.user), () => void change(id, false));
+                    } else {
+                      void change(id, false);
+                    }
+                  }}
                 />
               )
             }

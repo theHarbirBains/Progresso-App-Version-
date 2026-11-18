@@ -238,14 +238,18 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
       </View>
 
       <View testID="share-card-stats" style={card.stats}>
+        {/* Logged with no duration (Log Past Workout's is optional): none shown. */}
+        {data.durationMinutes !== null ? (
+          <Stat
+            first
+            icon="clock"
+            value={`${data.durationMinutes} min`}
+            label="Duration"
+            testID="share-card-duration"
+          />
+        ) : null}
         <Stat
-          first
-          icon="clock"
-          value={data.durationMinutes !== null ? `${data.durationMinutes} min` : '—'}
-          label="Duration"
-          testID="share-card-duration"
-        />
-        <Stat
+          first={data.durationMinutes === null}
           icon="list"
           value={String(data.exerciseCount)}
           label="Exercises"

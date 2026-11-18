@@ -564,6 +564,16 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     }
   }
 
+  // Finish asks first, as a group's and a trainer's session do: a tap meant for something else
+  // never ends the workout.
+  function confirmComplete() {
+    if (!workout || completing) return;
+    Alert.alert('Finish Workout?', 'Are you sure you want to finish this workout?', [
+      { text: 'Keep Going', style: 'cancel' },
+      { text: 'Finish Workout', onPress: () => void handleComplete() },
+    ]);
+  }
+
   async function handleComplete() {
     if (!workout || completing) return;
     setError(null);
@@ -868,7 +878,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           <PrimaryButton
             testID="complete-workout"
             label={completing ? 'Completing…' : 'Finish Workout'}
-            onPress={handleComplete}
+            onPress={confirmComplete}
             disabled={completing || cancelling}
             accentColor={theme.accent}
             onAccentColor={theme.onAccent}

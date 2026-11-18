@@ -40,6 +40,7 @@ import { findPeopleStyles as styles } from './findPeopleStyles';
 import { SkeletonRows } from '../design/Skeleton';
 import { useAppTheme } from '../theme/appThemeContext';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
+import { confirmUnfollow, unfollowName } from '../social/confirmUnfollow';
 
 type Props = RootStackScreenProps<'FindPeople'>;
 type FindPeopleTab = 'friends' | 'following' | 'requests';
@@ -270,7 +271,9 @@ export function FindPeopleScreen({ navigation, route }: Props) {
           label="Following"
           size="sm"
           loading={isPending}
-          onPress={() => onUnfollow(result.user.id)}
+          onPress={() =>
+            confirmUnfollow(unfollowName(result.user), () => onUnfollow(result.user.id))
+          }
         />
       );
     }

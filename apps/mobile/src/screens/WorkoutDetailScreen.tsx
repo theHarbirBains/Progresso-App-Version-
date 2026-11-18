@@ -314,6 +314,30 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const shownExercises = loggedByExercise.filter(
     ({ exercise }) => activeTab === 'all' || exercise.muscleGroup === activeTab,
   );
+  const setsStat = (
+    <StatBlock testID="workout-detail-stat-sets" value={String(loggedSetCount)} label="Sets" />
+  );
+  const volumeStat = (
+    <StatBlock
+      testID="workout-detail-stat-volume"
+      value={`${formatVolume(totalVolume)} ${weightUnit}`}
+      label="Volume"
+    />
+  );
+  const lastStat = isOwn ? (
+    <StatBlock
+      testID="workout-detail-stat-records"
+      value={String(recordCount)}
+      label={recordCount === 1 ? 'Record' : 'Records'}
+      valueColor={recordCount > 0 ? theme.accent : undefined}
+    />
+  ) : (
+    <StatBlock
+      testID="workout-detail-stat-exercises"
+      value={String(loggedByExercise.filter((entry) => entry.sets.length > 0).length)}
+      label="Exercises"
+    />
+  );
 
   return (
     <Screen
@@ -390,41 +414,30 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           </TouchableOpacity>
         ) : null}
         {muscles ? <Text style={styles.eyebrow}>{muscles}</Text> : null}
-        <View style={styles.statGrid}>
-          <View style={styles.statRow}>
-            <StatBlock
-              testID="workout-detail-stat-duration"
-              value={durationMinutes !== null ? formatCardDuration(durationMinutes) : '--'}
-              label="Duration"
-            />
-            <StatBlock
-              testID="workout-detail-stat-sets"
-              value={String(loggedSetCount)}
-              label="Sets"
-            />
-          </View>
-          <View style={styles.statRow}>
-            <StatBlock
-              testID="workout-detail-stat-volume"
-              value={`${formatVolume(totalVolume)} ${weightUnit}`}
-              label="Volume"
-            />
-            {isOwn ? (
+        {/* A workout logged with no duration (Log Past Workout's is optional) shows none: the
+            other three figures share one row instead. */}
+        {durationMinutes !== null ? (
+          <View style={styles.statGrid}>
+            <View style={styles.statRow}>
               <StatBlock
-                testID="workout-detail-stat-records"
-                value={String(recordCount)}
-                label={recordCount === 1 ? 'Record' : 'Records'}
-                valueColor={recordCount > 0 ? theme.accent : undefined}
+                testID="workout-detail-stat-duration"
+                value={formatCardDuration(durationMinutes)}
+                label="Duration"
               />
-            ) : (
-              <StatBlock
-                testID="workout-detail-stat-exercises"
-                value={String(loggedByExercise.filter((entry) => entry.sets.length > 0).length)}
-                label="Exercises"
-              />
-            )}
+              {setsStat}
+            </View>
+            <View style={styles.statRow}>
+              {volumeStat}
+              {lastStat}
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.statRow}>
+            {setsStat}
+            {volumeStat}
+            {lastStat}
+          </View>
+        )}
       </AppCard>
 
       {/* Opened at its comments (a feed card's bubble, a like or comment in the bell): they

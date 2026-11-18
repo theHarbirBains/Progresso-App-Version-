@@ -52,6 +52,7 @@ import { PeopleList, personLabel } from '../social/PeopleList';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
 import { useSocialSummaries } from '../social/useSocialSummaries';
 import { personProfileStyles as styles } from './personProfileStyles';
+import { confirmUnfollow } from '../social/confirmUnfollow';
 
 type Props = RootStackScreenProps<'PersonProfile'>;
 type Tab = 'stats' | 'workouts' | 'prs' | 'achievements';
@@ -294,19 +295,12 @@ export function PersonProfilePage({
     }
   }
 
-  function confirmUnfollow(target: PersonProfile) {
+  function handleUnfollow(target: PersonProfile) {
     if (target.followStatus === 'pending') {
       void run(() => unfollowUser(accessToken!, userId));
       return;
     }
-    Alert.alert(`Unfollow ${firstName(target)}?`, "You won't see their workouts any more.", [
-      { text: 'Keep Following', style: 'cancel' },
-      {
-        text: 'Unfollow',
-        style: 'destructive',
-        onPress: () => void run(() => unfollowUser(accessToken!, userId)),
-      },
-    ]);
+    confirmUnfollow(firstName(target), () => void run(() => unfollowUser(accessToken!, userId)));
   }
 
   function share(target: PersonProfile, name: string) {
@@ -886,7 +880,7 @@ export function PersonProfilePage({
                     label="Following"
                     size="md"
                     loading={busy}
-                    onPress={() => confirmUnfollow(profile)}
+                    onPress={() => handleUnfollow(profile)}
                     accentColor={theme.accent}
                     onAccentColor={theme.onAccent}
                   />
@@ -896,7 +890,7 @@ export function PersonProfilePage({
                     label="Requested"
                     size="md"
                     loading={busy}
-                    onPress={() => confirmUnfollow(profile)}
+                    onPress={() => handleUnfollow(profile)}
                   />
                 ) : (
                   <PrimaryButton
