@@ -23,7 +23,7 @@ describe('app themes', () => {
     expect(APP_THEMES[0].accent).toBe(colors.accent);
   });
 
-  it('has the nine themes, each with its own photo (for the launch screen, share card and widgets)', () => {
+  it('has the nine themes, each with its own photo (for the launch screen and widgets)', () => {
     expect(APP_THEMES.map((t) => t.name)).toEqual([
       'Golden Hour Gym',
       'Forest',

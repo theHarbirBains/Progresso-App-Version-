@@ -9,7 +9,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { fetchShareCardData } from '../sharing/shareCardData';
 import { CARD_MAX_HEIGHT, CARD_SCALE, CARD_WIDTH, STORY_SAFE_AREA } from '../sharing/ShareCard';
-import { DEFAULT_WORKOUT_COLOR, mixHex } from '../theme/accentColor';
+import { DEFAULT_WORKOUT_COLOR } from '../theme/accentColor';
+import { DEFAULT_THEME_ID, themeById } from '../theme/appThemes';
 import { ShareWorkoutScreen } from './ShareWorkoutScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -101,7 +102,7 @@ describe('ShareWorkoutScreen loading and preview', () => {
     await settle();
   });
 
-  it("renders the workout's own name and the date over the photo, with nothing under the name", async () => {
+  it("renders the workout's own name and the date on a plain card, with nothing under the name", async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
@@ -109,7 +110,8 @@ describe('ShareWorkoutScreen loading and preview', () => {
     expect(await screen.findByTestId('share-card-workout-name')).toHaveTextContent('Push Day');
     // No year on the date.
     expect(screen.getByTestId('share-card-date')).not.toHaveTextContent('2026');
-    expect(screen.getByTestId('share-card-photo')).toBeTruthy();
+    // Plain: no background photo.
+    expect(screen.queryByTestId('share-card-photo')).toBeNull();
     // The logo the app opens with, not a written brand name.
     expect(screen.getByTestId('share-card-logo')).toBeTruthy();
     expect(screen.getByTestId('share-card')).not.toHaveTextContent(/PROGRESSO/);
@@ -453,17 +455,16 @@ describe('ShareWorkoutScreen -- the card, then one primary action', () => {
     await settle();
   });
 
-  it("frames the card in a warm gradient, from the theme's accent into the warm near-black", async () => {
+  it("sets the card on the app theme's own plain background colour -- no photo, no gradient", async () => {
     render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: ProfileProvider,
     });
-    const frame = await screen.findByTestId('share-story-frame');
+    const story = await screen.findByTestId('share-story');
 
-    expect(frame.props.colors).toEqual([
-      mixHex(DEFAULT_WORKOUT_COLOR, colors.background, 0.62),
-      mixHex(DEFAULT_WORKOUT_COLOR, colors.background, 0.84),
-      colors.background,
-    ]);
+    expect(StyleSheet.flatten(story.props.style).backgroundColor).toBe(
+      themeById(DEFAULT_THEME_ID).background,
+    );
+    expect(screen.queryByTestId('share-story-frame')).toBeNull();
     await settle();
   });
 

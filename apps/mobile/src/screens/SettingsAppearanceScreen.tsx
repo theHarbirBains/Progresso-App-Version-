@@ -49,8 +49,7 @@ export function SettingsAppearanceScreen({ navigation }: Props) {
     >
       <Section title="Theme">
         <Text testID="appearance-themes-note" style={settingsStyles.intro}>
-          Each theme has its own background, design and heading font. Your widgets and share card
-          use its photo.
+          Each theme has its own background, design and heading font. Your widgets use its photo.
         </Text>
         <ThemeChoices selectedId={theme.id} onChoose={choose} testIDPrefix="appearance-theme" />
       </Section>

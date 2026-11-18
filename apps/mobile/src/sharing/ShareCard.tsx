@@ -2,13 +2,11 @@ import type { Ref } from 'react';
 import { View, type ViewInstance } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { THEME_PHOTO_ASPECT } from '../theme/appThemes';
 import { Avatar } from '../design/Avatar';
 import { Text } from '../design/Text';
 import { colors } from '../design/theme';
 import { fromKg, roundWeight } from '../lib/units';
-import { mixHex, withAlpha } from '../theme/accentColor';
+import { withAlpha } from '../theme/accentColor';
 import { formatSetValues } from '../workouts/setValues';
 import type { ShareCardData, ShareTopSet } from './shareCardData';
 import { shareCardBodyStyles as card, shareCardStyles as styles } from './shareCardStyles';
@@ -27,7 +25,7 @@ export {
 // The top-sets list fills the room left under the stats (design units): rows
 // shrink a little for a longer workout, so up to MAX_ROWS exercises each get
 // their own row. A long workout (COMPACT_FROM exercises or more) gets the compact
-// card -- a shorter photo and slimmer rows without pictures -- so up to
+// card -- a shorter header and slimmer rows without pictures -- so up to
 // COMPACT_MAX_ROWS still each get their own; past that, the last row says how
 // many more there are.
 const TOP_SETS_SPACE = 270;
@@ -40,28 +38,6 @@ const HERO_HEIGHT = 171;
 const COMPACT_HERO_HEIGHT = 120;
 const COMPACT_ROW_GAP = 3;
 
-// The frame around the card: a gradient from the app theme's accent (soft
-// amber in the default) into the warm near-black, so the space Instagram or
-// TikTok covers with its own controls is still on-brand colour, never empty.
-export function storyFrame(accent: string) {
-  return [
-    mixHex(accent, colors.background, 0.62),
-    mixHex(accent, colors.background, 0.84),
-    colors.background,
-  ] as const;
-}
-
-// The photo at the top of the card: the sunset photo, a little larger than the
-// card and placed so the sun glows low on the right, clear of the date and the
-// workout's name.
-const PHOTO_WIDTH = cardPt(CARD_WIDTH * 1.4);
-const PHOTO_STYLE = {
-  position: 'absolute',
-  left: 0,
-  top: cardPt(-120),
-  width: PHOTO_WIDTH,
-  height: PHOTO_WIDTH / THEME_PHOTO_ASPECT,
-} as const;
 const STAT_ICON_SIZE = cardPt(18);
 // The logo the app opens with (LaunchScreen's mark), cropped tight to the
 // mark, in place of a written brand name.
@@ -69,21 +45,6 @@ const LOGO = require('../../assets/progresso-mark-share.png');
 const LOGO_ASPECT = 360 / 289;
 const LOGO_HEIGHT = cardPt(26);
 const LOGO_STYLE = { width: LOGO_HEIGHT * LOGO_ASPECT, height: LOGO_HEIGHT } as const;
-// How the photo is darkened so its text reads: a scrim heaviest on the left,
-// where the text sits, then a fade into the card's own fill. Chosen by
-// measurement over the photo's brightest pixels -- don't lighten it without
-// re-measuring.
-const SIDE_SCRIM = [
-  withAlpha(colors.surface, 0.55),
-  withAlpha(colors.surface, 0.35),
-  withAlpha(colors.surface, 0.25),
-] as const;
-const FADE = [
-  withAlpha(colors.surface, 0.5),
-  withAlpha(colors.surface, 0.25),
-  withAlpha(colors.surface, 0.3),
-  colors.surface,
-] as const;
 
 interface Props {
   data: ShareCardData;
@@ -153,24 +114,19 @@ function Thumb({ set, size }: { set: ShareTopSet; size: number }) {
   );
 }
 
-// The shareable workout image: the card, inside its warm frame, on a 9:16
-// story canvas. This whole canvas is what gets captured -- the preview IS the
-// image.
+// The shareable workout image: the card on a 9:16 story canvas of the app
+// theme's own plain background colour -- no photo, no gradient -- so it looks
+// like the app it came from. This whole canvas is what gets captured -- the
+// preview IS the image.
 export function ShareStory({ storyRef, ...cardProps }: Props & { storyRef?: Ref<ViewInstance> }) {
-  const { accent } = useAppTheme();
+  const { theme } = useAppTheme();
   return (
     <View
       ref={storyRef}
       collapsable={false}
       testID="share-story"
-      style={[styles.story, STORY_CANVAS]}
+      style={[styles.story, STORY_CANVAS, { backgroundColor: theme.background }]}
     >
-      <LinearGradient
-        testID="share-story-frame"
-        colors={storyFrame(accent.accent)}
-        locations={[0, 0.5, 1]}
-        style={styles.fill}
-      />
       <View testID="share-story-safe-area" style={[styles.safeArea, STORY_SAFE_AREA_STYLE]}>
         <ShareCard {...cardProps} />
       </View>
@@ -183,22 +139,19 @@ const STORY_SAFE_AREA_STYLE = {
   bottom: STORY_SAFE_AREA.bottom,
 } as const;
 
-// The card: the theme's photo behind the brand mark, date and the workout's
-// own name (nothing under it -- the name is the user's); then the session as
+// The card, plain: the brand mark, date and the workout's own name (nothing under it -- the name is the user's); then the session as
 // four stats (duration, exercises, sets, volume), and every exercise's top set
 // in workout order, a personal record marked quietly in the accent. Everything is real logged data in the user's unit;
 // nothing is estimated, and no account detail (name, email, id) is ever drawn.
 // Nothing on it looks tappable (no chevrons, no "View All") -- it's a picture.
 export function ShareCard({ data, weightUnit, accentColor }: Props) {
-  // The theme's photo -- the card looks like the app it came from.
-  const { theme } = useAppTheme();
   const compact = data.topSets.length >= COMPACT_FROM;
   const maxRows = compact ? COMPACT_MAX_ROWS : MAX_ROWS;
   const overflow = data.topSets.length > maxRows;
   const shown = overflow ? data.topSets.slice(0, maxRows - 1) : data.topSets;
   const hiddenCount = data.topSets.length - shown.length;
   const rowCount = shown.length + (overflow ? 1 : 0);
-  // The compact card's shorter photo gives its room to the list.
+  // The compact card's shorter header gives its room to the list.
   const space = TOP_SETS_SPACE + (compact ? HERO_HEIGHT - COMPACT_HERO_HEIGHT : 0);
   const gap = compact ? COMPACT_ROW_GAP : ROW_GAP;
   const rowHeight = Math.min(
@@ -213,21 +166,6 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
         testID="share-card-hero"
         style={[card.hero, compact && { height: cardPt(COMPACT_HERO_HEIGHT) }]}
       >
-        <Image
-          testID="share-card-photo"
-          source={theme.photo}
-          style={PHOTO_STYLE}
-          contentFit="cover"
-        />
-        <LinearGradient
-          colors={SIDE_SCRIM}
-          locations={[0, 0.6, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.fill}
-        />
-        <LinearGradient colors={FADE} locations={[0, 0.3, 0.6, 1]} style={styles.fill} />
-
         <View style={card.heroTop}>
           <Image
             testID="share-card-logo"

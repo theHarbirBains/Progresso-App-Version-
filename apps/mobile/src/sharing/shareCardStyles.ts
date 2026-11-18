@@ -5,9 +5,9 @@ import { atCardScale } from './storyLayout';
 // The shareable workout image (ShareCard) and the screen around it. Token-only.
 //
 // The card is a PNG that leaves the app, so it paints everything itself --
-// the warm gym photo at its top and the warm surface below -- rather than
-// relying on the screen's background behind it. One accent (amber) marks
-// personal records and nothing else.
+// the theme's plain background colour around it (ShareStory) and the warm
+// surface of the card -- rather than relying on the screen behind it. No photo.
+// One accent marks personal records and nothing else.
 export const shareCardStyles = StyleSheet.create({
   // ---- The screen ----------------------------------------------------------
   content: {
@@ -49,13 +49,6 @@ export const shareCardStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fill: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
 });
 
 // ---- The card --------------------------------------------------------------
@@ -72,9 +65,8 @@ export const shareCardBodyStyles = StyleSheet.create(
       overflow: 'hidden',
     },
 
-    // The photo block: brand mark and date along the top, the workout at its
-    // foot. A fixed height, so the photo -- and its sun -- always sits the same
-    // way behind the text it was measured against.
+    // The header: brand mark and date along the top, the workout at its foot.
+    // A fixed height, so every card lays out the same way.
     hero: {
       height: 171,
       justifyContent: 'space-between',

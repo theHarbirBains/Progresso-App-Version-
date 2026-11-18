@@ -58,7 +58,7 @@ describe('SettingsAppearanceScreen', () => {
     await renderScreen();
 
     expect(screen.getByTestId('appearance-themes-note')).toHaveTextContent(
-      /^Each theme has its own background, design and heading font\. Your widgets and share card use its photo\.$/,
+      /^Each theme has its own background, design and heading font\. Your widgets use its photo\.$/,
     );
     const forest = screen.getByTestId('appearance-theme-forest');
     expect(forest.props.accessibilityLabel).toBe('Forest theme, Fraunces headings');

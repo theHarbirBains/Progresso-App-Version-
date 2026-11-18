@@ -37,7 +37,7 @@ export interface AppTheme {
   pattern: BackgroundPatternId;
   /** The heading face (screen and card titles, buttons). */
   font: HeadingFontId;
-  /** The bundled photo (a `require`): the launch screen's, the share card's and the widgets'. */
+  /** The bundled photo (a `require`): the launch screen's and the widgets'. */
   photo: number;
 }
 
