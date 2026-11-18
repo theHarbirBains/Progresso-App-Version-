@@ -104,6 +104,7 @@ export default [
   {
     slug: 'bw-nordic-hamstring-curl',
     name: 'Nordic Hamstring Curl',
+    retired: true,
     equipment: 'bodyweight',
     muscle: 'hamstrings',
     measure: 'bodyweight',

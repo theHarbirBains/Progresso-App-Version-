@@ -421,7 +421,7 @@ export default [
   },
   {
     slug: 'db-romanian-deadlift',
-    name: 'Dumbbell Romanian Deadlift',
+    name: 'Dumbbell Romanian Deadlift (RDL)',
     equipment: 'dumbbell',
     muscle: 'hamstrings',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },
@@ -1879,7 +1879,7 @@ export default [
   // ---------------------------------------------------------------------------- Hamstrings
   {
     slug: 'db-single-leg-rdl',
-    name: 'Single-Leg Dumbbell Romanian Deadlift',
+    name: 'Single-Leg Dumbbell Romanian Deadlift (RDL)',
     equipment: 'dumbbell',
     muscle: 'hamstrings',
     sides: 'single_side',
@@ -2006,6 +2006,7 @@ export default [
   {
     slug: 'db-curtsy-lunge',
     name: 'Dumbbell Curtsy Lunge',
+    retired: true,
     equipment: 'dumbbell',
     muscle: 'glutes',
     sides: 'alternating',
@@ -2034,6 +2035,7 @@ export default [
   {
     slug: 'db-cossack-squat',
     name: 'Dumbbell Cossack Squat',
+    retired: true,
     equipment: 'dumbbell',
     muscle: 'adductors',
     sides: 'alternating',

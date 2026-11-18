@@ -212,7 +212,7 @@ export default [
   },
   {
     slug: 'bb-romanian-deadlift',
-    name: 'Romanian Deadlift',
+    name: 'Romanian Deadlift (RDL)',
     equipment: 'barbell',
     muscle: 'hamstrings',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms', 'traps'] },
@@ -1693,7 +1693,8 @@ export default [
   // ---------------------------------------------------------------------------- Hamstrings
   {
     slug: 'bb-snatch-grip-rdl',
-    name: 'Snatch-Grip Romanian Deadlift',
+    name: 'Snatch-Grip Romanian Deadlift (RDL)',
+    retired: true,
     equipment: 'barbell',
     muscle: 'hamstrings',
     highlight: {
@@ -1721,7 +1722,8 @@ export default [
   },
   {
     slug: 'bb-single-leg-rdl',
-    name: 'Single-Leg Barbell Romanian Deadlift',
+    name: 'Single-Leg Barbell Romanian Deadlift (RDL)',
+    retired: true,
     equipment: 'barbell',
     muscle: 'hamstrings',
     sides: 'single_side',
@@ -1870,6 +1872,7 @@ export default [
   {
     slug: 'bb-cossack-squat',
     name: 'Barbell Cossack Squat',
+    retired: true,
     equipment: 'barbell',
     muscle: 'adductors',
     sides: 'alternating',
@@ -1986,6 +1989,7 @@ export default [
   {
     slug: 'bb-donkey-calf-raise',
     name: 'Barbell Donkey Calf Raise',
+    retired: true,
     equipment: 'barbell',
     muscle: 'calves',
     highlight: { primary: ['calves'], secondary: [] },

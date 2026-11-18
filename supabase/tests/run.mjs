@@ -15,6 +15,30 @@ const seedFile = join(__dirname, '..', 'seed.sql');
 const shimFile = join(__dirname, 'auth-shim.sql');
 const storageShimFile = join(__dirname, 'storage-shim.sql');
 
+// The built-in catalogue (supabase/catalog) and the migration its generator writes now: checks of
+// the library follow them, so retiring or renaming a built-in never needs a test edited.
+const catalogueDir = join(__dirname, '..', 'catalog');
+const libraryCatalogue = (
+  await Promise.all(
+    [
+      'dumbbell',
+      'barbell',
+      'bodyweight',
+      'cable',
+      'machine',
+      'smith',
+      'kettlebell',
+      'accessories',
+    ].map(
+      async (file) => (await import(pathToFileURL(join(catalogueDir, `${file}.mjs`)).href)).default,
+    ),
+  )
+).flat();
+const retiredNames = new Set(libraryCatalogue.filter((e) => e.retired).map((e) => e.name));
+const libraryMigration = readFileSync(join(catalogueDir, 'generate.mjs'), 'utf8').match(
+  /'(\d{14}_[a-z_]+\.sql)'/,
+)[1];
+
 const PORT = 54329;
 const dataDir = mkdtempSync(join(tmpdir(), 'progresso-pgtest-'));
 
@@ -2133,6 +2157,7 @@ async function main() {
         gluteBridge?.measurement_type === 'weight_reps',
     );
 
+    // The ones Harbir hasn't retired since (supabase/catalog).
     const libraryNames = [
       'Push-Up',
       'Pull-Up',
@@ -2143,7 +2168,7 @@ async function main() {
       'Plank',
       'Dead Hang',
       'Weighted Pull-Up',
-    ];
+    ].filter((name) => !retiredNames.has(name));
     const activeInLibrary = (
       await admin.query(
         'select name from public.exercises where created_by is null and is_active and name = any($1)',
@@ -6245,9 +6270,7 @@ async function main() {
         )
       ).rows[0];
     const before = await snapshot();
-    await admin.query(
-      readFileSync(join(migrationsDir, '20261130100000_simpler_exercise_names.sql'), 'utf8'),
-    );
+    await admin.query(readFileSync(join(migrationsDir, libraryMigration), 'utf8'));
     const after = await snapshot();
     record(
       'The library migration can run again without changing anything',

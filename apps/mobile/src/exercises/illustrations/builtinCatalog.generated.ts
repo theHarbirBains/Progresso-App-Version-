@@ -153,7 +153,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     pattern: 'hinge',
   },
   'db-romanian-deadlift': {
-    name: 'Dumbbell Romanian Deadlift',
+    name: 'Dumbbell Romanian Deadlift (RDL)',
     muscle: 'hamstrings',
     equipment: 'dumbbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },
@@ -612,7 +612,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     pattern: 'squat',
   },
   'db-single-leg-rdl': {
-    name: 'Single-Leg Dumbbell Romanian Deadlift',
+    name: 'Single-Leg Dumbbell Romanian Deadlift (RDL)',
     muscle: 'hamstrings',
     equipment: 'dumbbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'obliques'] },
@@ -880,7 +880,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     pattern: 'hinge',
   },
   'bb-romanian-deadlift': {
-    name: 'Romanian Deadlift',
+    name: 'Romanian Deadlift (RDL)',
     muscle: 'hamstrings',
     equipment: 'barbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms', 'traps'] },
@@ -1385,7 +1385,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     pattern: 'squat',
   },
   'bb-snatch-grip-rdl': {
-    name: 'Snatch-Grip Romanian Deadlift',
+    name: 'Snatch-Grip Romanian Deadlift (RDL)',
     muscle: 'hamstrings',
     equipment: 'barbell',
     highlight: {
@@ -1396,7 +1396,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     pattern: 'hinge',
   },
   'bb-single-leg-rdl': {
-    name: 'Single-Leg Barbell Romanian Deadlift',
+    name: 'Single-Leg Barbell Romanian Deadlift (RDL)',
     muscle: 'hamstrings',
     equipment: 'barbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'obliques'] },
@@ -2112,7 +2112,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     pattern: 'hip_adduction',
   },
   'cb-romanian-deadlift': {
-    name: 'Cable Romanian Deadlift',
+    name: 'Cable Romanian Deadlift (RDL)',
     muscle: 'hamstrings',
     equipment: 'cable',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },
@@ -2636,7 +2636,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     action: 'Step Back',
   },
   'sm-romanian-deadlift': {
-    name: 'Smith Machine Romanian Deadlift',
+    name: 'Smith Machine Romanian Deadlift (RDL)',
     muscle: 'hamstrings',
     equipment: 'machine',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },

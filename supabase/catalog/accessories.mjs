@@ -922,6 +922,7 @@ export default [
   trx({
     slug: 'st-hamstring-curl',
     name: 'Suspension Trainer Hamstring Curl',
+    retired: true,
     muscle: 'hamstrings',
     pattern: 'knee_flexion',
     highlight: { primary: ['hamstrings'], secondary: ['glutes', 'calves'] },

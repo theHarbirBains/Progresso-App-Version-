@@ -169,7 +169,7 @@ export default [
   }),
   smithEx({
     slug: 'sm-romanian-deadlift',
-    name: 'Smith Machine Romanian Deadlift',
+    name: 'Smith Machine Romanian Deadlift (RDL)',
     muscle: 'hamstrings',
     pattern: 'hinge',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },

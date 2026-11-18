@@ -1338,7 +1338,7 @@ export default [
   },
   {
     slug: 'cb-romanian-deadlift',
-    name: 'Cable Romanian Deadlift',
+    name: 'Cable Romanian Deadlift (RDL)',
     equipment: 'cable',
     muscle: 'hamstrings',
     pattern: 'hinge',
