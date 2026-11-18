@@ -13,7 +13,7 @@ import { EmptyState } from '../design/EmptyState';
 import { LoadingState } from '../design/LoadingState';
 import { RiseInStack } from '../design/RiseIn';
 import { Screen } from '../design/Screen';
-import type { ExerciseRow } from '../exercises/exerciseQueries';
+import { fetchAllExercises, type ExerciseRow } from '../exercises/exerciseQueries';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { FilterChips } from '../design/FilterChips';
 import { workoutMuscleTabs, type MuscleTab } from '../workouts/workoutMuscleTabs';
@@ -25,6 +25,9 @@ import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
 import { ExerciseCard } from '../workouts/ExerciseCard';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
+import { FoldedExercises, PlanDone, UpNextCard } from '../workouts/GuidedWorkoutParts';
+import { forgetGuided, isGuided, plannedSetsFor, remainingPlan } from '../workouts/guidedWorkout';
+import { fetchDayPlan, type PlannedExercise } from '../workouts/splitPlanQueries';
 import {
   LiveProgressionSheets,
   RepRangeRow,
@@ -111,6 +114,13 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const [cancelling, setCancelling] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
+  // A guided workout (a planned day's -- guidedWorkout.ts): its plan, the exercise being done
+  // (null: the last one), and the next exercise starting. Null plan: the usual live workout.
+  const [guidedPlan, setGuidedPlan] = useState<PlannedExercise[] | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [startingNext, setStartingNext] = useState(false);
+  // The sets added by themselves, by exercise and count, so one is never added twice.
+  const autoAddedSets = useRef(new Set<string>());
 
   const {
     setInputs,
@@ -265,6 +275,16 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           null,
         );
 
+        // A planned day started guided: one exercise at a time, the rest of its plan in Up Next.
+        if (detail.workoutSplitDayId && (await isGuided(workoutId))) {
+          try {
+            const plan = await fetchDayPlan(detail.workoutSplitDayId);
+            if (!cancelled && plan.length > 0) setGuidedPlan(plan);
+          } catch {
+            // Without its plan it's the usual live workout -- every exercise open.
+          }
+        }
+
         const savedInputs: Record<string, SetInputDraft> = {};
         const openSetIds = new Set<string>();
         for (const exercise of detail.exercises) {
@@ -351,6 +371,90 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       updateExerciseSets(exercise.id, (ex) => ({ ...ex, sets: [...ex.sets, created] }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add set');
+    }
+  }
+
+  // A guided workout: the exercise being done -- the one chosen, else the last one started.
+  const focused = guidedPlan
+    ? (workout?.exercises.find((ex) => ex.id === focusId) ??
+      workout?.exercises[workout.exercises.length - 1] ??
+      null)
+    : null;
+
+  // Each set of a planned exercise adds the next by itself once it's filled in (saved complete),
+  // up to the sets planned; past that, Add Set as usual.
+  const handleAddSetRef = useRef(handleAddSet);
+  handleAddSetRef.current = handleAddSet;
+  useEffect(() => {
+    if (!guidedPlan || !focused || focused.sets.length === 0) return;
+    const planned = plannedSetsFor(guidedPlan, focused.exerciseId);
+    if (planned === null) return;
+    const count = new Set(focused.sets.map((set) => set.setIndex)).size;
+    if (count >= planned || !focused.sets.every((set) => set.completedAt !== null)) return;
+    const key = `${focused.id}:${count}`;
+    if (autoAddedSets.current.has(key)) return;
+    autoAddedSets.current.add(key);
+    void handleAddSetRef.current(focused);
+  }, [guidedPlan, focused]);
+
+  /**
+   * Moving on from an exercise in a guided workout: a set left untouched goes (a planned set
+   * not done); an exercise with nothing done at all goes back to Up Next.
+   */
+  async function setAsideUntouched(exercise: WorkoutExerciseWithSets) {
+    const untouched = exercise.sets.filter(
+      (set) => set.completedAt === null && !hasDraftInput(setInputsRef.current[set.id]),
+    );
+    if (untouched.length === 0) return;
+    if (untouched.length === exercise.sets.length) {
+      await handleRemoveExercise(exercise.id);
+      return;
+    }
+    try {
+      await Promise.all(untouched.map((set) => deleteSet(set.id)));
+      const gone = new Set(untouched.map((set) => set.id));
+      updateExerciseSets(exercise.id, (ex) => ({
+        ...ex,
+        sets: ex.sets.filter((set) => !gone.has(set.id)),
+      }));
+      dropSetInputs(...gone);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to tidy the sets left blank');
+    }
+  }
+
+  /** Opens another exercise in a guided workout, setting aside what was left untouched. */
+  async function openExercise(exerciseId: string) {
+    if (focused && focused.id !== exerciseId) await setAsideUntouched(focused);
+    setFocusId(exerciseId);
+  }
+
+  /** Starts the next exercise from the plan (Up Next), as Add Exercise would. */
+  async function startPlanned(planned: PlannedExercise) {
+    if (startingNext) return;
+    setStartingNext(true);
+    try {
+      // From the library already read this session: its photo, gym and handle come with it.
+      const rows = await fetchAllExercises({
+        userId,
+        search: '',
+        muscleGroup: null,
+        source: 'all',
+      }).catch(() => [] as ExerciseRow[]);
+      const row: ExerciseRow = rows.find((candidate) => candidate.id === planned.exerciseId) ?? {
+        id: planned.exerciseId,
+        name: planned.exerciseName,
+        muscleGroup: planned.muscleGroup,
+        movementType: planned.movementType,
+        loggingStyle: null,
+        measurementType: planned.measurementType,
+        photoUrl: null,
+        isActive: true,
+        createdBy: null,
+      };
+      await handleSelectExercise(row);
+    } finally {
+      setStartingNext(false);
     }
   }
 
@@ -559,6 +663,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     if (!workout) return;
     setPickerOpen(false);
     setError(null);
+    // Guided: moving on from the exercise being done, whatever's untouched is set aside.
+    if (focused) await setAsideUntouched(focused);
     // Last Time loads while the exercise and its first set are created; the set starts empty.
     if (!(exercise.id in previousPerformance)) void loadPreviousPerformance(exercise.id);
     try {
@@ -600,6 +706,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       );
       // On a muscle tab, the new exercise's own tab, so it's never added out of sight.
       setMuscleTab((tab) => (tab === 'all' ? tab : exercise.muscleGroup));
+      // Guided: the new exercise is the one being done.
+      setFocusId(workoutExerciseId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add exercise');
     }
@@ -645,6 +753,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         return;
       }
       await completeWorkout(workout.id);
+      void forgetGuided(workout.id);
       void clearLiveWorkoutDraft(workout.id);
       void clearSetTimers(workout.id);
       rememberLiveWorkout(userId, null);
@@ -680,6 +789,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       // enters history, never advances split progression, and never
       // affects PR/1RM data. See cancelWorkout's own comment.
       await cancelWorkout(workout.id);
+      void forgetGuided(workout.id);
       void clearLiveWorkoutDraft(workout.id);
       void clearSetTimers(workout.id);
       rememberLiveWorkout(userId, null);
@@ -750,6 +860,76 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     .map((exercise, index) => ({ exercise, index }))
     .filter(({ exercise }) => activeTab === 'all' || exercise.muscleGroup === activeTab);
   const totalSets = computeTotalSets(workout.exercises);
+  // One exercise's card -- every exercise in the usual live workout, the one being done in a
+  // guided one (no moving it up or down there: the plan sets the order).
+  const exerciseCard = (
+    exercise: WorkoutExerciseWithSets,
+    index: number,
+    moveUp?: () => void,
+    moveDown?: () => void,
+  ) => (
+    <ExerciseCard
+      {...progression.cardPropsFor(exercise, previousPerformance[exercise.exerciseId]?.sets)}
+      key={exercise.id}
+      exerciseId={exercise.exerciseId}
+      testID={`exercise-card-${exercise.id}`}
+      exerciseName={exercise.exerciseName}
+      muscleGroup={exercise.muscleGroup}
+      movementType={exercise.movementType}
+      measurementType={measurementTypeOf(exercise)}
+      photoUrl={exercise.photoUrl}
+      gym={exercise.gym}
+      grip={exercise.grip}
+      attachment={exercise.attachment}
+      loadType={exercise.loadType}
+      pulleyPosition={exercise.pulleyPosition}
+      pulley={exercise.pulley}
+      weightUnit={weightUnit}
+      previousSession={buildPreviousSessionDisplay(
+        previousPerformance[exercise.exerciseId],
+        weightUnit,
+        measurementTypeOf(exercise),
+      )}
+      // Exercise progress charts weights; a bodyweight or timed exercise has none to show.
+      onViewHistory={
+        previousPerformance[exercise.exerciseId] && measurementTypeOf(exercise) === 'weight_reps'
+          ? () =>
+              navigation.navigate('ProgressExerciseDetail', {
+                exerciseId: exercise.exerciseId,
+                exerciseName: exercise.exerciseName,
+              })
+          : undefined
+      }
+      sets={
+        exercise.movementType === 'unilateral'
+          ? []
+          : computeCardSets(exercise.sets, setInputs, measurementTypeOf(exercise))
+      }
+      unilateralSets={
+        exercise.movementType === 'unilateral'
+          ? computeUnilateralSets(exercise.sets, setInputs, measurementTypeOf(exercise))
+          : []
+      }
+      onChangeWeight={changeSetWeight}
+      onChangeReps={changeSetReps}
+      onChangeDuration={changeSetDuration}
+      setTimers
+      onAddSet={() => handleAddSet(exercise)}
+      onRemoveSet={removeSet}
+      onToggleWarmup={toggleWarmup}
+      onRemoveExercise={() => handleRemoveExercise(exercise.id)}
+      onMoveUp={moveUp}
+      onMoveDown={moveDown}
+      accentColor={theme.accent}
+      onAccentColor={theme.onAccent}
+    />
+  );
+  // Guided: the exercises done before and after the one being done, and what's left of the plan.
+  const before = focused
+    ? workout.exercises.filter((ex) => ex.orderIndex < focused.orderIndex)
+    : [];
+  const after = focused ? workout.exercises.filter((ex) => ex.orderIndex > focused.orderIndex) : [];
+  const remaining = guidedPlan ? remainingPlan(guidedPlan, workout.exercises) : [];
   return (
     <>
       <Screen
@@ -783,7 +963,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 />
               </Card>
             </View>
-            {muscleTabs.length > 0 ? (
+            {muscleTabs.length > 0 && !guidedPlan ? (
               <View style={styles.muscleTabs}>
                 <FilterChips<MuscleTab>
                   testID="active-workout-muscle-tabs"
@@ -817,7 +997,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               </Text>
             ) : null}
 
-            {workout.exercises.length === 0 ? (
+            {workout.exercises.length === 0 && !guidedPlan ? (
               <View style={styles.emptyWrap}>
                 <EmptyState
                   testID="active-workout-empty"
@@ -826,73 +1006,45 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               </View>
             ) : null}
 
-            {shownExercises.map(({ exercise, index }, shownAt) => (
-              <ExerciseCard
-                {...progression.cardPropsFor(
+            {guidedPlan ? (
+              <>
+                <FoldedExercises
+                  testID="active-workout-done"
+                  exercises={before}
+                  onOpen={(id) => void openExercise(id)}
+                />
+                {focused ? exerciseCard(focused, workout.exercises.indexOf(focused)) : null}
+                <FoldedExercises
+                  testID="active-workout-later"
+                  exercises={after}
+                  onOpen={(id) => void openExercise(id)}
+                />
+                {remaining.length > 0 ? (
+                  <UpNextCard
+                    testID="active-workout-up-next"
+                    remaining={remaining}
+                    onStart={(planned) => void startPlanned(planned)}
+                    busy={startingNext}
+                    accentColor={theme.accent}
+                  />
+                ) : (
+                  <PlanDone testID="active-workout-plan-done" />
+                )}
+              </>
+            ) : (
+              shownExercises.map(({ exercise, index }, shownAt) =>
+                exerciseCard(
                   exercise,
-                  previousPerformance[exercise.exerciseId]?.sets,
-                )}
-                key={exercise.id}
-                exerciseId={exercise.exerciseId}
-                testID={`exercise-card-${exercise.id}`}
-                exerciseName={exercise.exerciseName}
-                muscleGroup={exercise.muscleGroup}
-                movementType={exercise.movementType}
-                measurementType={measurementTypeOf(exercise)}
-                photoUrl={exercise.photoUrl}
-                gym={exercise.gym}
-                grip={exercise.grip}
-                attachment={exercise.attachment}
-                loadType={exercise.loadType}
-                pulleyPosition={exercise.pulleyPosition}
-                pulley={exercise.pulley}
-                weightUnit={weightUnit}
-                previousSession={buildPreviousSessionDisplay(
-                  previousPerformance[exercise.exerciseId],
-                  weightUnit,
-                  measurementTypeOf(exercise),
-                )}
-                // Exercise progress charts weights; a bodyweight or timed exercise has none to show.
-                onViewHistory={
-                  previousPerformance[exercise.exerciseId] &&
-                  measurementTypeOf(exercise) === 'weight_reps'
-                    ? () =>
-                        navigation.navigate('ProgressExerciseDetail', {
-                          exerciseId: exercise.exerciseId,
-                          exerciseName: exercise.exerciseName,
-                        })
-                    : undefined
-                }
-                sets={
-                  exercise.movementType === 'unilateral'
-                    ? []
-                    : computeCardSets(exercise.sets, setInputs, measurementTypeOf(exercise))
-                }
-                unilateralSets={
-                  exercise.movementType === 'unilateral'
-                    ? computeUnilateralSets(exercise.sets, setInputs, measurementTypeOf(exercise))
-                    : []
-                }
-                onChangeWeight={changeSetWeight}
-                onChangeReps={changeSetReps}
-                onChangeDuration={changeSetDuration}
-                setTimers
-                onAddSet={() => handleAddSet(exercise)}
-                onRemoveSet={removeSet}
-                onToggleWarmup={toggleWarmup}
-                onRemoveExercise={() => handleRemoveExercise(exercise.id)}
-                onMoveUp={
-                  shownAt > 0 ? getMoveHandler(index, shownExercises[shownAt - 1].index) : undefined
-                }
-                onMoveDown={
+                  index,
+                  shownAt > 0
+                    ? getMoveHandler(index, shownExercises[shownAt - 1].index)
+                    : undefined,
                   shownAt < shownExercises.length - 1
                     ? getMoveHandler(index, shownExercises[shownAt + 1].index)
-                    : undefined
-                }
-                accentColor={theme.accent}
-                onAccentColor={theme.onAccent}
-              />
-            ))}
+                    : undefined,
+                ),
+              )
+            )}
 
             <View style={styles.endActions}>
               <AddExerciseButton

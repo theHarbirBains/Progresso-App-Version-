@@ -148,10 +148,12 @@ export async function copyDayPlan(fromDayId: string, toDayId: string): Promise<v
 export async function applyPlanToWorkout(
   workoutId: string,
   plan: PlannedExercise[],
+  /** How many sets each gets; the plan's own (targetSets) when left out. */
+  setsEach?: number,
 ): Promise<void> {
   for (const [index, planned] of plan.entries()) {
     const workoutExerciseId = await addExerciseToWorkout(workoutId, planned.exerciseId, index + 1);
-    for (let setIndex = 1; setIndex <= planned.targetSets; setIndex++) {
+    for (let setIndex = 1; setIndex <= (setsEach ?? planned.targetSets); setIndex++) {
       if (planned.movementType === 'unilateral') {
         await createSet(workoutExerciseId, setIndex, 'left');
         await createSet(workoutExerciseId, setIndex, 'right');

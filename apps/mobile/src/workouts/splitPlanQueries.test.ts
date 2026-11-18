@@ -44,4 +44,13 @@ describe('applyPlanToWorkout', () => {
       ['we-lunge', 1, 'right'],
     ]);
   });
+
+  it('gives each exercise only the sets asked for, when a count is given', async () => {
+    (addExerciseToWorkout as jest.Mock).mockReset().mockResolvedValueOnce('we-bench');
+    (createSet as jest.Mock).mockReset().mockResolvedValue({});
+
+    await applyPlanToWorkout('w1', [planned({ exerciseId: 'bench', targetSets: 4 })], 1);
+
+    expect((createSet as jest.Mock).mock.calls).toEqual([['we-bench', 1]]);
+  });
 });

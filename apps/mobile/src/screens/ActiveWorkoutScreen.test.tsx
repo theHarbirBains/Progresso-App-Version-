@@ -32,6 +32,8 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { widgetShown } from '../testUtils/widgetShown';
 import { clearSetTimers, stopSetTimer } from '../workouts/setTimers';
 import { recallLiveWorkout } from '../feed/liveWorkoutMemory';
+import { isGuided } from '../workouts/guidedWorkout';
+import { fetchDayPlan } from '../workouts/splitPlanQueries';
 import { forgetShown } from '../lib/lastShown';
 import { homeWidgets } from '../widgets/homeWidgets';
 import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
@@ -106,6 +108,18 @@ jest.mock('../workouts/workoutQueries', () => ({
 
 jest.mock('../progress/progressStatsQueries', () => ({
   fetchAllCompletedWorkouts: jest.fn(),
+}));
+
+// A planned day's plan (guided workouts); none unless a test gives one.
+jest.mock('../workouts/splitPlanQueries', () => ({
+  fetchDayPlan: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../workouts/guidedWorkout', () => ({
+  ...jest.requireActual('../workouts/guidedWorkout'),
+  isGuided: jest.fn().mockResolvedValue(false),
+  forgetGuided: jest.fn().mockResolvedValue(undefined),
+  markGuided: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../workouts/allExerciseHistoryQueries', () => ({
@@ -2350,5 +2364,114 @@ describe('ActiveWorkoutScreen -- timing a timed set', () => {
     });
 
     expect(stopSetTimer('s2')).toBeNull();
+  });
+});
+
+describe('ActiveWorkoutScreen -- a guided workout (a planned day)', () => {
+  const plan = [
+    {
+      id: 'p1',
+      exerciseId: 'ex1',
+      exerciseName: 'Barbell Bench Press',
+      muscleGroup: 'chest',
+      movementType: 'bilateral',
+      measurementType: 'weight_reps',
+      position: 1,
+      targetSets: 3,
+    },
+    {
+      id: 'p2',
+      exerciseId: 'ex2',
+      exerciseName: 'Squat',
+      muscleGroup: 'quads',
+      movementType: 'bilateral',
+      measurementType: 'weight_reps',
+      position: 2,
+      targetSets: 3,
+    },
+    {
+      id: 'p3',
+      exerciseId: 'ex3',
+      exerciseName: 'Lat Pulldown',
+      muscleGroup: 'back',
+      movementType: 'bilateral',
+      measurementType: 'weight_reps',
+      position: 3,
+      targetSets: 2,
+    },
+  ];
+
+  beforeEach(() => {
+    mockFetchWorkoutDetail.mockResolvedValue({ ...baseWorkout, workoutSplitDayId: 'day1' });
+    (isGuided as jest.Mock).mockResolvedValue(true);
+    (fetchDayPlan as jest.Mock).mockResolvedValue(plan);
+  });
+
+  afterEach(() => {
+    (isGuided as jest.Mock).mockResolvedValue(false);
+    (fetchDayPlan as jest.Mock).mockResolvedValue([]);
+  });
+
+  function renderGuided() {
+    return render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+  }
+
+  it('shows only the exercise being done, with the next one from the plan in Up Next', async () => {
+    renderGuided();
+
+    expect(await screen.findByTestId('active-workout-up-next-name')).toHaveTextContent('Squat');
+    expect(screen.getByTestId('exercise-card-we1')).toBeTruthy();
+    expect(fetchDayPlan).toHaveBeenCalledWith('day1');
+    // The rest of the plan is a tap away, not laid out.
+    expect(screen.queryByTestId('active-workout-up-next-other-p3')).toBeNull();
+    fireEvent.press(screen.getByTestId('active-workout-up-next-choose'));
+    expect(screen.getByTestId('active-workout-up-next-other-p3')).toHaveTextContent(/Lat Pulldown/);
+  });
+
+  it('starts the next planned exercise in one tap; the one done folds away above it', async () => {
+    mockCreateSet.mockResolvedValue({
+      id: 's-squat-1',
+      setIndex: 1,
+      weightKg: null,
+      reps: null,
+      completedAt: null,
+    });
+    renderGuided();
+
+    fireEvent.press(await screen.findByTestId('active-workout-up-next-start'));
+
+    await waitFor(() => expect(mockAddExerciseToWorkout).toHaveBeenCalledWith('w1', 'ex2', 2));
+    expect(await screen.findByTestId('exercise-card-we2')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-card-we1')).toBeNull();
+    // Its untouched set is set aside; the set done stays.
+    expect(mockDeleteSet).toHaveBeenCalledWith('s2');
+    expect(screen.getByTestId('active-workout-done-we1')).toHaveTextContent(/1 set done/);
+    expect(screen.getByTestId('active-workout-up-next-name')).toHaveTextContent('Lat Pulldown');
+
+    // Tapped, the one done opens again.
+    fireEvent.press(screen.getByTestId('active-workout-done-we1'));
+    expect(await screen.findByTestId('exercise-card-we1')).toBeTruthy();
+  });
+
+  it("adds the next set by itself once a set is filled in, up to the plan's sets", async () => {
+    renderGuided();
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '100');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '8');
+
+    await waitFor(() => expect(mockCreateSet).toHaveBeenCalledWith('we1', 3));
+    expect(await screen.findByTestId('exercise-card-we1-set-s3-weight')).toBeTruthy();
+    expect(mockCreateSet).toHaveBeenCalledTimes(1);
+  });
+
+  it('is the usual live workout for a planned day with no plan to follow', async () => {
+    (fetchDayPlan as jest.Mock).mockResolvedValue([]);
+    renderGuided();
+
+    await screen.findByTestId('exercise-card-we1');
+    expect(screen.queryByTestId('active-workout-up-next')).toBeNull();
   });
 });

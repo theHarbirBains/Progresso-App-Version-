@@ -1,4 +1,5 @@
 import type { RootStackParamList } from '../navigation/types';
+import { markGuided } from './guidedWorkout';
 import { applyPlanToWorkout, fetchDayPlan } from './splitPlanQueries';
 import { createWorkout, type WorkoutSummary } from './workoutQueries';
 
@@ -27,7 +28,12 @@ export async function startPlannedWorkout(
   }
   let planError: string | undefined;
   try {
-    await applyPlanToWorkout(result.workout.id, plan);
+    // A planned day is a guided workout (guidedWorkout.ts): it starts on the plan's first exercise
+    // with one set ready, and the rest of the plan waits in Up Next.
+    if (plan.length > 0) {
+      await markGuided(result.workout.id);
+      await applyPlanToWorkout(result.workout.id, plan.slice(0, 1), 1);
+    }
   } catch (err) {
     // The workout has started; what was added stays, and the live workout says the rest
     // didn't make it, so it can be added by hand.

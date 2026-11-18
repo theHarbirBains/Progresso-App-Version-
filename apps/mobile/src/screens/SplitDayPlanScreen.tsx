@@ -30,8 +30,8 @@ const MAX_SETS = 20;
 
 /**
  * A split day's plan: the exercises to do that day, in order, each with how many sets. Starting
- * the day (Start Workout) adds them to the new workout, sets ready to fill from last time; the
- * workout can still be changed freely, and changing the plan never changes a workout already
+ * the day (Start Workout) runs it as a guided workout (workouts/guidedWorkout.ts), one exercise
+ * at a time with its sets adding themselves; the workout can still be changed freely, and changing the plan never changes a workout already
  * done. Each change saves at once, like the split editor. Exercises come from the same picker
  * the live workout uses, custom ones included.
  *
@@ -149,7 +149,7 @@ export function SplitDayPlanScreen({ navigation, route }: Props) {
           <EmptyState
             testID="split-day-plan-empty"
             title="No exercises planned"
-            description="Add the exercises you do on this day. Starting it then adds them for you, sets ready to fill."
+            description="Add the exercises you do on this day. Starting it then takes you through them one at a time."
           />
         ) : null}
 

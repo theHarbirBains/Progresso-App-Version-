@@ -2,6 +2,7 @@ import { ActivityIndicator, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { applyPlanToWorkout, fetchDayPlan } from '../workouts/splitPlanQueries';
+import { isGuided } from '../workouts/guidedWorkout';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
 import { ProfileProvider } from '../profile/ProfileProvider';
@@ -181,7 +182,9 @@ describe('NewWorkoutScreen -- day selection only, no exercise UI', () => {
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('ActiveWorkout', { workoutId: 'w1', planned: true }),
     );
-    expect(applyPlanToWorkout).toHaveBeenCalledWith('w1', plan);
+    // A guided workout: the plan's first exercise with one set ready, the rest in Up Next.
+    expect(applyPlanToWorkout).toHaveBeenCalledWith('w1', [plan[0]], 1);
+    await expect(isGuided('w1')).resolves.toBe(true);
   });
 
   it('still starts the workout when part of the plan could not be added, and says so', async () => {
