@@ -33,6 +33,34 @@ function edgeStyle(fill: string): Shape {
 /** The tone of a bar's end as it faces the viewer. */
 export const METAL_END = '#D9DCE0';
 
+/**
+ * Every solid as it's built, in the rig's 3D space -- read by the 3D render pipeline
+ * (tools/exercise-renders), which rebuilds the equipment in Blender. Off in the app.
+ */
+export type Solid =
+  | {
+      kind: 'box';
+      center: V3;
+      axes: [V3, V3, V3];
+      colors: { top: string; side: string; front: string };
+    }
+  | { kind: 'cylinder'; a: V3; b: V3; r: number; side: Material; cap: string }
+  | { kind: 'ball'; center: V3; r: number; side: Material };
+let solidRecorder: ((solid: Solid) => void) | null = null;
+
+/** Starts (or, with null, stops) recording solids. */
+export function recordSolids(recorder: ((solid: Solid) => void) | null): void {
+  solidRecorder = recorder;
+}
+
+/**
+ * The recorder, when one is listening: `solidsRecorder()?.({...})` builds the solid only then (an
+ * optional call skips its arguments), so the app never does.
+ */
+export function solidsRecorder(): ((solid: Solid) => void) | null {
+  return solidRecorder;
+}
+
 /** A solid cylinder from `a` to `b`. */
 export function cylinder(
   cam: Camera,
@@ -43,6 +71,7 @@ export function cylinder(
   cap: string,
   opts: { layer?: 0 | 1; bias?: number; hub?: number; floor?: boolean } = {},
 ): Piece {
+  solidRecorder?.({ kind: 'cylinder', a, b, r, side, cap });
   const axis = normalize(sub(b, a));
   const u = anyPerpendicular(axis);
   const w = cross(axis, u);
@@ -87,6 +116,7 @@ export function box(
   colors: { top: string; side: string; front: string },
   opts: { layer?: 0 | 1; bias?: number; floor?: boolean } = {},
 ): Piece {
+  solidRecorder?.({ kind: 'box', center, axes: [hx, hy, hz], colors });
   const axes = [hx, hy, hz];
   const shapes: Shape[] = [];
   const pts: P2[] = [];

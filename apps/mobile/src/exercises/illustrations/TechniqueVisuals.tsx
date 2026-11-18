@@ -1,16 +1,19 @@
 import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { colors, radii } from '../../design/theme';
 import { withAlpha } from '../../theme/accentColor';
 import type { TechniqueVisual as Visual } from './builtinGuides.generated';
 import { illustrationFor } from './exerciseArt';
 import { Frame, usePrefix } from './ExerciseIllustration';
+import type { P2 } from './geometry';
 import { MATERIALS } from './palette';
 import type { SceneAnchors, ViewBox } from './render';
+import { EXERCISE_RENDERS, RENDER_ANCHORS, type RenderAnchor } from './renders.generated';
 
 // Technique & Setup's pictures (How to Do It's second page), each in a square `size` across: a close
-// look at the exercise's own drawing -- with a line, an angle or a plumb line in the accent where
-// that's the point -- or a simple diagram: the hands on the grip, the feet on a plate or from above,
+// look at the exercise's own picture (its 3D render, else its drawing) -- with a line, an angle or a
+// plumb line in the accent where that's the point -- or a simple diagram: the hands on the grip, the feet on a plate or from above,
 // the bench's angle. Kept plain, so one thing reads at a glance.
 
 const SKIN = MATERIALS.skin.light;
@@ -29,6 +32,9 @@ const CROP: Record<Extract<Visual, { kind: 'closeup' }>['focus'], number> = {
   torso: 104,
   head: 62,
 };
+
+/** How much wider a rendered close look takes in than the drawing's. */
+const RENDER_CROP_WIDER = 1.3;
 
 const FOCUS_ANCHOR: Record<Extract<Visual, { kind: 'closeup' }>['focus'], keyof SceneAnchors> = {
   hands: 'hands',
@@ -81,6 +87,38 @@ export function TechniqueVisual({
 
 // ---------------------------------------------------------------------------------- Close looks
 
+const distance = (a: P2, b: P2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+/** The back and the near leg's length on screen, to tell a picture's scale. */
+const bodyLength = (a: SceneAnchors) =>
+  distance(a.shoulders, a.hips) + distance(a.hip, a.knee) + distance(a.knee, a.ankle);
+
+/** A rendered frame's anchors (0-1 across and down the image), by name. */
+function renderedAnchors(slug: string, frame: number): SceneAnchors | null {
+  const points = EXERCISE_RENDERS[slug]?.anchors[frame];
+  if (!points) return null;
+  const at = (name: RenderAnchor): P2 => {
+    const i = RENDER_ANCHORS.indexOf(name) * 2;
+    return [points[i] ?? 0, points[i + 1] ?? 0];
+  };
+  return {
+    hands: at('hands'),
+    feet: at('feet'),
+    hip: at('hip'),
+    knee: at('knee'),
+    ankle: at('ankle'),
+    hips: at('hips'),
+    torso: at('torso'),
+    shoulders: at('shoulders'),
+    head: at('head'),
+  };
+}
+
+/**
+ * A close look at one part of the exercise: its rendered frame where there is one, cropped around
+ * the part (a little wider than the drawing's crop, since a photo-like picture holds less detail
+ * up close), else the drawing; the mark drawn over either in the same coordinates.
+ */
 function Closeup({
   slug,
   visual,
@@ -96,15 +134,47 @@ function Closeup({
   const scene = illustrationFor(slug);
   if (!scene) return null;
   const frame = Math.min(visual.frame, scene.frames.length - 1);
-  const anchors = scene.anchors[frame];
+  const drawn = scene.anchors[frame];
+  const rendered = renderedAnchors(slug, frame);
+  const anchors = rendered ?? drawn;
   const c = anchors[FOCUS_ANCHOR[visual.focus]];
-  const span = CROP[visual.focus];
-  const box: ViewBox = { x: c[0] - span / 2, y: c[1] - span / 2, width: span, height: span };
-  const stroke = span / 90;
+  let box: ViewBox;
+  if (rendered) {
+    const scale = bodyLength(rendered) / (bodyLength(drawn) || 1);
+    const span = Math.min(Math.max(CROP[visual.focus] * scale * RENDER_CROP_WIDER, 0.12), 1);
+    const clamp = (v: number) => Math.min(Math.max(v - span / 2, 0), 1 - span);
+    box = { x: clamp(c[0]), y: clamp(c[1]), width: span, height: span };
+  } else {
+    const span = CROP[visual.focus];
+    box = { x: c[0] - span / 2, y: c[1] - span / 2, width: span, height: span };
+  }
+  const stroke = box.width / 90;
   const vb = `${box.x} ${box.y} ${box.width} ${box.height}`;
+  const zoom = size / box.width;
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Frame frame={scene.frames[frame]} viewBox={box} width={size} height={size} prefix={prefix} />
+      {rendered ? (
+        <Image
+          testID="technique-closeup-render"
+          source={EXERCISE_RENDERS[slug].frames[frame]}
+          style={{
+            position: 'absolute',
+            left: -box.x * zoom,
+            top: -box.y * zoom,
+            width: zoom,
+            height: zoom,
+          }}
+          contentFit="fill"
+        />
+      ) : (
+        <Frame
+          frame={scene.frames[frame]}
+          viewBox={box}
+          width={size}
+          height={size}
+          prefix={prefix}
+        />
+      )}
       {visual.mark ? (
         <Svg style={StyleSheet.absoluteFill} width={size} height={size} viewBox={vb}>
           {visual.mark === 'line' ? (

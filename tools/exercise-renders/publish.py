@@ -1,13 +1,20 @@
-"""python tools/exercise-renders/publish.py <render_dir>
+"""python tools/exercise-renders/publish.py <render_dir> [--all]
 
-Takes the pipeline's finished renders (<slug>_<frame>.png, transparent, square) and publishes them to
-the app: each one resized to 720 px and saved as WebP in apps/mobile/assets/exercise-renders, and
-apps/mobile/src/exercises/illustrations/renders.generated.ts rewritten to map every rendered
-exercise's slug to its frames, in order. An exercise is published only with all its frames."""
+Publishes the pipeline's finished renders to the app: each frame (<slug>_<n>.png) as a 720 px WebP,
+a 160 px thumbnail cropped to the body in the exercise's last frame, and
+apps/mobile/src/exercises/illustrations/renders.generated.ts mapping every rendered exercise's slug
+to its frames, its thumbnail and where the body is in each frame (<slug>.json, from
+render_exercise.py), formatted by the repo's Prettier. An exercise is published only with all its
+frames and its positions. Files of exercises no longer rendered are removed. A WebP already made
+from its render is left as it is; --all makes every one again (after changing SIZE or QUALITY)."""
+import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
 
 from PIL import Image
 
@@ -16,45 +23,107 @@ ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 ASSETS = os.path.join(ROOT, 'apps', 'mobile', 'assets', 'exercise-renders')
 GENERATED = os.path.join(ROOT, 'apps', 'mobile', 'src', 'exercises', 'illustrations', 'renders.generated.ts')
 SIZE = 720
-QUALITY = 80
+THUMB = 160
+QUALITY = 76
+# The parts a close-up looks at, in the order renders.generated.ts lists them.
+ANCHORS = ('hands', 'feet', 'hip', 'knee', 'ankle', 'hips', 'torso', 'shoulders', 'head')
 
 
-def main(render_dir):
+def thumbnail(img, bounds):
+    """A square around the body (its bounds, 0-1), with a little room."""
+    x0, y0, x1, y1 = bounds
+    side = max(x1 - x0, y1 - y0) * 1.12
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    half = min(side / 2, 0.5)
+    cx, cy = min(max(cx, half), 1 - half), min(max(cy, half), 1 - half)
+    w = img.width
+    box = tuple(round(v * w) for v in (cx - half, cy - half, cx + half, cy + half))
+    return img.crop(box).resize((THUMB, THUMB), Image.LANCZOS)
+
+
+def _fresh(out, sources, again):
+    """Whether `out` was already made from `sources` (newer than each of them), unless made `again`."""
+    return not again and os.path.exists(out) and all(os.path.getmtime(out) >= os.path.getmtime(s) for s in sources)
+
+
+def convert(slug, pngs, meta_path, bounds, again):
+    """One exercise's frames and thumbnail as WebPs (skipping any already up to date); their names."""
+    files = []
+    for i, png in enumerate(pngs):
+        out = f'{slug}_{i}.webp'
+        if not _fresh(os.path.join(ASSETS, out), [png], again):
+            img = Image.open(png).convert('RGBA').resize((SIZE, SIZE), Image.LANCZOS)
+            img.save(os.path.join(ASSETS, out), 'WEBP', quality=QUALITY, method=6)
+        files.append(out)
+    thumb = f'{slug}_thumb.webp'
+    if not _fresh(os.path.join(ASSETS, thumb), [pngs[-1], meta_path], again):
+        thumbnail(Image.open(pngs[-1]).convert('RGBA'), bounds).save(
+            os.path.join(ASSETS, thumb), 'WEBP', quality=82, method=6)
+    return files, thumb
+
+
+def main(render_dir, again=False):
     os.makedirs(ASSETS, exist_ok=True)
     frames = defaultdict(dict)
     for name in os.listdir(render_dir):
         m = re.fullmatch(r'([a-z0-9-]+)_(\d+)\.png', name)
         if m:
             frames[m.group(1)][int(m.group(2))] = os.path.join(render_dir, name)
-    published = {}
-    for slug, by_index in sorted(frames.items()):
-        if sorted(by_index) != list(range(len(by_index))):
-            print(f'skipping {slug}: frames {sorted(by_index)}')
-            continue
-        files = []
-        for i in range(len(by_index)):
-            img = Image.open(by_index[i]).convert('RGBA').resize((SIZE, SIZE), Image.LANCZOS)
-            out = os.path.join(ASSETS, f'{slug}_{i}.webp')
-            img.save(out, 'WEBP', quality=QUALITY, method=6)
-            files.append(f'{slug}_{i}.webp')
-            print(f'{out}: {os.path.getsize(out) // 1024} KB')
-        published[slug] = files
+    jobs, metas = {}, {}
+    with ProcessPoolExecutor() as pool:
+        for slug, by_index in sorted(frames.items()):
+            meta_path = os.path.join(render_dir, f'{slug}.json')
+            if sorted(by_index) != list(range(len(by_index))) or not os.path.exists(meta_path):
+                print(f'skipping {slug}: incomplete')
+                continue
+            meta = json.load(open(meta_path))
+            if len(meta['frames']) != len(by_index):
+                print(f'skipping {slug}: {len(meta["frames"])} positions for {len(by_index)} frames')
+                continue
+            pngs = [by_index[i] for i in range(len(by_index))]
+            jobs[slug] = pool.submit(convert, slug, pngs, meta_path, meta['frames'][-1]['bounds'], again)
+            metas[slug] = meta['frames']
+        published = {slug: (*job.result(), metas[slug]) for slug, job in jobs.items()}
+    written = {f for files, thumb, _ in published.values() for f in files + [thumb]}
+    total = sum(os.path.getsize(os.path.join(ASSETS, f)) for f in written)
+    for name in os.listdir(ASSETS):
+        if name not in written:
+            os.remove(os.path.join(ASSETS, name))
     lines = [
         '// GENERATED by tools/exercise-renders/publish.py -- do not edit by hand.',
         "// Each rendered built-in exercise's How to Do It frames (the app's own frames, in order: the",
-        '// first is the setup and the way back, the next the movement), from the Blender pipeline.',
+        '// first is the setup and the way back, the next the movement), its list thumbnail, and where',
+        "// the body is in each frame (0-1 across and down) for Technique & Setup's close-ups:",
+        f"// {', '.join(ANCHORS)}.",
         '',
-        'export const EXERCISE_RENDERS: Record<string, readonly number[]> = {',
+        "export type RenderAnchor = (typeof RENDER_ANCHORS)[number];",
+        '',
+        f"export const RENDER_ANCHORS = [{', '.join(repr(a) for a in ANCHORS)}] as const;",
+        '',
+        'export interface ExerciseRender {',
+        '  frames: readonly number[];',
+        '  thumb: number;',
+        '  /** Each frame: every RENDER_ANCHORS point, in that order, as x then y. */',
+        '  anchors: readonly (readonly number[])[];',
+        '}',
+        '',
+        'export const EXERCISE_RENDERS: Record<string, ExerciseRender> = {',
     ]
-    for slug, files in published.items():
-        lines.append(f"  '{slug}': [")
-        for f in files:
-            lines.append(f"    require('../../../assets/exercise-renders/{f}'),")
-        lines.append('  ],')
+    for slug, (files, thumb, metas) in published.items():
+        anchors = [[v for a in ANCHORS for v in meta[a]] for meta in metas]
+        lines.append(f"  '{slug}': {{")
+        lines.append('    frames: [')
+        lines.extend(f"      require('../../../assets/exercise-renders/{f}')," for f in files)
+        lines.append('    ],')
+        lines.append(f"    thumb: require('../../../assets/exercise-renders/{thumb}'),")
+        lines.append(f'    anchors: {json.dumps(anchors, separators=(",", ":"))},')
+        lines.append('  },')
     lines.append('};')
     open(GENERATED, 'w', encoding='utf-8', newline='\n').write('\n'.join(lines) + '\n')
-    print(f'{GENERATED}: {len(published)} exercises')
+    # In the repo's own style, like the catalogue's generated files.
+    subprocess.run([shutil.which('npx'), 'prettier', '--write', GENERATED], cwd=ROOT, check=True, capture_output=True)
+    print(f'{len(published)} exercises, {total / 1048576:.1f} MB')
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main(sys.argv[1], '--all' in sys.argv[2:])

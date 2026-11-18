@@ -32,7 +32,7 @@ export function RenderedPhases({
   accent: string;
   testID?: string;
 }) {
-  const frames = EXERCISE_RENDERS[slug];
+  const frames = EXERCISE_RENDERS[slug]?.frames;
   const phases = guidePhases(slug);
   const reduceMotion = useReduceMotionPreference();
   const [index, setIndex] = useState(0);

@@ -57,10 +57,11 @@ def world_coords(objects):
     return pts
 
 
-def setup(view, objects, preview=False, coords=None, size=1000):
+def setup(view, coords, preview=False, size=1000):
+    """The studio, its lights and camera placed around `coords` (every point to be framed)."""
     scene = bpy.context.scene
     device = gpu(scene)
-    scene.cycles.samples = 48 if preview else 384
+    scene.cycles.samples = 48 if preview else 256
     scene.cycles.use_denoising = True
     scene.render.film_transparent = True
     scene.render.resolution_x = scene.render.resolution_y = size
@@ -79,9 +80,8 @@ def setup(view, objects, preview=False, coords=None, size=1000):
     world.node_tree.nodes['Background'].inputs['Strength'].default_value = 0.6
     scene.world = world
 
-    pts = coords if coords is not None else world_coords(objects)
-    lo = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
-    hi = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+    lo = Vector((min(p.x for p in coords), min(p.y for p in coords), min(p.z for p in coords)))
+    hi = Vector((max(p.x for p in coords), max(p.y for p in coords), max(p.z for p in coords)))
     centre = (lo + hi) / 2
     span = (hi - lo).length
 
@@ -106,6 +106,6 @@ def setup(view, objects, preview=False, coords=None, size=1000):
     scene.camera = cam
     cam.rotation_euler = (-d).to_track_quat('-Z', 'Y').to_euler()
     bpy.context.view_layer.update()
-    loc, _ = cam.camera_fit_coords(bpy.context.evaluated_depsgraph_get(), [c for p in pts for c in p])
+    loc, _ = cam.camera_fit_coords(bpy.context.evaluated_depsgraph_get(), [c for p in coords for c in p])
     cam.location = centre + (Vector(loc) - centre) * 1.1
     return device

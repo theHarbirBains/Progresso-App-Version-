@@ -27,6 +27,14 @@ def material(name):
         'plate': dict(base=(0.03, 0.03, 0.032), rough=0.72),
         'tread': dict(base=(0.03, 0.03, 0.033), metal=0.3, rough=0.6, bump=('wave', 60.0, 0.5)),
         'accent': dict(base=(0.75, 0.42, 0.12), metal=0.2, rough=0.35),
+        # The rest of the gym (generic.py): cast iron, braided rope, nylon strap, a wooden box, a
+        # rubber floor mat, steel cable.
+        'iron': dict(base=(0.035, 0.035, 0.038), metal=0.6, rough=0.45),
+        'rope': dict(base=(0.025, 0.025, 0.027), rough=0.9, bump=('wave', 140.0, 0.6)),
+        'strap': dict(base=(0.03, 0.03, 0.034), rough=0.75, bump=('wave', 300.0, 0.3)),
+        'wood': dict(base=(0.32, 0.2, 0.11), rough=0.6, bump=('noise', 40.0, 0.15)),
+        'mat': dict(base=(0.045, 0.046, 0.05), rough=0.92, bump=('noise', 180.0, 0.25)),
+        'cable': dict(base=(0.25, 0.26, 0.28), metal=1.0, rough=0.35),
     }[name]
     b.inputs['Base Color'].default_value = (*spec['base'], 1)
     b.inputs['Metallic'].default_value = spec.get('metal', 0.0)
@@ -60,8 +68,6 @@ def _finish(name, bm, mat, bevel=0.0, segments=3, smooth=True):
         mod.harden_normals = False
     for poly in obj.data.polygons:
         poly.use_smooth = smooth
-    if smooth:
-        mod = obj.modifiers.new('smooth', 'NODES') if False else None
     return obj
 
 

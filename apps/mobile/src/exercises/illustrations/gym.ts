@@ -12,7 +12,16 @@ import {
   type V3,
 } from './geometry';
 import { ART, MATERIALS, type Material } from './palette';
-import { barbell, box, cylinder, FRAME, handleDirection, METAL_END, PAD } from './props';
+import {
+  barbell,
+  box,
+  cylinder,
+  FRAME,
+  handleDirection,
+  METAL_END,
+  PAD,
+  solidsRecorder,
+} from './props';
 import type { Camera, Piece, PropBuilder } from './render';
 import type { Side, Skeleton } from './rig';
 import { midTone, sphereGradient } from './shading';
@@ -79,6 +88,7 @@ function rod(
 
 /** A ball: a kettlebell's bell, a medicine ball, a rope's knot. */
 export function ball(cam: Camera, center: V3, r: number, material: Material, bias = 0): Piece {
+  solidsRecorder()?.({ kind: 'ball', center, r, side: material });
   const c = cam.toScreen(center);
   const top = cam.toScreen(add(center, [0, r, 0]));
   const sr = Math.max(0.5, Math.abs(top[1] - c[1]));

@@ -1,5 +1,6 @@
 import { Alert } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { Image } from 'expo-image';
 import {
   forgetBuiltinExtras,
   setBuiltinSources,
@@ -10,8 +11,11 @@ import { ExerciseDetailsCard } from './ExerciseDetailsCard';
 import { ExerciseGuideSheet } from './ExerciseGuideSheet';
 import { ExercisePhoto } from './ExercisePhoto';
 import { HowToPill } from './HowToPill';
+import { illustrationFor } from './illustrations/exerciseArt';
+import { ExerciseThumbnail } from './illustrations/ExerciseIllustration';
 import { hasRenders, RenderedPhases } from './illustrations/RenderedPhases';
-import { EXERCISE_RENDERS } from './illustrations/renders.generated';
+import { EXERCISE_RENDERS, RENDER_ANCHORS } from './illustrations/renders.generated';
+import { TechniqueVisual } from './illustrations/TechniqueVisuals';
 import { removeOwnPhoto, saveOwnPhoto, setOwnPhotoSource, type OwnPhotoSource } from './ownPhotos';
 
 jest.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
@@ -435,13 +439,13 @@ describe('RenderedPhases (the 3D renders)', () => {
     const label = (i: number) => screen.getByTestId(`phases-label-${i}`);
     expect(label(0).props.accessibilityState).toEqual({ selected: true });
     expect(screen.getByTestId('phases-image').props.source).toBe(
-      EXERCISE_RENDERS['db-bench-press'][0],
+      EXERCISE_RENDERS['db-bench-press'].frames[0],
     );
 
     act(() => jest.advanceTimersByTime(1700));
     expect(label(1).props.accessibilityState).toEqual({ selected: true });
     expect(screen.getByTestId('phases-image').props.source).toBe(
-      EXERCISE_RENDERS['db-bench-press'][1],
+      EXERCISE_RENDERS['db-bench-press'].frames[1],
     );
 
     // The way back is drawn from the setup's frame.
@@ -449,16 +453,56 @@ describe('RenderedPhases (the 3D renders)', () => {
     act(() => jest.advanceTimersByTime(5000));
     expect(label(2).props.accessibilityState).toEqual({ selected: true });
     expect(screen.getByTestId('phases-image').props.source).toBe(
-      EXERCISE_RENDERS['db-bench-press'][0],
+      EXERCISE_RENDERS['db-bench-press'].frames[0],
     );
     jest.useRealTimers();
   });
 
-  it('is only for the exercises that have been rendered; the rest keep their drawings', () => {
+  it('has, for every rendered exercise, a frame and its positions for each drawn frame, and a thumbnail', () => {
     expect(hasRenders('db-bench-press')).toBe(true);
-    expect(hasRenders('pl-leg-press')).toBe(true);
-    expect(hasRenders('pl-t-bar-row')).toBe(true);
-    expect(hasRenders('bb-back-squat')).toBe(false);
-    for (const frames of Object.values(EXERCISE_RENDERS)) expect(frames.length).toBe(2);
+    expect(hasRenders('not-an-exercise')).toBe(false);
+    expect(hasRenders(null)).toBe(false);
+    for (const [slug, rendered] of Object.entries(EXERCISE_RENDERS)) {
+      const frames = illustrationFor(slug)?.frames.length;
+      expect(frames).toBeGreaterThan(0);
+      expect(rendered.frames).toHaveLength(frames!);
+      expect(rendered.anchors).toHaveLength(frames!);
+      expect(rendered.thumb).toBeTruthy();
+      for (const points of rendered.anchors) {
+        expect(points).toHaveLength(RENDER_ANCHORS.length * 2);
+        // Every part is in the picture.
+        for (const v of points) expect(v >= 0 && v <= 1).toBe(true);
+      }
+    }
+  });
+
+  it('shows a rendered exercise in a list by its thumbnail', () => {
+    render(<ExerciseThumbnail slug="db-bench-press" size={44} testID="thumb" />);
+    expect(screen.UNSAFE_getByType(Image).props.source).toBe(
+      EXERCISE_RENDERS['db-bench-press'].thumb,
+    );
+  });
+
+  it("crops Technique & Setup's close look from the render, around the part it's about", () => {
+    render(
+      <TechniqueVisual
+        slug="db-bench-press"
+        visual={{ kind: 'closeup', focus: 'hands', frame: 1 }}
+        accent="#D99A50"
+        size={112}
+      />,
+    );
+    const image = screen.getByTestId('technique-closeup-render');
+    expect(image.props.source).toBe(EXERCISE_RENDERS['db-bench-press'].frames[1]);
+    // Zoomed in (the picture is bigger than its frame), the hands inside the frame.
+    const { left, top, width } = image.props.style;
+    expect(width).toBeGreaterThan(112);
+    const hands = RENDER_ANCHORS.indexOf('hands');
+    const frame = EXERCISE_RENDERS['db-bench-press'].anchors[1]!;
+    const [hx, hy] = [frame[2 * hands]!, frame[2 * hands + 1]!];
+    expect(left + hx * width).toBeGreaterThan(0);
+    expect(left + hx * width).toBeLessThan(112);
+    expect(top + hy * width).toBeGreaterThan(0);
+    expect(top + hy * width).toBeLessThan(112);
   });
 });

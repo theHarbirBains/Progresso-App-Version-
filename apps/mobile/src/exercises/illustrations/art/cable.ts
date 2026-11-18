@@ -513,21 +513,22 @@ function standingLegCurl(): SceneSpec {
 // ------------------------------------------------------------------------------------------ Core
 
 function cableCrunch(): SceneSpec {
-  const kneel = feet({ at: [-40, 8, 11], pole: [0.3, -1, 0], toe: [-0.3, -1, 0] });
+  // Kneeling a stride back from the column: knees down, the tops of the feet flat behind.
+  const kneel = feet({ at: [-40, 7, 11], pole: [0.3, -1, 0], toe: [-1, -0.05, 0] });
   return two(
     {
-      pelvis: [0, 62, 0],
+      pelvis: [0, 55, 0],
       pitch: 22,
       feet: kneel,
-      hands: hands({ at: [22, 132, 8], pole: [0.3, -1, 0.6] }),
+      hands: hands({ at: [22, 125, 8], pole: [0.3, -1, 0.6] }),
     },
     {
-      pelvis: [-2, 60, 0],
+      pelvis: [-2, 53, 0],
       pitch: 78,
       feet: kneel,
-      hands: hands({ at: [38, 74, 8], pole: [0.3, -1, 0.6] }),
+      hands: hands({ at: [38, 67, 8], pole: [0.3, -1, 0.6] }),
     },
-    [cable({ column: front(198, 50), attachment: 'rope' })],
+    [cable({ column: front(198, 80), attachment: 'rope' })],
     SIDE,
     motion.head,
   );

@@ -111,7 +111,7 @@ const CATALOGUE_GRIPS = {
 };
 
 /** The exercise's grip and width, from its catalogue grip, its name, or how it's usually held. */
-function gripOf(ex) {
+export function gripOf(ex) {
   const name = ex.name;
   if (ex.grip && CATALOGUE_GRIPS[ex.grip]) return CATALOGUE_GRIPS[ex.grip];
   const width = /Wide/.test(name) ? 'wide' : /Close|Narrow/.test(name) ? 'close' : undefined;

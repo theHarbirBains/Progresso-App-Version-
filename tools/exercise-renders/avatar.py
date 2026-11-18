@@ -105,8 +105,10 @@ def _blend(a, b, t):
     return a.to_quaternion().slerp(b.to_quaternion(), t).to_matrix()
 
 
-def pose(arm, f, palms):
-    """Poses the avatar to one frame of the app's skeleton. `palms`: each side's palm direction (rig)."""
+def pose(arm, f, hands):
+    """Poses the avatar to one frame of the app's skeleton. `hands`, each side's: `across` (Blender)
+    to line the knuckles up along a handle, or `palm` (rig) to face the palm; and `curl` (0 open,
+    1 a closed fist)."""
     for pb in arm.pose.bones:
         pb.matrix_basis = Matrix.Identity(4)
         for c in list(pb.constraints):
@@ -129,17 +131,26 @@ def pose(arm, f, palms):
         end, joint = Vector(a['end']), Vector(a['joint'])
         along = end - joint
         along.normalize()
-        wrist = bl(end - along * 7.5)
+        hand = hands[side]
+        # A hand flat on a surface: the wrist just behind and above the palm, fingers forward.
+        flat = hand.get('flat')
+        wrist = bl(end) + Vector((0, 0, 0.03)) - flat * 0.075 if flat is not None else bl(end - along * 7.5)
         _limb(arm, f'Bip01 {letter} UpperArm', f'Bip01 {letter} Forearm', f'Bip01 {letter} Hand',
               wrist, bl(joint))
-        _hand(arm, letter, bl_dir(palms[side]))
+        if flat is not None:
+            _hand_frame(arm, letter, flat, Vector((0, 0, -1)))
+        elif hand.get('across') is not None:
+            _hand_along(arm, letter, hand['across'])
+        else:
+            _hand(arm, letter, bl_dir(hand['palm']))
         lg = f['legs'][side]
         _limb(arm, f'Bip01 {letter} Thigh', f'Bip01 {letter} Calf', f'Bip01 {letter} Foot',
               bl(lg['end']), bl(lg['joint']))
         foot = f['feet'][side]
         sole = Vector(foot['toe']) - Vector(foot['heel'])
         _foot(arm, letter, bl_dir(sole))
-    fist(arm)
+    for side, letter in (('r', 'R'), ('l', 'L')):
+        fist(arm, hands[side].get('curl', 1.0), letters=(letter,))
     return []
 
 
@@ -187,21 +198,46 @@ def _limb(arm, upper, lower, end, target, pole):
         _set_world_rotation(arm, arm.pose.bones[bone], turn)
 
 
+def _rest_hand(arm, letter):
+    """The hand at rest: the line from the wrist to its knuckles, and by name the knuckles' line
+    (`across`, little finger to index) and the way its palm faces (`palm`, in toward the body --
+    the A-pose palms face the thighs)."""
+    h0 = _rest_world(arm, f'Bip01 {letter} Hand')
+    knuckles0 = sum((_rest_world(arm, f'Bip01 {letter} Finger{i}') for i in range(1, 5)), Vector()) / 4
+    across0 = _rest_world(arm, f'Bip01 {letter} Finger1') - _rest_world(arm, f'Bip01 {letter} Finger4')
+    along0 = knuckles0 - h0
+    palm0 = along0.cross(across0)
+    if palm0.dot(Vector((-h0.x, -h0.y, 0))) < 0:
+        palm0 = -palm0
+    return along0, {'across': across0, 'palm': palm0}
+
+
+def _turn_hand(arm, letter, along, second, rest_second):
+    """Turns the hand so the line to its knuckles lies along `along` and its `rest_second` ('across'
+    or 'palm') turns toward `second`."""
+    along0, rest = _rest_hand(arm, letter)
+    turn = _frame(along, second) @ _frame(along0, rest[rest_second]).transposed()
+    _set_world_rotation(arm, arm.pose.bones[f'Bip01 {letter} Hand'], turn)
+
+
+def _forearm_line(arm, letter):
+    return _posed_world(arm, f'Bip01 {letter} Hand') - _posed_world(arm, f'Bip01 {letter} Forearm')
+
+
 def _hand(arm, letter, palm):
     """The wrist straight on the forearm's line, the palm turned to face `palm`."""
-    hand = f'Bip01 {letter} Hand'
-    h0 = _rest_world(arm, hand)
-    knuckles0 = sum((_rest_world(arm, f'Bip01 {letter} Finger{i}') for i in range(1, 5)), Vector()) / 4
-    index0, pinky0 = _rest_world(arm, f'Bip01 {letter} Finger1'), _rest_world(arm, f'Bip01 {letter} Finger4')
-    along0 = knuckles0 - h0
-    palm0 = along0.cross(index0 - pinky0)
-    # Pointing in toward the body at rest (A-pose palms face the thighs).
-    if palm0.dot(Vector((0, 0, 0)) - h0 + Vector((0, 0, h0.z))) < 0:
-        palm0 = -palm0
-    f_head = _posed_world(arm, f'Bip01 {letter} Forearm')
-    along = _posed_world(arm, hand) - f_head
-    turn = _frame(along, palm) @ _frame(along0, palm0).transposed()
-    _set_world_rotation(arm, arm.pose.bones[hand], turn)
+    _turn_hand(arm, letter, _forearm_line(arm, letter), palm, 'palm')
+
+
+def _hand_frame(arm, letter, along, palm):
+    """The hand laid along `along` (fingers that way), its palm facing `palm` -- flat on a surface."""
+    _turn_hand(arm, letter, along, palm, 'palm')
+
+
+def _hand_along(arm, letter, across):
+    """The wrist straight on the forearm's line, the knuckles (little finger to index) along
+    `across` -- a handle's line, the way the hand holds it."""
+    _turn_hand(arm, letter, _forearm_line(arm, letter), across, 'across')
 
 
 def _foot(arm, letter, sole):
@@ -217,14 +253,14 @@ def _foot(arm, letter, sole):
     _set_world_rotation(arm, arm.pose.bones[foot], turn)
 
 
-def fist(arm, curl=1.0):
+def fist(arm, curl=1.0, letters=('R', 'L')):
     """Closes each hand around its grip: every finger curled at each joint, the thumb across."""
-    for letter in ('R', 'L'):
+    for letter in letters:
         for finger in range(1, 5):
             for j, amount in ((f'{finger}', 55), (f'{finger}1', 85), (f'{finger}2', 60)):
                 pb = arm.pose.bones[f'Bip01 {letter} Finger{j}']
                 pb.rotation_mode = 'XYZ'
-                pb.rotation_euler = (0, 0, math.radians(amount * curl) * (1 if letter == 'R' else 1))
+                pb.rotation_euler = (0, 0, math.radians(amount * curl))
         for j, rot in (('0', (0, 20, 25)), ('01', (0, 0, 30)), ('02', (0, 0, 35))):
             pb = arm.pose.bones[f'Bip01 {letter} Finger{j}']
             pb.rotation_mode = 'XYZ'

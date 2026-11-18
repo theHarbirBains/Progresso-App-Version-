@@ -309,9 +309,9 @@ function KeyGroup({
 }
 
 /**
- * The end position alone, fitted into a circle `size` across -- a list row's picture. Drawn flat
- * (thumbnailFor), and only drawn again when its exercise or size changes, never because the list
- * around it did.
+ * The end position alone, fitted into a circle `size` across -- a list row's picture: the render's
+ * thumbnail where there is one, else drawn flat (thumbnailFor), and only drawn again when its
+ * exercise or size changes, never because the list around it did.
  */
 export const ExerciseThumbnail = memo(function ExerciseThumbnail({
   slug,
@@ -326,14 +326,10 @@ export const ExerciseThumbnail = memo(function ExerciseThumbnail({
   const rendered = EXERCISE_RENDERS[slug];
   const scene = rendered ? null : thumbnailFor(slug);
   if (rendered) {
-    // A rendered exercise shows its movement's end position, filling the circle.
+    // A rendered exercise shows its movement's end position, cropped to the body.
     return (
       <View testID={testID} style={{ width: size, height: size }}>
-        <Image
-          source={rendered[rendered.length - 1]}
-          style={{ width: size, height: size, transform: [{ scale: 1.35 }] }}
-          contentFit="cover"
-        />
+        <Image source={rendered.thumb} style={{ width: size, height: size }} contentFit="cover" />
       </View>
     );
   }
