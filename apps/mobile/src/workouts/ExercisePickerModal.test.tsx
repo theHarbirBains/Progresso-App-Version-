@@ -264,7 +264,7 @@ describe('ExercisePickerModal -- deleting your own exercises', () => {
 
     const mine = await screen.findByTestId('exercise-item-ex-mine');
     // Its gym after the muscle, so look-alike machines read apart.
-    expect(within(mine).getByText('Quadriceps · Bilateral · Downtown')).toBeTruthy();
+    expect(within(mine).getByText('Quadriceps · Downtown')).toBeTruthy();
     expect(screen.getByTestId('exercise-item-ex1').props.accessibilityActions).toBeUndefined();
 
     fireEvent(mine, 'accessibilityAction', { nativeEvent: { actionName: 'delete' } });
@@ -294,7 +294,7 @@ describe('ExercisePickerModal', () => {
 
     const item = await screen.findByTestId('exercise-item-ex1');
     expect(within(item).getByText('Barbell Bench Press')).toBeTruthy();
-    expect(within(item).getByText('Chest · Bilateral')).toBeTruthy();
+    expect(within(item).getByText('Chest')).toBeTruthy();
   });
 
   // Regression guard: the muscle-group filter row was sitting flush against
@@ -514,7 +514,7 @@ describe('ExercisePickerModal -- one list of plain rows', () => {
     const open = await screen.findByTestId('exercise-item-ex1');
     const added = screen.getByTestId('exercise-item-ex2');
 
-    expect(open.props.accessibilityLabel).toBe('Barbell Bench Press, Chest · Bilateral');
+    expect(open.props.accessibilityLabel).toBe('Barbell Bench Press, Chest');
     expect(added).toHaveTextContent(/Barbell Back Squat \(added\)/);
     expect(open.props.accessibilityState.disabled).toBe(false);
   });

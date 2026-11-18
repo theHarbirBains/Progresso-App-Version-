@@ -122,6 +122,7 @@ export default [
   kb({
     slug: 'kb-press',
     name: 'Kettlebell Overhead Press',
+    retired: true,
     muscle: 'shoulders',
     pattern: 'vertical_push',
     sides: 'single_side',
@@ -274,6 +275,7 @@ export default [
   kb({
     slug: 'kb-high-pull',
     name: 'Kettlebell High Pull',
+    retired: true,
     muscle: 'shoulders',
     pattern: 'vertical_pull',
     action: 'Pull',

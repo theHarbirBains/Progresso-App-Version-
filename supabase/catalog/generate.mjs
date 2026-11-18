@@ -21,7 +21,7 @@ import kettlebell from './kettlebell.mjs';
 import accessories from './accessories.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const MIGRATION = join(here, '..', 'migrations', '20261130100000_simpler_exercise_names.sql');
+const MIGRATION = join(here, '..', 'migrations', '20261201100000_retire_more_exercises.sql');
 const APP_FILE = join(
   here,
   '..',

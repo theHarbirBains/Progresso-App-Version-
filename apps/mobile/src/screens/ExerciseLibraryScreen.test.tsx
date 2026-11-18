@@ -208,18 +208,17 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
-  it('filters by muscle group when a chip is pressed', async () => {
+  it('filters by muscle group in the list itself when a chip is pressed -- no new read', async () => {
     renderScreen();
     await screen.findByTestId('exercise-item-ex-builtin');
     mockFetchAllExercises.mockClear();
 
     fireEvent.press(screen.getByTestId('muscle-group-chip-chest'));
 
-    await waitFor(() =>
-      expect(mockFetchAllExercises).toHaveBeenCalledWith(
-        expect.objectContaining({ muscleGroup: 'chest' }),
-      ),
-    );
+    // Only the chest exercise is left; the biceps one is gone, and nothing was fetched again.
+    await waitFor(() => expect(screen.queryByTestId('exercise-item-ex-mine')).toBeNull());
+    expect(screen.getByTestId('exercise-item-ex-builtin')).toBeTruthy();
+    expect(mockFetchAllExercises).not.toHaveBeenCalled();
     await settle();
   });
 
@@ -334,12 +333,12 @@ describe('ExerciseLibraryScreen', () => {
     await settle();
   });
 
-  it('shows real muscle-group and movement-type tags on each row, not images', async () => {
+  it("shows each row's muscle group, and says nothing of sides for a both-sides exercise", async () => {
     renderScreen();
 
     const row = await screen.findByTestId('exercise-item-ex-builtin');
     expect(row).toHaveTextContent(/Chest/);
-    expect(row).toHaveTextContent(/Bilateral/);
+    expect(row).not.toHaveTextContent(/Bilateral/);
     await settle();
   });
 
@@ -429,7 +428,8 @@ describe('ExerciseLibraryScreen -- two widgets, source blocks, New Exercise in t
     renderScreen();
     const row = await screen.findByTestId('exercise-item-ex-builtin');
 
-    expect(row).toHaveTextContent(/Chest · Bilateral/);
+    expect(row).toHaveTextContent(/Chest/);
+    expect(row).not.toHaveTextContent(/Bilateral/);
     await settle();
   });
 

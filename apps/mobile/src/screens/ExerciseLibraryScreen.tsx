@@ -87,7 +87,8 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
       const result = await fetchAllExercises({
         userId,
         search,
-        muscleGroup,
+        // The muscle filter is applied in the list itself (ExerciseBrowser), from these rows.
+        muscleGroup: null,
         source,
         shared: sharedRows,
         equipment,
@@ -100,7 +101,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [userId, search, muscleGroup, source, sharedRows, equipment]);
+  }, [userId, search, source, sharedRows, equipment]);
 
   useEffect(() => {
     void load();

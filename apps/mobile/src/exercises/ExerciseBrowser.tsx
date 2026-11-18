@@ -1,5 +1,20 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Alert, SectionList, TouchableOpacity, View, type SectionListData } from 'react-native';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import {
+  Alert,
+  Animated,
+  SectionList,
+  TouchableOpacity,
+  View,
+  type SectionListData,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { EmptyState } from '../design/EmptyState';
@@ -22,7 +37,7 @@ import { FriendPicker } from './FriendPicker';
 import { MuscleGroupChips } from './MuscleGroupChips';
 import type { SharingFriend } from './sharingFriends';
 import { machineLine } from './machineDetails';
-import { MOVEMENT_TYPE_LABELS } from './movementTypes';
+import { sidesLabel } from './movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
 import { SkeletonRows } from '../design/Skeleton';
 
@@ -126,13 +141,28 @@ export function ExerciseBrowser({
     if (friendId !== null && !friends.some((friend) => friend.id === friendId)) setFriendId(null);
   }, [friends, friendId]);
   const inFriends = source === 'friends';
+  // The muscle filter is applied here, to the rows already in hand -- never a new read. The chip
+  // changes the moment it's tapped; the list (rows with a drawing each) follows as a deferred
+  // render that never holds up a tap, dimmed while it's on its way.
+  const listedMuscle = useDeferredValue(muscleGroup);
+  const switching = listedMuscle !== muscleGroup;
   const shownRows = useMemo(
     () =>
-      inFriends && friendId !== null
-        ? rows.filter((row) => row.shared?.ownerId === friendId)
-        : rows,
-    [rows, inFriends, friendId],
+      rows.filter(
+        (row) =>
+          (!inFriends || friendId === null || row.shared?.ownerId === friendId) &&
+          (listedMuscle === null || row.muscleGroup === listedMuscle),
+      ),
+    [rows, inFriends, friendId, listedMuscle],
   );
+  const fade = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.timing(fade, {
+      toValue: switching ? 0.35 : 1,
+      duration: switching ? 80 : 180,
+      useNativeDriver: true,
+    }).start();
+  }, [switching, fade]);
 
   // The one row showing Delete, if any; and whether a row is being swiped, when the list holds
   // its scroll still.
@@ -244,7 +274,7 @@ export function ExerciseBrowser({
                 machineLine(
                   item,
                   MUSCLE_GROUP_LABELS[item.muscleGroup],
-                  MOVEMENT_TYPE_LABELS[item.movementType],
+                  sidesLabel(item.movementType),
                 ) ?? ''
               }
               detail={shared ? `From ${shared.ownerName}` : undefined}
@@ -413,11 +443,20 @@ export function ExerciseBrowser({
         ) : loading ? (
           <SkeletonRows testID="exercise-library-loading" count={6} />
         ) : (
-          <View style={styles.flex}>
+          <Animated.View
+            testID={`${testID}-results`}
+            style={[styles.flex, { opacity: fade }]}
+            accessibilityState={{ busy: switching }}
+          >
             <SectionList
               testID="exercise-library-list-section"
               sections={listSections}
               keyExtractor={(item) => item.id}
+              // A screenful or so at first, and only a few screens either side kept drawn: a
+              // filter with forty exercises doesn't draw forty pictures at once.
+              initialNumToRender={10}
+              maxToRenderPerBatch={6}
+              windowSize={7}
               keyboardShouldPersistTaps="handled"
               scrollEnabled={!rowSwiping}
               showsVerticalScrollIndicator={false}
@@ -439,7 +478,7 @@ export function ExerciseBrowser({
               renderSectionHeader={renderSectionHeader}
               renderItem={renderItem}
             />
-          </View>
+          </Animated.View>
         )}
       </AppCard>
     </RiseInStack>

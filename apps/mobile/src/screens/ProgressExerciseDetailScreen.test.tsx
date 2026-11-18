@@ -280,7 +280,7 @@ describe('ProgressExerciseDetailScreen -- which machine', () => {
     });
 
     expect(await screen.findByTestId('progress-exercise-detail-details-line')).toHaveTextContent(
-      'Back · Bilateral · Fit4Less Downtown · V-handle · Double stack · Lighter pulley',
+      'Back · Fit4Less Downtown · V-handle · Double stack · Lighter pulley',
     );
     expect(fetchExerciseDetails).toHaveBeenCalledWith('user-1', 'ex-1');
     // The photo opens full size.

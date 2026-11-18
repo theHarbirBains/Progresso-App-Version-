@@ -718,6 +718,7 @@ export default [
   band({
     slug: 'bd-lateral-walk',
     name: 'Banded Lateral Walk',
+    retired: true,
     muscle: 'glutes',
     pattern: 'hip_abduction',
     action: 'Step',
@@ -775,6 +776,7 @@ export default [
   band({
     slug: 'bd-curl',
     name: 'Resistance Band Bicep Curl',
+    retired: true,
     muscle: 'biceps',
     pattern: 'curl',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
@@ -790,6 +792,7 @@ export default [
   band({
     slug: 'bd-pushdown',
     name: 'Resistance Band Triceps Pushdown',
+    retired: true,
     muscle: 'triceps',
     pattern: 'triceps_extension',
     action: 'Push Down',
@@ -803,6 +806,7 @@ export default [
   band({
     slug: 'bd-glute-bridge',
     name: 'Banded Glute Bridge',
+    retired: true,
     muscle: 'glutes',
     pattern: 'hip_extension',
     action: 'Bridge',
@@ -820,6 +824,7 @@ export default [
   band({
     slug: 'bd-assisted-pull-up',
     name: 'Band-Assisted Pull-Up',
+    retired: true,
     muscle: 'back',
     pattern: 'vertical_pull',
     action: 'Pull Up',
@@ -876,6 +881,7 @@ export default [
   trx({
     slug: 'st-biceps-curl',
     name: 'Suspension Trainer Biceps Curl',
+    retired: true,
     muscle: 'biceps',
     pattern: 'curl',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },

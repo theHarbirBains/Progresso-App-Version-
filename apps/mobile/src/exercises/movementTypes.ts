@@ -11,6 +11,14 @@ export const MOVEMENT_TYPE_LABELS: Record<MovementType, string> = {
   unilateral: 'Unilateral',
 };
 
+/**
+ * What an exercise's line says about its sides: "Unilateral" for one done a side at a time, and
+ * nothing for the usual both-sides-together -- saying "Bilateral" on every row is only clutter.
+ */
+export function sidesLabel(movementType: MovementType): string | null {
+  return movementType === 'unilateral' ? MOVEMENT_TYPE_LABELS.unilateral : null;
+}
+
 export const LOGGING_STYLES = ['single_side', 'alternating'] as const;
 export type LoggingStyle = (typeof LOGGING_STYLES)[number];
 

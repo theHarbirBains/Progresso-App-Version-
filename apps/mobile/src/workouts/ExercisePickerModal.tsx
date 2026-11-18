@@ -118,7 +118,8 @@ export function ExercisePickerModal({
     fetchAllExercises({
       userId,
       search,
-      muscleGroup,
+      // The muscle filter is applied in the list itself (ExerciseBrowser), from these rows.
+      muscleGroup: null,
       source,
       shared: sharedRows,
       equipment,
@@ -139,7 +140,7 @@ export function ExercisePickerModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, userId, search, muscleGroup, source, attempt, sharedRows, equipment]);
+  }, [visible, userId, search, source, attempt, sharedRows, equipment]);
 
   // The tab counts are independent of the search and filter, so they load once per opening.
   useEffect(() => {

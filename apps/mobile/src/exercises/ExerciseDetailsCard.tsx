@@ -11,7 +11,7 @@ import { ExercisePhoto } from './ExercisePhoto';
 import { hasIllustration } from './illustrations/exerciseArt';
 import { fetchExerciseDetails, type ExerciseDetails } from './exerciseQueries';
 import { machineLine } from './machineDetails';
-import { MOVEMENT_TYPE_LABELS } from './movementTypes';
+import { sidesLabel } from './movementTypes';
 import { MUSCLE_GROUP_LABELS } from './muscleGroups';
 
 /**
@@ -69,7 +69,7 @@ export function ExerciseDetailsCard({
   const line = machineLine(
     details,
     MUSCLE_GROUP_LABELS[details.muscleGroup],
-    MOVEMENT_TYPE_LABELS[details.movementType],
+    sidesLabel(details.movementType),
   );
   return (
     <AppCard testID={testID}>

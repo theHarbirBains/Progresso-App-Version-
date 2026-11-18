@@ -788,6 +788,7 @@ export default [
   {
     slug: 'db-cuban-press',
     name: 'Dumbbell Cuban Press',
+    retired: true,
     equipment: 'dumbbell',
     muscle: 'shoulders',
     highlight: { primary: ['rearDelts', 'sideDelts'], secondary: ['traps', 'frontDelts'] },
@@ -1043,6 +1044,7 @@ export default [
   {
     slug: 'db-zottman-curl',
     name: 'Zottman Curl',
+    retired: true,
     equipment: 'dumbbell',
     muscle: 'biceps',
     highlight: { primary: ['biceps', 'forearms'], secondary: [] },
@@ -1339,6 +1341,7 @@ export default [
   {
     slug: 'db-cross-body-triceps-extension',
     name: 'Cross-Body Dumbbell Triceps Extension',
+    retired: true,
     equipment: 'dumbbell',
     muscle: 'triceps',
     sides: 'single_side',

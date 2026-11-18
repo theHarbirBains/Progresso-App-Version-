@@ -754,6 +754,7 @@ export default [
   {
     slug: 'bb-snatch-grip-high-pull',
     name: 'Snatch-Grip High Pull',
+    retired: true,
     equipment: 'barbell',
     muscle: 'shoulders',
     highlight: {
@@ -1026,6 +1027,7 @@ export default [
   {
     slug: 'bb-cheat-curl',
     name: 'Cheat Curl',
+    retired: true,
     equipment: 'barbell',
     muscle: 'biceps',
     highlight: { primary: ['biceps'], secondary: ['forearms', 'lowerBack', 'frontDelts'] },
