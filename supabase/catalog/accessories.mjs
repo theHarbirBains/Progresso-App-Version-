@@ -694,6 +694,7 @@ export default [
   band({
     slug: 'bd-face-pull',
     name: 'Band Face Pull',
+    retired: true,
     muscle: 'shoulders',
     pattern: 'horizontal_pull',
     action: 'Pull',
