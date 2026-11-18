@@ -17,6 +17,8 @@ export interface OwnPhotoSource {
 
 let source: OwnPhotoSource | null = null;
 let photos: Map<string, string> | null = null;
+// Whether they could be read: until then (say, before the table exists) nothing offers to add one.
+let readable = false;
 let reading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((listener) => listener());
@@ -33,6 +35,7 @@ function load(): void {
   reading = (async () => {
     try {
       photos = await read();
+      readable = true;
       notify();
     } catch {
       // Non-critical (say, before the table exists): built-ins show their drawings as always.
@@ -57,9 +60,9 @@ export function useOwnPhoto(exerciseId: string | null | undefined): string | nul
   return exerciseId ? (photos?.get(exerciseId) ?? null) : null;
 }
 
-/** Whether a photo of your own can be added here (the source is plugged in). */
+/** Whether a photo of your own can be added here: the source is plugged in and could be read. */
 export function canKeepOwnPhotos(): boolean {
-  return source !== null;
+  return source !== null && readable;
 }
 
 /** Saves a picked photo as this built-in's, shown everywhere at once. */
@@ -83,6 +86,7 @@ export async function removeOwnPhoto(exerciseId: string): Promise<void> {
 /** Forgets everything read: at sign-out or sign-in, and for tests. */
 export function forgetOwnPhotos(): void {
   photos = null;
+  readable = false;
   reading = null;
   notify();
 }
