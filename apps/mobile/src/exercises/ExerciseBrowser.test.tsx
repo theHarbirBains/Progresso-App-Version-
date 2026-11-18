@@ -87,17 +87,8 @@ describe('ExerciseBrowser and the built-in library', () => {
     expect(onEquipmentChange).toHaveBeenCalledWith('dumbbell');
   });
 
-  it('lists a muscle’s own exercises first, then under Also Works the built-ins that also work it', () => {
+  it('has no Also Works section: a muscle filter is the primary muscle group alone', () => {
     renderBrowser({ muscleGroup: 'triceps' });
-    expect(screen.getByTestId('exercise-library-section-also-works')).toHaveTextContent(
-      'Also Works Triceps',
-    );
-    // Its own three counted; the bench press listed under Also Works, not among them.
-    expect(screen.getByTestId('exercise-library-count')).toHaveTextContent('3 exercises');
-  });
-
-  it('has no Also Works heading without a muscle chosen', () => {
-    renderBrowser();
-    expect(screen.queryByTestId('exercise-library-section-also-works')).toBeNull();
+    expect(screen.queryByText(/Also Works/)).toBeNull();
   });
 });

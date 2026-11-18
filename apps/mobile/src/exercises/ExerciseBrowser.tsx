@@ -165,31 +165,20 @@ export function ExerciseBrowser({
     [onDeleteMine],
   );
 
-  // With a muscle chosen, the exercises for it come first, A-Z; then, under their own heading, the
-  // built-ins that also work it (a press under Triceps) -- so one exercise is never listed twice.
-  const ownRows = useMemo(
-    () => (muscleGroup ? shownRows.filter((row) => row.muscleGroup === muscleGroup) : shownRows),
-    [shownRows, muscleGroup],
+  // A-Z under a letter each. With a muscle chosen, only the exercises that are for it (their
+  // primary muscle group) -- never one that only works it secondarily.
+  const listSections = useMemo(
+    () =>
+      groupExercisesByLetter(shownRows).map((section) => ({
+        title: section.letter,
+        data: section.data,
+      })),
+    [shownRows],
   );
-  const alsoRows = useMemo(
-    () => (muscleGroup ? shownRows.filter((row) => row.muscleGroup !== muscleGroup) : []),
-    [shownRows, muscleGroup],
-  );
-  const listSections = useMemo(() => {
-    const lettered = groupExercisesByLetter(ownRows).map((section) => ({
-      title: section.letter,
-      data: section.data,
-    }));
-    return alsoRows.length > 0 && muscleGroup
-      ? [...lettered, { title: `Also Works ${MUSCLE_GROUP_LABELS[muscleGroup]}`, data: alsoRows }]
-      : lettered;
-  }, [ownRows, alsoRows, muscleGroup]);
 
   const renderSectionHeader = useCallback(
     ({ section }: { section: SectionListData<ExerciseRow, { title: string }> }) => (
-      <View
-        testID={`exercise-library-section-${section.title.startsWith('Also Works') ? 'also-works' : section.title}`}
-      >
+      <View testID={`exercise-library-section-${section.title}`}>
         <SectionHeader label={section.title} />
       </View>
     ),
@@ -414,7 +403,7 @@ export function ExerciseBrowser({
         ) : (
           <View style={styles.countSortRow}>
             <Text testID="exercise-library-count" style={styles.countText}>
-              {ownRows.length} {ownRows.length === 1 ? 'exercise' : 'exercises'}
+              {shownRows.length} {shownRows.length === 1 ? 'exercise' : 'exercises'}
             </Text>
           </View>
         )}

@@ -673,13 +673,9 @@ describe('the built-in library: extras, search and filters', () => {
     expect((await all({ equipment: 'barbell' })).map((r) => r.id)).toEqual(['bench']);
   });
 
-  it("lists a muscle's own exercises, and with withSecondary the built-ins that also work it", async () => {
+  it('lists only the exercises whose primary muscle group is the one chosen, never one that only works it secondarily', async () => {
+    // The row works the biceps and the bench press the triceps, but neither is for them.
     expect((await all({ muscleGroup: 'biceps' })).map((r) => r.id)).toEqual(['curl']);
-    expect(
-      (await all({ muscleGroup: 'biceps', withSecondary: true })).map((r) => r.id).sort(),
-    ).toEqual(['curl', 'row']);
-    expect((await all({ muscleGroup: 'triceps', withSecondary: true })).map((r) => r.id)).toEqual([
-      'bench',
-    ]);
+    expect((await all({ muscleGroup: 'triceps' })).map((r) => r.id)).toEqual([]);
   });
 });

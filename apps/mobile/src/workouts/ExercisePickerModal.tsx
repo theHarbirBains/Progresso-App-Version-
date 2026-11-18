@@ -122,7 +122,6 @@ export function ExercisePickerModal({
       source,
       shared: sharedRows,
       equipment,
-      withSecondary: true,
     })
       .then((result) => {
         if (cancelled) return;

@@ -91,7 +91,6 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         source,
         shared: sharedRows,
         equipment,
-        withSecondary: true,
       });
       setRows(result);
       listShown.current = true;

@@ -223,11 +223,6 @@ export interface FetchAllExercisesParams {
   shared?: ExerciseRow[];
   /** Only what's done with this equipment. */
   equipment?: Equipment | null;
-  /**
-   * With a muscle chosen, the exercises that also work it too (after its own, which the caller
-   * tells apart by their muscle group).
-   */
-  withSecondary?: boolean;
 }
 
 /**
@@ -354,19 +349,13 @@ function filterExerciseRows(
     muscleGroup: MuscleGroup | null;
     source: ExerciseSource;
     equipment?: Equipment | null;
-    withSecondary?: boolean;
   },
 ): ExerciseRow[] {
-  const { userId, search, muscleGroup, source, equipment, withSecondary } = params;
+  const { userId, search, muscleGroup, source, equipment } = params;
   return rows.filter((row) => {
     if (!matchesExerciseSearch(row, search)) return false;
-    if (
-      muscleGroup &&
-      row.muscleGroup !== muscleGroup &&
-      !(withSecondary && row.secondaryMuscleGroups?.includes(muscleGroup))
-    ) {
-      return false;
-    }
+    // A muscle filter is the exercise's primary muscle group alone.
+    if (muscleGroup && row.muscleGroup !== muscleGroup) return false;
     if (equipment && row.equipment !== equipment) return false;
     if (source === 'builtin' && row.createdBy !== null) return false;
     if (source === 'mine' && row.createdBy !== userId) return false;
@@ -383,16 +372,7 @@ function filterExerciseRows(
  * rather than a fresh Supabase query every time.
  */
 export async function fetchAllExercises(params: FetchAllExercisesParams): Promise<ExerciseRow[]> {
-  const {
-    userId,
-    search,
-    muscleGroup,
-    source,
-    ascending = true,
-    shared = [],
-    equipment,
-    withSecondary,
-  } = params;
+  const { userId, search, muscleGroup, source, ascending = true, shared = [], equipment } = params;
 
   const pool = libraryPool(await fetchFullExerciseList(userId), shared, userId, source);
   const filtered = filterExerciseRows(pool, {
@@ -401,7 +381,6 @@ export async function fetchAllExercises(params: FetchAllExercisesParams): Promis
     muscleGroup,
     source,
     equipment,
-    withSecondary,
   });
   return ascending ? filtered : [...filtered].reverse();
 }

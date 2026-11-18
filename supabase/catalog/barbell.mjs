@@ -318,6 +318,7 @@ export default [
   {
     slug: 'bb-yates-row',
     name: 'Yates Row',
+    retired: true,
     equipment: 'barbell',
     muscle: 'back',
     highlight: { primary: ['lats', 'upperBack'], secondary: ['biceps', 'rearDelts', 'lowerBack'] },
