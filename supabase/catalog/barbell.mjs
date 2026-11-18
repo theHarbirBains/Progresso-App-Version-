@@ -1496,6 +1496,7 @@ export default [
   {
     slug: 'bb-pin-squat',
     name: 'Pin Squat',
+    retired: true,
     equipment: 'barbell',
     muscle: 'quadriceps',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'lowerBack'] },
