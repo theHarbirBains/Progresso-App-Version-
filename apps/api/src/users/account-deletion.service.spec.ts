@@ -52,7 +52,7 @@ function setup(
 }
 
 describe('AccountDeletionService', () => {
-  it('removes photos and feedback screenshots, then the data, then the auth accounts -- theirs first, then their guests', async () => {
+  it('removes photos, montage videos and feedback screenshots, then the data, then the auth accounts -- theirs first, then their guests', async () => {
     const { steps, service } = setup({
       listings: {
         avatars: [{ data: [{ id: 'a', name: 'avatar.jpg' }], error: null }],
@@ -80,6 +80,7 @@ describe('AccountDeletionService', () => {
       `list food-photos/${ME}`,
       `list feedback-screenshots/${ME}`,
       `remove feedback-screenshots ${ME}/shot.png`,
+      `list profile-montage/${ME}`,
       `rpc delete_account {"p_user":"${ME}"}`,
       `deleteUser ${ME}`,
       `deleteUser ${GUEST}`,

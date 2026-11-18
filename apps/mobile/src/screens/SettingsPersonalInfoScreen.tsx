@@ -185,6 +185,14 @@ export function SettingsPersonalInfoScreen({ navigation }: Props) {
               </Text>
             ) : null}
 
+            <ListRow
+              testID="settings-personal-info-montage"
+              icon="film"
+              title="Profile Montage"
+              subtitle="Up to four photos or videos on your profile"
+              onPress={() => navigation.navigate('ProfileMontage')}
+            />
+
             <TextInput
               testID="account-display-name"
               label="First Name"

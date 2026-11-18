@@ -91,6 +91,22 @@ export interface PersonProfile {
   rank: { points: number; awards: number } | null;
   /** The achievements they've earned, the latest first -- once their follow is accepted. */
   achievements: EarnedAchievement[] | null;
+  /**
+   * Their montage, in their order -- yours, or once their follow is accepted (null otherwise).
+   * Missing from an API from before montages.
+   */
+  montage?: MontageItem[] | null;
+}
+
+/** One photo or video of a profile montage, with a link that works for an hour. */
+export interface MontageItem {
+  id: string;
+  kind: 'photo' | 'video';
+  url: string;
+  width: number | null;
+  height: number | null;
+  /** A video's length; null for a photo. */
+  durationSeconds: number | null;
 }
 
 /** An achievement someone's earned, as their profile lists it -- never a nutrition one. */

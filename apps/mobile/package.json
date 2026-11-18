@@ -46,6 +46,7 @@
     "expo-sharing": "~58.0.21",
     "expo-splash-screen": "~58.0.12",
     "expo-status-bar": "~58.0.4",
+    "expo-video": "~58.0.14",
     "expo-web-browser": "~58.0.7",
     "expo-widgets": "~58.0.26",
     "libphonenumber-js": "1.13.15",

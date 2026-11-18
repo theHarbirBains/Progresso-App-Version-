@@ -4692,6 +4692,159 @@ async function main() {
     );
     record("Nobody else sees someone's own machine photos", photosSeen.rows[0].n === 0);
 
+    // The profile montage (20261205100000_profile_montage.sql): four at most, in the owner's order.
+    {
+      const montageRow = (who, name, kind = 'photo') =>
+        asUserCommitted(who, (c) =>
+          c.query(
+            `insert into public.profile_montage_items (user_id, kind, storage_path, width, height, duration_seconds)
+             values ($1, $2, $3, 1080, 1350, $4) returning id, position`,
+            [who, kind, `${who}/${name}`, kind === 'video' ? 12.5 : null],
+          ),
+        );
+      const positions = () =>
+        asUser(lifter, (c) =>
+          c.query(
+            'select id, position from public.profile_montage_items where user_id = $1 order by position',
+            [lifter],
+          ),
+        );
+      const added = [];
+      for (const [name, kind] of [
+        ['a.jpg', 'photo'],
+        ['b.mp4', 'video'],
+        ['c.jpg', 'photo'],
+        ['d.mov', 'video'],
+      ]) {
+        added.push((await montageRow(lifter, name, kind)).rows[0]);
+      }
+      record(
+        'Each photo or video added to a montage goes at the end',
+        added.map((row) => row.position).join() === '0,1,2,3',
+      );
+      await expectThrows(
+        montageRow(lifter, 'e.jpg'),
+        'A montage holds four at most',
+        /four photos or videos at most/,
+      );
+      await expectThrows(
+        asUser(stranger, (c) =>
+          c.query(
+            "insert into public.profile_montage_items (user_id, kind, storage_path) values ($1, 'photo', $2)",
+            [stranger, `${lifter}/theirs.jpg`],
+          ),
+        ),
+        "A montage can't point at a file in someone else's folder",
+        /check constraint/,
+      );
+      await expectThrows(
+        asUser(stranger, (c) =>
+          c.query(
+            "insert into public.profile_montage_items (user_id, kind, storage_path) values ($1, 'photo', $2)",
+            [lifter, `${lifter}/sneaky.jpg`],
+          ),
+        ),
+        'Nobody can add to someone else’s montage',
+        RLS_ERROR,
+      );
+      const montageSeen = await asUser(stranger, (c) =>
+        c.query('select count(*)::int as n from public.profile_montage_items'),
+      );
+      record(
+        "Nobody else reads someone's montage straight from the database",
+        montageSeen.rows[0].n === 0,
+      );
+      await expectThrows(
+        asUser(lifter, (c) =>
+          c.query(`update public.profile_montage_items set storage_path = $2 where user_id = $1`, [
+            lifter,
+            `${lifter}/swapped.jpg`,
+          ]),
+        ),
+        'Only the order of a montage changes once added',
+        /permission denied/,
+      );
+
+      const reversed = [...added].reverse().map((row) => row.id);
+      await asUserCommitted(lifter, (c) =>
+        c.query('select public.reorder_profile_montage($1::uuid[])', [reversed]),
+      );
+      record(
+        'A montage is put in a new order in one go',
+        (await positions()).rows.map((row) => row.id).join() === reversed.join(),
+      );
+      await expectThrows(
+        asUser(lifter, (c) =>
+          c.query('select public.reorder_profile_montage($1::uuid[])', [reversed.slice(1)]),
+        ),
+        'A new order lists every one of them',
+        /each of your montage/,
+      );
+      await expectThrows(
+        asUser(lifter, (c) =>
+          c.query('select public.reorder_profile_montage($1::uuid[])', [
+            [reversed[0], reversed[0], reversed[1], reversed[2]],
+          ]),
+        ),
+        'A new order lists each one once',
+        /each of your montage/,
+      );
+      await expectThrows(
+        asUser(stranger, (c) =>
+          c.query('select public.reorder_profile_montage($1::uuid[])', [reversed]),
+        ),
+        "Nobody can reorder someone else's montage",
+        /each of your montage/,
+      );
+
+      // Removing the second closes the gap, the rest in the same order.
+      await asUserCommitted(lifter, (c) =>
+        c.query('delete from public.profile_montage_items where id = $1', [reversed[1]]),
+      );
+      const left = (await positions()).rows;
+      record(
+        'Removing one from a montage closes the gap',
+        left.map((row) => row.position).join() === '0,1,2' &&
+          left.map((row) => row.id).join() === [reversed[0], reversed[2], reversed[3]].join(),
+      );
+
+      // The files: each person's own folder of a private bucket.
+      await asUserCommitted(lifter, (c) =>
+        c.query(
+          "insert into storage.objects (bucket_id, name, owner) values ('profile-montage', $1, $2)",
+          [`${lifter}/a.jpg`, lifter],
+        ),
+      );
+      record('Someone can upload to their own montage folder', true);
+      await expectThrows(
+        asUser(stranger, (c) =>
+          c.query(
+            "insert into storage.objects (bucket_id, name, owner) values ('profile-montage', $1, $2)",
+            [`${lifter}/planted.jpg`, stranger],
+          ),
+        ),
+        "Nobody can upload into someone else's montage folder",
+        RLS_ERROR,
+      );
+      const filesSeen = await asUser(stranger, (c) =>
+        c.query(
+          "select count(*)::int as n from storage.objects where bucket_id = 'profile-montage'",
+        ),
+      );
+      record("Nobody else can read someone's montage files", filesSeen.rows[0].n === 0);
+      const bucket = (
+        await admin.query(
+          "select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'profile-montage'",
+        )
+      ).rows[0];
+      record(
+        'The montage bucket is private, 50 MB a file, photos and videos only',
+        bucket.public === false &&
+          Number(bucket.file_size_limit) === 52428800 &&
+          bucket.allowed_mime_types.join() === 'image/jpeg,video/mp4,video/quicktime',
+      );
+    }
+
     // The one-off move of custom exercises onto their built-ins
     // (20261204100000_custom_exercises_to_builtins.sql): staged here with one of production's
     // ids, then the migration run again.

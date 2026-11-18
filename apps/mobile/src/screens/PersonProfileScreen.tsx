@@ -50,6 +50,7 @@ import { formatCardDate } from '../workouts/workoutFormat';
 import { setText } from '../social/setText';
 import { PeopleList, personLabel } from '../social/PeopleList';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
+import { ProfileMontage } from '../profile/montage/ProfileMontage';
 import { useSocialSummaries } from '../social/useSocialSummaries';
 import { personProfileStyles as styles } from './personProfileStyles';
 import { confirmUnfollow } from '../social/confirmUnfollow';
@@ -916,6 +917,19 @@ export function PersonProfilePage({
                 />
               </View>
             </View>
+
+            {/* Their montage: yours always (an empty one invites you to add to it), anyone else's
+                once you can see their activity and they've added to it. */}
+            {profile.montage && (profile.isSelf || profile.montage.length > 0) ? (
+              <ProfileMontage
+                testID="person-profile-montage"
+                items={profile.montage}
+                accent={theme.accent}
+                ownerName={firstName(profile)}
+                isOwn={profile.isSelf}
+                onEdit={profile.isSelf ? () => navigation.navigate('ProfileMontage') : undefined}
+              />
+            ) : null}
 
             {profile.rank ? renderRank(profile, title) : null}
           </View>

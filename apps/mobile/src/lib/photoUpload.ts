@@ -4,12 +4,13 @@ import { supabase } from './supabase';
 
 /**
  * A new, unguessable name in the person's own folder ("<userId>/<time>-<random>.jpg"), for a
- * bucket where they keep many photos -- one per food, machine or screenshot -- each its own file.
- * Storage RLS only lets a person write under their own folder.
+ * bucket where they keep many photos -- one per food, machine or screenshot -- each its own file
+ * (a montage's video with its own extension). Storage RLS only lets a person write under their own
+ * folder.
  */
-export function uniquePhotoPath(userId: string): string {
+export function uniquePhotoPath(userId: string, extension = 'jpg'): string {
   const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  return `${userId}/${unique}.jpg`;
+  return `${userId}/${unique}.${extension}`;
 }
 
 /**

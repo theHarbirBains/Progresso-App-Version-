@@ -116,7 +116,8 @@
           "NSHealthUpdateUsageDescription": "Progresso doesn't save anything to Apple Health. It only reads your step count to show today's steps.",
           "background": false
         }
-      ]
+      ],
+      "expo-video"
     ]
   }
 }

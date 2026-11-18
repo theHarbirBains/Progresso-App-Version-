@@ -277,6 +277,15 @@ describe('SettingsPersonalInfoScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('CalorieEstimation');
   });
 
+  it('opens your profile montage', async () => {
+    renderScreen();
+    await screen.findByTestId('account-display-name');
+
+    fireEvent.press(screen.getByTestId('settings-personal-info-montage'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('ProfileMontage');
+  });
+
   it('renders no bare text outside <Text>', async () => {
     renderScreen();
     await screen.findByTestId('account-display-name');

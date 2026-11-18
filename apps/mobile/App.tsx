@@ -115,6 +115,7 @@ import { useMembership } from './src/membership/useMembership';
 import { withNutrition } from './src/membership/withNutrition';
 import { SettingsNutritionScreen } from './src/screens/SettingsNutritionScreen';
 import { SettingsPersonalInfoScreen } from './src/screens/SettingsPersonalInfoScreen';
+import { ProfileMontageScreen } from './src/screens/ProfileMontageScreen';
 import { SettingsSupportScreen } from './src/screens/SettingsSupportScreen';
 import { FeedbackScreen } from './src/screens/FeedbackScreen';
 import { FeedbackFormScreen } from './src/screens/FeedbackFormScreen';
@@ -418,6 +419,7 @@ function Root() {
                     name="SettingsPersonalInfo"
                     component={SettingsPersonalInfoScreen}
                   />
+                  <Stack.Screen name="ProfileMontage" component={ProfileMontageScreen} />
                   <Stack.Screen
                     name="SettingsWorkoutPreferences"
                     component={SettingsWorkoutPreferencesScreen}

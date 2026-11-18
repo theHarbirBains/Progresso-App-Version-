@@ -43,7 +43,14 @@ function createMockClient() {
     calls.push({ table: `rpc:${name}`, method: 'rpc', args: [args] });
     return next(`rpc:${name}`);
   });
-  return { from, rpc, queue, calls };
+  // Signed links, from the bucket named: queued as "sign:<bucket>".
+  const createSignedUrls = jest.fn();
+  const storage = {
+    from: jest.fn((bucket: string) => ({
+      createSignedUrls: createSignedUrls.mockImplementation(async () => next(`sign:${bucket}`)),
+    })),
+  };
+  return { from, rpc, storage, createSignedUrls, queue, calls };
 }
 
 const ME = '11111111-1111-1111-1111-111111111111';
@@ -212,6 +219,43 @@ describe('PeopleService', () => {
         data: [{ points: 1250, awards: 14 }],
         error: null,
       });
+      client.queue('profile_montage_items', {
+        data: [
+          {
+            id: 'm1',
+            kind: 'video',
+            storage_path: `${SAM}/clip.mp4`,
+            width: 1080,
+            height: 1920,
+            duration_seconds: '12.50',
+          },
+          {
+            id: 'm2',
+            kind: 'photo',
+            storage_path: `${SAM}/gym.jpg`,
+            width: 1600,
+            height: 1200,
+            duration_seconds: null,
+          },
+          {
+            id: 'm3',
+            kind: 'photo',
+            storage_path: `${SAM}/gone.jpg`,
+            width: null,
+            height: null,
+            duration_seconds: null,
+          },
+        ],
+        error: null,
+      });
+      client.queue('sign:profile-montage', {
+        data: [
+          { path: `${SAM}/clip.mp4`, signedUrl: 'https://cdn.test/clip?token=1', error: null },
+          { path: `${SAM}/gym.jpg`, signedUrl: 'https://cdn.test/gym?token=2', error: null },
+          { path: `${SAM}/gone.jpg`, signedUrl: '', error: 'Object not found' },
+        ],
+        error: null,
+      });
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, SAM);
@@ -330,7 +374,35 @@ describe('PeopleService', () => {
             lastAwardedAt: '2026-01-02T10:00:00Z',
           },
         ],
+        // Their montage in their order, each with an hour's link -- a file without one left out.
+        montage: [
+          {
+            id: 'm1',
+            kind: 'video',
+            url: 'https://cdn.test/clip?token=1',
+            width: 1080,
+            height: 1920,
+            durationSeconds: 12.5,
+          },
+          {
+            id: 'm2',
+            kind: 'photo',
+            url: 'https://cdn.test/gym?token=2',
+            width: 1600,
+            height: 1200,
+            durationSeconds: null,
+          },
+        ],
       });
+      expect(client.calls).toContainEqual({
+        table: 'profile_montage_items',
+        method: 'order',
+        args: ['position'],
+      });
+      expect(client.createSignedUrls).toHaveBeenCalledWith(
+        [`${SAM}/clip.mp4`, `${SAM}/gym.jpg`, `${SAM}/gone.jpg`],
+        3600,
+      );
       expect(client.calls).toContainEqual({
         table: 'achievement_definitions',
         method: 'eq',
@@ -381,6 +453,7 @@ describe('PeopleService', () => {
         exercises: null,
         rank: { points: 640, awards: 9 },
         achievements: null,
+        montage: null,
       });
       // Brought up to date for their rank, which anyone may see.
       expect(client.rpc).toHaveBeenCalledWith(
@@ -389,6 +462,8 @@ describe('PeopleService', () => {
       );
       expect(client.from).not.toHaveBeenCalledWith('workouts');
       expect(client.from).not.toHaveBeenCalledWith('achievement_awards');
+      expect(client.from).not.toHaveBeenCalledWith('profile_montage_items');
+      expect(client.storage.from).not.toHaveBeenCalled();
     });
 
     it('still shows the profile when bringing their achievements up to date fails', async () => {
@@ -446,6 +521,11 @@ describe('PeopleService', () => {
       client.queue('achievement_levels', { data: [], error: null });
       client.queue('achievement_awards', { data: [], error: null });
       client.queue('rpc:achievement_summary', { data: [{ points: 75, awards: 2 }], error: null });
+      // A montage that can't be read never keeps the profile from opening.
+      client.queue('profile_montage_items', {
+        data: null,
+        error: { message: 'relation "profile_montage_items" does not exist' },
+      });
       const service = serviceWith(client);
 
       const profile = await service.getProfile(ME, ME);
@@ -458,6 +538,7 @@ describe('PeopleService', () => {
         // Your own rank shows to you, even hidden from others.
         rank: { points: 75, awards: 2 },
         achievements: [],
+        montage: [],
       });
       expect(client.rpc).toHaveBeenCalledWith('award_achievements', {
         p_user: ME,

@@ -11,6 +11,8 @@ export type RootStackParamList = {
   /** Settings' own root: a compact list of category rows, each pushing one of the subpages below. */
   AccountSettings: undefined;
   SettingsPersonalInfo: undefined;
+  /** Your profile montage: up to four photos or videos, added, put in order and removed. */
+  ProfileMontage: undefined;
   SettingsWorkoutPreferences: undefined;
   /** The person's rep range and the exercises they train outside it. */
   RepRangeExceptions: undefined;

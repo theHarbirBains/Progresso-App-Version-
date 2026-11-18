@@ -50,7 +50,26 @@ jest.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
   launchCameraAsync: jest.fn().mockResolvedValue({ canceled: true, assets: null }),
   MediaTypeOptions: { Images: 'Images' },
+  VideoExportPreset: { H264_1280x720: 6 },
 }));
+
+// expo-video plays a profile montage's videos. Its players and views are native: a test gets a
+// player whose methods are jest.fn()s (play, pause, release) and a plain view in VideoView's place.
+jest.mock('expo-video', () => {
+  const { View } = require('react-native');
+  return {
+    createVideoPlayer: jest.fn((source) => ({
+      source,
+      muted: false,
+      loop: false,
+      audioMixingMode: 'auto',
+      play: jest.fn(),
+      pause: jest.fn(),
+      release: jest.fn(),
+    })),
+    VideoView: (props) => require('react').createElement(View, { ...props, testID: 'video-view' }),
+  };
+});
 
 // expo-linking has no jest-expo auto-mock either. AuthProvider.tsx uses it
 // for the password-reset deep-link flow; GlassBackground's

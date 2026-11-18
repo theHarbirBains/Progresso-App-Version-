@@ -455,6 +455,61 @@ describe('PersonProfileScreen', () => {
     expect(screen.queryByTestId('person-profile-more')).toBeNull();
   });
 
+  it('shows their montage under the buttons, above their rank', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({
+        montage: [
+          {
+            id: 'm1',
+            kind: 'photo',
+            url: 'https://cdn.test/m1',
+            width: 10,
+            height: 10,
+            durationSeconds: null,
+          },
+        ],
+      }),
+    );
+    renderScreen();
+
+    expect(await screen.findByTestId('person-profile-montage')).toHaveProp(
+      'accessibilityLabel',
+      "Sam's montage: 1 photo",
+    );
+    const page = JSON.stringify(screen.toJSON());
+    expect(page.indexOf('person-profile-share')).toBeLessThan(
+      page.indexOf('person-profile-montage'),
+    );
+    expect(page.indexOf('person-profile-montage')).toBeLessThan(
+      page.indexOf('person-profile-rank'),
+    );
+  });
+
+  it("shows no montage of someone who hasn't added to it, or whose activity you can't see", async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(profile({ montage: [] }));
+    const { unmount } = renderScreen();
+    await screen.findByTestId('person-profile-name');
+    expect(screen.queryByTestId('person-profile-montage')).toBeNull();
+    unmount();
+
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({ canSeeActivity: false, followStatus: 'none', montage: null }),
+    );
+    renderScreen();
+    await screen.findByTestId('person-profile-name');
+    expect(screen.queryByTestId('person-profile-montage')).toBeNull();
+  });
+
+  it('invites you to add to your own empty montage, opening it', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({ isSelf: true, followStatus: 'none', followsYou: false, montage: [] }),
+    );
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('person-profile-montage'));
+    expect(mockNavigate).toHaveBeenCalledWith('ProfileMontage');
+  });
+
   it('opens their workouts read-only, and who follows them', async () => {
     renderScreen();
 

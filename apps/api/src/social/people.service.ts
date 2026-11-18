@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { FeedService, type FeedPage } from '../feed/feed.service';
@@ -22,6 +23,10 @@ const TOP_SETS = 100;
 const LAST_DAYS = 30;
 /** How many mutual friends a profile lists (the count is all of them). */
 const MUTUALS = 50;
+/** The private bucket a montage's photos and videos are in (20261205100000_profile_montage.sql). */
+const MONTAGE_BUCKET = 'profile-montage';
+/** How long a montage's links work: the profile is read again each time it opens. */
+const MONTAGE_LINK_SECONDS = 60 * 60;
 
 export interface ProfileStats {
   /** Finished workouts in all, and in the last 30 days. */
@@ -141,6 +146,17 @@ export interface BestLift {
   performedAt: string;
 }
 
+/** One photo or video of their montage, in their order, with a link that works for an hour. */
+export interface MontageItem {
+  id: string;
+  kind: 'photo' | 'video';
+  url: string;
+  width: number | null;
+  height: number | null;
+  /** A video's length; null for a photo. */
+  durationSeconds: number | null;
+}
+
 export interface PersonProfile {
   user: FollowUserSummary;
   isSelf: boolean;
@@ -173,6 +189,8 @@ export interface PersonProfile {
   rank: PersonRank | null;
   /** The achievements they've earned, the latest first -- only when the viewer can see activity. */
   achievements: EarnedAchievement[] | null;
+  /** Their montage (up to four photos or videos) -- only when the viewer can see activity. */
+  montage: MontageItem[] | null;
 }
 
 /**
@@ -185,6 +203,8 @@ export interface PersonProfile {
  */
 @Injectable()
 export class PeopleService {
+  private readonly logger = new Logger(PeopleService.name);
+
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly followsService: FollowsService,
@@ -233,11 +253,12 @@ export class PeopleService {
     const showsRank = relationship.isSelf || aboutRow?.show_rank !== false;
     // Their rank and achievements as of now, whether or not their own app has asked lately.
     if (showsRank || visible) await this.awardAchievements(personId, aboutRow?.time_zone ?? null);
-    const [stats, exercises, achievements, rank] = await Promise.all([
+    const [stats, exercises, achievements, rank, montage] = await Promise.all([
       visible ? this.workoutStats(personId, relationship.isSelf) : null,
       visible ? this.exerciseBests(personId, relationship.isSelf) : null,
       visible ? this.earnedAchievements(personId) : null,
       showsRank ? this.rankOf(personId) : null,
+      visible ? this.montage(personId) : null,
     ]);
 
     return {
@@ -254,7 +275,61 @@ export class PeopleService {
       exercises,
       rank,
       achievements,
+      montage,
     };
+  }
+
+  /**
+   * Their montage in their order, each with a signed link. A montage is never worth a profile that
+   * won't open: one that can't be read is left out (and logged), and so is a file without a link.
+   */
+  private async montage(personId: string): Promise<MontageItem[]> {
+    const client = this.supabaseService.getClient();
+    try {
+      const { data, error } = await client
+        .from('profile_montage_items')
+        .select('id, kind, storage_path, width, height, duration_seconds')
+        .eq('user_id', personId)
+        .order('position');
+      if (error) throw new Error(error.message);
+      const rows = (data ?? []) as {
+        id: string;
+        kind: 'photo' | 'video';
+        storage_path: string;
+        width: number | null;
+        height: number | null;
+        duration_seconds: string | number | null;
+      }[];
+      if (rows.length === 0) return [];
+      const signed = await client.storage.from(MONTAGE_BUCKET).createSignedUrls(
+        rows.map((row) => row.storage_path),
+        MONTAGE_LINK_SECONDS,
+      );
+      if (signed.error) throw new Error(signed.error.message);
+      const links = new Map(
+        (signed.data ?? []).flatMap((link) =>
+          link.path && link.signedUrl && !link.error ? [[link.path, link.signedUrl] as const] : [],
+        ),
+      );
+      return rows.flatMap((row) => {
+        const url = links.get(row.storage_path);
+        return url
+          ? [
+              {
+                id: row.id,
+                kind: row.kind,
+                url,
+                width: row.width,
+                height: row.height,
+                durationSeconds: numberOrNull(row.duration_seconds),
+              },
+            ]
+          : [];
+      });
+    } catch (err) {
+      this.logger.warn(`Could not load a montage: ${err instanceof Error ? err.message : err}`);
+      return [];
+    }
   }
 
   async getWorkouts(viewerId: string, personId: string, page: number): Promise<FeedPage> {
