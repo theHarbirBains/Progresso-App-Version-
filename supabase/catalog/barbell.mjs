@@ -1744,6 +1744,7 @@ export default [
   {
     slug: 'bb-deficit-rdl',
     name: 'Deficit Romanian Deadlift',
+    retired: true,
     equipment: 'barbell',
     muscle: 'hamstrings',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },
