@@ -327,7 +327,8 @@ function rdl(
     gear,
     TOP,
     { pelvis: [-28, 88, 0], pitch: 74, hand: [15, depth, 0] },
-    { width, legs },
+    // Side-on, where the hips going back and the flat back show.
+    { width, legs, view: SIDE },
   );
 }
 

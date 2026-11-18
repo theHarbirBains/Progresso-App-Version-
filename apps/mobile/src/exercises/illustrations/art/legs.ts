@@ -16,6 +16,7 @@ import {
   barOnBack,
   feet,
   FRONT,
+  FACING,
   hands,
   hanging,
   motion,
@@ -550,9 +551,9 @@ export const LEGS_ART: Record<string, SceneSpec> = {
   'db-goblet-squat': squat(
     'goblet',
     { pelvis: [-20, 46, 0], pitch: 24 },
-    { legs: stance(18, 0, 22) },
+    { legs: stance(18, 0, 22), view: FACING },
   ),
-  'db-front-squat': squat('shoulders', { pelvis: [-20, 48, 0], pitch: 22 }),
+  'db-front-squat': squat('shoulders', { pelvis: [-20, 48, 0], pitch: 22 }, { view: FACING }),
   'db-sumo-squat': squat(
     'between',
     { pelvis: [-10, 56, 0], pitch: 14 },

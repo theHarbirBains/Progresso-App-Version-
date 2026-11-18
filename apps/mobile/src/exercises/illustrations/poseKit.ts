@@ -20,6 +20,8 @@ export const BENCH_TOP = 44;
 export const SIDE: Partial<ViewSpec> = { yaw: -30, tilt: 9 };
 /** Nearly face-on: raises out to the sides, side bends, wide stances. */
 export const FRONT: Partial<ViewSpec> = { yaw: -76, tilt: 7 };
+/** Facing the viewer, turned just enough to show depth: curls, overhead presses, goblet squats. */
+export const FACING: Partial<ViewSpec> = { yaw: -68, tilt: 8 };
 /** Three-quarters from the front. */
 export const THREE_QUARTER: Partial<ViewSpec> = { yaw: -48, tilt: 10 };
 /** Three-quarters from behind: what the back, glutes and hamstrings do. */

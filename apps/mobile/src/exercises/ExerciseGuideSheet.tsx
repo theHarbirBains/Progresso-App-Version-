@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { ErrorState } from '../design/ErrorState';
@@ -13,6 +13,7 @@ import { EQUIPMENT_LABELS } from './equipment';
 import { Image } from 'expo-image';
 import { readExerciseGuide, type ExerciseGuide } from './builtinExtras';
 import { ExerciseIllustration } from './illustrations/ExerciseIllustration';
+import { muscleMapFor } from './illustrations/exerciseArt';
 import { MOVEMENT_PATTERN_LABELS } from './movementPatterns';
 import { MEASUREMENT_TYPE_LABELS } from './movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from './muscleGroups';
@@ -28,8 +29,9 @@ interface Props {
 
 /**
  * How to do a built-in exercise, as a page of its own over whatever opened it -- an iPhone page
- * sheet, swiped down or closed with its X: the illustrated instructor from start to finish, the
- * muscles it works, then how to set up, how to do it and what to avoid. Read when it opens.
+ * sheet, swiped down or closed with its X: its name and what it targets, the illustrated
+ * instructor from start to finish, the muscles it works, then how to set up, how to do it and what
+ * to avoid. Read when it opens.
  */
 export function ExerciseGuideSheet({
   visible,
@@ -63,6 +65,11 @@ export function ExerciseGuideSheet({
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   const shown = guide && guide.name ? guide : null;
+  // What it targets, under its name: the drawn illustration's primary muscles ("Quads / Glutes"),
+  // or the exercise's own muscle group.
+  const target = shown
+    ? (muscleMapFor(shown.slug)?.primaryNames.join(' / ') ?? MUSCLE_GROUP_LABELS[shown.muscleGroup])
+    : null;
 
   return (
     <Modal
@@ -83,9 +90,21 @@ export function ExerciseGuideSheet({
           }}
         />
         <ScrollView contentContainerStyle={styles.content}>
-          <Text testID={`${testID}-name`} style={styles.name}>
-            {shown?.name ?? exerciseName}
-          </Text>
+          <View style={styles.titleRow}>
+            <View style={[styles.titleIcon, { borderColor: accent }]}>
+              <MaterialCommunityIcons name="dumbbell" size={22} color={accent} />
+            </View>
+            <View style={styles.titleText}>
+              <Text testID={`${testID}-name`} style={styles.name}>
+                {shown?.name ?? exerciseName}
+              </Text>
+              {target ? (
+                <Text testID={`${testID}-target`} style={[styles.target, { color: accent }]}>
+                  {target}
+                </Text>
+              ) : null}
+            </View>
+          </View>
           {shown ? (
             <Text testID={`${testID}-line`} style={styles.line}>
               {[
@@ -254,14 +273,34 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxxl,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  titleIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleText: {
+    flex: 1,
+  },
   name: {
     ...typeScale.screenTitle,
     color: colors.textPrimary,
   },
+  target: {
+    ...typeScale.label,
+    marginTop: 2,
+  },
   line: {
     ...typeScale.secondary,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },
   card: {

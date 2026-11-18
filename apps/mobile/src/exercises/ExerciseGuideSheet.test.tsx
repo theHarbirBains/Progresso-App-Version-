@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import {
   forgetBuiltinExtras,
   setBuiltinSources,
@@ -75,22 +75,25 @@ describe('ExerciseGuideSheet', () => {
     expect(screen.getByTestId('exercise-guide-line')).toHaveTextContent(
       'Dumbbell · Horizontal Push · Weight and reps',
     );
-    // The anatomy figure's key names the muscles.
-    expect(screen.getByTestId('exercise-guide-illustration-primary')).toHaveTextContent(
-      'Primary: Chest',
-    );
-    expect(screen.getByTestId('exercise-guide-illustration-secondary')).toHaveTextContent(
-      'Secondary: Shoulders, Triceps',
-    );
+    // What it targets, under its name.
+    expect(screen.getByTestId('exercise-guide-target')).toHaveTextContent('Chest');
+    // The anatomy figure's key names the muscles, one per line.
+    const primary = screen.getByTestId('exercise-guide-illustration-primary');
+    expect(within(primary).getByText('Primary:')).toBeTruthy();
+    expect(within(primary).getByText('Chest')).toBeTruthy();
+    const secondary = screen.getByTestId('exercise-guide-illustration-secondary');
+    expect(within(secondary).getByText('Secondary:')).toBeTruthy();
+    expect(within(secondary).getByText('Shoulders')).toBeTruthy();
+    expect(within(secondary).getByText('Triceps')).toBeTruthy();
     expect(screen.queryByTestId('exercise-guide-muscles')).toBeNull();
     expect(screen.getByTestId('exercise-guide-setup')).toHaveTextContent(
       /Lie back with the dumbbells/,
     );
     expect(screen.getByTestId('exercise-guide-steps')).toHaveTextContent(/Press them up/);
     expect(screen.getByTestId('exercise-guide-mistakes')).toHaveTextContent(/Flaring the elbows/);
-    // Start and Finish, under the frames.
+    // Start, then what the movement does, under the frames.
     expect(screen.getByTestId('exercise-guide-illustration-label-0')).toHaveTextContent('Start');
-    expect(screen.getByTestId('exercise-guide-illustration-label-1')).toHaveTextContent('Finish');
+    expect(screen.getByTestId('exercise-guide-illustration-label-1')).toHaveTextContent('Press');
   });
 
   it("says when the guide can't be read, and Retry reads it again", async () => {

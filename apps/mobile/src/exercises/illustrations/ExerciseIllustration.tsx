@@ -4,7 +4,6 @@ import { Feather } from '@expo/vector-icons';
 import Svg, { ClipPath, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { Text } from '../../design/Text';
 import { colors, radii, spacing, typeScale } from '../../design/theme';
-import { MUSCLE_GROUP_LABELS } from '../muscleGroups';
 import { BUILTIN_CATALOG } from './builtinCatalog.generated';
 import { frameLabels, illustrationFor, muscleMapFor, thumbnailFor } from './exerciseArt';
 import { ART } from './palette';
@@ -12,9 +11,10 @@ import type { RenderedFrame, ViewBox } from './render';
 import type { Gradient } from './shading';
 
 // The illustrated instructor on screen: the positions side by side with an arrow between them,
-// each named in a pill underneath; beside them, the grey anatomy figure with the worked muscles in
-// red (primary) and yellow (secondary) and a key naming them; and the small thumbnail a list row
-// shows. Every frame is react-native-svg, drawn from the shapes render.ts works out.
+// each named in a pill underneath (Start, then what the movement does); under them, the grey
+// anatomy figure with the worked muscles in red (primary) and yellow (secondary) and a key naming
+// them; and the small thumbnail a list row shows. Every frame is react-native-svg, drawn from the
+// shapes render.ts works out.
 
 function GradientDef({ gradient, id }: { gradient: Gradient; id: string }) {
   const stops = gradient.stops.map(([offset, color], i) => (
@@ -105,13 +105,13 @@ function usePrefix(): string {
 /** The tallest the positions draw, so a standing figure never fills the screen. */
 const MAX_FRAME_HEIGHT = 220;
 /** The arrow between two positions. */
-const ARROW_WIDTH = 22;
+const ARROW_WIDTH = 26;
 /** How tall the anatomy figure stands beside its key. */
-const MAP_HEIGHT = 128;
+const MAP_HEIGHT = 156;
 
 /**
  * The full illustration: the positions side by side at one scale with an arrow between them, each
- * named in a pill under it (Start, Finish), then the anatomy figure and its key. Null for an
+ * named in a pill under it (Start, Press), then the anatomy figure and its key. Null for an
  * exercise without one.
  */
 export function ExerciseIllustration({
@@ -134,9 +134,7 @@ export function ExerciseIllustration({
     width > 0 ? Math.floor((width - arrows * (ARROW_WIDTH + spacing.xs * 2)) / count) : 0;
   const frameHeight = Math.min(MAX_FRAME_HEIGHT, Math.round(frameWidth * aspect));
   const drawWidth = Math.round(frameHeight / aspect);
-  const labels = frameLabels(count);
-  const names = (groups: readonly string[]) =>
-    groups.map((g) => MUSCLE_GROUP_LABELS[g as keyof typeof MUSCLE_GROUP_LABELS]).join(', ');
+  const labels = frameLabels(slug);
   return (
     <View testID={testID} style={styles.wrap}>
       <View
@@ -145,14 +143,14 @@ export function ExerciseIllustration({
         onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}
         accessible
         accessibilityRole="image"
-        accessibilityLabel={`How ${entry.name} is done: ${labels.join(', then ').toLowerCase()} position${count > 1 ? 's' : ''}`}
+        accessibilityLabel={`How ${entry.name} is done: ${labels.join(', then ')}`}
       >
         {frameWidth > 0
           ? scene.frames.map((frame, i) => (
               <View key={i} style={styles.frameRow}>
                 {i > 0 ? (
                   <View style={[styles.arrow, { height: frameHeight }]}>
-                    <Feather name="arrow-right" size={18} color={colors.textMuted} />
+                    <Feather name="arrow-right" size={24} color={colors.textSecondary} />
                   </View>
                 ) : null}
                 <View style={[styles.frame, { width: frameWidth }]}>
@@ -184,7 +182,7 @@ export function ExerciseIllustration({
           style={styles.map}
           accessible
           accessibilityRole="image"
-          accessibilityLabel={`Muscles worked: ${names(map.primary)}${map.secondary.length ? `, and ${names(map.secondary)}` : ''}`}
+          accessibilityLabel={`Muscles worked: ${map.primaryNames.join(', ')}${map.secondaryNames.length ? `, and ${map.secondaryNames.join(', ')}` : ''}`}
         >
           {map.views.map((view, i) => (
             <Frame
@@ -198,24 +196,49 @@ export function ExerciseIllustration({
           ))}
         </View>
         <View style={styles.key}>
-          <View testID={testID ? `${testID}-primary` : undefined} style={styles.keyRow}>
-            <View style={[styles.keyDot, { backgroundColor: ART.primary }]} />
-            <Text style={styles.keyText}>
-              <Text style={styles.keyLabel}>Primary: </Text>
-              {names(map.primary)}
-            </Text>
-          </View>
-          {map.secondary.length > 0 ? (
-            <View testID={testID ? `${testID}-secondary` : undefined} style={styles.keyRow}>
-              <View style={[styles.keyDot, { backgroundColor: ART.secondary }]} />
-              <Text style={styles.keyText}>
-                <Text style={styles.keyLabel}>Secondary: </Text>
-                {names(map.secondary)}
-              </Text>
-            </View>
+          <KeyGroup
+            label="Primary"
+            color={ART.primary}
+            names={map.primaryNames}
+            testID={testID ? `${testID}-primary` : undefined}
+          />
+          {map.secondaryNames.length > 0 ? (
+            <KeyGroup
+              label="Secondary"
+              color={ART.secondary}
+              names={map.secondaryNames}
+              testID={testID ? `${testID}-secondary` : undefined}
+            />
           ) : null}
         </View>
       </View>
+    </View>
+  );
+}
+
+/** One colour's muscles in the key: a dot and its label, then each muscle on a line of its own. */
+function KeyGroup({
+  label,
+  color,
+  names,
+  testID,
+}: {
+  label: string;
+  color: string;
+  names: readonly string[];
+  testID?: string;
+}) {
+  return (
+    <View testID={testID} style={styles.keyGroup}>
+      <View style={styles.keyRow}>
+        <View style={[styles.keyDot, { backgroundColor: color }]} />
+        <Text style={styles.keyLabel}>{label}:</Text>
+      </View>
+      {names.map((name) => (
+        <Text key={name} style={styles.keyName}>
+          {name}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -279,9 +302,6 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-    overflow: 'hidden',
   },
   pill: {
     borderRadius: radii.pill,
@@ -310,27 +330,30 @@ const styles = StyleSheet.create({
   },
   key: {
     flex: 1,
-    gap: spacing.sm,
+    gap: spacing.lg,
+  },
+  keyGroup: {
+    gap: 2,
   },
   keyRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.sm,
   },
   keyDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginTop: 5,
-  },
-  keyText: {
-    ...typeScale.secondary,
-    color: colors.textSecondaryBright,
-    flex: 1,
   },
   keyLabel: {
     ...typeScale.secondary,
     color: colors.textPrimary,
     fontWeight: '700',
+  },
+  keyName: {
+    ...typeScale.secondary,
+    color: colors.textSecondaryBright,
+    // In line with the label, past its dot.
+    paddingLeft: 10 + spacing.sm,
   },
 });

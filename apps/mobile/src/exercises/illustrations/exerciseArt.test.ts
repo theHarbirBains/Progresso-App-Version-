@@ -7,7 +7,8 @@ import {
   muscleMapFor,
   thumbnailFor,
 } from './exerciseArt';
-import { MUSCLE_REGIONS, REGION_GROUP } from './muscles';
+import { legendNames, mapSide } from './muscleMap';
+import { MUSCLE_REGIONS, REGION_GROUP, REGION_NAMES } from './muscles';
 import { ART } from './palette';
 import { renderScene } from './render';
 
@@ -77,9 +78,57 @@ describe('the built-in exercise illustrations', () => {
     expect(hasIllustration('bb-deadlift')).toBe(true);
   });
 
-  it('names the positions under each frame', () => {
-    expect(frameLabels(1)).toEqual(['Hold']);
-    expect(frameLabels(2)).toEqual(['Start', 'Finish']);
-    expect(frameLabels(3)).toEqual(['Start', 'Step 2', 'Finish']);
+  it('names each position: the start, then what the movement does', () => {
+    expect(frameLabels('db-bench-press')).toEqual(['Start', 'Press']);
+    expect(frameLabels('db-single-arm-row')).toEqual(['Start', 'Row']);
+    expect(frameLabels('db-romanian-deadlift')).toEqual(['Start', 'Hinge']);
+    expect(frameLabels('bb-deadlift')).toEqual(['Start', 'Lift']);
+    expect(frameLabels('db-goblet-squat')).toEqual(['Start', 'Squat']);
+    expect(frameLabels('db-skull-crusher')).toEqual(['Start', 'Lower']);
+    expect(frameLabels('bb-push-press')).toEqual(['Start', 'Dip', 'Press']);
+    expect(frameLabels('db-static-hold')).toEqual(['Hold']);
+    expect(frameLabels('my-own-press')).toEqual([]);
+    // Every exercise has one name for each of its positions, never a placeholder.
+    for (const slug of slugs) {
+      const labels = frameLabels(slug);
+      expect(labels).toHaveLength(EXERCISE_ART[slug].frames.length);
+      for (const label of labels) expect(label).not.toMatch(/^(Finish|Step \d+)$/);
+    }
+  });
+
+  it('shows the anatomy figure head to toe, from the side most of the primary muscles are on', () => {
+    expect(mapSide({ primary: ['chest'], secondary: ['triceps'] })).toBe('front');
+    expect(mapSide({ primary: ['hamstrings', 'glutes'], secondary: [] })).toBe('back');
+    expect(mapSide({ primary: ['quads', 'glutes'], secondary: ['adductors'] })).toBe('front');
+    expect(mapSide({ primary: ['quads', 'glutes'], secondary: ['hamstrings', 'lowerBack'] })).toBe(
+      'back',
+    );
+    expect(muscleMapFor('db-romanian-deadlift')?.views.map((v) => v.side)).toEqual(['back']);
+  });
+
+  it("names the key's muscles one per line, its own muscle group first", () => {
+    expect(muscleMapFor('db-incline-bench-press')?.primaryNames).toEqual(['Chest (Upper)']);
+    expect(muscleMapFor('db-decline-bench-press')?.primaryNames).toEqual(['Chest (Lower)']);
+    expect(muscleMapFor('db-bench-press')).toMatchObject({
+      primaryNames: ['Chest'],
+      secondaryNames: ['Shoulders', 'Triceps'],
+    });
+    // The front and side delts together are the shoulders.
+    expect(
+      legendNames({ primary: ['frontDelts', 'sideDelts'], secondary: [] }, 'shoulders', 'Press'),
+    ).toEqual({ primary: ['Shoulders'], secondary: [] });
+    // A muscle named as primary isn't named again as secondary.
+    expect(
+      legendNames({ primary: ['lats'], secondary: ['lats', 'biceps'] }, 'back', 'Row').secondary,
+    ).toEqual(['Biceps']);
+    for (const slug of slugs) {
+      const map = muscleMapFor(slug);
+      const entry = BUILTIN_CATALOG[slug];
+      // "Chest (Upper)" is the chest, and the front and side delts together "Shoulders".
+      const own = entry.highlight.primary
+        .filter((r) => REGION_GROUP[r] === entry.muscle)
+        .map((r) => REGION_NAMES[r].split(' (')[0]);
+      expect(own.some((name) => map?.primaryNames[0].startsWith(name))).toBe(true);
+    }
   });
 });

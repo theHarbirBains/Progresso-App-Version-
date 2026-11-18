@@ -1,3 +1,4 @@
+import { actionLabels } from './actionLabels';
 import { BACK_ART } from './art/back';
 import { CORE_ART } from './art/core';
 import { LEGS_ART } from './art/legs';
@@ -5,7 +6,7 @@ import { LYING_ART } from './art/lying';
 import { UPPER_ART } from './art/upper';
 import { BUILTIN_CATALOG } from './builtinCatalog.generated';
 import type { MuscleGroup } from '../muscleGroups';
-import { legendGroups, renderMuscleMap, type MuscleMapView } from './muscleMap';
+import { legendGroups, legendNames, renderMuscleMap, type MuscleMapView } from './muscleMap';
 import { renderScene, type RenderedScene, type SceneSpec } from './render';
 
 // Every built-in exercise's illustration, by its slug (`exercises.slug`): its poses and equipment
@@ -55,20 +56,20 @@ export function thumbnailFor(slug: string | null | undefined): RenderedScene | n
   return scene;
 }
 
-/** What each frame of an illustration is called under it. */
-export function frameLabels(count: number): string[] {
-  if (count <= 1) return ['Hold'];
-  if (count === 2) return ['Start', 'Finish'];
-  return Array.from({ length: count }, (_, i) =>
-    i === 0 ? 'Start' : i === count - 1 ? 'Finish' : `Step ${i + 1}`,
-  );
+/** What each frame of an exercise's illustration is called under it ("Start", "Press"). */
+export function frameLabels(slug: string): string[] {
+  if (!hasIllustration(slug)) return [];
+  return actionLabels(slug, BUILTIN_CATALOG[slug].pattern, EXERCISE_ART[slug].frames.length);
 }
 
 export interface MuscleMap {
   views: MuscleMapView[];
-  /** The muscle groups its key names, primary and secondary. */
+  /** The muscle groups it works, primary and secondary. */
   primary: MuscleGroup[];
   secondary: MuscleGroup[];
+  /** What its key names, one per line ("Chest (Upper)", "Shoulders"). */
+  primaryNames: string[];
+  secondaryNames: string[];
 }
 
 const maps = new Map<string, MuscleMap>();
@@ -79,9 +80,12 @@ export function muscleMapFor(slug: string | null | undefined): MuscleMap | null 
   let map = maps.get(slug);
   if (!map) {
     const entry = BUILTIN_CATALOG[slug];
+    const names = legendNames(entry.highlight, entry.muscle as MuscleGroup, entry.name);
     map = {
       views: renderMuscleMap(entry.highlight),
       ...legendGroups(entry.highlight, entry.muscle as MuscleGroup),
+      primaryNames: names.primary,
+      secondaryNames: names.secondary,
     };
     maps.set(slug, map);
   }

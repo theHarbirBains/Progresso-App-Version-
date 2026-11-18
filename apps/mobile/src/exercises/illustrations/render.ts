@@ -508,6 +508,8 @@ function muscleShapes(
           shade.axis[1],
           materialOf(MUSCLE_COLORS[tone]),
         ),
+        stroke: ART.muscleEdge,
+        strokeWidth: 0.35,
         clipId,
       });
     }
@@ -607,7 +609,10 @@ function limbDrawing(
     rims: outlineShapes(polys),
     fills,
     muscles: muscles
-      ? muscleShapes(cam, part, surface, clipId, muscles, { points: outline, axis: axis2 })
+      ? [
+          ...definitionShapes(cam, part, surface, clipId, { points: outline, axis: axis2 }),
+          ...muscleShapes(cam, part, surface, clipId, muscles, { points: outline, axis: axis2 }),
+        ]
       : [],
     clips: [{ id: clipId, paths: polys.map((p) => smoothPath(p)) }],
     points: polys.flat(),
@@ -687,6 +692,124 @@ function torsoOutline(cam: Camera, s: Skeleton, surface: Surface): P2[][] {
   return [[...left, ...right.reverse()], ...ends];
 }
 
+/**
+ * The skin a tank top leaves bare on the torso: a scooped neckline front and back, and the
+ * shoulders beside its straps.
+ */
+const TANK_TOP_BARE: readonly Pick<MusclePatch, 't' | 'theta'>[] = [
+  { t: [0.82, 1.1], theta: [-40, 40] },
+  { t: [0.86, 1.12], theta: [146, 214] },
+  { t: [0.9, 1.12], theta: [58, 128] },
+  { t: [0.9, 1.12], theta: [-128, -58] },
+];
+
+function tankTopSkin(
+  cam: Camera,
+  surface: Surface,
+  clipId: string,
+  points: readonly P2[],
+  axis: [P2, P2],
+  skin: Material,
+): Shape[] {
+  const shapes: Shape[] = [];
+  for (const { t, theta } of TANK_TOP_BARE) {
+    const poly = patchPolygon(cam, surface, t, theta);
+    if (poly) {
+      shapes.push({
+        d: smoothPath(poly),
+        fill: midTone(skin),
+        gradient: cylinderGradient(points, axis[0], axis[1], skin),
+        clipId,
+      });
+    }
+  }
+  return shapes;
+}
+
+/**
+ * Every muscle on a part of the anatomy figure, drawn faintly lighter than the body with a fine
+ * edge, so it reads as an anatomy chart before the worked muscles are coloured over it.
+ */
+function definitionShapes(
+  cam: Camera,
+  part: BodyPartKey,
+  surface: Surface,
+  clipId: string,
+  shade: { points: readonly P2[]; axis: [P2, P2] },
+): Shape[] {
+  const shapes: Shape[] = [];
+  for (const region of Object.keys(REGION_PATCHES) as (keyof typeof REGION_PATCHES)[]) {
+    for (const patch of REGION_PATCHES[region]) {
+      if (patch.part !== part) continue;
+      const poly = patchPolygon(cam, surface, patch.t, patch.theta);
+      if (!poly) continue;
+      shapes.push({
+        d: smoothPath(poly),
+        fill: midTone(MATERIALS.definition),
+        gradient: cylinderGradient(
+          shade.points,
+          shade.axis[0],
+          shade.axis[1],
+          MATERIALS.definition,
+        ),
+        stroke: ART.muscleEdge,
+        strokeWidth: 0.35,
+        clipId,
+      });
+    }
+  }
+  return shapes;
+}
+
+/** A face when it's turned toward the viewer: eyes, brows and a mouth on the head's ball. */
+function faceShapes(cam: Camera, s: Skeleton): Shape[] {
+  const { up, forward, right } = s.headFrame;
+  const r = BODY.headRadius;
+  const onHead = (f: number, side: number, u: number): { p: V3; n: V3 } => {
+    const n = normalize(add(add(scale(forward, f), scale(right, side)), scale(up, u)));
+    return { p: add(s.head, scale(n, r)), n };
+  };
+  const shapes: Shape[] = [];
+  for (const side of [1, -1]) {
+    const eye = onHead(0.9, 0.36 * side, 0.08);
+    if (cam.facing(eye.n) > 0.25) {
+      const c = cam.toScreen(eye.p);
+      shapes.push({
+        d: polygonPath(
+          Array.from({ length: 10 }, (_, i): P2 => {
+            const a = (i / 10) * Math.PI * 2;
+            return [c[0] + Math.cos(a) * 1.05, c[1] + Math.sin(a) * 0.7];
+          }),
+        ),
+        fill: ART.feature,
+      });
+      const b0 = cam.toScreen(onHead(0.88, 0.22 * side, 0.3).p);
+      const b1 = cam.toScreen(onHead(0.8, 0.52 * side, 0.27).p);
+      shapes.push({
+        d: `M${b0[0].toFixed(1)} ${b0[1].toFixed(1)}L${b1[0].toFixed(1)} ${b1[1].toFixed(1)}`,
+        fill: 'none',
+        stroke: ART.feature,
+        strokeWidth: 0.8,
+      });
+    }
+  }
+  // The mouth, on the jaw.
+  const jaw = add(add(s.head, scale(forward, 3.6)), scale(up, -5.2));
+  const mouthN = normalize(add(scale(forward, 0.97), scale(up, -0.08)));
+  if (cam.facing(mouthN) > 0.3) {
+    const m = add(jaw, scale(mouthN, 7.3));
+    const m0 = cam.toScreen(add(m, scale(right, 2)));
+    const m1 = cam.toScreen(add(m, scale(right, -2)));
+    shapes.push({
+      d: `M${m0[0].toFixed(1)} ${m0[1].toFixed(1)}L${m1[0].toFixed(1)} ${m1[1].toFixed(1)}`,
+      fill: 'none',
+      stroke: ART.lips,
+      strokeWidth: 0.7,
+    });
+  }
+  return shapes;
+}
+
 function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight, look: Look): Piece[] {
   const shown = look.muscles ? muscles : null;
   const pieces: Piece[] = [];
@@ -706,8 +829,17 @@ function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight, look: Lo
     layer: 1,
     shapes: [
       ...outlineShapes(torso),
-      // Dressed, the tee and shorts cover the torso; bare, it's the figure's own grey.
+      // Dressed, the tank top and shorts cover the torso; bare, it's the figure's own grey.
       ...shadedShapes(torso, look.cloth ?? look.skin, torsoAxis),
+      ...(look.cloth
+        ? tankTopSkin(cam, surface, torsoClip, torso.flat(), torsoAxis, look.skin)
+        : []),
+      ...(look.muscles
+        ? definitionShapes(cam, 'torso', surface, torsoClip, {
+            points: torso.flat(),
+            axis: torsoAxis,
+          })
+        : []),
       ...(shown
         ? muscleShapes(cam, 'torso', surface, torsoClip, shown, {
             points: torso.flat(),
@@ -724,19 +856,10 @@ function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight, look: Lo
     lateralHints.set(arm, sub(s.shoulders[side], s.shoulderCenter));
     const farArm = isFar(arm.root, midArms);
     const armSkin = farArm ? look.skinFar : look.skin;
-    const sleeve = farArm ? look.clothFar : look.cloth;
+    // A tank top: the arms are bare.
     pieces.push(
       jointedPiece(
-        limbDrawing(
-          cam,
-          arm,
-          'upperArm',
-          BODY.upperArm,
-          armSkin,
-          shown,
-          // The tee's short sleeve.
-          sleeve ? { from: -0.08, to: 0.32, grow: 0.3, material: sleeve } : undefined,
-        ),
+        limbDrawing(cam, arm, 'upperArm', BODY.upperArm, armSkin, shown),
         limbDrawing(cam, lowerLimb(arm), 'forearm', BODY.forearm, armSkin, shown),
         isFolded(arm),
       ),
@@ -824,12 +947,14 @@ function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight, look: Lo
     { c: at(10.1, -2.4), r: 1.6 },
   ]);
   const headCenter = cam.toScreen(s.head);
+  // Short hair with some volume on top: a cap of a slightly larger ball, set up and back.
+  const hairCenter = add(add(s.head, scale(up, 0.9)), scale(forward, -0.7));
   const hair = capPolygon(
     cam,
-    s.head,
-    BODY.headRadius + 0.4,
-    normalize(add(scale(up, 0.86), scale(forward, -0.52))),
-    80,
+    hairCenter,
+    BODY.headRadius + 0.9,
+    normalize(add(scale(up, 0.82), scale(forward, -0.5))),
+    74,
   );
   const ears = [1, -1]
     .map((side) =>
@@ -861,13 +986,13 @@ function bodyPieces(cam: Camera, s: Skeleton, muscles: MuscleHighlight, look: Lo
             clipId: headClip,
           }))
         : []),
+      ...(look.hair ? faceShapes(cam, s) : []),
       ...(hair && look.hair
         ? [
             {
               d: smoothPath(hair),
               fill: midTone(look.hair),
-              gradient: sphereGradient(headCenter, BODY.headRadius, look.hair),
-              clipId: headClip,
+              gradient: sphereGradient(cam.toScreen(hairCenter), BODY.headRadius + 1, look.hair),
             },
           ]
         : []),

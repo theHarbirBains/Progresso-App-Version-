@@ -4,6 +4,7 @@ import type { FrameSpec, PropBuilder, SceneSpec } from '../render';
 import type { PoseSpec, Skeleton } from '../rig';
 import {
   FRONT,
+  FACING,
   hands,
   motion,
   scene,
@@ -82,7 +83,7 @@ function curl(
   // A Zottman curl turns the palms down at the top and lowers slowly: a third step, halfway down.
   const halfway = make({ at: [21, (y0 + y1) / 2 + 6, width] as V3, pole: DOWN_BACK });
   return scene(opts.lowering ? [make(down), finish, halfway] : [make(down), finish], {
-    view: opts.view ?? SIDE,
+    view: opts.view ?? FACING,
     props: [...(opts.seated ? [seatBench] : []), gear],
     motion: motion.hand,
   });
@@ -238,7 +239,8 @@ function press(
       : ELBOWS_DOWN_OUT;
   const top: V3 = [-1, 200 + lift, opts.bar ? width : 17];
   return scene([make({ at: rack, pole }), make({ at: top, pole })], {
-    view: SIDE,
+    // Behind the neck is seen from the side, where the bar's path behind the head shows.
+    view: opts.behind ? SIDE : FACING,
     props: [...(opts.seated ? [uprightBench] : []), gear],
     motion: opts.bar ? motion.hands : motion.hand,
   });

@@ -86,6 +86,29 @@ export const REGION_GROUP: Record<MuscleRegion, MuscleGroup> = {
   tibialis: 'calves',
 };
 
+/** What the anatomy figure's key calls each region. */
+export const REGION_NAMES: Record<MuscleRegion, string> = {
+  chest: 'Chest',
+  frontDelts: 'Shoulders',
+  sideDelts: 'Shoulders (Lateral)',
+  rearDelts: 'Rear Delts',
+  biceps: 'Biceps',
+  triceps: 'Triceps',
+  forearms: 'Forearms',
+  traps: 'Traps',
+  upperBack: 'Upper Back',
+  lats: 'Back (Lats)',
+  lowerBack: 'Lower Back',
+  abs: 'Abs',
+  obliques: 'Obliques',
+  glutes: 'Glutes',
+  quads: 'Quads',
+  hamstrings: 'Hamstrings',
+  adductors: 'Adductors',
+  calves: 'Calves',
+  tibialis: 'Tibialis',
+};
+
 export interface MuscleHighlight {
   primary: readonly MuscleRegion[];
   secondary: readonly MuscleRegion[];

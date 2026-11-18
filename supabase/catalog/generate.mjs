@@ -320,13 +320,15 @@ export interface BuiltinCatalogEntry {
   highlight: MuscleHighlight;
   /** The muscle groups it also works (\`exercises.secondary_muscle_groups\`). */
   secondaryGroups: readonly string[];
+  /** How it moves (\`exercises.movement_pattern\`): names what its illustration's last position does. */
+  pattern: string;
 }
 
 export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
 ${all
   .map(
     (ex) =>
-      `  '${ex.slug}': { name: ${JSON.stringify(ex.name)}, muscle: '${ex.muscle}', equipment: '${ex.equipment}', highlight: { primary: ${JSON.stringify(ex.highlight.primary)}, secondary: ${JSON.stringify(ex.highlight.secondary)} }, secondaryGroups: ${JSON.stringify(secondaryGroups(ex))} },`,
+      `  '${ex.slug}': { name: ${JSON.stringify(ex.name)}, muscle: '${ex.muscle}', equipment: '${ex.equipment}', highlight: { primary: ${JSON.stringify(ex.highlight.primary)}, secondary: ${JSON.stringify(ex.highlight.secondary)} }, secondaryGroups: ${JSON.stringify(secondaryGroups(ex))}, pattern: '${ex.pattern}' },`,
   )
   .join('\n')}
 };

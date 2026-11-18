@@ -11,6 +11,8 @@ export interface BuiltinCatalogEntry {
   highlight: MuscleHighlight;
   /** The muscle groups it also works (`exercises.secondary_muscle_groups`). */
   secondaryGroups: readonly string[];
+  /** How it moves (`exercises.movement_pattern`): names what its illustration's last position does. */
+  pattern: string;
 }
 
 export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
@@ -20,6 +22,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['chest'], secondary: ['frontDelts', 'triceps'] },
     secondaryGroups: ['shoulders', 'triceps'],
+    pattern: 'horizontal_push',
   },
   'db-incline-bench-press': {
     name: 'Incline Dumbbell Bench Press',
@@ -27,6 +30,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['chest'], secondary: ['frontDelts', 'triceps'] },
     secondaryGroups: ['shoulders', 'triceps'],
+    pattern: 'horizontal_push',
   },
   'db-decline-bench-press': {
     name: 'Decline Dumbbell Bench Press',
@@ -34,6 +38,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['chest'], secondary: ['triceps', 'frontDelts'] },
     secondaryGroups: ['shoulders', 'triceps'],
+    pattern: 'horizontal_push',
   },
   'db-chest-fly': {
     name: 'Dumbbell Chest Fly',
@@ -41,6 +46,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['chest'], secondary: ['frontDelts', 'biceps'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'fly',
   },
   'db-incline-chest-fly': {
     name: 'Incline Dumbbell Chest Fly',
@@ -48,6 +54,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['chest'], secondary: ['frontDelts', 'biceps'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'fly',
   },
   'db-decline-chest-fly': {
     name: 'Decline Dumbbell Chest Fly',
@@ -55,6 +62,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['chest'], secondary: ['frontDelts', 'biceps'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'fly',
   },
   'db-squeeze-press': {
     name: 'Dumbbell Squeeze Press',
@@ -62,6 +70,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['chest'], secondary: ['triceps', 'frontDelts'] },
     secondaryGroups: ['shoulders', 'triceps'],
+    pattern: 'horizontal_push',
   },
   'db-pullover': {
     name: 'Dumbbell Pullover',
@@ -69,6 +78,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['chest', 'lats'], secondary: ['triceps', 'abs'] },
     secondaryGroups: ['back', 'triceps', 'core'],
+    pattern: 'pullover',
   },
   'db-bent-over-row': {
     name: 'Dumbbell Bent-Over Row',
@@ -76,6 +86,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['lats', 'upperBack'], secondary: ['rearDelts', 'biceps', 'lowerBack'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'horizontal_pull',
   },
   'db-single-arm-row': {
     name: 'Single-Arm Dumbbell Row',
@@ -83,6 +94,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['lats', 'upperBack'], secondary: ['rearDelts', 'biceps'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'horizontal_pull',
   },
   'db-chest-supported-row': {
     name: 'Chest-Supported Dumbbell Row',
@@ -90,6 +102,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['upperBack', 'lats'], secondary: ['rearDelts', 'biceps'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'horizontal_pull',
   },
   'db-renegade-row': {
     name: 'Dumbbell Renegade Row',
@@ -100,6 +113,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['abs', 'obliques', 'biceps', 'triceps'],
     },
     secondaryGroups: ['biceps', 'triceps', 'core'],
+    pattern: 'horizontal_pull',
   },
   'db-rear-delt-fly': {
     name: 'Dumbbell Rear Delt Fly',
@@ -107,6 +121,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['rearDelts'], secondary: ['upperBack', 'traps'] },
     secondaryGroups: ['back'],
+    pattern: 'raise',
   },
   'db-incline-rear-delt-fly': {
     name: 'Incline Dumbbell Rear Delt Fly',
@@ -114,6 +129,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['rearDelts'], secondary: ['upperBack', 'traps'] },
     secondaryGroups: ['back'],
+    pattern: 'raise',
   },
   'db-shrug': {
     name: 'Dumbbell Shrug',
@@ -121,6 +137,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['traps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'shrug',
   },
   'db-deadlift': {
     name: 'Dumbbell Deadlift',
@@ -131,6 +148,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['quads', 'traps', 'forearms'],
     },
     secondaryGroups: ['forearms', 'quadriceps', 'hamstrings', 'glutes'],
+    pattern: 'hinge',
   },
   'db-romanian-deadlift': {
     name: 'Dumbbell Romanian Deadlift',
@@ -138,6 +156,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },
     secondaryGroups: ['back', 'forearms', 'glutes'],
+    pattern: 'hinge',
   },
   'db-stiff-leg-deadlift': {
     name: 'Dumbbell Stiff-Leg Deadlift',
@@ -145,6 +164,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },
     secondaryGroups: ['back', 'forearms', 'glutes'],
+    pattern: 'hinge',
   },
   'db-farmers-carry': {
     name: "Dumbbell Farmer's Carry",
@@ -155,6 +175,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['abs', 'obliques', 'glutes', 'quads'],
     },
     secondaryGroups: ['forearms', 'quadriceps', 'glutes', 'core'],
+    pattern: 'carry',
   },
   'db-suitcase-carry': {
     name: 'Dumbbell Suitcase Carry',
@@ -162,6 +183,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['obliques'], secondary: ['forearms', 'traps', 'abs'] },
     secondaryGroups: ['back', 'forearms'],
+    pattern: 'carry',
   },
   'db-seated-shoulder-press': {
     name: 'Seated Dumbbell Shoulder Press',
@@ -169,6 +191,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['frontDelts', 'sideDelts'], secondary: ['triceps', 'traps'] },
     secondaryGroups: ['back', 'triceps'],
+    pattern: 'vertical_push',
   },
   'db-standing-shoulder-press': {
     name: 'Standing Dumbbell Shoulder Press',
@@ -176,6 +199,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['frontDelts', 'sideDelts'], secondary: ['triceps', 'traps', 'abs'] },
     secondaryGroups: ['back', 'triceps', 'core'],
+    pattern: 'vertical_push',
   },
   'db-arnold-press': {
     name: 'Arnold Press',
@@ -183,6 +207,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['frontDelts', 'sideDelts'], secondary: ['triceps', 'traps'] },
     secondaryGroups: ['back', 'triceps'],
+    pattern: 'vertical_push',
   },
   'db-lateral-raise': {
     name: 'Dumbbell Lateral Raise',
@@ -190,6 +215,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['sideDelts'], secondary: ['traps', 'frontDelts'] },
     secondaryGroups: ['back'],
+    pattern: 'raise',
   },
   'db-leaning-lateral-raise': {
     name: 'Leaning Dumbbell Lateral Raise',
@@ -197,6 +223,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['sideDelts'], secondary: ['traps'] },
     secondaryGroups: ['back'],
+    pattern: 'raise',
   },
   'db-seated-lateral-raise': {
     name: 'Seated Dumbbell Lateral Raise',
@@ -204,6 +231,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['sideDelts'], secondary: ['traps'] },
     secondaryGroups: ['back'],
+    pattern: 'raise',
   },
   'db-front-raise': {
     name: 'Dumbbell Front Raise',
@@ -211,6 +239,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['frontDelts'], secondary: ['sideDelts', 'chest'] },
     secondaryGroups: ['chest'],
+    pattern: 'raise',
   },
   'db-alternating-front-raise': {
     name: 'Alternating Dumbbell Front Raise',
@@ -218,6 +247,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['frontDelts'], secondary: ['sideDelts', 'chest'] },
     secondaryGroups: ['chest'],
+    pattern: 'raise',
   },
   'db-upright-row': {
     name: 'Dumbbell Upright Row',
@@ -225,6 +255,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['sideDelts', 'traps'], secondary: ['frontDelts', 'biceps'] },
     secondaryGroups: ['back', 'biceps'],
+    pattern: 'vertical_pull',
   },
   'db-y-raise': {
     name: 'Dumbbell Y-Raise',
@@ -232,6 +263,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['traps', 'sideDelts'], secondary: ['rearDelts', 'upperBack'] },
     secondaryGroups: ['back'],
+    pattern: 'raise',
   },
   'db-cuban-press': {
     name: 'Dumbbell Cuban Press',
@@ -239,6 +271,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['rearDelts', 'sideDelts'], secondary: ['traps', 'frontDelts'] },
     secondaryGroups: ['back'],
+    pattern: 'vertical_push',
   },
   'db-curl': {
     name: 'Standing Dumbbell Bicep Curl',
@@ -246,6 +279,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-alternating-curl': {
     name: 'Alternating Dumbbell Curl',
@@ -253,6 +287,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-seated-curl': {
     name: 'Seated Dumbbell Curl',
@@ -260,6 +295,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-incline-curl': {
     name: 'Incline Dumbbell Curl',
@@ -267,6 +303,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps'], secondary: ['forearms', 'frontDelts'] },
     secondaryGroups: ['shoulders', 'forearms'],
+    pattern: 'curl',
   },
   'db-hammer-curl': {
     name: 'Hammer Curl',
@@ -274,6 +311,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps', 'forearms'], secondary: [] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-cross-body-hammer-curl': {
     name: 'Cross-Body Hammer Curl',
@@ -281,6 +319,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps', 'forearms'], secondary: [] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-concentration-curl': {
     name: 'Concentration Curl',
@@ -288,6 +327,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-preacher-curl': {
     name: 'Preacher Dumbbell Curl',
@@ -295,6 +335,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-spider-curl': {
     name: 'Dumbbell Spider Curl',
@@ -302,6 +343,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-zottman-curl': {
     name: 'Zottman Curl',
@@ -309,6 +351,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps', 'forearms'], secondary: [] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-reverse-curl': {
     name: 'Dumbbell Reverse Curl',
@@ -316,6 +359,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['forearms', 'biceps'], secondary: [] },
     secondaryGroups: ['biceps'],
+    pattern: 'curl',
   },
   'db-drag-curl': {
     name: 'Dumbbell Drag Curl',
@@ -323,6 +367,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps'], secondary: ['forearms', 'rearDelts'] },
     secondaryGroups: ['shoulders', 'forearms'],
+    pattern: 'curl',
   },
   'db-waiter-curl': {
     name: 'Dumbbell Waiter Curl',
@@ -330,6 +375,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-seated-alternating-supinating-curl': {
     name: 'Seated Alternating Supinating Curl',
@@ -337,6 +383,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'db-overhead-triceps-extension': {
     name: 'Overhead Dumbbell Triceps Extension',
@@ -344,6 +391,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['triceps'], secondary: ['frontDelts'] },
     secondaryGroups: ['shoulders'],
+    pattern: 'triceps_extension',
   },
   'db-single-arm-overhead-extension': {
     name: 'Single-Arm Overhead Dumbbell Extension',
@@ -351,6 +399,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['triceps'], secondary: ['frontDelts'] },
     secondaryGroups: ['shoulders'],
+    pattern: 'triceps_extension',
   },
   'db-seated-triceps-extension': {
     name: 'Seated Dumbbell Triceps Extension',
@@ -358,6 +407,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['triceps'], secondary: ['frontDelts'] },
     secondaryGroups: ['shoulders'],
+    pattern: 'triceps_extension',
   },
   'db-skull-crusher': {
     name: 'Dumbbell Skull Crusher',
@@ -365,6 +415,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['triceps'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'triceps_extension',
   },
   'db-incline-triceps-extension': {
     name: 'Incline Dumbbell Triceps Extension',
@@ -372,6 +423,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['triceps'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'triceps_extension',
   },
   'db-tate-press': {
     name: 'Dumbbell Tate Press',
@@ -379,6 +431,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['triceps'], secondary: ['chest'] },
     secondaryGroups: ['chest'],
+    pattern: 'triceps_extension',
   },
   'db-kickback': {
     name: 'Dumbbell Kickback',
@@ -386,6 +439,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['triceps'], secondary: ['rearDelts'] },
     secondaryGroups: ['shoulders'],
+    pattern: 'triceps_extension',
   },
   'db-cross-body-triceps-extension': {
     name: 'Cross-Body Dumbbell Triceps Extension',
@@ -393,6 +447,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['triceps'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'triceps_extension',
   },
   'db-close-grip-press': {
     name: 'Dumbbell Close-Grip Press',
@@ -400,6 +455,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['triceps'], secondary: ['chest', 'frontDelts'] },
     secondaryGroups: ['chest', 'shoulders'],
+    pattern: 'horizontal_push',
   },
   'db-jm-press': {
     name: 'Dumbbell JM Press',
@@ -407,6 +463,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['triceps'], secondary: ['chest'] },
     secondaryGroups: ['chest'],
+    pattern: 'triceps_extension',
   },
   'db-wrist-curl': {
     name: 'Dumbbell Wrist Curl',
@@ -414,6 +471,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['forearms'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'wrist',
   },
   'db-reverse-wrist-curl': {
     name: 'Reverse Dumbbell Wrist Curl',
@@ -421,6 +479,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['forearms'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'wrist',
   },
   'db-static-hold': {
     name: 'Dumbbell Static Hold',
@@ -428,6 +487,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['forearms'], secondary: ['traps'] },
     secondaryGroups: ['back'],
+    pattern: 'hold',
   },
   'db-finger-curl': {
     name: 'Dumbbell Finger Curl',
@@ -435,6 +495,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['forearms'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'wrist',
   },
   'db-pronation': {
     name: 'Dumbbell Pronation',
@@ -442,6 +503,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['forearms'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'wrist',
   },
   'db-supination': {
     name: 'Dumbbell Supination',
@@ -449,6 +511,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['forearms'], secondary: ['biceps'] },
     secondaryGroups: ['biceps'],
+    pattern: 'wrist',
   },
   'db-goblet-squat': {
     name: 'Dumbbell Goblet Squat',
@@ -456,6 +519,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'abs'] },
     secondaryGroups: ['adductors', 'glutes', 'core'],
+    pattern: 'squat',
   },
   'db-front-squat': {
     name: 'Dumbbell Front Squat',
@@ -463,6 +527,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'abs'] },
     secondaryGroups: ['adductors', 'glutes', 'core'],
+    pattern: 'squat',
   },
   'db-bulgarian-split-squat': {
     name: 'Dumbbell Bulgarian Split Squat',
@@ -470,6 +535,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'hamstrings'] },
     secondaryGroups: ['hamstrings', 'adductors', 'glutes'],
+    pattern: 'lunge',
   },
   'db-walking-lunge': {
     name: 'Dumbbell Walking Lunge',
@@ -477,6 +543,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'hamstrings', 'calves'] },
     secondaryGroups: ['hamstrings', 'adductors', 'glutes', 'calves'],
+    pattern: 'lunge',
   },
   'db-reverse-lunge': {
     name: 'Dumbbell Reverse Lunge',
@@ -484,6 +551,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['hamstrings', 'adductors'] },
     secondaryGroups: ['hamstrings', 'adductors', 'glutes'],
+    pattern: 'lunge',
   },
   'db-forward-lunge': {
     name: 'Dumbbell Forward Lunge',
@@ -491,6 +559,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['hamstrings', 'adductors'] },
     secondaryGroups: ['hamstrings', 'adductors', 'glutes'],
+    pattern: 'lunge',
   },
   'db-step-up': {
     name: 'Dumbbell Step-Up',
@@ -498,6 +567,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['hamstrings', 'calves'] },
     secondaryGroups: ['hamstrings', 'glutes', 'calves'],
+    pattern: 'lunge',
   },
   'db-split-squat': {
     name: 'Dumbbell Split Squat',
@@ -505,6 +575,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'hamstrings'] },
     secondaryGroups: ['hamstrings', 'adductors', 'glutes'],
+    pattern: 'lunge',
   },
   'db-sumo-squat': {
     name: 'Dumbbell Sumo Squat',
@@ -512,6 +583,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads', 'adductors', 'glutes'], secondary: ['hamstrings'] },
     secondaryGroups: ['hamstrings', 'adductors', 'glutes'],
+    pattern: 'squat',
   },
   'db-heels-elevated-squat': {
     name: 'Dumbbell Heels-Elevated Squat',
@@ -519,6 +591,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads'], secondary: ['glutes', 'adductors'] },
     secondaryGroups: ['adductors', 'glutes'],
+    pattern: 'squat',
   },
   'db-cyclist-squat': {
     name: 'Dumbbell Cyclist Squat',
@@ -526,6 +599,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads'], secondary: ['glutes'] },
     secondaryGroups: ['glutes'],
+    pattern: 'squat',
   },
   'db-single-leg-squat': {
     name: 'Dumbbell Single-Leg Squat',
@@ -533,6 +607,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['abs', 'adductors'] },
     secondaryGroups: ['adductors', 'glutes', 'core'],
+    pattern: 'squat',
   },
   'db-single-leg-rdl': {
     name: 'Single-Leg Dumbbell Romanian Deadlift',
@@ -540,6 +615,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'obliques'] },
     secondaryGroups: ['back', 'glutes', 'core'],
+    pattern: 'hinge',
   },
   'db-good-morning': {
     name: 'Dumbbell Good Morning',
@@ -547,6 +623,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack'] },
     secondaryGroups: ['back', 'glutes'],
+    pattern: 'hinge',
   },
   'db-hip-thrust': {
     name: 'Dumbbell Hip Thrust',
@@ -554,6 +631,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['glutes'], secondary: ['hamstrings', 'quads'] },
     secondaryGroups: ['quadriceps', 'hamstrings'],
+    pattern: 'hip_extension',
   },
   'db-glute-bridge': {
     name: 'Dumbbell Glute Bridge',
@@ -561,6 +639,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['glutes'], secondary: ['hamstrings'] },
     secondaryGroups: ['hamstrings'],
+    pattern: 'hip_extension',
   },
   'db-single-leg-glute-bridge': {
     name: 'Single-Leg Dumbbell Glute Bridge',
@@ -568,6 +647,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['glutes'], secondary: ['hamstrings'] },
     secondaryGroups: ['hamstrings'],
+    pattern: 'hip_extension',
   },
   'db-curtsy-lunge': {
     name: 'Dumbbell Curtsy Lunge',
@@ -575,6 +655,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['glutes', 'quads'], secondary: ['adductors'] },
     secondaryGroups: ['quadriceps', 'adductors'],
+    pattern: 'lunge',
   },
   'db-cossack-squat': {
     name: 'Dumbbell Cossack Squat',
@@ -582,6 +663,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['adductors', 'quads'], secondary: ['glutes', 'hamstrings'] },
     secondaryGroups: ['quadriceps', 'hamstrings', 'glutes'],
+    pattern: 'lunge',
   },
   'db-lateral-lunge': {
     name: 'Dumbbell Lateral Lunge',
@@ -589,6 +671,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['adductors', 'glutes', 'quads'], secondary: ['hamstrings'] },
     secondaryGroups: ['quadriceps', 'hamstrings', 'glutes'],
+    pattern: 'lunge',
   },
   'db-goblet-lateral-lunge': {
     name: 'Dumbbell Goblet Lateral Lunge',
@@ -596,6 +679,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['adductors', 'glutes', 'quads'], secondary: ['abs'] },
     secondaryGroups: ['quadriceps', 'glutes', 'core'],
+    pattern: 'lunge',
   },
   'db-standing-calf-raise': {
     name: 'Standing Dumbbell Calf Raise',
@@ -603,6 +687,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['calves'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'calf_raise',
   },
   'db-seated-calf-raise': {
     name: 'Seated Dumbbell Calf Raise',
@@ -610,6 +695,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['calves'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'calf_raise',
   },
   'db-single-leg-calf-raise': {
     name: 'Single-Leg Dumbbell Calf Raise',
@@ -617,6 +703,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['calves'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'calf_raise',
   },
   'db-donkey-calf-raise': {
     name: 'Dumbbell Donkey Calf Raise',
@@ -624,6 +711,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['calves'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'calf_raise',
   },
   'db-tibialis-raise': {
     name: 'Dumbbell Tibialis Raise',
@@ -631,6 +719,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['tibialis'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'calf_raise',
   },
   'db-russian-twist': {
     name: 'Dumbbell Russian Twist',
@@ -638,6 +727,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['obliques', 'abs'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'core_rotation',
   },
   'db-sit-up': {
     name: 'Dumbbell Sit-Up',
@@ -645,6 +735,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['abs'], secondary: ['obliques'] },
     secondaryGroups: [],
+    pattern: 'core_flexion',
   },
   'db-weighted-crunch': {
     name: 'Dumbbell Weighted Crunch',
@@ -652,6 +743,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['abs'], secondary: ['obliques'] },
     secondaryGroups: [],
+    pattern: 'core_flexion',
   },
   'db-side-bend': {
     name: 'Dumbbell Side Bend',
@@ -659,6 +751,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['obliques'], secondary: ['lowerBack'] },
     secondaryGroups: ['back'],
+    pattern: 'lateral_flexion',
   },
   'db-woodchop': {
     name: 'Dumbbell Woodchop',
@@ -666,6 +759,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['obliques'], secondary: ['abs', 'frontDelts'] },
     secondaryGroups: ['shoulders'],
+    pattern: 'core_rotation',
   },
   'db-windmill': {
     name: 'Dumbbell Windmill',
@@ -673,6 +767,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['obliques'], secondary: ['sideDelts', 'hamstrings', 'glutes'] },
     secondaryGroups: ['shoulders', 'hamstrings', 'glutes'],
+    pattern: 'lateral_flexion',
   },
   'db-turkish-get-up': {
     name: 'Dumbbell Turkish Get-Up',
@@ -683,6 +778,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['frontDelts', 'sideDelts', 'glutes', 'triceps'],
     },
     secondaryGroups: ['shoulders', 'triceps', 'glutes'],
+    pattern: 'get_up',
   },
   'db-plank-drag': {
     name: 'Dumbbell Plank Drag',
@@ -690,6 +786,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['abs', 'obliques'], secondary: ['frontDelts', 'triceps'] },
     secondaryGroups: ['shoulders', 'triceps'],
+    pattern: 'anti_extension',
   },
   'db-dead-bug': {
     name: 'Dumbbell Dead Bug',
@@ -697,6 +794,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'dumbbell',
     highlight: { primary: ['abs'], secondary: ['obliques'] },
     secondaryGroups: [],
+    pattern: 'anti_extension',
   },
   'db-overhead-carry': {
     name: 'Dumbbell Overhead Carry',
@@ -707,6 +805,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['sideDelts', 'frontDelts', 'traps', 'triceps'],
     },
     secondaryGroups: ['back', 'shoulders', 'triceps'],
+    pattern: 'carry',
   },
   'bb-bench-press': {
     name: 'Barbell Bench Press',
@@ -714,6 +813,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['chest'], secondary: ['frontDelts', 'triceps'] },
     secondaryGroups: ['shoulders', 'triceps'],
+    pattern: 'horizontal_push',
   },
   'bb-incline-bench-press': {
     name: 'Incline Barbell Bench Press',
@@ -721,6 +821,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['chest'], secondary: ['frontDelts', 'triceps'] },
     secondaryGroups: ['shoulders', 'triceps'],
+    pattern: 'horizontal_push',
   },
   'bb-decline-bench-press': {
     name: 'Decline Barbell Bench Press',
@@ -728,6 +829,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['chest'], secondary: ['triceps', 'frontDelts'] },
     secondaryGroups: ['shoulders', 'triceps'],
+    pattern: 'horizontal_push',
   },
   'bb-close-grip-bench-press': {
     name: 'Close-Grip Bench Press',
@@ -735,6 +837,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['triceps', 'chest'], secondary: ['frontDelts'] },
     secondaryGroups: ['chest', 'shoulders'],
+    pattern: 'horizontal_push',
   },
   'bb-floor-press': {
     name: 'Barbell Floor Press',
@@ -742,6 +845,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['chest', 'triceps'], secondary: ['frontDelts'] },
     secondaryGroups: ['shoulders', 'triceps'],
+    pattern: 'horizontal_push',
   },
   'bb-guillotine-press': {
     name: 'Guillotine Press',
@@ -749,6 +853,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['chest'], secondary: ['frontDelts', 'triceps'] },
     secondaryGroups: ['shoulders', 'triceps'],
+    pattern: 'horizontal_push',
   },
   'bb-deadlift': {
     name: 'Conventional Barbell Deadlift',
@@ -759,6 +864,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['quads', 'traps', 'lats', 'forearms'],
     },
     secondaryGroups: ['forearms', 'quadriceps', 'hamstrings', 'glutes'],
+    pattern: 'hinge',
   },
   'bb-sumo-deadlift': {
     name: 'Sumo Barbell Deadlift',
@@ -769,6 +875,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['hamstrings', 'lowerBack', 'traps', 'forearms'],
     },
     secondaryGroups: ['back', 'forearms', 'quadriceps', 'hamstrings', 'adductors'],
+    pattern: 'hinge',
   },
   'bb-romanian-deadlift': {
     name: 'Romanian Deadlift',
@@ -776,6 +883,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms', 'traps'] },
     secondaryGroups: ['back', 'forearms', 'glutes'],
+    pattern: 'hinge',
   },
   'bb-stiff-leg-deadlift': {
     name: 'Stiff-Leg Deadlift',
@@ -783,6 +891,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },
     secondaryGroups: ['back', 'forearms', 'glutes'],
+    pattern: 'hinge',
   },
   'bb-bent-over-row': {
     name: 'Bent-Over Barbell Row',
@@ -793,6 +902,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['rearDelts', 'biceps', 'lowerBack', 'hamstrings'],
     },
     secondaryGroups: ['shoulders', 'biceps', 'hamstrings'],
+    pattern: 'horizontal_pull',
   },
   'bb-pendlay-row': {
     name: 'Pendlay Row',
@@ -800,6 +910,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['lats', 'upperBack'], secondary: ['rearDelts', 'biceps', 'lowerBack'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'horizontal_pull',
   },
   'bb-yates-row': {
     name: 'Yates Row',
@@ -807,6 +918,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['lats', 'upperBack'], secondary: ['biceps', 'rearDelts', 'lowerBack'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'horizontal_pull',
   },
   'bb-underhand-row': {
     name: 'Underhand Barbell Row',
@@ -814,6 +926,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['lats', 'upperBack'], secondary: ['biceps', 'rearDelts', 'lowerBack'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'horizontal_pull',
   },
   'bb-t-bar-row': {
     name: 'T-Bar Row',
@@ -821,6 +934,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['upperBack', 'lats'], secondary: ['rearDelts', 'biceps', 'lowerBack'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'horizontal_pull',
   },
   'bb-meadows-row': {
     name: 'Meadows Row',
@@ -828,6 +942,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['lats', 'upperBack'], secondary: ['rearDelts', 'biceps'] },
     secondaryGroups: ['shoulders', 'biceps'],
+    pattern: 'horizontal_pull',
   },
   'bb-shrug': {
     name: 'Barbell Shrug',
@@ -835,6 +950,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['traps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'shrug',
   },
   'bb-snatch-grip-deadlift': {
     name: 'Snatch-Grip Deadlift',
@@ -845,6 +961,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['lowerBack', 'quads', 'forearms'],
     },
     secondaryGroups: ['forearms', 'quadriceps', 'hamstrings', 'glutes'],
+    pattern: 'hinge',
   },
   'bb-rack-pull': {
     name: 'Rack Pull',
@@ -855,6 +972,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['hamstrings', 'lats', 'forearms'],
     },
     secondaryGroups: ['forearms', 'hamstrings', 'glutes'],
+    pattern: 'hinge',
   },
   'bb-deficit-deadlift': {
     name: 'Deficit Deadlift',
@@ -865,6 +983,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['quads', 'traps', 'forearms'],
     },
     secondaryGroups: ['forearms', 'quadriceps', 'hamstrings', 'glutes'],
+    pattern: 'hinge',
   },
   'bb-good-morning': {
     name: 'Good Morning',
@@ -872,6 +991,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack'] },
     secondaryGroups: ['back', 'glutes'],
+    pattern: 'hinge',
   },
   'bb-pullover': {
     name: 'Barbell Pullover',
@@ -879,6 +999,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['lats', 'chest'], secondary: ['triceps', 'abs'] },
     secondaryGroups: ['chest', 'triceps', 'core'],
+    pattern: 'pullover',
   },
   'bb-overhead-press': {
     name: 'Standing Barbell Overhead Press',
@@ -886,6 +1007,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['frontDelts', 'sideDelts'], secondary: ['triceps', 'traps', 'abs'] },
     secondaryGroups: ['back', 'triceps', 'core'],
+    pattern: 'vertical_push',
   },
   'bb-seated-shoulder-press': {
     name: 'Seated Barbell Shoulder Press',
@@ -893,6 +1015,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['frontDelts', 'sideDelts'], secondary: ['triceps', 'traps'] },
     secondaryGroups: ['back', 'triceps'],
+    pattern: 'vertical_push',
   },
   'bb-push-press': {
     name: 'Push Press',
@@ -903,6 +1026,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['quads', 'glutes', 'traps'],
     },
     secondaryGroups: ['back', 'triceps', 'quadriceps', 'glutes'],
+    pattern: 'vertical_push',
   },
   'bb-behind-the-neck-press': {
     name: 'Behind-the-Neck Press',
@@ -913,6 +1037,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['triceps', 'traps', 'rearDelts'],
     },
     secondaryGroups: ['back', 'triceps'],
+    pattern: 'vertical_push',
   },
   'bb-bradford-press': {
     name: 'Bradford Press',
@@ -920,6 +1045,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['frontDelts', 'sideDelts'], secondary: ['triceps', 'traps'] },
     secondaryGroups: ['back', 'triceps'],
+    pattern: 'vertical_push',
   },
   'bb-upright-row': {
     name: 'Barbell Upright Row',
@@ -927,6 +1053,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['sideDelts', 'traps'], secondary: ['frontDelts', 'biceps'] },
     secondaryGroups: ['back', 'biceps'],
+    pattern: 'vertical_pull',
   },
   'bb-front-raise': {
     name: 'Barbell Front Raise',
@@ -934,6 +1061,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['frontDelts'], secondary: ['sideDelts', 'chest'] },
     secondaryGroups: ['chest'],
+    pattern: 'raise',
   },
   'bb-snatch-grip-high-pull': {
     name: 'Snatch-Grip High Pull',
@@ -944,6 +1072,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['glutes', 'hamstrings', 'upperBack'],
     },
     secondaryGroups: ['back', 'hamstrings', 'glutes'],
+    pattern: 'vertical_pull',
   },
   'bb-high-pull': {
     name: 'Barbell High Pull',
@@ -954,6 +1083,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['glutes', 'hamstrings', 'upperBack', 'rearDelts'],
     },
     secondaryGroups: ['back', 'hamstrings', 'glutes'],
+    pattern: 'vertical_pull',
   },
   'bb-curl': {
     name: 'Standing Barbell Curl',
@@ -961,6 +1091,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'bb-ez-bar-curl': {
     name: 'EZ-Bar Curl',
@@ -968,6 +1099,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'bb-wide-grip-curl': {
     name: 'Wide-Grip Barbell Curl',
@@ -975,6 +1107,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'bb-close-grip-curl': {
     name: 'Close-Grip Barbell Curl',
@@ -982,6 +1115,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'bb-reverse-curl': {
     name: 'Reverse Barbell Curl',
@@ -989,6 +1123,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['forearms', 'biceps'], secondary: [] },
     secondaryGroups: ['biceps'],
+    pattern: 'curl',
   },
   'bb-drag-curl': {
     name: 'Barbell Drag Curl',
@@ -996,6 +1131,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['biceps'], secondary: ['forearms', 'rearDelts'] },
     secondaryGroups: ['shoulders', 'forearms'],
+    pattern: 'curl',
   },
   'bb-preacher-curl': {
     name: 'Barbell Preacher Curl',
@@ -1003,6 +1139,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'bb-spider-curl': {
     name: 'Barbell Spider Curl',
@@ -1010,6 +1147,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'bb-seated-curl': {
     name: 'Seated Barbell Curl',
@@ -1017,6 +1155,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['biceps'], secondary: ['forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'curl',
   },
   'bb-cheat-curl': {
     name: 'Cheat Curl',
@@ -1024,6 +1163,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['biceps'], secondary: ['forearms', 'lowerBack', 'frontDelts'] },
     secondaryGroups: ['back', 'shoulders', 'forearms'],
+    pattern: 'curl',
   },
   'bb-wrist-curl': {
     name: 'Barbell Wrist Curl',
@@ -1031,6 +1171,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['forearms'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'wrist',
   },
   'bb-ez-skull-crusher': {
     name: 'EZ-Bar Skull Crusher',
@@ -1038,6 +1179,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['triceps'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'triceps_extension',
   },
   'bb-skull-crusher': {
     name: 'Barbell Skull Crusher',
@@ -1045,6 +1187,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['triceps'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'triceps_extension',
   },
   'bb-incline-ez-triceps-extension': {
     name: 'Incline EZ-Bar Triceps Extension',
@@ -1052,6 +1195,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['triceps'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'triceps_extension',
   },
   'bb-overhead-ez-triceps-extension': {
     name: 'Overhead EZ-Bar Triceps Extension',
@@ -1059,6 +1203,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['triceps'], secondary: ['frontDelts'] },
     secondaryGroups: ['shoulders'],
+    pattern: 'triceps_extension',
   },
   'bb-jm-press': {
     name: 'JM Press',
@@ -1066,6 +1211,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['triceps'], secondary: ['chest'] },
     secondaryGroups: ['chest'],
+    pattern: 'triceps_extension',
   },
   'bb-reverse-grip-bench-press': {
     name: 'Reverse-Grip Bench Press',
@@ -1073,6 +1219,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['triceps', 'chest'], secondary: ['frontDelts', 'biceps'] },
     secondaryGroups: ['chest', 'shoulders', 'biceps'],
+    pattern: 'horizontal_push',
   },
   'bb-reverse-wrist-curl': {
     name: 'Reverse Barbell Wrist Curl',
@@ -1080,6 +1227,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['forearms'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'wrist',
   },
   'bb-behind-back-wrist-curl': {
     name: 'Behind-the-Back Barbell Wrist Curl',
@@ -1087,6 +1235,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['forearms'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'wrist',
   },
   'bb-static-hold': {
     name: 'Barbell Static Hold',
@@ -1094,6 +1243,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['forearms'], secondary: ['traps'] },
     secondaryGroups: ['back'],
+    pattern: 'hold',
   },
   'bb-finger-curl': {
     name: 'Barbell Finger Curl',
@@ -1101,6 +1251,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['forearms'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'wrist',
   },
   'bb-back-squat': {
     name: 'Barbell Back Squat',
@@ -1111,6 +1262,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['adductors', 'hamstrings', 'lowerBack'],
     },
     secondaryGroups: ['back', 'hamstrings', 'adductors', 'glutes'],
+    pattern: 'squat',
   },
   'bb-high-bar-squat': {
     name: 'High-Bar Back Squat',
@@ -1118,6 +1270,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'lowerBack'] },
     secondaryGroups: ['back', 'adductors', 'glutes'],
+    pattern: 'squat',
   },
   'bb-low-bar-squat': {
     name: 'Low-Bar Back Squat',
@@ -1128,6 +1281,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['hamstrings', 'adductors', 'lowerBack'],
     },
     secondaryGroups: ['back', 'hamstrings', 'adductors', 'glutes'],
+    pattern: 'squat',
   },
   'bb-front-squat': {
     name: 'Front Squat',
@@ -1135,6 +1289,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['abs', 'upperBack', 'adductors'] },
     secondaryGroups: ['back', 'adductors', 'glutes', 'core'],
+    pattern: 'squat',
   },
   'bb-zercher-squat': {
     name: 'Zercher Squat',
@@ -1142,6 +1297,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['abs', 'upperBack', 'biceps'] },
     secondaryGroups: ['back', 'biceps', 'glutes', 'core'],
+    pattern: 'squat',
   },
   'bb-box-squat': {
     name: 'Box Squat',
@@ -1152,6 +1308,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['hamstrings', 'adductors', 'lowerBack'],
     },
     secondaryGroups: ['back', 'hamstrings', 'adductors', 'glutes'],
+    pattern: 'squat',
   },
   'bb-pause-squat': {
     name: 'Pause Squat',
@@ -1159,6 +1316,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'lowerBack'] },
     secondaryGroups: ['back', 'adductors', 'glutes'],
+    pattern: 'squat',
   },
   'bb-pin-squat': {
     name: 'Pin Squat',
@@ -1166,6 +1324,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'lowerBack'] },
     secondaryGroups: ['back', 'adductors', 'glutes'],
+    pattern: 'squat',
   },
   'bb-hack-squat': {
     name: 'Barbell Hack Squat',
@@ -1173,6 +1332,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads'], secondary: ['glutes', 'hamstrings', 'forearms'] },
     secondaryGroups: ['forearms', 'hamstrings', 'glutes'],
+    pattern: 'squat',
   },
   'bb-walking-lunge': {
     name: 'Barbell Walking Lunge',
@@ -1180,6 +1340,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'hamstrings', 'calves'] },
     secondaryGroups: ['hamstrings', 'adductors', 'glutes', 'calves'],
+    pattern: 'lunge',
   },
   'bb-reverse-lunge': {
     name: 'Barbell Reverse Lunge',
@@ -1187,6 +1348,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['hamstrings', 'adductors'] },
     secondaryGroups: ['hamstrings', 'adductors', 'glutes'],
+    pattern: 'lunge',
   },
   'bb-bulgarian-split-squat': {
     name: 'Barbell Bulgarian Split Squat',
@@ -1194,6 +1356,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'hamstrings'] },
     secondaryGroups: ['hamstrings', 'adductors', 'glutes'],
+    pattern: 'lunge',
   },
   'bb-step-up': {
     name: 'Barbell Step-Up',
@@ -1201,6 +1364,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['hamstrings', 'calves'] },
     secondaryGroups: ['hamstrings', 'glutes', 'calves'],
+    pattern: 'lunge',
   },
   'bb-split-squat': {
     name: 'Barbell Split Squat',
@@ -1208,6 +1372,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads', 'glutes'], secondary: ['adductors', 'hamstrings'] },
     secondaryGroups: ['hamstrings', 'adductors', 'glutes'],
+    pattern: 'lunge',
   },
   'bb-heels-elevated-squat': {
     name: 'Barbell Heels-Elevated Squat',
@@ -1215,6 +1380,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['quads'], secondary: ['glutes', 'adductors'] },
     secondaryGroups: ['adductors', 'glutes'],
+    pattern: 'squat',
   },
   'bb-snatch-grip-rdl': {
     name: 'Snatch-Grip Romanian Deadlift',
@@ -1225,6 +1391,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['upperBack', 'traps', 'lowerBack'],
     },
     secondaryGroups: ['back', 'glutes'],
+    pattern: 'hinge',
   },
   'bb-single-leg-rdl': {
     name: 'Single-Leg Barbell Romanian Deadlift',
@@ -1232,6 +1399,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'obliques'] },
     secondaryGroups: ['back', 'glutes', 'core'],
+    pattern: 'hinge',
   },
   'bb-deficit-rdl': {
     name: 'Deficit Romanian Deadlift',
@@ -1239,6 +1407,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'] },
     secondaryGroups: ['back', 'forearms', 'glutes'],
+    pattern: 'hinge',
   },
   'bb-hip-thrust': {
     name: 'Barbell Hip Thrust',
@@ -1246,6 +1415,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['glutes'], secondary: ['hamstrings', 'quads'] },
     secondaryGroups: ['quadriceps', 'hamstrings'],
+    pattern: 'hip_extension',
   },
   'bb-glute-bridge': {
     name: 'Barbell Glute Bridge',
@@ -1253,6 +1423,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['glutes'], secondary: ['hamstrings'] },
     secondaryGroups: ['hamstrings'],
+    pattern: 'hip_extension',
   },
   'bb-single-leg-hip-thrust': {
     name: 'Single-Leg Barbell Hip Thrust',
@@ -1260,6 +1431,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['glutes'], secondary: ['hamstrings', 'quads'] },
     secondaryGroups: ['quadriceps', 'hamstrings'],
+    pattern: 'hip_extension',
   },
   'bb-sumo-squat': {
     name: 'Barbell Sumo Squat',
@@ -1267,6 +1439,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['glutes', 'adductors', 'quads'], secondary: ['hamstrings'] },
     secondaryGroups: ['quadriceps', 'hamstrings', 'adductors'],
+    pattern: 'squat',
   },
   'bb-cossack-squat': {
     name: 'Barbell Cossack Squat',
@@ -1274,6 +1447,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['adductors', 'quads'], secondary: ['glutes', 'hamstrings'] },
     secondaryGroups: ['quadriceps', 'hamstrings', 'glutes'],
+    pattern: 'lunge',
   },
   'bb-lateral-lunge': {
     name: 'Barbell Lateral Lunge',
@@ -1281,6 +1455,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['adductors', 'glutes', 'quads'], secondary: ['hamstrings'] },
     secondaryGroups: ['quadriceps', 'hamstrings', 'glutes'],
+    pattern: 'lunge',
   },
   'bb-standing-calf-raise': {
     name: 'Standing Barbell Calf Raise',
@@ -1288,6 +1463,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['calves'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'calf_raise',
   },
   'bb-seated-calf-raise': {
     name: 'Seated Barbell Calf Raise',
@@ -1295,6 +1471,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['calves'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'calf_raise',
   },
   'bb-single-leg-calf-raise': {
     name: 'Barbell Single-Leg Calf Raise',
@@ -1302,6 +1479,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['calves'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'calf_raise',
   },
   'bb-donkey-calf-raise': {
     name: 'Barbell Donkey Calf Raise',
@@ -1309,6 +1487,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['calves'], secondary: [] },
     secondaryGroups: [],
+    pattern: 'calf_raise',
   },
   'bb-rollout': {
     name: 'Barbell Rollout',
@@ -1316,6 +1495,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['abs'], secondary: ['lats', 'obliques', 'triceps'] },
     secondaryGroups: ['back', 'triceps'],
+    pattern: 'anti_extension',
   },
   'bb-russian-twist': {
     name: 'Barbell Russian Twist',
@@ -1323,6 +1503,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['obliques', 'abs'], secondary: ['frontDelts'] },
     secondaryGroups: ['shoulders'],
+    pattern: 'core_rotation',
   },
   'bb-landmine-rotation': {
     name: 'Barbell Landmine Rotation',
@@ -1330,6 +1511,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['obliques'], secondary: ['abs', 'frontDelts', 'glutes'] },
     secondaryGroups: ['shoulders', 'glutes'],
+    pattern: 'core_rotation',
   },
   'bb-landmine-woodchop': {
     name: 'Landmine Woodchop',
@@ -1337,6 +1519,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['obliques'], secondary: ['abs', 'frontDelts', 'glutes'] },
     secondaryGroups: ['shoulders', 'glutes'],
+    pattern: 'core_rotation',
   },
   'bb-side-bend': {
     name: 'Barbell Side Bend',
@@ -1344,6 +1527,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'barbell',
     highlight: { primary: ['obliques'], secondary: ['lowerBack'] },
     secondaryGroups: ['back'],
+    pattern: 'lateral_flexion',
   },
   'bb-windmill': {
     name: 'Barbell Windmill',
@@ -1354,6 +1538,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['sideDelts', 'hamstrings', 'glutes', 'triceps'],
     },
     secondaryGroups: ['shoulders', 'triceps', 'hamstrings', 'glutes'],
+    pattern: 'lateral_flexion',
   },
   'bb-overhead-carry': {
     name: 'Barbell Overhead Carry',
@@ -1364,6 +1549,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['sideDelts', 'frontDelts', 'traps', 'triceps'],
     },
     secondaryGroups: ['back', 'shoulders', 'triceps'],
+    pattern: 'carry',
   },
   'bb-turkish-get-up': {
     name: 'Barbell Turkish Get-Up',
@@ -1374,6 +1560,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
       secondary: ['frontDelts', 'sideDelts', 'glutes', 'triceps', 'forearms'],
     },
     secondaryGroups: ['shoulders', 'triceps', 'forearms', 'glutes'],
+    pattern: 'get_up',
   },
   'bw-push-up': {
     name: 'Push-Up',
@@ -1381,6 +1568,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'bodyweight',
     highlight: { primary: ['chest'], secondary: ['triceps', 'frontDelts', 'abs'] },
     secondaryGroups: ['shoulders', 'triceps', 'core'],
+    pattern: 'horizontal_push',
   },
   'bw-pull-up': {
     name: 'Pull-Up',
@@ -1388,6 +1576,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'bodyweight',
     highlight: { primary: ['lats'], secondary: ['biceps', 'upperBack', 'rearDelts', 'forearms'] },
     secondaryGroups: ['shoulders', 'biceps', 'forearms'],
+    pattern: 'vertical_pull',
   },
   'bw-weighted-pull-up': {
     name: 'Weighted Pull-Up',
@@ -1395,6 +1584,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'other',
     highlight: { primary: ['lats'], secondary: ['biceps', 'upperBack', 'rearDelts', 'forearms'] },
     secondaryGroups: ['shoulders', 'biceps', 'forearms'],
+    pattern: 'vertical_pull',
   },
   'bw-dead-hang': {
     name: 'Dead Hang',
@@ -1402,6 +1592,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'bodyweight',
     highlight: { primary: ['forearms'], secondary: ['lats'] },
     secondaryGroups: ['back'],
+    pattern: 'hold',
   },
   'bw-nordic-hamstring-curl': {
     name: 'Nordic Hamstring Curl',
@@ -1409,6 +1600,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'bodyweight',
     highlight: { primary: ['hamstrings'], secondary: ['glutes', 'calves'] },
     secondaryGroups: ['glutes', 'calves'],
+    pattern: 'hip_extension',
   },
   'bw-plank': {
     name: 'Plank',
@@ -1416,6 +1608,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'bodyweight',
     highlight: { primary: ['abs'], secondary: ['obliques', 'frontDelts', 'glutes'] },
     secondaryGroups: ['shoulders', 'glutes'],
+    pattern: 'anti_extension',
   },
   'bw-hanging-leg-raise': {
     name: 'Hanging Leg Raise',
@@ -1423,6 +1616,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'bodyweight',
     highlight: { primary: ['abs'], secondary: ['obliques', 'forearms'] },
     secondaryGroups: ['forearms'],
+    pattern: 'core_flexion',
   },
   'bw-sit-up': {
     name: 'Sit-Up',
@@ -1430,6 +1624,7 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'bodyweight',
     highlight: { primary: ['abs'], secondary: ['obliques'] },
     secondaryGroups: [],
+    pattern: 'core_flexion',
   },
   'bw-ab-wheel-rollout': {
     name: 'Ab Wheel Rollout',
@@ -1437,5 +1632,6 @@ export const BUILTIN_CATALOG: Record<string, BuiltinCatalogEntry> = {
     equipment: 'other',
     highlight: { primary: ['abs'], secondary: ['lats', 'obliques', 'triceps'] },
     secondaryGroups: ['back', 'triceps'],
+    pattern: 'anti_extension',
   },
 };
