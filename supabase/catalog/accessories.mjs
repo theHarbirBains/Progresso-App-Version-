@@ -834,6 +834,7 @@ export default [
   trx({
     slug: 'st-row',
     name: 'Suspension Trainer Row',
+    retired: true,
     muscle: 'back',
     pattern: 'horizontal_pull',
     highlight: { primary: ['upperBack', 'lats'], secondary: ['biceps', 'rearDelts', 'abs'] },
