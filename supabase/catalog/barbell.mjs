@@ -2098,6 +2098,7 @@ export default [
   {
     slug: 'bb-side-bend',
     name: 'Barbell Side Bend',
+    retired: true,
     equipment: 'barbell',
     muscle: 'core',
     highlight: { primary: ['obliques'], secondary: ['lowerBack'] },
