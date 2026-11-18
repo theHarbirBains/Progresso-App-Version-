@@ -1052,6 +1052,7 @@ export default [
   {
     slug: 'br-slams',
     name: 'Battle Rope Slams',
+    retired: true,
     equipment: 'other',
     attachment: 'Battle ropes',
     measure: 'timed',
