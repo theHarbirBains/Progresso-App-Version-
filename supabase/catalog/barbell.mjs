@@ -650,6 +650,7 @@ export default [
   {
     slug: 'bb-behind-the-neck-press',
     name: 'Behind-the-Neck Press',
+    retired: true,
     equipment: 'barbell',
     muscle: 'shoulders',
     highlight: {
