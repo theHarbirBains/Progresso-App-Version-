@@ -21,6 +21,7 @@ import { readExerciseGuide, type ExerciseGuide } from './builtinExtras';
 import type { Equipment } from './equipment';
 import { BUILTIN_GUIDES, type TechniqueCard } from './illustrations/builtinGuides.generated';
 import { TechniqueVisual } from './illustrations/TechniqueVisuals';
+import { hasRenders, RenderedPhases } from './illustrations/RenderedPhases';
 import { ExercisePhases, MuscleFigures } from './illustrations/ExerciseIllustration';
 import { guidePhases, hasIllustration, muscleMapFor } from './illustrations/exerciseArt';
 import { MUSCLE_GROUP_LABELS } from './muscleGroups';
@@ -403,7 +404,12 @@ function HowToPage({
         </AppCard>
       ) : drawn ? (
         <AppCard testID={`${testID}-illustration-card`}>
-          <ExercisePhases slug={guide.slug} accent={accent} testID={`${testID}-illustration`} />
+          {/* Rendered 3D phases where the exercise has them (the Blender pipeline), else the drawing. */}
+          {hasRenders(guide.slug) ? (
+            <RenderedPhases slug={guide.slug} accent={accent} testID={`${testID}-illustration`} />
+          ) : (
+            <ExercisePhases slug={guide.slug} accent={accent} testID={`${testID}-illustration`} />
+          )}
         </AppCard>
       ) : null}
 

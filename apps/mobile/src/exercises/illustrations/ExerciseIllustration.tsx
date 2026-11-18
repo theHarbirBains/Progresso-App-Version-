@@ -4,7 +4,9 @@ import { Feather } from '@expo/vector-icons';
 import Svg, { ClipPath, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { Text } from '../../design/Text';
 import { colors, radii, spacing, typeScale } from '../../design/theme';
+import { Image } from 'expo-image';
 import { BUILTIN_CATALOG } from './builtinCatalog.generated';
+import { EXERCISE_RENDERS } from './renders.generated';
 import {
   guidePhases,
   illustrationFor,
@@ -321,7 +323,20 @@ export const ExerciseThumbnail = memo(function ExerciseThumbnail({
   testID?: string;
 }) {
   const prefix = usePrefix();
-  const scene = thumbnailFor(slug);
+  const rendered = EXERCISE_RENDERS[slug];
+  const scene = rendered ? null : thumbnailFor(slug);
+  if (rendered) {
+    // A rendered exercise shows its movement's end position, filling the circle.
+    return (
+      <View testID={testID} style={{ width: size, height: size }}>
+        <Image
+          source={rendered[rendered.length - 1]}
+          style={{ width: size, height: size, transform: [{ scale: 1.35 }] }}
+          contentFit="cover"
+        />
+      </View>
+    );
+  }
   if (!scene) return null;
   // Square the view box around the drawing so it sits centred in the circle.
   const vb = scene.viewBox;

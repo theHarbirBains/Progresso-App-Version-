@@ -10,6 +10,8 @@ import { ExerciseDetailsCard } from './ExerciseDetailsCard';
 import { ExerciseGuideSheet } from './ExerciseGuideSheet';
 import { ExercisePhoto } from './ExercisePhoto';
 import { HowToPill } from './HowToPill';
+import { hasRenders, RenderedPhases } from './illustrations/RenderedPhases';
+import { EXERCISE_RENDERS } from './illustrations/renders.generated';
 import { removeOwnPhoto, saveOwnPhoto, setOwnPhotoSource, type OwnPhotoSource } from './ownPhotos';
 
 jest.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
@@ -109,9 +111,9 @@ describe('ExerciseGuideSheet', () => {
     expect(within(secondary).getByText('Shoulders')).toBeTruthy();
     expect(within(secondary).getByText('Triceps')).toBeTruthy();
     // Exactly three phases -- the setup, the movement, the way back -- each a numbered row.
-    expect(screen.getByTestId('exercise-guide-illustration-label-0')).toHaveTextContent('Setup');
-    expect(screen.getByTestId('exercise-guide-illustration-label-1')).toHaveTextContent('Press');
-    expect(screen.getByTestId('exercise-guide-illustration-label-2')).toHaveTextContent('Lower');
+    expect(screen.getByTestId('exercise-guide-illustration-label-0')).toHaveTextContent(/Setup/);
+    expect(screen.getByTestId('exercise-guide-illustration-label-1')).toHaveTextContent(/Press/);
+    expect(screen.getByTestId('exercise-guide-illustration-label-2')).toHaveTextContent(/Lower/);
     expect(screen.queryByTestId('exercise-guide-illustration-label-3')).toBeNull();
     expect(screen.getByTestId('exercise-guide-step-0')).toHaveTextContent(/Setup.*Sit on the end/);
     expect(screen.getByTestId('exercise-guide-step-1')).toHaveTextContent(
@@ -423,5 +425,40 @@ describe('a photo of your own machine for a built-in', () => {
       await removeOwnPhoto('bench-id');
     });
     expect(screen.getByTestId('photo-illustration')).toBeTruthy();
+  });
+});
+
+describe('RenderedPhases (the 3D renders)', () => {
+  it('shows a rendered exercise large, stepping through its three phases, and holds the one tapped', async () => {
+    jest.useFakeTimers();
+    render(<RenderedPhases slug="db-bench-press" accent="#D99A50" testID="phases" />);
+    const label = (i: number) => screen.getByTestId(`phases-label-${i}`);
+    expect(label(0).props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByTestId('phases-image').props.source).toBe(
+      EXERCISE_RENDERS['db-bench-press'][0],
+    );
+
+    act(() => jest.advanceTimersByTime(1700));
+    expect(label(1).props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByTestId('phases-image').props.source).toBe(
+      EXERCISE_RENDERS['db-bench-press'][1],
+    );
+
+    // The way back is drawn from the setup's frame.
+    fireEvent.press(label(2));
+    act(() => jest.advanceTimersByTime(5000));
+    expect(label(2).props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByTestId('phases-image').props.source).toBe(
+      EXERCISE_RENDERS['db-bench-press'][0],
+    );
+    jest.useRealTimers();
+  });
+
+  it('is only for the exercises that have been rendered; the rest keep their drawings', () => {
+    expect(hasRenders('db-bench-press')).toBe(true);
+    expect(hasRenders('pl-leg-press')).toBe(true);
+    expect(hasRenders('pl-t-bar-row')).toBe(true);
+    expect(hasRenders('bb-back-squat')).toBe(false);
+    for (const frames of Object.values(EXERCISE_RENDERS)) expect(frames.length).toBe(2);
   });
 });
