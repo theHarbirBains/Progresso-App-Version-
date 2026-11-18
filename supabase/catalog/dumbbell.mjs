@@ -2183,6 +2183,7 @@ export default [
   {
     slug: 'db-donkey-calf-raise',
     name: 'Dumbbell Donkey Calf Raise',
+    retired: true,
     equipment: 'dumbbell',
     muscle: 'calves',
     highlight: { primary: ['calves'], secondary: [] },
