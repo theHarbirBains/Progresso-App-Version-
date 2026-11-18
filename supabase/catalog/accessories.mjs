@@ -673,6 +673,7 @@ export default [
   band({
     slug: 'bd-pull-apart',
     name: 'Band Pull-Apart',
+    retired: true,
     muscle: 'shoulders',
     pattern: 'fly',
     highlight: { primary: ['rearDelts'], secondary: ['upperBack', 'traps'] },
