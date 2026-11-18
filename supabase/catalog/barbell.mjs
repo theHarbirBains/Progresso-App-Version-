@@ -1423,6 +1423,7 @@ export default [
   {
     slug: 'bb-zercher-squat',
     name: 'Zercher Squat',
+    retired: true,
     equipment: 'barbell',
     muscle: 'quadriceps',
     highlight: { primary: ['quads', 'glutes'], secondary: ['abs', 'upperBack', 'biceps'] },
