@@ -1262,6 +1262,7 @@ export default [
   {
     slug: 'bb-static-hold',
     name: 'Barbell Static Hold',
+    retired: true,
     equipment: 'barbell',
     muscle: 'forearms',
     measure: 'timed',
