@@ -328,6 +328,7 @@ export default [
   bw({
     slug: 'bw-jump-squat',
     name: 'Jump Squat',
+    retired: true,
     muscle: 'quadriceps',
     pattern: 'conditioning',
     action: 'Jump',
@@ -345,6 +346,7 @@ export default [
   {
     slug: 'bw-box-jump',
     name: 'Box Jump',
+    retired: true,
     equipment: 'other',
     measure: 'bodyweight',
     muscle: 'quadriceps',
@@ -606,6 +608,7 @@ export default [
   bw({
     slug: 'bw-mountain-climber',
     name: 'Mountain Climber',
+    retired: true,
     muscle: 'core',
     pattern: 'conditioning',
     measure: 'timed',
@@ -933,6 +936,7 @@ export default [
   {
     slug: 'mb-slam',
     name: 'Medicine Ball Slam',
+    retired: true,
     equipment: 'other',
     attachment: 'Medicine ball',
     muscle: 'core',
@@ -959,6 +963,7 @@ export default [
   {
     slug: 'mb-wall-ball',
     name: 'Wall Ball',
+    retired: true,
     equipment: 'other',
     attachment: 'Medicine ball',
     muscle: 'quadriceps',
@@ -1029,6 +1034,7 @@ export default [
   {
     slug: 'br-waves',
     name: 'Battle Rope Waves',
+    retired: true,
     equipment: 'other',
     attachment: 'Battle ropes',
     measure: 'timed',
@@ -1076,6 +1082,7 @@ export default [
   {
     slug: 'sl-push',
     name: 'Sled Push',
+    retired: true,
     equipment: 'other',
     attachment: 'Sled',
     measure: 'timed',
@@ -1102,6 +1109,7 @@ export default [
   {
     slug: 'sl-drag',
     name: 'Sled Drag',
+    retired: true,
     equipment: 'other',
     attachment: 'Sled',
     measure: 'timed',
