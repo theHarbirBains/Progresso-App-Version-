@@ -47,3 +47,7 @@ Thumbs.db
 
 # Supabase CLI local state
 supabase/.temp/
+
+# The 3D render pipeline's working files (renders, assets): never uploaded with a build either --
+# EAS reads only this root file.
+tools/exercise-renders/work/

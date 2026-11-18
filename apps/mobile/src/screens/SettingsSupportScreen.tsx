@@ -57,13 +57,24 @@ export function SettingsSupportScreen({ navigation }: Props) {
       </Section>
 
       <Section title="About">
-        <ListRow
-          testID="about-progresso"
-          icon="info"
-          title="About Progresso"
-          value={aboutValue || undefined}
-          chevron={false}
-        />
+        <View>
+          <ListRow
+            testID="about-progresso"
+            icon="info"
+            title="About Progresso"
+            value={aboutValue || undefined}
+            chevron={false}
+          />
+          {/* The exercise renders' 3D figure is Microsoft Rocketbox, MIT licensed: its notice. */}
+          <ListRow
+            testID="about-credits"
+            icon="award"
+            title="Credits"
+            subtitle="3D exercise figure: Microsoft Rocketbox, © Microsoft Corporation, MIT License"
+            chevron={false}
+            divider
+          />
+        </View>
       </Section>
     </Screen>
   );

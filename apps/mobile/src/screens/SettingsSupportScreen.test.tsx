@@ -67,6 +67,10 @@ describe('SettingsSupportScreen', () => {
 
     expect(screen.getByTestId('about-progresso')).toHaveTextContent(/Version 1\.2\.3/);
     expect(screen.getByTestId('about-progresso')).toHaveTextContent(/Build 45/);
+    // The 3D exercise figure's licence notice.
+    expect(screen.getByTestId('about-credits')).toHaveTextContent(
+      /Microsoft Rocketbox.*MIT License/,
+    );
   });
 
   it('shows no version/build line at all when neither is available, rather than "undefined"', () => {
