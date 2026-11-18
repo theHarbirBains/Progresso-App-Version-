@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { AppHeader } from '../design/AppHeader';
 import { Screen } from '../design/Screen';
@@ -67,6 +67,13 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
   // Once the list has shown, a change of filter keeps it on screen until the new rows are in (they
   // come from memory, at once) -- swapping it for placeholders would rebuild every row and picture.
   const listShown = useRef(false);
+  // The source and equipment the rows on screen were read for: while either differs from what's
+  // chosen, the list fades softly (ExerciseBrowser's `updating`). Only the newest read is kept.
+  const [readFor, setReadFor] = useState<{ source: ExerciseSource; equipment: Equipment | null }>({
+    source: 'all',
+    equipment: null,
+  });
+  const readNumber = useRef(0);
   const [error, setError] = useState<string | null>(null);
   // Real, independent per-source totals for the "All / Built-in / Mine"
   // category cards (see fetchExerciseSourceCounts) -- never fabricated, and
@@ -83,6 +90,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
     if (!userId) return;
     if (!listShown.current) setLoading(true);
     setError(null);
+    const thisRead = ++readNumber.current;
     try {
       const result = await fetchAllExercises({
         userId,
@@ -93,7 +101,15 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         shared: sharedRows,
         equipment,
       });
-      setRows(result);
+      if (thisRead !== readNumber.current) return;
+      const show = () => {
+        setRows(result);
+        setReadFor({ source, equipment });
+      };
+      // A filter's new list renders in the background, so a tab or chip changes the moment it's
+      // tapped; the first one lands at once, with the placeholders going.
+      if (listShown.current) startTransition(show);
+      else show();
       listShown.current = true;
     } catch (err) {
       listShown.current = false;
@@ -205,6 +221,7 @@ export function ExerciseLibraryScreen({ navigation }: Props) {
         sourceCounts={sourceCounts}
         rows={rows}
         loading={loading}
+        updating={readFor.source !== source || readFor.equipment !== equipment}
         // Friends is only what's shared, so a failure to read it is the tab's own.
         error={source === 'friends' ? (shared.error ?? error) : error}
         onRetry={source === 'friends' && shared.error ? shared.reload : load}

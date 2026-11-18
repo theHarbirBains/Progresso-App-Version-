@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { updateExercise } from '../lib/api';
 import { Alert, Modal, View } from 'react-native';
@@ -109,6 +109,12 @@ export function ExercisePickerModal({
   const [photoOpen, setPhotoOpen] = useState<string | null>(null);
   // Bumped by Retry to load the exercises again.
   const [attempt, setAttempt] = useState(0);
+  // The source and equipment the rows on screen were read for: while either differs from what's
+  // chosen, the list fades softly (ExerciseBrowser's `updating`).
+  const [readFor, setReadFor] = useState<{ source: ExerciseSource; equipment: Equipment | null }>({
+    source: 'all',
+    equipment: null,
+  });
 
   useEffect(() => {
     if (!visible || !userId) return;
@@ -126,7 +132,14 @@ export function ExercisePickerModal({
     })
       .then((result) => {
         if (cancelled) return;
-        setRows(result);
+        const show = () => {
+          setRows(result);
+          setReadFor({ source, equipment });
+        };
+        // A filter's new list renders in the background, so a tab or chip changes the moment it's
+        // tapped; the first one lands at once, with the placeholders going.
+        if (listShown.current) startTransition(show);
+        else show();
         listShown.current = true;
       })
       .catch((err: unknown) => {
@@ -260,6 +273,7 @@ export function ExercisePickerModal({
             sourceCounts={sourceCounts}
             rows={rows}
             loading={loading}
+            updating={readFor.source !== source || readFor.equipment !== equipment}
             error={source === 'friends' ? (shared.error ?? error) : error}
             onRetry={() => {
               if (source === 'friends' && shared.error) shared.reload();

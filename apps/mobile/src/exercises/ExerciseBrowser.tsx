@@ -10,6 +10,7 @@ import {
 import {
   Alert,
   Animated,
+  Easing,
   SectionList,
   TouchableOpacity,
   View,
@@ -66,6 +67,11 @@ interface Props {
   sourceCounts: ExerciseSourceCounts | null;
   rows: ExerciseRow[];
   loading: boolean;
+  /**
+   * The rows for a source or equipment just tapped are on their way (the caller's read): the list
+   * fades softly until they're in, as it does for a muscle.
+   */
+  updating?: boolean;
   error: string | null;
   onRetry: () => void;
   /** The Workout accent, and its soft fill for the selected source tab. */
@@ -120,6 +126,7 @@ export function ExerciseBrowser({
   sourceCounts,
   rows,
   loading,
+  updating = false,
   error,
   onRetry,
   accent,
@@ -143,9 +150,10 @@ export function ExerciseBrowser({
   const inFriends = source === 'friends';
   // The muscle filter is applied here, to the rows already in hand -- never a new read. The chip
   // changes the moment it's tapped; the list (rows with a drawing each) follows as a deferred
-  // render that never holds up a tap, dimmed while it's on its way.
+  // render that never holds up a tap. Any filter on its way -- a muscle, or the caller's rows for a
+  // source or equipment -- fades the list down a touch and lifts it back in as the new rows land.
   const listedMuscle = useDeferredValue(muscleGroup);
-  const switching = listedMuscle !== muscleGroup;
+  const switching = listedMuscle !== muscleGroup || updating;
   const shownRows = useMemo(
     () =>
       rows.filter(
@@ -158,11 +166,13 @@ export function ExerciseBrowser({
   const fade = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     Animated.timing(fade, {
-      toValue: switching ? 0.35 : 1,
-      duration: switching ? 80 : 180,
+      toValue: switching ? 0.4 : 1,
+      duration: switching ? 90 : 220,
+      easing: switching ? Easing.out(Easing.quad) : Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
   }, [switching, fade]);
+  const lift = fade.interpolate({ inputRange: [0.4, 1], outputRange: [6, 0] });
 
   // The one row showing Delete, if any; and whether a row is being swiped, when the list holds
   // its scroll still.
@@ -445,7 +455,7 @@ export function ExerciseBrowser({
         ) : (
           <Animated.View
             testID={`${testID}-results`}
-            style={[styles.flex, { opacity: fade }]}
+            style={[styles.flex, { opacity: fade, transform: [{ translateY: lift }] }]}
             accessibilityState={{ busy: switching }}
           >
             <SectionList
