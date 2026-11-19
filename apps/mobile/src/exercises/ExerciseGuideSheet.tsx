@@ -192,6 +192,7 @@ export function ExerciseGuideSheet({
                 testID={`${testID}-card-page-${i}`}
               />
             ))}
+            pagesHeight={(width) => cardsHeight(cards, width)}
             accent={accent}
           />
         ) : shown && !error ? (
@@ -290,16 +291,20 @@ function TitleRow({
 
 /**
  * The guide's pages side by side, swiped between (How to Do It, then Technique & Setup), with the
- * page dots under them -- the current one in the accent -- and a chevron either side to step.
+ * page dots under them -- the current one in the accent -- and a chevron either side to step. Pages
+ * of a set height (`pagesHeight`, for a page that wide) are only that tall, so the dots sit right
+ * under them; the rest fill the sheet.
  */
 function Pager({
   pages,
   accent,
   testID,
+  pagesHeight,
 }: {
   pages: React.ReactNode[];
   accent: string;
   testID: string;
+  pagesHeight?: (width: number) => number;
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const [measured, setMeasured] = useState(0);
@@ -316,6 +321,8 @@ function Pager({
       <ScrollView
         ref={scroller}
         testID={`${testID}-pages`}
+        // As tall as they are, as far as there's room (a ScrollView shrinks to fit).
+        style={pagesHeight ? { flexGrow: 0, height: pagesHeight(width) } : undefined}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -374,13 +381,19 @@ function Pager({
   );
 }
 
+/** How tall an exercise's cards are on a page this wide: the taller of its two, at its own shape. */
+function cardsHeight(cards: readonly GuideCardPage[], pageWidth: number): number {
+  return Math.max(...cards.map((page) => Math.ceil((pageWidth - 2 * CARD_GUTTER) / page.aspect)));
+}
+
 /**
- * One of an exercise's own cards, the whole page: as large as fits, never cropped, centred, and
- * pinched to zoom in on its smaller print.
+ * One of an exercise's own cards, the whole page: the page's full width at the card's own shape,
+ * from the top, scrolled if it's ever taller than the room there is -- never shrunk, stretched or
+ * cropped -- and pinched to zoom in on its smaller print.
  */
 function CardPage({ page, label, testID }: { page: GuideCardPage; label: string; testID: string }) {
-  const [box, setBox] = useState({ width: 0, height: 0 });
-  const width = Math.min(box.width - 2 * spacing.lg, box.height * page.aspect);
+  const [pageWidth, setPageWidth] = useState(0);
+  const width = pageWidth - 2 * CARD_GUTTER;
   return (
     <ScrollView
       testID={`${testID}-zoom`}
@@ -390,7 +403,7 @@ function CardPage({ page, label, testID }: { page: GuideCardPage; label: string;
       minimumZoomScale={1}
       showsVerticalScrollIndicator={false}
       showsHorizontalScrollIndicator={false}
-      onLayout={(e) => setBox(e.nativeEvent.layout)}
+      onLayout={(e) => setPageWidth(e.nativeEvent.layout.width)}
     >
       {width > 0 ? (
         <Image
@@ -584,6 +597,8 @@ function CueList({
 
 /** A Technique & Setup card's picture, square. */
 const TECHNIQUE_PICTURE = 112;
+/** Either side of an exercise's own card: it has its own border and dark margin. */
+const CARD_GUTTER = spacing.sm;
 
 const styles = StyleSheet.create({
   pager: {
@@ -593,9 +608,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardContent: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: CARD_GUTTER,
   },
   dots: {
     flexDirection: 'row',

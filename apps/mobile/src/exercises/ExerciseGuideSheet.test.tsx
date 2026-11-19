@@ -562,16 +562,38 @@ describe("an exercise's own guide cards", () => {
     );
   });
 
-  it('fit the page whole, by its width or, on a short page, its height', async () => {
+  it("fill an iPhone's width at their own shape, from the top, and are never shrunk to fit", async () => {
     open();
     await screen.findByTestId('exercise-guide-card-page-0-zoom');
-    const { aspect } = GUIDE_CARDS['bb-back-squat'][0];
-    const size = () => screen.getByTestId('exercise-guide-card-page-0').props.style;
-    // Its width, less the margins either side.
-    measure('exercise-guide-card-page-0-zoom', 390, 640);
-    expect(size()).toEqual({ width: 358, height: 358 / aspect });
-    measure('exercise-guide-card-page-0-zoom', 390, 300);
-    expect(size()).toEqual({ width: 300 * aspect, height: 300 });
+    const [first, second] = GUIDE_CARDS['bb-back-squat'];
+    const size = (i: number) => screen.getByTestId(`exercise-guide-card-page-${i}`).props.style;
+    // An iPhone 15's page: 393 wide, less a gutter of 8 either side.
+    measure('exercise-guide-card-page-0-zoom', 393, 640);
+    measure('exercise-guide-card-page-1-zoom', 393, 640);
+    expect(size(0)).toEqual({ width: 377, height: 377 / first.aspect });
+    expect(size(1)).toEqual({ width: 377, height: 377 / second.aspect });
+    // A short page keeps the card's size and scrolls, rather than shrinking it.
+    measure('exercise-guide-card-page-0-zoom', 393, 200);
+    expect(size(0)).toEqual({ width: 377, height: 377 / first.aspect });
+    // Nothing centres it: it starts at the top, the gutters its only margin.
+    expect(
+      screen.getByTestId('exercise-guide-card-page-0-zoom').props.contentContainerStyle,
+    ).toEqual({ paddingHorizontal: 8 });
+  });
+
+  it('are only as tall as the taller card, so the page dots sit right under them', async () => {
+    open();
+    await screen.findByTestId('exercise-guide-card-page-0-zoom');
+    fireEvent(screen.getByTestId('exercise-guide-pages').parent!, 'layout', {
+      nativeEvent: { layout: { width: 393, height: 700, x: 0, y: 0 } },
+    });
+    const tallest = Math.max(
+      ...GUIDE_CARDS['bb-back-squat'].map((page) => Math.ceil(377 / page.aspect)),
+    );
+    expect(screen.getByTestId('exercise-guide-pages').props.style).toEqual({
+      flexGrow: 0,
+      height: tallest,
+    });
   });
 
   it("say what's on them to VoiceOver, in the guide's own words", async () => {

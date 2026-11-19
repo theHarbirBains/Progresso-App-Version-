@@ -10,61 +10,61 @@ export interface GuideCardPage {
 
 export const GUIDE_CARDS: Record<string, readonly [GuideCardPage, GuideCardPage]> = {
   'bb-back-squat': [
-    { image: require('../../../assets/guide-cards/bb-back-squat_1.webp'), aspect: 0.7329 },
-    { image: require('../../../assets/guide-cards/bb-back-squat_2.webp'), aspect: 0.885 },
+    { image: require('../../../assets/guide-cards/bb-back-squat_1.webp'), aspect: 0.732 },
+    { image: require('../../../assets/guide-cards/bb-back-squat_2.webp'), aspect: 0.8875 },
   ],
   'bb-bench-press': [
-    { image: require('../../../assets/guide-cards/bb-bench-press_1.webp'), aspect: 0.7568 },
-    { image: require('../../../assets/guide-cards/bb-bench-press_2.webp'), aspect: 0.9055 },
+    { image: require('../../../assets/guide-cards/bb-bench-press_1.webp'), aspect: 0.7324 },
+    { image: require('../../../assets/guide-cards/bb-bench-press_2.webp'), aspect: 0.8914 },
   ],
   'bb-bulgarian-split-squat': [
     {
       image: require('../../../assets/guide-cards/bb-bulgarian-split-squat_1.webp'),
-      aspect: 0.7048,
+      aspect: 0.7241,
     },
     {
       image: require('../../../assets/guide-cards/bb-bulgarian-split-squat_2.webp'),
-      aspect: 0.8433,
+      aspect: 0.8813,
     },
   ],
   'bb-curl': [
-    { image: require('../../../assets/guide-cards/bb-curl_1.webp'), aspect: 0.7318 },
-    { image: require('../../../assets/guide-cards/bb-curl_2.webp'), aspect: 0.8756 },
+    { image: require('../../../assets/guide-cards/bb-curl_1.webp'), aspect: 0.7303 },
+    { image: require('../../../assets/guide-cards/bb-curl_2.webp'), aspect: 0.8889 },
   ],
   'bb-deadlift': [
-    { image: require('../../../assets/guide-cards/bb-deadlift_1.webp'), aspect: 0.7214 },
-    { image: require('../../../assets/guide-cards/bb-deadlift_2.webp'), aspect: 0.8632 },
+    { image: require('../../../assets/guide-cards/bb-deadlift_1.webp'), aspect: 0.7386 },
+    { image: require('../../../assets/guide-cards/bb-deadlift_2.webp'), aspect: 0.899 },
   ],
   'bb-standing-calf-raise': [
-    { image: require('../../../assets/guide-cards/bb-standing-calf-raise_1.webp'), aspect: 0.7339 },
-    { image: require('../../../assets/guide-cards/bb-standing-calf-raise_2.webp'), aspect: 0.8781 },
+    { image: require('../../../assets/guide-cards/bb-standing-calf-raise_1.webp'), aspect: 0.7261 },
+    { image: require('../../../assets/guide-cards/bb-standing-calf-raise_2.webp'), aspect: 0.8838 },
   ],
   'bw-ab-wheel-rollout': [
-    { image: require('../../../assets/guide-cards/bw-ab-wheel-rollout_1.webp'), aspect: 0.9372 },
-    { image: require('../../../assets/guide-cards/bw-ab-wheel-rollout_2.webp'), aspect: 1.0585 },
+    { image: require('../../../assets/guide-cards/bw-ab-wheel-rollout_1.webp'), aspect: 0.9134 },
+    { image: require('../../../assets/guide-cards/bw-ab-wheel-rollout_2.webp'), aspect: 1.1474 },
   ],
   'bw-back-extension': [
-    { image: require('../../../assets/guide-cards/bw-back-extension_1.webp'), aspect: 0.7226 },
-    { image: require('../../../assets/guide-cards/bw-back-extension_2.webp'), aspect: 0.8725 },
+    { image: require('../../../assets/guide-cards/bw-back-extension_1.webp'), aspect: 0.7258 },
+    { image: require('../../../assets/guide-cards/bw-back-extension_2.webp'), aspect: 0.88 },
   ],
   'db-alternating-curl': [
-    { image: require('../../../assets/guide-cards/db-alternating-curl_1.webp'), aspect: 0.9427 },
-    { image: require('../../../assets/guide-cards/db-alternating-curl_2.webp'), aspect: 1.0647 },
+    { image: require('../../../assets/guide-cards/db-alternating-curl_1.webp'), aspect: 0.9134 },
+    { image: require('../../../assets/guide-cards/db-alternating-curl_2.webp'), aspect: 1.15 },
   ],
   'mc-ab-crunch': [
-    { image: require('../../../assets/guide-cards/mc-ab-crunch_1.webp'), aspect: 0.9427 },
-    { image: require('../../../assets/guide-cards/mc-ab-crunch_2.webp'), aspect: 1.0647 },
+    { image: require('../../../assets/guide-cards/mc-ab-crunch_1.webp'), aspect: 0.9134 },
+    { image: require('../../../assets/guide-cards/mc-ab-crunch_2.webp'), aspect: 1.1474 },
   ],
   'mc-assisted-dip': [
-    { image: require('../../../assets/guide-cards/mc-assisted-dip_1.webp'), aspect: 0.7391 },
-    { image: require('../../../assets/guide-cards/mc-assisted-dip_2.webp'), aspect: 0.8925 },
+    { image: require('../../../assets/guide-cards/mc-assisted-dip_1.webp'), aspect: 0.7402 },
+    { image: require('../../../assets/guide-cards/mc-assisted-dip_2.webp'), aspect: 0.8975 },
   ],
   'mc-assisted-pull-up': [
-    { image: require('../../../assets/guide-cards/mc-assisted-pull-up_1.webp'), aspect: 0.7205 },
-    { image: require('../../../assets/guide-cards/mc-assisted-pull-up_2.webp'), aspect: 0.87 },
+    { image: require('../../../assets/guide-cards/mc-assisted-pull-up_1.webp'), aspect: 0.7237 },
+    { image: require('../../../assets/guide-cards/mc-assisted-pull-up_2.webp'), aspect: 0.8775 },
   ],
   'mc-back-extension': [
-    { image: require('../../../assets/guide-cards/mc-back-extension_1.webp'), aspect: 0.7184 },
-    { image: require('../../../assets/guide-cards/mc-back-extension_2.webp'), aspect: 0.8675 },
+    { image: require('../../../assets/guide-cards/mc-back-extension_1.webp'), aspect: 0.7237 },
+    { image: require('../../../assets/guide-cards/mc-back-extension_2.webp'), aspect: 0.8775 },
   ],
 };

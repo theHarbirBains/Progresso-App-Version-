@@ -7,11 +7,12 @@ mapping each exercise's slug to them, formatted by the repo's Prettier.
 
 The cards come from <source_dir> (kept outside the repo): a sheet named in cards.json is a grid of
 exercises side by side, page 1 along the top and page 2 under it, a column for each exercise listed,
-in order (null for a column to skip). It's cut between its cards -- on the thin line drawn across the
-sheet between them where there is one, else in the middle of the dark gap between them. A file
-<slug>_1.png or <slug>_2.png (or .jpg, .webp) in the same folder takes that page's place, for a card
-made on its own at full size. Every slug must be an active built-in, listed once. A card is never made larger than it was drawn, only smaller past
-MAX_WIDTH. Files of exercises no longer listed are removed."""
+in order (null for a column to skip). It's cut between its cards -- on the thin lines drawn across a
+sheet put together from screenshots; else in the gaps, each card then trimmed to its own border. A
+file <slug>_1.png or <slug>_2.png (or .jpg, .webp) in the same folder takes that page's place, for a
+card made on its own at full size. Every slug must be an active built-in, listed once. A card is
+never made larger than it was drawn, only smaller past MAX_WIDTH. Files of exercises no longer
+listed are removed."""
 import json
 import os
 import re
@@ -28,13 +29,20 @@ ASSETS = os.path.join(ROOT, 'apps', 'mobile', 'assets', 'guide-cards')
 ILLUSTRATIONS = os.path.join(ROOT, 'apps', 'mobile', 'src', 'exercises', 'illustrations')
 GENERATED = os.path.join(ILLUSTRATIONS, 'guideCards.generated.ts')
 ROWS = 2
-# How far either side of the cut between two cards is left out, px.
-LINE = 3
+# How far from an even split the cut between two rows or two columns can be, as a share of a card:
+# page 1 is taller than page 2, and every card's about as wide as the next.
+ROW_REACH, COLUMN_REACH = 0.35, 0.25
 # A line drawn across the whole sheet is at least this bright end to end (0-255); a card's own
 # border isn't, since it stops at the gap between two rows or columns.
 DRAWN = 35
-# The gap between two cards with no line in it is at least this wide, px.
-GAP = 7
+# A line of pixels through a card crosses its border, so its brightest are at least this bright
+# (0-255); one through the gap between cards, or the space around them, crosses nothing.
+EDGE = 48
+# The most trimmed off a side of a card, down to its border, px.
+MOST_TRIMMED = 60
+# How far from an even split a line between two cards of a sheet put together from screenshots is
+# (they're laid out evenly), px.
+SNAP = 12
 # An iPhone's widest page in pixels (430 pt at 3x would be 1290; the card sits inside its margins).
 MAX_WIDTH = 1170
 QUALITY = 90
@@ -55,33 +63,83 @@ def own_card(source_dir, slug, page):
     return None
 
 
-def cuts(lines, count, reach):
-    """Where to cut a sheet between its cards, along one side (`lines`: each line of pixels across
-    it): near each even split -- within `reach` of a card, since the cards aren't all one size (page
-    1 is taller than page 2) -- on the brightest line drawn right across the sheet, or with none,
-    in the middle of the darkest gap."""
+def is_lined(grey):
+    """Whether a sheet has lines drawn between its cards (one put together from screenshots): a line
+    drawn right across it between its two rows, bright end to end."""
+    height = len(grey)
+    near = round(height / ROWS * ROW_REACH)
+    return any(np.percentile(grey[y], 2) > DRAWN for y in range(height // 2 - near, height // 2 + near))
+
+
+def separators(lines, count, reach, lined):
+    """Where a sheet's cards part along one side (`lines`: each line of pixels across it), as the
+    first and last line between each two, near each even split (within `reach` of a card). On a sheet with lines drawn between its
+    cards, the line drawn right across it there, or with none (a card covers part of it), the
+    brightest line beside the even split, each with its soft edges; on a sheet without, the darkest
+    line of the gap, where no card's border is crossed."""
     size = len(lines)
     near = round(size / count * reach)
     brightness = lines.mean(axis=1)
     drawn = np.percentile(lines, 2, axis=1) > DRAWN
-    gap = np.convolve(brightness, np.ones(GAP) / GAP, mode='same')
+    # A card's border is a few pixels of a line across the whole sheet: its brightest 0.2%.
+    peak = np.percentile(lines, 99.8, axis=1)
     found = []
     for k in range(1, count):
-        lo, hi = round(k * size / count) - near, round(k * size / count) + near
-        on_line = [i for i in range(lo, hi) if drawn[i]]
-        found.append(max(on_line, key=lambda i: brightness[i]) if on_line
-                     else lo + int(np.argmin(gap[lo:hi])))
+        guess = round(k * size / count)
+        window = range(guess - near, guess + near)
+        if lined:
+            on_line = [i for i in window if drawn[i]] or range(guess - SNAP, guess + SNAP)
+            first = last = max(on_line, key=lambda i: brightness[i])
+            edge = brightness[first] * 0.5
+            while brightness[first - 1] >= edge:
+                first -= 1
+            while brightness[last + 1] >= edge:
+                last += 1
+        else:
+            gap = [i for i in window if peak[i] < EDGE]
+            if not gap:
+                sys.exit(f'no gap between cards near line {guess}')
+            first = last = min(gap, key=lambda i: (peak[i], abs(i - guess)))
+        found.append((first, last))
     return found
 
 
+def trimmed(card):
+    """A card cut down to its own border: the lines around it that cross nothing trimmed off each
+    side, keeping one for the border's soft edge."""
+    grey = np.asarray(card.convert('L'), dtype=float)
+
+    def space(lines):
+        # A line through the card crosses its two borders: its brightest 0.5%.
+        peak = np.percentile(lines, 99.5, axis=1)
+        n = 0
+        while n < MOST_TRIMMED and peak[n] < EDGE:
+            n += 1
+        if n == MOST_TRIMMED:
+            sys.exit('a card has no border to trim to')
+        return max(n - 1, 0)
+
+    left, right = space(grey.T), space(grey.T[::-1])
+    top, bottom = space(grey), space(grey[::-1])
+    return card.crop((left, top, card.width - right, card.height - bottom))
+
+
 def sheet_cards(path, slugs):
-    """Each listed exercise's two pages, cut from a sheet's grid."""
+    """Each listed exercise's two pages, cut from a sheet's grid. A sheet with lines drawn between
+    its cards is cut on them and nothing more (its cards' borders are too faint to trim to); one
+    without, in the gaps, each card then trimmed to its border."""
     sheet = Image.open(path)
     grey = np.asarray(sheet.convert('L'), dtype=float)
-    xs = [-LINE] + cuts(grey.T, len(slugs), 0.25) + [sheet.width + LINE]
-    ys = [-LINE] + cuts(grey, ROWS, 0.35) + [sheet.height + LINE]
-    cut = lambda col, row: sheet.crop((xs[col] + LINE, ys[row] + LINE,
-                                       xs[col + 1] - LINE + 1, ys[row + 1] - LINE + 1))
+    lined = is_lined(grey)
+    across = separators(grey.T, len(slugs), COLUMN_REACH, lined)
+    down = separators(grey, ROWS, ROW_REACH, lined)
+    xs = [0] + [b for first, last in across for b in (first, last + 1)] + [sheet.width]
+    ys = [0] + [b for first, last in down for b in (first, last + 1)] + [sheet.height]
+
+    def cut(col, row):
+        card = sheet.crop((xs[2 * col], ys[2 * row], xs[2 * col + 1], ys[2 * row + 1]))
+        return card if lined else trimmed(card)
+
     return {slug: [cut(col, 0), cut(col, 1)] for col, slug in enumerate(slugs) if slug}
 
 

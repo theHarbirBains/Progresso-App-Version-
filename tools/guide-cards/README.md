@@ -9,8 +9,11 @@ page.
 
 1. Put the images in a folder outside the repo (they're the sources; only the published WebPs are
    committed). A **sheet** is a grid of exercises side by side (three or five so far), page 1 along
-   the top and page 2 under it, its cards parted by a thin line drawn across the sheet or by a dark
-   gap. A card made **on its own** is named for the exercise's slug and page:
+   the top and page 2 under it. One generated whole, its cards parted by a dark gap, is cut in the
+   gaps and each card trimmed to its own border, one pixel kept outside it. One put together from
+   screenshots, with thin lines drawn between its cards, is cut on the lines; its cards' borders
+   are too faint to trim to, so a faint pixel of the line can stay at an edge -- make it again as
+   one image. A card made **on its own** is named for the exercise's slug and page:
    `bb-back-squat_1.png`, `bb-back-squat_2.png` (or `.jpg`, `.webp`), and takes that page's place.
 2. List each sheet in `cards.json`: its file name and a slug for each column, in order (`null` for a
    column to skip). A slug is the catalogue's (`supabase/catalog/*.mjs`). A new sheet for exercises
