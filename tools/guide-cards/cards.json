@@ -1,0 +1,18 @@
+{
+  "sheets": {
+    "1.png": [
+      "mc-ab-crunch",
+      "bw-ab-wheel-rollout",
+      "db-alternating-curl",
+      "db-alternating-front-raise",
+      "db-arnold-press"
+    ],
+    "2.png": [
+      "mc-assisted-dip",
+      "mc-assisted-pull-up",
+      "bw-back-extension",
+      "mc-back-extension",
+      "bb-back-squat"
+    ]
+  }
+}

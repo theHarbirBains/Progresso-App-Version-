@@ -12,8 +12,9 @@ import { ExerciseGuideSheet } from './ExerciseGuideSheet';
 import { ExercisePhoto } from './ExercisePhoto';
 import { HowToPill } from './HowToPill';
 import { illustrationFor } from './illustrations/exerciseArt';
-import { ExerciseThumbnail } from './illustrations/ExerciseIllustration';
-import { hasRenders, RenderedPhases } from './illustrations/RenderedPhases';
+import { BUILTIN_GUIDES } from './illustrations/builtinGuides.generated';
+import { ExercisePhases, ExerciseThumbnail } from './illustrations/ExerciseIllustration';
+import { GUIDE_CARDS } from './illustrations/guideCards.generated';
 import { EXERCISE_RENDERS, RENDER_ANCHORS } from './illustrations/renders.generated';
 import { TechniqueVisual } from './illustrations/TechniqueVisuals';
 import { removeOwnPhoto, saveOwnPhoto, setOwnPhotoSource, type OwnPhotoSource } from './ownPhotos';
@@ -432,36 +433,26 @@ describe('a photo of your own machine for a built-in', () => {
   });
 });
 
-describe('RenderedPhases (the 3D renders)', () => {
-  it('shows a rendered exercise large, stepping through its three phases, and holds the one tapped', async () => {
+describe('the 3D renders', () => {
+  it("shows a rendered exercise's three phases still, side by side", () => {
     jest.useFakeTimers();
-    render(<RenderedPhases slug="db-bench-press" accent="#D99A50" testID="phases" />);
-    const label = (i: number) => screen.getByTestId(`phases-label-${i}`);
-    expect(label(0).props.accessibilityState).toEqual({ selected: true });
-    expect(screen.getByTestId('phases-image').props.source).toBe(
-      EXERCISE_RENDERS['db-bench-press'].frames[0],
-    );
-
-    act(() => jest.advanceTimersByTime(1700));
-    expect(label(1).props.accessibilityState).toEqual({ selected: true });
-    expect(screen.getByTestId('phases-image').props.source).toBe(
-      EXERCISE_RENDERS['db-bench-press'].frames[1],
-    );
-
+    render(<ExercisePhases slug="db-bench-press" accent="#D99A50" testID="phases" />);
+    fireEvent(screen.getByTestId('phases'), 'layout', {
+      nativeEvent: { layout: { width: 320, height: 240, x: 0, y: 0 } },
+    });
+    const frames = EXERCISE_RENDERS['db-bench-press'].frames;
+    const shown = () => [0, 1, 2].map((i) => screen.getByTestId(`phases-render-${i}`).props.source);
     // The way back is drawn from the setup's frame.
-    fireEvent.press(label(2));
-    act(() => jest.advanceTimersByTime(5000));
-    expect(label(2).props.accessibilityState).toEqual({ selected: true });
-    expect(screen.getByTestId('phases-image').props.source).toBe(
-      EXERCISE_RENDERS['db-bench-press'].frames[0],
-    );
+    expect(shown()).toEqual([frames[0], frames[1], frames[0]]);
+    expect(screen.queryByTestId('phases-stacked')).toBeNull();
+    expect(screen.getByTestId('phases-label-1')).toHaveTextContent(/Press/);
+    // Nothing moves on by itself.
+    act(() => jest.advanceTimersByTime(10000));
+    expect(shown()).toEqual([frames[0], frames[1], frames[0]]);
     jest.useRealTimers();
   });
 
   it('has, for every rendered exercise, a frame and its positions for each drawn frame, and a thumbnail', () => {
-    expect(hasRenders('db-bench-press')).toBe(true);
-    expect(hasRenders('not-an-exercise')).toBe(false);
-    expect(hasRenders(null)).toBe(false);
     for (const [slug, rendered] of Object.entries(EXERCISE_RENDERS)) {
       const frames = illustrationFor(slug)?.frames.length;
       expect(frames).toBeGreaterThan(0);
@@ -504,5 +495,140 @@ describe('RenderedPhases (the 3D renders)', () => {
     expect(left + hx * width).toBeLessThan(112);
     expect(top + hy * width).toBeGreaterThan(0);
     expect(top + hy * width).toBeLessThan(112);
+  });
+});
+
+describe("an exercise's own guide cards", () => {
+  const squatGuide: ExerciseGuide = {
+    ...benchGuide,
+    name: 'Barbell Back Squat',
+    muscleGroup: 'quadriceps',
+    equipment: 'barbell',
+    slug: 'bb-back-squat',
+    commonMistakes: ['Letting the knees cave in.'],
+  };
+  beforeEach(() => {
+    setBuiltinSources({
+      extras: async () =>
+        new Map([
+          ...extras,
+          [
+            'squat-id',
+            {
+              slug: 'bb-back-squat',
+              secondaryMuscleGroups: [],
+              searchAliases: [],
+              movementPattern: 'squat',
+              illustrationUrl: null,
+            },
+          ],
+        ]),
+      guide: async (id) => (id === 'squat-id' ? squatGuide : null),
+    });
+  });
+  const open = () =>
+    render(
+      <ExerciseGuideSheet
+        visible
+        onClose={jest.fn()}
+        exerciseId="squat-id"
+        exerciseName="Barbell Back Squat"
+      />,
+    );
+  const measure = (testID: string, width: number, height: number) =>
+    fireEvent(screen.getByTestId(testID), 'layout', {
+      nativeEvent: { layout: { width, height, x: 0, y: 0 } },
+    });
+
+  it('are two pages, swiped between, in place of the drawn guide', async () => {
+    open();
+    expect(await screen.findByTestId('exercise-guide-card-page-0-zoom')).toBeTruthy();
+    measure('exercise-guide-card-page-0-zoom', 390, 640);
+    measure('exercise-guide-card-page-1-zoom', 390, 640);
+    const [first, second] = GUIDE_CARDS['bb-back-squat'];
+    expect(screen.getByTestId('exercise-guide-card-page-0').props.source).toBe(first.image);
+    expect(screen.getByTestId('exercise-guide-card-page-1').props.source).toBe(second.image);
+    // Just the cards: their own title, none of the drawn page.
+    expect(screen.queryByText('HOW TO DO IT')).toBeNull();
+    expect(screen.queryByTestId('exercise-guide-steps')).toBeNull();
+    expect(screen.queryByTestId('exercise-guide-illustration')).toBeNull();
+    expect(screen.queryByTestId('exercise-guide-page-2')).toBeNull();
+    expect(screen.getByTestId('exercise-guide-page-dots').props.accessibilityLabel).toBe(
+      'Page 1 of 2',
+    );
+    fireEvent.press(screen.getByTestId('exercise-guide-next'));
+    expect(screen.getByTestId('exercise-guide-page-dots').props.accessibilityLabel).toBe(
+      'Page 2 of 2',
+    );
+  });
+
+  it('fit the page whole, by its width or, on a short page, its height', async () => {
+    open();
+    await screen.findByTestId('exercise-guide-card-page-0-zoom');
+    const { aspect } = GUIDE_CARDS['bb-back-squat'][0];
+    const size = () => screen.getByTestId('exercise-guide-card-page-0').props.style;
+    // Its width, less the margins either side.
+    measure('exercise-guide-card-page-0-zoom', 390, 640);
+    expect(size()).toEqual({ width: 358, height: 358 / aspect });
+    measure('exercise-guide-card-page-0-zoom', 390, 300);
+    expect(size()).toEqual({ width: 300 * aspect, height: 300 });
+  });
+
+  it("say what's on them to VoiceOver, in the guide's own words", async () => {
+    open();
+    await screen.findByTestId('exercise-guide-card-page-0-zoom');
+    measure('exercise-guide-card-page-0-zoom', 390, 640);
+    measure('exercise-guide-card-page-1-zoom', 390, 640);
+    const own = BUILTIN_GUIDES['bb-back-squat'];
+    await waitFor(() =>
+      expect(screen.getByTestId('exercise-guide-card-page-0').props.accessibilityLabel).toMatch(
+        /Common mistakes: Letting the knees cave in\./,
+      ),
+    );
+    const how = screen.getByTestId('exercise-guide-card-page-0').props.accessibilityLabel;
+    expect(how).toMatch(/^How to do Barbell Back Squat\. 1, Setup: /);
+    expect(how).toContain(own.rows[1]);
+    expect(how).toContain(`Key tips: ${own.tips[0]}`);
+    const technique = screen.getByTestId('exercise-guide-card-page-1').props.accessibilityLabel;
+    expect(technique).toMatch(/^Barbell Back Squat, technique and setup\./);
+    expect(technique).toContain(`${own.technique[0].title}: ${own.technique[0].text}`);
+  });
+
+  it('show without waiting on the guide, and even when it cannot be read', async () => {
+    setBuiltinSources({
+      extras: async () =>
+        new Map([
+          [
+            'squat-id',
+            {
+              slug: 'bb-back-squat',
+              secondaryMuscleGroups: [],
+              searchAliases: [],
+              movementPattern: 'squat',
+              illustrationUrl: null,
+            },
+          ],
+        ]),
+      guide: async () => {
+        throw new Error('offline');
+      },
+    });
+    open();
+    expect(await screen.findByTestId('exercise-guide-card-page-0-zoom')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-guide-error')).toBeNull();
+  });
+
+  it('are, for each exercise that has them, an active built-in with two whole pages', () => {
+    const slugs = Object.keys(GUIDE_CARDS);
+    expect(slugs.length).toBeGreaterThan(0);
+    for (const slug of slugs) {
+      expect(BUILTIN_GUIDES[slug]).toBeTruthy();
+      expect(GUIDE_CARDS[slug]).toHaveLength(2);
+      for (const page of GUIDE_CARDS[slug]) {
+        expect(page.image).toBeTruthy();
+        expect(page.aspect).toBeGreaterThan(0.4);
+        expect(page.aspect).toBeLessThan(1.5);
+      }
+    }
   });
 });

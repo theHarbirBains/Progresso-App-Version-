@@ -37,7 +37,8 @@ keeps its drawing.
    cropped to the body, in `apps/mobile/assets/exercise-renders/` (about 33 MB for the library,
    bundled with the app so it works offline); `renders.generated.ts` maps each slug to its frames,
    its thumbnail and where the hands, feet, knee, hips, torso and head are in each frame. The app
-   shows them in How to Do It (`RenderedPhases.tsx`), the list thumbnails, and Technique & Setup's
+   shows them in How to Do It (its three phases, still, side by side -- `ExercisePhases`), the list
+   thumbnails, and Technique & Setup's
    close-ups (cropped from the render around the part, `TechniqueVisuals.tsx`).
 
 ## Running it

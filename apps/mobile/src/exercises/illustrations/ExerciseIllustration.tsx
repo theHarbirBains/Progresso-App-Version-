@@ -21,7 +21,7 @@ import type { Gradient } from './shading';
 // The illustrated instructor on screen: How to Do It's three phases (ExercisePhases), the grey
 // anatomy figure with the worked muscles in red (primary) and yellow (secondary) and a key naming
 // them (MuscleFigures), and the small thumbnail a list row shows. Every frame is react-native-svg, drawn from the
-// shapes render.ts works out.
+// shapes render.ts works out, except an exercise's 3D renders (renders.generated.ts) where it has them.
 
 function GradientDef({ gradient, id }: { gradient: Gradient; id: string }) {
   const stops = gradient.stops.map(([offset, color], i) => (
@@ -128,7 +128,9 @@ const DIRECTION_ICONS = {
  * movement and the way back) drawn at one scale, each named in a numbered pill, with an arrow in
  * the accent showing which way the movement goes. Side by side with an arrow between them, or --
  * for a wide drawing (anything lying down or seated long) -- one under the other, each beside its
- * pill. Null for an exercise without an illustration.
+ * pill. A rendered exercise shows its 3D frames instead, still and always side by side: each is
+ * square and framed for the whole movement, so it reads at a third of the card. Null for an
+ * exercise without an illustration.
  */
 export function ExercisePhases({
   slug,
@@ -145,21 +147,31 @@ export function ExercisePhases({
   if (!scene || !slug) return null;
   const phases = guidePhases(slug);
   const entry = BUILTIN_CATALOG[slug];
-  const aspect = scene.viewBox.height / scene.viewBox.width;
+  const rendered = EXERCISE_RENDERS[slug]?.frames;
+  const aspect = rendered ? 1 : scene.viewBox.height / scene.viewBox.width;
   const sideWidth = width > 0 ? Math.floor((width - 2 * (ARROW_WIDTH + spacing.xs * 2)) / 3) : 0;
-  const stacked = width > 0 && sideWidth * aspect < MIN_SIDE_BY_SIDE_HEIGHT;
+  const stacked = !rendered && width > 0 && sideWidth * aspect < MIN_SIDE_BY_SIDE_HEIGHT;
   const artWidth = stacked ? Math.floor(width * 0.62) : sideWidth;
   const artHeight = Math.min(MAX_PHASE_HEIGHT, Math.round(artWidth * aspect));
   const drawWidth = Math.round(artHeight / aspect);
   const art = (frame: number, i: number) => (
     <View style={[styles.phaseArt, { width: artWidth, height: artHeight }]}>
-      <Frame
-        frame={scene.frames[frame]}
-        viewBox={scene.viewBox}
-        width={drawWidth}
-        height={artHeight}
-        prefix={`${prefix}p${i}`}
-      />
+      {rendered ? (
+        <Image
+          testID={testID ? `${testID}-render-${i}` : undefined}
+          source={rendered[Math.min(frame, rendered.length - 1)]}
+          style={{ width: artWidth, height: artHeight }}
+          contentFit="contain"
+        />
+      ) : (
+        <Frame
+          frame={scene.frames[frame]}
+          viewBox={scene.viewBox}
+          width={drawWidth}
+          height={artHeight}
+          prefix={`${prefix}p${i}`}
+        />
+      )}
     </View>
   );
   const pill = (label: string, i: number) => (

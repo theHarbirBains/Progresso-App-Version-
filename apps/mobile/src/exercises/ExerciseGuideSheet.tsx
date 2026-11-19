@@ -17,11 +17,11 @@ import { Text } from '../design/Text';
 import { colors, spacing, typeScale } from '../design/theme';
 import { useAppTheme } from '../theme/appThemeContext';
 import { withAlpha } from '../theme/accentColor';
-import { readExerciseGuide, type ExerciseGuide } from './builtinExtras';
+import { readExerciseGuide, useBuiltinExtras, type ExerciseGuide } from './builtinExtras';
 import type { Equipment } from './equipment';
 import { BUILTIN_GUIDES, type TechniqueCard } from './illustrations/builtinGuides.generated';
+import { GUIDE_CARDS, type GuideCardPage } from './illustrations/guideCards.generated';
 import { TechniqueVisual } from './illustrations/TechniqueVisuals';
-import { hasRenders, RenderedPhases } from './illustrations/RenderedPhases';
 import { ExercisePhases, MuscleFigures } from './illustrations/ExerciseIllustration';
 import { guidePhases, hasIllustration, muscleMapFor } from './illustrations/exerciseArt';
 import { MUSCLE_GROUP_LABELS } from './muscleGroups';
@@ -67,11 +67,41 @@ function phaseRows(guide: ExerciseGuide): {
 }
 
 /**
+ * What an exercise's two cards say, for VoiceOver -- their words are part of the picture: the
+ * guide's own phase rows, Key Tips and Common Mistakes (once read), then its Technique & Setup.
+ */
+function cardLabels(
+  slug: string,
+  name: string,
+  mistakes: readonly string[],
+): readonly [string, string] {
+  const own = BUILTIN_GUIDES[slug];
+  const labels = guidePhases(slug).map((phase) => phase.label);
+  return [
+    [
+      `How to do ${name}.`,
+      ...(own?.rows ?? []).map((row, i) => `${i + 1}, ${labels[i] ?? ''}: ${row}`),
+      own?.tips.length ? `Key tips: ${own.tips.join(' ')}` : '',
+      mistakes.length ? `Common mistakes: ${mistakes.join(' ')}` : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+    [
+      `${name}, technique and setup.`,
+      ...(own?.technique ?? []).map((card) => `${card.title}: ${card.text}`),
+    ].join(' '),
+  ];
+}
+
+/**
  * How to do a built-in exercise, as a page of its own over whatever opened it -- an iPhone page
- * sheet, swiped down or closed with its X. Laid out like a coaching card: its name and what it
- * targets, a line on what it is and the muscles it works (front and back, primary and secondary);
- * the illustrated instructor through its three phases -- the setup, the movement and the way back
- * -- with a numbered row for each; then its Key Tips beside its Common Mistakes. Read when it opens.
+ * sheet, swiped down or closed with its X. An exercise with its own two cards (tools/guide-cards)
+ * shows just those, swiped between: the demonstration and instructions, then Technique & Setup --
+ * bundled, so they show at once, with nothing to read. Otherwise it's laid out like a coaching
+ * card: its name and what it targets, a line on what it is and the muscles it works (front and
+ * back, primary and secondary); the instructor through its three phases -- the setup, the movement
+ * and the way back -- with a numbered row for each; then its Key Tips beside its Common Mistakes.
+ * Read when it opens.
  */
 export function ExerciseGuideSheet({
   visible,
@@ -113,6 +143,11 @@ export function ExerciseGuideSheet({
   const drawn = shown && !shown.illustrationUrl && hasIllustration(shown.slug);
   // Technique & Setup's cards: only a drawn built-in has them.
   const technique = shown?.slug && drawn ? (BUILTIN_GUIDES[shown.slug]?.technique ?? []) : [];
+  // The exercise's own two cards, known from its extras (read before anything offers this page).
+  const slug = useBuiltinExtras(exerciseId)?.slug ?? shown?.slug;
+  const cards = slug ? GUIDE_CARDS[slug] : undefined;
+  const labels =
+    cards && slug ? cardLabels(slug, shown?.name ?? exerciseName, shown?.commonMistakes ?? []) : [];
 
   return (
     <Modal
@@ -123,12 +158,17 @@ export function ExerciseGuideSheet({
     >
       <View testID={testID} style={styles.page}>
         <View style={styles.header}>
+          {/* A card has the title in its own picture. */}
           <View style={styles.headerTitle}>
-            <View style={styles.headerRule} />
-            <Text style={styles.headerText} accessibilityRole="header">
-              HOW TO DO IT
-            </Text>
-            <View style={styles.headerRule} />
+            {cards ? null : (
+              <>
+                <View style={styles.headerRule} />
+                <Text style={styles.headerText} accessibilityRole="header">
+                  HOW TO DO IT
+                </Text>
+                <View style={styles.headerRule} />
+              </>
+            )}
           </View>
           <TouchableOpacity
             testID={`${testID}-close`}
@@ -141,7 +181,20 @@ export function ExerciseGuideSheet({
             <Feather name="x" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
-        {shown && !error ? (
+        {cards ? (
+          <Pager
+            testID={testID}
+            pages={cards.map((page, i) => (
+              <CardPage
+                key={i}
+                page={page}
+                label={labels[i] ?? ''}
+                testID={`${testID}-card-page-${i}`}
+              />
+            ))}
+            accent={accent}
+          />
+        ) : shown && !error ? (
           <Pager
             testID={testID}
             pages={[
@@ -321,6 +374,39 @@ function Pager({
   );
 }
 
+/**
+ * One of an exercise's own cards, the whole page: as large as fits, never cropped, centred, and
+ * pinched to zoom in on its smaller print.
+ */
+function CardPage({ page, label, testID }: { page: GuideCardPage; label: string; testID: string }) {
+  const [box, setBox] = useState({ width: 0, height: 0 });
+  const width = Math.min(box.width - 2 * spacing.lg, box.height * page.aspect);
+  return (
+    <ScrollView
+      testID={`${testID}-zoom`}
+      style={styles.cardPage}
+      contentContainerStyle={styles.cardContent}
+      maximumZoomScale={3}
+      minimumZoomScale={1}
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+      onLayout={(e) => setBox(e.nativeEvent.layout)}
+    >
+      {width > 0 ? (
+        <Image
+          testID={testID}
+          source={page.image}
+          style={{ width, height: width / page.aspect }}
+          contentFit="contain"
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={label}
+        />
+      ) : null}
+    </ScrollView>
+  );
+}
+
 /** Technique & Setup: each card a picture beside its title and a line or two. */
 function TechniquePage({
   slug,
@@ -404,12 +490,7 @@ function HowToPage({
         </AppCard>
       ) : drawn ? (
         <AppCard testID={`${testID}-illustration-card`}>
-          {/* Rendered 3D phases where the exercise has them (the Blender pipeline), else the drawing. */}
-          {hasRenders(guide.slug) ? (
-            <RenderedPhases slug={guide.slug} accent={accent} testID={`${testID}-illustration`} />
-          ) : (
-            <ExercisePhases slug={guide.slug} accent={accent} testID={`${testID}-illustration`} />
-          )}
+          <ExercisePhases slug={guide.slug} accent={accent} testID={`${testID}-illustration`} />
         </AppCard>
       ) : null}
 
@@ -507,6 +588,14 @@ const TECHNIQUE_PICTURE = 112;
 const styles = StyleSheet.create({
   pager: {
     flex: 1,
+  },
+  cardPage: {
+    flex: 1,
+  },
+  cardContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dots: {
     flexDirection: 'row',
