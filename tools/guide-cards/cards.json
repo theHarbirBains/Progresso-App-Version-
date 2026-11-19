@@ -1,18 +1,19 @@
 {
   "sheets": {
-    "1.png": [
-      "mc-ab-crunch",
-      "bw-ab-wheel-rollout",
-      "db-alternating-curl",
-      "db-alternating-front-raise",
-      "db-arnold-press"
-    ],
+    "1.png": ["mc-ab-crunch", "bw-ab-wheel-rollout", "db-alternating-curl"],
     "2.png": [
       "mc-assisted-dip",
       "mc-assisted-pull-up",
       "bw-back-extension",
       "mc-back-extension",
       "bb-back-squat"
+    ],
+    "3.png": [
+      "bb-bench-press",
+      "bb-bulgarian-split-squat",
+      "bb-standing-calf-raise",
+      "bb-curl",
+      "bb-deadlift"
     ]
   }
 }

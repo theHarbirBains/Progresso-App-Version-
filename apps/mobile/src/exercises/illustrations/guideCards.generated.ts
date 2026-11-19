@@ -13,35 +13,47 @@ export const GUIDE_CARDS: Record<string, readonly [GuideCardPage, GuideCardPage]
     { image: require('../../../assets/guide-cards/bb-back-squat_1.webp'), aspect: 0.7329 },
     { image: require('../../../assets/guide-cards/bb-back-squat_2.webp'), aspect: 0.885 },
   ],
+  'bb-bench-press': [
+    { image: require('../../../assets/guide-cards/bb-bench-press_1.webp'), aspect: 0.7568 },
+    { image: require('../../../assets/guide-cards/bb-bench-press_2.webp'), aspect: 0.9055 },
+  ],
+  'bb-bulgarian-split-squat': [
+    {
+      image: require('../../../assets/guide-cards/bb-bulgarian-split-squat_1.webp'),
+      aspect: 0.7048,
+    },
+    {
+      image: require('../../../assets/guide-cards/bb-bulgarian-split-squat_2.webp'),
+      aspect: 0.8433,
+    },
+  ],
+  'bb-curl': [
+    { image: require('../../../assets/guide-cards/bb-curl_1.webp'), aspect: 0.7318 },
+    { image: require('../../../assets/guide-cards/bb-curl_2.webp'), aspect: 0.8756 },
+  ],
+  'bb-deadlift': [
+    { image: require('../../../assets/guide-cards/bb-deadlift_1.webp'), aspect: 0.7214 },
+    { image: require('../../../assets/guide-cards/bb-deadlift_2.webp'), aspect: 0.8632 },
+  ],
+  'bb-standing-calf-raise': [
+    { image: require('../../../assets/guide-cards/bb-standing-calf-raise_1.webp'), aspect: 0.7339 },
+    { image: require('../../../assets/guide-cards/bb-standing-calf-raise_2.webp'), aspect: 0.8781 },
+  ],
   'bw-ab-wheel-rollout': [
-    { image: require('../../../assets/guide-cards/bw-ab-wheel-rollout_1.webp'), aspect: 0.714 },
-    { image: require('../../../assets/guide-cards/bw-ab-wheel-rollout_2.webp'), aspect: 0.8741 },
+    { image: require('../../../assets/guide-cards/bw-ab-wheel-rollout_1.webp'), aspect: 0.9372 },
+    { image: require('../../../assets/guide-cards/bw-ab-wheel-rollout_2.webp'), aspect: 1.0585 },
   ],
   'bw-back-extension': [
     { image: require('../../../assets/guide-cards/bw-back-extension_1.webp'), aspect: 0.7226 },
     { image: require('../../../assets/guide-cards/bw-back-extension_2.webp'), aspect: 0.8725 },
   ],
   'db-alternating-curl': [
-    { image: require('../../../assets/guide-cards/db-alternating-curl_1.webp'), aspect: 0.714 },
-    { image: require('../../../assets/guide-cards/db-alternating-curl_2.webp'), aspect: 0.8741 },
-  ],
-  'db-alternating-front-raise': [
-    {
-      image: require('../../../assets/guide-cards/db-alternating-front-raise_1.webp'),
-      aspect: 0.7181,
-    },
-    {
-      image: require('../../../assets/guide-cards/db-alternating-front-raise_2.webp'),
-      aspect: 0.8791,
-    },
-  ],
-  'db-arnold-press': [
-    { image: require('../../../assets/guide-cards/db-arnold-press_1.webp'), aspect: 0.7305 },
-    { image: require('../../../assets/guide-cards/db-arnold-press_2.webp'), aspect: 0.8942 },
+    { image: require('../../../assets/guide-cards/db-alternating-curl_1.webp'), aspect: 0.9427 },
+    { image: require('../../../assets/guide-cards/db-alternating-curl_2.webp'), aspect: 1.0647 },
   ],
   'mc-ab-crunch': [
-    { image: require('../../../assets/guide-cards/mc-ab-crunch_1.webp'), aspect: 0.7346 },
-    { image: require('../../../assets/guide-cards/mc-ab-crunch_2.webp'), aspect: 0.8992 },
+    { image: require('../../../assets/guide-cards/mc-ab-crunch_1.webp'), aspect: 0.9427 },
+    { image: require('../../../assets/guide-cards/mc-ab-crunch_2.webp'), aspect: 1.0647 },
   ],
   'mc-assisted-dip': [
     { image: require('../../../assets/guide-cards/mc-assisted-dip_1.webp'), aspect: 0.7391 },

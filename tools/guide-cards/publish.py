@@ -6,10 +6,11 @@ apps/mobile/assets/guide-cards, and apps/mobile/src/exercises/illustrations/guid
 mapping each exercise's slug to them, formatted by the repo's Prettier.
 
 The cards come from <source_dir> (kept outside the repo): a sheet named in cards.json is a grid of
-five exercises side by side, page 1 along the top and page 2 under it, its columns in the order
-listed (null for a column to skip), cut just inside the thin lines between its cards. A file <slug>_1.png or <slug>_2.png (or .jpg, .webp) in the same
-folder takes that page's place, for a card made on its own at full size. Every slug must be an
-active built-in, listed once. A card is never made larger than it was drawn, only smaller past
+exercises side by side, page 1 along the top and page 2 under it, a column for each exercise listed,
+in order (null for a column to skip). It's cut between its cards -- on the thin line drawn across the
+sheet between them where there is one, else in the middle of the dark gap between them. A file
+<slug>_1.png or <slug>_2.png (or .jpg, .webp) in the same folder takes that page's place, for a card
+made on its own at full size. Every slug must be an active built-in, listed once. A card is never made larger than it was drawn, only smaller past
 MAX_WIDTH. Files of exercises no longer listed are removed."""
 import json
 import os
@@ -26,9 +27,14 @@ ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 ASSETS = os.path.join(ROOT, 'apps', 'mobile', 'assets', 'guide-cards')
 ILLUSTRATIONS = os.path.join(ROOT, 'apps', 'mobile', 'src', 'exercises', 'illustrations')
 GENERATED = os.path.join(ILLUSTRATIONS, 'guideCards.generated.ts')
-COLUMNS, ROWS = 5, 2
-# How far either side of a line between two cards is left out, px.
+ROWS = 2
+# How far either side of the cut between two cards is left out, px.
 LINE = 3
+# A line drawn across the whole sheet is at least this bright end to end (0-255); a card's own
+# border isn't, since it stops at the gap between two rows or columns.
+DRAWN = 35
+# The gap between two cards with no line in it is at least this wide, px.
+GAP = 7
 # An iPhone's widest page in pixels (430 pt at 3x would be 1290; the card sits inside its margins).
 MAX_WIDTH = 1170
 QUALITY = 90
@@ -49,25 +55,31 @@ def own_card(source_dir, slug, page):
     return None
 
 
-def lines(profile, count, reach):
-    """Where a sheet's thin bright lines between its cards are, along one side: the brightest line
-    within `reach` (a share of the side) of each even split -- the cards aren't all one size, page 1
-    being taller than page 2."""
-    size = len(profile)
-    near = round(size * reach)
+def cuts(lines, count, reach):
+    """Where to cut a sheet between its cards, along one side (`lines`: each line of pixels across
+    it): near each even split -- within `reach` of a card, since the cards aren't all one size (page
+    1 is taller than page 2) -- on the brightest line drawn right across the sheet, or with none,
+    in the middle of the darkest gap."""
+    size = len(lines)
+    near = round(size / count * reach)
+    brightness = lines.mean(axis=1)
+    drawn = np.percentile(lines, 2, axis=1) > DRAWN
+    gap = np.convolve(brightness, np.ones(GAP) / GAP, mode='same')
     found = []
     for k in range(1, count):
-        guess = round(k * size / count)
-        found.append(guess - near + int(np.argmax(profile[guess - near:guess + near])))
+        lo, hi = round(k * size / count) - near, round(k * size / count) + near
+        on_line = [i for i in range(lo, hi) if drawn[i]]
+        found.append(max(on_line, key=lambda i: brightness[i]) if on_line
+                     else lo + int(np.argmin(gap[lo:hi])))
     return found
 
 
 def sheet_cards(path, slugs):
-    """Each listed exercise's two pages, cut from a sheet's grid just inside the lines between them."""
+    """Each listed exercise's two pages, cut from a sheet's grid."""
     sheet = Image.open(path)
     grey = np.asarray(sheet.convert('L'), dtype=float)
-    xs = [-LINE] + lines(grey.mean(axis=0), COLUMNS, 0.05) + [sheet.width + LINE]
-    ys = [-LINE] + lines(grey.mean(axis=1), ROWS, 0.17) + [sheet.height + LINE]
+    xs = [-LINE] + cuts(grey.T, len(slugs), 0.25) + [sheet.width + LINE]
+    ys = [-LINE] + cuts(grey, ROWS, 0.35) + [sheet.height + LINE]
     cut = lambda col, row: sheet.crop((xs[col] + LINE, ys[row] + LINE,
                                        xs[col + 1] - LINE + 1, ys[row + 1] - LINE + 1))
     return {slug: [cut(col, 0), cut(col, 1)] for col, slug in enumerate(slugs) if slug}
@@ -78,8 +90,8 @@ def main(source_dir):
     active = active_slugs()
     cards, problems = {}, []
     for name, slugs in manifest['sheets'].items():
-        if len(slugs) != COLUMNS:
-            problems.append(f'{name}: lists {len(slugs)} exercises, a sheet has {COLUMNS} columns')
+        if not any(slugs):
+            problems.append(f'{name}: lists no exercises')
             continue
         for slug in filter(None, slugs):
             if slug not in active:
