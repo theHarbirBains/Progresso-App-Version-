@@ -14,7 +14,7 @@ import { LoadingState } from '../design/LoadingState';
 import { RiseInStack } from '../design/RiseIn';
 import { Screen } from '../design/Screen';
 import { fetchAllExercises, type ExerciseRow } from '../exercises/exerciseQueries';
-import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
+import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { FilterChips } from '../design/FilterChips';
 import { workoutMuscleTabs, type MuscleTab } from '../workouts/workoutMuscleTabs';
 import { measurementTypeOf } from '../exercises/movementTypes';
@@ -866,9 +866,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const muscleTabs = workoutMuscleTabs(workout.exercises);
   const activeTab: MuscleTab =
     muscleTab !== 'all' && muscleTabs.includes(muscleTab) ? muscleTab : 'all';
+  const onTab = (exercise: { muscleGroup: MuscleGroup }) =>
+    activeTab === 'all' || exercise.muscleGroup === activeTab;
   const shownExercises = workout.exercises
     .map((exercise, index) => ({ exercise, index }))
-    .filter(({ exercise }) => activeTab === 'all' || exercise.muscleGroup === activeTab);
+    .filter(({ exercise }) => onTab(exercise));
   // The warm-up tip sits on the first exercise on show (the one being done, in a guided workout).
   const hintedExerciseId = guidedPlan
     ? (focused?.id ?? null)
@@ -939,12 +941,17 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       onAccentColor={theme.onAccent}
     />
   );
-  // Guided: the exercises done before and after the one being done, and what's left of the plan.
+  // Guided: the exercises done before and after the one being done, and what's left of the plan
+  // -- on a muscle tab, just that muscle's (the one being done shows only when it's that muscle's;
+  // a tap on another opens it).
   const before = focused
-    ? workout.exercises.filter((ex) => ex.orderIndex < focused.orderIndex)
+    ? workout.exercises.filter((ex) => ex.orderIndex < focused.orderIndex && onTab(ex))
     : [];
-  const after = focused ? workout.exercises.filter((ex) => ex.orderIndex > focused.orderIndex) : [];
+  const after = focused
+    ? workout.exercises.filter((ex) => ex.orderIndex > focused.orderIndex && onTab(ex))
+    : [];
   const remaining = guidedPlan ? remainingPlan(guidedPlan, workout.exercises) : [];
+  const remainingOnTab = remaining.filter(onTab);
   return (
     <>
       <Screen
@@ -978,7 +985,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 />
               </Card>
             </View>
-            {muscleTabs.length > 0 && !guidedPlan ? (
+            {muscleTabs.length > 0 ? (
               <View style={styles.muscleTabs}>
                 <FilterChips<MuscleTab>
                   testID="active-workout-muscle-tabs"
@@ -1028,23 +1035,25 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                   exercises={before}
                   onOpen={(id) => void openExercise(id)}
                 />
-                {focused ? exerciseCard(focused, workout.exercises.indexOf(focused)) : null}
+                {focused && onTab(focused)
+                  ? exerciseCard(focused, workout.exercises.indexOf(focused))
+                  : null}
                 <FoldedExercises
                   testID="active-workout-later"
                   exercises={after}
                   onOpen={(id) => void openExercise(id)}
                 />
-                {remaining.length > 0 ? (
+                {remainingOnTab.length > 0 ? (
                   <UpNextCard
                     testID="active-workout-up-next"
-                    remaining={remaining}
+                    remaining={remainingOnTab}
                     onStart={(planned) => void startPlanned(planned)}
                     busy={startingNext}
                     accentColor={theme.accent}
                   />
-                ) : (
+                ) : remaining.length === 0 ? (
                   <PlanDone testID="active-workout-plan-done" />
-                )}
+                ) : null}
               </>
             ) : (
               shownExercises.map(({ exercise, index }, shownAt) =>

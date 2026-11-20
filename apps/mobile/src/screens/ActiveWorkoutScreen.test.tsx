@@ -2491,6 +2491,41 @@ describe('ActiveWorkoutScreen -- a guided workout (a planned day)', () => {
     expect(mockCreateSet).toHaveBeenCalledTimes(1);
   });
 
+  it("has the muscle tabs too: a muscle's tab once it's started, showing only its exercises", async () => {
+    mockCreateSet.mockResolvedValue({
+      id: 's-squat-1',
+      setIndex: 1,
+      weightKg: null,
+      reps: null,
+      completedAt: null,
+    });
+    renderGuided();
+
+    // The plan's first exercise is already in: All and Chest -- not Quads or Back, still ahead.
+    const tabs = await screen.findByTestId('active-workout-muscle-tabs');
+    expect(within(tabs).getByTestId('active-workout-muscle-tabs-chest')).toBeTruthy();
+    expect(within(tabs).queryByTestId('active-workout-muscle-tabs-quads')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('active-workout-up-next-start'));
+    expect(await screen.findByTestId('active-workout-muscle-tabs-quads')).toBeTruthy();
+    expect(await screen.findByTestId('exercise-card-we2')).toBeTruthy();
+
+    // Chest: just the bench press, folded, a tap from open -- not the squat being done, and no
+    // Up Next, since what's left of the plan isn't chest.
+    fireEvent.press(screen.getByTestId('active-workout-muscle-tabs-chest'));
+    expect(screen.queryByTestId('exercise-card-we2')).toBeNull();
+    expect(screen.getByTestId('active-workout-done-we1')).toBeTruthy();
+    expect(screen.queryByTestId('active-workout-up-next')).toBeNull();
+    expect(screen.queryByTestId('active-workout-plan-done')).toBeNull();
+    fireEvent.press(screen.getByTestId('active-workout-done-we1'));
+    expect(await screen.findByTestId('exercise-card-we1')).toBeTruthy();
+
+    // Moving on set the squat aside untouched, so it's back in Up Next and its tab has gone.
+    fireEvent.press(screen.getByTestId('active-workout-muscle-tabs-all'));
+    expect(screen.getByTestId('active-workout-up-next-name')).toHaveTextContent('Squat');
+    expect(screen.queryByTestId('active-workout-muscle-tabs-quads')).toBeNull();
+  });
+
   it('is the usual live workout for a planned day with no plan to follow', async () => {
     (fetchDayPlan as jest.Mock).mockResolvedValue([]);
     renderGuided();
