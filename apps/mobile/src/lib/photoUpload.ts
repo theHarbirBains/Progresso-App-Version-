@@ -26,14 +26,15 @@ export async function localFileBytes(localUri: string): Promise<ArrayBuffer> {
 /**
  * Puts a locally picked photo (a file:// URI from expo-image-picker) at `path` in `bucket`,
  * scaled down first (resizeForUpload), as a JPEG. `asJpeg` re-encodes it as JPEG even when it
- * needed no scaling, for a bucket that takes nothing else (a library photo can be HEIC); `upsert`
- * replaces what's at a fixed path. Throws with Storage's own message when the upload fails.
+ * needed no scaling, for a bucket that takes nothing else (a library photo can be HEIC). Never
+ * over a file already there: a photo that changes goes to a new path (uniquePhotoPath), so no CDN
+ * or phone can show the old one in its place. Throws with Storage's own message when it fails.
  */
 export async function uploadPhoto(
   bucket: string,
   path: string,
   localUri: string,
-  options: { asJpeg?: boolean; upsert?: boolean } = {},
+  options: { asJpeg?: boolean } = {},
 ): Promise<void> {
   let uri = await resizeForUpload(localUri);
   if (options.asJpeg) {
@@ -46,7 +47,6 @@ export async function uploadPhoto(
   }
   const { error } = await supabase.storage.from(bucket).upload(path, await localFileBytes(uri), {
     contentType: 'image/jpeg',
-    ...(options.upsert ? { upsert: true } : {}),
   });
   if (error) throw new Error(error.message);
 }

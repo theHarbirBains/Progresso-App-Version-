@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useAuth } from '../auth/AuthProvider';
@@ -264,8 +264,13 @@ describe('SettingsPersonalInfoScreen', () => {
     fireEvent.press(screen.getByTestId('settings-personal-info-remove-photo'));
 
     await screen.findByTestId('account-display-name');
-    expect(mockRemoveAvatarFile).toHaveBeenCalledWith('user-1');
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', { avatarUrl: null });
+    await waitFor(() =>
+      expect(mockRemoveAvatarFile).toHaveBeenCalledWith(
+        'user-1',
+        'https://example.test/existing.jpg',
+      ),
+    );
   });
 
   it('navigates to CalorieEstimation for body measurements, not a second copy of that form', async () => {

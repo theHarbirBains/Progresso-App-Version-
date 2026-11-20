@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { removeAvatarFile, uploadAvatar } from './avatarUpload';
+import { avatarFileOf, removeAvatarFile, uploadAvatar } from './avatarUpload';
 jest.mock('./imageResize', () => ({ resizeForUpload: async (uri: string) => uri }));
 
 jest.mock('./supabase', () => ({
@@ -33,27 +33,23 @@ beforeEach(() => {
 });
 
 describe('uploadAvatar', () => {
-  it('uploads to the user-specific path with upsert so re-uploading replaces the old file', async () => {
-    const { upload } = mockBucket();
+  it("uploads each new picture to a new file in the user's own folder -- never over the old one", async () => {
+    const { upload, getPublicUrl } = mockBucket();
 
-    await uploadAvatar('user-1', 'file:///tmp/photo.jpg');
+    const url = await uploadAvatar('user-1', 'file:///tmp/photo.jpg');
+    await uploadAvatar('user-1', 'file:///tmp/again.jpg');
 
     expect(mockFrom).toHaveBeenCalledWith('avatars');
-    expect(upload).toHaveBeenCalledWith('user-1/avatar.jpg', fakeBytes, {
-      contentType: 'image/jpeg',
-      upsert: true,
-    });
-  });
-
-  it('returns the public URL with a cache-busting query param appended', async () => {
-    mockBucket({
-      publicUrl: 'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
-    });
-
-    const result = await uploadAvatar('user-1', 'file:///tmp/photo.jpg');
-
-    expect(result).toMatch(
-      /^https:\/\/project\.supabase\.co\/storage\/v1\/object\/public\/avatars\/user-1\/avatar\.jpg\?v=\d+$/,
+    const [first, body, options] = upload.mock.calls[0];
+    const [second] = upload.mock.calls[1];
+    expect(first).toMatch(/^user-1\/[\w-]+\.jpg$/);
+    expect(second).not.toBe(first);
+    expect(body).toBe(fakeBytes);
+    // A new address, so no CDN or phone can hand out the old picture in its place.
+    expect(options).toEqual({ contentType: 'image/jpeg' });
+    expect(getPublicUrl).toHaveBeenCalledWith(first);
+    expect(url).toBe(
+      'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg',
     );
   });
 
@@ -65,18 +61,41 @@ describe('uploadAvatar', () => {
 });
 
 describe('removeAvatarFile', () => {
-  it('removes the file at the user-specific path', async () => {
+  it("removes the file a picture's link points at -- an old fixed one too", async () => {
     const { remove } = mockBucket();
 
-    await removeAvatarFile('user-1');
+    await removeAvatarFile(
+      'user-1',
+      'https://project.supabase.co/storage/v1/object/public/avatars/user-1/1795-ab12.jpg',
+    );
+    await removeAvatarFile(
+      'user-1',
+      'https://project.supabase.co/storage/v1/object/public/avatars/user-1/avatar.jpg?v=17',
+    );
 
     expect(mockFrom).toHaveBeenCalledWith('avatars');
-    expect(remove).toHaveBeenCalledWith(['user-1/avatar.jpg']);
+    expect(remove).toHaveBeenNthCalledWith(1, ['user-1/1795-ab12.jpg']);
+    expect(remove).toHaveBeenNthCalledWith(2, ['user-1/avatar.jpg']);
+  });
+
+  it("never removes anything outside the user's own folder", async () => {
+    const { remove } = mockBucket();
+    const base = 'https://project.supabase.co/storage/v1/object/public/avatars/';
+
+    await removeAvatarFile('user-1', `${base}user-2/avatar.jpg`);
+    await removeAvatarFile('user-1', 'https://elsewhere.test/user-1/avatar.jpg');
+    expect(remove).not.toHaveBeenCalled();
+    expect(avatarFileOf('user-1', `${base}user-1/../user-2/x.jpg`)).toBeNull();
   });
 
   it('throws when removal fails', async () => {
     mockBucket({ removeError: { message: 'not found' } });
 
-    await expect(removeAvatarFile('user-1')).rejects.toThrow('not found');
+    await expect(
+      removeAvatarFile(
+        'user-1',
+        'https://project.supabase.co/storage/v1/object/public/avatars/user-1/a.jpg',
+      ),
+    ).rejects.toThrow('not found');
   });
 });

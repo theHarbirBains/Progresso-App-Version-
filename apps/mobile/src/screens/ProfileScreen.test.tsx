@@ -215,7 +215,7 @@ beforeEach(() => {
   mockGetPersonProfile.mockReset().mockResolvedValue(me());
   mockGetPersonWorkouts.mockReset().mockResolvedValue({ items: [workoutItem], hasMore: false });
   mockUploadAvatar.mockReset();
-  mockRemoveAvatarFile.mockReset();
+  mockRemoveAvatarFile.mockReset().mockResolvedValue(undefined);
   mockRequestMediaLibraryPermissionsAsync.mockReset().mockResolvedValue({ granted: true });
   mockLaunchImageLibraryAsync.mockReset().mockResolvedValue({ canceled: true, assets: null });
   mockFetchAllCompletedWorkouts.mockReset().mockResolvedValue([
@@ -626,6 +626,31 @@ describe('ProfileScreen profile picture', () => {
     );
   });
 
+  it("a new photo's file replaces the old one only once the profile shows it", async () => {
+    mockFetchMyProfile.mockResolvedValue({ ...baseProfile, avatarUrl: AVATAR });
+    mockLaunchImageLibraryAsync.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/photo.jpg' }],
+    });
+    const fresh = AVATAR.replace('avatar.jpg', '1795-ab12.jpg');
+    mockUploadAvatar.mockResolvedValue(fresh);
+    mockRemoveAvatarFile.mockResolvedValue(undefined);
+    mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, avatarUrl: fresh });
+    renderProfile();
+
+    fireEvent.press(await screen.findByTestId('profile-avatar'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('profile-avatar-choose-photo'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(mockRemoveAvatarFile).toHaveBeenCalledWith('user-1', AVATAR));
+    expect(mockUpdateMyProfile.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRemoveAvatarFile.mock.invocationCallOrder[0]!,
+    );
+  });
+
   it('removing the photo deletes the file and clears the profile field, reverting to the fallback', async () => {
     mockFetchMyProfile.mockResolvedValue({ ...baseProfile, avatarUrl: AVATAR });
     mockUpdateMyProfile.mockResolvedValue({ ...baseProfile, avatarUrl: null });
@@ -637,8 +662,9 @@ describe('ProfileScreen profile picture', () => {
       await Promise.resolve();
     });
 
-    expect(mockRemoveAvatarFile).toHaveBeenCalledWith('user-1');
     expect(mockUpdateMyProfile).toHaveBeenCalledWith('token-123', { avatarUrl: null });
+    // Its file goes once the profile no longer points at it.
+    await waitFor(() => expect(mockRemoveAvatarFile).toHaveBeenCalledWith('user-1', AVATAR));
     await waitFor(() => expect(screen.getByTestId('profile-avatar')).toHaveTextContent(/H/));
   });
 
