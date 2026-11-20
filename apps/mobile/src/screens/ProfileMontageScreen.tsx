@@ -40,7 +40,7 @@ function clock(seconds: number): string {
 }
 
 /**
- * Your montage (from your profile, or Edit Profile): it as your profile shows it, then each photo
+ * Your montage (from Edit Profile -- the profile itself only shows it): it as your profile shows it, then each photo
  * or video in its place -- moved earlier or later, or removed -- and Add Photos or Videos, up to
  * four in all. Every change saves as it's made, and your profile shows it the next time it's in
  * view. Read each time the page opens.

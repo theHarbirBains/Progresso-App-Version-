@@ -1,20 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import {
-  Animated,
-  AppState,
-  Easing,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Animated, AppState, Easing, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { createVideoPlayer, VideoView, type VideoPlayer } from 'expo-video';
-import { Text } from '../../design/Text';
-import { colors, radii, spacing, typeScale } from '../../design/theme';
+import { colors, radii } from '../../design/theme';
 import type { MontageItem } from '../../lib/api';
 import { useReduceMotionPreference } from '../../navigation/navigationTransitions';
 import { useScreenFocused } from '../../navigation/useScreenFocused';
@@ -109,14 +98,12 @@ function Panel({
   height,
   seam,
   children,
-  style,
 }: {
   left: number;
   width: number;
   height: number;
   seam: string;
   children?: ReactNode;
-  style?: StyleProp<ViewStyle>;
 }) {
   // Wide enough that, leant back upright, the picture still reaches each slanted edge.
   const lean = height * Math.tan((SKEW * Math.PI) / 180);
@@ -131,7 +118,6 @@ function Panel({
           borderLeftColor: seam,
           transform: [{ skewX: `-${SKEW}deg` }],
         },
-        style,
       ]}
     >
       <View
@@ -155,7 +141,6 @@ export function ProfileMontage({
   accent,
   ownerName,
   isOwn,
-  onEdit,
   testID,
 }: {
   items: MontageItem[];
@@ -163,8 +148,6 @@ export function ProfileMontage({
   /** Whose it is, for a screen reader ("Sam"). */
   ownerName: string;
   isOwn: boolean;
-  /** On your own: opens your montage's page. Empty, your own invites you to add to it. */
-  onEdit?: () => void;
   testID?: string;
 }) {
   const [width, setWidth] = useState(0);
@@ -229,7 +212,7 @@ export function ProfileMontage({
     [panels, items, count, slot],
   );
 
-  if (count === 0 && !onEdit) return null;
+  if (count === 0) return null;
 
   const videos = items.filter((item) => item.kind === 'video').length;
   const photos = count - videos;
@@ -239,18 +222,19 @@ export function ProfileMontage({
   ]
     .filter(Boolean)
     .join(' and ');
-  const label =
-    count === 0
-      ? 'Your montage is empty. Add photos or videos'
-      : `${isOwn ? 'Your' : `${ownerName}'s`} montage: ${contents}${onEdit ? '. Edit your montage' : ''}`;
+  const label = `${isOwn ? 'Your' : `${ownerName}'s`} montage: ${contents}`;
 
-  const strip = (
+  return (
     <View
+      testID={testID}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={label}
       style={[styles.glow, { height: height || undefined, shadowColor: accent }]}
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
     >
       <View style={[styles.frame, { borderColor: accent }]}>
-        {width > 0 && count > 0 ? (
+        {width > 0 ? (
           <Animated.View
             testID={testID ? `${testID}-row` : undefined}
             style={[StyleSheet.absoluteFill, { transform: [{ translateX: offset }] }]}
@@ -261,24 +245,6 @@ export function ProfileMontage({
               </Panel>
             ))}
           </Animated.View>
-        ) : null}
-        {width > 0 && count === 0 ? (
-          <>
-            {[0, 1, 2, 3, 4].map((index) => (
-              <Panel
-                key={index}
-                left={(index - 0.5) * slot}
-                width={slot}
-                height={height}
-                seam={withAlpha(accent, 0.25)}
-                style={index % 2 === 0 ? styles.emptyPanel : undefined}
-              />
-            ))}
-            <View style={styles.invite}>
-              <Feather name="plus-circle" size={18} color={accent} />
-              <Text style={styles.inviteText}>Add photos or videos</Text>
-            </View>
-          </>
         ) : null}
       </View>
       <LinearGradient
@@ -295,22 +261,6 @@ export function ProfileMontage({
         end={{ x: 1, y: 0.5 }}
         style={[styles.streak, styles.streakBottom]}
       />
-    </View>
-  );
-
-  return onEdit ? (
-    <TouchableOpacity
-      testID={testID}
-      activeOpacity={0.85}
-      onPress={onEdit}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      {strip}
-    </TouchableOpacity>
-  ) : (
-    <View testID={testID} accessible accessibilityRole="image" accessibilityLabel={label}>
-      {strip}
     </View>
   );
 }
@@ -336,20 +286,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderLeftWidth: 1.5,
     backgroundColor: colors.surfaceRaised,
-  },
-  emptyPanel: {
-    backgroundColor: colors.surface,
-  },
-  invite: {
-    ...StyleSheet.absoluteFill,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  inviteText: {
-    ...typeScale.label,
-    color: colors.textPrimary,
   },
   // A brighter run of light along the frame's edge.
   streak: {

@@ -6,11 +6,12 @@ jest.mock('../lib/imageResize', () => ({ resizeForUpload: async (uri: string) =>
 jest.mock('../lib/supabase', () => ({ supabase: { storage: { from: jest.fn() } } }));
 
 const mockFrom = supabase.storage.from as jest.Mock;
-const fakeBlob = { size: 123 };
+/** A photo's bytes as read from the phone -- uploaded as they are, never as a Blob. */
+const fakeBytes = new ArrayBuffer(123);
 
 beforeEach(() => {
   mockFrom.mockReset();
-  global.fetch = jest.fn().mockResolvedValue({ blob: () => Promise.resolve(fakeBlob) });
+  global.fetch = jest.fn().mockResolvedValue({ arrayBuffer: () => Promise.resolve(fakeBytes) });
   (ImageManipulator.manipulateAsync as jest.Mock).mockClear();
 });
 
@@ -27,7 +28,7 @@ describe('uploadFeedbackScreenshot', () => {
     });
     expect(mockFrom).toHaveBeenCalledWith('feedback-screenshots');
     expect(path).toMatch(/^user-1\/[A-Za-z0-9_-]+\.jpg$/);
-    expect(upload).toHaveBeenCalledWith(path, fakeBlob, { contentType: 'image/jpeg' });
+    expect(upload).toHaveBeenCalledWith(path, fakeBytes, { contentType: 'image/jpeg' });
   });
 
   it('throws when the upload fails', async () => {

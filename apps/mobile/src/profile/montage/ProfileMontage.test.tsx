@@ -24,8 +24,9 @@ const video = (id: string): MontageItem => ({
 
 /** Lays the strip out at `width` across, as the page would. */
 function layOut(width = 360) {
-  const strip = screen.getByTestId('montage').children[0] as never;
-  fireEvent(strip, 'layout', { nativeEvent: { layout: { width, height: 0, x: 0, y: 0 } } });
+  fireEvent(screen.getByTestId('montage'), 'layout', {
+    nativeEvent: { layout: { width, height: 0, x: 0, y: 0 } },
+  });
 }
 
 let appStateListener: ((state: AppStateStatus) => void) | null = null;
@@ -43,29 +44,13 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe('ProfileMontage', () => {
-  it('is nothing at all on someone else’s profile with nothing in it', () => {
+  it('is nothing at all with nothing in it, even your own', () => {
     render(
       <ProfileMontage testID="montage" items={[]} accent="#D99A50" ownerName="Sam" isOwn={false} />,
     );
     expect(screen.queryByTestId('montage')).toBeNull();
-  });
-
-  it('invites you to add to your own empty one, opening your montage', () => {
-    const onEdit = jest.fn();
-    render(
-      <ProfileMontage
-        testID="montage"
-        items={[]}
-        accent="#D99A50"
-        ownerName="Your"
-        isOwn
-        onEdit={onEdit}
-      />,
-    );
-    layOut();
-    expect(screen.getByText('Add photos or videos')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('montage'));
-    expect(onEdit).toHaveBeenCalled();
+    render(<ProfileMontage testID="mine" items={[]} accent="#D99A50" ownerName="Your" isOwn />);
+    expect(screen.queryByTestId('mine')).toBeNull();
   });
 
   it('shows four panels at a time with no title, count or play button, round and round', () => {
@@ -166,8 +151,7 @@ describe('ProfileMontage', () => {
     expect(timing).not.toHaveBeenCalled();
   });
 
-  it('on your own, opens your montage when tapped', () => {
-    const onEdit = jest.fn();
+  it('shows your own just as others see it, with nothing to tap', () => {
     render(
       <ProfileMontage
         testID="montage"
@@ -175,14 +159,11 @@ describe('ProfileMontage', () => {
         accent="#D99A50"
         ownerName="Your"
         isOwn
-        onEdit={onEdit}
       />,
     );
-    expect(screen.getByTestId('montage')).toHaveProp(
-      'accessibilityLabel',
-      'Your montage: 1 photo. Edit your montage',
-    );
-    fireEvent.press(screen.getByTestId('montage'));
-    expect(onEdit).toHaveBeenCalled();
+    const strip = screen.getByTestId('montage');
+    expect(strip).toHaveProp('accessibilityLabel', 'Your montage: 1 photo');
+    expect(strip).toHaveProp('accessibilityRole', 'image');
+    expect(strip.props.onPress).toBeUndefined();
   });
 });

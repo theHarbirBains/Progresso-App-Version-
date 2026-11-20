@@ -14,10 +14,20 @@ export function uniquePhotoPath(userId: string, extension = 'jpg'): string {
 }
 
 /**
+ * A file on the phone (a file:// URI), as its bytes, to upload with its content type. Never as a
+ * Blob: Storage sends a Blob as a form part typed by the Blob alone, ignoring `contentType`, and a
+ * Blob read from a file on the phone has no type -- so it arrived as text/plain, which a bucket
+ * that takes only some types (the montage's, feedback screenshots') refuses.
+ */
+export async function localFileBytes(localUri: string): Promise<ArrayBuffer> {
+  return (await fetch(localUri)).arrayBuffer();
+}
+
+/**
  * Puts a locally picked photo (a file:// URI from expo-image-picker) at `path` in `bucket`,
- * scaled down first (resizeForUpload). `asJpeg` re-encodes it as JPEG even when it needed no
- * scaling, for a bucket that takes nothing else (a library photo can be HEIC); `upsert` replaces
- * what's at a fixed path. Throws with Storage's own message when the upload fails.
+ * scaled down first (resizeForUpload), as a JPEG. `asJpeg` re-encodes it as JPEG even when it
+ * needed no scaling, for a bucket that takes nothing else (a library photo can be HEIC); `upsert`
+ * replaces what's at a fixed path. Throws with Storage's own message when the upload fails.
  */
 export async function uploadPhoto(
   bucket: string,
@@ -34,8 +44,7 @@ export async function uploadPhoto(
       })
     ).uri;
   }
-  const blob = await (await fetch(uri)).blob();
-  const { error } = await supabase.storage.from(bucket).upload(path, blob, {
+  const { error } = await supabase.storage.from(bucket).upload(path, await localFileBytes(uri), {
     contentType: 'image/jpeg',
     ...(options.upsert ? { upsert: true } : {}),
   });

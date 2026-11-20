@@ -500,14 +500,38 @@ describe('PersonProfileScreen', () => {
     expect(screen.queryByTestId('person-profile-montage')).toBeNull();
   });
 
-  it('invites you to add to your own empty montage, opening it', async () => {
+  it('offers nothing about your montage on your own profile: it is added to from Edit Profile', async () => {
     (getPersonProfile as jest.Mock).mockResolvedValue(
       profile({ isSelf: true, followStatus: 'none', followsYou: false, montage: [] }),
     );
-    renderScreen();
+    const { unmount } = renderScreen();
+    await screen.findByTestId('person-profile-name');
+    expect(screen.queryByTestId('person-profile-montage')).toBeNull();
+    expect(screen.queryByText(/add photos or videos/i)).toBeNull();
+    unmount();
 
-    fireEvent.press(await screen.findByTestId('person-profile-montage'));
-    expect(mockNavigate).toHaveBeenCalledWith('ProfileMontage');
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({
+        isSelf: true,
+        followStatus: 'none',
+        followsYou: false,
+        montage: [
+          {
+            id: 'm1',
+            kind: 'photo',
+            url: 'https://cdn.test/m1',
+            width: 10,
+            height: 10,
+            durationSeconds: null,
+          },
+        ],
+      }),
+    );
+    renderScreen();
+    const montage = await screen.findByTestId('person-profile-montage');
+    expect(montage).toHaveProp('accessibilityLabel', 'Your montage: 1 photo');
+    fireEvent.press(montage);
+    expect(mockNavigate).not.toHaveBeenCalledWith('ProfileMontage');
   });
 
   it('opens their workouts read-only, and who follows them', async () => {

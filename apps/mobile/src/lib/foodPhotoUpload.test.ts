@@ -7,7 +7,8 @@ jest.mock('./supabase', () => ({
 }));
 
 const mockFrom = supabase.storage.from as jest.Mock;
-const fakeBlob = { size: 123 };
+/** A photo's bytes as read from the phone -- uploaded as they are, never as a Blob. */
+const fakeBytes = new ArrayBuffer(123);
 
 function mockBucket({ uploadError = null }: { uploadError?: { message: string } | null } = {}) {
   const upload = jest.fn().mockResolvedValue({ data: {}, error: uploadError });
@@ -20,7 +21,7 @@ function mockBucket({ uploadError = null }: { uploadError?: { message: string } 
 
 beforeEach(() => {
   mockFrom.mockReset();
-  global.fetch = jest.fn().mockResolvedValue({ blob: () => Promise.resolve(fakeBlob) });
+  global.fetch = jest.fn().mockResolvedValue({ arrayBuffer: () => Promise.resolve(fakeBytes) });
 });
 
 describe('uploadFoodPhoto', () => {
@@ -30,9 +31,9 @@ describe('uploadFoodPhoto', () => {
     const url = await uploadFoodPhoto('user-1', 'file:///tmp/food.jpg');
 
     expect(mockFrom).toHaveBeenCalledWith('food-photos');
-    const [path, blob, options] = upload.mock.calls[0];
+    const [path, body, options] = upload.mock.calls[0];
     expect(path).toMatch(/^user-1\/[\w-]+\.jpg$/);
-    expect(blob).toBe(fakeBlob);
+    expect(body).toBe(fakeBytes);
     expect(options).toEqual({ contentType: 'image/jpeg' });
     expect(url).toBe('https://project.supabase.co/food-photos/x.jpg');
   });

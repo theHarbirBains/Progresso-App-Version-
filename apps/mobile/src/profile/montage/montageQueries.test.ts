@@ -47,9 +47,13 @@ function table(result: { data?: unknown; error?: { message: string } | null }) {
   return chain;
 }
 
+/** A video's bytes as read from the phone. */
+let videoBytes = new ArrayBuffer(4_000);
+
 beforeEach(() => {
   jest.clearAllMocks();
-  global.fetch = jest.fn().mockResolvedValue({ blob: () => Promise.resolve({ size: 4_000_000 }) });
+  videoBytes = new ArrayBuffer(4_000);
+  global.fetch = jest.fn().mockResolvedValue({ arrayBuffer: () => Promise.resolve(videoBytes) });
 });
 
 describe('montageProblem', () => {
@@ -104,8 +108,10 @@ describe('addToMontage', () => {
       mimeType: 'video/mp4',
     });
 
-    const [path, , options] = files.upload.mock.calls[0];
+    // Its bytes with their type -- never a Blob, which Storage would take as text/plain.
+    const [path, body, options] = files.upload.mock.calls[0];
     expect(path).toMatch(/^me\/[\w-]+\.mp4$/);
+    expect(body).toBe(videoBytes);
     expect(options).toEqual({ contentType: 'video/mp4' });
     expect(rows.insert).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'video', storage_path: path, duration_seconds: 12.4 }),
@@ -120,6 +126,15 @@ describe('addToMontage', () => {
       addToMontage('me', { uri: 'file:///p.jpg', type: 'image', width: 100, height: 100 }),
     ).rejects.toThrow('Your montage already has four. Remove one to add another.');
     expect(files.remove).toHaveBeenCalledWith([expect.stringMatching(/^me\//)]);
+  });
+
+  it('never uploads a video file over 50 MB', async () => {
+    const files = bucket();
+    videoBytes = new ArrayBuffer(51 * 1024 * 1024);
+    await expect(
+      addToMontage('me', { uri: 'v', type: 'video', width: 1, height: 1, duration: 9_000 }),
+    ).rejects.toThrow(/50 MB/);
+    expect(files.upload).not.toHaveBeenCalled();
   });
 
   it('never uploads a video that is too long', async () => {

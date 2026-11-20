@@ -918,16 +918,15 @@ export function PersonProfilePage({
               </View>
             </View>
 
-            {/* Their montage: yours always (an empty one invites you to add to it), anyone else's
-                once you can see their activity and they've added to it. */}
-            {profile.montage && (profile.isSelf || profile.montage.length > 0) ? (
+            {/* Their montage, once you can see their activity and they've added to it -- yours just
+                as others see it (it's added to and changed from Edit Profile). */}
+            {profile.montage && profile.montage.length > 0 ? (
               <ProfileMontage
                 testID="person-profile-montage"
                 items={profile.montage}
                 accent={theme.accent}
                 ownerName={firstName(profile)}
                 isOwn={profile.isSelf}
-                onEdit={profile.isSelf ? () => navigation.navigate('ProfileMontage') : undefined}
               />
             ) : null}
 

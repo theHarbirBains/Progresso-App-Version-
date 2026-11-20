@@ -1,6 +1,6 @@
 import type { MontageItem } from '../../lib/api';
 import { UPLOAD_MAX_EDGE_PX } from '../../lib/imageResize';
-import { uniquePhotoPath, uploadPhoto } from '../../lib/photoUpload';
+import { localFileBytes, uniquePhotoPath, uploadPhoto } from '../../lib/photoUpload';
 import { supabase } from '../../lib/supabase';
 
 // Your own montage, straight from Supabase under its own-row policies
@@ -94,9 +94,11 @@ export async function addToMontage(userId: string, media: PickedMedia): Promise<
   if (video) {
     const quickTime = media.mimeType === 'video/quicktime' || /\.mov$/i.test(media.uri);
     path = uniquePhotoPath(userId, quickTime ? 'mov' : 'mp4');
-    const blob = await (await fetch(media.uri)).blob();
-    if (blob.size > MONTAGE_FILE_BYTES) throw new Error('That video is too big: up to 50 MB.');
-    const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+    const bytes = await localFileBytes(media.uri);
+    if (bytes.byteLength > MONTAGE_FILE_BYTES) {
+      throw new Error('That video is too big: up to 50 MB.');
+    }
+    const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
       contentType: quickTime ? 'video/quicktime' : 'video/mp4',
     });
     if (error) throw new Error(error.message);

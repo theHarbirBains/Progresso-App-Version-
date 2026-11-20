@@ -24,11 +24,12 @@ function mockBucket({
   return { upload, getPublicUrl, remove };
 }
 
-const fakeBlob = { size: 123 };
+/** A photo's bytes as read from the phone -- uploaded as they are, never as a Blob. */
+const fakeBytes = new ArrayBuffer(123);
 
 beforeEach(() => {
   mockFrom.mockReset();
-  global.fetch = jest.fn().mockResolvedValue({ blob: () => Promise.resolve(fakeBlob) });
+  global.fetch = jest.fn().mockResolvedValue({ arrayBuffer: () => Promise.resolve(fakeBytes) });
 });
 
 describe('uploadAvatar', () => {
@@ -38,7 +39,7 @@ describe('uploadAvatar', () => {
     await uploadAvatar('user-1', 'file:///tmp/photo.jpg');
 
     expect(mockFrom).toHaveBeenCalledWith('avatars');
-    expect(upload).toHaveBeenCalledWith('user-1/avatar.jpg', fakeBlob, {
+    expect(upload).toHaveBeenCalledWith('user-1/avatar.jpg', fakeBytes, {
       contentType: 'image/jpeg',
       upsert: true,
     });
