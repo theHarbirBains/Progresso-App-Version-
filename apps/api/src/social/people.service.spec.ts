@@ -236,6 +236,9 @@ describe('PeopleService', () => {
             width: 1600,
             height: 1200,
             duration_seconds: null,
+            frame_x: '0.3000',
+            frame_y: '0.6500',
+            frame_zoom: '1.50',
           },
           {
             id: 'm3',
@@ -383,6 +386,7 @@ describe('PeopleService', () => {
             width: 1080,
             height: 1920,
             durationSeconds: 12.5,
+            frame: null,
           },
           {
             id: 'm2',
@@ -391,6 +395,8 @@ describe('PeopleService', () => {
             width: 1600,
             height: 1200,
             durationSeconds: null,
+            // Where its owner placed it in its panel.
+            frame: { x: 0.3, y: 0.65, zoom: 1.5 },
           },
         ],
       });

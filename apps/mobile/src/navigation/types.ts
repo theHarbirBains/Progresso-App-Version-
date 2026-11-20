@@ -1,4 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { MontageItem } from '../lib/api';
 
 // The signed-in app's navigation structure. Sign-in/forgot-password/reset
 // (and now onboarding, which ends in account creation -- see
@@ -13,6 +14,8 @@ export type RootStackParamList = {
   SettingsPersonalInfo: undefined;
   /** Your profile montage: up to four photos or videos, added, put in order and removed. */
   ProfileMontage: undefined;
+  /** One of your montage's photos, moved and zoomed within its panel. */
+  ProfileMontageFrame: { item: MontageItem };
   SettingsWorkoutPreferences: undefined;
   /** The person's rep range and the exercises they train outside it. */
   RepRangeExceptions: undefined;

@@ -155,6 +155,18 @@ export interface MontageItem {
   height: number | null;
   /** A video's length; null for a photo. */
   durationSeconds: number | null;
+  /** Where its owner placed a photo in its panel; null for the automatic framing (and a video). */
+  frame: MontageFrame | null;
+}
+
+/**
+ * A photo's place in its montage panel: the point of the photo at the panel's middle (0-1, across
+ * and down) and how far it's zoomed in past just filling the panel (1-4).
+ */
+export interface MontageFrame {
+  x: number;
+  y: number;
+  zoom: number;
 }
 
 export interface PersonProfile {
@@ -288,7 +300,9 @@ export class PeopleService {
     try {
       const { data, error } = await client
         .from('profile_montage_items')
-        .select('id, kind, storage_path, width, height, duration_seconds')
+        .select(
+          'id, kind, storage_path, width, height, duration_seconds, frame_x, frame_y, frame_zoom',
+        )
         .eq('user_id', personId)
         .order('position');
       if (error) throw new Error(error.message);
@@ -299,6 +313,9 @@ export class PeopleService {
         width: number | null;
         height: number | null;
         duration_seconds: string | number | null;
+        frame_x?: string | number | null;
+        frame_y?: string | number | null;
+        frame_zoom?: string | number | null;
       }[];
       if (rows.length === 0) return [];
       const signed = await client.storage.from(MONTAGE_BUCKET).createSignedUrls(
@@ -322,6 +339,14 @@ export class PeopleService {
                 width: row.width,
                 height: row.height,
                 durationSeconds: numberOrNull(row.duration_seconds),
+                frame:
+                  row.frame_x == null || row.frame_y == null || row.frame_zoom == null
+                    ? null
+                    : {
+                        x: Number(row.frame_x),
+                        y: Number(row.frame_y),
+                        zoom: Number(row.frame_zoom),
+                      },
               },
             ]
           : [];

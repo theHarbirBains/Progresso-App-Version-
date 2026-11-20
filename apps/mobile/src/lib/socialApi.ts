@@ -107,6 +107,21 @@ export interface MontageItem {
   height: number | null;
   /** A video's length; null for a photo. */
   durationSeconds: number | null;
+  /**
+   * Where its owner placed a photo in its panel (montage/montageFrame.ts); null -- or missing,
+   * from an API from before framing -- for the automatic framing, and for a video.
+   */
+  frame?: MontageFrame | null;
+}
+
+/**
+ * A photo's place in its montage panel: the point of the photo at the panel's middle (0-1, across
+ * and down) and how far it's zoomed in past just filling the panel (1-4).
+ */
+export interface MontageFrame {
+  x: number;
+  y: number;
+  zoom: number;
 }
 
 /** An achievement someone's earned, as their profile lists it -- never a nutrition one. */

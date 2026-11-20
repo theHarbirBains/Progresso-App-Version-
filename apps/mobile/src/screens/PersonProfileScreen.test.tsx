@@ -485,6 +485,34 @@ describe('PersonProfileScreen', () => {
     );
   });
 
+  it('plays their montage full screen when it is tapped -- one photo is enough to show it', async () => {
+    (getPersonProfile as jest.Mock).mockResolvedValue(
+      profile({
+        montage: [
+          {
+            id: 'm1',
+            kind: 'photo',
+            url: 'https://cdn.test/m1',
+            width: 10,
+            height: 10,
+            durationSeconds: null,
+          },
+        ],
+      }),
+    );
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('person-profile-montage'));
+    expect(await screen.findByTestId('person-profile-montage-viewer-title')).toHaveTextContent(
+      "Sam's montage",
+    );
+    expect(screen.getByTestId('person-profile-montage-viewer-position')).toHaveTextContent(
+      '1 of 1',
+    );
+    fireEvent.press(screen.getByTestId('person-profile-montage-viewer-close'));
+    expect(screen.queryByTestId('person-profile-montage-viewer')).toBeNull();
+  });
+
   it("shows no montage of someone who hasn't added to it, or whose activity you can't see", async () => {
     (getPersonProfile as jest.Mock).mockResolvedValue(profile({ montage: [] }));
     const { unmount } = renderScreen();

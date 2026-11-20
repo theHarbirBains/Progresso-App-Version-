@@ -4765,6 +4765,42 @@ async function main() {
         /permission denied/,
       );
 
+      // Framing a photo (20261206100000_profile_montage_framing.sql): its owner's, all three at once.
+      const frame = (who, id, x, y, zoom) =>
+        asUser(who, (c) =>
+          c.query(
+            'update public.profile_montage_items set frame_x = $2, frame_y = $3, frame_zoom = $4 where id = $1',
+            [id, x, y, zoom],
+          ),
+        );
+      record(
+        'Someone can frame a photo of their own montage',
+        (await frame(lifter, added[0].id, 0.3, 0.65, 1.5)).rowCount === 1,
+      );
+      await expectThrows(
+        asUser(lifter, (c) =>
+          c.query('update public.profile_montage_items set frame_x = 0.5 where id = $1', [
+            added[2].id,
+          ]),
+        ),
+        "A photo's framing is all of it or none",
+        /check constraint/,
+      );
+      await expectThrows(
+        frame(lifter, added[0].id, 0.5, 0.5, 6),
+        'A photo is zoomed in four times at most',
+        /check constraint/,
+      );
+      await expectThrows(
+        frame(lifter, added[1].id, 0.5, 0.5, 1),
+        "A montage's video isn't framed",
+        /check constraint/,
+      );
+      record(
+        "Nobody can frame someone else's montage",
+        (await frame(stranger, added[0].id, 0.1, 0.1, 2)).rowCount === 0,
+      );
+
       const reversed = [...added].reverse().map((row) => row.id);
       await asUserCommitted(lifter, (c) =>
         c.query('select public.reorder_profile_montage($1::uuid[])', [reversed]),

@@ -2,6 +2,8 @@ import { AccessibilityInfo, Animated, AppState, type AppStateStatus } from 'reac
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { createVideoPlayer } from 'expo-video';
 import type { MontageItem } from '../../lib/api';
+import { Image } from 'expo-image';
+import { framedRect, leanFor } from './montageFrame';
 import { MONTAGE_PANEL_MS, ProfileMontage } from './ProfileMontage';
 
 const photo = (id: string, extra: Partial<MontageItem> = {}): MontageItem => ({
@@ -24,9 +26,8 @@ const video = (id: string): MontageItem => ({
 
 /** Lays the strip out at `width` across, as the page would. */
 function layOut(width = 360) {
-  fireEvent(screen.getByTestId('montage'), 'layout', {
-    nativeEvent: { layout: { width, height: 0, x: 0, y: 0 } },
-  });
+  const strip = screen.getByTestId('montage').children[0] as never;
+  fireEvent(strip, 'layout', { nativeEvent: { layout: { width, height: 0, x: 0, y: 0 } } });
 }
 
 let appStateListener: ((state: AppStateStatus) => void) | null = null;
@@ -149,6 +150,66 @@ describe('ProfileMontage', () => {
     timing.mockClear();
     await act(async () => {});
     expect(timing).not.toHaveBeenCalled();
+  });
+
+  it('shows with just one photo -- it needs no more than that -- repeated to fill the strip', () => {
+    render(
+      <ProfileMontage
+        testID="montage"
+        items={[photo('a')]}
+        accent="#D99A50"
+        ownerName="Sam"
+        isOwn={false}
+      />,
+    );
+    layOut();
+    expect(screen.getByTestId('montage')).toHaveProp(
+      'accessibilityLabel',
+      "Sam's montage: 1 photo",
+    );
+    expect(screen.UNSAFE_getAllByType(Image).length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('draws a photo where its owner placed it in its panel', () => {
+    const frame = { x: 0.2, y: 0.3, zoom: 2 };
+    render(
+      <ProfileMontage
+        testID="montage"
+        items={[photo('a', { width: 1000, height: 1500, frame })]}
+        accent="#D99A50"
+        ownerName="Sam"
+        isOwn={false}
+      />,
+    );
+    layOut(400);
+    const height = Math.round(400 * 0.235);
+    const box = { width: 100 + leanFor(height), height };
+    const placed = framedRect(box, { width: 1000, height: 1500 }, frame);
+    expect(screen.UNSAFE_getAllByType(Image)[0]!.props.style).toEqual(
+      expect.objectContaining({ position: 'absolute', ...placed }),
+    );
+  });
+
+  it('opens full screen when tapped, and holds still while it is', () => {
+    const onOpen = jest.fn();
+    render(
+      <ProfileMontage
+        testID="montage"
+        items={[video('b')]}
+        accent="#D99A50"
+        ownerName="Sam"
+        isOwn={false}
+        onOpen={onOpen}
+        paused
+      />,
+    );
+    const strip = screen.getByTestId('montage');
+    expect(strip).toHaveProp('accessibilityRole', 'button');
+    fireEvent.press(strip);
+    expect(onOpen).toHaveBeenCalled();
+    const player = (createVideoPlayer as jest.Mock).mock.results[0]!.value;
+    expect(player.play).not.toHaveBeenCalled();
+    expect(player.pause).toHaveBeenCalled();
   });
 
   it('shows your own just as others see it, with nothing to tap', () => {

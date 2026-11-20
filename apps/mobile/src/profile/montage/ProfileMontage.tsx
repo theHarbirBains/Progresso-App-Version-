@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, AppState, Easing, StyleSheet, View } from 'react-native';
+import {
+  Animated,
+  AppState,
+  Easing,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { createVideoPlayer, VideoView, type VideoPlayer } from 'expo-video';
@@ -8,6 +17,7 @@ import type { MontageItem } from '../../lib/api';
 import { useReduceMotionPreference } from '../../navigation/navigationTransitions';
 import { useScreenFocused } from '../../navigation/useScreenFocused';
 import { mixHex, withAlpha } from '../../theme/accentColor';
+import { framedRect, HEIGHT_RATIO, leanFor, photoSize, SKEW, type Size } from './montageFrame';
 import { photoSource, videoSource } from './montageMedia';
 
 // A profile's montage, after Harbir's reference: one strip the width of the page under its
@@ -15,19 +25,17 @@ import { photoSource, videoSource } from './montageMedia';
 // accent that glows, with a brighter streak along its top and bottom edges. No title, count or
 // controls. It moves by itself, slowly and steadily left to right, through the photos and videos
 // and round again without a seam (fewer than four repeat to fill it); videos play muted, on a
-// loop, as they go by. It holds still, videos paused, while its page isn't the one in view or the
-// app is in the background, and under Reduce Motion it doesn't move (its videos still play).
+// loop, as they go by. A photo sits where its owner placed it in its panel (montageFrame.ts). It
+// holds still, videos paused, while its page isn't the one in view, the app is in the background
+// or the montage is open full screen (MontageViewer), and under Reduce Motion it doesn't move (its
+// videos still play). Tapped, it opens full screen.
 
-/** The strip's height for its width -- the reference's proportions. */
-const HEIGHT_RATIO = 0.235;
-/** How far each panel leans, degrees. */
-const SKEW = 12;
 /** How long the strip takes to move one panel along, ms. */
 export const MONTAGE_PANEL_MS = 3200;
 const RADIUS = radii.md;
 
 /** Whether the app is in front (a montage pauses in the background). */
-function useAppActive(): boolean {
+export function useAppActive(): boolean {
   const [active, setActive] = useState(AppState.currentState !== 'background');
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) =>
@@ -66,8 +74,16 @@ function useVideoPlayers(items: MontageItem[], playing: boolean): Map<string, Vi
   return players;
 }
 
-/** One panel's picture: the photo (a tall one kept toward its top, where a face usually is) or video. */
-function PanelMedia({ item, player }: { item: MontageItem; player: VideoPlayer | undefined }) {
+/** One panel's picture, in its upright `box`: the photo where its owner placed it, or the video. */
+function PanelMedia({
+  item,
+  player,
+  box,
+}: {
+  item: MontageItem;
+  player: VideoPlayer | undefined;
+  box: Size;
+}) {
   if (item.kind === 'video') {
     return player ? (
       <VideoView
@@ -79,45 +95,56 @@ function PanelMedia({ item, player }: { item: MontageItem; player: VideoPlayer |
       />
     ) : null;
   }
-  const tall = (item.height ?? 0) > (item.width ?? 0) * 1.1;
+  const size = photoSize(item);
   return (
     <Image
       source={photoSource(item)}
-      style={StyleSheet.absoluteFill}
+      style={
+        size
+          ? { position: 'absolute', ...framedRect(box, size, item.frame ?? null) }
+          : StyleSheet.absoluteFill
+      }
       contentFit="cover"
-      contentPosition={tall ? { top: '25%', left: '50%' } : 'center'}
       transition={200}
     />
   );
 }
 
-/** A slanted panel, `width` wide and `height` tall, its picture upright inside it. */
-function Panel({
+/**
+ * A slanted panel, `width` wide and `height` tall, its picture upright inside it -- in a box
+ * `leanFor(height)` wider, reaching each slanted edge (the box montageFrame.ts places a photo in).
+ */
+export function MontagePanel({
   left,
+  top = 0,
   width,
   height,
   seam,
+  style,
   children,
 }: {
   left: number;
+  top?: number;
   width: number;
   height: number;
   seam: string;
+  style?: StyleProp<ViewStyle>;
   children?: ReactNode;
 }) {
-  // Wide enough that, leant back upright, the picture still reaches each slanted edge.
-  const lean = height * Math.tan((SKEW * Math.PI) / 180);
+  const lean = leanFor(height);
   return (
     <View
       style={[
         styles.panel,
         {
           left,
+          top,
           width,
           height,
           borderLeftColor: seam,
           transform: [{ skewX: `-${SKEW}deg` }],
         },
+        style,
       ]}
     >
       <View
@@ -141,6 +168,8 @@ export function ProfileMontage({
   accent,
   ownerName,
   isOwn,
+  onOpen,
+  paused = false,
   testID,
 }: {
   items: MontageItem[];
@@ -148,18 +177,23 @@ export function ProfileMontage({
   /** Whose it is, for a screen reader ("Sam"). */
   ownerName: string;
   isOwn: boolean;
+  /** Opens it full screen. */
+  onOpen?: () => void;
+  /** Held still, videos paused -- while it's open full screen. */
+  paused?: boolean;
   testID?: string;
 }) {
   const [width, setWidth] = useState(0);
   const inView = useScreenFocused();
   const appActive = useAppActive();
   const reduceMotion = useReduceMotionPreference();
-  const live = inView && appActive;
+  const live = inView && appActive && !paused;
   const players = useVideoPlayers(items, live);
 
   const count = items.length;
   const height = Math.round(width * HEIGHT_RATIO);
   const slot = width / 4;
+  const box = { width: slot + leanFor(height), height };
   // The panels in a row, starting a period (every item once) and a panel to the left, with enough
   // to fill the strip and its slanted edges at every point between: moving the row right by a
   // period brings it back to just how it started.
@@ -224,12 +258,8 @@ export function ProfileMontage({
     .join(' and ');
   const label = `${isOwn ? 'Your' : `${ownerName}'s`} montage: ${contents}`;
 
-  return (
+  const strip = (
     <View
-      testID={testID}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={label}
       style={[styles.glow, { height: height || undefined, shadowColor: accent }]}
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
     >
@@ -240,9 +270,9 @@ export function ProfileMontage({
             style={[StyleSheet.absoluteFill, { transform: [{ translateX: offset }] }]}
           >
             {row.map(({ key, item, left }) => (
-              <Panel key={key} left={left} width={slot} height={height} seam={seam}>
-                <PanelMedia item={item} player={players.get(item.id)} />
-              </Panel>
+              <MontagePanel key={key} left={left} width={slot} height={height} seam={seam}>
+                <PanelMedia item={item} player={players.get(item.id)} box={box} />
+              </MontagePanel>
             ))}
           </Animated.View>
         ) : null}
@@ -261,6 +291,23 @@ export function ProfileMontage({
         end={{ x: 1, y: 0.5 }}
         style={[styles.streak, styles.streakBottom]}
       />
+    </View>
+  );
+
+  return onOpen ? (
+    <TouchableOpacity
+      testID={testID}
+      activeOpacity={0.85}
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint="Plays it full screen"
+    >
+      {strip}
+    </TouchableOpacity>
+  ) : (
+    <View testID={testID} accessible accessibilityRole="image" accessibilityLabel={label}>
+      {strip}
     </View>
   );
 }

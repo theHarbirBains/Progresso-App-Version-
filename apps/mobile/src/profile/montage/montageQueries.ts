@@ -1,4 +1,4 @@
-import type { MontageItem } from '../../lib/api';
+import type { MontageFrame, MontageItem } from '../../lib/api';
 import { UPLOAD_MAX_EDGE_PX } from '../../lib/imageResize';
 import { localFileBytes, uniquePhotoPath, uploadPhoto } from '../../lib/photoUpload';
 import { supabase } from '../../lib/supabase';
@@ -50,7 +50,7 @@ export function montageProblem(media: PickedMedia): string | null {
 export async function fetchOwnMontage(userId: string): Promise<OwnMontageItem[]> {
   const { data, error } = await supabase
     .from('profile_montage_items')
-    .select('id, kind, storage_path, width, height, duration_seconds')
+    .select('id, kind, storage_path, width, height, duration_seconds, frame_x, frame_y, frame_zoom')
     .eq('user_id', userId)
     .order('position');
   if (error) throw new Error(error.message);
@@ -61,6 +61,9 @@ export async function fetchOwnMontage(userId: string): Promise<OwnMontageItem[]>
     width: number | null;
     height: number | null;
     duration_seconds: string | number | null;
+    frame_x: string | number | null;
+    frame_y: string | number | null;
+    frame_zoom: string | number | null;
   }[];
   if (rows.length === 0) return [];
   const signed = await supabase.storage.from(BUCKET).createSignedUrls(
@@ -76,6 +79,10 @@ export async function fetchOwnMontage(userId: string): Promise<OwnMontageItem[]>
     width: row.width,
     height: row.height,
     durationSeconds: row.duration_seconds === null ? null : Number(row.duration_seconds),
+    frame:
+      row.frame_x == null || row.frame_y == null || row.frame_zoom == null
+        ? null
+        : { x: Number(row.frame_x), y: Number(row.frame_y), zoom: Number(row.frame_zoom) },
     path: row.storage_path,
   }));
 }
@@ -125,6 +132,19 @@ export async function addToMontage(userId: string, media: PickedMedia): Promise<
         : error.message,
     );
   }
+}
+
+/** Places one of your photos in its panel -- or, with null, back to the automatic framing. */
+export async function saveMontageFrame(id: string, frame: MontageFrame | null): Promise<void> {
+  const { error } = await supabase
+    .from('profile_montage_items')
+    .update({
+      frame_x: frame?.x ?? null,
+      frame_y: frame?.y ?? null,
+      frame_zoom: frame?.zoom ?? null,
+    })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
 }
 
 /** Puts your montage in this order (every one of yours, each once). */

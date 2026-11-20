@@ -15,6 +15,7 @@ import { SkeletonRows } from '../design/Skeleton';
 import { Text } from '../design/Text';
 import { colors, radii, spacing, typeScale } from '../design/theme';
 import type { RootStackScreenProps } from '../navigation/types';
+import { photoSize } from '../profile/montage/montageFrame';
 import { photoSource } from '../profile/montage/montageMedia';
 import {
   addToMontage,
@@ -27,6 +28,7 @@ import {
   type OwnMontageItem,
   type PickedMedia,
 } from '../profile/montage/montageQueries';
+import { MontageViewer } from '../profile/montage/MontageViewer';
 import { ProfileMontage } from '../profile/montage/ProfileMontage';
 import { settingsStyles } from '../settings/settingsStyles';
 import { useAppTheme } from '../theme/appThemeContext';
@@ -40,9 +42,10 @@ function clock(seconds: number): string {
 }
 
 /**
- * Your montage (from Edit Profile -- the profile itself only shows it): it as your profile shows it, then each photo
- * or video in its place -- moved earlier or later, or removed -- and Add Photos or Videos, up to
- * four in all. Every change saves as it's made, and your profile shows it the next time it's in
+ * Your montage (from Edit Profile -- the profile itself only shows it): it as your profile shows it
+ * (tap it to play it full screen), then each photo or video in its place -- a photo tapped to
+ * adjust it within its panel, any moved earlier or later, or removed -- and Add Photos or Videos,
+ * up to four in all. Every change saves as it's made, and your profile shows it the next time it's in
  * view. Read each time the page opens.
  */
 export function ProfileMontageScreen({ navigation }: Props) {
@@ -54,6 +57,7 @@ export function ProfileMontageScreen({ navigation }: Props) {
   /** What's being saved ("Adding 1 of 2..."), while it is. */
   const [working, setWorking] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [viewing, setViewing] = useState(false);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -179,6 +183,8 @@ export function ProfileMontageScreen({ navigation }: Props) {
               accent={accent.accent}
               ownerName="Your"
               isOwn
+              onOpen={() => setViewing(true)}
+              paused={viewing}
             />
           ) : null}
 
@@ -191,6 +197,8 @@ export function ProfileMontageScreen({ navigation }: Props) {
               ) : (
                 items.map((item, index) => {
                   const name = item.kind === 'video' ? 'Video' : 'Photo';
+                  // A photo opens to be moved and zoomed within its panel.
+                  const adjustable = item.kind === 'photo' && photoSize(item) !== null;
                   return (
                     <ListRow
                       key={item.id}
@@ -199,8 +207,16 @@ export function ProfileMontageScreen({ navigation }: Props) {
                       subtitle={
                         item.kind === 'video' && item.durationSeconds
                           ? clock(item.durationSeconds)
+                          : adjustable
+                            ? 'Tap to adjust'
+                            : undefined
+                      }
+                      onPress={
+                        adjustable && working === null
+                          ? () => navigation.navigate('ProfileMontageFrame', { item })
                           : undefined
                       }
+                      chevron={false}
                       divider={index > 0}
                       leading={
                         item.kind === 'video' ? (
@@ -242,7 +258,7 @@ export function ProfileMontageScreen({ navigation }: Props) {
                           />
                         </View>
                       }
-                      accessibilityLabel={`${index + 1}. ${name}`}
+                      accessibilityLabel={`${index + 1}. ${name}${adjustable ? ', adjust it' : ''}`}
                     />
                   );
                 })
@@ -270,6 +286,16 @@ export function ProfileMontageScreen({ navigation }: Props) {
             {count} of {MONTAGE_LIMIT}. Photos, and videos up to a minute, shown muted. You and the
             people whose follow you accepted see it.
           </Text>
+
+          <MontageViewer
+            testID="profile-montage-viewer"
+            items={items}
+            visible={viewing}
+            ownerName="Your"
+            isOwn
+            onClose={() => setViewing(false)}
+            accent={accent.accent}
+          />
         </>
       )}
     </Screen>

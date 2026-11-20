@@ -68,6 +68,28 @@ describe('ProfileMontageScreen', () => {
     expectNoBareText();
   });
 
+  it('opens a photo to adjust it within its panel; a video has nothing to adjust', async () => {
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('profile-montage-item-0'));
+    expect(screen.getByTestId('profile-montage-item-0')).toHaveTextContent(/Tap to adjust/);
+    expect(navigation.navigate).toHaveBeenCalledWith('ProfileMontageFrame', {
+      item: expect.objectContaining({ id: 'a', kind: 'photo' }),
+    });
+    navigation.navigate.mockClear();
+    fireEvent.press(screen.getByTestId('profile-montage-item-1'));
+    expect(navigation.navigate).not.toHaveBeenCalled();
+  });
+
+  it('plays your montage full screen from its preview', async () => {
+    renderScreen();
+
+    fireEvent.press(await screen.findByTestId('profile-montage-preview'));
+    expect(await screen.findByTestId('profile-montage-viewer')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('profile-montage-viewer-close'));
+    expect(screen.queryByTestId('profile-montage-viewer')).toBeNull();
+  });
+
   it('adds what you pick -- no more than there is room for -- and reads it again', async () => {
     (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValueOnce({
       canceled: false,

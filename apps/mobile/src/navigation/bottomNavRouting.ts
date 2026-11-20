@@ -37,6 +37,8 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   ProgressExerciseDetail: 'progress',
   AccountSettings: 'you',
   SettingsPersonalInfo: 'you',
+  ProfileMontage: 'you',
+  ProfileMontageFrame: 'you',
   SettingsWorkoutPreferences: 'you',
   RepRangeExceptions: 'you',
   SettingsNutrition: 'you',

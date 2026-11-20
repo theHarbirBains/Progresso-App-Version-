@@ -50,6 +50,7 @@ import { formatCardDate } from '../workouts/workoutFormat';
 import { setText } from '../social/setText';
 import { PeopleList, personLabel } from '../social/PeopleList';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
+import { MontageViewer } from '../profile/montage/MontageViewer';
 import { ProfileMontage } from '../profile/montage/ProfileMontage';
 import { useSocialSummaries } from '../social/useSocialSummaries';
 import { personProfileStyles as styles } from './personProfileStyles';
@@ -200,6 +201,8 @@ export function PersonProfilePage({
   const [tab, setTab] = useState<Tab>('stats');
   const [liftQuery, setLiftQuery] = useState('');
   const [mutualsOpen, setMutualsOpen] = useState(false);
+  // Their montage, playing full screen.
+  const [montageOpen, setMontageOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!accessToken || !userId) return;
@@ -918,16 +921,30 @@ export function PersonProfilePage({
               </View>
             </View>
 
-            {/* Their montage, once you can see their activity and they've added to it -- yours just
-                as others see it (it's added to and changed from Edit Profile). */}
+            {/* Their montage, once you can see their activity and they've added to it -- one or more,
+                yours just as others see it (it's added to and changed from Edit Profile). Tapped,
+                it plays full screen. */}
             {profile.montage && profile.montage.length > 0 ? (
-              <ProfileMontage
-                testID="person-profile-montage"
-                items={profile.montage}
-                accent={theme.accent}
-                ownerName={firstName(profile)}
-                isOwn={profile.isSelf}
-              />
+              <>
+                <ProfileMontage
+                  testID="person-profile-montage"
+                  items={profile.montage}
+                  accent={theme.accent}
+                  ownerName={firstName(profile)}
+                  isOwn={profile.isSelf}
+                  onOpen={() => setMontageOpen(true)}
+                  paused={montageOpen}
+                />
+                <MontageViewer
+                  testID="person-profile-montage-viewer"
+                  items={profile.montage}
+                  visible={montageOpen}
+                  ownerName={firstName(profile)}
+                  isOwn={profile.isSelf}
+                  onClose={() => setMontageOpen(false)}
+                  accent={theme.accent}
+                />
+              </>
             ) : null}
 
             {profile.rank ? renderRank(profile, title) : null}

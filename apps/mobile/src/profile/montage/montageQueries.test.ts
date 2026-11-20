@@ -6,6 +6,7 @@ import {
   montageProblem,
   removeFromMontage,
   reorderMontage,
+  saveMontageFrame,
 } from './montageQueries';
 
 jest.mock('../../lib/photoUpload', () => ({
@@ -36,6 +37,7 @@ function table(result: { data?: unknown; error?: { message: string } | null }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = {
     insert: jest.fn(() => Promise.resolve({ data: null, error: result.error ?? null })),
+    update: jest.fn(() => chain),
     delete: jest.fn(() => chain),
     select: jest.fn(() => chain),
     eq: jest.fn(() => chain),
@@ -166,6 +168,9 @@ describe('your montage', () => {
           width: 10,
           height: 20,
           duration_seconds: null,
+          frame_x: '0.2500',
+          frame_y: '0.7500',
+          frame_zoom: '2.00',
         },
         {
           id: 'b',
@@ -182,9 +187,36 @@ describe('your montage', () => {
 
     expect(rows.order).toHaveBeenCalledWith('position');
     expect(items).toEqual([
-      expect.objectContaining({ id: 'a', url: 'https://cdn.test/a', path: 'me/a.jpg' }),
-      expect.objectContaining({ id: 'b', url: 'https://cdn.test/b', durationSeconds: 9.5 }),
+      expect.objectContaining({
+        id: 'a',
+        url: 'https://cdn.test/a',
+        path: 'me/a.jpg',
+        frame: { x: 0.25, y: 0.75, zoom: 2 },
+      }),
+      expect.objectContaining({
+        id: 'b',
+        url: 'https://cdn.test/b',
+        durationSeconds: 9.5,
+        frame: null,
+      }),
     ]);
+  });
+
+  it("keeps a photo's place in its panel, or puts it back to automatic", async () => {
+    const rows = table({});
+    await saveMontageFrame('a', { x: 0.3, y: 0.6, zoom: 1.5 });
+    expect(rows.update).toHaveBeenCalledWith({ frame_x: 0.3, frame_y: 0.6, frame_zoom: 1.5 });
+    expect(rows.eq).toHaveBeenCalledWith('id', 'a');
+
+    await saveMontageFrame('a', null);
+    expect(rows.update).toHaveBeenLastCalledWith({
+      frame_x: null,
+      frame_y: null,
+      frame_zoom: null,
+    });
+
+    table({ error: { message: 'permission denied' } });
+    await expect(saveMontageFrame('a', null)).rejects.toThrow('permission denied');
   });
 
   it('is put in order in one go, and loses one row first, then its file', async () => {

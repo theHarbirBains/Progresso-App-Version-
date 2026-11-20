@@ -54,7 +54,8 @@ jest.mock('expo-image-picker', () => ({
 }));
 
 // expo-video plays a profile montage's videos. Its players and views are native: a test gets a
-// player whose methods are jest.fn()s (play, pause, release) and a plain view in VideoView's place.
+// player whose methods are jest.fn()s (play, pause, release, addListener) and a plain view in
+// VideoView's place.
 jest.mock('expo-video', () => {
   const { View } = require('react-native');
   return {
@@ -63,9 +64,17 @@ jest.mock('expo-video', () => {
       muted: false,
       loop: false,
       audioMixingMode: 'auto',
+      duration: 0,
+      timeUpdateEventInterval: 0,
       play: jest.fn(),
       pause: jest.fn(),
       release: jest.fn(),
+      // Its events (timeUpdate, playToEnd): a test fires one through `listeners`.
+      listeners: {},
+      addListener: jest.fn(function addListener(event, listener) {
+        this.listeners[event] = listener;
+        return { remove: jest.fn() };
+      }),
     })),
     VideoView: (props) => require('react').createElement(View, { ...props, testID: 'video-view' }),
   };
