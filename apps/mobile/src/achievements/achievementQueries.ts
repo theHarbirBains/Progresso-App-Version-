@@ -11,6 +11,7 @@ export type AchievementCategory =
   | 'consistency'
   | 'strength'
   | 'muscles'
+  | 'cardio'
   | 'progression'
   | 'exploration'
   | 'volume'
@@ -19,7 +20,7 @@ export type AchievementCategory =
 
 export interface AchievementLevel {
   level: number;
-  /** In the figure's own unit: kg for weight (set in pounds), a count, or a percent. */
+  /** In the figure's own unit: kg for weight (set in pounds), km for distance (set in miles), a count, or a percent. */
   goal: number;
   ap: number;
 }
@@ -33,7 +34,7 @@ export interface AchievementDefinition {
   description: string;
   icon: keyof typeof Feather.glyphMap;
   metric: string;
-  unit: 'count' | 'kg' | 'percent';
+  unit: 'count' | 'kg' | 'percent' | 'km';
   /** What a goal's figure counts: "workouts", "lifted on biceps". */
   goalLabel: string;
   visibility: 'public' | 'private';

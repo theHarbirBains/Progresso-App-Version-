@@ -15,6 +15,7 @@ export const CATEGORY_LABELS: Record<AchievementCategory, string> = {
   consistency: 'Consistency',
   strength: 'Strength',
   muscles: 'Muscles',
+  cardio: 'Cardio',
   progression: 'Progression',
   exploration: 'Exploration',
   volume: 'Volume',
@@ -25,6 +26,7 @@ export const CATEGORY_LABELS: Record<AchievementCategory, string> = {
 export const CATEGORY_ORDER: AchievementCategory[] = [
   'workouts',
   'muscles',
+  'cardio',
   'strength',
   'progression',
   'volume',
@@ -62,6 +64,15 @@ function count(value: number): string {
   return Math.floor(value).toLocaleString('en-US');
 }
 
+const KM_PER_MILE = 1.609344;
+
+/** A distance in the reader's own unit -- miles with pounds, km with kilograms -- as a bare figure. */
+function distanceFigure(km: number, weightUnit: 'kg' | 'lb'): string {
+  const shown = weightUnit === 'lb' ? km / KM_PER_MILE : km;
+  // A tenth while it's short ("3.2"), whole once it's long ("1,250").
+  return shown < 100 ? String(Math.floor(shown * 10) / 10) : count(Math.round(shown));
+}
+
 /**
  * A figure in its unit -- weight to the nearest whole in the reader's own, so a goal set in
  * pounds reads as it was set.
@@ -72,6 +83,8 @@ export function figureText(
   weightUnit: 'kg' | 'lb',
 ): string {
   if (unit === 'kg') return `${count(Math.round(fromKg(value, weightUnit)))} ${weightUnit}`;
+  if (unit === 'km')
+    return `${distanceFigure(value, weightUnit)} ${weightUnit === 'lb' ? 'mi' : 'km'}`;
   if (unit === 'percent') return `${Number(value.toFixed(1))}%`;
   return count(value);
 }
@@ -113,7 +126,9 @@ export function achievementStatuses(
     const currentText =
       definition.unit === 'kg'
         ? count(Math.round(fromKg(shownValue, weightUnit)))
-        : figureText(shownValue, definition.unit, weightUnit);
+        : definition.unit === 'km'
+          ? distanceFigure(shownValue, weightUnit)
+          : figureText(shownValue, definition.unit, weightUnit);
     return {
       definition,
       level,

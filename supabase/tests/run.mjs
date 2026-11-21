@@ -6138,6 +6138,102 @@ async function main() {
     );
   }
 
+  // ---- cardio achievements (20261209100000_cardio_achievements.sql) ----
+  {
+    const runner = randomUUID();
+    await admin.query("insert into auth.users (id, email) values ($1, 'ca-runner@test.local')", [
+      runner,
+    ]);
+    const press = (
+      await admin.query(
+        "insert into public.exercises (name, muscle_group, created_by, measurement_type) values ('CA Press', 'chest', $1, 'weight_reps') returning id",
+        [runner],
+      )
+    ).rows[0].id;
+    // A finished (or open) workout at `at` with cardio of { activity, seconds, metres }, lifting too.
+    const session = async (at, cardio, { lift = false, completed = true } = {}) => {
+      const w = (
+        await admin.query(
+          "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'CA', $2, $3) returning id",
+          [runner, at, completed ? at : null],
+        )
+      ).rows[0].id;
+      if (lift) {
+        const we = (
+          await admin.query(
+            'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, 1) returning id',
+            [w, press],
+          )
+        ).rows[0].id;
+        await admin.query(
+          'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, 1, 60, 8, $2)',
+          [we, at],
+        );
+      }
+      for (const c of cardio) {
+        await admin.query(
+          'insert into public.workout_cardio (workout_id, activity, duration_seconds, distance_m) values ($1, $2, $3, $4)',
+          [w, c.activity, c.seconds, c.metres ?? null],
+        );
+      }
+      return w;
+    };
+    await session('2026-01-05T10:00:00Z', [
+      { activity: 'outdoor_run', seconds: 1800, metres: 5000 },
+    ]);
+    // A day's treadmill typed in by mistake counts 4 hours and 100 km at most.
+    await session(
+      '2026-01-07T10:00:00Z',
+      [{ activity: 'treadmill', seconds: 86400, metres: 400000 }],
+      { lift: true },
+    );
+    await session('2026-01-09T10:00:00Z', [
+      { activity: 'cycling', seconds: 600 },
+      { activity: 'rowing', seconds: 600, metres: 2000 },
+      { activity: 'swimming', seconds: 1200, metres: 1000 },
+    ]);
+    // An unfinished workout's cardio counts toward nothing.
+    await session('2026-01-10T10:00:00Z', [{ activity: 'walking', seconds: 3600, metres: 5000 }], {
+      completed: false,
+    });
+    const m = (await admin.query("select public.achievement_metrics($1, 'UTC') as m", [runner]))
+      .rows[0].m;
+    record(
+      'Cardio achievements count finished workouts with cardio, their time and distance (each activity up to 4 h and 100 km), its kinds and workouts with lifting too',
+      m.cardio_workouts === 3 &&
+        m.cardio_minutes === 30 + 240 + 10 + 10 + 20 &&
+        Number(m.cardio_distance_km) === 5 + 100 + 2 + 1 &&
+        m.cardio_kinds === 5 &&
+        m.hybrid_workouts === 1 &&
+        m.workouts === 3,
+      JSON.stringify(m),
+    );
+    const awarded = await asUserCommitted(runner, async (c) =>
+      (await c.query("select * from public.award_my_achievements('UTC')")).rows.map(
+        (r) => `${r.achievement_id}@${r.level}`,
+      ),
+    );
+    const cardioAwards = awarded
+      .filter((id) =>
+        /^(heart-starter|hybrid-athlete|cross-trainer|engine-room|long-haul|mile-marker)@/.test(id),
+      )
+      .sort();
+    record(
+      'A cardio athlete is awarded Heart Starter, Hybrid Athlete, Cross Trainer and their Long Haul and Mile Marker levels',
+      JSON.stringify(cardioAwards) ===
+        JSON.stringify([
+          'cross-trainer@1',
+          'heart-starter@1',
+          'hybrid-athlete@1',
+          'long-haul@1',
+          'long-haul@2',
+          'mile-marker@1',
+          'mile-marker@2',
+        ]),
+      JSON.stringify(cardioAwards),
+    );
+  }
+
   // ---- achievement levels: awarding, idempotency, muscles, time zones, integrity ----
   {
     const ath = randomUUID();
@@ -6229,10 +6325,10 @@ async function main() {
     ).rows;
     const ladder = (id) => levels.filter((l) => l.achievement_id === id);
     record(
-      'The catalogue holds 32 achievements and 175 levels, 50,805 AP in all',
-      definitions.length === 32 &&
-        levels.length === 175 &&
-        levels.reduce((sum, l) => sum + l.ap, 0) === 50805,
+      'The catalogue holds 38 achievements and 203 levels, 58,230 AP in all',
+      definitions.length === 38 &&
+        levels.length === 203 &&
+        levels.reduce((sum, l) => sum + l.ap, 0) === 58230,
       `${definitions.length} / ${levels.length}`,
     );
     record(
@@ -6514,12 +6610,12 @@ async function main() {
       (await seen(other, 'achievement_awards')) === 0 &&
         (await seen(other, 'achievement_progress')) === 0 &&
         (await seen(ath, 'achievement_awards')) === before.awards &&
-        (await seen(ath, 'achievement_progress')) === 32,
+        (await seen(ath, 'achievement_progress')) === 38,
     );
     record(
       'Anyone signed in reads the catalogue and its levels',
-      (await seen(other, 'achievement_definitions')) === 32 &&
-        (await seen(other, 'achievement_levels')) === 175,
+      (await seen(other, 'achievement_definitions')) === 38 &&
+        (await seen(other, 'achievement_levels')) === 203,
     );
 
     // Everyone is awarded, whether or not their own app has asked -- never a tracked client's

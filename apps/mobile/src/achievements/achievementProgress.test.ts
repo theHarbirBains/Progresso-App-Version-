@@ -133,6 +133,36 @@ describe('achievementStatuses', () => {
   });
 });
 
+describe('a distance achievement', () => {
+  const MI = 1.609344;
+  const mileMarker = definition({
+    id: 'mile-marker',
+    category: 'cardio',
+    title: 'Mile Marker',
+    metric: 'cardio_distance_km',
+    unit: 'km',
+    goalLabel: 'covered',
+    levels: [
+      { level: 1, goal: 5 * MI, ap: 20 },
+      { level: 2, goal: 25 * MI, ap: 40 },
+    ],
+  });
+  const progress = [{ achievementId: 'mile-marker', value: 12, level: 1 }];
+
+  it('reads its goals in miles with pounds, and in km with kilograms', () => {
+    expect(goalText(mileMarker, 25 * MI, 'lb')).toBe('25 mi covered');
+    expect(goalText(mileMarker, 25 * MI, 'kg')).toBe('40.2 km covered');
+    expect(goalText(mileMarker, 2500 * MI, 'lb')).toBe('2,500 mi covered');
+  });
+
+  it('shows where you are against the next goal, its unit once', () => {
+    const [lb] = achievementStatuses([mileMarker], [award('mile-marker', 1, 20)], progress, 'lb');
+    expect(lb.progressLabel).toBe('7.4 / 25 mi');
+    const [kg] = achievementStatuses([mileMarker], [award('mile-marker', 1, 20)], progress, 'kg');
+    expect(kg.progressLabel).toBe('12 / 40.2 km');
+  });
+});
+
 describe('lifetimePoints', () => {
   it('is the sum of every award', () => {
     expect(
