@@ -1,7 +1,7 @@
 import { recipeMicronutrients } from '../foodGroups';
 import type { FoodRow } from '../foodQueries';
 import type { FoodLogRow } from '../foodLogQueries';
-import { dayLine, displayName, overUpperLimit, weekLine } from './display';
+import { dayLine, displayName, leadSentence, overUpperLimit, weekLine } from './display';
 import { isComplete, nutrientIntake, progressOf, weekIntake } from './intake';
 import {
   DRI_FOOTNOTES,
@@ -9,7 +9,14 @@ import {
   NUTRIENT_SOURCES,
   REFERENCE_VALUES,
 } from './nutrientCatalog.generated';
-import { formatAmount, nutrientById, readAmounts, scaleAmounts, unitWithBasis } from './nutrients';
+import {
+  formatAmount,
+  nutrientById,
+  nutrientsIn,
+  readAmounts,
+  scaleAmounts,
+  unitWithBasis,
+} from './nutrients';
 import { readStoredChoices } from './referenceSettings';
 import {
   lifeStageApplies,
@@ -21,6 +28,7 @@ import {
   valueNotes,
 } from './referenceValues';
 import { logsByDay, weekDayKeys } from './weekDays';
+import { nutrientWeekDays, weekOf, weekSummary } from './weekTracker';
 
 const NOW = new Date(2026, 10, 21, 12);
 // Born mid-1990: 36 on November 21, 2026 -- Health Canada's 31-50 group.
@@ -214,7 +222,7 @@ describe("a day's intake", () => {
       dayLine(nutrientById('selenium')!, day, referenceRowFor('selenium', person(ADULT))),
     ).toMatchObject({
       amount: 27.6,
-      coverage: 'From 1 of 3 foods',
+      coverage: '1 of 3 foods',
     });
   });
 
@@ -225,7 +233,7 @@ describe("a day's intake", () => {
       referenceRowFor('vitamin_b12', person(ADULT)),
     );
     expect(entry).toMatchObject({ amount: null, figure: '— / 2.4 mcg', fraction: null });
-    expect(entry.caption).toBe('No data from the 3 foods logged');
+    expect(entry.caption).toBe('No data');
   });
 
   it('reads as a share of the recommendation, with a bar that stops at full and no warning past it', () => {
@@ -235,20 +243,22 @@ describe("a day's intake", () => {
       referenceRowFor('vitamin_c', person(ADULT)),
     );
     expect(vitaminC).toMatchObject({ figure: '153 / 75 mg', percent: 204, fraction: 1 });
-    expect(vitaminC.caption).toBe('204% of daily recommendation');
+    expect(vitaminC.caption).toBe('204%');
+    expect(vitaminC.longCaption).toBe('204% of your recommendation');
     expect(progressOf(68, 90)).toEqual({ percent: 76, fraction: 68 / 90 });
     const vitaminK = dayLine(
       nutrientById('vitamin_k')!,
       [log({ vitamin_k: 45 })],
       referenceRowFor('vitamin_k', person(ADULT)),
     );
-    expect(vitaminK.caption).toBe('50% of adequate intake');
+    // An AI is told apart from an RDA where the page says what the percentage is of.
+    expect(vitaminK.longCaption).toBe('50% of your adequate intake');
   });
 
   it('gives the fats with no target their guidance, never a percentage', () => {
     const entry = dayLine(nutrientById('saturated_fat')!, [log({ saturated_fat: 12 })], null);
     expect(entry).toMatchObject({ figure: '12 g', percent: null, fraction: null });
-    expect(entry.caption).toBe('No daily target — as low as possible');
+    expect(entry.caption).toBe('No target · as low as possible');
   });
 
   it("is only held to an upper limit that's about food", () => {
@@ -284,8 +294,9 @@ describe("a week's average", () => {
       weekLine(nutrientById('iron')!, days, referenceRowFor('iron', person(ADULT))),
     ).toMatchObject({
       amount: 12,
-      coverage: 'Over 2 days, some foods without data',
-      caption: 'Averaging 67% of daily recommendation',
+      coverage: '2 days · some foods lack data',
+      caption: 'Avg 67%',
+      longCaption: 'Averaging 67% of your recommendation',
     });
   });
 
@@ -352,5 +363,75 @@ describe('the choices kept on the phone', () => {
     });
     expect(readStoredChoices('not json')).toEqual({});
     expect(readStoredChoices(null)).toEqual({});
+  });
+});
+
+describe('the weekly tracker', () => {
+  // Wednesday, November 18, 2026: Sunday 15 to Saturday 21, the 19th on ahead.
+  const week = weekOf(
+    '2026-11-18',
+    ['2026-11-15', '2026-11-16', '2026-11-17', '2026-11-18'],
+    [[log({ vitamin_c: 80, iron: 20 })], [], [log({ vitamin_c: 30 }), log(null)], [log(null)]],
+    new Date(2026, 10, 18, 12),
+  );
+
+  it('is the whole week, Sunday to Saturday, the days ahead marked and nothing counted for them', () => {
+    expect(week.map((day) => `${day.letter}${day.future ? '+' : ''}`)).toEqual([
+      'S',
+      'M',
+      'T',
+      'W',
+      'T+',
+      'F+',
+      'S+',
+    ]);
+    expect(week[4].logs).toEqual([]);
+  });
+
+  it("gives a nutrient's day its share of the reference -- unknown, not 0, where no food had it", () => {
+    const days = nutrientWeekDays(
+      nutrientById('vitamin_c')!,
+      week,
+      referenceRowFor('vitamin_c', person(ADULT)),
+    );
+    expect(days.map((day) => day.percent)).toEqual([107, null, 40, null, null, null, null]);
+    expect(days[0].fraction).toBe(1);
+    // Nothing logged on Monday; Wednesday logged, but nothing with vitamin C data.
+    expect(days[1]).toMatchObject({ logged: false, amount: null });
+    expect(days[3]).toMatchObject({ logged: true, amount: null });
+  });
+
+  it('counts, each day, the nutrients that reached their reference value -- never the fats with guidance', () => {
+    const summary = weekSummary(
+      [...nutrientsIn('vitamin'), ...nutrientsIn('mineral'), ...nutrientsIn('other')],
+      week,
+      (id) => referenceRowFor(id, person(ADULT)),
+    );
+    // Vitamin C (75 mg) and iron (18 mg) on Sunday; nothing reached on Tuesday.
+    expect(summary.map((day) => day.reached)).toEqual([2, 0, 0, 0, 0, 0, 0]);
+    expect(summary[0].tracked).toBe(26);
+    expect(summary.map((day) => day.logged)).toEqual([
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+});
+
+describe('leadSentence', () => {
+  it('splits off the first sentence, keeping the rest for More', () => {
+    expect(leadSentence('Helps absorb calcium. It keeps bones strong.')).toEqual({
+      lead: 'Helps absorb calcium.',
+      rest: 'It keeps bones strong.',
+    });
+    expect(leadSentence('One sentence only.')).toEqual({ lead: 'One sentence only.', rest: null });
+    // 2.4 mcg isn't the end of a sentence.
+    expect(leadSentence('Adults need 2.4 mcg a day. More in pregnancy.').lead).toBe(
+      'Adults need 2.4 mcg a day.',
+    );
   });
 });

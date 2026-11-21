@@ -24,8 +24,13 @@ jest.mock('../nutrition/useDayLogs', () => ({
     error: null,
   }),
 }));
+// The week read: just the day asked for, with nothing logged -- the page puts today's own foods in.
 jest.mock('../nutrition/micronutrients/useWeekLogs', () => ({
-  useWeekLogs: () => ({ days: [], logs: null, error: null }),
+  useWeekLogs: (_userId: string, day: string | null) => ({
+    days: day ? [day] : [],
+    logs: day ? [[]] : null,
+    error: null,
+  }),
 }));
 
 const navigation = {
@@ -67,26 +72,41 @@ describe('NutrientDetailScreen', () => {
     expect(await screen.findByTestId('nutrient-detail-amount')).toHaveTextContent('14');
     expect(screen.getByTestId('nutrient-detail-intake')).toHaveTextContent(/of 15 mcg/);
     expect(screen.getByTestId('nutrient-detail-caption')).toHaveTextContent(
-      /93% of daily recommendation/,
+      /93% of your recommendation/,
     );
     expect(screen.getByTestId('nutrient-detail-coverage')).toHaveTextContent(/From 2 of 3 foods/);
     expect(screen.getByTestId('nutrient-detail-foods')).toHaveTextContent(
       /Salmon.*11 mcg.*Milk.*2.9 mcg/,
     );
     expect(screen.getByTestId('nutrient-detail-foods-missing')).toHaveTextContent(
-      /No vitamin d data for Granola bar — not counted, rather than counted as none/,
+      /No data, so not counted: Granola bar/,
+    );
+  });
+
+  it('shows the week day by day against the target -- unknown, not 0, on a day without data', async () => {
+    renderDetail('vitamin_d');
+    const today = todayKey();
+    // Today's 13.9 mcg of the 15: 93%.
+    expect(await screen.findByTestId(`nutrient-detail-week-bars-${today}`)).toHaveProp(
+      'accessibilityLabel',
+      expect.stringMatching(/93%$/),
+    );
+    expect(screen.getByTestId('nutrient-detail-week')).toHaveTextContent(
+      /This Week.*against 15 mcg/,
     );
   });
 
   it('explains it in plain words, from its sources', async () => {
     renderDetail('vitamin_d');
     expect(await screen.findByTestId('nutrient-detail-does')).toHaveTextContent(
-      /Helps your body absorb calcium/,
+      /What It Does.*Helps your body absorb calcium/,
     );
+    // Short: the first sentence, the rest a tap away -- nothing cut.
+    expect(screen.getByTestId('nutrient-detail-low')).not.toHaveTextContent(/rickets in children/);
+    fireEvent.press(screen.getByTestId('nutrient-detail-low-text-more'));
     expect(screen.getByTestId('nutrient-detail-low')).toHaveTextContent(/rickets in children/);
-    expect(screen.getByTestId('nutrient-detail-low')).toHaveTextContent(
-      /doesn’t mean a deficiency/,
-    );
+    expect(screen.getByTestId('nutrient-detail-low')).toHaveTextContent(/isn’t a deficiency/);
+    fireEvent.press(screen.getByTestId('nutrient-detail-high-text-more'));
     expect(screen.getByTestId('nutrient-detail-high')).toHaveTextContent(
       /Kidney stones|kidney stones/,
     );
@@ -104,7 +124,7 @@ describe('NutrientDetailScreen', () => {
       /100 mcg per day \(4,000 IU\)/,
     );
     expect(screen.getByTestId('nutrient-detail-upper-limit')).toHaveTextContent(
-      /This is a safety limit, not a daily goal/,
+      /A safety limit, not a daily goal/,
     );
   });
 
@@ -128,6 +148,9 @@ describe('NutrientDetailScreen', () => {
     mockTodayLogs = [food('log-1', 'Seeds', { magnesium: 500 })];
     renderDetail('magnesium');
     expect(await screen.findByTestId('nutrient-detail-upper-limit')).toHaveTextContent(
+      /A safety limit for supplements, not food/,
+    );
+    expect(screen.getByTestId('nutrient-detail-upper-limit')).toHaveTextContent(
       /represents intake from a pharmacological agent only/,
     );
     expect(screen.queryByTestId('nutrient-detail-over')).toBeNull();
@@ -147,6 +170,7 @@ describe('NutrientDetailScreen', () => {
       'Health Canada hasn’t set an upper limit.',
     );
     // With no other source on too much B12, its note on the missing limit is what's said.
+    fireEvent.press(screen.getByTestId('nutrient-detail-high-text-more'));
     expect(screen.getByTestId('nutrient-detail-high')).toHaveTextContent(
       /ULs could not be established for vitamin B12.*does not mean that there is no potential for adverse effects/,
     );

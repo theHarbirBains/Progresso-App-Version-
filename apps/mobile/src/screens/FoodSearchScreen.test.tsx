@@ -10,6 +10,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { searchFoods } from '../lib/api';
 import { fetchTodaysFoodLogs, logFood } from '../nutrition/foodLogQueries';
 import { FoodLogProvider } from '../nutrition/FoodLogProvider';
+import { forgetSearches } from '../nutrition/foodSearchMemory';
 import { ProfileProvider } from '../profile/ProfileProvider';
 import { FoodSearchScreen } from './FoodSearchScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
@@ -126,6 +127,8 @@ async function flush() {
 
 beforeEach(() => {
   jest.useFakeTimers();
+  // Every test searches afresh: nothing remembered from the one before.
+  forgetSearches();
   mockUseAuth.mockReturnValue({
     user: { id: 'user-1' },
     session: { access_token: 'token-123' },
@@ -161,6 +164,35 @@ describe('FoodSearchScreen', () => {
     expect(await screen.findByTestId('food-search-result-food-1')).toHaveTextContent(
       /Chicken Breast/,
     );
+  });
+
+  it('shows a search already answered at once, asking nothing again', async () => {
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    await typeSearch('chicken');
+    await screen.findByTestId('food-search-result-food-1');
+    const asked = mockSearchFoods.mock.calls.length;
+
+    await typeSearch('');
+    await typeSearch('chicken');
+
+    expect(screen.getByTestId('food-search-result-food-1')).toBeTruthy();
+    expect(mockSearchFoods).toHaveBeenCalledTimes(asked);
+    expect(screen.queryByTestId('food-search-finding-more')).toBeNull();
+  });
+
+  it('narrows what is on screen as the search is typed on, while the new answer comes', async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    render(<FoodSearchScreen navigation={navigation} route={route} />, { wrapper: TestProviders });
+    await typeSearch('chicken');
+    await screen.findByTestId('food-search-result-food-1');
+
+    mockSearchFoods.mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    await typeSearch('chicken bre');
+    // Still a match, before anything has come back.
+    expect(screen.getByTestId('food-search-result-food-1')).toBeTruthy();
+    await typeSearch('chicken thigh');
+    expect(screen.queryByTestId('food-search-result-food-1')).toBeNull();
+    await act(async () => answer({ foods: [], hasMore: false }));
   });
 
   it('searches and displays a real branded grocery product', async () => {
@@ -395,8 +427,11 @@ describe('FoodSearchScreen -- rows, shared nutrition view, one primary action', 
     );
     expect(calories.fontFamily).toBe(fonts.monoBold);
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    // Hero (picture, serving, calories) and macros.
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(2);
+    // Hero (picture, serving, calories), macros, and its vitamins and minerals.
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(3);
+    expect(screen.getByTestId('food-search-detail-nutrients')).toHaveTextContent(
+      /Vitamins & Minerals/,
+    );
   });
 
   it('labels the Log Food step: named quantity field, one filled button that reports busy', async () => {

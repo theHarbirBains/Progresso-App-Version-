@@ -373,6 +373,20 @@ export async function fetchUsualFoods(
 }
 
 /** These foods as they are now, in no particular order -- one missing (or unseen) is left out. */
+/**
+ * One food's micronutrients per serving (foods.micronutrients) -- a Search Food or Scan Barcode
+ * result, whose figures come from the API without them. Null when the food's data has none.
+ */
+export async function fetchFoodMicronutrients(foodId: string): Promise<NutrientAmounts | null> {
+  const { data, error } = await supabase
+    .from('foods')
+    .select('micronutrients')
+    .eq('id', foodId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return readAmounts((data as { micronutrients?: unknown } | null)?.micronutrients);
+}
+
 export async function fetchFoodsByIds(ids: string[]): Promise<FoodRow[]> {
   if (ids.length === 0) return [];
   const { data, error } = await supabase.from('foods').select(FOOD_COLUMNS).in('id', ids);

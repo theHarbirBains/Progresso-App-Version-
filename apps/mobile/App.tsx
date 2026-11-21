@@ -37,6 +37,7 @@ import {
 import { goToSection } from './src/navigation/sectionNavigation';
 import { PageArrival } from './src/navigation/useAfterTransition';
 import { forgetShown } from './src/lib/lastShown';
+import { forgetSearches } from './src/nutrition/foodSearchMemory';
 import { WorkspaceContext, type Workspace } from './src/workspace/WorkspaceContext';
 import { isNutritionRoute } from './src/navigation/nutritionMenuSections';
 import type { RootStackParamList } from './src/navigation/types';
@@ -303,9 +304,13 @@ function Root() {
     }),
     [openSection],
   );
-  // What pages last showed (lib/lastShown.ts) never outlives the session.
+  // What pages last showed (lib/lastShown.ts) and the searches answered (foodSearchMemory.ts)
+  // never outlive the session.
   useEffect(() => {
-    if (status !== 'signedIn') forgetShown();
+    if (status !== 'signedIn') {
+      forgetShown();
+      forgetSearches();
+    }
   }, [status]);
   // The same object until the mode actually changes, so the screens that read
   // it (every page with a menu button) don't all redraw on every navigation.

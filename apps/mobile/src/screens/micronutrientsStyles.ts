@@ -72,6 +72,12 @@ export const micronutrientsStyles = StyleSheet.create({
     ...typeScale.secondary,
     color: colors.textSecondary,
   },
+  // Under the bar: its percentage, and how many foods it's from.
+  rowBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
   rowQuiet: {
     ...typeScale.secondary,
     color: colors.textMuted,
@@ -97,7 +103,15 @@ export const micronutrientsStyles = StyleSheet.create({
     color: colors.textPrimary,
   },
   sectionGap: {
-    gap: spacing.sm,
+    gap: spacing.md,
+  },
+  // The page's one line on what the values are, under its widgets.
+  footnote: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.sm,
   },
 
   // The detail page's figure: the amount, large, and what it's of.
@@ -135,10 +149,6 @@ export const micronutrientsStyles = StyleSheet.create({
     ...typeScale.secondary,
     fontFamily: typeScale.statSmall.fontFamily,
     color: colors.textPrimary,
-  },
-
-  spacedTop: {
-    marginTop: spacing.sm,
   },
 
   // A source: its title as a link, and who published it.

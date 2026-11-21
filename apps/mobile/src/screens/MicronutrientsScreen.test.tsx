@@ -27,12 +27,16 @@ jest.mock('../nutrition/useDayLogs', () => ({
 }));
 let mockWeek: unknown[][] | null = null;
 const mockUseWeekLogs = jest.fn();
+// The week of the day asked for, from its Sunday: as many days as the logs given.
 jest.mock('../nutrition/micronutrients/useWeekLogs', () => ({
   useWeekLogs: (...args: unknown[]) => {
     mockUseWeekLogs(...args);
-    return args[1]
-      ? { days: ['a', 'b', 'c'], logs: mockWeek, error: null }
-      : { days: [], logs: null, error: null };
+    const { shiftDay } = jest.requireActual('../nutrition/logDay');
+    const { dayFromKey } = jest.requireActual('../lib/dayKey');
+    const day = args[1] as string;
+    const sunday = shiftDay(day, -dayFromKey(day).getDay());
+    const days = (mockWeek ?? [[], [], []]).map((_, i) => shiftDay(sunday, i));
+    return { days, logs: mockWeek, error: null };
   },
 }));
 
@@ -81,9 +85,7 @@ describe('MicronutrientsScreen', () => {
     expect(screen.getByTestId('micronutrients-row-vitamin_c-figure')).toHaveTextContent(
       '153 / 75 mg',
     );
-    expect(screen.getByTestId('micronutrients-row-vitamin_c-caption')).toHaveTextContent(
-      '204% of daily recommendation',
-    );
+    expect(screen.getByTestId('micronutrients-row-vitamin_c-caption')).toHaveTextContent('204%');
     // Past 100% the bar is simply full -- no warning colour or wording.
     expect(
       screen.getByTestId('micronutrients-row-vitamin_c-bar', { includeHiddenElements: true }),
@@ -99,12 +101,12 @@ describe('MicronutrientsScreen', () => {
     fireEvent.press(within(screen.getByTestId('micronutrients-category')).getByText('Minerals'));
     expect(screen.getByTestId('micronutrients-row-iron-figure')).toHaveTextContent('3.8 / 18 mg');
     expect(screen.getByTestId('micronutrients-row-selenium-coverage')).toHaveTextContent(
-      'From 1 of 3 foods',
+      '1 of 3 foods',
     );
 
     fireEvent.press(within(screen.getByTestId('micronutrients-category')).getByText('Other'));
     expect(screen.getByTestId('micronutrients-row-saturated_fat')).toHaveTextContent(
-      /Saturated Fat.*1 g.*No daily target — as low as possible/,
+      /Saturated Fat.*1 g.*No target · as low as possible/,
     );
   });
 
@@ -114,7 +116,7 @@ describe('MicronutrientsScreen', () => {
       '— / 2.4 mcg',
     );
     expect(screen.getByTestId('micronutrients-row-vitamin_b12-caption')).toHaveTextContent(
-      'No data from the 3 foods logged',
+      'No data',
     );
     expect(
       screen.queryByTestId('micronutrients-row-vitamin_b12-bar', { includeHiddenElements: true }),
@@ -157,7 +159,7 @@ describe('MicronutrientsScreen', () => {
     fireEvent.press(await screen.findByTestId('micronutrients-reference-missing-age'));
     expect(mockNavigate).toHaveBeenCalledWith('SettingsPersonalInfo');
     expect(screen.getByTestId('micronutrients-row-vitamin_c-caption')).toHaveTextContent(
-      'Add your details to see a recommendation',
+      'Add your details for a target',
     );
   });
 
@@ -207,15 +209,42 @@ describe('MicronutrientsScreen', () => {
     await screen.findByTestId('micronutrients-row-vitamin_c');
     fireEvent.press(within(screen.getByTestId('micronutrients-range')).getByText('Week'));
     expect(mockUseWeekLogs).toHaveBeenLastCalledWith('user-1', todayKey(), navigation);
+    // The week's days as a strip on each row.
+    expect(
+      screen.getByTestId('micronutrients-row-vitamin_c-week', { includeHiddenElements: true }),
+    ).toBeTruthy();
     expect(screen.getByTestId('micronutrients-row-vitamin_c-figure')).toHaveTextContent(
       '75 / 75 mg',
     );
     expect(screen.getByTestId('micronutrients-row-vitamin_c-caption')).toHaveTextContent(
-      'Averaging 100% of daily recommendation',
+      'Avg 100%',
     );
     expect(screen.getByTestId('micronutrients-coverage')).toHaveTextContent(
       '2 of 3 days logged so far',
     );
+  });
+
+  it('tracks the week: each day, how many nutrients reached their target -- a tap opens it', async () => {
+    mockWeek = [
+      [],
+      [food('a', 'Orange', { vitamin_c: 80, iron: 20 })],
+      [food('b', 'Kiwi', { vitamin_c: 10 })],
+    ];
+    // The week of Tuesday, November 10: Sunday the 8th, Monday the 9th, ...
+    renderScreen('2026-11-10');
+    const week = await screen.findByTestId('micronutrients-week');
+    expect(week).toHaveTextContent(/This Week.*Nutrients at target each day, of 26/);
+    // Monday: vitamin C (75 mg) and iron (18 mg) reached. Sunday: nothing logged, never 0.
+    expect(screen.getByTestId('micronutrients-week-bars-2026-11-09')).toHaveProp(
+      'accessibilityLabel',
+      expect.stringMatching(/2 of 26 nutrients at target$/),
+    );
+    expect(screen.getByTestId('micronutrients-week-bars-2026-11-08')).toHaveProp(
+      'accessibilityLabel',
+      expect.stringMatching(/nothing logged$/),
+    );
+    fireEvent.press(screen.getByTestId('micronutrients-week-bars-2026-11-09'));
+    expect(screen.getByTestId('micronutrients-date')).toHaveTextContent(/November 9/);
   });
 
   it('never steps past today', async () => {

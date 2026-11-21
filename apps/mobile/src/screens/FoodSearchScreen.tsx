@@ -19,6 +19,7 @@ import type { RootStackScreenProps } from '../navigation/types';
 import { goToSection } from '../navigation/sectionNavigation';
 import { FoodFacts } from '../nutrition/FoodFacts';
 import { FoodImage } from '../nutrition/FoodImage';
+import { FoodNutrients } from '../nutrition/FoodNutrients';
 import { foodPageActions } from '../nutrition/foodPageActions';
 import { foodSourceText } from '../nutrition/foodSource';
 import { LogFoodStep } from '../nutrition/LogFoodStep';
@@ -26,6 +27,12 @@ import { useProgressTheme } from '../progress/useProgressTheme';
 import { foodSearchStyles as styles } from './foodSearchStyles';
 import { SkeletonRows } from '../design/Skeleton';
 import { wholeFigure } from '../nutrition/wholeFigures';
+import {
+  narrowResults,
+  recallSearch,
+  rememberSearch,
+  SEARCH_TYPING_PAUSE_MS,
+} from '../nutrition/foodSearchMemory';
 
 type Props = RootStackScreenProps<'FoodSearch'>;
 
@@ -54,6 +61,10 @@ type Props = RootStackScreenProps<'FoodSearch'>;
 // for meanwhile. An answer to anything but the latest search is dropped, so a
 // slow early search never overwrites a later one, and what was found stays on
 // screen while the next search runs instead of flashing back to placeholders.
+// To feel instant (nutrition/foodSearchMemory.ts): a search already answered
+// this session shows its answer at once, with nothing asked again; and typing
+// on from a search ("chick" to "chicken") narrows what's on screen to the
+// foods that still match while the new answer is on its way.
 // Nothing found offers the other ways in: AI Food Search and Quick Macro Entry.
 export function FoodSearchScreen({ navigation, route }: Props) {
   const { session } = useAuth();
@@ -66,7 +77,7 @@ export function FoodSearchScreen({ navigation, route }: Props) {
   const { nutritionTheme: theme } = useProgressTheme();
 
   const [searchInput, setSearchInput] = useState(route.params?.query ?? '');
-  const search = useDebouncedValue(searchInput.trim());
+  const search = useDebouncedValue(searchInput.trim(), SEARCH_TYPING_PAUSE_MS);
   const [results, setResults] = useState<FoodSearchResult[]>([]);
   // The search the results on screen answer, and what it was put right to, if anything.
   const [shownFor, setShownFor] = useState<string | null>(null);
@@ -79,6 +90,9 @@ export function FoodSearchScreen({ navigation, route }: Props) {
   const [productsFailed, setProductsFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const latestSearch = useRef(0);
+  // The search the rows on screen answer, for narrowing them as the next is typed.
+  const shownForRef = useRef<string | null>(null);
+  shownForRef.current = shownFor;
 
   // Another entry for a food, asked for from a food's page.
   const askedQuery = route.params?.query;
@@ -103,19 +117,34 @@ export function FoodSearchScreen({ navigation, route }: Props) {
       return;
     }
     if (!accessToken) return;
-    setLoading(true);
-    setFindingMore(true);
-
-    let fullShown = false;
-    let quickShown = false;
     const show = (response: FoodSearchResponse) => {
       setResults(response.foods);
       setCorrectedQuery(response.correctedQuery ?? null);
       setShownFor(search);
       setLoading(false);
     };
+    // Answered already this session: shown at once, nothing asked again.
+    const remembered = recallSearch(search);
+    if (remembered?.full) {
+      show(remembered.full);
+      setLoading(false);
+      setFindingMore(false);
+      return;
+    }
+    setLoading(true);
+    setFindingMore(true);
+    // Meanwhile: the quick answer from before, or what's on screen narrowed to the new words.
+    if (remembered?.quick) {
+      show(remembered.quick);
+    } else {
+      setResults((shown) => narrowResults(shown, shownForRef.current, search));
+    }
+
+    let fullShown = false;
+    let quickShown = false;
     const quick = searchFoods(accessToken, search, 0, 30, { branded: false })
       .then((response) => {
+        rememberSearch(search, { quick: response });
         if (!isLatest() || fullShown) return;
         quickShown = true;
         show(response);
@@ -123,6 +152,7 @@ export function FoodSearchScreen({ navigation, route }: Props) {
       .catch(() => undefined);
     try {
       const response = await searchFoods(accessToken, search);
+      rememberSearch(search, { full: response });
       if (!isLatest()) return;
       fullShown = true;
       show(response);
@@ -211,6 +241,12 @@ export function FoodSearchScreen({ navigation, route }: Props) {
               attribution: 'food-search-detail-attribution',
               source: 'food-search-detail-source',
             }}
+          />
+          <FoodNutrients
+            testID="food-search-detail-nutrients"
+            foodId={selected.id}
+            servings={1}
+            accentColor={theme.accent}
           />
         </View>
 

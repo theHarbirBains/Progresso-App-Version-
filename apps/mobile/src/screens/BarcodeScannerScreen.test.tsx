@@ -396,7 +396,9 @@ describe('BarcodeScannerScreen -- one primary action per state', () => {
     await screen.findByTestId('log-food-header');
     expect(screen.getByTestId('log-food-serving')).toHaveTextContent('1 serving: 3 cookies (34 g)');
     expect(screen.UNSAFE_queryAllByType(PrimaryButton)).toHaveLength(1);
-    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(3);
+    // Summary, amount, macros, and its vitamins and minerals.
+    expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(4);
+    expect(screen.getByTestId('log-food-nutrients')).toHaveTextContent(/Vitamins & Minerals/);
     expectNoBareText();
   });
 

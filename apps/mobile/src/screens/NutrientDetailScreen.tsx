@@ -7,13 +7,13 @@ import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
 import { EmptyState } from '../design/EmptyState';
 import { Screen } from '../design/Screen';
-import { SectionHeader } from '../design/SectionHeader';
 import { SkeletonRows } from '../design/Skeleton';
 import { Text } from '../design/Text';
 import type { RootStackParamList } from '../navigation/types';
 import { useFoodLog } from '../nutrition/FoodLogProvider';
 import { dayLabel, isTodayKey, shiftDay, weekOfLabel } from '../nutrition/logDay';
 import { dayLine, overUpperLimit, weekLine } from '../nutrition/micronutrients/display';
+import { MoreText } from '../nutrition/micronutrients/MoreText';
 import {
   DRI_PAGES,
   DRI_SOURCE_KEY,
@@ -39,7 +39,10 @@ import {
   upperLimitNotes,
   valueNotes,
 } from '../nutrition/micronutrients/referenceValues';
+import { TopicHeader } from '../nutrition/micronutrients/TopicHeader';
 import { useWeekLogs } from '../nutrition/micronutrients/useWeekLogs';
+import { WeekBars } from '../nutrition/micronutrients/WeekBars';
+import { nutrientWeekDays, weekOf } from '../nutrition/micronutrients/weekTracker';
 import { useDayLogs } from '../nutrition/useDayLogs';
 import { dayFromKey } from '../lib/dayKey';
 import { useProfile } from '../profile/ProfileProvider';
@@ -66,10 +69,12 @@ const FOOD_DATA_SOURCES = [
 
 /**
  * One nutrient's page (explicitly requested): the day's intake against the person's reference
- * value -- or the week's average -- and the foods it's from; then what it does, what too little and
- * too much can do, the recommendation for their life stage and the upper limit apart from it, and
- * every source, each a link. All of it comes from the catalogue (supabase/nutrients): a section
- * with no source that could be read says so instead of saying anything.
+ * value -- or the week's average -- the week day by day, and the foods it's from; then what it
+ * does, what too little and too much can do, the recommendation for their life stage and the
+ * upper limit apart from it, and every source, each a link. Each topic leads with its own heading
+ * (TopicHeader) and says its first sentence, the rest a tap away (MoreText) -- nothing the source
+ * says is cut. All of it comes from the catalogue (supabase/nutrients): a section with no source
+ * that could be read says so instead of saying anything.
  */
 export function NutrientDetailScreen({ navigation, route }: Props) {
   const { nutrientId, day, range } = route.params;
@@ -86,7 +91,8 @@ export function NutrientDetailScreen({ navigation, route }: Props) {
   const todayLog = useFoodLog();
   const pastLog = useDayLogs(userId, range === 'day' && !isToday ? day : null, navigation);
   const dayLogs = isToday ? todayLog.logs : pastLog.day === day ? pastLog.logs : null;
-  const week = useWeekLogs(userId, range === 'week' ? day : null, navigation);
+  // The week the day is in: its days, and Week's average.
+  const weekRead = useWeekLogs(userId, day, navigation);
 
   const header = (
     <AppHeader
@@ -109,19 +115,30 @@ export function NutrientDetailScreen({ navigation, route }: Props) {
 
   const row = referenceRowFor(nutrient.id, person);
   const unit = unitWithBasis(nutrient);
-  const ready = range === 'day' ? dayLogs !== null : week.logs !== null;
+  const ready = range === 'day' ? dayLogs !== null : weekRead.logs !== null;
   const entry =
     range === 'day'
       ? dayLine(nutrient, dayLogs ?? [], row)
-      : weekLine(nutrient, week.logs ?? [], row);
+      : weekLine(nutrient, weekRead.logs ?? [], row);
   const nothingLogged =
-    range === 'day' ? dayLogs?.length === 0 : week.logs?.every((logs) => logs.length === 0);
+    range === 'day' ? dayLogs?.length === 0 : weekRead.logs?.every((logs) => logs.length === 0);
   const when =
     range === 'day'
       ? isToday
         ? 'Today'
         : dayLabel(day)
       : `${weekOfLabel(shiftDay(day, -dayFromKey(day).getDay()))} · daily average`;
+
+  // The week day by day -- the day shown (and today) as this page has them, the rest as read.
+  const week = weekOf(day, weekRead.days, weekRead.logs).map((weekDay) =>
+    weekDay.key === day && dayLogs
+      ? { ...weekDay, logs: dayLogs }
+      : isTodayKey(weekDay.key) && !todayLog.loading
+        ? { ...weekDay, logs: todayLog.logs }
+        : weekDay,
+  );
+  const weekDays = nutrientWeekDays(nutrient, week, row);
+  const hasTarget = row?.value != null && !nutrient.guidance;
 
   // The day's foods and their part in it: those with a figure, most first, then those without.
   const id = nutrient.id as NutrientId;
@@ -143,7 +160,7 @@ export function NutrientDetailScreen({ navigation, route }: Props) {
       contentContainerStyle={styles.content}
       header={header}
     >
-      {/* A. Today's intake (or the week's average) against the recommendation. */}
+      {/* Today's intake (or the week's average) against the recommendation. */}
       <AppCard hero testID="nutrient-detail-intake">
         <View style={styles.sectionGap}>
           <Text style={styles.dateCaption}>{when}</Text>
@@ -172,11 +189,11 @@ export function NutrientDetailScreen({ navigation, route }: Props) {
                   ? range === 'day'
                     ? 'Nothing logged on this day'
                     : 'Nothing logged this week yet'
-                  : entry.caption}
+                  : entry.longCaption}
               </Text>
               {entry.coverage && !nothingLogged ? (
                 <Text testID="nutrient-detail-coverage" style={styles.rowQuiet}>
-                  {entry.coverage}
+                  From {entry.coverage}
                 </Text>
               ) : null}
               {nutrient.note ? <Text style={styles.quiet}>{nutrient.note}</Text> : null}
@@ -185,87 +202,149 @@ export function NutrientDetailScreen({ navigation, route }: Props) {
         </View>
       </AppCard>
 
-      {range === 'day' && (withData.length > 0 || withoutData.length > 0) ? (
-        <AppCard testID="nutrient-detail-foods">
-          <SectionHeader label="From your foods" />
-          {withData.map((log) => (
-            <View key={log.id} style={styles.foodRow}>
-              <Text style={styles.foodName} numberOfLines={1}>
-                {log.foodNameSnapshot}
-              </Text>
-              <Text style={styles.foodAmount}>
-                {formatAmount(log.micronutrients![id]!)} {unit}
-              </Text>
-            </View>
-          ))}
-          {withoutData.length > 0 ? (
-            <Text testID="nutrient-detail-foods-missing" style={[styles.quiet, styles.spacedTop]}>
-              No {nutrient.name.toLowerCase()} data for{' '}
-              {withoutData.map((log) => log.foodNameSnapshot).join(', ')} — not counted, rather than
-              counted as none.
-            </Text>
-          ) : null}
+      {/* The week, day by day, against the target. */}
+      {hasTarget ? (
+        <AppCard testID="nutrient-detail-week">
+          <View style={styles.sectionGap}>
+            <TopicHeader
+              icon="calendar"
+              title="This Week"
+              detail={`Each day against ${formatAmount(row!.value!)} ${unit}`}
+              accentColor={accent}
+            />
+            {weekRead.logs === null && !weekRead.error ? (
+              <SkeletonRows testID="nutrient-detail-week-loading" count={1} />
+            ) : (
+              <WeekBars
+                testID="nutrient-detail-week-bars"
+                height={72}
+                accentColor={accent}
+                days={weekDays.map((weekDay) => ({
+                  key: weekDay.key,
+                  letter: weekDay.letter,
+                  fraction: weekDay.fraction,
+                  label: weekDay.future
+                    ? null
+                    : weekDay.percent !== null
+                      ? `${weekDay.percent}%`
+                      : '—',
+                  muted: weekDay.future,
+                  selected: weekDay.key === day,
+                  accessibilityLabel: `${dayLabel(weekDay.key)}: ${
+                    weekDay.future
+                      ? 'ahead'
+                      : weekDay.percent !== null
+                        ? `${weekDay.percent}%`
+                        : weekDay.logged
+                          ? 'no data'
+                          : 'nothing logged'
+                  }`,
+                }))}
+              />
+            )}
+          </View>
         </AppCard>
       ) : null}
 
-      {/* B, C and D: what it does, and what too little and too much can do. */}
-      <Explanation testID="nutrient-detail-does" title="What it does" part={nutrient.about.does} />
+      {range === 'day' && (withData.length > 0 || withoutData.length > 0) ? (
+        <AppCard testID="nutrient-detail-foods">
+          <View style={styles.sectionGap}>
+            <TopicHeader icon="list" title="From Your Foods" accentColor={accent} />
+            <View>
+              {withData.map((log) => (
+                <View key={log.id} style={styles.foodRow}>
+                  <Text style={styles.foodName} numberOfLines={1}>
+                    {log.foodNameSnapshot}
+                  </Text>
+                  <Text style={styles.foodAmount}>
+                    {formatAmount(log.micronutrients![id]!)} {unit}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            {withoutData.length > 0 ? (
+              <Text testID="nutrient-detail-foods-missing" style={styles.quiet}>
+                No data, so not counted: {withoutData.map((log) => log.foodNameSnapshot).join(', ')}
+              </Text>
+            ) : null}
+          </View>
+        </AppCard>
+      ) : null}
+
+      {/* What it does, and what too little and too much can do. */}
+      <Explanation
+        testID="nutrient-detail-does"
+        icon="zap"
+        title="What It Does"
+        part={nutrient.about.does}
+        accentColor={accent}
+      />
       <Explanation
         testID="nutrient-detail-low"
-        title="When intake is too low"
+        icon="arrow-down-circle"
+        title="Too Little"
         part={nutrient.about.low}
-        footer="A day below the recommendation doesn’t mean a deficiency — only a health care provider can tell you that."
+        footer="A low day isn’t a deficiency — only a health care provider can say."
+        accentColor={accent}
       />
       <Explanation
         testID="nutrient-detail-high"
-        title="When intake is too high"
+        icon="arrow-up-circle"
+        title="Too Much"
         part={nutrient.about.high}
         fallback={row && row.ul === null ? ulNotes : undefined}
+        accentColor={accent}
       />
 
-      {/* E. The recommendation for their life stage. */}
+      {/* The recommendation for their life stage. */}
       <AppCard testID="nutrient-detail-recommendation">
         <View style={styles.sectionGap}>
-          <SectionHeader label="Recommended intake" />
+          <TopicHeader icon="target" title="Your Daily Target" accentColor={accent} />
           <Recommendation nutrient={nutrient} row={row} missing={missing} />
         </View>
       </AppCard>
 
-      {/* F. The upper limit, apart from it. */}
+      {/* The upper limit, apart from it. */}
       {nutrient.guidance ? null : (
         <AppCard testID="nutrient-detail-upper-limit">
           <View style={styles.sectionGap}>
-            <SectionHeader label="Upper limit" />
+            <TopicHeader icon="shield" title="Upper Limit" accentColor={accent} />
             {row === null ? (
-              <Text style={styles.body}>Shown once your recommendation can be.</Text>
+              <Text style={styles.body}>Shown once your target can be.</Text>
             ) : row.ul !== null ? (
               <>
                 <Text testID="nutrient-detail-ul" style={styles.limitValue}>
                   {formatAmount(row.ul)} {unit} per day
                   {row.ulIu != null ? ` (${formatAmount(row.ulIu)} IU)` : ''}
                 </Text>
-                <Text style={styles.body}>This is a safety limit, not a daily goal.</Text>
-                {notesFor(nutrient.footnotes.ul).map((note) => (
-                  <Text key={note} style={styles.quiet}>
-                    {note}
-                  </Text>
-                ))}
+                <Text style={styles.body}>
+                  {nutrient.ulOnlySupplements
+                    ? 'A safety limit for supplements, not food — never a daily goal.'
+                    : 'A safety limit, not a daily goal.'}
+                </Text>
                 {over ? (
                   <Text testID="nutrient-detail-over" style={styles.body}>
                     Today’s logged total is above this level.
                   </Text>
                 ) : null}
+                <MoreText
+                  testID="nutrient-detail-ul-notes"
+                  paragraphs={notesFor(nutrient.footnotes.ul)}
+                  style={styles.quiet}
+                  label="Health Canada’s notes"
+                />
               </>
             ) : (
               <>
                 <Text testID="nutrient-detail-ul" style={styles.body}>
                   Health Canada hasn’t set an upper limit.
                 </Text>
-                {ulNotes.map((note) => (
-                  <Text key={note} style={styles.quiet}>
-                    {note}
-                  </Text>
-                ))}
+                <MoreText
+                  testID="nutrient-detail-ul-notes"
+                  paragraphs={ulNotes}
+                  style={styles.quiet}
+                  label="Health Canada’s notes"
+                />
               </>
             )}
             {row?.cdrr != null ? (
@@ -274,21 +353,22 @@ export function NutrientDetailScreen({ navigation, route }: Props) {
                   {formatAmount(row.cdrr)} {unit} per day
                 </Text>
                 <Text style={styles.body}>Chronic Disease Risk Reduction intake</Text>
-                {notesFor(nutrient.footnotes.cdrr).map((note) => (
-                  <Text key={note} style={styles.quiet}>
-                    {note}
-                  </Text>
-                ))}
+                <MoreText
+                  testID="nutrient-detail-cdrr-notes"
+                  paragraphs={notesFor(nutrient.footnotes.cdrr)}
+                  style={styles.quiet}
+                  label="Health Canada’s notes"
+                />
               </>
             ) : null}
           </View>
         </AppCard>
       )}
 
-      {/* G. Every source, each a link. */}
+      {/* Every source, each a link. */}
       <AppCard testID="nutrient-detail-sources">
         <View style={styles.sectionGap}>
-          <SectionHeader label="Sources" />
+          <TopicHeader icon="book-open" title="Sources" accentColor={accent} />
           {[...sourceKeys].map((key) => {
             const source = NUTRIENT_SOURCES[key];
             if (!source) return null;
@@ -317,42 +397,43 @@ export function NutrientDetailScreen({ navigation, route }: Props) {
               url={source.url}
             />
           ))}
+          <Text style={styles.quiet}>A guide for healthy people — not medical advice.</Text>
         </View>
       </AppCard>
     </Screen>
   );
 }
 
-/** One of What it does / Too low / Too high: the words and their sources, or that there are none. */
+/** One of What It Does / Too Little / Too Much: its words and their sources, or that there are none. */
 function Explanation({
   title,
+  icon,
   part,
   fallback,
   footer,
+  accentColor,
   testID,
 }: {
   title: string;
+  icon: Parameters<typeof TopicHeader>[0]['icon'];
   part: NutrientExplanation | null;
   /** Health Canada's own words to show when there's no explanation (why there's no upper limit). */
   fallback?: string[];
   footer?: string;
+  accentColor: string;
   testID: string;
 }) {
   return (
     <AppCard testID={testID}>
       <View style={styles.sectionGap}>
-        <SectionHeader label={title} />
+        <TopicHeader icon={icon} title={title} accentColor={accentColor} />
         {part ? (
-          <Text style={styles.body}>{part.text}</Text>
+          <MoreText testID={`${testID}-text`} paragraphs={[part.text]} style={styles.body} />
         ) : fallback && fallback.length > 0 ? (
-          fallback.map((note) => (
-            <Text key={note} style={styles.body}>
-              {note}
-            </Text>
-          ))
+          <MoreText testID={`${testID}-text`} paragraphs={fallback} style={styles.body} />
         ) : (
           <Text testID={`${testID}-unavailable`} style={styles.quiet}>
-            We couldn’t find a reliable source to explain this yet, so we’d rather not guess.
+            No reliable source to explain this yet, so we won’t guess.
           </Text>
         )}
         {part && footer ? <Text style={styles.quiet}>{footer}</Text> : null}
@@ -377,9 +458,7 @@ function Recommendation({
         <Text testID="nutrient-detail-guidance" style={styles.limitValue}>
           {nutrient.guidance}
         </Text>
-        <Text style={styles.quiet}>
-          Health Canada sets no daily amount for it — this is its guidance for everyone.
-        </Text>
+        <Text style={styles.quiet}>Health Canada’s guidance — there’s no daily amount.</Text>
       </>
     );
   }
@@ -387,9 +466,9 @@ function Recommendation({
     return (
       <Text testID="nutrient-detail-no-recommendation" style={styles.body}>
         {missing.includes('age')
-          ? 'Add your birthday to your profile to see the recommendation for your age.'
+          ? 'Add your birthday to your profile to see your target.'
           : missing.includes('sex')
-            ? 'Choose your reference values on the Micronutrients page to see your recommendation.'
+            ? 'Choose your reference values on the Micronutrients page to see your target.'
             : 'Health Canada hasn’t set a value for this life stage.'}
       </Text>
     );
@@ -404,15 +483,12 @@ function Recommendation({
       <Text style={styles.body}>
         {referenceTypeName(row.type)} for {lifeStageLabel(row)}
       </Text>
-      {valueNotes(nutrient, row).map((note) => (
-        <Text key={note} style={styles.quiet}>
-          {note}
-        </Text>
-      ))}
-      <Text style={styles.quiet}>
-        A reference for healthy people, not a medical prescription. Health conditions and medicines
-        can change what you need.
-      </Text>
+      <MoreText
+        testID="nutrient-detail-value-notes"
+        paragraphs={valueNotes(nutrient, row)}
+        style={styles.quiet}
+        label="Health Canada’s notes"
+      />
     </>
   );
 }

@@ -20,9 +20,12 @@ export interface NutrientLine {
   amount: number | null;
   /** "68 / 90 mg", "12 g", "No data". */
   figure: string;
-  /** "76% of daily recommendation", "No daily target", ... */
+  /** A row's short word on it: "76%", "Avg 76%", "No data", "No target · as low as possible". */
   caption: string;
-  /** How much of what was logged the figure is from, when not all of it: "From 3 of 5 foods". */
+  /** The nutrient page's: what the percentage is of -- "76% of your recommendation" (an RDA) or
+   * "76% of your adequate intake" (an AI) -- else the same as `caption`. */
+  longCaption: string;
+  /** How much of what was logged the figure is from, when not all of it: "3 of 5 foods". */
   coverage: string | null;
   percent: number | null;
   /** How full its bar is, 0-1 (never past full); none to draw without a reference. */
@@ -34,10 +37,22 @@ export function displayName(nutrient: NutrientDefinition): string {
   return nutrient.altName ? `${nutrient.altName} (${nutrient.name})` : nutrient.name;
 }
 
-/** What its percentage is of: an RDA is a recommendation, an AI an adequate intake. */
-function percentCaption(percent: number, type: 'RDA' | 'AI' | null, week: boolean): string {
-  const of = type === 'AI' ? 'adequate intake' : 'daily recommendation';
+/** What its percentage is of, said in full: an RDA is a recommendation, an AI an adequate intake. */
+function percentOf(percent: number, type: 'RDA' | 'AI' | null, week: boolean): string {
+  const of = type === 'AI' ? 'your adequate intake' : 'your recommendation';
   return week ? `Averaging ${percent}% of ${of}` : `${percent}% of ${of}`;
+}
+
+/**
+ * A text's first sentence and the rest, for a page that shows the first and the rest a tap away.
+ * A sentence ends at ".", "!" or "?" followed by a space and a capital (or a quote or bracket).
+ */
+export function leadSentence(text: string): { lead: string; rest: string | null } {
+  const match = /[.!?](?=\s+[A-Z“"(])/.exec(text);
+  if (!match) return { lead: text.trim(), rest: null };
+  const end = match.index + 1;
+  const rest = text.slice(end).trim();
+  return { lead: text.slice(0, end).trim(), rest: rest || null };
 }
 
 function line(
@@ -60,10 +75,14 @@ function line(
         : `${formatAmount(amount)} / ${formatAmount(target)} ${unit}`;
 
   let caption: string;
-  if (nutrient.guidance) caption = 'No daily target — as low as possible';
-  else if (target === null) caption = 'Add your details to see a recommendation';
+  let longCaption: string | null = null;
+  if (nutrient.guidance) caption = 'No target · as low as possible';
+  else if (target === null) caption = 'Add your details for a target';
   else if (amount === null) caption = noData;
-  else caption = percentCaption(percent ?? 0, reference?.type ?? null, week);
+  else {
+    caption = week ? `Avg ${percent ?? 0}%` : `${percent ?? 0}%`;
+    longCaption = percentOf(percent ?? 0, reference?.type ?? null, week);
+  }
 
   return {
     nutrient,
@@ -72,6 +91,7 @@ function line(
     amount,
     figure,
     caption,
+    longCaption: longCaption ?? caption,
     coverage: amount === null ? null : coverage,
     percent: amount === null || target === null ? null : percent,
     fraction: amount === null || target === null ? null : fraction,
@@ -90,15 +110,8 @@ export function dayLine(
   const known = hasData(intake);
   const coverage = isComplete(intake)
     ? null
-    : `From ${intake.foodsWithData} of ${plural(intake.foodsLogged, 'food')}`;
-  return line(
-    nutrient,
-    reference,
-    known ? intake.amount : null,
-    coverage,
-    false,
-    `No data from the ${plural(intake.foodsLogged, 'food')} logged`,
-  );
+    : `${intake.foodsWithData} of ${plural(intake.foodsLogged, 'food')}`;
+  return line(nutrient, reference, known ? intake.amount : null, coverage, false, 'No data');
 }
 
 /** A nutrient's row for a week: its average over the days with data for it. */
@@ -109,8 +122,8 @@ export function weekLine(
 ): NutrientLine {
   const week = weekIntake(days, nutrient.id as NutrientId);
   const partial = week.daysComplete < week.daysWithData;
-  const coverage = `Over ${plural(week.daysWithData, 'day')}${partial ? ', some foods without data' : ''}`;
-  return line(nutrient, reference, week.average, coverage, true, 'No data on the days logged');
+  const coverage = `${plural(week.daysWithData, 'day')}${partial ? ' · some foods lack data' : ''}`;
+  return line(nutrient, reference, week.average, coverage, true, 'No data');
 }
 
 /**

@@ -24,6 +24,7 @@ import { defaultMealTypeForTime } from './mealTypes';
 import type { EnteredAmount } from './foodLogQueries';
 import { calculateLogTotals } from './nutritionCalculations';
 import type { FoodProvenance, FoodRow } from './foodQueries';
+import { FoodNutrients } from './FoodNutrients';
 import { foodSourceText } from './foodSource';
 import { wholeFigure } from './wholeFigures';
 
@@ -41,6 +42,11 @@ export type LoggableFood = Pick<
   provenance?: FoodProvenance | null;
   /** The provider a shared food was cached from ('usda_fdc', 'open_food_facts'); null for a built-in. */
   provider?: string | null;
+  /**
+   * Its micronutrients per serving, when in hand (a food of the person's own); left out, they're
+   * read for it (a Search Food or Scan Barcode result).
+   */
+  micronutrients?: FoodRow['micronutrients'];
 };
 
 interface LogFoodStepProps {
@@ -90,10 +96,11 @@ function servingsText(servings: number): string {
  * itself; each caller renders it inline in place of its own content once a
  * food is selected.
  *
- * Layout: three widgets `widgetGap` apart, then the one filled Log Food
+ * Layout: four widgets `widgetGap` apart, then the one filled Log Food
  * button. The hero holds the food's picture, the amount being logged and its
  * calories; the amount widget holds the unit switch and the field (and the
- * serving it is measured against); the last holds protein / carbs / fat.
+ * serving it is measured against); then protein / carbs / fat, and its
+ * vitamins and minerals (FoodNutrients).
  * Every figure follows the amount as it's typed, so what's on screen is what
  * gets logged. The amount can be typed in servings; in the pieces the
  * serving's own wording names ("3 cookies (34 g)" -> Cookies, which it
@@ -323,6 +330,15 @@ export function LogFoodStep({
         carbsG={totals ? totals.carbsG : null}
         fatG={totals ? totals.fatG : null}
         testIDs={{ protein: 'log-food-protein', carbs: 'log-food-carbs', fat: 'log-food-fat' }}
+      />
+
+      {/* Its vitamins and minerals for the amount being logged, as they'll count. */}
+      <FoodNutrients
+        testID="log-food-nutrients"
+        foodId={food.id}
+        perServing={food.micronutrients}
+        servings={validAmount ? servings : null}
+        accentColor={accentColor}
       />
 
       {showAttribution ? (

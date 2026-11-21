@@ -4,6 +4,11 @@ import { expectNoBareText } from '../testUtils/expectNoBareText';
 import { useFoodLog } from './FoodLogProvider';
 import { LogFoodStep, type LoggableFood } from './LogFoodStep';
 
+// Its vitamins and minerals are read for it; this food's data has none.
+jest.mock('./foodQueries', () => ({
+  fetchFoodMicronutrients: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('../profile/ProfileProvider', () => ({ useProfileIfAny: () => null }));
 jest.mock('./FoodLogProvider', () => ({
   useFoodLog: jest.fn(),
 }));

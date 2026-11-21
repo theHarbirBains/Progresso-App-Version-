@@ -79,6 +79,14 @@ export function ProfileProvider({ children }: PropsWithChildren) {
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 }
 
+/**
+ * The signed-in person's profile where a ProfileProvider is above, else null -- for a widget that
+ * shows more with it and still works without (a food's vitamins against the person's targets).
+ */
+export function useProfileIfAny(): ProfileContextValue['profile'] | null {
+  return useContext(ProfileContext)?.profile ?? null;
+}
+
 export function useProfile(): ProfileContextValue {
   const ctx = useContext(ProfileContext);
   if (!ctx) {
