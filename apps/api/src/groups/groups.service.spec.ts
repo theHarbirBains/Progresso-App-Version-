@@ -272,11 +272,15 @@ describe('GroupsService', () => {
   });
 
   describe('finish', () => {
+    const done = { completed_at: '2026-11-21T10:00:00Z', deleted_at: null };
+    const empty = { completed_at: null, deleted_at: null };
+
     it('completes every open workout in the group, for everyone', async () => {
       const { mock, service } = setup();
       mock.queue('workout_group_members', joined(MEMBER));
       mock.queue('workout_groups', ok({ status: 'live' }), ok());
-      mock.queue('workouts', ok());
+      mock.queue('workouts', ok([{ id: 'w-host' }, { id: 'w-member' }]), ok());
+      mock.queue('workout_exercises', ok([{ id: 'we-1', sets: [done] }]));
 
       await service.finish(MEMBER, GROUP);
 
@@ -284,6 +288,54 @@ describe('GroupsService', () => {
       expect(group?.args[0]).toMatchObject({ status: 'finished' });
       const workouts = mock.calls.find((c) => c.target === 'workouts' && c.method === 'update');
       expect(workouts?.args[0]).toMatchObject({ completed_at: expect.any(String) });
+      // Everything was done by someone: nothing is taken off.
+      expect(
+        mock.calls.some((c) => c.target === 'workout_exercises' && c.method === 'update'),
+      ).toBe(false);
+    });
+
+    it("takes an exercise off the workout of anyone who did nothing on it, before it's completed", async () => {
+      const { mock, service } = setup();
+      mock.queue('workout_group_members', joined(MEMBER));
+      mock.queue('workout_groups', ok({ status: 'live' }), ok());
+      mock.queue('workouts', ok([{ id: 'w-host' }, { id: 'w-member' }]), ok());
+      mock.queue(
+        'workout_exercises',
+        ok([
+          // Done: a finished set, even beside one left empty.
+          { id: 'we-done', sets: [empty, done] },
+          // Not done: no sets left (removed at Finish), only empty ones, or only removed ones.
+          { id: 'we-none', sets: [] },
+          { id: 'we-empty', sets: [empty] },
+          { id: 'we-removed', sets: [{ ...done, deleted_at: '2026-11-21T10:05:00Z' }] },
+        ]),
+        ok(),
+      );
+
+      await service.finish(MEMBER, GROUP);
+
+      const read = mock.calls.find((c) => c.target === 'workout_exercises' && c.method === 'in');
+      expect(read?.args).toEqual(['workout_id', ['w-host', 'w-member']]);
+      const drop = mock.calls.filter((c) => c.target === 'workout_exercises');
+      const update = drop.find((c) => c.method === 'update');
+      expect(update?.args[0]).toEqual({ deleted_at: expect.any(String) });
+      expect(drop.at(-1)?.args).toEqual(['id', ['we-none', 'we-empty', 'we-removed']]);
+      // Taken off first, then the group and its workouts are finished.
+      const order = mock.calls.filter((c) => c.method === 'update').map((c) => c.target);
+      expect(order).toEqual(['workout_exercises', 'workout_groups', 'workouts']);
+    });
+
+    it('finishes nothing if the exercises cannot be tidied, so it can be tried again', async () => {
+      const { mock, service } = setup();
+      mock.queue('workout_group_members', joined(MEMBER));
+      mock.queue('workout_groups', ok({ status: 'live' }));
+      mock.queue('workouts', ok([{ id: 'w-member' }]));
+      mock.queue('workout_exercises', { data: null, error: { message: 'boom' } });
+
+      await expect(service.finish(MEMBER, GROUP)).rejects.toThrow(
+        'Failed to load the group workouts',
+      );
+      expect(mock.calls.some((c) => c.method === 'update')).toBe(false);
     });
   });
 

@@ -86,7 +86,9 @@ interface Props {
  * A group's live workout, laid out like the regular Active Workout. A tab per person
  * across the top; the exercises are the group's, so adding or removing one changes
  * every person's workout. Only the sets differ: the tab shows that person's own sets,
- * with the weight lifted and reps done, and anyone in the group can enter them.
+ * with the weight lifted and reps done, and anyone in the group can enter them. When the
+ * group finishes, each person keeps only the exercises they did (the API's GroupsService.finish
+ * takes the rest off their workout).
  *
  * The signed-in person's own tab also has everything Active Workout shows from their own
  * records and settings (useLiveProgression): their rep range under the stats, and each

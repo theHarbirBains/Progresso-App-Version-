@@ -57,6 +57,11 @@ interface MemberRow {
   is_guest: boolean;
 }
 
+interface ExerciseSetsRow {
+  id: string;
+  sets: { completed_at: string | null; deleted_at: string | null }[] | null;
+}
+
 /**
  * Group workouts: a host and members, each with their own workout in the group.
  * Joined members can read and edit every group workout's exercises and sets (the
@@ -414,12 +419,18 @@ export class GroupsService {
     }
   }
 
-  /** Finishes the group for everyone: every open group workout is completed. */
+  /**
+   * Finishes the group for everyone: every open group workout is completed. An exercise added
+   * in the group is added to everyone's workout, so first each person's loses the ones they did
+   * nothing on -- people often do their own variation -- and keeps only what they did.
+   */
   async finish(userId: string, groupId: string): Promise<void> {
     await this.requireJoined(userId, groupId);
     await this.requireLive(groupId);
     const client = this.supabaseService.getClient();
     const now = new Date().toISOString();
+
+    await this.dropUndoneExercises(groupId, now);
 
     const { error: groupError } = await client
       .from('workout_groups')
@@ -608,6 +619,48 @@ export class GroupsService {
       .maybeSingle();
     if (error) throw new InternalServerErrorException('Failed to check your subscription');
     if (!data) throw new ForbiddenException('A Trainer subscription is required to add clients');
+  }
+
+  /**
+   * Takes every exercise with no set finished on it off the group's open workouts --
+   * soft-deleted, as removing one does. Each workout is its owner's alone, so this only ever
+   * touches the workout of the person who didn't do it.
+   */
+  private async dropUndoneExercises(groupId: string, now: string): Promise<void> {
+    const client = this.supabaseService.getClient();
+    const { data: workouts, error: workoutsError } = await client
+      .from('workouts')
+      .select('id')
+      .eq('group_id', groupId)
+      .is('completed_at', null)
+      .is('deleted_at', null);
+    if (workoutsError) throw new InternalServerErrorException('Failed to load the group workouts');
+    const workoutIds = ((workouts ?? []) as { id: string }[]).map((workout) => workout.id);
+    if (workoutIds.length === 0) return;
+
+    const { data: exercises, error: exercisesError } = await client
+      .from('workout_exercises')
+      .select('id, sets(completed_at, deleted_at)')
+      .in('workout_id', workoutIds)
+      .is('deleted_at', null);
+    if (exercisesError) {
+      throw new InternalServerErrorException('Failed to load the group workouts');
+    }
+    const undone = ((exercises ?? []) as ExerciseSetsRow[])
+      .filter(
+        (exercise) =>
+          !(exercise.sets ?? []).some(
+            (set) => set.completed_at !== null && set.deleted_at === null,
+          ),
+      )
+      .map((exercise) => exercise.id);
+    if (undone.length === 0) return;
+
+    const { error } = await client
+      .from('workout_exercises')
+      .update({ deleted_at: now })
+      .in('id', undone);
+    if (error) throw new InternalServerErrorException('Failed to tidy the group workouts');
   }
 
   private async requireLive(groupId: string): Promise<void> {
