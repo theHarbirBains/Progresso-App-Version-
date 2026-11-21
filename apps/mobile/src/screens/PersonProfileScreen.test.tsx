@@ -443,16 +443,28 @@ describe('PersonProfileScreen', () => {
     share.mockRestore();
   });
 
-  it('offers Edit Profile on your own, in place of Follow', async () => {
+  it('keeps Edit Profile and Share off your own page, behind the header "..."', async () => {
+    const share = jest
+      .spyOn(Share, 'share')
+      .mockResolvedValue({ action: 'sharedAction', activityType: undefined });
     (getPersonProfile as jest.Mock).mockResolvedValue(
       profile({ isSelf: true, followStatus: 'none', followsYou: false }),
     );
     renderScreen();
 
-    fireEvent.press(await screen.findByTestId('person-profile-edit'));
-    expect(mockNavigate).toHaveBeenCalledWith('SettingsPersonalInfo');
+    await screen.findByTestId('person-profile-name');
     expect(screen.queryByTestId('person-profile-follow')).toBeNull();
+    expect(screen.queryByTestId('person-profile-share')).toBeNull();
     expect(screen.queryByTestId('person-profile-more')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('person-profile-own-menu'));
+    fireEvent.press(screen.getByTestId('own-profile-sheet-edit'));
+    expect(mockNavigate).toHaveBeenCalledWith('SettingsPersonalInfo');
+
+    fireEvent.press(screen.getByTestId('person-profile-own-menu'));
+    fireEvent.press(screen.getByTestId('own-profile-sheet-share'));
+    expect(share).toHaveBeenCalledWith({ message: 'Follow me on Progresso: @sam' });
+    share.mockRestore();
   });
 
   it('shows their montage under the buttons, above their rank', async () => {

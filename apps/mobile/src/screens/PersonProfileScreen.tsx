@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Share, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthProvider';
 import { AppCard } from '../design/AppCard';
@@ -49,7 +49,9 @@ import { AnimatedBar } from '../design/AnimatedBar';
 import { formatCardDate } from '../workouts/workoutFormat';
 import { setText } from '../social/setText';
 import { PeopleList, personLabel } from '../social/PeopleList';
+import { OwnProfileSheet } from '../social/OwnProfileSheet';
 import { PersonActionsSheet } from '../social/PersonActionsSheet';
+import { shareProfile } from '../social/shareProfile';
 import { MontageViewer } from '../profile/montage/MontageViewer';
 import { ProfileMontage } from '../profile/montage/ProfileMontage';
 import { useSocialSummaries } from '../social/useSocialSummaries';
@@ -155,10 +157,10 @@ function StatTile({
  * Someone's profile, after the design Harbir drew: the theme's photo glowing behind the top, where
  * their photo sits in an accent ring beside their name, and "@username · 12 workouts" under it;
  * their bio; "12 followers • 3 following" on one line (on your own, your follow requests between
- * them, when there are any) and the people you follow who follow them too; then two equal buttons
- * -- Follow / Following at full size with a small Share beside it, or on your own two small,
- * quiet pills, Edit Profile and Share -- with Accept and Decline above them when they asked to
- * follow you. For
+ * them, when there are any) and the people you follow who follow them too; then Follow /
+ * Following at full size with a small Share beside it -- on your own, nothing: Edit Profile and
+ * Share Profile are behind the header's "..." -- with Accept and Decline above them when they
+ * asked to follow you. For
  * you, or someone who accepted your follow: four figures -- workouts, the last 30 days, records
  * held and everything lifted -- then Stats (where it opens), Workouts (all of them, with likes
  * and comments), PRs (every exercise's best set, each opening its top sets and records) and
@@ -199,6 +201,8 @@ export function PersonProfilePage({
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  // Your own, opened like anyone's: Edit Profile and Share Profile behind its "...".
+  const [ownMenuOpen, setOwnMenuOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('stats');
   const [liftQuery, setLiftQuery] = useState('');
   const [mutualsOpen, setMutualsOpen] = useState(false);
@@ -306,14 +310,6 @@ export function PersonProfilePage({
       return;
     }
     confirmUnfollow(firstName(target), () => void run(() => unfollowUser(accessToken!, userId)));
-  }
-
-  function share(target: PersonProfile, name: string) {
-    const handle = target.user.username ? `@${target.user.username}` : null;
-    const message = target.isSelf
-      ? `Follow me on Progresso${handle ? `: ${handle}` : '.'}`
-      : `Check out ${name} on Progresso${handle ? ` (${handle})` : ''}.`;
-    void Share.share({ message }).catch(() => undefined);
   }
 
   const label = profile ? personLabel(profile.user) : null;
@@ -680,14 +676,21 @@ export function PersonProfilePage({
             title={handle}
             onBack={() => navigation.goBack()}
             rightAction={
-              profile && !profile.isSelf
-                ? {
-                    icon: 'more-horizontal',
-                    onPress: () => setActionsOpen(true),
-                    accessibilityLabel: `More options for ${title || 'this person'}`,
-                    testID: 'person-profile-more',
-                  }
-                : undefined
+              !profile
+                ? undefined
+                : profile.isSelf
+                  ? {
+                      icon: 'more-horizontal',
+                      onPress: () => setOwnMenuOpen(true),
+                      accessibilityLabel: 'Edit or share your profile',
+                      testID: 'person-profile-own-menu',
+                    }
+                  : {
+                      icon: 'more-horizontal',
+                      onPress: () => setActionsOpen(true),
+                      accessibilityLabel: `More options for ${title || 'this person'}`,
+                      testID: 'person-profile-more',
+                    }
             }
           />
         )
@@ -872,28 +875,10 @@ export function PersonProfilePage({
               </View>
             ) : null}
 
-            {/* Your own: Edit Profile and Share as two small, quiet pills at their own width --
-                the profile is the page, not its buttons. Someone else's: Follow at full size,
-                Share small beside it. */}
-            {profile.isSelf ? (
-              <View style={styles.ownActions}>
-                <SecondaryButton
-                  testID="person-profile-edit"
-                  label="Edit Profile"
-                  icon="edit-2"
-                  size="sm"
-                  onPress={() => navigation.navigate('SettingsPersonalInfo')}
-                />
-                <SecondaryButton
-                  testID="person-profile-share"
-                  label="Share"
-                  icon="share"
-                  size="sm"
-                  onPress={() => share(profile, title)}
-                  accessibilityLabel="Share your profile"
-                />
-              </View>
-            ) : (
+            {/* Someone else's: Follow at full size, Share small beside it. Your own has no
+                buttons on the page -- the profile is the page, not its buttons (Harbir's call):
+                Edit Profile and Share Profile are behind the header's "...". */}
+            {profile.isSelf ? null : (
               <View style={styles.actions}>
                 <View style={styles.action}>
                   {profile.followStatus === 'accepted' ? (
@@ -931,7 +916,9 @@ export function PersonProfilePage({
                   label="Share"
                   icon="share"
                   size="sm"
-                  onPress={() => share(profile, title)}
+                  onPress={() =>
+                    shareProfile({ isSelf: false, username: profile.user.username }, title)
+                  }
                   accessibilityLabel={`Share ${title}'s profile`}
                 />
               </View>
@@ -1053,6 +1040,14 @@ export function PersonProfilePage({
         person={actionsOpen && profile ? profile.user : null}
         onClose={() => setActionsOpen(false)}
         onBlocked={() => navigation.goBack()}
+      />
+      <OwnProfileSheet
+        visible={ownMenuOpen}
+        onClose={() => setOwnMenuOpen(false)}
+        onEditProfile={() => navigation.navigate('SettingsPersonalInfo')}
+        onShare={() =>
+          shareProfile({ isSelf: true, username: profile?.user.username ?? null }, title)
+        }
       />
     </Screen>
   );

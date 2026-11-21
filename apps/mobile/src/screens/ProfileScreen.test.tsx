@@ -315,7 +315,7 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     expect(screen.queryByText('Build Muscle')).toBeNull();
   });
 
-  it('has Find People and Settings in the header, and Edit Profile and Share Profile -- never Follow or "..."', async () => {
+  it('has Find People, "..." (Edit Profile, Share Profile) and Settings in the header -- no buttons on the page', async () => {
     renderProfile();
     await screen.findByTestId('person-profile-name');
 
@@ -326,17 +326,20 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     fireEvent.press(screen.getByTestId('profile-open-settings'));
     expect(mockNavigate).toHaveBeenCalledWith('AccountSettings');
 
-    mockNavigate.mockClear();
-    fireEvent.press(screen.getByTestId('person-profile-edit'));
-    expect(mockNavigate).toHaveBeenCalledWith('SettingsPersonalInfo');
-
-    // Small and quiet: Edit Profile and Share as two small pills.
-    expect(screen.getByTestId('person-profile-share')).toHaveTextContent(/Share$/);
-    expect(screen.getByTestId('person-profile-share').props.accessibilityLabel).toBe(
-      'Share your profile',
-    );
+    // Nothing on the page itself: the profile is the page.
+    expect(screen.queryByTestId('person-profile-edit')).toBeNull();
+    expect(screen.queryByTestId('person-profile-share')).toBeNull();
     expect(screen.queryByTestId('person-profile-follow')).toBeNull();
     expect(screen.queryByTestId('person-profile-more')).toBeNull();
+
+    mockNavigate.mockClear();
+    fireEvent.press(screen.getByTestId('profile-menu'));
+    fireEvent.press(screen.getByTestId('profile-menu-sheet-edit'));
+    expect(mockNavigate).toHaveBeenCalledWith('SettingsPersonalInfo');
+    fireEvent.press(screen.getByTestId('profile-menu'));
+    expect(screen.getByTestId('profile-menu-sheet-share').props.accessibilityLabel).toBe(
+      'Share your profile',
+    );
   });
 
   it('shows who follows you and who you follow, each opening its list', async () => {

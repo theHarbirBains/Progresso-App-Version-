@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
@@ -29,6 +29,8 @@ import {
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { workingSets } from '../workouts/exerciseHistoryGrouping';
 import { formatTotalTime } from '../workouts/workoutMonthSummary';
+import { OwnProfileSheet } from '../social/OwnProfileSheet';
+import { shareProfile } from '../social/shareProfile';
 import { PersonProfilePage } from './PersonProfileScreen';
 import { profileStyles as styles } from './profileStyles';
 import { wholeFigureText } from '../nutrition/wholeFigures';
@@ -207,13 +209,13 @@ function YourRecords({ navigation }: { navigation: Props['navigation'] }) {
 
 // The You tab's own root screen (see App.tsx's bottom nav): your profile
 // exactly as the people who follow you see it (PersonProfilePage) -- photo,
-// name, bio, counts, Edit Profile and Share, the four figures, and
-// Achievements / Workouts / PRs / Stats -- plus what's yours alone, inside
-// the same tabs: your full records under PRs, and under Stats today's
-// calories and macros (with Nutrition in your membership), this week and
-// your muscle groups. The header has Find People, your
-// @username and Settings,
-// and tapping your photo chooses, changes or removes it (useAvatarPhoto).
+// name, bio, counts, the four figures, and Achievements / Workouts / PRs /
+// Stats -- plus what's yours alone, inside the same tabs: your full records
+// under PRs, and under Stats today's calories and macros (with Nutrition in
+// your membership), this week and your muscle groups. The header has Find
+// People, your @username, "..." (Edit Profile and Share Profile, kept off the
+// page itself) and Settings, and tapping your photo chooses, changes or
+// removes it (useAvatarPhoto).
 export function ProfileScreen({ navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
@@ -224,6 +226,7 @@ export function ProfileScreen({ navigation }: Props) {
   const { loading: logsLoading } = useFoodLog();
   const { statsLoading, prsLoading } = useAllTimeStats();
   const avatar = useAvatarPhoto(userId);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const notices =
     profileError || avatar.error ? (
@@ -258,6 +261,12 @@ export function ProfileScreen({ navigation }: Props) {
                 testID: 'profile-find-people',
               }}
               rightAction={{
+                icon: 'more-horizontal',
+                onPress: () => setMenuOpen(true),
+                accessibilityLabel: 'Edit or share your profile',
+                testID: 'profile-menu',
+              }}
+              rightAction2={{
                 icon: 'settings',
                 onPress: () => navigation.navigate('AccountSettings'),
                 accessibilityLabel: 'Settings',
@@ -288,6 +297,19 @@ export function ProfileScreen({ navigation }: Props) {
             !statsLoading &&
             !prsLoading &&
             (!nutrition || (!goalsLoading && !logsLoading)),
+        }}
+      />
+
+      <OwnProfileSheet
+        testID="profile-menu-sheet"
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onEditProfile={() => navigation.navigate('SettingsPersonalInfo')}
+        onShare={() => {
+          const name = [profile?.displayName?.trim(), profile?.lastName?.trim()]
+            .filter(Boolean)
+            .join(' ');
+          shareProfile({ isSelf: true, username: profile?.username ?? null }, name);
         }}
       />
 
