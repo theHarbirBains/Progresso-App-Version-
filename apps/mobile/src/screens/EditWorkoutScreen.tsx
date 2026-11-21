@@ -159,11 +159,16 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
     draft.addExercise(exercise);
   }
 
-  // A trainer removes a client's workout. It is cancelled, never logged, and the client's history drops it.
+  // Deletes the workout -- yours, or a client's when their trainer edits it -- as the workout's own
+  // page does: soft-deleted, so its history and records are worked out again without it. Back
+  // past that page too, since it's gone.
   function confirmDeleteWorkout() {
+    if (saving) return;
     Alert.alert(
       'Delete this workout?',
-      'It will be removed from the client’s history. This cannot be undone.',
+      clientId
+        ? 'It will be removed from the client’s history. This cannot be undone.'
+        : 'It will be removed from your history. This cannot be undone.',
       [
         { text: 'Keep it', style: 'cancel' },
         {
@@ -171,7 +176,13 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
           style: 'destructive',
           onPress: () => {
             deleteWorkout(workoutId)
-              .then(() => navigation.goBack())
+              .then(() => {
+                // A client's workout was never part of the trainer's own stats.
+                if (!clientId) void refetchAllTimeStats();
+                const routes = navigation.getState()?.routes ?? [];
+                if (routes[routes.length - 2]?.name === 'WorkoutDetail') navigation.pop(2);
+                else navigation.goBack();
+              })
               .catch((err: unknown) =>
                 setError(err instanceof Error ? err.message : 'Could not delete the workout'),
               );
@@ -464,14 +475,13 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
             accentColor={theme.accent}
             onAccentColor={theme.onAccent}
           />
-          {clientId ? (
-            <TextButton
-              testID="edit-workout-delete"
-              label="Delete Workout"
-              destructive
-              onPress={confirmDeleteWorkout}
-            />
-          ) : null}
+          <TextButton
+            testID="edit-workout-delete"
+            label="Delete Workout"
+            destructive
+            onPress={confirmDeleteWorkout}
+            disabled={saving}
+          />
         </View>
       </Screen>
 

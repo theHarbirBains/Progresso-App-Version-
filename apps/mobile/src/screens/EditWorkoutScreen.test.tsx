@@ -1,4 +1,5 @@
 import type { PropsWithChildren } from 'react';
+import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { toLocalDateKey } from '../design/calendarGrid';
@@ -12,6 +13,7 @@ import {
   addExerciseToWorkout,
   createCompletedSets,
   deleteSet,
+  deleteWorkout,
   fetchWorkoutDetail,
   moveSets,
   removeExerciseFromWorkout,
@@ -96,6 +98,7 @@ jest.mock('../workouts/workoutQueries', () => ({
   createCompletedSets: jest.fn(),
   updateSet: jest.fn(),
   deleteSet: jest.fn(),
+  deleteWorkout: jest.fn(),
   moveSets: jest.fn(),
 }));
 
@@ -118,8 +121,18 @@ const mockMoveSets = moveSets as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockReplace = jest.fn();
+const mockPop = jest.fn();
+// Opened from the workout's own page, as it always is.
+const mockGetState = jest.fn(() => ({
+  routes: [{ name: 'WorkoutHistory' }, { name: 'WorkoutDetail' }, { name: 'EditWorkout' }],
+}));
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const navigation: any = { goBack: mockGoBack, replace: mockReplace };
+const navigation: any = {
+  goBack: mockGoBack,
+  replace: mockReplace,
+  pop: mockPop,
+  getState: mockGetState,
+};
 const route = { params: { workoutId: 'w1' } } as never;
 
 function renderScreen() {
@@ -525,6 +538,43 @@ describe('EditWorkoutScreen -- saving changes', () => {
       expect.objectContaining({ activity: 'walking', durationSeconds: 2100 }),
     );
     expect(deleteCardio).toHaveBeenCalledWith('c2');
+  });
+
+  it('deletes your own workout after asking, and goes back past its page', async () => {
+    (deleteWorkout as jest.Mock).mockReset().mockResolvedValue(undefined);
+    mockPop.mockClear();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Delete')?.onPress?.();
+    });
+    renderScreen();
+    await screen.findByTestId(EX);
+
+    fireEvent.press(screen.getByTestId('edit-workout-delete'));
+
+    expect(alert).toHaveBeenCalledWith(
+      'Delete this workout?',
+      'It will be removed from your history. This cannot be undone.',
+      expect.any(Array),
+    );
+    await waitFor(() => expect(deleteWorkout).toHaveBeenCalledWith('w1'));
+    await waitFor(() => expect(mockPop).toHaveBeenCalledWith(2));
+    expect(mockReplace).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
+  it('keeps the workout when you choose Keep it', async () => {
+    (deleteWorkout as jest.Mock).mockReset().mockResolvedValue(undefined);
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Keep it')?.onPress?.();
+    });
+    renderScreen();
+    await screen.findByTestId(EX);
+
+    fireEvent.press(screen.getByTestId('edit-workout-delete'));
+
+    expect(alert).toHaveBeenCalled();
+    expect(deleteWorkout).not.toHaveBeenCalled();
+    alert.mockRestore();
   });
 
   it('saves a set marked a warm-up with a tap on its number', async () => {
