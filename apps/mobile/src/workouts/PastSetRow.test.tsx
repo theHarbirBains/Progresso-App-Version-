@@ -8,6 +8,7 @@ const baseProps = {
   onChangeWeight: jest.fn(),
   onChangeReps: jest.fn(),
   onRemove: jest.fn(),
+  accentColor: '#D99A50',
   testID: 'past-set-row',
 };
 
@@ -70,4 +71,24 @@ describe('PastSetRow render behaviour', () => {
       expect(arePropsEqual(prev, next)).toBe(false);
     },
   );
+
+  it('marks a warm-up from its number, and shows a drop set under its set', () => {
+    const onToggleWarmup = jest.fn();
+    const { rerender } = render(<PastSetRow {...baseProps} onToggleWarmup={onToggleWarmup} />);
+    fireEvent.press(screen.getByTestId('past-set-row-number'));
+    expect(onToggleWarmup).toHaveBeenCalled();
+
+    rerender(<PastSetRow {...baseProps} warmup onToggleWarmup={onToggleWarmup} />);
+    expect(screen.getByTestId('past-set-row-number')).toHaveTextContent('W');
+
+    rerender(<PastSetRow {...baseProps} drop />);
+    expect(screen.getByTestId('past-set-row-drop')).toHaveProp(
+      'accessibilityLabel',
+      'Drop set, set 1',
+    );
+    expect(screen.getByTestId('past-set-row-remove')).toHaveProp(
+      'accessibilityLabel',
+      'Remove drop set under set 1',
+    );
+  });
 });

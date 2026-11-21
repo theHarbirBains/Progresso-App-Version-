@@ -13,7 +13,7 @@ function fromDbSide(dbSide: 'none' | 'left' | 'right'): SetSide {
 
 /** A set row's columns, as every read here selects them. */
 const SET_COLUMNS =
-  'id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_warmup';
+  'id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_warmup, is_drop';
 
 function toSetRecord(row: {
   id: string;
@@ -24,6 +24,7 @@ function toSetRecord(row: {
   duration_seconds?: number | null;
   completed_at: string | null;
   is_warmup?: boolean | null;
+  is_drop?: boolean | null;
 }): SetRecord {
   return {
     id: row.id,
@@ -35,6 +36,8 @@ function toSetRecord(row: {
     completedAt: row.completed_at,
     // Only a warm-up says so; a working set (nearly all of them) leaves it out.
     ...(row.is_warmup === true ? { isWarmup: true } : {}),
+    // Likewise a drop set.
+    ...(row.is_drop === true ? { isDrop: true } : {}),
   };
 }
 
@@ -72,6 +75,13 @@ export interface SetRecord {
    * completedSetsOnly leave it out). Absent means a working set.
    */
   isWarmup?: boolean;
+  /**
+   * A drop set (`sets.is_drop`): part of the working set before it in the exercise's order --
+   * the weight dropped and the set carried on. Its volume counts (completedSetsOnly keeps it),
+   * but it's never a set of its own in a count, a record, a top set or a progression cue
+   * (loggedSets leaves it out). Absent means it isn't one.
+   */
+  isDrop?: boolean;
   /** null for a bilateral exercise's set (the overwhelming majority). For a
    * unilateral exercise, a logical set is two SetRecords sharing the same
    * setIndex -- one 'left', one 'right' -- each with its own independent
@@ -257,7 +267,7 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
     const { data: sets, error: setsError } = await supabase
       .from('sets')
       .select(
-        'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_warmup',
+        'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_warmup, is_drop',
       )
       .in('workout_exercise_id', workoutExerciseIds)
       .is('deleted_at', null)
@@ -543,6 +553,7 @@ export async function createSet(
   workoutExerciseId: string,
   setIndex: number,
   side?: 'left' | 'right',
+  options: { isDrop?: boolean } = {},
 ): Promise<SetRecord> {
   const { data, error } = await supabase
     .from('sets')
@@ -550,6 +561,7 @@ export async function createSet(
       workout_exercise_id: workoutExerciseId,
       set_index: setIndex,
       ...(side ? { side } : {}),
+      ...(options.isDrop ? { is_drop: true } : {}),
     })
     .select(SET_COLUMNS)
     .single();
@@ -571,6 +583,8 @@ export async function createCompletedSets(
     weightKg: number | null;
     reps: number | null;
     durationSeconds: number | null;
+    isWarmup?: boolean;
+    isDrop?: boolean;
   }[],
   completedAt: string,
 ): Promise<void> {
@@ -584,8 +598,22 @@ export async function createCompletedSets(
       reps: set.reps,
       duration_seconds: set.durationSeconds,
       completed_at: completedAt,
+      is_warmup: set.isWarmup === true,
+      is_drop: set.isDrop === true,
     })),
   );
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Puts sets at new places in their exercise's order (`setIndex`), all in one go -- a drop set
+ * slotted in under the set it drops from moves the sets after it down one. Through move_sets
+ * (20261207100000_drop_sets.sql), which moves every set out of the way first so no two ever share
+ * a slot on the way, and moves nothing if any can't be.
+ */
+export async function moveSets(moves: { id: string; setIndex: number }[]): Promise<void> {
+  if (moves.length === 0) return;
+  const { error } = await supabase.rpc('move_sets', { p_moves: moves });
   if (error) throw new Error(error.message);
 }
 
@@ -601,10 +629,12 @@ export async function updateSet(
     durationSeconds?: number | null;
     completedAt?: string | null;
     isWarmup?: boolean;
+    isDrop?: boolean;
   },
 ): Promise<SetRecord> {
   const payload: Record<string, unknown> = {};
   if (updates.isWarmup !== undefined) payload.is_warmup = updates.isWarmup;
+  if (updates.isDrop !== undefined) payload.is_drop = updates.isDrop;
   if (updates.weightKg !== undefined) payload.weight_kg = updates.weightKg;
   if (updates.reps !== undefined) payload.reps = updates.reps;
   if (updates.durationSeconds !== undefined) payload.duration_seconds = updates.durationSeconds;
@@ -677,9 +707,10 @@ export async function fetchPreviousPerformance(
     )
     .is('deleted_at', null)
     // "Previous performance" only ever means real, logged history -- never
-    // a set that was left blank/incomplete in that past workout, nor a warm-up.
+    // a set that was left blank/incomplete in that past workout, nor a warm-up or a drop set.
     .not('completed_at', 'is', null)
     .eq('is_warmup', false)
+    .eq('is_drop', false)
     .order('set_index', { ascending: true });
   if (setsError) throw new Error(setsError.message);
 

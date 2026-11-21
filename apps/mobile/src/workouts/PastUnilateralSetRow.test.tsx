@@ -8,6 +8,7 @@ const baseProps = {
   onChangeWeight: jest.fn(),
   onChangeReps: jest.fn(),
   onRemove: jest.fn(),
+  accentColor: '#D99A50',
   testID: 'past-unilateral-set',
 };
 
@@ -80,5 +81,27 @@ describe('PastUnilateralSetRow render behaviour', () => {
   it('reports not equal when setIndex or testID changes', () => {
     expect(arePropsEqual(baseProps, { ...baseProps, setIndex: 2 })).toBe(false);
     expect(arePropsEqual(baseProps, { ...baseProps, testID: 'other' })).toBe(false);
+  });
+
+  it('marks a warm-up from its number, and shows a drop set under its set', () => {
+    const onToggleWarmup = jest.fn();
+    const { rerender } = render(
+      <PastUnilateralSetRow {...baseProps} onToggleWarmup={onToggleWarmup} />,
+    );
+    fireEvent.press(screen.getByTestId('past-unilateral-set-number'));
+    expect(onToggleWarmup).toHaveBeenCalled();
+
+    rerender(<PastUnilateralSetRow {...baseProps} warmup onToggleWarmup={onToggleWarmup} />);
+    expect(screen.getByTestId('past-unilateral-set-number')).toHaveTextContent('W');
+
+    rerender(<PastUnilateralSetRow {...baseProps} drop />);
+    expect(screen.getByTestId('past-unilateral-set-drop')).toHaveProp(
+      'accessibilityLabel',
+      'Drop set, set 1',
+    );
+    expect(screen.getByTestId('past-unilateral-set-remove')).toHaveProp(
+      'accessibilityLabel',
+      'Remove drop set under set 1',
+    );
   });
 });

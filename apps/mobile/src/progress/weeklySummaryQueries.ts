@@ -66,7 +66,9 @@ export async function fetchSummaryTraining(
 
   const sets = setRows.flatMap((row): SummarySet[] => {
     const exercise = exercises.get(row.workout_exercise_id);
-    if (!exercise) return [];
+    // The week's figures are set counts and bests: a drop set is part of the set before it, never
+    // one of its own.
+    if (!exercise || row.is_drop === true) return [];
     return [
       {
         workoutId: exercise.workout_id,

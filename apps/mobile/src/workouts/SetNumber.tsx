@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '../design/Text';
 import { colors, radii, typeScale } from '../design/theme';
@@ -8,6 +9,8 @@ interface Props {
   index: number;
   /** A warm-up set: shown as "W", counted toward nothing. */
   warmup?: boolean;
+  /** A drop set under set `index`: shown as an arrow turning in under it, never tapped. */
+  drop?: boolean;
   /** Marks or unmarks the set as a warm-up; without it the number is plain text. */
   onToggleWarmup?: () => void;
   accentColor: string;
@@ -19,7 +22,28 @@ interface Props {
  * warm-up: tapped, it turns into a small "W" on a soft tint of the accent -- quiet, but clear at a
  * glance -- and tapped again it's a working set. A faint ring shows it can be tapped.
  */
-export function SetNumber({ index, warmup = false, onToggleWarmup, accentColor, testID }: Props) {
+export function SetNumber({
+  index,
+  warmup = false,
+  drop = false,
+  onToggleWarmup,
+  accentColor,
+  testID,
+}: Props) {
+  // A drop is part of the set above it: an arrow turning in under that set, in the accent, where a
+  // number would be -- it has none of its own.
+  if (drop) {
+    return (
+      <View
+        testID={testID ? `${testID}-drop` : undefined}
+        style={styles.slot}
+        accessible
+        accessibilityLabel={`Drop set, set ${index}`}
+      >
+        <Feather name="corner-down-right" size={16} color={accentColor} style={styles.dropGlyph} />
+      </View>
+    );
+  }
   if (!onToggleWarmup) return <Text style={liveWorkoutStyles.setIndex}>{index}</Text>;
   return (
     <TouchableOpacity
@@ -66,6 +90,10 @@ const styles = StyleSheet.create({
   },
   plain: {
     borderColor: colors.border,
+  },
+  // Lined up under the set's number above it.
+  dropGlyph: {
+    marginLeft: 4,
   },
   label: {
     ...typeScale.statSmall,

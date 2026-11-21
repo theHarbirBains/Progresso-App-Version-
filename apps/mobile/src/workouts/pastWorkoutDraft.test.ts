@@ -115,7 +115,7 @@ describe('usePastWorkoutDraft', () => {
     act(() => result.current.changeSet('local-1', 'local-2', 'weight', '100'));
     expect(result.current.exercises[0].sets[0].weight).toBe('100');
 
-    act(() => result.current.removeSet('local-1', 'local-2'));
+    act(() => result.current.removeSet(result.current.exercises[0], 'local-2'));
     expect(result.current.exercises[0].sets.map((s) => s.setIndex)).toEqual([2]);
 
     act(() => result.current.removeExercise('local-1'));
@@ -128,8 +128,42 @@ describe('usePastWorkoutDraft', () => {
     act(() => result.current.addExercise({ ...bench, movementType: 'unilateral' }));
     expect(result.current.exercises[0].sets.map((s) => s.side)).toEqual(['left', 'right']);
 
-    act(() => result.current.removeUnilateralSet('local-1', 1));
+    act(() => result.current.removeUnilateralSet(result.current.exercises[0], 1));
     expect(result.current.exercises[0].sets).toEqual([]);
+  });
+
+  it('marks a set a warm-up and back with a tap, both sides of a unilateral set together', () => {
+    const { result } = renderHook(() => usePastWorkoutDraft());
+    act(() => result.current.addExercise({ ...bench, movementType: 'unilateral' }));
+
+    act(() => result.current.toggleWarmup('local-1', 1));
+    expect(result.current.exercises[0].sets.map((s) => s.isWarmup)).toEqual([true, true]);
+    act(() => result.current.toggleWarmup('local-1', 1));
+    expect(result.current.exercises[0].sets.map((s) => s.isWarmup)).toEqual([false, false]);
+  });
+
+  it('adds drop sets under the last set filled in, before a set waiting empty, and removes them with their set', () => {
+    const { result } = renderHook(() => usePastWorkoutDraft());
+    act(() => result.current.addExercise(bench));
+    act(() => result.current.addSet(result.current.exercises[0]));
+    const shape = () =>
+      result.current.exercises[0].sets.map((s) => `${s.setIndex}${s.isDrop ? 'D' : ''}`);
+
+    // Nothing filled in yet: there's no set to drop from.
+    act(() => result.current.addDropSet(result.current.exercises[0]));
+    expect(shape()).toEqual(['1', '2']);
+
+    act(() => result.current.changeSet('local-1', 'local-2', 'weight', '100'));
+    act(() => result.current.changeSet('local-1', 'local-2', 'reps', '8'));
+    act(() => result.current.addDropSet(result.current.exercises[0]));
+    // Under set 1, the empty set 2 moved down one.
+    expect(shape()).toEqual(['1', '2D', '3']);
+    // And again: drops stack, each under the last.
+    act(() => result.current.addDropSet(result.current.exercises[0]));
+    expect(shape()).toEqual(['1', '2D', '3D', '4']);
+
+    act(() => result.current.removeSet(result.current.exercises[0], 'local-2'));
+    expect(shape()).toEqual(['4']);
   });
 });
 

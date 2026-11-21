@@ -211,6 +211,8 @@ export interface FriendWorkoutSet {
   completedAt: string | null;
   /** A warm-up: shown, marked W, counted toward nothing (older servers leave it out). */
   isWarmup?: boolean;
+  /** A drop set: part of the working set before it, shown under it (older servers leave it out). */
+  isDrop?: boolean;
 }
 
 /** A followed person's finished workout, to read. */

@@ -369,6 +369,14 @@ export const liveWorkoutStyles = StyleSheet.create({
   addSet: {
     marginTop: spacing.sm,
   },
+  // Add Set and Drop Set side by side, sharing the row.
+  addSetRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  addSetButton: {
+    flex: 1,
+  },
 
   // ---- Progression (workouts/progression.ts) ---------------------------------
   // Quiet text, never a card or a badge: the one accent is the small glyph.

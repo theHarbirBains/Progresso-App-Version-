@@ -1,8 +1,8 @@
 import { memo } from 'react';
 import { View } from 'react-native';
-import { Text } from '../design/Text';
 import type { MeasurementType } from '../exercises/movementTypes';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { SetNumber } from './SetNumber';
 import { PastSetRemoveButton } from './SetRowActions';
 import { SetValueFields } from './SetValueFields';
 
@@ -18,6 +18,12 @@ interface Props {
   onChangeReps: (text: string) => void;
   onChangeDuration?: (text: string) => void;
   onRemove: () => void;
+  /** A warm-up set, shown as W: tapping the number marks or unmarks it. */
+  warmup?: boolean;
+  onToggleWarmup?: () => void;
+  /** A drop set under set `setIndex`: shown as an arrow under it, with no number of its own. */
+  drop?: boolean;
+  accentColor: string;
   testID?: string;
 }
 
@@ -39,14 +45,25 @@ function PastSetRowComponent({
   onChangeReps,
   onChangeDuration,
   onRemove,
+  warmup = false,
+  onToggleWarmup,
+  drop = false,
+  accentColor,
   testID,
 }: Props) {
   return (
     <View testID={testID} style={styles.setRow}>
-      <Text style={styles.setIndex}>{setIndex}</Text>
+      <SetNumber
+        index={setIndex}
+        warmup={warmup}
+        drop={drop}
+        onToggleWarmup={onToggleWarmup}
+        accentColor={accentColor}
+        testID={testID}
+      />
       <SetValueFields
         setId=""
-        label={`Set ${setIndex}`}
+        label={drop ? `Set ${setIndex} drop` : `Set ${setIndex}`}
         measurementType={measurementType}
         weight={weight}
         reps={reps}
@@ -57,7 +74,7 @@ function PastSetRowComponent({
         onChangeDuration={(_, text) => onChangeDuration?.(text)}
         testID={testID}
       />
-      <PastSetRemoveButton testID={testID} setIndex={setIndex} onRemove={onRemove} />
+      <PastSetRemoveButton testID={testID} setIndex={setIndex} onRemove={onRemove} drop={drop} />
     </View>
   );
 }
@@ -78,6 +95,10 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     prev.reps === next.reps &&
     prev.duration === next.duration &&
     prev.measurementType === next.measurementType &&
+    prev.warmup === next.warmup &&
+    prev.drop === next.drop &&
+    (prev.onToggleWarmup === undefined) === (next.onToggleWarmup === undefined) &&
+    prev.accentColor === next.accentColor &&
     prev.testID === next.testID
   );
 }

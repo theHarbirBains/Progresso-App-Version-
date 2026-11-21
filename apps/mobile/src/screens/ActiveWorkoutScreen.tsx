@@ -39,9 +39,12 @@ import {
   computeCardSets,
   computeUnilateralSets,
   draftFromSet,
+  groupUnilateralSets,
   hasDraftInput,
+  isValidDraft,
   type SetInputDraft,
 } from '../workouts/setInputDrafts';
+import { dropSetSlot, rowsRemovedWith, setLabels, type DropSetRow } from '../workouts/dropSets';
 import {
   addExerciseToWorkout,
   fetchNextExerciseOrderIndex,
@@ -51,6 +54,7 @@ import {
   deleteSet,
   fetchPreviousPerformance,
   fetchWorkoutDetail,
+  moveSets,
   removeExerciseFromWorkout,
   reorderExercises,
   updateSet,
@@ -375,6 +379,59 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     }
   }
 
+  /**
+   * Drop Set: a drop set under the last set filled in (and any drops already under it) -- for a
+   * unilateral exercise both sides together. A set waiting below moves down one to make room,
+   * on the server first (moveSets, all at once), then here.
+   */
+  async function handleAddDropSet(exercise: WorkoutExerciseWithSets) {
+    setError(null);
+    const type = measurementTypeOf(exercise);
+    const unilateral = exercise.movementType === 'unilateral';
+    const filled = (set: SetRecord) =>
+      set.completedAt !== null || isValidDraft(setInputsRef.current[set.id], type);
+    const rows: DropSetRow[] = unilateral
+      ? groupUnilateralSets(exercise.sets).map(({ setIndex, left, right }) => ({
+          setIndex,
+          ids: [left.id, right.id],
+          isWarmup: left.isWarmup,
+          isDrop: left.isDrop,
+          filled: filled(left) && filled(right),
+        }))
+      : [...exercise.sets]
+          .sort((a, b) => a.setIndex - b.setIndex)
+          .map((set) => ({
+            setIndex: set.setIndex,
+            ids: [set.id],
+            isWarmup: set.isWarmup,
+            isDrop: set.isDrop,
+            filled: filled(set),
+          }));
+    const slot = dropSetSlot(rows);
+    if (!slot) return;
+    try {
+      await moveSets(slot.moves);
+      const created = unilateral
+        ? await Promise.all([
+            createSet(exercise.id, slot.setIndex, 'left', { isDrop: true }),
+            createSet(exercise.id, slot.setIndex, 'right', { isDrop: true }),
+          ])
+        : [await createSet(exercise.id, slot.setIndex, undefined, { isDrop: true })];
+      const moved = new Map(slot.moves.map((move) => [move.id, move.setIndex]));
+      updateExerciseSets(exercise.id, (ex) => ({
+        ...ex,
+        sets: [
+          ...ex.sets.map((set) =>
+            moved.has(set.id) ? { ...set, setIndex: moved.get(set.id)! } : set,
+          ),
+          ...created,
+        ].sort((a, b) => a.setIndex - b.setIndex),
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add the drop set');
+    }
+  }
+
   // A guided workout: the exercise being done -- the one chosen, else the last one started.
   const focused = guidedPlan
     ? (workout?.exercises.find((ex) => ex.id === focusId) ??
@@ -390,7 +447,9 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     if (!guidedPlan || !focused || focused.sets.length === 0) return;
     const planned = plannedSetsFor(guidedPlan, focused.exerciseId);
     if (planned === null) return;
-    const count = new Set(focused.sets.map((set) => set.setIndex)).size;
+    // A drop set is part of the set before it, never one of the sets planned.
+    const count = new Set(focused.sets.filter((set) => !set.isDrop).map((set) => set.setIndex))
+      .size;
     if (count >= planned || !focused.sets.every((set) => set.completedAt !== null)) return;
     const key = `${focused.id}:${count}`;
     if (autoAddedSets.current.has(key)) return;
@@ -479,37 +538,21 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     });
   }
 
-  async function handleRemoveSet(exerciseId: string, set: SetRecord) {
+  /**
+   * Removes sets together: a unilateral set's two sides (one unit, same as completion), and a
+   * working set's drop sets with it.
+   */
+  async function handleRemoveSets(exerciseId: string, rows: SetRecord[]) {
     setError(null);
     try {
-      await deleteSet(set.id);
+      await Promise.all(rows.map((row) => deleteSet(row.id)));
+      const gone = new Set(rows.map((row) => row.id));
       updateExerciseSets(exerciseId, (ex) => ({
         ...ex,
-        sets: ex.sets.filter((s) => s.id !== set.id),
+        sets: ex.sets.filter((s) => !gone.has(s.id)),
       }));
-      dropSetInputs(set.id);
-      discardSetTimer(set.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove set');
-    }
-  }
-
-  /** Removes both sides of one unilateral logical set together -- it's one unit, same as completion. */
-  async function handleRemoveUnilateralSet(exercise: WorkoutExerciseWithSets, setIndex: number) {
-    const left = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'left');
-    const right = exercise.sets.find((s) => s.setIndex === setIndex && s.side === 'right');
-    if (!left || !right) return;
-
-    setError(null);
-    try {
-      await Promise.all([deleteSet(left.id), deleteSet(right.id)]);
-      updateExerciseSets(exercise.id, (ex) => ({
-        ...ex,
-        sets: ex.sets.filter((s) => s.id !== left.id && s.id !== right.id),
-      }));
-      dropSetInputs(left.id, right.id);
-      discardSetTimer(left.id);
-      discardSetTimer(right.id);
+      dropSetInputs(...gone);
+      for (const id of gone) discardSetTimer(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove set');
     }
@@ -559,10 +602,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   // reference is what lets SetRow's memo skip the other rows while the user types into one.
   const workoutRef = useRef(workout);
   workoutRef.current = workout;
-  const removeSetRef = useRef(handleRemoveSet);
-  removeSetRef.current = handleRemoveSet;
-  const removeUnilateralSetRef = useRef(handleRemoveUnilateralSet);
-  removeUnilateralSetRef.current = handleRemoveUnilateralSet;
+  const removeSetsRef = useRef(handleRemoveSets);
+  removeSetsRef.current = handleRemoveSets;
   const setInputsRef = useRef(setInputs);
   setInputsRef.current = setInputs;
   const removeSet = useCallback((setId: string) => {
@@ -571,15 +612,19 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     for (const exercise of current.exercises) {
       const set = exercise.sets.find((candidate) => candidate.id === setId);
       if (set) {
-        const unilateral = exercise.movementType === 'unilateral';
-        // A unilateral set is removed as one unit, same as completion above.
-        const rows = unilateral
-          ? exercise.sets.filter((candidate) => candidate.setIndex === set.setIndex)
-          : [set];
-        const remove = () => {
-          if (unilateral) void removeUnilateralSetRef.current(exercise, set.setIndex);
-          else void removeSetRef.current(exercise.id, set);
-        };
+        // The exercise's sets in order, a unilateral set's two sides together -- one unit, same
+        // as completion above.
+        const logical = Array.from(new Set(exercise.sets.map((row) => row.setIndex)))
+          .sort((a, b) => a - b)
+          .map((setIndex) => exercise.sets.filter((row) => row.setIndex === setIndex));
+        const position = logical.findIndex((group) => group.some((row) => row.id === setId));
+        // A working set goes with the drop sets under it: they're part of it.
+        const groups = rowsRemovedWith(
+          logical.map((group) => ({ rows: group, isDrop: group[0].isDrop })),
+          position,
+        );
+        const rows = groups.flatMap((group) => group.rows);
+        const remove = () => void removeSetsRef.current(exercise.id, rows);
         // A set with nothing in it goes straight away; one with numbers in it, or ticked, is
         // asked about first, so a stray tap never loses a logged set.
         const hasData = rows.some(
@@ -589,16 +634,19 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
           remove();
           return;
         }
-        const indexes = Array.from(new Set(exercise.sets.map((row) => row.setIndex))).sort(
-          (a, b) => a - b,
-        );
-        const number = indexes.indexOf(set.setIndex) + 1;
-        const lastOne = indexes.length === 1;
+        const label = setLabels(logical.map((group) => ({ isDrop: group[0].isDrop })))[position];
+        const workingSets = logical.filter((group) => !group[0].isDrop).length;
+        const lastOne = !label.drop && workingSets === 1;
+        const withDrops = groups.length > 1;
         Alert.alert(
-          `Remove set ${number}?`,
+          label.drop
+            ? `Remove this drop set?`
+            : withDrops
+              ? `Remove set ${label.number} and its drop sets?`
+              : `Remove set ${label.number}?`,
           lastOne
             ? `It's the only set of ${exercise.exerciseName}. The exercise stays in your workout, so you can add a set again.`
-            : `What you entered for it is removed from this workout.`,
+            : `What you entered for ${withDrops ? 'them' : 'it'} is removed from this workout.`,
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Remove Set', style: 'destructive', onPress: remove },
@@ -931,6 +979,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       onChangeDuration={changeSetDuration}
       setTimers
       onAddSet={() => handleAddSet(exercise)}
+      onAddDropSet={() => handleAddDropSet(exercise)}
       onRemoveSet={removeSet}
       onToggleWarmup={toggleWarmup}
       warmupHint={showWarmupHint && exercise.id === hintedExerciseId ? warmupHint : null}

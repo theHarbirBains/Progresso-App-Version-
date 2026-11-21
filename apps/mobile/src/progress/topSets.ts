@@ -1,6 +1,7 @@
 import type { MachineDetails } from '../exercises/machineDetails';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import type { HistoricalSetWithExercise } from '../workouts/allExerciseHistoryQueries';
+import { workingSets } from '../workouts/exerciseHistoryGrouping';
 
 /**
  * Minimum reps for a completed set to qualify as this exercise's "Top Set".
@@ -40,7 +41,8 @@ export interface TopSetRow extends MachineDetails {
  */
 export function computeTopSets(history: HistoricalSetWithExercise[]): TopSetRow[] {
   const bestByExercise = new Map<string, TopSetRow>();
-  for (const s of history) {
+  // A drop set is never a top set.
+  for (const s of workingSets(history)) {
     if (s.reps < TOP_SET_MIN_REPS) continue;
     const current = bestByExercise.get(s.exerciseId);
     const isBetter =

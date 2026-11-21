@@ -38,6 +38,8 @@ interface Props {
   onRemove?: (setId: string) => void;
   /** A warm-up set, shown as W. */
   warmup?: boolean;
+  /** A drop set under set `setIndex`: shown as an arrow under it, with no number of its own. */
+  drop?: boolean;
   /** Tapping the set's number marks or unmarks it as a warm-up (the live workout only). */
   onToggleWarmup?: (setId: string) => void;
   /** A timed set gets a timer (the live workout only); its check then finishes the timer too. */
@@ -70,6 +72,7 @@ function SetRowComponent({
   onToggleComplete,
   onRemove,
   warmup = false,
+  drop = false,
   onToggleWarmup,
   timer = false,
   accentColor,
@@ -94,13 +97,14 @@ function SetRowComponent({
       <SetNumber
         index={setIndex}
         warmup={warmup}
+        drop={drop}
         onToggleWarmup={onToggleWarmup ? () => onToggleWarmup(setId) : undefined}
         accentColor={accentColor}
         testID={testID}
       />
       <SetValueFields
         setId={setId}
-        label={`Set ${setIndex}`}
+        label={drop ? `Set ${setIndex} drop` : `Set ${setIndex}`}
         measurementType={measurementType}
         weight={weight}
         reps={reps}
@@ -120,6 +124,7 @@ function SetRowComponent({
         canToggle={canToggle}
         onComplete={autosaved ? undefined : handleComplete}
         onRemove={onRemove ? () => onRemove(setId) : undefined}
+        drop={drop}
         accentColor={accentColor}
         onAccentColor={onAccentColor}
       />

@@ -51,6 +51,7 @@ import {
 } from '../workouts/workoutQueries';
 import { formatCardDuration } from '../workouts/workoutFormat';
 import { workoutMuscleTabs, type MuscleTab } from '../workouts/workoutMuscleTabs';
+import { setLabels } from '../workouts/dropSets';
 import { formatVolume, volumeInUnit } from '../workouts/workoutSummary';
 import { workoutDetailStyles as styles } from './workoutDetailStyles';
 import { SkeletonCards } from '../design/Skeleton';
@@ -293,10 +294,10 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
       withWarmups: shownSets(exercise.sets, type),
     };
   });
-  // Volume is weight x reps: weighted exercises only.
+  // Volume is weight x reps: weighted exercises only, drop sets included.
   const weightedLogged = loggedByExercise
     .filter((entry) => entry.type === 'weight_reps')
-    .flatMap((entry) => completedSetsOnly(entry.sets));
+    .flatMap((entry) => completedSetsOnly(entry.withWarmups));
   const totalVolume = volumeInUnit(weightedLogged, weightUnit);
   const loggedSetCount = loggedByExercise.reduce((sum, entry) => sum + entry.sets.length, 0);
   const durationMinutes = computeDurationMinutes(shown.performedAt, shown.completedAt);
@@ -474,6 +475,11 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         // logged -- a blank/incomplete set left over from a live session
         // that was completed anyway is not real performance data.
         const topSet = bestLoggedSet(exerciseSets, type);
+        // Each set's label, by its place: a unilateral set's two sides share one, and a drop set
+        // sits under the set it drops from with none of its own.
+        const logical = [...new Map(exerciseSets.map((set) => [set.setIndex, set])).values()];
+        const labels = setLabels(logical);
+        const labelOf = new Map(logical.map((set, position) => [set.setIndex, labels[position]]));
         return (
           <AppCard key={exercise.id} testID={`exercise-card-${exercise.id}`}>
             {/* PR history is weighted rep PRs and 1RMs: a bodyweight or timed exercise's
@@ -540,10 +546,18 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
                 const oneRepMax =
                   type === 'weight_reps' && oneRepMaxes[exercise.id]?.sourceSetId === set.id;
                 const record = isRecord(exercise.id, type, set);
+                const label = labelOf.get(set.setIndex);
                 return (
-                  <View key={set.id} style={[styles.setRow, set.isWarmup && styles.warmupRow]}>
+                  <View
+                    key={set.id}
+                    style={[
+                      styles.setRow,
+                      set.isWarmup && styles.warmupRow,
+                      label?.drop && styles.dropRow,
+                    ]}
+                  >
                     <Text testID={`set-label-${set.id}`} style={styles.setLabel}>
-                      {set.isWarmup ? 'Warm-up' : `Set ${set.setIndex}`}
+                      {set.isWarmup ? 'Warm-up' : label?.drop ? 'Drop' : `Set ${label?.number}`}
                     </Text>
                     <Text style={styles.setValue}>
                       {type === 'weight_reps'

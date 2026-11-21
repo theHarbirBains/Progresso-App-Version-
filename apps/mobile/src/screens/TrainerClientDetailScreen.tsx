@@ -47,6 +47,7 @@ import {
   groupByExercise,
   type HistoricalSetWithExercise,
 } from '../workouts/allExerciseHistoryQueries';
+import { workingSets } from '../workouts/exerciseHistoryGrouping';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import {
   fetchAllExerciseRecords,
@@ -497,7 +498,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                   <OverviewSection
                     groups={progressGroups}
                     lifetimeStats={lifetimeStats}
-                    totalCompletedSets={data?.allSetHistory.length ?? 0}
+                    totalCompletedSets={workingSets(data?.allSetHistory ?? []).length}
                     totalPRs={totalPRs}
                     repPRs={data?.repPRs ?? []}
                     oneRepMaxes={data?.oneRepMaxes ?? []}
@@ -527,7 +528,7 @@ export function TrainerClientDetailScreen({ navigation, route }: Props) {
                     history={data?.allSetHistory ?? []}
                     completedWorkouts={data?.allWorkouts ?? []}
                     lifetimeStats={lifetimeStats}
-                    totalCompletedSets={data?.allSetHistory.length ?? 0}
+                    totalCompletedSets={workingSets(data?.allSetHistory ?? []).length}
                     totalPRs={totalPRs}
                     repPRs={data?.repPRs ?? []}
                     oneRepMaxes={data?.oneRepMaxes ?? []}

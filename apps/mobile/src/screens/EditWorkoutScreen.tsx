@@ -36,6 +36,7 @@ import {
   deleteSet,
   deleteWorkout,
   fetchWorkoutDetail,
+  moveSets,
   removeExerciseFromWorkout,
   updateSet,
   updateWorkout,
@@ -126,6 +127,8 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
               side: s.side,
               duration: '',
               ...draftFromSet(s, measurementTypeOf(ex), weightUnit),
+              ...(s.isWarmup ? { isWarmup: true } : {}),
+              ...(s.isDrop ? { isDrop: true } : {}),
             })),
           })),
         );
@@ -257,12 +260,24 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
           if (!keptSetIds.has(originalSetId)) await deleteSet(originalSetId);
         }
 
+        // A drop set slotted in under a saved set moved the ones after it down: they move first,
+        // all at once, so the new sets find their places free.
+        await moveSets(
+          validSets.flatMap((set) => {
+            const originalIndex = set.id !== null ? originalSetsById.get(set.id)?.setIndex : null;
+            return set.id !== null && originalIndex != null && originalIndex !== set.setIndex
+              ? [{ id: set.id, setIndex: set.setIndex }]
+              : [];
+          }),
+        );
+
         // Sets added here are saved together, once the changed ones are.
         const added: Parameters<typeof createCompletedSets>[1] = [];
         for (const set of validSets) {
           const values = draftValues(set, type, weightUnit);
+          const marks = { isWarmup: set.isWarmup === true, isDrop: set.isDrop === true };
           if (set.id === null) {
-            added.push({ setIndex: set.setIndex, side: set.side, ...values });
+            added.push({ setIndex: set.setIndex, side: set.side, ...values, ...marks });
             continue;
           }
           const originalSet = originalSetsById.get(set.id);
@@ -275,14 +290,16 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
             wasCompleted &&
             originalSet.weightKg === values.weightKg &&
             originalSet.reps === values.reps &&
-            (originalSet.durationSeconds ?? null) === values.durationSeconds
+            (originalSet.durationSeconds ?? null) === values.durationSeconds &&
+            (originalSet.isWarmup === true) === marks.isWarmup
           ) {
             continue;
           }
-          await updateSet(
-            set.id,
-            wasCompleted ? values : { ...values, completedAt: performedAtIso },
-          );
+          await updateSet(set.id, {
+            ...values,
+            isWarmup: marks.isWarmup,
+            ...(wasCompleted ? {} : { completedAt: performedAtIso }),
+          });
         }
         if (added.length > 0) await createCompletedSets(workoutExerciseId, added, performedAtIso);
       }
@@ -392,6 +409,7 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
                 testID="edit-workout"
                 exercise={exercise}
                 draft={draft}
+                accentColor={theme.accent}
               />
             ))}
 

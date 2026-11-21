@@ -4,6 +4,7 @@
 // week; duplicated here in miniature rather than importing across the
 // dashboard/progress folder boundary for 3 lines of date math).
 
+import { workingSets } from '../workouts/exerciseHistoryGrouping';
 import { setVolumeKg } from '../workouts/workoutSummary';
 
 export interface WeeklyPoint {
@@ -84,14 +85,14 @@ export function computeWeeklyVolumeKg(
   return bucketByWeek(sets, (s) => s.performedAt, setVolumeKg, weeks, now);
 }
 
-/** One point per week: how many completed sets were logged that week. */
+/** One point per week: how many completed sets were logged that week (a drop set is part of the set before it). */
 export function computeWeeklySetCounts(
-  sets: { performedAt: string }[],
+  sets: { performedAt: string; isDrop?: boolean }[],
   weeks = 8,
   now: Date = new Date(),
 ): WeeklyPoint[] {
   return bucketByWeek(
-    sets,
+    workingSets(sets),
     (s) => s.performedAt,
     () => 1,
     weeks,

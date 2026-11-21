@@ -27,6 +27,7 @@ import {
   computeWeeklyWorkoutCounts,
 } from '../progress/trainingOverTime';
 import { useProgressTheme } from '../progress/useProgressTheme';
+import { workingSets } from '../workouts/exerciseHistoryGrouping';
 import { formatTotalTime } from '../workouts/workoutMonthSummary';
 import { PersonProfilePage } from './PersonProfileScreen';
 import { profileStyles as styles } from './profileStyles';
@@ -145,7 +146,7 @@ function YourTraining() {
         <StatTile
           testID="profile-stat-tile-sets"
           label="Total Sets"
-          value={formatCount(allSetHistory.length)}
+          value={formatCount(workingSets(allSetHistory).length)}
         />
         <StatTile
           testID="profile-stat-tile-time"

@@ -23,8 +23,15 @@ interface LiveProps {
   onComplete?: () => void;
   /** Omitted where removing a set mid-workout isn't offered. */
   onRemove?: () => void;
+  /** A drop set under set `setIndex`: its remove says so. */
+  drop?: boolean;
   accentColor: string;
   onAccentColor: string;
+}
+
+/** What a set's remove button is called: a drop set is named for the set it drops from. */
+function removeLabel(setIndex: number, drop: boolean): string {
+  return drop ? `Remove drop set under set ${setIndex}` : `Remove set ${setIndex}`;
 }
 
 /** A live set's 44pt check, filled with the accent once done, and its remove button. */
@@ -35,6 +42,7 @@ export function LiveSetActions({
   canToggle,
   onComplete,
   onRemove,
+  drop = false,
   accentColor,
   onAccentColor,
 }: LiveProps) {
@@ -69,7 +77,7 @@ export function LiveSetActions({
           style={styles.setRemoveButton}
           onPress={onRemove}
           accessibilityRole="button"
-          accessibilityLabel={`Remove set ${setIndex}`}
+          accessibilityLabel={removeLabel(setIndex, drop)}
         >
           <Feather name="trash-2" size={18} color={colors.textMuted} />
         </TouchableOpacity>
@@ -83,10 +91,12 @@ export function PastSetRemoveButton({
   testID,
   setIndex,
   onRemove,
+  drop = false,
 }: {
   testID?: string;
   setIndex: number;
   onRemove: () => void;
+  drop?: boolean;
 }) {
   return (
     <TouchableOpacity
@@ -94,7 +104,7 @@ export function PastSetRemoveButton({
       style={styles.setCompleteButton}
       onPress={onRemove}
       accessibilityRole="button"
-      accessibilityLabel={`Remove set ${setIndex}`}
+      accessibilityLabel={removeLabel(setIndex, drop)}
     >
       <Feather name="trash-2" size={18} color={colors.textMuted} />
     </TouchableOpacity>

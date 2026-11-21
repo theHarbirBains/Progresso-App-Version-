@@ -15,6 +15,14 @@ export interface HistoricalSetWithExercise extends HistoricalSet, MachineDetails
   movementType: MovementType;
 }
 
+/**
+ * The sets that count as sets of their own -- and can be a top set, a record or a best: no drop
+ * sets (each is part of the set before it; volume still counts it).
+ */
+export function workingSets<T extends { isDrop?: boolean }>(sets: T[]): T[] {
+  return sets.filter((set) => !set.isDrop);
+}
+
 export interface ExerciseHistoryGroup {
   exerciseId: string;
   exerciseName: string;
@@ -36,6 +44,7 @@ export function groupByExercise(sets: HistoricalSetWithExercise[]): ExerciseHist
       reps: s.reps,
       performedAt: s.performedAt,
       workoutExerciseId: s.workoutExerciseId,
+      ...(s.isDrop ? { isDrop: true } : {}),
     });
   }
   return Array.from(groups.values());

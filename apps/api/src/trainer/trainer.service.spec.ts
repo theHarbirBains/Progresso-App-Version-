@@ -581,6 +581,46 @@ describe('TrainerService', () => {
       });
     });
 
+    it('sends a warm-up and a drop set with their marks', async () => {
+      const { mock, service } = setup();
+      mock.queue('subscriptions', activeTrainer());
+      mock.queue('trainer_clients', ok({ id: 'l1', status: 'active', source: 'managed' }));
+      mock.queueRpc('trainer_log_workout', ok('workout-1'));
+      mock.queue('trainer_actions', ok());
+
+      await service.logWorkout(
+        TRAINER,
+        CLIENT,
+        logDto({
+          exercises: [
+            {
+              exerciseId,
+              sets: [
+                { setIndex: 1, weightKg: 40, reps: 10, isWarmup: true },
+                { setIndex: 2, weightKg: 100, reps: 8 },
+                { setIndex: 3, weightKg: 75, reps: 9, isDrop: true },
+              ],
+            },
+          ],
+        }),
+      );
+
+      const rpc = mock.calls.find((c) => c.target === 'rpc:trainer_log_workout');
+      expect(rpc?.args[0]).toMatchObject({
+        p_payload: {
+          exercises: [
+            {
+              sets: [
+                { setIndex: 1, isWarmup: true, isDrop: false },
+                { setIndex: 2, isWarmup: false, isDrop: false },
+                { setIndex: 3, isWarmup: false, isDrop: true },
+              ],
+            },
+          ],
+        },
+      });
+    });
+
     it("turns a set that doesn't match its exercise into a 400", async () => {
       for (const message of [
         "only a timed exercise's set has a duration",

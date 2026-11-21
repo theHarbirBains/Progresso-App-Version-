@@ -11,7 +11,11 @@ import type { WorkoutExerciseWithSets } from './workoutQueries';
 // ChartPointDetail/exerciseProgress.ts.
 
 export function computeTotalSets(exercises: WorkoutExerciseWithSets[]): number {
-  return exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
+  // A drop set is part of the set before it, never one of its own.
+  return exercises.reduce(
+    (sum, exercise) => sum + exercise.sets.filter((set) => !set.isDrop).length,
+    0,
+  );
 }
 
 /** One set's own volume (weight x reps) -- the single authoritative

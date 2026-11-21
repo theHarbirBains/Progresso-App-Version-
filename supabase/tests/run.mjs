@@ -1652,6 +1652,104 @@ async function main() {
       [we.id],
     );
 
+    // Drop sets are part of the set before them: their volume counts, but never as a set of their
+    // own, and never as a PR or a true 1RM, however heavy.
+    const totalsOf = async () => {
+      await admin.query('reset role');
+      const row = (
+        await admin.query(
+          'select total_sets, total_volume_kg from public.person_profile_totals($1, true)',
+          [userA],
+        )
+      ).rows[0];
+      await asClaims(admin, userA);
+      return row;
+    };
+    const beforeDrops = await totalsOf();
+    const drop = (
+      await admin.query(
+        'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at, is_drop) values ($1, 5, 120, 5, now(), true) returning id',
+        [we.id],
+      )
+    ).rows[0];
+    await admin.query(
+      'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at, is_drop) values ($1, 6, 150, 1, now(), true)',
+      [we.id],
+    );
+    pr = await admin.query(
+      'select best_weight_kg from public.rep_prs where user_id = $1 and exercise_id = $2 and reps = 5',
+      [userA, squat],
+    );
+    orm = await admin.query(
+      'select weight_kg from public.one_rep_maxes where user_id = $1 and exercise_id = $2',
+      [userA, squat],
+    );
+    record(
+      'A drop set is never a PR or a true 1RM: a 120kg x 5 and a 150kg x 1 drop leave them at 110kg and 140kg',
+      pr.rows[0]?.best_weight_kg === '110.00' && orm.rows[0]?.weight_kg === '140.00',
+      `got ${pr.rows[0]?.best_weight_kg} and ${orm.rows[0]?.weight_kg}`,
+    );
+    const withDrops = await totalsOf();
+    record(
+      "A drop set adds its volume but isn't a set of its own in a profile's totals",
+      withDrops.total_sets === beforeDrops.total_sets &&
+        Number(withDrops.total_volume_kg) - Number(beforeDrops.total_volume_kg) === 750,
+      `sets ${beforeDrops.total_sets} -> ${withDrops.total_sets}, volume ${beforeDrops.total_volume_kg} -> ${withDrops.total_volume_kg}`,
+    );
+    await expectThrowsInTransaction(
+      admin,
+      () => admin.query('update public.sets set is_warmup = true where id = $1', [drop.id]),
+      'A set is never both a warm-up and a drop set',
+      /sets_warmup_or_drop/,
+    );
+
+    // move_sets puts sets at new places in one go: two sets can swap slots, which a plain update
+    // of each would refuse (sets_live_slot_key).
+    const slotIds = async () =>
+      Object.fromEntries(
+        (
+          await admin.query(
+            'select set_index, id from public.sets where workout_exercise_id = $1 and deleted_at is null',
+            [we.id],
+          )
+        ).rows.map((row) => [row.set_index, row.id]),
+      );
+    const before = await slotIds();
+    await admin.query('select public.move_sets($1)', [
+      JSON.stringify([
+        { id: before[2], setIndex: 3 },
+        { id: before[3], setIndex: 2 },
+      ]),
+    ]);
+    const swapped = await slotIds();
+    record(
+      'move_sets swaps two sets of an exercise in one go',
+      swapped[2] === before[3] && swapped[3] === before[2],
+      JSON.stringify(swapped),
+    );
+    await expectThrowsInTransaction(
+      admin,
+      () =>
+        admin.query('select public.move_sets($1)', [
+          JSON.stringify([
+            { id: before[2], setIndex: 2 },
+            { id: randomUUID(), setIndex: 9 },
+          ]),
+        ]),
+      "move_sets moves nothing when a set can't be found (another person's, under RLS, or none)",
+      /a set to move was not found/,
+    );
+    await admin.query('select public.move_sets($1)', [
+      JSON.stringify([
+        { id: before[2], setIndex: 2 },
+        { id: before[3], setIndex: 3 },
+      ]),
+    ]);
+    await admin.query(
+      'update public.sets set deleted_at = now() where workout_exercise_id = $1 and is_drop',
+      [we.id],
+    );
+
     await admin.query('update public.workouts set deleted_at = now() where id = $1', [w.id]);
     expectRowCount(
       await admin.query(

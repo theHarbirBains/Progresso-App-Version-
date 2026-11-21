@@ -11,12 +11,19 @@ import { supabase } from '../lib/supabase';
 export function fetchCompletedSetValues<Reps extends number | null = number | null>(
   workoutExerciseIds: string[],
 ): Promise<
-  { id: string; workout_exercise_id: string; weight_kg: string | number | null; reps: Reps }[]
+  {
+    id: string;
+    workout_exercise_id: string;
+    weight_kg: string | number | null;
+    reps: Reps;
+    /** A drop set: its volume counts, never as a set of its own or a record. */
+    is_drop?: boolean | null;
+  }[]
 > {
   return fetchAllRowsForIds(workoutExerciseIds, (ids, from, to) =>
     supabase
       .from('sets')
-      .select('id, workout_exercise_id, weight_kg, reps', { count: 'exact' })
+      .select('id, workout_exercise_id, weight_kg, reps, is_drop', { count: 'exact' })
       .in('workout_exercise_id', ids)
       .is('deleted_at', null)
       .not('completed_at', 'is', null)
@@ -43,6 +50,11 @@ export interface HistoricalSet {
   performedAt: string;
   /** Identifies one occurrence of this exercise within one workout -- the grouping key for "top set per session". */
   workoutExerciseId: string;
+  /**
+   * A drop set: part of the working set before it. Volume counts it; a set count, a top set, a
+   * record or a best never does (workingSets). Absent means it isn't one.
+   */
+  isDrop?: boolean;
 }
 
 /**
@@ -91,7 +103,9 @@ export async function fetchExerciseSetHistory(
 
   const sets = await fetchCompletedSetValues<number>(workoutExerciseIds);
 
+  // Every chart here is a top set, a record or a best -- a drop set is never one.
   return sets
+    .filter((s) => s.is_drop !== true)
     .map((s) => ({
       setId: s.id,
       weightKg: Number(s.weight_kg),

@@ -135,6 +135,7 @@ function cardSet(
     completed: set.completedAt !== null,
     canComplete: isValidDraft(setInputs[set.id], type),
     isWarmup: set.isWarmup === true,
+    isDrop: set.isDrop === true,
   };
 }
 
@@ -144,7 +145,10 @@ export function computeCardSets(
   setInputs: Record<string, SetInputDraft>,
   type: MeasurementType = 'weight_reps',
 ): ExerciseCardSet[] {
-  return sets.map((set) => ({ ...cardSet(set, setInputs, type), setIndex: set.setIndex }));
+  // In their exercise's order: a drop set slotted in under its set moves the ones after it.
+  return [...sets]
+    .sort((a, b) => a.setIndex - b.setIndex)
+    .map((set) => ({ ...cardSet(set, setInputs, type), setIndex: set.setIndex }));
 }
 
 /** The values a valid draft saves as. Call only after isValidDraft. */
@@ -211,6 +215,7 @@ export function computeUnilateralSets(
   return groupUnilateralSets(sets).map(({ setIndex, left, right }) => ({
     setIndex,
     isWarmup: left.isWarmup === true,
+    isDrop: left.isDrop === true,
     left: cardSet(left, setInputs, type),
     right: cardSet(right, setInputs, type),
   }));

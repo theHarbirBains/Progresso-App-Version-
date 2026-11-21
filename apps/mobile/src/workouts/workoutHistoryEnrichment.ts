@@ -122,7 +122,7 @@ export async function enrichWorkoutSummaries(
     const { data: sets, error: setsError } = await supabase
       .from('sets')
       .select(
-        'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at',
+        'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_drop',
       )
       .in('workout_exercise_id', workoutExerciseIds)
       .is('deleted_at', null)
@@ -143,11 +143,23 @@ export async function enrichWorkoutSummaries(
       };
       // Only a set holding what its exercise records counts as logged.
       if (!holdsMeasurement(record, type)) continue;
+      const workoutIdOfSet = workoutIdByExerciseId.get(set.workout_exercise_id);
+      // A drop set is part of the set before it: its volume counts, but it's never a set of its
+      // own or a top set.
+      if (set.is_drop === true) {
+        if (workoutIdOfSet && type === 'weight_reps') {
+          totalVolumeKgByWorkoutId.set(
+            workoutIdOfSet,
+            (totalVolumeKgByWorkoutId.get(workoutIdOfSet) ?? 0) + record.weightKg! * record.reps!,
+          );
+        }
+        continue;
+      }
       const bucket = setsByWorkoutExerciseId.get(set.workout_exercise_id) ?? [];
       bucket.push(record);
       setsByWorkoutExerciseId.set(set.workout_exercise_id, bucket);
 
-      const workoutId = workoutIdByExerciseId.get(set.workout_exercise_id);
+      const workoutId = workoutIdOfSet;
       if (!workoutId) continue;
       completedSetCountByWorkoutId.set(
         workoutId,

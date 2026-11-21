@@ -12,18 +12,20 @@ import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import { liveWorkoutStyles } from '../screens/liveWorkoutStyles';
 import { logPastWorkoutStyles as styles } from '../screens/logPastWorkoutStyles';
 import { AddExerciseButton } from './AddExerciseButton';
+import { setLabels } from './dropSets';
 import { CreateCustomExerciseButton } from './CreateCustomExerciseButton';
 import { DurationInput } from './DurationInput';
 import { PastSetRow } from './PastSetRow';
 import { PastUnilateralSetRow } from './PastUnilateralSetRow';
 import type {
   PastDraftExercise,
+  PastDraftSet,
   PastSetField,
   PastWorkoutDate,
   PastWorkoutDraft,
 } from './pastWorkoutDraft';
 import { PER_SIDE_NOTE, SetColumnHeader } from './SetColumnHeader';
-import { groupUnilateralSets } from './setInputDrafts';
+import { groupUnilateralSets, isValidDraft } from './setInputDrafts';
 import { formatCardDate } from './workoutFormat';
 
 // The parts Log a Past Workout and Edit Workout share. Each takes the page's
@@ -87,19 +89,34 @@ interface ExerciseProps {
   testID: string;
   exercise: PastDraftExercise;
   draft: PastWorkoutDraft;
+  accentColor: string;
 }
 
 /**
  * One exercise's card: its name and muscle group, a remove button, its sets -- a unilateral
- * exercise's as left/right pairs -- and Add Set.
+ * exercise's as left/right pairs -- and Add Set. As in the live workout, tapping a set's number
+ * marks it a warm-up, and a weighted exercise's Drop Set adds a drop under the last set filled in.
  */
-export function PastExerciseCard({ testID, exercise, draft }: ExerciseProps) {
+export function PastExerciseCard({ testID, exercise, draft, accentColor }: ExerciseProps) {
   const isUnilateral = exercise.movementType === 'unilateral';
   const unilateralRows = isUnilateral ? groupUnilateralSets(exercise.sets) : [];
+  const orderedSets = isUnilateral
+    ? []
+    : [...exercise.sets].sort((a, b) => a.setIndex - b.setIndex);
   const hasRows = isUnilateral ? unilateralRows.length > 0 : exercise.sets.length > 0;
   const prefix = `${testID}-exercise-${exercise.localId}`;
   const change = (setLocalId: string, field: PastSetField, text: string) =>
     draft.changeSet(exercise.localId, setLocalId, field, text);
+  // Working sets numbered by position; a drop set under the set it drops from, with no number.
+  const labels = setLabels(
+    isUnilateral ? unilateralRows.map((row) => ({ isDrop: row.left.isDrop })) : orderedSets,
+  );
+  const filled = (set: PastDraftSet) => isValidDraft(set, exercise.measurementType);
+  const canDrop =
+    exercise.measurementType === 'weight_reps' &&
+    (isUnilateral
+      ? unilateralRows.some((row) => !row.left.isWarmup && filled(row.left) && filled(row.right))
+      : orderedSets.some((set) => !set.isWarmup && filled(set)));
 
   return (
     <Card testID={prefix}>
@@ -131,29 +148,36 @@ export function PastExerciseCard({ testID, exercise, draft }: ExerciseProps) {
       {hasRows ? <SetColumnHeader measurementType={exercise.measurementType} /> : null}
 
       {isUnilateral
-        ? unilateralRows.map((row) => {
+        ? unilateralRows.map((row, position) => {
             const sideId = (side: 'left' | 'right') =>
               side === 'left' ? row.left.localId : row.right.localId;
+            const label = labels[position];
             return (
               <PastUnilateralSetRow
-                key={row.setIndex}
+                key={row.left.localId}
                 testID={`${prefix}-set-${row.setIndex}`}
-                setIndex={row.setIndex}
+                setIndex={label.number}
                 left={row.left}
                 right={row.right}
                 onChangeWeight={(side, text) => change(sideId(side), 'weight', text)}
                 onChangeReps={(side, text) => change(sideId(side), 'reps', text)}
                 onChangeDuration={(side, text) => change(sideId(side), 'duration', text)}
                 measurementType={exercise.measurementType}
-                onRemove={() => draft.removeUnilateralSet(exercise.localId, row.setIndex)}
+                onRemove={() => draft.removeUnilateralSet(exercise, row.setIndex)}
+                warmup={row.left.isWarmup === true}
+                drop={label.drop}
+                onToggleWarmup={
+                  label.drop ? undefined : () => draft.toggleWarmup(exercise.localId, row.setIndex)
+                }
+                accentColor={accentColor}
               />
             );
           })
-        : exercise.sets.map((set) => (
+        : orderedSets.map((set, position) => (
             <PastSetRow
               key={set.localId}
               testID={`${prefix}-set-${set.setIndex}`}
-              setIndex={set.setIndex}
+              setIndex={labels[position].number}
               weight={set.weight}
               reps={set.reps}
               duration={set.duration}
@@ -161,18 +185,40 @@ export function PastExerciseCard({ testID, exercise, draft }: ExerciseProps) {
               onChangeDuration={(text) => change(set.localId, 'duration', text)}
               onChangeWeight={(text) => change(set.localId, 'weight', text)}
               onChangeReps={(text) => change(set.localId, 'reps', text)}
-              onRemove={() => draft.removeSet(exercise.localId, set.localId)}
+              onRemove={() => draft.removeSet(exercise, set.localId)}
+              warmup={set.isWarmup === true}
+              drop={labels[position].drop}
+              onToggleWarmup={
+                labels[position].drop
+                  ? undefined
+                  : () => draft.toggleWarmup(exercise.localId, set.setIndex)
+              }
+              accentColor={accentColor}
             />
           ))}
 
-      <View style={liveWorkoutStyles.addSet}>
-        <SecondaryButton
-          testID={`${prefix}-add-set`}
-          size="md"
-          label="+ Add Set"
-          accessibilityLabel="Add Set"
-          onPress={() => draft.addSet(exercise)}
-        />
+      <View style={[liveWorkoutStyles.addSet, canDrop ? liveWorkoutStyles.addSetRow : null]}>
+        <View style={canDrop ? liveWorkoutStyles.addSetButton : undefined}>
+          <SecondaryButton
+            testID={`${prefix}-add-set`}
+            size="md"
+            label="+ Add Set"
+            accessibilityLabel="Add Set"
+            onPress={() => draft.addSet(exercise)}
+          />
+        </View>
+        {canDrop ? (
+          <View style={liveWorkoutStyles.addSetButton}>
+            <SecondaryButton
+              testID={`${prefix}-add-drop-set`}
+              size="md"
+              icon="corner-down-right"
+              label="Drop Set"
+              accessibilityLabel="Add a drop set under the last set"
+              onPress={() => draft.addDropSet(exercise)}
+            />
+          </View>
+        ) : null}
       </View>
     </Card>
   );

@@ -286,7 +286,7 @@ export class FeedService {
     if (workoutExerciseIds.length > 0) {
       const { data: sets, error: setsError } = await client
         .from('sets')
-        .select('id, workout_exercise_id, set_index, weight_kg, reps, duration_seconds')
+        .select('id, workout_exercise_id, set_index, weight_kg, reps, duration_seconds, is_drop')
         .in('workout_exercise_id', workoutExerciseIds)
         .is('deleted_at', null)
         .not('completed_at', 'is', null)
@@ -310,6 +310,17 @@ export class FeedService {
         };
         // Only a set holding what its exercise records counts as logged.
         if (!holdsMeasurement(feedSet, type)) continue;
+        // A drop set is part of the set before it: its volume counts, but it's never a set of
+        // its own or a top set.
+        if (set.is_drop === true) {
+          if (type === 'weight_reps') {
+            totalVolumeKgByWorkoutId.set(
+              workoutId,
+              (totalVolumeKgByWorkoutId.get(workoutId) ?? 0) + feedSet.weightKg! * feedSet.reps!,
+            );
+          }
+          continue;
+        }
         const bucket = setsByExerciseRowId.get(exerciseRowId) ?? [];
         bucket.push(feedSet);
         setsByExerciseRowId.set(exerciseRowId, bucket);

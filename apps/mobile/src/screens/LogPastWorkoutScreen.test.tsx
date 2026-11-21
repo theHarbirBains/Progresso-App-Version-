@@ -303,11 +303,61 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
     expect(mockCreateCompletedSets).toHaveBeenCalledTimes(1);
     expect(mockCreateCompletedSets).toHaveBeenCalledWith(
       'we1',
-      [{ setIndex: 1, side: null, weightKg: 100, reps: 5, durationSeconds: null }],
+      [
+        {
+          setIndex: 1,
+          side: null,
+          weightKg: 100,
+          reps: 5,
+          durationSeconds: null,
+          isWarmup: false,
+          isDrop: false,
+        },
+      ],
       expect.any(String),
     );
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' }),
+    );
+  });
+
+  it('logs a warm-up, a set and a drop set under it, each with its mark', async () => {
+    mockFetchExercises.mockResolvedValue([squat]);
+    renderScreen();
+    await screen.findByTestId('log-past-workout-date');
+    fireEvent.changeText(screen.getByTestId('log-past-workout-name'), 'Leg Day');
+    await addExerciseViaPicker(squat);
+
+    // No Drop Set until there's a set to drop from.
+    expect(screen.queryByTestId(`${EX}-add-drop-set`)).toBeNull();
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-1-weight`), '60');
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-1-reps`), '10');
+    fireEvent.press(screen.getByTestId(`${EX}-set-1-number`));
+    // A warm-up isn't a set to drop from either.
+    expect(screen.queryByTestId(`${EX}-add-drop-set`)).toBeNull();
+    fireEvent.press(screen.getByTestId(`${EX}-add-set`));
+    fireEvent.changeText(await screen.findByTestId(`${EX}-set-2-weight`), '100');
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-2-reps`), '8');
+    fireEvent.press(screen.getByTestId(`${EX}-add-drop-set`));
+    fireEvent.changeText(await screen.findByTestId(`${EX}-set-3-weight`), '75');
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-3-reps`), '9');
+    // The drop sits under set 2 with no number of its own.
+    expect(screen.getByTestId(`${EX}-set-3-drop`)).toHaveProp(
+      'accessibilityLabel',
+      'Drop set, set 2',
+    );
+
+    fireEvent.press(screen.getByTestId('log-past-workout-save'));
+
+    await waitFor(() => expect(mockCreateCompletedSets).toHaveBeenCalled());
+    expect(mockCreateCompletedSets).toHaveBeenCalledWith(
+      'we1',
+      [
+        expect.objectContaining({ setIndex: 1, weightKg: 60, isWarmup: true, isDrop: false }),
+        expect.objectContaining({ setIndex: 2, weightKg: 100, isWarmup: false, isDrop: false }),
+        expect.objectContaining({ setIndex: 3, weightKg: 75, reps: 9, isDrop: true }),
+      ],
+      expect.any(String),
     );
   });
 

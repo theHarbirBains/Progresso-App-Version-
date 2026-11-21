@@ -353,6 +353,64 @@ describe('FeedService', () => {
       });
     });
 
+    it("adds a drop set's volume to its workout, never as a set of its own or a top set", async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
+      client.queue('workouts', {
+        data: [
+          {
+            id: 'w1',
+            user_id: 'user-2',
+            name: 'Legs',
+            performed_at: '2026-09-20T10:00:00.000Z',
+            completed_at: '2026-09-20T11:00:00.000Z',
+            workout_split_day_id: null,
+          },
+        ],
+        error: null,
+      });
+      client.queue('workout_exercises', {
+        data: [
+          {
+            id: 'we-press',
+            workout_id: 'w1',
+            exercise_id: 'press',
+            order_index: 1,
+            exercises: { name: 'Leg Press' },
+          },
+        ],
+        error: null,
+      });
+      client.queue('sets', {
+        data: [
+          { id: 's1', workout_exercise_id: 'we-press', set_index: 1, weight_kg: 100, reps: 8 },
+          // A drop set heavier than its set (a typo, say) still never becomes the top set.
+          {
+            id: 's2',
+            workout_exercise_id: 'we-press',
+            set_index: 2,
+            weight_kg: 120,
+            reps: 9,
+            is_drop: true,
+          },
+        ],
+        error: null,
+      });
+      client.queue('users', {
+        data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const result = await service.getFriendsFeed('user-1', 0);
+
+      expect(result.items[0]?.workout).toMatchObject({
+        completedSetCount: 1,
+        totalVolumeKg: 800 + 1080,
+        topSets: [{ exerciseId: 'press', weightKg: 100, reps: 8 }],
+      });
+    });
+
     it('leaves workouts a trainer logged for a client out of the friends feed', async () => {
       const client = createMockClient();
       client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });

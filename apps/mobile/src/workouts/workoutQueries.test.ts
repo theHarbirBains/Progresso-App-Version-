@@ -730,16 +730,42 @@ describe('createCompletedSets', () => {
         { setIndex: 1, side: 'left', weightKg: 20, reps: 10, durationSeconds: null },
         { setIndex: 1, side: 'right', weightKg: 20, reps: 9, durationSeconds: null },
         { setIndex: 2, side: null, weightKg: null, reps: null, durationSeconds: 90 },
+        { setIndex: 3, side: null, weightKg: 10, reps: 12, durationSeconds: null, isWarmup: true },
+        { setIndex: 4, side: null, weightKg: 75, reps: 9, durationSeconds: null, isDrop: true },
       ],
       '2026-10-05T12:00:00.000Z',
     );
 
     expect(sets.builder.insert).toHaveBeenCalledTimes(1);
-    const row = { workout_exercise_id: 'we1', completed_at: '2026-10-05T12:00:00.000Z' };
+    const row = {
+      workout_exercise_id: 'we1',
+      completed_at: '2026-10-05T12:00:00.000Z',
+      is_warmup: false,
+      is_drop: false,
+    };
     expect(sets.builder.insert).toHaveBeenCalledWith([
       { ...row, set_index: 1, side: 'left', weight_kg: 20, reps: 10, duration_seconds: null },
       { ...row, set_index: 1, side: 'right', weight_kg: 20, reps: 9, duration_seconds: null },
       { ...row, set_index: 2, side: 'none', weight_kg: null, reps: null, duration_seconds: 90 },
+      // A warm-up and a drop set keep their marks.
+      {
+        ...row,
+        set_index: 3,
+        side: 'none',
+        weight_kg: 10,
+        reps: 12,
+        duration_seconds: null,
+        is_warmup: true,
+      },
+      {
+        ...row,
+        set_index: 4,
+        side: 'none',
+        weight_kg: 75,
+        reps: 9,
+        duration_seconds: null,
+        is_drop: true,
+      },
     ]);
   });
 

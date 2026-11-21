@@ -24,6 +24,7 @@ import {
   deleteSet,
   fetchPreviousPerformance,
   fetchWorkoutDetail,
+  moveSets,
   removeExerciseFromWorkout,
   reorderExercises,
   updateSet,
@@ -105,6 +106,7 @@ jest.mock('../workouts/workoutQueries', () => ({
   completeWorkout: jest.fn(),
   cancelWorkout: jest.fn(),
   fetchPreviousPerformance: jest.fn(),
+  moveSets: jest.fn(),
 }));
 
 jest.mock('../progress/progressStatsQueries', () => ({
@@ -412,6 +414,93 @@ describe('ActiveWorkoutScreen', () => {
     await waitFor(() => expect(mockUpdateSet).toHaveBeenCalledWith('s1', { isWarmup: false }));
   });
 
+  it('adds a drop set under the set just done -- the empty set waiting below moves down one', async () => {
+    (moveSets as jest.Mock).mockReset().mockResolvedValue(undefined);
+    mockCreateSet.mockResolvedValue({
+      id: 'd1',
+      setIndex: 2,
+      side: null,
+      weightKg: null,
+      reps: null,
+      completedAt: null,
+      isDrop: true,
+    });
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('exercise-card-we1-add-drop-set'));
+
+    await waitFor(() =>
+      expect(mockCreateSet).toHaveBeenCalledWith('we1', 2, undefined, { isDrop: true }),
+    );
+    expect(moveSets).toHaveBeenCalledWith([{ id: 's2', setIndex: 3 }]);
+    // Under set 1 with no number of its own; the empty set is still set 2, and the drop is part
+    // of set 1, never a set of its own.
+    expect(await screen.findByTestId('exercise-card-we1-set-d1-drop')).toHaveProp(
+      'accessibilityLabel',
+      'Drop set, set 1',
+    );
+    expect(screen.getByTestId('exercise-card-we1-set-s2-number')).toHaveTextContent('2');
+    expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('2');
+  });
+
+  it('offers no Drop Set until a set is filled in to drop from', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [{ ...baseWorkout.exercises[0], sets: [baseWorkout.exercises[0].sets[1]] }],
+    });
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    expect(screen.queryByTestId('exercise-card-we1-add-drop-set')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-weight'), '80');
+    fireEvent.changeText(screen.getByTestId('exercise-card-we1-set-s2-reps'), '8');
+    expect(screen.getByTestId('exercise-card-we1-add-drop-set')).toBeTruthy();
+  });
+
+  it('removes a set together with the drop sets under it, asking first', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [
+        {
+          ...baseWorkout.exercises[0],
+          sets: [
+            baseWorkout.exercises[0].sets[0],
+            {
+              id: 'd1',
+              setIndex: 2,
+              weightKg: 75,
+              reps: 9,
+              completedAt: '2026-01-01T00:06:00Z',
+              isDrop: true,
+            },
+            { ...baseWorkout.exercises[0].sets[1], setIndex: 3 },
+          ],
+        },
+      ],
+    });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.style === 'destructive')?.onPress?.();
+    });
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1-set-d1');
+
+    fireEvent.press(screen.getByTestId('exercise-card-we1-set-s1-remove'));
+
+    expect(alert.mock.calls[0][0]).toBe('Remove set 1 and its drop sets?');
+    await waitFor(() => expect(mockDeleteSet).toHaveBeenCalledWith('d1'));
+    expect(mockDeleteSet).toHaveBeenCalledWith('s1');
+    expect(mockDeleteSet).not.toHaveBeenCalledWith('s2');
+    await waitFor(() => expect(screen.queryByTestId('exercise-card-we1-set-d1')).toBeNull());
+    alert.mockRestore();
+  });
+
   it('tells you once how to mark a warm-up, on the first exercise, until you do or dismiss it', async () => {
     await AsyncStorage.removeItem('@progresso/warmupHintSeen');
     const { unmount } = render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
@@ -630,7 +719,7 @@ describe('ActiveWorkoutScreen', () => {
     fireEvent.press(screen.getByTestId('exercise-card-we1-set-s2-remove'));
 
     await waitFor(() => expect(mockDeleteSet).toHaveBeenCalledWith('s2'));
-    expect(screen.queryByTestId('exercise-card-we1-set-s2')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('exercise-card-we1-set-s2')).toBeNull());
     expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('1');
   });
 

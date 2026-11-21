@@ -594,6 +594,38 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     expect(screen.getByTestId('workout-detail-stat-volume')).toHaveTextContent(/2,360 kg/);
   });
 
+  it('shows a drop set under its set, adding its volume but never counting it as a set', async () => {
+    const withDrop = {
+      ...twoExercises,
+      exercises: twoExercises.exercises.map((exercise) =>
+        exercise.id === 'we2'
+          ? {
+              ...exercise,
+              sets: [
+                ...exercise.sets,
+                {
+                  id: 'd9',
+                  setIndex: 2,
+                  weightKg: 40,
+                  reps: 8,
+                  completedAt: '2026-01-01T12:31:00Z',
+                  isDrop: true,
+                },
+              ],
+            }
+          : exercise,
+      ),
+    };
+    await ready(withDrop);
+
+    expect(screen.getByTestId('set-label-s9')).toHaveTextContent('Set 1');
+    expect(screen.getByTestId('set-label-d9')).toHaveTextContent('Drop');
+    // Still 3 sets; the 40 kg x 8 drop adds 320 kg to the 2,360 kg.
+    expect(screen.getByTestId('workout-detail-stat-sets')).toHaveTextContent(/^3/);
+    expect(screen.getByTestId('workout-detail-stat-volume')).toHaveTextContent(/2,680 kg/);
+    expect(screen.getByTestId('top-set-we2')).toHaveTextContent(/60/);
+  });
+
   it('leaves Duration out of a workout logged with none, the other figures on one row', async () => {
     await ready({ ...twoExercises, completedAt: twoExercises.performedAt });
 

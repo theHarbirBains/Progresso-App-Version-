@@ -1,8 +1,9 @@
 import { memo } from 'react';
 import { View } from 'react-native';
-import { Text } from '../design/Text';
 import type { MeasurementType } from '../exercises/movementTypes';
+import { Text } from '../design/Text';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { SetNumber } from './SetNumber';
 import { PastSetRemoveButton, SIDES } from './SetRowActions';
 import { SetValueFields } from './SetValueFields';
 
@@ -24,6 +25,12 @@ interface Props {
   measurementType?: MeasurementType;
   /** Removes both sides together -- one logical set, same as the live flow's completion handling. */
   onRemove: () => void;
+  /** A warm-up set (both sides), shown as W: tapping the number marks or unmarks it. */
+  warmup?: boolean;
+  onToggleWarmup?: () => void;
+  /** A drop set (both sides) under set `setIndex`: shown as an arrow under it. */
+  drop?: boolean;
+  accentColor: string;
   testID?: string;
 }
 
@@ -37,13 +44,24 @@ function PastUnilateralSetRowComponent({
   onChangeDuration,
   measurementType = 'weight_reps',
   onRemove,
+  warmup = false,
+  onToggleWarmup,
+  drop = false,
+  accentColor,
   testID,
 }: Props) {
   const values = { left, right };
 
   return (
     <View testID={testID} style={styles.unilateralSetRow}>
-      <Text style={styles.setIndex}>{setIndex}</Text>
+      <SetNumber
+        index={setIndex}
+        warmup={warmup}
+        drop={drop}
+        onToggleWarmup={onToggleWarmup}
+        accentColor={accentColor}
+        testID={testID}
+      />
 
       <View style={styles.unilateralSideRows}>
         {SIDES.map(({ key, tag, name }) => (
@@ -51,7 +69,7 @@ function PastUnilateralSetRowComponent({
             <Text style={styles.unilateralSideLabel}>{tag}</Text>
             <SetValueFields
               setId=""
-              label={`Set ${setIndex} ${name}`}
+              label={drop ? `Set ${setIndex} drop ${name}` : `Set ${setIndex} ${name}`}
               measurementType={measurementType}
               weight={values[key].weight}
               reps={values[key].reps}
@@ -66,7 +84,7 @@ function PastUnilateralSetRowComponent({
         ))}
       </View>
 
-      <PastSetRemoveButton testID={testID} setIndex={setIndex} onRemove={onRemove} />
+      <PastSetRemoveButton testID={testID} setIndex={setIndex} onRemove={onRemove} drop={drop} />
     </View>
   );
 }
@@ -84,6 +102,10 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
   return (
     prev.setIndex === next.setIndex &&
     prev.measurementType === next.measurementType &&
+    prev.warmup === next.warmup &&
+    prev.drop === next.drop &&
+    (prev.onToggleWarmup === undefined) === (next.onToggleWarmup === undefined) &&
+    prev.accentColor === next.accentColor &&
     prev.testID === next.testID &&
     sideEqual(prev.left, next.left) &&
     sideEqual(prev.right, next.right)

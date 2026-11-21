@@ -1,3 +1,4 @@
+import { workingSets } from './exerciseHistoryGrouping';
 import type { HistoricalSet } from './exerciseHistoryQueries';
 
 // Pure, deterministic derivations over raw historical sets -- no estimation,
@@ -37,10 +38,10 @@ export function filterByTimeRange(
   return sets.filter((s) => new Date(s.performedAt).getTime() >= cutoffMs);
 }
 
-/** One heaviest set per workout occurrence, chronologically ascending. */
+/** One heaviest set per workout occurrence, chronologically ascending -- never a drop set. */
 function bestSetPerOccurrence(sets: HistoricalSet[]): HistoricalSet[] {
   const bestByOccurrence = new Map<string, HistoricalSet>();
-  for (const s of sets) {
+  for (const s of workingSets(sets)) {
     const current = bestByOccurrence.get(s.workoutExerciseId);
     if (!current || s.weightKg > current.weightKg) {
       bestByOccurrence.set(s.workoutExerciseId, s);
@@ -110,7 +111,8 @@ export function summarizeProgress(points: { weightKg: number }[]): ProgressSumma
  * have said at each point in time, derived only from real logged sets.
  */
 export function runningMax(sets: HistoricalSet[]): ChartPoint[] {
-  const sorted = [...sets].sort(
+  // A drop set is never a record.
+  const sorted = workingSets(sets).sort(
     (a, b) => new Date(a.performedAt).getTime() - new Date(b.performedAt).getTime(),
   );
   const points: ChartPoint[] = [];
@@ -141,7 +143,7 @@ export function trueOneRepMaxProgression(sets: HistoricalSet[]): ChartPoint[] {
  */
 export function mostCommonRepCount(sets: HistoricalSet[]): number | null {
   const counts = new Map<number, number>();
-  for (const s of sets) {
+  for (const s of workingSets(sets)) {
     if (s.reps < 2) continue;
     counts.set(s.reps, (counts.get(s.reps) ?? 0) + 1);
   }

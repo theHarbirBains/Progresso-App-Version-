@@ -49,6 +49,8 @@ interface Props {
   onRemove?: (setId: string) => void;
   /** A warm-up set (both sides), shown as W. */
   warmup?: boolean;
+  /** A drop set (both sides) under set `setIndex`: shown as an arrow under it. */
+  drop?: boolean;
   /** Tapping the set's number marks or unmarks it as a warm-up; receives the left side's id. */
   onToggleWarmup?: (setId: string) => void;
   accentColor: string;
@@ -80,6 +82,7 @@ function UnilateralSetRowComponent({
   onToggleComplete,
   onRemove,
   warmup = false,
+  drop = false,
   onToggleWarmup,
   timer = false,
   accentColor,
@@ -114,6 +117,7 @@ function UnilateralSetRowComponent({
       <SetNumber
         index={setIndex}
         warmup={warmup}
+        drop={drop}
         onToggleWarmup={onToggleWarmup ? () => onToggleWarmup(left.id) : undefined}
         accentColor={accentColor}
         testID={testID}
@@ -125,7 +129,7 @@ function UnilateralSetRowComponent({
             <Text style={styles.unilateralSideLabel}>{tag}</Text>
             <SetValueFields
               setId={values[key].id}
-              label={`Set ${setIndex} ${name}`}
+              label={drop ? `Set ${setIndex} drop ${name}` : `Set ${setIndex} ${name}`}
               measurementType={measurementType}
               weight={values[key].weight}
               reps={values[key].reps}
@@ -149,6 +153,7 @@ function UnilateralSetRowComponent({
         canToggle={canToggle}
         onComplete={autosaved ? undefined : handleComplete}
         onRemove={onRemove ? () => onRemove(left.id) : undefined}
+        drop={drop}
         accentColor={accentColor}
         onAccentColor={onAccentColor}
       />

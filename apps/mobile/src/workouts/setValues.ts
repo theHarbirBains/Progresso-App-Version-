@@ -25,13 +25,15 @@ export function holdsMeasurement(set: SetRecord, type: MeasurementType): boolean
 
 /**
  * The completed working sets that hold what their exercise records, in the order given: what
- * counts. A warm-up never does.
+ * counts as a set, and what can be a top set, a record or a progression cue. A warm-up never
+ * does, and nor does a drop set -- it's part of the working set before it (its volume counts:
+ * completedSetsOnly keeps it).
  */
 export function loggedSets(sets: SetRecord[], type: MeasurementType): SetRecord[] {
-  return shownSets(sets, type).filter((set) => !set.isWarmup);
+  return shownSets(sets, type).filter((set) => !set.isWarmup && !set.isDrop);
 }
 
-/** The completed sets a finished workout shows -- its warm-ups too, marked as such. */
+/** The completed sets a finished workout shows -- its warm-ups and drop sets too, marked as such. */
 export function shownSets(sets: SetRecord[], type: MeasurementType): SetRecord[] {
   return sets.filter((set) => set.completedAt !== null && holdsMeasurement(set, type));
 }

@@ -18,6 +18,7 @@ import type { LoadType, Pulley, PulleyPosition } from '../exercises/machineLoad'
 import type { MeasurementType, MovementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
 import { liveWorkoutStyles as styles } from '../screens/liveWorkoutStyles';
+import { setLabels } from './dropSets';
 import type { AllTimeBest } from './progression';
 import { PER_SIDE_NOTE, SetColumnHeader } from './SetColumnHeader';
 import { SetRow } from './SetRow';
@@ -62,12 +63,16 @@ export interface ExerciseCardSet {
   canComplete: boolean;
   /** Marked a warm-up (shown as W). */
   isWarmup?: boolean;
+  /** A drop set: shown under the set above it, with no number of its own. */
+  isDrop?: boolean;
 }
 
 export interface UnilateralExerciseCardSet {
   setIndex: number;
   /** Marked a warm-up (both sides together, shown as W). */
   isWarmup?: boolean;
+  /** A drop set (both sides): shown under the set above it. */
+  isDrop?: boolean;
   /** Same shape/validity semantics as ExerciseCardSet -- computed by the
    * caller (ActiveWorkoutScreen's isValidDraft), never re-derived here from
    * raw weight/reps strings. */
@@ -136,6 +141,11 @@ interface Props {
   onToggleWarmup?: (setId: string) => void;
   /** Shows the one-time tip on how to mark a warm-up (the live workout's first exercise). */
   warmupHint?: { onDismiss: () => void } | null;
+  /**
+   * Adds a drop set under the last set filled in (a weighted exercise's, once one is). Omitted
+   * where drop sets aren't offered.
+   */
+  onAddDropSet?: () => void;
   onRemoveExercise: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -258,6 +268,7 @@ function ExerciseCardComponent({
   onRemoveSet,
   onToggleWarmup,
   warmupHint,
+  onAddDropSet,
   onRemoveExercise,
   onMoveUp,
   onMoveDown,
@@ -273,6 +284,21 @@ function ExerciseCardComponent({
   const hasRows = isUnilateral ? unilateralSets.length > 0 : sets.length > 0;
   const previousSets = previousSession?.sets ?? [];
   const id = (suffix: string) => (testID ? `${testID}-${suffix}` : undefined);
+  // Working sets numbered by position, so removing one never leaves a gap (1, 3); a drop set sits
+  // under the set it drops from, with that set's number and none of its own.
+  const labels = setLabels(isUnilateral ? unilateralSets : sets);
+  // A drop needs a weighted set filled in to drop from -- a warm-up isn't one.
+  const canDrop =
+    measurementType === 'weight_reps' &&
+    (isUnilateral
+      ? unilateralSets.some(
+          (set) =>
+            !set.isWarmup &&
+            (set.left.completed || set.left.canComplete) &&
+            (set.right.completed || set.right.canComplete),
+        )
+      : sets.some((set) => !set.isWarmup && (set.completed || set.canComplete)));
+  const showDrop = onAddDropSet !== undefined && canDrop;
 
   function fromMenu(action: () => void) {
     return () => {
@@ -478,10 +504,11 @@ function ExerciseCardComponent({
         {isUnilateral
           ? unilateralSets.map((set, position) => (
               <UnilateralSetRow
-                key={set.setIndex}
+                // Keyed by the set, not its place: a drop set slotted in moves the places after it.
+                key={set.left.id}
                 testID={id(`set-${set.setIndex}`)}
-                // Numbered by position, so removing a set never leaves a gap (1, 3).
-                setIndex={position + 1}
+                setIndex={labels[position].number}
+                drop={labels[position].drop}
                 left={set.left}
                 right={set.right}
                 completed={set.left.completed && set.right.completed}
@@ -493,7 +520,8 @@ function ExerciseCardComponent({
                 onToggleComplete={onToggleComplete}
                 onRemove={onRemoveSet}
                 warmup={set.isWarmup}
-                onToggleWarmup={onToggleWarmup}
+                // A drop set is part of the set above it, never a warm-up.
+                onToggleWarmup={set.isDrop ? undefined : onToggleWarmup}
                 timer={setTimers}
                 accentColor={accentColor}
                 onAccentColor={onAccentColor}
@@ -503,7 +531,8 @@ function ExerciseCardComponent({
               <SetRow
                 key={set.id}
                 testID={id(`set-${set.id}`)}
-                setIndex={position + 1}
+                setIndex={labels[position].number}
+                drop={labels[position].drop}
                 weight={set.weight}
                 reps={set.reps}
                 duration={set.duration ?? ''}
@@ -517,7 +546,7 @@ function ExerciseCardComponent({
                 onToggleComplete={onToggleComplete}
                 onRemove={onRemoveSet}
                 warmup={set.isWarmup}
-                onToggleWarmup={onToggleWarmup}
+                onToggleWarmup={set.isDrop ? undefined : onToggleWarmup}
                 timer={setTimers}
                 accentColor={accentColor}
                 onAccentColor={onAccentColor}
@@ -536,14 +565,28 @@ function ExerciseCardComponent({
           </View>
         ) : null}
 
-        <View style={styles.addSet}>
-          <SecondaryButton
-            testID={id('add-set')}
-            size="md"
-            label="+ Add Set"
-            accessibilityLabel="Add Set"
-            onPress={onAddSet}
-          />
+        <View style={[styles.addSet, showDrop ? styles.addSetRow : null]}>
+          <View style={showDrop ? styles.addSetButton : undefined}>
+            <SecondaryButton
+              testID={id('add-set')}
+              size="md"
+              label="+ Add Set"
+              accessibilityLabel="Add Set"
+              onPress={onAddSet}
+            />
+          </View>
+          {showDrop ? (
+            <View style={styles.addSetButton}>
+              <SecondaryButton
+                testID={id('add-drop-set')}
+                size="md"
+                icon="corner-down-right"
+                label="Drop Set"
+                accessibilityLabel="Add a drop set under the last set"
+                onPress={onAddDropSet}
+              />
+            </View>
+          ) : null}
         </View>
       </View>
     </Card>
@@ -568,7 +611,8 @@ function setsEqual(a: ExerciseCardSet[], b: ExerciseCardSet[]): boolean {
       set.duration === other.duration &&
       set.completed === other.completed &&
       set.canComplete === other.canComplete &&
-      (set.isWarmup ?? false) === (other.isWarmup ?? false),
+      (set.isWarmup ?? false) === (other.isWarmup ?? false) &&
+      (set.isDrop ?? false) === (other.isDrop ?? false),
   );
 }
 
@@ -595,6 +639,7 @@ function unilateralSetsEqual(
     (set, other) =>
       set.setIndex === other.setIndex &&
       (set.isWarmup ?? false) === (other.isWarmup ?? false) &&
+      (set.isDrop ?? false) === (other.isDrop ?? false) &&
       unilateralSideEqual(set.left, other.left) &&
       unilateralSideEqual(set.right, other.right),
   );
@@ -686,6 +731,7 @@ export function arePropsEqual(prev: Props, next: Props): boolean {
     prev.onEditProgression === next.onEditProgression &&
     (prev.onToggleWarmup === undefined) === (next.onToggleWarmup === undefined) &&
     (prev.warmupHint == null) === (next.warmupHint == null) &&
+    (prev.onAddDropSet === undefined) === (next.onAddDropSet === undefined) &&
     flagsEqual(prev.lastTimeFlags ?? null, next.lastTimeFlags ?? null) &&
     previousSessionEqual(prev.previousSession, next.previousSession) &&
     setsEqual(prev.sets, next.sets) &&

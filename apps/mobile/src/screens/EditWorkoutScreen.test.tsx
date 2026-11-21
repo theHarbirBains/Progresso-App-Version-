@@ -13,6 +13,7 @@ import {
   createCompletedSets,
   deleteSet,
   fetchWorkoutDetail,
+  moveSets,
   removeExerciseFromWorkout,
   updateSet,
   updateWorkout,
@@ -88,6 +89,7 @@ jest.mock('../workouts/workoutQueries', () => ({
   createCompletedSets: jest.fn(),
   updateSet: jest.fn(),
   deleteSet: jest.fn(),
+  moveSets: jest.fn(),
 }));
 
 const mockUseAuth = useAuth as jest.Mock;
@@ -105,6 +107,7 @@ const mockRemoveExerciseFromWorkout = removeExerciseFromWorkout as jest.Mock;
 const mockCreateCompletedSets = createCompletedSets as jest.Mock;
 const mockUpdateSet = updateSet as jest.Mock;
 const mockDeleteSet = deleteSet as jest.Mock;
+const mockMoveSets = moveSets as jest.Mock;
 
 const mockGoBack = jest.fn();
 const mockReplace = jest.fn();
@@ -174,6 +177,7 @@ beforeEach(() => {
       ...updates,
     }));
   mockDeleteSet.mockReset().mockResolvedValue(undefined);
+  mockMoveSets.mockReset().mockResolvedValue(undefined);
   mockGoBack.mockClear();
   mockReplace.mockClear();
 });
@@ -295,6 +299,7 @@ describe('EditWorkoutScreen -- saving changes', () => {
         weightKg: 100,
         reps: 5,
         durationSeconds: null,
+        isWarmup: false,
         completedAt: baseWorkout.performedAt,
       }),
     );
@@ -321,6 +326,7 @@ describe('EditWorkoutScreen -- saving changes', () => {
       weightKg: 105,
       reps: 5,
       durationSeconds: null,
+      isWarmup: false,
     });
     expect(mockCreateCompletedSets).not.toHaveBeenCalled();
     await waitFor(() =>
@@ -390,12 +396,93 @@ describe('EditWorkoutScreen -- saving changes', () => {
     await waitFor(() =>
       expect(mockCreateCompletedSets).toHaveBeenCalledWith(
         'we1',
-        [{ setIndex: 2, side: null, weightKg: 110, reps: 3, durationSeconds: null }],
+        [
+          {
+            setIndex: 2,
+            side: null,
+            weightKg: 110,
+            reps: 3,
+            durationSeconds: null,
+            isWarmup: false,
+            isDrop: false,
+          },
+        ],
         expect.any(String),
       ),
     );
     // The pre-existing set was never touched.
     expect(mockUpdateSet).not.toHaveBeenCalledWith('s1', expect.anything());
+  });
+
+  it('slots a drop set in under a saved set, moving the one after it down', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      exercises: [
+        {
+          ...baseWorkout.exercises[0],
+          sets: [
+            { id: 's1', setIndex: 1, weightKg: 100, reps: 8, completedAt: FIXTURE_PERFORMED_AT },
+            { id: 's2', setIndex: 2, weightKg: 100, reps: 6, completedAt: FIXTURE_PERFORMED_AT },
+          ],
+        },
+      ],
+    });
+    renderScreen();
+    await screen.findByTestId(EX);
+
+    // Set 2 is the last filled in: the drop goes under it. Move the drop under set 1 by
+    // emptying set 2 first, then fill it in again.
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-2-weight`), '');
+    fireEvent.press(screen.getByTestId(`${EX}-add-drop-set`));
+    // Set 2 moved down to 3; the drop is set index 2, under set 1, with no number of its own.
+    expect(screen.getByTestId(`${EX}-set-2-drop`)).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-2-weight`), '75');
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-2-reps`), '9');
+    fireEvent.changeText(screen.getByTestId(`${EX}-set-3-weight`), '100');
+
+    fireEvent.press(screen.getByTestId('edit-workout-save'));
+
+    await waitFor(() =>
+      expect(mockCreateCompletedSets).toHaveBeenCalledWith(
+        'we1',
+        [
+          {
+            setIndex: 2,
+            side: null,
+            weightKg: 75,
+            reps: 9,
+            durationSeconds: null,
+            isWarmup: false,
+            isDrop: true,
+          },
+        ],
+        expect.any(String),
+      ),
+    );
+    expect(mockMoveSets).toHaveBeenCalledWith([{ id: 's2', setIndex: 3 }]);
+    // Moved before the drop takes its place.
+    expect(mockMoveSets.mock.invocationCallOrder[0]).toBeLessThan(
+      mockCreateCompletedSets.mock.invocationCallOrder[0],
+    );
+    // Set 2 only moved: its figures are as they were.
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it('saves a set marked a warm-up with a tap on its number', async () => {
+    renderScreen();
+    await screen.findByTestId(EX);
+
+    fireEvent.press(screen.getByTestId(`${EX}-set-1-number`));
+    fireEvent.press(screen.getByTestId('edit-workout-save'));
+
+    await waitFor(() =>
+      expect(mockUpdateSet).toHaveBeenCalledWith('s1', {
+        weightKg: 100,
+        reps: 5,
+        durationSeconds: null,
+        isWarmup: true,
+      }),
+    );
   });
 
   it('soft-deletes a removed existing set', async () => {

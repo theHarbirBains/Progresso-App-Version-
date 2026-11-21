@@ -10,8 +10,9 @@ export type CompletedSetRecord = SetRecord & { weightKg: number; reps: number };
 /**
  * Only sets that have actually been logged (weight + reps entered and
  * marked complete) represent real performance data -- a blank/in-progress
- * set is live-tracking UI state, not yet something PRs, previous-
- * performance, volume, or share cards should ever include.
+ * set is live-tracking UI state, not yet something volume or share cards
+ * should ever include. Its drop sets are kept: their weight x reps is part of
+ * the set's volume (loggedSets is what leaves them out of counts and records).
  */
 export function completedSetsOnly(sets: SetRecord[]): CompletedSetRecord[] {
   // A warm-up is real, but counted toward nothing.

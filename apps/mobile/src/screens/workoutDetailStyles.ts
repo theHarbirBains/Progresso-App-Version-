@@ -74,6 +74,12 @@ export const workoutDetailStyles = StyleSheet.create({
   warmupRow: {
     opacity: 0.6,
   },
+  // A drop set: tucked in under the set it drops from, with no line between them.
+  dropRow: {
+    paddingLeft: spacing.md,
+    paddingTop: 0,
+    borderTopWidth: 0,
+  },
   setLabel: {
     ...typeScale.caption,
     color: colors.textMuted,

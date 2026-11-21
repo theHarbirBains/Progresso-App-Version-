@@ -121,6 +121,8 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
               setIndex: set.setIndex,
               side: set.side ?? 'none',
               ...draftValues(set, ex.measurementType, weightUnit),
+              isWarmup: set.isWarmup === true,
+              isDrop: set.isDrop === true,
             })),
           })),
         });
@@ -145,6 +147,8 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
             setIndex: set.setIndex,
             side: set.side,
             ...draftValues(set, ex.measurementType, weightUnit),
+            isWarmup: set.isWarmup === true,
+            isDrop: set.isDrop === true,
           })),
           performedAtIso,
         );
@@ -230,6 +234,7 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
                 testID="log-past-workout"
                 exercise={exercise}
                 draft={draft}
+                accentColor={theme.accent}
               />
             ))}
 

@@ -519,6 +519,8 @@ export class TrainerService {
           weightKg: set.weightKg ?? null,
           reps: set.reps ?? null,
           durationSeconds: set.durationSeconds ?? null,
+          isWarmup: set.isWarmup === true,
+          isDrop: set.isDrop === true,
         })),
       })),
     };

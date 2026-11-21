@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
@@ -49,6 +50,16 @@ export class LoggedSetDto {
   @Min(1)
   @Max(86_400)
   durationSeconds?: number;
+
+  /** A warm-up: shown with the workout, counted toward nothing. */
+  @IsOptional()
+  @IsBoolean()
+  isWarmup?: boolean;
+
+  /** A drop set: part of the working set before it -- its volume counts, never as a record. */
+  @IsOptional()
+  @IsBoolean()
+  isDrop?: boolean;
 }
 
 export class LoggedExerciseDto {

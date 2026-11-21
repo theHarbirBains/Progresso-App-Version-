@@ -7,6 +7,7 @@ import {
   type MeasurementType,
   type MovementType,
 } from '../exercises/movementTypes';
+import { dropSetSlot, rowsRemovedWith, type DropSetRow } from './dropSets';
 import { groupUnilateralSets, isValidDraft } from './setInputDrafts';
 
 // What Log a Past Workout and Edit Workout type in: a workout's exercises and
@@ -25,6 +26,10 @@ export interface PastDraftSet {
   reps: string;
   /** A timed set's duration as typed. */
   duration: string;
+  /** A warm-up: saved with the workout, counted toward nothing. */
+  isWarmup?: boolean;
+  /** A drop set: part of the working set before it (dropSets.ts). */
+  isDrop?: boolean;
 }
 
 export interface PastDraftExercise {
@@ -114,6 +119,31 @@ export function usePastWorkoutDraft() {
     setExercises((prev) => prev.map((ex) => (ex.localId === localId ? change(ex) : ex)));
   }
 
+  /** An exercise's sets in order, one entry per logical set (a unilateral set's two sides together). */
+  function logicalSets(exercise: PastDraftExercise): PastDraftSet[][] {
+    if (exercise.movementType === 'unilateral') {
+      return groupUnilateralSets(exercise.sets).map(({ left, right }) => [left, right]);
+    }
+    return [...exercise.sets].sort((a, b) => a.setIndex - b.setIndex).map((set) => [set]);
+  }
+
+  /** Removes a set -- with the drop sets under it, which are part of it. */
+  function removeLogicalSet(exercise: PastDraftExercise, matches: (set: PastDraftSet) => boolean) {
+    const groups = logicalSets(exercise);
+    const position = groups.findIndex((group) => group.some(matches));
+    if (position < 0) return;
+    const gone = new Set(
+      rowsRemovedWith(
+        groups.map((group) => ({ rows: group, isDrop: group[0].isDrop })),
+        position,
+      ).flatMap((entry) => entry.rows.map((set) => set.localId)),
+    );
+    changeExercise(exercise.localId, (ex) => ({
+      ...ex,
+      sets: ex.sets.filter((s) => !gone.has(s.localId)),
+    }));
+  }
+
   return {
     exercises,
     /** Replaces every exercise -- a saved workout's, as it loads. */
@@ -142,17 +172,51 @@ export function usePastWorkoutDraft() {
       const newSets = blankSets(exercise.movementType, nextIndex);
       changeExercise(exercise.localId, (ex) => ({ ...ex, sets: [...ex.sets, ...newSets] }));
     },
-    removeSet(exerciseLocalId: string, setLocalId: string) {
-      changeExercise(exerciseLocalId, (ex) => ({
-        ...ex,
-        sets: ex.sets.filter((s) => s.localId !== setLocalId),
-      }));
+    /** Removes a set, and the drop sets under it. */
+    removeSet(exercise: PastDraftExercise, setLocalId: string) {
+      removeLogicalSet(exercise, (s) => s.localId === setLocalId);
     },
-    /** Removes both sides of a unilateral exercise's set. */
-    removeUnilateralSet(exerciseLocalId: string, setIndex: number) {
-      changeExercise(exerciseLocalId, (ex) => ({
+    /** Removes both sides of a unilateral exercise's set, and the drop sets under it. */
+    removeUnilateralSet(exercise: PastDraftExercise, setIndex: number) {
+      removeLogicalSet(exercise, (s) => s.setIndex === setIndex);
+    },
+    /** Marks a set a warm-up, or a working set again -- a unilateral set's two sides together. */
+    toggleWarmup(exerciseLocalId: string, setIndex: number) {
+      changeExercise(exerciseLocalId, (ex) => {
+        const warmup = !ex.sets.find((s) => s.setIndex === setIndex)?.isWarmup;
+        return {
+          ...ex,
+          sets: ex.sets.map((s) => (s.setIndex === setIndex ? { ...s, isWarmup: warmup } : s)),
+        };
+      });
+    },
+    /**
+     * A drop set under the last set filled in (and any drops already under it), the sets after it
+     * moving down one -- the live workout's Drop Set, typed in.
+     */
+    addDropSet(exercise: PastDraftExercise) {
+      const rows: DropSetRow[] = logicalSets(exercise).map((group) => ({
+        setIndex: group[0].setIndex,
+        ids: group.map((set) => set.localId),
+        isWarmup: group[0].isWarmup,
+        isDrop: group[0].isDrop,
+        filled: group.every((set) => isValidDraft(set, exercise.measurementType)),
+      }));
+      const slot = dropSetSlot(rows);
+      if (!slot) return;
+      const moved = new Map(slot.moves.map((move) => [move.id, move.setIndex]));
+      const drops = blankSets(exercise.movementType, slot.setIndex).map((set) => ({
+        ...set,
+        isDrop: true,
+      }));
+      changeExercise(exercise.localId, (ex) => ({
         ...ex,
-        sets: ex.sets.filter((s) => s.setIndex !== setIndex),
+        sets: [
+          ...ex.sets.map((s) =>
+            moved.has(s.localId) ? { ...s, setIndex: moved.get(s.localId)! } : s,
+          ),
+          ...drops,
+        ].sort((a, b) => a.setIndex - b.setIndex),
       }));
     },
     changeSet(exerciseLocalId: string, setLocalId: string, field: PastSetField, text: string) {

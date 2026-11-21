@@ -34,6 +34,8 @@ export interface WorkoutSet {
   completedAt: string | null;
   /** A warm-up: shown, marked W, counted toward nothing. */
   isWarmup: boolean;
+  /** A drop set: part of the working set before it, shown under it. */
+  isDrop: boolean;
 }
 
 /** Someone else's workout, as the app shows it read-only: what they logged, and on what. */
@@ -136,7 +138,7 @@ export class WorkoutSocialService {
       const { data: sets, error: setsError } = await client
         .from('sets')
         .select(
-          'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_warmup',
+          'id, workout_exercise_id, set_index, side, weight_kg, reps, duration_seconds, completed_at, is_warmup, is_drop',
         )
         .in(
           'workout_exercise_id',
@@ -156,6 +158,7 @@ export class WorkoutSocialService {
         duration_seconds: number | null;
         completed_at: string | null;
         is_warmup: boolean | null;
+        is_drop: boolean | null;
       }[]) {
         const list = setsByExercise.get(set.workout_exercise_id) ?? [];
         list.push({
@@ -167,6 +170,7 @@ export class WorkoutSocialService {
           durationSeconds: set.duration_seconds,
           completedAt: set.completed_at,
           isWarmup: set.is_warmup === true,
+          isDrop: set.is_drop === true,
         });
         setsByExercise.set(set.workout_exercise_id, list);
       }

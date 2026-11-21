@@ -89,6 +89,7 @@ export async function fetchAllExerciseHistory(
         reps: s.reps,
         performedAt: info.performedAt,
         workoutExerciseId: s.workout_exercise_id,
+        ...(s.is_drop === true ? { isDrop: true } : {}),
         exerciseId: info.exerciseId,
         exerciseName: info.exerciseName,
         muscleGroup: info.muscleGroup,

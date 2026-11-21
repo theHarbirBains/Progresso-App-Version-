@@ -29,6 +29,7 @@ import { TopSetsSection } from '../progress/TopSetsSection';
 import { EditTopSetSheet, type TopSetToEdit } from '../progress/EditTopSetSheet';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { groupByExercise } from '../workouts/allExerciseHistoryQueries';
+import { workingSets } from '../workouts/exerciseHistoryGrouping';
 
 type Props = RootStackScreenProps<'ProgressOverview'>;
 
@@ -167,7 +168,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
               <OverviewSection
                 groups={groups}
                 lifetimeStats={lifetimeStats}
-                totalCompletedSets={history.length}
+                totalCompletedSets={workingSets(history).length}
                 totalPRs={totalPRs}
                 repPRs={repPRs}
                 oneRepMaxes={oneRepMaxes}
@@ -238,7 +239,7 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                     history={history}
                     completedWorkouts={completedWorkouts}
                     lifetimeStats={lifetimeStats}
-                    totalCompletedSets={history.length}
+                    totalCompletedSets={workingSets(history).length}
                     totalPRs={totalPRs}
                     repPRs={repPRs}
                     oneRepMaxes={oneRepMaxes}

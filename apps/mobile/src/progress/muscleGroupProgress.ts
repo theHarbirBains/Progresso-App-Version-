@@ -1,5 +1,5 @@
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
-import type { HistoricalSetWithExercise } from '../workouts/exerciseHistoryGrouping';
+import { workingSets, type HistoricalSetWithExercise } from '../workouts/exerciseHistoryGrouping';
 import { setVolumeKg } from '../workouts/workoutSummary';
 
 // Each exercise already declares which single muscle group it trains
@@ -20,7 +20,8 @@ export function computeMuscleGroupSetCounts(
   history: HistoricalSetWithExercise[],
 ): MuscleGroupSetCount[] {
   const counts = new Map<MuscleGroup, number>();
-  for (const set of history) {
+  // A drop set is part of the set before it, never one of its own.
+  for (const set of workingSets(history)) {
     counts.set(set.muscleGroup, (counts.get(set.muscleGroup) ?? 0) + 1);
   }
   return Array.from(counts.entries())
