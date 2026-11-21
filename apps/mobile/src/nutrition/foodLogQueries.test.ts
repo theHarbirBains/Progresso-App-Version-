@@ -147,6 +147,7 @@ describe('fetchTodaysFoodLogs', () => {
         enteredAmount: null,
         enteredUnit: null,
         servingLabel: null,
+        micronutrients: null,
       },
     ]);
     expect(calls.eq).toEqual([['user_id', 'user-1']]);
@@ -204,6 +205,7 @@ describe('fetchFoodLogsForMonth', () => {
         enteredAmount: null,
         enteredUnit: null,
         servingLabel: null,
+        micronutrients: null,
       },
     ]);
     expect(calls.eq).toEqual([['user_id', 'user-1']]);
@@ -228,6 +230,32 @@ describe('fetchFoodLogsForMonth', () => {
     mockTable({ data: null, error: { message: 'boom' } });
 
     await expect(fetchFoodLogsForMonth('user-1', 2026, 2)).rejects.toThrow('boom');
+  });
+});
+
+describe('logFood -- micronutrients', () => {
+  it("snapshots the food's micronutrients for the amount logged -- only the ones it has", async () => {
+    const { builder } = mockTable({ data: dbRow, error: null });
+    const food = {
+      id: 'food-1',
+      name: 'Chicken Breast',
+      servingSize: 100,
+      servingUnit: 'g',
+      calories: 165,
+      proteinG: 31,
+      carbsG: 0,
+      fatG: 3.6,
+      micronutrients: { iron: 1.04, selenium: 27.6, vitamin_c: 0 },
+    };
+
+    await logFood('user-1', food, 1.5, 'lunch');
+
+    expect(builder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quantity: 1.5,
+        micronutrients: { iron: 1.56, selenium: 41.4, vitamin_c: 0 },
+      }),
+    );
   });
 });
 
@@ -263,6 +291,8 @@ describe('logFood', () => {
       entered_amount: null,
       entered_unit: null,
       serving_label: null,
+      // No micronutrients known for this food, so none on the log -- never zeros.
+      micronutrients: null,
       // No provenance on this food, so the log records none either.
       nutrition_confidence: null,
       nutrition_source_kind: null,
@@ -387,6 +417,20 @@ describe('updateFoodLogQuantity', () => {
       fat_g: 15,
     });
     expect(builder.eq).toHaveBeenCalledWith('id', 'log-1');
+  });
+
+  it("scales the log's own micronutrients with it, keeping unknown ones unknown", async () => {
+    const { builder } = mockTable({ data: dbRow, error: null });
+
+    await updateFoodLogQuantity({ ...domainRow, micronutrients: { iron: 2, calcium: 0 } }, 3);
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ micronutrients: { iron: 3, calcium: 0 } }),
+    );
+
+    await updateFoodLogQuantity({ ...domainRow, micronutrients: null }, 3);
+    expect(builder.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ micronutrients: null }),
+    );
   });
 
   it('throws on a query error', async () => {

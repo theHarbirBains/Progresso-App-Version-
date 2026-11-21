@@ -24,6 +24,11 @@ export interface NormalizedFood {
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
+  /**
+   * Micronutrients for the serving, by nutrient id, in each nutrient's unit -- only the ones the
+   * provider gives a real figure for (an unknown one is absent, never 0). Null or absent: none.
+   */
+  micronutrients?: Record<string, number> | null;
 }
 
 export interface FoodSearchResult {

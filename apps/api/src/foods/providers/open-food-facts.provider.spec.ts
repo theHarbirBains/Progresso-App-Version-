@@ -1,4 +1,4 @@
-import { OpenFoodFactsProvider } from './open-food-facts.provider';
+import { OpenFoodFactsProvider, pickMicronutrients } from './open-food-facts.provider';
 
 function mockFetchOnce(body: unknown, ok = true, status = 200) {
   (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -58,6 +58,8 @@ describe('OpenFoodFactsProvider', () => {
           proteinG: 1.6,
           carbsG: 25,
           fatG: 7,
+          // None of its micronutrients are in this record: none, rather than zeros.
+          micronutrients: null,
         },
       ]);
     });
@@ -396,5 +398,59 @@ describe('OpenFoodFactsProvider', () => {
 
       expect(result).toMatchObject({ providerFoodId: '555' });
     });
+  });
+});
+
+// From a real product (Multi-Grain Cheerios, 0065633132832, as Open Food Facts had it in November
+// 2026): masses in grams, and several fields left at 0 that its label doesn't give.
+describe('pickMicronutrients', () => {
+  const cheerios = {
+    iron_serving: 0.004,
+    iron_100g: 0.0133333333333333,
+    sodium_serving: 0.16,
+    fiber_serving: 0.9,
+    'saturated-fat_serving': 0.3,
+    calcium_serving: 0.1,
+    zinc_serving: 0.0005,
+    'vitamin-b6_serving': 0.0002,
+    'vitamin-c_serving': 0,
+    copper_serving: 0,
+    manganese_serving: 0,
+    'vitamin-a_serving': 1e-5,
+  };
+
+  it("gives each one in the nutrient's own unit, for the serving", () => {
+    expect(pickMicronutrients(cheerios, true, 30)).toEqual({
+      iron: 4,
+      sodium: 160,
+      fibre: 0.9,
+      saturated_fat: 0.3,
+      calcium: 100,
+      zinc: 0.5,
+      vitamin_b6: 0.2,
+    });
+  });
+
+  it("reads a 0 as unknown unless it's something a label must declare", () => {
+    const amounts = pickMicronutrients({ ...cheerios, 'trans-fat_serving': 0 }, true, 30);
+    expect(amounts).toMatchObject({ trans_fat: 0 });
+    for (const unknown of ['vitamin_c', 'copper', 'manganese']) {
+      expect(amounts).not.toHaveProperty(unknown);
+    }
+  });
+
+  it("never reads vitamin A (a label's unit for it can't be trusted)", () => {
+    expect(pickMicronutrients(cheerios, true, 30)).not.toHaveProperty('vitamin_a');
+  });
+
+  it('scales the per-100 g figure to the serving when there is no per-serving one', () => {
+    expect(pickMicronutrients({ iron_100g: 0.0133333333333333 }, true, 30)).toEqual({ iron: 4 });
+    // With no serving, the food is 100 g: its per-100 g figure as it is.
+    expect(pickMicronutrients({ potassium_100g: 0.25 }, false, 100)).toEqual({ potassium: 250 });
+  });
+
+  it('is null with nothing to read', () => {
+    expect(pickMicronutrients(undefined, true, 30)).toBeNull();
+    expect(pickMicronutrients({ 'vitamin-c_serving': 0, iron_serving: -1 }, true, 30)).toBeNull();
   });
 });

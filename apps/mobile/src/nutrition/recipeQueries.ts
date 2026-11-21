@@ -1,5 +1,10 @@
 import { supabase } from '../lib/supabase';
-import { recipePerServing, recipeProvenance, type FoodGroupItem } from './foodGroups';
+import {
+  recipeMicronutrients,
+  recipePerServing,
+  recipeProvenance,
+  type FoodGroupItem,
+} from './foodGroups';
 import { FOOD_COLUMNS, createFood, updateFood, type FoodRow } from './foodQueries';
 import { itemColumns, itemsFromRows, type ItemDbRow } from './savedMealQueries';
 
@@ -51,6 +56,7 @@ function recipeFood(input: RecipeInput) {
     servingSize: 1,
     servingUnit: 'serving',
     ...perServing,
+    micronutrients: recipeMicronutrients(input.ingredients, input.servings),
     recipeServings: input.servings,
     provenance: recipeProvenance(input.ingredients),
   };

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { FoodProvider, FoodSearchResult, NormalizedFood } from '../food-provider.interface';
+import { OPEN_FOOD_FACTS_MICRONUTRIENTS } from '../micronutrient-fields.generated';
 
 // Canada-scoped subdomain (rather than world.openfoodfacts.org) so search
 // ranking favours products actually tagged/sold in Canada -- Progresso's
@@ -77,6 +78,31 @@ function pickNutrient(
 }
 
 /**
+ * The product's micronutrients for its serving, in each nutrient's unit (Open Food Facts keeps
+ * masses in grams), on the same basis as its other figures: the per-serving field first, else the
+ * per-100 g one scaled to the serving. Only real figures: a 0 counts only for what a nutrition
+ * label must declare (sodium, fibre, the fats, cholesterol, potassium, calcium, iron) -- elsewhere
+ * a 0 is a field left at 0 and is read as unknown -- and vitamins A, D and E and folate aren't
+ * read at all (OPEN_FOOD_FACTS_MICRONUTRIENTS). Null when there are none.
+ */
+export function pickMicronutrients(
+  nutriments: OffNutriments | undefined,
+  hasStructuredServing: boolean,
+  servingSizeG: number,
+): Record<string, number> | null {
+  if (!nutriments) return null;
+  const amounts: Record<string, number> = {};
+  for (const { nutrient, key, factor, zero } of OPEN_FOOD_FACTS_MICRONUTRIENTS) {
+    const perServing = hasStructuredServing ? toFiniteNumber(nutriments[`${key}_serving`]) : null;
+    const per100g = toFiniteNumber(nutriments[`${key}_100g`]);
+    const grams = perServing ?? (per100g === null ? null : per100g * (servingSizeG / 100));
+    if (grams === null || grams < 0 || (grams === 0 && !zero)) continue;
+    amounts[nutrient] = Math.round(grams * factor * 10000) / 10000;
+  }
+  return Object.keys(amounts).length > 0 ? amounts : null;
+}
+
+/**
  * Normalizes one Open Food Facts product into Progresso's shape, or returns
  * null if it's missing something a search result can't do without (a name,
  * a barcode/id, or any calorie figure at all) -- dropped from results
@@ -128,6 +154,7 @@ function normalizeProduct(product: OffProduct): NormalizedFood | null {
     proteinG: pickNutrient(product.nutriments, 'proteins', hasStructuredServing, servingSize),
     carbsG: pickNutrient(product.nutriments, 'carbohydrates', hasStructuredServing, servingSize),
     fatG: pickNutrient(product.nutriments, 'fat', hasStructuredServing, servingSize),
+    micronutrients: pickMicronutrients(product.nutriments, hasStructuredServing, servingSize),
   };
 }
 

@@ -31,6 +31,8 @@ const ROUTE_TABS: Partial<Record<keyof RootStackParamList, BottomNavDestination 
   QuickFoodEntry: 'nutrition',
   NutritionGoals: 'nutrition',
   CalorieEstimation: 'nutrition',
+  Micronutrients: 'nutrition',
+  NutrientDetail: 'nutrition',
   PRHistory: 'progress',
   ExerciseProgress: 'progress',
   ProgressOverview: 'progress',

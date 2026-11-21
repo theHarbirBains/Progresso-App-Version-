@@ -52,6 +52,7 @@ import { type NutritionGoals } from '../nutrition/nutritionGoalQueries';
 import { CopyYesterdaySheet, SaveAsMealSheet } from '../nutrition/TodayShortcutSheets';
 import { readAheadDayLogs, readDayLogs, useDayLogs } from '../nutrition/useDayLogs';
 import { WeeklyCalorieBudget } from '../nutrition/WeeklyCalorieBudget';
+import { MicronutrientsWidget } from '../nutrition/MicronutrientsWidget';
 import { weekLogging, weekRangeText } from '../nutrition/weekLogging';
 import { useShowAllAtOnce } from '../lib/useShowAllAtOnce';
 import { wholeFigure } from '../nutrition/wholeFigures';
@@ -81,6 +82,8 @@ const AMOUNT_DONE_ID = 'food-log-amount-done';
 // - **This Week**: the week's calorie budget -- 7 times the daily target, Sunday to
 //   Saturday -- against what's been eaten so far, as a bar, with what's left and the days
 //   left to spread it over (WeeklyCalorieBudget).
+// - **Micronutrients**: one quiet row to the vitamins and minerals for the day shown
+//   (MicronutrientsWidget) -- no figures of its own here.
 // - **Actions**: Log Food, the one filled button, with Scan Barcode and Search
 //   Food outlined side by side under it, and AI Food Search ("Describe a Food")
 //   outlined under those -- every way into the same LogFoodStep-backed logging
@@ -447,6 +450,10 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
           </Animated.View>
 
           <Animated.View style={dayTurn.widgetStyle(2)}>
+            <MicronutrientsWidget onPress={() => navigation.navigate('Micronutrients', { day })} />
+          </Animated.View>
+
+          <Animated.View style={dayTurn.widgetStyle(3)}>
             <AppCard testID="nutrition-today-actions" style={styles.actions}>
               <PrimaryButton
                 testID="log-food-button"
@@ -494,7 +501,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
             </AppCard>
           </Animated.View>
 
-          <Animated.View style={dayTurn.widgetStyle(3)}>
+          <Animated.View style={dayTurn.widgetStyle(4)}>
             <AppCard testID="nutrition-today-foods">
               <Section
                 title={isToday ? "Today's Foods" : 'Foods'}
@@ -629,7 +636,7 @@ export function NutritionTodayScreen({ navigation, route }: Props) {
         </>
       )}
 
-      <Animated.View style={dayTurn.widgetStyle(4)}>
+      <Animated.View style={dayTurn.widgetStyle(5)}>
         <AppCard testID="nutrition-today-targets">
           <Section
             title="Daily Targets"

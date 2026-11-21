@@ -86,9 +86,42 @@ describe('UsdaReferenceBuilder', () => {
         protein_g_per_100g: 1.96,
         carbs_g_per_100g: 21.55,
         fat_g_per_100g: 0.1,
+        micronutrients_per_100g: null,
         data_version: 'SR Legacy 2018-04',
       },
     ]);
+  });
+
+  it("keeps each micronutrient FoodData Central has, in the nutrient's own unit", () => {
+    const b = builder();
+    b.addFood({ fdc_id: '170112', data_type: 'sr_legacy_food', description: 'Potato' });
+    for (const row of FULL_NUTRIENTS) b.addNutrient(row);
+    // Vitamin C (mg), copper (given in mg, kept in mcg), sodium at a real 0, and fibre from the
+    // newer method's field when the usual one isn't there.
+    b.addNutrient({ fdc_id: '170112', nutrient_id: '1162', amount: '9.6' });
+    b.addNutrient({ fdc_id: '170112', nutrient_id: '1098', amount: '0.118' });
+    b.addNutrient({ fdc_id: '170112', nutrient_id: '1093', amount: '0' });
+    b.addNutrient({ fdc_id: '170112', nutrient_id: '2033', amount: '2.2' });
+
+    expect(b.finish().foods[0]?.micronutrients_per_100g).toEqual({
+      vitamin_c: 9.6,
+      copper: 118,
+      sodium: 0,
+      fibre: 2.2,
+    });
+  });
+
+  it('leaves out a micronutrient it has no figure for, and one given as negative -- never a 0', () => {
+    const b = builder();
+    b.addFood({ fdc_id: '170112', data_type: 'sr_legacy_food', description: 'Potato' });
+    for (const row of FULL_NUTRIENTS) b.addNutrient(row);
+    b.addNutrient({ fdc_id: '170112', nutrient_id: '1079', amount: '1.5' });
+    b.addNutrient({ fdc_id: '170112', nutrient_id: '2033', amount: '9.9' });
+    b.addNutrient({ fdc_id: '170112', nutrient_id: '1106', amount: '-1' });
+    b.addNutrient({ fdc_id: '170112', nutrient_id: '1089', amount: '' });
+
+    // The usual fibre field wins over the other; vitamin A and iron stay unknown.
+    expect(b.finish().foods[0]?.micronutrients_per_100g).toEqual({ fibre: 1.5 });
   });
 
   it('skips a food missing a macro, counting it, rather than filling in a zero', () => {

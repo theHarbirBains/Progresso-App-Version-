@@ -17,6 +17,8 @@ const NUTRITION_ROUTE_NAMES = new Set([
   'NutritionGoals',
   'NutritionHistory',
   'CalorieEstimation',
+  'Micronutrients',
+  'NutrientDetail',
 ]);
 
 export function isNutritionRoute(routeName: string | undefined): boolean {

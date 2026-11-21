@@ -98,6 +98,7 @@ describe('fetchFoods', () => {
         isActive: true,
         provenance: null,
         recipeServings: null,
+        micronutrients: null,
       },
     ]);
     expect(result.hasMore).toBe(false);
@@ -164,6 +165,7 @@ describe('fetchAllFoods', () => {
         isActive: true,
         provenance: null,
         recipeServings: null,
+        micronutrients: null,
       },
     ]);
     expect(calls.eq).toEqual([

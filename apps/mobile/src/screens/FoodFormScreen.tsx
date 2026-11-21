@@ -182,7 +182,20 @@ export function FoodFormScreen(props: Props) {
       if (props.mode === 'create') {
         props.onDone(await createFood(userId, input));
       } else {
-        await updateFood(props.food.id, input);
+        // Its micronutrients came with its figures, from its source. Change its serving or a
+        // figure and they'd describe some other food, so they go; a new name or photo keeps them.
+        const original = props.food;
+        const figuresChanged =
+          original.servingSize !== servingSizeNum ||
+          original.servingUnit !== servingUnit.trim() ||
+          original.calories !== caloriesNum ||
+          original.proteinG !== proteinNum ||
+          original.carbsG !== carbsNum ||
+          original.fatG !== fatNum;
+        await updateFood(
+          props.food.id,
+          figuresChanged && original.micronutrients ? { ...input, micronutrients: null } : input,
+        );
         props.onDone();
       }
     } catch (err) {

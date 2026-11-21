@@ -441,6 +441,23 @@ describe('NutritionTodayScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('FoodLibrary', undefined);
   });
 
+  it('offers Micronutrients as one quiet row between the weekly summary and Log Food', async () => {
+    renderScreen();
+    await screen.findByTestId('food-log-empty');
+
+    const widget = screen.getByTestId('nutrition-micronutrients');
+    expect(widget).toHaveTextContent(/Micronutrients.*Vitamins, minerals and more/);
+    // No vitamin or mineral figures on the dashboard itself.
+    expect(widget).not.toHaveTextContent(/\d/);
+    // Right after the week's budget and before Log Food, in the page's own order.
+    expect(screen.getByTestId('nutrition-day-content')).toHaveTextContent(
+      /This Week.*Micronutrients.*Vitamins, minerals and more.*Log Food/s,
+    );
+
+    fireEvent.press(screen.getByTestId('nutrition-micronutrients-open'));
+    expect(mockNavigate).toHaveBeenCalledWith('Micronutrients', { day: dayKey(new Date()) });
+  });
+
   it('opens AI Food Search straight from the Nutrition dashboard', async () => {
     renderScreen();
     await screen.findByTestId('food-log-empty');
@@ -554,7 +571,7 @@ describe('NutritionTodayScreen background refresh from the shared cache', () => 
 });
 
 describe('NutritionTodayScreen -- widgets, one primary action', () => {
-  it("is five widgets: today's intake (the hero), the week, the actions, today's foods and the daily targets", async () => {
+  it("is six widgets: today's intake (the hero), the week, Micronutrients, the actions, today's foods and the daily targets", async () => {
     mockFetchTodaysFoodLogs.mockResolvedValue([sampleLog]);
     renderScreen();
     await screen.findByTestId('food-log-row-log-1');
@@ -563,11 +580,19 @@ describe('NutritionTodayScreen -- widgets, one primary action', () => {
     expect(cards.map((c) => c.props.testID)).toEqual([
       'nutrition-today-macros',
       'nutrition-today-week',
+      'nutrition-micronutrients',
       'nutrition-today-actions',
       'nutrition-today-foods',
       'nutrition-today-targets',
     ]);
-    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([true, false, false, false, false]);
+    expect(cards.map((c) => Boolean(c.props.hero))).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
     expect(
       within(screen.getByTestId('nutrition-today-foods')).getByTestId('food-log-row-log-1'),
     ).toBeTruthy();

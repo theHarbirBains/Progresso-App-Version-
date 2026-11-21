@@ -92,6 +92,8 @@ import { NewWorkoutScreen } from './src/screens/NewWorkoutScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { NutritionGoalsScreen } from './src/screens/NutritionGoalsScreen';
 import { NutritionHistoryScreen } from './src/screens/NutritionHistoryScreen';
+import { MicronutrientsScreen } from './src/screens/MicronutrientsScreen';
+import { NutrientDetailScreen } from './src/screens/NutrientDetailScreen';
 import { NutritionTodayScreen } from './src/screens/NutritionTodayScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { AddPhoneNumberScreen } from './src/screens/AddPhoneNumberScreen';
@@ -171,6 +173,8 @@ const NUTRITION_SCREENS = {
   NutritionGoals: withNutrition(NutritionGoalsScreen),
   NutritionHistory: withNutrition(NutritionHistoryScreen),
   CalorieEstimation: withNutrition(CalorieEstimationScreen),
+  Micronutrients: withNutrition(MicronutrientsScreen),
+  NutrientDetail: withNutrition(NutrientDetailScreen),
 };
 
 function Root() {
@@ -486,6 +490,14 @@ function Root() {
                   <Stack.Screen
                     name="CalorieEstimation"
                     component={NUTRITION_SCREENS.CalorieEstimation}
+                  />
+                  <Stack.Screen
+                    name="Micronutrients"
+                    component={NUTRITION_SCREENS.Micronutrients}
+                  />
+                  <Stack.Screen
+                    name="NutrientDetail"
+                    component={NUTRITION_SCREENS.NutrientDetail}
                   />
                   <Stack.Screen name="ProgressOverview" component={ProgressOverviewScreen} />
                   <Stack.Screen

@@ -196,6 +196,7 @@ const onionsRaw = {
   protein_g_per_100g: '1.10',
   carbs_g_per_100g: '9.34',
   fat_g_per_100g: '0.10',
+  micronutrients_per_100g: { vitamin_c: 7.4, potassium: 146, sodium: 4 },
   data_version: 'SR Legacy 2018-04',
 };
 
@@ -204,6 +205,7 @@ const onionChips = {
   fdc_id: 167963,
   description: 'Snacks, potato chips, sour-cream-and-onion-flavor',
   calories_per_100g: '531.00',
+  micronutrients_per_100g: null,
 };
 
 const onionMeasures = [
@@ -297,6 +299,9 @@ describe('FoodsService.search', () => {
       nutrition_licence: 'public_domain',
     });
     expect(String(rows[0]!.nutrition_attribution)).toContain('FoodData Central');
+    // Its micronutrients come with it, per 100 g (its serving); one with none has none.
+    expect(rows[0]!.micronutrients).toEqual({ vitamin_c: 7.4, potassium: 146, sodium: 4 });
+    expect(rows[1]!.micronutrients).toBeNull();
     // USDA lists no measure for the chips: the serving is 100 g, with no wording.
     expect(rows[1]!.serving_label).toBe('');
   });

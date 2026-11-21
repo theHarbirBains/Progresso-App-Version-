@@ -119,6 +119,10 @@ export type RootStackParamList = {
   /** `date` ("YYYY-MM-DD"): opens on that day, from a day in Progress. */
   NutritionHistory: { date?: string } | undefined;
   CalorieEstimation: undefined;
+  /** The day's vitamins and minerals (`day` "YYYY-MM-DD", today when absent), from Nutrition. */
+  Micronutrients: { day?: string } | undefined;
+  /** One nutrient: the day's intake (or the week's average) and what it does. */
+  NutrientDetail: { nutrientId: string; day: string; range: 'day' | 'week' };
   ProgressOverview: undefined;
   ProgressExerciseDetail: { exerciseId: string; exerciseName: string };
   WorkoutSplits: undefined;

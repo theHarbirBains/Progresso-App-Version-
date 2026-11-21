@@ -4,6 +4,12 @@
 //
 // Only foods with all four Progresso figures (energy, protein, fat, carbohydrate) are kept.
 // A food missing any of them is skipped and counted, never filled with a zero.
+//
+// Each kept food's micronutrients come too, per 100 g in each nutrient's own unit (the mapping is
+// generated from supabase/nutrients -- micronutrient-fields.generated.ts): only the ones
+// FoodData Central has a figure for, so a nutrient it doesn't give stays unknown, never 0.
+
+import { USDA_MICRONUTRIENTS } from '../foods/micronutrient-fields.generated';
 
 /** The FoodData Central data types this importer accepts now, mapped to the stored names. */
 export const ACCEPTED_DATA_TYPES: Record<string, 'Foundation' | 'SR Legacy'> = {
@@ -30,6 +36,8 @@ export interface ReferenceFoodRow {
   protein_g_per_100g: number;
   carbs_g_per_100g: number;
   fat_g_per_100g: number;
+  /** Nutrient id to amount per 100 g; null when FoodData Central gives none of them. */
+  micronutrients_per_100g: Record<string, number> | null;
   data_version: string;
 }
 
@@ -103,6 +111,28 @@ export function releaseLabelFrom(dir: string): string {
   return match ? match[1]! : name;
 }
 
+/** Every FoodData Central nutrient id a micronutrient is read from. */
+const MICRONUTRIENT_SOURCE_IDS = new Set(USDA_MICRONUTRIENTS.flatMap((entry) => entry.ids));
+
+/**
+ * A food's micronutrients per 100 g: for each, its first FoodData Central figure, converted to
+ * the nutrient's unit. A negative figure (calculated by difference) isn't a real amount, so that
+ * nutrient is left unknown rather than clamped. Null when there are none.
+ */
+export function micronutrientsPer100g(
+  nutrients: Map<number, number>,
+): Record<string, number> | null {
+  const amounts: Record<string, number> = {};
+  for (const { nutrient, ids, factor } of USDA_MICRONUTRIENTS) {
+    const id = ids.find((candidate) => nutrients.has(candidate));
+    if (id === undefined) continue;
+    const amount = nutrients.get(id)!;
+    if (amount < 0) continue;
+    amounts[nutrient] = Math.round(amount * factor * 10000) / 10000;
+  }
+  return Object.keys(amounts).length > 0 ? amounts : null;
+}
+
 function finiteOrNull(value: string): number | null {
   if (value.trim() === '') return null;
   const parsed = Number(value);
@@ -149,7 +179,8 @@ export class UsdaReferenceBuilder {
       nutrientId === PROTEIN_NUTRIENT_ID ||
       nutrientId === FAT_NUTRIENT_ID ||
       nutrientId === CARBS_NUTRIENT_ID ||
-      (ENERGY_NUTRIENT_IDS as readonly number[]).includes(nutrientId);
+      (ENERGY_NUTRIENT_IDS as readonly number[]).includes(nutrientId) ||
+      MICRONUTRIENT_SOURCE_IDS.has(nutrientId);
     if (isKnown && !food.nutrients.has(nutrientId)) food.nutrients.set(nutrientId, amount);
   }
 
@@ -227,6 +258,7 @@ export class UsdaReferenceBuilder {
         protein_g_per_100g: protein,
         carbs_g_per_100g: carbs,
         fat_g_per_100g: fat,
+        micronutrients_per_100g: micronutrientsPer100g(food.nutrients),
         data_version: `${food.dataType} ${this.releaseLabel}`,
       });
       measures.push(...food.portions);

@@ -71,7 +71,7 @@ const REFERENCE_CANDIDATES = 250;
 // USDA's plain reference foods; Branded and FNDDS are not imported.
 const REFERENCE_DATA_TYPES = ['Foundation', 'SR Legacy'] as const;
 const REFERENCE_COLUMNS =
-  'fdc_id, description, data_type, gtin_upc, calories_per_100g, protein_g_per_100g, carbs_g_per_100g, fat_g_per_100g, data_version';
+  'fdc_id, description, data_type, gtin_upc, calories_per_100g, protein_g_per_100g, carbs_g_per_100g, fat_g_per_100g, micronutrients_per_100g, data_version';
 // The household measure a reference food's serving wording names, in this order of preference.
 const PREFERRED_MEASURES = ['medium', 'large', 'small', 'cup', 'slice', 'piece', 'tbsp', 'oz'];
 
@@ -84,6 +84,7 @@ interface ReferenceFoodRow {
   protein_g_per_100g: number | string;
   carbs_g_per_100g: number | string;
   fat_g_per_100g: number | string;
+  micronutrients_per_100g?: Record<string, number> | null;
   data_version: string;
 }
 
@@ -204,7 +205,11 @@ export function referenceServingLabel(
   return `100 g · ${shortAmount(preferred.amount)} ${preferred.wording} ≈ ${Math.round(preferred.grams)} g`;
 }
 
-/** A USDA reference food as a catalog row: per 100 g, verified, with USDA's own citation. */
+/**
+ * A USDA reference food as a catalog row: per 100 g, verified, with USDA's own citation -- its
+ * micronutrients too, as FoodData Central gives them (the serving is 100 g, so per 100 g is per
+ * serving).
+ */
 function referenceFoodRow(food: ReferenceFoodRow, measureRows: ReferenceMeasureRow[]) {
   const measures = measureRows
     .filter((measure) => Number(measure.fdc_id) === food.fdc_id)
@@ -224,6 +229,7 @@ function referenceFoodRow(food: ReferenceFoodRow, measureRows: ReferenceMeasureR
     protein_g: Number(food.protein_g_per_100g),
     carbs_g: Number(food.carbs_g_per_100g),
     fat_g: Number(food.fat_g_per_100g),
+    micronutrients: food.micronutrients_per_100g ?? null,
     provider: USDA_PROVIDER,
     provider_food_id: String(food.fdc_id),
     barcode: food.gtin_upc ?? null,
@@ -902,6 +908,8 @@ export class FoodsService implements OnModuleInit {
       protein_g: food.proteinG,
       carbs_g: food.carbsG,
       fat_g: food.fatG,
+      // Only what the product's label data gives (see the provider): unknown ones are absent.
+      micronutrients: food.micronutrients ?? null,
       provider: food.provider,
       provider_food_id: food.providerFoodId,
       barcode: food.barcode,

@@ -2,6 +2,7 @@ import type { EnteredAmount } from './foodLogQueries';
 import type { FoodProvenance, FoodRow } from './foodQueries';
 import { amountText, servingMeasures } from './logQuantity';
 import { calculateLogTotals, round2, type NutritionTotals } from './nutritionCalculations';
+import type { NutrientAmounts, NutrientId } from './micronutrients/nutrients';
 
 // Saved meals and recipes are both a list of foods, each with an amount. A saved meal is
 // logged as each of its foods; a recipe is one food whose figures per serving are its
@@ -49,6 +50,34 @@ export function recipePerServing(items: FoodGroupItem[], servings: number): Nutr
     carbsG: round2(batch.carbsG / servings),
     fatG: round2(batch.fatG / servings),
   };
+}
+
+/**
+ * A recipe's micronutrients for one serving: each one only where every ingredient has a figure
+ * for it -- the ingredients' amounts added up and divided by the servings. One that any ingredient
+ * is missing is left unknown, since adding up the others would quietly read low. Null when none.
+ */
+export function recipeMicronutrients(
+  items: FoodGroupItem[],
+  servings: number,
+): NutrientAmounts | null {
+  if (items.length === 0 || !(servings > 0)) return null;
+  const ids = Object.keys(items[0]!.food.micronutrients ?? {}) as NutrientId[];
+  const perServing: Partial<Record<NutrientId, number>> = {};
+  for (const id of ids) {
+    let total = 0;
+    let everyIngredient = true;
+    for (const item of items) {
+      const amount = item.food.micronutrients?.[id];
+      if (amount === undefined) {
+        everyIngredient = false;
+        break;
+      }
+      total += amount * item.quantity;
+    }
+    if (everyIngredient) perServing[id] = Math.round((total / servings) * 10000) / 10000;
+  }
+  return Object.keys(perServing).length > 0 ? perServing : null;
 }
 
 /**

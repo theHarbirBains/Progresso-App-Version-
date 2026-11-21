@@ -1,5 +1,7 @@
 // CLI: loads USDA FoodData Central bulk CSV releases into usda_food_reference and
-// usda_food_measure through the service role, and records an audit row per release.
+// usda_food_measure through the service role, and records an audit row per release. Then it
+// gives the foods already cached from a reference food (and people's unchanged copies of them)
+// that food's micronutrients -- fill_usda_micronutrients(); no log is changed.
 //
 // Usage (after `npm run build`), from apps/api, with the service-role key in the environment:
 //   node --env-file=.env dist/nutrition-resolution/usda-fdc.import.cli.js <extracted-dir> [<extracted-dir> ...]
@@ -147,6 +149,9 @@ async function main(): Promise<void> {
   for (const dir of dirs) {
     await importRelease(client, dir);
   }
+  const { data: filled, error } = await client.rpc('fill_usda_micronutrients');
+  if (error) throw new Error(`Filling cached foods' micronutrients failed: ${error.message}`);
+  console.log(`Cached foods given their micronutrients: ${String(filled)}`);
 }
 
 main().catch((error: unknown) => {

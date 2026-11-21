@@ -48,6 +48,9 @@ const pgInstance = new EmbeddedPostgres({
   password: 'postgres',
   port: PORT,
   persistent: false,
+  // UTF-8, like Supabase's databases: a machine's own default (WIN1252 on Windows) can't hold
+  // text such as Health Canada's "≤18 y". The locale is left as it is, so sorting doesn't change.
+  initdbFlags: ['--encoding=UTF8'],
 });
 
 const results = [];
@@ -6328,6 +6331,178 @@ async function main() {
       )
     ).rows[0].count;
     record('The clean-up deletes no set: it only marks the exercise, as Remove does', sets === 1);
+  }
+
+  // ---- micronutrients (20261214100000, 20261214100100) ----
+  {
+    const eater = randomUUID();
+    await admin.query("insert into auth.users (id, email) values ($1, 'micro-eater@test.local')", [
+      eater,
+    ]);
+
+    const counts = (
+      await admin.query(
+        `select (select count(*)::int from public.nutrient_definitions) as definitions,
+                (select count(*)::int from public.nutrient_reference_values) as reference_values`,
+      )
+    ).rows[0];
+    record(
+      "Micronutrients: every tracked nutrient and Health Canada's values for each life stage are in",
+      counts.definitions === 29 && counts.reference_values === 572,
+      JSON.stringify(counts),
+    );
+    const iron = (
+      await asUser(eater, (c) =>
+        c.query(
+          `select reference_type, reference_value, ul, value_notes from public.nutrient_reference_values
+           where nutrient_id = 'iron' and life_stage = 'females' and age_label = '31–50 y'`,
+        ),
+      )
+    ).rows[0];
+    record(
+      'Micronutrients: anyone signed in reads the reference values, with Health Canada’s notes',
+      iron?.reference_type === 'RDA' &&
+        Number(iron.reference_value) === 18 &&
+        Number(iron.ul) === 45 &&
+        iron.value_notes.some((n) => n.includes('1.8 times higher for vegetarians')),
+      JSON.stringify(iron),
+    );
+    await expectThrows(
+      asUser(eater, (c) =>
+        c
+          .query(
+            "update public.nutrient_reference_values set reference_value = 1 where nutrient_id = 'iron'",
+          )
+          .then((res) => {
+            if (res.rowCount === 0) throw new Error('row-level security: nothing updated');
+          }),
+      ),
+      'Micronutrients: nobody changes a reference value from the app',
+      RLS_ERROR,
+    );
+    const migration = readFileSync(
+      join(migrationsDir, '20261214100100_nutrient_reference_values.sql'),
+      'utf8',
+    );
+    await admin.query(migration);
+    record(
+      'Micronutrients: writing the reference values again changes nothing',
+      (await admin.query('select count(*)::int as n from public.nutrient_reference_values')).rows[0]
+        .n === 572,
+    );
+
+    // An amount is an object of nutrient ids to amounts of 0 or more: nothing else is stored.
+    const ownFood = (micronutrients) =>
+      asUser(eater, (c) =>
+        c.query(
+          `insert into public.foods (created_by, name, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, micronutrients)
+           values ($1, 'Mine', 100, 'g', 100, 1, 1, 1, $2::jsonb) returning micronutrients`,
+          [eater, JSON.stringify(micronutrients)],
+        ),
+      );
+    record(
+      'Micronutrients: a food keeps its amounts, a real 0 included',
+      JSON.stringify((await ownFood({ iron: 2.5, calcium: 0 })).rows[0].micronutrients) ===
+        JSON.stringify({ iron: 2.5, calcium: 0 }),
+    );
+    for (const [bad, why] of [
+      [{ iron: -1 }, 'a negative amount'],
+      [{ iron: 'lots' }, 'an amount that isn’t a number'],
+      [{ 'Iron!': 1 }, 'a key that isn’t a nutrient id'],
+      [[1, 2], 'a list instead of an object'],
+    ]) {
+      await expectThrows(
+        ownFood(bad),
+        `Micronutrients: ${why} is refused`,
+        /check constraint|violates/i,
+      );
+    }
+
+    // fill_usda_micronutrients: a reference food's amounts onto the foods that are still it.
+    const fdcId = 990001;
+    await admin.query(
+      `insert into public.usda_food_reference
+         (fdc_id, description, data_type, calories_per_100g, protein_g_per_100g, carbs_g_per_100g, fat_g_per_100g, micronutrients_per_100g, data_version)
+       values ($1, 'Broccoli, raw', 'SR Legacy', 34, 2.82, 6.64, 0.37, '{"vitamin_c": 89.2, "iron": 0.73, "calcium": 47}', 'SR Legacy 2018-04')`,
+      [fdcId],
+    );
+    const usdaFood = async ({
+      createdBy = null,
+      serving = 100,
+      calories = 34,
+      recipe = null,
+      micro = null,
+      provider = null,
+    }) =>
+      (
+        await admin.query(
+          `insert into public.foods
+             (created_by, name, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, recipe_servings, micronutrients,
+              provider, provider_food_id, nutrition_confidence, nutrition_source_kind, nutrition_source_id)
+           values ($1, 'Broccoli, raw', $2, 'g', $3, $4, $5, $6, $7, $8::jsonb, $9, $10, 'verified', 'usda_fdc', $11)
+           returning id`,
+          [
+            createdBy,
+            serving,
+            calories,
+            (2.82 * serving) / 100,
+            (6.64 * serving) / 100,
+            (0.37 * serving) / 100,
+            recipe,
+            micro ? JSON.stringify(micro) : null,
+            provider,
+            provider ? String(fdcId) : null,
+            String(fdcId),
+          ],
+        )
+      ).rows[0].id;
+    const cached = await usdaFood({ provider: 'usda_fdc' });
+    const copy = await usdaFood({ createdBy: eater });
+    const bigger = await usdaFood({ createdBy: eater, serving: 150, calories: 51 });
+    const edited = await usdaFood({ createdBy: eater, calories: 60 });
+    const recipe = await usdaFood({ createdBy: eater, recipe: 2 });
+    const already = await usdaFood({ createdBy: eater, micro: { iron: 9 } });
+    const logged = (
+      await admin.query(
+        `insert into public.food_logs (user_id, food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g)
+         values ($1, $2, 'Broccoli, raw', 100, 'g', 1, 34, 2.82, 6.64, 0.37) returning id`,
+        [eater, copy],
+      )
+    ).rows[0].id;
+
+    const filled = (await admin.query('select public.fill_usda_micronutrients() as n')).rows[0].n;
+    const microOf = async (id) =>
+      (await admin.query('select micronutrients from public.foods where id = $1', [id])).rows[0]
+        .micronutrients;
+    record(
+      'Micronutrients: a cached USDA food and an unchanged copy get its amounts, scaled to their serving',
+      JSON.stringify(await microOf(cached)) ===
+        JSON.stringify({ iron: 0.73, calcium: 47, vitamin_c: 89.2 }) &&
+        JSON.stringify(await microOf(copy)) ===
+          JSON.stringify({ iron: 0.73, calcium: 47, vitamin_c: 89.2 }) &&
+        Number((await microOf(bigger)).vitamin_c) === 133.8,
+      JSON.stringify({ filled, cached: await microOf(cached), bigger: await microOf(bigger) }),
+    );
+    record(
+      'Micronutrients: a food changed since, a recipe, or one already holding amounts is left alone',
+      (await microOf(edited)) === null &&
+        (await microOf(recipe)) === null &&
+        JSON.stringify(await microOf(already)) === JSON.stringify({ iron: 9 }),
+    );
+    record(
+      'Micronutrients: no log is ever filled in -- a log keeps what it was logged with',
+      (await admin.query('select micronutrients from public.food_logs where id = $1', [logged]))
+        .rows[0].micronutrients === null,
+    );
+    record(
+      'Micronutrients: filling them again changes nothing',
+      (await admin.query('select public.fill_usda_micronutrients() as n')).rows[0].n === 0,
+    );
+    await expectThrows(
+      asUser(eater, (c) => c.query('select public.fill_usda_micronutrients()')),
+      'Micronutrients: the app cannot run the fill itself',
+      /permission denied/i,
+    );
   }
 
   // ---- previous exercises by muscle group (20261213100000) ----

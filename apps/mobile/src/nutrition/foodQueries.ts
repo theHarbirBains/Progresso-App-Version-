@@ -3,6 +3,7 @@ import { fetchAllRows } from '../lib/fetchAllRows';
 import { escapeIlike } from '../lib/ilike';
 import { supabase } from '../lib/supabase';
 import type { QuantityUnit } from './logQuantity';
+import { readAmounts, type NutrientAmounts } from './micronutrients/nutrients';
 
 // fetchFoods/fetchAllFoods/createFood/updateFood are the user's own custom
 // foods (created_by = the querying user) -- direct-to-Supabase, same as
@@ -34,6 +35,11 @@ export interface FoodRow {
   provenance?: FoodProvenance | null;
   /** Set when the food is one of the user's recipes: how many servings the recipe makes. */
   recipeServings?: number | null;
+  /**
+   * Its micronutrients per serving -- only the ones its source gives (a missing one is unknown,
+   * never 0). Null when none are known.
+   */
+  micronutrients?: NutrientAmounts | null;
 }
 
 /**
@@ -68,6 +74,7 @@ interface FoodDbRow {
   carbs_g: string | number;
   fat_g: string | number;
   is_active: boolean;
+  micronutrients?: unknown;
   nutrition_confidence: FoodProvenance['confidence'] | null;
   nutrition_source_kind: string | null;
   nutrition_source_id: string | null;
@@ -138,10 +145,11 @@ function toFoodRow(row: FoodDbRow): FoodRow {
       row.recipe_servings === null || row.recipe_servings === undefined
         ? null
         : Number(row.recipe_servings),
+    micronutrients: readAmounts(row.micronutrients),
   };
 }
 
-export const FOOD_COLUMNS = `id, name, brand, barcode, image_url, serving_size, serving_unit, serving_label, calories, protein_g, carbs_g, fat_g, is_active, recipe_servings, ${PROVENANCE_COLUMNS}`;
+export const FOOD_COLUMNS = `id, name, brand, barcode, image_url, serving_size, serving_unit, serving_label, calories, protein_g, carbs_g, fat_g, is_active, recipe_servings, micronutrients, ${PROVENANCE_COLUMNS}`;
 
 /** A food read through a log, a meal item or an ingredient -- as a FoodRow. */
 export function foodFromRow(row: unknown): FoodRow {
@@ -414,6 +422,8 @@ export interface FoodInput {
   provenance?: FoodProvenance | null;
   /** For a recipe: how many servings it makes. */
   recipeServings?: number | null;
+  /** Its micronutrients per serving, from its source. Omit to leave them alone; null clears them. */
+  micronutrients?: NutrientAmounts | null;
 }
 
 /** A food the user typed in: its figures are the user's own, not from any data source. */
@@ -447,6 +457,7 @@ export async function createFood(userId: string, input: FoodInput): Promise<Food
       ...(input.imageUrl !== undefined ? { image_url: input.imageUrl } : {}),
       ...(input.servingLabel !== undefined ? { serving_label: input.servingLabel } : {}),
       ...(input.recipeServings !== undefined ? { recipe_servings: input.recipeServings } : {}),
+      ...(input.micronutrients !== undefined ? { micronutrients: input.micronutrients } : {}),
       ...provenanceToColumns(input.provenance === undefined ? USER_ENTERED : input.provenance),
     })
     .select(FOOD_COLUMNS)
@@ -512,6 +523,8 @@ export async function keepInLibrary(userId: string, foodId: string): Promise<Foo
     fatG: source.fatG,
     imageUrl: source.imageUrl,
     provenance: source.provenance ?? null,
+    // Its micronutrients come with it, from the same source as its other figures.
+    micronutrients: source.micronutrients ?? null,
   });
 }
 
@@ -531,6 +544,7 @@ export async function updateFood(foodId: string, input: UpdateFoodInput): Promis
   if (input.imageUrl !== undefined) payload.image_url = input.imageUrl;
   if (input.isActive !== undefined) payload.is_active = input.isActive;
   if (input.recipeServings !== undefined) payload.recipe_servings = input.recipeServings;
+  if (input.micronutrients !== undefined) payload.micronutrients = input.micronutrients;
   // A recipe's figures are worked out again whenever it's saved, and so is where they came from.
   if (input.provenance !== undefined) Object.assign(payload, provenanceToColumns(input.provenance));
 

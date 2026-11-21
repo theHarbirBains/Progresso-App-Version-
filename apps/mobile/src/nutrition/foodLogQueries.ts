@@ -4,6 +4,7 @@ import { calculateLogTotals, recalculateForQuantity } from './nutritionCalculati
 import type { QuantityUnit } from './logQuantity';
 import type { MealType } from './mealTypes';
 import { PROVENANCE_COLUMNS, provenanceToColumns, USER_ENTERED, type FoodRow } from './foodQueries';
+import { readAmounts, scaleAmounts, type NutrientAmounts } from './micronutrients/nutrients';
 
 // Direct-to-Supabase, same reasoning as foodQueries.ts: food_logs is
 // entirely own-row RLS with a real delete policy (no PR-style derived
@@ -32,6 +33,11 @@ export interface FoodLogRow {
   servingLabel?: string | null;
   /** The food's photo as it is now -- a presentation detail, not part of the nutrition snapshot. Only loaded for today's list; null when the food has none (or was deleted). */
   imageUrl?: string | null;
+  /**
+   * Its micronutrients for the amount logged, snapshotted when it was logged -- only the ones its
+   * food's data gave. Null for a log made before they were tracked, or of a food with none known.
+   */
+  micronutrients?: NutrientAmounts | null;
 }
 
 interface FoodLogDbRow {
@@ -50,6 +56,7 @@ interface FoodLogDbRow {
   entered_amount: string | number | null;
   entered_unit: string | null;
   serving_label: string | null;
+  micronutrients?: unknown;
   // A to-one embed comes back as an object; the client's inferred type says array, so both are read.
   foods?: { image_url: string | null } | { image_url: string | null }[] | null;
 }
@@ -76,12 +83,13 @@ function toFoodLogRow(row: FoodLogDbRow): FoodLogRow {
     enteredAmount: row.entered_amount == null ? null : Number(row.entered_amount),
     enteredUnit: (row.entered_unit as QuantityUnit | null) ?? null,
     servingLabel: row.serving_label ?? null,
+    micronutrients: readAmounts(row.micronutrients),
     ...(row.foods !== undefined ? { imageUrl: embeddedImageUrl(row.foods) } : {}),
   };
 }
 
 const FOOD_LOG_COLUMNS =
-  'id, food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, meal_type, logged_at, entered_amount, entered_unit, serving_label';
+  'id, food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, meal_type, logged_at, entered_amount, entered_unit, serving_label, micronutrients';
 
 // Today's list also shows each food's picture, read through the food_id link
 // rather than copied into the log.
@@ -158,7 +166,7 @@ export async function logFood(
     | 'carbsG'
     | 'fatG'
     | 'provenance'
-  > & { servingLabel?: string | null },
+  > & { servingLabel?: string | null; micronutrients?: NutrientAmounts | null },
   quantity: number,
   mealType: MealType,
   entered?: EnteredAmount | null,
@@ -184,6 +192,8 @@ export async function logFood(
       entered_amount: entered?.amount ?? null,
       entered_unit: entered?.unit ?? null,
       serving_label: food.servingLabel ?? null,
+      // Its micronutrients for the amount logged, kept with the log like its other figures.
+      micronutrients: scaleAmounts(food.micronutrients, quantity),
       ...(loggedAt ? { logged_at: loggedAt.toISOString() } : {}),
       // The log keeps the figures' provenance as it was at logging time, even if the library food changes later.
       ...provenanceToColumns(food.provenance),
@@ -254,6 +264,10 @@ export async function updateFoodLogQuantity(
       protein_g: totals.proteinG,
       carbs_g: totals.carbsG,
       fat_g: totals.fatG,
+      // Its micronutrients scale with it, from the log's own snapshot -- only when it was read.
+      ...(log.micronutrients !== undefined
+        ? { micronutrients: scaleAmounts(log.micronutrients, newQuantity / log.quantity) }
+        : {}),
       ...(entered !== undefined
         ? { entered_amount: entered?.amount ?? null, entered_unit: entered?.unit ?? null }
         : {}),
@@ -334,7 +348,7 @@ export async function fetchIntakeForRange(
 }
 
 // Everything a log snapshots, so a copy is exactly what was logged.
-const COPIED_COLUMNS = `food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, meal_type, entered_amount, entered_unit, serving_label, ${PROVENANCE_COLUMNS}`;
+const COPIED_COLUMNS = `food_id, food_name_snapshot, serving_size, serving_unit, quantity, calories, protein_g, carbs_g, fat_g, meal_type, entered_amount, entered_unit, serving_label, micronutrients, ${PROVENANCE_COLUMNS}`;
 
 /**
  * Logs these past logs again, now: each copy is exactly what was logged then -- the same
