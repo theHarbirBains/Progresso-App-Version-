@@ -1,6 +1,36 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import type { CardioValues } from './cardioActivities';
+import type { CardioHistoryEntry } from './cardioQueries';
 import { CardioSheet } from './CardioSheet';
+
+const NOTHING: Omit<CardioValues, 'activity' | 'durationSeconds'> = {
+  name: null,
+  distanceM: null,
+  speedKmh: null,
+  speedSetting: null,
+  inclinePercent: null,
+  resistanceLevel: null,
+  floors: null,
+  steps: null,
+  strokeRate: null,
+  poolLengthM: null,
+  laps: null,
+  notes: null,
+};
+
+/** A past activity as useRecentCardio gives it. */
+function done(values: Partial<CardioValues> & Pick<CardioValues, 'activity'>): CardioHistoryEntry {
+  return {
+    ...NOTHING,
+    durationSeconds: 1800,
+    ...values,
+    id: `old-${values.activity}`,
+    workoutId: 'w0',
+    afterStrength: false,
+    createdAt: '2026-11-10T10:30:00Z',
+    performedAt: '2026-11-10T10:00:00Z',
+  };
+}
 
 function renderSheet(entry: CardioValues | null = null, onRemove?: () => void) {
   const onSave = jest.fn();
@@ -28,7 +58,7 @@ describe('CardioSheet', () => {
       <CardioSheet
         visible
         entry={null}
-        recent={['swimming']}
+        recent={[done({ activity: 'swimming' })]}
         accentColor="#E8A23C"
         onAccentColor="#000"
         onSave={jest.fn()}
@@ -128,6 +158,62 @@ describe('CardioSheet', () => {
         expect.objectContaining({ activity: 'other', name: 'Jump Rope', notes: 'Double unders' }),
       ),
     );
+  });
+
+  it('shows the last time an activity was done, and starts from its figures with Use These', async () => {
+    const onSave = jest.fn();
+    render(
+      <CardioSheet
+        visible
+        entry={null}
+        recent={[done({ activity: 'outdoor_run', durationSeconds: 1650, distanceM: 5000 })]}
+        accentColor="#E8A23C"
+        onAccentColor="#000"
+        onSave={onSave}
+        onClose={jest.fn()}
+      />,
+    );
+    // An activity never done before has nothing to show.
+    fireEvent.press(screen.getByTestId('cardio-sheet-activity-cycling'));
+    expect(screen.queryByTestId('cardio-sheet-last')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('cardio-sheet-change'));
+    fireEvent.press(screen.getByTestId('cardio-sheet-activity-outdoor_run'));
+    expect(screen.getByTestId('cardio-sheet-last')).toHaveTextContent(
+      /Last time · Nov 10.*27:30 · 5 km · 5:30 \/km/,
+    );
+    fireEvent.press(screen.getByTestId('cardio-sheet-use-last'));
+    expect(screen.getByTestId('cardio-sheet-duration')).toHaveProp('value', '27:30');
+    expect(screen.getByTestId('cardio-sheet-distance')).toHaveProp('value', '5');
+    fireEvent.press(screen.getByTestId('cardio-sheet-save'));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          activity: 'outdoor_run',
+          durationSeconds: 1650,
+          distanceM: 5000,
+        }),
+      ),
+    );
+  });
+
+  it('opens straight on the figures to start from when doing a recent one again', () => {
+    render(
+      <CardioSheet
+        visible
+        entry={null}
+        initial={done({ activity: 'stairmaster', durationSeconds: 900, floors: 40 })}
+        accentColor="#E8A23C"
+        onAccentColor="#000"
+        onSave={jest.fn()}
+        onClose={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId('cardio-sheet-activity')).toHaveTextContent('StairMaster');
+    expect(screen.getByTestId('cardio-sheet-duration')).toHaveProp('value', '15');
+    expect(screen.getByTestId('cardio-sheet-floors')).toHaveProp('value', '40');
+    // Still an addition, not a change.
+    expect(screen.getByTestId('cardio-sheet-save')).toHaveTextContent('Add Cardio');
   });
 
   it('opens a saved activity on its figures, to change or remove', async () => {

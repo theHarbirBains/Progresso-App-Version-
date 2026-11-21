@@ -1,3 +1,11 @@
+import {
+  CARDIO_INFO,
+  cardioDetails,
+  cardioName,
+  cardioTotals,
+  type CardioActivity,
+} from '../cardio/cardioActivities';
+import { workoutTimes } from '../cardio/workoutTime';
 import { measurementTypeOf, type MeasurementType } from '../exercises/movementTypes';
 import { MUSCLE_GROUP_LABELS } from '../exercises/muscleGroups';
 import {
@@ -39,11 +47,30 @@ export interface ShareTopSet {
   prLabel: string | null;
 }
 
+/** One cardio activity as the card draws it: its glyph, its name and its figures on one line. */
+export interface ShareCardio {
+  activity: CardioActivity;
+  icon: (typeof CARDIO_INFO)[CardioActivity]['icon'];
+  name: string;
+  /** "30 min · 5 km · 6:00 /km" -- only what was saved, in km for everyone, never calories. */
+  figures: string;
+}
+
 export interface ShareCardData {
   workoutName: string;
   performedAt: string;
   musclesTrained: string;
   durationMinutes: number | null;
+  /**
+   * With cardio, the active training in minutes -- strength and cardio, never the session's rests
+   * and breaks (cardio/workoutTime.ts), which the card shows in Duration's place; null without.
+   */
+  activeMinutes: number | null;
+  /** Every cardio activity, in the order it was done. Empty without cardio. */
+  cardio: ShareCardio[];
+  /** All the cardio's time, in seconds, and the distance of the ones with one (null with none). */
+  cardioSeconds: number;
+  cardioDistanceM: number | null;
   /** Exercises with at least one logged set -- never one that was only planned. */
   exerciseCount: number;
   /** Sets actually logged (completed) -- never planned or blank ones. */
@@ -117,6 +144,17 @@ export async function fetchShareCardData(
 
   const logged = detail.exercises.map((e) => loggedSets(e.sets, measurementTypeOf(e)));
   const exerciseCount = logged.filter((sets) => sets.length > 0).length;
+  const totalSets = logged.reduce((sum, sets) => sum + sets.length, 0);
+  // Its cardio, each activity a row of its own, and its time told apart from the session's.
+  const cardioEntries = detail.cardio ?? [];
+  const times = workoutTimes({
+    performedAt: detail.performedAt,
+    completedAt: detail.completedAt,
+    strengthEndedAt: detail.strengthEndedAt,
+    hasStrength: totalSets > 0,
+    cardio: cardioEntries,
+  });
+  const totals = cardioTotals(cardioEntries);
   // Volume is weight x reps: weighted exercises only.
   const weightedSets = detail.exercises
     .filter((e) => measurementTypeOf(e) === 'weight_reps')
@@ -127,8 +165,20 @@ export async function fetchShareCardData(
     performedAt: detail.performedAt,
     musclesTrained,
     durationMinutes,
+    activeMinutes:
+      cardioEntries.length > 0 && times.activeSeconds !== null
+        ? Math.round(times.activeSeconds / 60)
+        : null,
+    cardio: cardioEntries.map((entry) => ({
+      activity: entry.activity,
+      icon: CARDIO_INFO[entry.activity].icon,
+      name: cardioName(entry),
+      figures: cardioDetails(entry),
+    })),
+    cardioSeconds: totals.seconds,
+    cardioDistanceM: totals.distanceM,
     exerciseCount,
-    totalSets: logged.reduce((sum, sets) => sum + sets.length, 0),
+    totalSets,
     totalVolumeKg: computeLifetimeVolumeKg(weightedSets),
     topSets,
   };

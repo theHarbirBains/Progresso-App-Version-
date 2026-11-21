@@ -55,6 +55,49 @@ describe('fetchShareCardData', () => {
     );
   });
 
+  it('carries its cardio -- each activity named, with its figures -- and the active time', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue(
+      workoutDetail({
+        strengthEndedAt: '2026-01-01T10:40:00Z',
+        cardio: [
+          {
+            id: 'c1',
+            workoutId: 'w1',
+            activity: 'outdoor_run',
+            name: null,
+            durationSeconds: 900,
+            distanceM: 2500,
+            speedKmh: null,
+            afterStrength: true,
+            createdAt: '2026-01-01T10:42:00Z',
+          },
+        ],
+      }),
+    );
+
+    const result = await fetchShareCardData('w1', 'user-1');
+
+    expect(result.cardio).toEqual([
+      {
+        activity: 'outdoor_run',
+        icon: 'wind',
+        name: 'Outdoor Running',
+        figures: '15 min · 2.5 km · 6:00 /km',
+      },
+    ]);
+    // 40 minutes of lifting and the 15-minute run: 55, never the hour the session took.
+    expect(result.activeMinutes).toBe(55);
+    expect(result.cardioSeconds).toBe(900);
+    expect(result.cardioDistanceM).toBe(2500);
+  });
+
+  it('has no cardio or active time for a workout without cardio', async () => {
+    const result = await fetchShareCardData('w1', 'user-1');
+
+    expect(result.cardio).toEqual([]);
+    expect(result.activeMinutes).toBeNull();
+  });
+
   it('returns the workout name, date, and muscles trained', async () => {
     const result = await fetchShareCardData('w1', 'user-1');
 

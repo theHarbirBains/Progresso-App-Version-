@@ -8,28 +8,40 @@ import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
 import { TextInput } from '../design/TextInput';
 import { colors, fonts, minTouchTarget, radii, spacing, typeScale } from '../design/theme';
-import { withAlpha } from '../theme/accentColor';
+import { formatRecentDate } from '../workouts/workoutFormat';
 import {
   activitiesInOrder,
   CARDIO_FIELDS,
   CARDIO_INFO,
+  cardioDetails,
   cardioReadout,
   cardioValues,
   draftFromCardio,
   emptyCardioDraft,
+  lastTimeFor,
   type CardioActivity,
   type CardioDraft,
   type CardioField,
   type CardioProblem,
   type CardioValues,
 } from './cardioActivities';
+import { GlyphWell } from '../design/GlyphWell';
+import type { CardioHistoryEntry } from './cardioQueries';
 
 interface Props {
   visible: boolean;
   /** The activity being changed, or null to add one. */
   entry: CardioValues | null;
-  /** The activities the person did last, most recent first: offered first. */
-  recent?: CardioActivity[];
+  /**
+   * Adding, the figures to start from -- "do it again" from the Cardio page's recent ones: it
+   * opens straight on them, to change and add.
+   */
+  initial?: CardioValues | null;
+  /**
+   * The last time the person did each activity, most recent first (useRecentCardio): offered
+   * first, and shown on its figures as Last Time, with Use These to start from them.
+   */
+  recent?: CardioHistoryEntry[];
   accentColor: string;
   onAccentColor: string;
   /** Saves it; a rejection's message is shown and the sheet stays open. */
@@ -44,8 +56,9 @@ const COLUMNS = 3;
 
 /**
  * Adds or changes a cardio activity, in two steps in one sheet. Adding opens on the activities as
- * a grid of tiles -- the ones used last first -- and a tap goes straight to its figures; changing
- * one opens on its figures. The figures are only the activity's own (cardio/cardioActivities.ts):
+ * a grid of tiles -- the ones used last first -- and a tap goes straight to its figures, with the
+ * last time it was done above them and Use These to start from those; changing one, or doing a
+ * recent one again, opens on its figures. The figures are only the activity's own (cardio/cardioActivities.ts):
  * its time -- the one figure it needs -- with its main ones beside it, what they work out to
  * under them ("Pace 5:30 /km"), and the rest, never required, under Optional. A level, a
  * resistance or an incline can be nudged with − and +. Change goes back to the tiles keeping
@@ -55,7 +68,8 @@ const COLUMNS = 3;
 export function CardioSheet({
   visible,
   entry,
-  recent = [],
+  initial = null,
+  recent = NO_RECENT,
   accentColor,
   onAccentColor,
   onSave,
@@ -65,7 +79,9 @@ export function CardioSheet({
 }: Props) {
   const [step, setStep] = useState<'pick' | 'form'>('pick');
   const [draft, setDraft] = useState<CardioDraft>(() => emptyCardioDraft());
-  const [order, setOrder] = useState<CardioActivity[]>(() => activitiesInOrder(recent));
+  const [order, setOrder] = useState<CardioActivity[]>(() =>
+    activitiesInOrder(recent.map((done) => done.activity)),
+  );
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<CardioProblem | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,20 +96,21 @@ export function CardioSheet({
     [],
   );
 
-  // Each time it opens: on the activity being changed, or on the tiles, in the order of the moment
-  // (so they never move under a finger).
+  // Each time it opens: on the activity being changed (or the figures to start from), or on the
+  // tiles, in the order of the moment (so they never move under a finger).
   useEffect(() => {
     if (!visible) return;
-    setDraft(entry ? draftFromCardio(entry) : emptyCardioDraft());
-    setStep(entry ? 'form' : 'pick');
-    setPicked(entry !== null);
-    setOrder(activitiesInOrder(recent));
+    const from = entry ?? initial;
+    setDraft(from ? draftFromCardio(from) : emptyCardioDraft());
+    setStep(from ? 'form' : 'pick');
+    setPicked(from !== null);
+    setOrder(activitiesInOrder(recent.map((done) => done.activity)));
     setProblem(null);
     setError(null);
     setSaving(false);
     // Opened afresh, not on every change to `recent` while it's showing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, entry]);
+  }, [visible, entry, initial]);
 
   const id = (suffix: string) => `${testID}-${suffix}`;
   const info = CARDIO_INFO[draft.activity];
@@ -159,6 +176,16 @@ export function CardioSheet({
   const primary = info.primary.filter((field) => field !== 'name');
   const optional = info.optional.filter((field) => field !== 'notes');
   const readout = step === 'form' ? cardioReadout(draft) : null;
+  // The last time this activity was done (an "Other" once it's named), to start from.
+  const last =
+    step === 'form' && (draft.activity !== 'other' || draft.name.trim())
+      ? lastTimeFor(recent, { activity: draft.activity, name: draft.name })
+      : null;
+  const useLast = () => {
+    if (!last) return;
+    setDraft(draftFromCardio(last));
+    setProblem(null);
+  };
 
   return (
     <BottomSheet visible={visible} onClose={onClose} testID={testID}>
@@ -199,9 +226,7 @@ export function CardioSheet({
         >
           <Text style={styles.caption}>{entry ? 'Edit Cardio' : 'Add Cardio'}</Text>
           <View testID={id('heading')} style={styles.heading}>
-            <View style={[styles.headingIcon, { backgroundColor: withAlpha(accentColor, 0.14) }]}>
-              <Feather name={info.icon} size={18} color={accentColor} />
-            </View>
+            <GlyphWell icon={info.icon} accentColor={accentColor} />
             <Text testID={id('activity')} style={styles.title} numberOfLines={1}>
               {info.label}
             </Text>
@@ -214,6 +239,26 @@ export function CardioSheet({
           </View>
 
           {info.primary.includes('name') ? fieldInput('name') : null}
+          {last ? (
+            <View testID={id('last')} style={styles.last}>
+              <View style={styles.lastText}>
+                <Text style={styles.lastLabel}>
+                  Last time · {formatRecentDate(last.performedAt)}
+                </Text>
+                <Text testID={id('last-figures')} style={styles.lastFigures}>
+                  {cardioDetails(last)}
+                </Text>
+              </View>
+              {entry ? null : (
+                <TextButton
+                  testID={id('use-last')}
+                  label="Use These"
+                  accessibilityLabel="Fill in last time's figures"
+                  onPress={useLast}
+                />
+              )}
+            </View>
+          ) : null}
           <FieldGrid>
             {[
               <TextInput
@@ -273,6 +318,8 @@ export function CardioSheet({
     </BottomSheet>
   );
 }
+
+const NO_RECENT: CardioHistoryEntry[] = [];
 
 function rowsOf<T>(items: T[], size: number): T[][] {
   const rows: T[][] = [];
@@ -433,13 +480,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  headingIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   fields: {
     gap: spacing.md,
   },
@@ -454,6 +494,29 @@ const styles = StyleSheet.create({
     ...typeScale.caption,
     color: colors.textMuted,
     marginTop: -spacing.xs,
+  },
+  // Last time's figures, on a quiet raised block, as a live exercise's Last Time is.
+  last: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceLift,
+  },
+  lastText: {
+    flex: 1,
+    gap: 2,
+  },
+  lastLabel: {
+    ...typeScale.caption,
+    color: colors.textSecondary,
+  },
+  lastFigures: {
+    ...typeScale.callout,
+    fontFamily: fonts.mono,
+    color: colors.textPrimary,
   },
   optional: {
     gap: spacing.md,

@@ -51,7 +51,7 @@ import {
 } from '../workouts/workoutQueries';
 import { formatCardDuration } from '../workouts/workoutFormat';
 import { workoutMuscleTabs, type MuscleTab } from '../workouts/workoutMuscleTabs';
-import { WorkoutCardioCard } from '../cardio/CardioSection';
+import { WorkoutCardio } from '../cardio/CardioSection';
 import { formatMinutes, workoutTimes } from '../cardio/workoutTime';
 import { setLabels } from '../workouts/dropSets';
 import { formatVolume, volumeInUnit } from '../workouts/workoutSummary';
@@ -64,6 +64,9 @@ import {
 } from '../workouts/groupWorkoutHistory';
 
 type Props = RootStackScreenProps<'WorkoutDetail'>;
+
+/** What a finished workout's chips show: every exercise, one muscle group's, or its cardio. */
+type DetailTab = MuscleTab | 'cardio';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -145,8 +148,9 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   // Everyone's workout in the group this one was part of; null when it wasn't one.
   const [people, setPeople] = useState<GroupWorkoutPerson[] | null>(null);
   const [selectedId, setSelectedId] = useState(workoutId);
-  // Which muscle group's exercises show, as in the live workout; All to start.
-  const [muscleTab, setMuscleTab] = useState<MuscleTab>('all');
+  // Which muscle group's exercises show, as in the live workout -- or its cardio alone; All to
+  // start.
+  const [muscleTab, setMuscleTab] = useState<DetailTab>('all');
   // In a group, the people who are this person's active clients: as their trainer, they can fix
   // a set logged wrong in that client's workout (as from the client's own page).
   const [clientIds, setClientIds] = useState<Set<string>>(new Set());
@@ -323,14 +327,21 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   // all of them from the start, since it's done. Another person's workout in a group has its own;
   // a tab they didn't train shows All.
   const muscleTabs = workoutMuscleTabs(shown.exercises);
-  const activeTab: MuscleTab =
-    muscleTab !== 'all' && muscleTabs.includes(muscleTab) ? muscleTab : 'all';
-  const shownExercises = loggedByExercise.filter(
-    ({ exercise }) => activeTab === 'all' || exercise.muscleGroup === activeTab,
-  );
   // Its cardio, and its time told apart: strength, cardio and the two together, rests and breaks
-  // in none of them (cardio/workoutTime.ts).
+  // in none of them (cardio/workoutTime.ts). With lifting too, Cardio is a tab of its own.
   const cardio = shown.cardio ?? [];
+  const activeTab: DetailTab =
+    muscleTab === 'cardio'
+      ? cardio.length > 0
+        ? 'cardio'
+        : 'all'
+      : muscleTab !== 'all' && muscleTabs.includes(muscleTab)
+        ? muscleTab
+        : 'all';
+  const shownExercises = loggedByExercise.filter(
+    ({ exercise }) =>
+      activeTab === 'all' || (activeTab !== 'cardio' && exercise.muscleGroup === activeTab),
+  );
   const times = workoutTimes({
     performedAt: shown.performedAt,
     completedAt: shown.completedAt,
@@ -400,7 +411,7 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
               : undefined
           }
           rightAction2={
-            isOwn && workout.completedAt && !clientId && loggedSetCount > 0
+            isOwn && workout.completedAt && !clientId && (loggedSetCount > 0 || cardio.length > 0)
               ? {
                   icon: 'share',
                   onPress: () => navigation.navigate('ShareWorkout', { workoutId }),
@@ -500,11 +511,12 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
       {focusComments ? comments : null}
 
       {muscleTabs.length > 0 ? (
-        <FilterChips<MuscleTab>
+        <FilterChips<DetailTab>
           testID="workout-detail-muscle-tabs"
           options={[
             { value: 'all', label: 'All' },
             ...muscleTabs.map((muscle) => ({ value: muscle, label: MUSCLE_GROUP_LABELS[muscle] })),
+            ...(cardio.length > 0 ? [{ value: 'cardio' as const, label: 'Cardio' }] : []),
           ]}
           value={activeTab}
           onChange={setMuscleTab}
@@ -623,12 +635,13 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         );
       })}
 
-      {cardio.length > 0 && activeTab === 'all' ? (
-        <WorkoutCardioCard
+      {cardio.length > 0 && (activeTab === 'all' || activeTab === 'cardio') ? (
+        <WorkoutCardio
           testID="workout-detail-cardio"
           entries={cardio}
           times={times}
           keyOf={(entry) => entry.id}
+          accentColor={theme.accent}
         />
       ) : null}
 

@@ -17,7 +17,7 @@ import { fetchAllExercises } from '../exercises/exerciseQueries';
 import {
   addCardio,
   deleteCardio,
-  fetchRecentCardioActivities,
+  fetchRecentCardio,
   settleStrengthTime,
   updateCardio,
 } from '../cardio/cardioQueries';
@@ -126,7 +126,7 @@ jest.mock('../cardio/cardioQueries', () => ({
   updateCardio: jest.fn(),
   deleteCardio: jest.fn(),
   settleStrengthTime: jest.fn(),
-  fetchRecentCardioActivities: jest.fn(),
+  fetchRecentCardio: jest.fn(),
 }));
 
 jest.mock('../progress/progressStatsQueries', () => ({
@@ -267,7 +267,7 @@ const baseWorkout = {
 beforeEach(async () => {
   // What a test typed into a set is kept on the device for the workout; each test starts clean.
   await clearLiveWorkoutDraft('w1');
-  (fetchRecentCardioActivities as jest.Mock).mockReset().mockResolvedValue([]);
+  (fetchRecentCardio as jest.Mock).mockReset().mockResolvedValue([]);
   (settleStrengthTime as jest.Mock).mockReset().mockResolvedValue(undefined);
   (fetchExerciseSettings as jest.Mock).mockReset().mockResolvedValue(new Map());
   (saveExerciseSetting as jest.Mock).mockReset();
@@ -321,9 +321,14 @@ beforeEach(async () => {
   mockReplace.mockClear();
 });
 
-/** The scrolling list of exercises -- not the muscle tabs, which scroll sideways above it. */
+/**
+ * The scrolling list of exercises, on the Lifting page -- not the muscle tabs, which scroll
+ * sideways above it, nor the Cardio page's.
+ */
 function exerciseList() {
-  const lists = screen.UNSAFE_getAllByType(ScrollView).filter((list) => !list.props.horizontal);
+  const lists = within(screen.getByTestId('active-workout-lifting-page'))
+    .UNSAFE_getAllByType(ScrollView)
+    .filter((list) => !list.props.horizontal);
   expect(lists).toHaveLength(1);
   return lists[0];
 }
@@ -556,8 +561,16 @@ describe('ActiveWorkoutScreen', () => {
     alert.mockRestore();
   });
 
-  it('adds cardio from the slim line at the top -- an activity tile, then its figures -- and changes it', async () => {
-    (fetchRecentCardioActivities as jest.Mock).mockResolvedValue(['rowing']);
+  it('adds cardio on its own page, a swipe (or a tab) from the lifting -- an activity tile, then its figures -- and changes it', async () => {
+    (fetchRecentCardio as jest.Mock).mockResolvedValue([
+      {
+        ...walk,
+        id: 'old-row',
+        workoutId: 'w0',
+        activity: 'rowing',
+        performedAt: '2025-12-30T10:00:00Z',
+      },
+    ]);
     (addCardio as jest.Mock).mockReset().mockImplementation(async (workoutId, values) => ({
       ...values,
       id: 'c1',
@@ -575,9 +588,18 @@ describe('ActiveWorkoutScreen', () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
     });
-    // In the workout's own widget, pinned above the exercises.
-    const hero = within(await screen.findByTestId('active-workout-hero'));
-    expect(hero.getByTestId('active-workout-cardio')).toBeTruthy();
+    // Its own page, beside the lifting -- the tabs under the workout's widget say so.
+    await screen.findByTestId('exercise-card-we1');
+    expect(screen.getByTestId('active-workout-pages')).toHaveTextContent(/Lifting.*Cardio/);
+    expect(screen.queryByTestId('active-workout-cardio-add')).toBeNull();
+    fireEvent.press(screen.getByTestId('active-workout-pages-cardio'));
+    expect(await screen.findByTestId('active-workout-cardio-empty')).toHaveTextContent(
+      /No cardio yet/,
+    );
+    // What was done lately is a tap from being done again.
+    expect(screen.getByTestId('active-workout-cardio-again-rowing')).toHaveTextContent(
+      /Rowing.*30 min · 3.2 km.*Last done Dec 30/,
+    );
 
     fireEvent.press(screen.getByTestId('active-workout-cardio-add'));
     // The activities first, what was done last leading; a tap goes straight to its figures.
@@ -624,7 +646,11 @@ describe('ActiveWorkoutScreen', () => {
       ),
     );
     expect(await screen.findByTestId('active-workout-cardio-entry-c1')).toHaveTextContent(
-      'Treadmill · 20 min',
+      /Treadmill.*20 min.*Time.*3 km.*Distance.*6.5.*Speed.*1%.*Incline/,
+    );
+    expect(screen.getByTestId('active-workout-pages-cardio')).toHaveTextContent(/Cardio.*1/);
+    expect(screen.getByTestId('active-workout-cardio-totals')).toHaveTextContent(
+      /20 min.*Time.*3 km.*Distance.*1.*Activity/,
     );
     // Cardio is never a set: the workout still has its two.
     expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('2');
@@ -652,7 +678,8 @@ describe('ActiveWorkoutScreen', () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
     });
-    fireEvent.press(await screen.findByTestId('active-workout-cardio-add'));
+    fireEvent.press(await screen.findByTestId('active-workout-pages-cardio'));
+    fireEvent.press(screen.getByTestId('active-workout-cardio-add'));
     fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-activity-treadmill'));
     fireEvent.changeText(screen.getByTestId('active-workout-cardio-sheet-duration'), '30');
     fireEvent.changeText(screen.getByTestId('active-workout-cardio-sheet-distance'), '5');
@@ -687,6 +714,7 @@ describe('ActiveWorkoutScreen', () => {
       wrapper: TestProviders,
     });
 
+    fireEvent.press(await screen.findByTestId('active-workout-pages-cardio'));
     fireEvent.press(await screen.findByTestId('active-workout-cardio-entry-c9'));
     fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-remove'));
 
@@ -710,7 +738,7 @@ describe('ActiveWorkoutScreen', () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
     });
-    await screen.findByTestId('active-workout-cardio-entry-c10');
+    await screen.findByTestId('active-workout-cardio-entry-c10', { includeHiddenElements: true });
 
     fireEvent.press(screen.getByTestId('complete-workout'));
 
@@ -736,7 +764,7 @@ describe('ActiveWorkoutScreen', () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
     });
-    await screen.findByTestId('active-workout-cardio-entry-c9');
+    await screen.findByTestId('active-workout-cardio-entry-c9', { includeHiddenElements: true });
 
     fireEvent.press(screen.getByTestId('complete-workout'));
 
@@ -2362,11 +2390,12 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     await renderReady();
 
     expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
-    // The workout's widget (pinned, its cardio line in it), then one per exercise.
+    // The workout's widget (pinned), then one per exercise -- and, a swipe away, the Cardio page.
     expect(screen.UNSAFE_queryAllByType(Card).map((card) => card.props.testID)).toEqual([
       'active-workout-hero',
       'exercise-card-we1',
       'exercise-card-we2',
+      'active-workout-cardio-empty',
     ]);
   });
 

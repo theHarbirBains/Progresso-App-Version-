@@ -122,6 +122,10 @@ export const shareCardBodyStyles = StyleSheet.create(
       paddingBottom: spacing.lg,
       gap: 6,
     },
+    // Cardio under the top sets: the two sections close together.
+    bodyFollowing: {
+      paddingTop: 0,
+    },
     sectionLabel: {
       ...typeScale.caption,
       letterSpacing: 2,

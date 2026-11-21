@@ -4,7 +4,11 @@ import {
   CARDIO_INFO,
   cardioDetails,
   cardioFieldsOf,
+  cardioFigures,
+  cardioKey,
   cardioName,
+  cardioTotals,
+  lastTimeFor,
   cardioReadout,
   cardioValues,
   draftFromCardio,
@@ -363,5 +367,46 @@ describe('the order Add Cardio offers them in', () => {
       'walking',
     ]);
     expect(activitiesInOrder([])).toEqual(CARDIO_ACTIVITIES);
+  });
+});
+
+describe('cardio figures, totals and last time', () => {
+  it('labels each saved figure, its time first, in the order the line reads', () => {
+    expect(
+      cardioFigures(
+        values({ distanceM: 3000, speedSetting: 6.5, inclinePercent: 2.5, resistanceLevel: null }),
+      ),
+    ).toEqual([
+      { key: 'time', label: 'Time', value: '20 min' },
+      { key: 'distance', label: 'Distance', value: '3 km' },
+      { key: 'speed', label: 'Speed', value: '6.5' },
+      { key: 'incline', label: 'Incline', value: '2.5%' },
+    ]);
+    // A run tells its pace; a swim its laps and pool.
+    expect(
+      cardioFigures(values({ activity: 'outdoor_run', durationSeconds: 1800, distanceM: 5000 })),
+    ).toContainEqual({ key: 'rate', label: 'Pace', value: '6:00 /km' });
+    expect(
+      cardioFigures(values({ activity: 'swimming', laps: 40, poolLengthM: 25 })).map((f) => f.key),
+    ).toEqual(['time', 'laps', 'pool']);
+  });
+
+  it("adds a workout's cardio up, a distance only from the ones that have one", () => {
+    expect(
+      cardioTotals([values({ distanceM: 3000 }), values({ activity: 'stairmaster' })]),
+    ).toEqual({ seconds: 2400, distanceM: 3000, count: 2 });
+    expect(cardioTotals([values({ activity: 'stairmaster' })]).distanceM).toBeNull();
+  });
+
+  it('finds the last time of the same activity -- an Other by its name', () => {
+    const recent = [
+      values({ activity: 'other', name: 'Jump Rope', durationSeconds: 600 }),
+      values({ activity: 'rowing' }),
+    ];
+    expect(lastTimeFor(recent, { activity: 'rowing' })).toBe(recent[1]);
+    expect(lastTimeFor(recent, { activity: 'other', name: ' jump rope ' })).toBe(recent[0]);
+    expect(lastTimeFor(recent, { activity: 'other', name: 'Sled Push' })).toBeNull();
+    expect(lastTimeFor(recent, { activity: 'cycling' })).toBeNull();
+    expect(cardioKey({ activity: 'other', name: 'Jump Rope' })).toBe('other:jump rope');
   });
 });

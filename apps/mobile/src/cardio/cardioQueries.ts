@@ -1,6 +1,11 @@
 import { fetchAllRows } from '../lib/fetchAllRows';
 import { supabase } from '../lib/supabase';
-import { CARDIO_ACTIVITIES, type CardioActivity, type CardioValues } from './cardioActivities';
+import {
+  CARDIO_ACTIVITIES,
+  cardioKey,
+  type CardioActivity,
+  type CardioValues,
+} from './cardioActivities';
 
 // A workout's cardio, straight to Supabase under own-row RLS like its sets
 // (20261208100000_workout_cardio.sql, 20261211100000_cardio_metrics.sql): the row's owner is
@@ -170,31 +175,59 @@ export async function settleStrengthTime(
   }
 }
 
-/**
- * The activities the person did last, most recent first, one each -- what Add Cardio offers
- * first. Their own only (a trainer can read a client's). Never fails a page: none on an error.
- */
-export async function fetchRecentCardioActivities(userId: string): Promise<CardioActivity[]> {
-  const { data, error } = await supabase
-    .from('workout_cardio')
-    .select('activity')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(40);
-  if (error) return [];
-  const seen: CardioActivity[] = [];
-  for (const row of (data ?? []) as { activity: CardioActivity }[]) {
-    if (CARDIO_ACTIVITIES.includes(row.activity) && !seen.includes(row.activity)) {
-      seen.push(row.activity);
-    }
-  }
-  return seen;
-}
-
 /** A cardio activity in the person's history: when its workout was, as well as its figures. */
 export interface CardioHistoryEntry extends CardioEntry {
   /** When the workout it's in started. */
   performedAt: string;
+}
+
+/** How far back the last time for each activity is looked for. */
+const RECENT_CARDIO_ROWS = 80;
+
+/**
+ * The last time the person did each activity (an "Other" by its name), most recent first, one
+ * each -- from their finished workouts (not a deleted one, nor `excludeWorkoutId`, the one going).
+ * What Add Cardio offers first, and what the live workout's Cardio page shows as Last Time. Their
+ * own only (a trainer can read a client's). Never fails a page: none on an error.
+ */
+export async function fetchRecentCardio(
+  userId: string,
+  excludeWorkoutId?: string,
+): Promise<CardioHistoryEntry[]> {
+  type Row = CardioRow & {
+    workouts: {
+      performed_at: string;
+      completed_at: string | null;
+      deleted_at: string | null;
+    } | null;
+  };
+  const { data, error } = await supabase
+    .from('workout_cardio')
+    .select(`${CARDIO_COLUMNS}, workouts(performed_at, completed_at, deleted_at)`)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(RECENT_CARDIO_ROWS);
+  if (error) return [];
+  const entries = ((data ?? []) as unknown as Row[])
+    .filter(
+      (row) =>
+        CARDIO_ACTIVITIES.includes(row.activity) &&
+        row.workout_id !== excludeWorkoutId &&
+        row.workouts?.completed_at &&
+        !row.workouts.deleted_at,
+    )
+    .map((row) => ({ ...toCardioEntry(row), performedAt: row.workouts!.performed_at }))
+    .sort(
+      (a, b) =>
+        b.performedAt.localeCompare(a.performedAt) || b.createdAt.localeCompare(a.createdAt),
+    );
+  const seen = new Set<string>();
+  return entries.filter((entry) => {
+    const key = cardioKey(entry);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**

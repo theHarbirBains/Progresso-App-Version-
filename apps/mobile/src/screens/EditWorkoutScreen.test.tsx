@@ -87,7 +87,7 @@ jest.mock('../cardio/cardioQueries', () => ({
   addCardio: jest.fn(),
   updateCardio: jest.fn(),
   deleteCardio: jest.fn(),
-  fetchRecentCardioActivities: jest.fn().mockResolvedValue([]),
+  fetchRecentCardio: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({

@@ -1,5 +1,15 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import {
+  Alert,
+  Animated,
+  ScrollView,
+  useWindowDimensions,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
+} from 'react-native';
 import { Card } from '../design/Card';
 import { Text } from '../design/Text';
 import { useAuth } from '../auth/AuthProvider';
@@ -25,9 +35,11 @@ import {
   updateCardio,
   type CardioEntry,
 } from '../cardio/cardioQueries';
-import { CardioStrip } from '../cardio/CardioSection';
 import { CardioSheet } from '../cardio/CardioSheet';
+import { LiveCardioPage } from '../cardio/LiveCardioPage';
 import { useRecentCardio } from '../cardio/useRecentCardio';
+import { useReduceMotionPreference } from '../navigation/navigationTransitions';
+import { LivePageTabs } from '../workouts/LivePageTabs';
 import { measurementTypeOf } from '../exercises/movementTypes';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
@@ -91,6 +103,13 @@ import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
 
 type Props = RootStackScreenProps<'ActiveWorkout'>;
 
+// The live workout's two pages, swiped between: the lifting, and the cardio.
+const LIFTING_PAGE = 0;
+const CARDIO_PAGE = 1;
+// The first live workout on a phone nudges toward the Cardio page and back, once.
+const SWIPE_HINT_KEY = '@progresso/liveCardioSwipeHint';
+const SWIPE_HINT_DISTANCE = 72;
+
 /** When the workout's last set was finished (warm-ups and drops too); null with none. */
 function lastFinishedSetAt(exercises: { sets: { completedAt: string | null }[] }[]): string | null {
   let last: string | null = null;
@@ -114,11 +133,15 @@ function lastFinishedSetAt(exercises: { sets: { completedAt: string | null }[] }
 //
 // Layout, built for one-handed use between sets: the header carries the
 // workout's name and muscles; under it a pinned strip keeps duration, total
-// sets and volume in view; the exercises scroll as plain blocks (each with
-// the last session's numbers right above the sets to log); and the one
-// filled button, Finish Workout, is pinned at the bottom. Add Exercise /
-// Create Custom / Cancel Workout come after the last exercise -- Cancel is
-// deliberately out of thumb range of Finish, and still asks for confirmation.
+// sets and volume in view, and under that the workout's two pages as tabs --
+// Lifting and Cardio -- swiped between (the first time, the lifting nudges
+// toward the cardio and back, once). On Lifting the exercises scroll as plain
+// blocks (each with the last session's numbers right above the sets to log);
+// on Cardio, each activity with what it was last time (LiveCardioPage). The
+// one filled button, Finish Workout, is pinned at the bottom of both. Add
+// Exercise / Create Custom / Cancel Workout come after the last exercise --
+// Cancel is deliberately out of thumb range of Finish, and still asks for
+// confirmation.
 // Every set write (create/update/reorder/remove) reuses the existing
 // direct-to-Supabase workoutQueries functions; nothing here talks to a new
 // endpoint.
@@ -143,10 +166,29 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const [completing, setCompleting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // The cardio sheet: open on an activity to change, or on none to add one.
-  const [cardioSheet, setCardioSheet] = useState<{ entry: CardioEntry | null } | null>(null);
-  // What the person did last, offered first when cardio is added -- read once as it opens.
-  const recentCardio = useRecentCardio();
+  // The cardio sheet: open on an activity to change, or on none to add one -- from scratch, or
+  // from a recent one's figures (the Cardio page's Do It Again).
+  const [cardioSheet, setCardioSheet] = useState<{
+    entry: CardioEntry | null;
+    initial?: CardioValues | null;
+  } | null>(null);
+  // The last time each activity was done, offered first when cardio is added and shown on the
+  // Cardio page as Last Time -- read once as it opens.
+  const recentCardio = useRecentCardio(workoutId);
+  // The page in view -- Lifting or Cardio -- and the pages' sideways scroll, which the tabs'
+  // underline follows.
+  const { width: pageWidth } = useWindowDimensions();
+  const reduceMotion = useReduceMotionPreference();
+  const [page, setPage] = useState(LIFTING_PAGE);
+  const pagerRef = useRef<ScrollViewInstance>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const onPagerScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+        useNativeDriver: true,
+      }),
+    [scrollX],
+  );
   // Add Exercise's previous exercises: read as the workout opens, with its split day's muscles.
   const previousExercises = usePreviousExercises(
     userId,
@@ -831,6 +873,48 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     );
   }
 
+  function goToPage(index: number) {
+    setPage(index);
+    pagerRef.current?.scrollTo({ x: index * pageWidth, animated: !reduceMotion });
+  }
+
+  function onPageSettled(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    if (pageWidth > 0) setPage(Math.round(event.nativeEvent.contentOffset.x / pageWidth));
+  }
+
+  // The first time a live workout is seen on this phone, the lifting slides toward the Cardio
+  // page and back: a hint that it's a swipe away. Once only, and never under Reduce Motion.
+  const loaded = workout !== null && !loading;
+  useEffect(() => {
+    if (!loaded || reduceMotion) return undefined;
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    void (async () => {
+      try {
+        if (await AsyncStorage.getItem(SWIPE_HINT_KEY)) return;
+        await AsyncStorage.setItem(SWIPE_HINT_KEY, '1');
+      } catch {
+        return;
+      }
+      if (cancelled) return;
+      timers.push(
+        setTimeout(() => {
+          if (cancelled) return;
+          pagerRef.current?.scrollTo({ x: SWIPE_HINT_DISTANCE, animated: true });
+          timers.push(
+            setTimeout(() => {
+              if (!cancelled) pagerRef.current?.scrollTo({ x: 0, animated: true });
+            }, 420),
+          );
+        }, 900),
+      );
+    })();
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+    };
+  }, [loaded, reduceMotion]);
+
   // Finish asks first, as a group's and a trainer's session do: a tap meant for something else
   // never ends the workout. Nothing about cardio -- it's added whenever the person likes.
   function confirmComplete() {
@@ -1100,17 +1184,51 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                   exercises={workout.exercises}
                   accentColor={theme.accent}
                 />
-                {/* Cardio, before, between or after the lifting: one slim line, always in view. */}
-                <CardioStrip
-                  testID="active-workout-cardio"
-                  entries={workout.cardio ?? []}
-                  keyOf={(entry) => entry.id}
-                  onAdd={() => setCardioSheet({ entry: null })}
-                  onEdit={(entry) => setCardioSheet({ entry })}
-                  accentColor={theme.accent}
-                />
               </Card>
             </View>
+            {/* The workout's two pages -- the tabs say it swipes, and go to either. */}
+            <View style={styles.pageTabs}>
+              <LivePageTabs
+                testID="active-workout-pages"
+                pages={[
+                  { key: 'lifting', label: 'Lifting', icon: 'list' },
+                  {
+                    key: 'cardio',
+                    label: 'Cardio',
+                    icon: 'activity',
+                    count: (workout.cardio ?? []).length,
+                  },
+                ]}
+                page={page}
+                scrollX={scrollX}
+                pageWidth={pageWidth}
+                onSelect={goToPage}
+                accentColor={theme.accent}
+              />
+            </View>
+          </View>
+        }
+      >
+        <Animated.ScrollView
+          ref={pagerRef}
+          testID="active-workout-pager"
+          horizontal
+          pagingEnabled
+          bounces={false}
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}
+          onScroll={onPagerScroll}
+          onMomentumScrollEnd={onPageSettled}
+          style={styles.flex}
+        >
+          {/* Lifting: the muscle tabs pinned over the exercises. */}
+          <View
+            testID="active-workout-lifting-page"
+            style={{ width: pageWidth }}
+            accessibilityElementsHidden={page !== LIFTING_PAGE}
+            importantForAccessibility={page === LIFTING_PAGE ? 'auto' : 'no-hide-descendants'}
+          >
             {muscleTabs.length > 0 ? (
               <View style={styles.muscleTabs}>
                 <FilterChips<MuscleTab>
@@ -1129,92 +1247,117 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                 />
               </View>
             ) : null}
-          </View>
-        }
-      >
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <RiseInStack>
-            {(error ?? planError) ? (
-              <Text testID="active-workout-error" style={styles.errorText}>
-                {error ?? planError}
-              </Text>
-            ) : null}
-
-            {workout.exercises.length === 0 && !guidedPlan ? (
-              <View style={styles.emptyWrap}>
-                <EmptyState
-                  testID="active-workout-empty"
-                  title="Add your first exercise or cardio to get started."
-                />
-              </View>
-            ) : null}
-
-            {guidedPlan ? (
-              <>
-                <FoldedExercises
-                  testID="active-workout-done"
-                  exercises={before}
-                  onOpen={(id) => void openExercise(id)}
-                />
-                {focused && onTab(focused)
-                  ? exerciseCard(focused, workout.exercises.indexOf(focused))
-                  : null}
-                <FoldedExercises
-                  testID="active-workout-later"
-                  exercises={after}
-                  onOpen={(id) => void openExercise(id)}
-                />
-                {remainingOnTab.length > 0 ? (
-                  <UpNextCard
-                    testID="active-workout-up-next"
-                    remaining={remainingOnTab}
-                    onStart={(planned) => void startPlanned(planned)}
-                    busy={startingNext}
-                    accentColor={theme.accent}
-                  />
-                ) : remaining.length === 0 ? (
-                  <PlanDone testID="active-workout-plan-done" />
+            <ScrollView
+              style={styles.flex}
+              contentContainerStyle={styles.content}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <RiseInStack>
+                {(error ?? planError) ? (
+                  <Text testID="active-workout-error" style={styles.errorText}>
+                    {error ?? planError}
+                  </Text>
                 ) : null}
-              </>
-            ) : (
-              shownExercises.map(({ exercise, index }, shownAt) =>
-                exerciseCard(
-                  exercise,
-                  index,
-                  shownAt > 0
-                    ? getMoveHandler(index, shownExercises[shownAt - 1].index)
-                    : undefined,
-                  shownAt < shownExercises.length - 1
-                    ? getMoveHandler(index, shownExercises[shownAt + 1].index)
-                    : undefined,
-                ),
-              )
-            )}
 
-            <View style={styles.endActions}>
-              <AddExerciseButton
-                testID="active-workout-add-exercise"
-                onPress={() => setPickerOpen(true)}
+                {workout.exercises.length === 0 && !guidedPlan ? (
+                  <View style={styles.emptyWrap}>
+                    <EmptyState
+                      testID="active-workout-empty"
+                      title="Add your first exercise to get started."
+                      description="Doing cardio? Swipe left, or tap Cardio above."
+                    />
+                  </View>
+                ) : null}
+
+                {guidedPlan ? (
+                  <>
+                    <FoldedExercises
+                      testID="active-workout-done"
+                      exercises={before}
+                      onOpen={(id) => void openExercise(id)}
+                    />
+                    {focused && onTab(focused)
+                      ? exerciseCard(focused, workout.exercises.indexOf(focused))
+                      : null}
+                    <FoldedExercises
+                      testID="active-workout-later"
+                      exercises={after}
+                      onOpen={(id) => void openExercise(id)}
+                    />
+                    {remainingOnTab.length > 0 ? (
+                      <UpNextCard
+                        testID="active-workout-up-next"
+                        remaining={remainingOnTab}
+                        onStart={(planned) => void startPlanned(planned)}
+                        busy={startingNext}
+                        accentColor={theme.accent}
+                      />
+                    ) : remaining.length === 0 ? (
+                      <PlanDone testID="active-workout-plan-done" />
+                    ) : null}
+                  </>
+                ) : (
+                  shownExercises.map(({ exercise, index }, shownAt) =>
+                    exerciseCard(
+                      exercise,
+                      index,
+                      shownAt > 0
+                        ? getMoveHandler(index, shownExercises[shownAt - 1].index)
+                        : undefined,
+                      shownAt < shownExercises.length - 1
+                        ? getMoveHandler(index, shownExercises[shownAt + 1].index)
+                        : undefined,
+                    ),
+                  )
+                )}
+
+                <View style={styles.endActions}>
+                  <AddExerciseButton
+                    testID="active-workout-add-exercise"
+                    onPress={() => setPickerOpen(true)}
+                  />
+                  <CreateCustomExerciseButton
+                    testID="active-workout-create-custom"
+                    onPress={() => setCustomExerciseOpen(true)}
+                  />
+                  <TextButton
+                    testID="cancel-workout"
+                    label={cancelling ? 'Cancelling…' : 'Cancel Workout'}
+                    destructive
+                    onPress={handleCancelWorkout}
+                    disabled={cancelling || completing}
+                  />
+                </View>
+              </RiseInStack>
+            </ScrollView>
+          </View>
+
+          {/* Cardio: each activity with its last time, and + Add Cardio. */}
+          <View
+            testID="active-workout-cardio-page"
+            style={{ width: pageWidth }}
+            accessibilityElementsHidden={page !== CARDIO_PAGE}
+            importantForAccessibility={page === CARDIO_PAGE ? 'auto' : 'no-hide-descendants'}
+          >
+            <ScrollView
+              style={styles.flex}
+              contentContainerStyle={styles.content}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <LiveCardioPage
+                testID="active-workout-cardio"
+                entries={workout.cardio ?? []}
+                recent={recentCardio}
+                onAdd={() => setCardioSheet({ entry: null })}
+                onEdit={(entry) => setCardioSheet({ entry })}
+                onRepeat={(done) => setCardioSheet({ entry: null, initial: done })}
+                accentColor={theme.accent}
               />
-              <CreateCustomExerciseButton
-                testID="active-workout-create-custom"
-                onPress={() => setCustomExerciseOpen(true)}
-              />
-              <TextButton
-                testID="cancel-workout"
-                label={cancelling ? 'Cancelling…' : 'Cancel Workout'}
-                destructive
-                onPress={handleCancelWorkout}
-                disabled={cancelling || completing}
-              />
-            </View>
-          </RiseInStack>
-        </ScrollView>
+            </ScrollView>
+          </View>
+        </Animated.ScrollView>
 
         {/* A group is only started before a workout begins (New Workout > Start a Group), never
             from one already going. */}
@@ -1259,6 +1402,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         testID="active-workout-cardio-sheet"
         visible={cardioSheet !== null}
         entry={cardioSheet?.entry ?? null}
+        initial={cardioSheet?.initial ?? null}
         recent={recentCardio}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}

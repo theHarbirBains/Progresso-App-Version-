@@ -6,7 +6,9 @@ import { Card } from '../design/Card';
 import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
 import { colors, minTouchTarget, spacing } from '../design/theme';
-import { cardioDetails, cardioName } from '../cardio/cardioActivities';
+import { GlyphWell } from '../design/GlyphWell';
+import { CARDIO_INFO, cardioDetails, cardioName } from '../cardio/cardioActivities';
+import { useAppTheme } from '../theme/appThemeContext';
 import type { EnrichedWorkoutSummary } from '../workouts/workoutHistoryEnrichment';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
@@ -74,6 +76,7 @@ export function WorkoutFeedCard({
 }: Props) {
   const cardio = workout.cardio ?? [];
   const cardioOnly = cardio.length > 0 && workout.completedSetCount === 0;
+  const accent = useAppTheme().accent.accent;
   return (
     <Card testID={`${idPrefix}-${workout.id}`} onPress={onPress}>
       <View style={styles.metaRow}>
@@ -174,14 +177,21 @@ export function WorkoutFeedCard({
       {cardio.length > 0 ? (
         <View testID={`${idPrefix}-${workout.id}-cardio`} style={cardioListStyle}>
           {cardio.map((entry, index) => (
-            <Text
+            <View
               key={index}
-              style={styles.itemSubtitle}
-              numberOfLines={1}
+              style={cardioRowStyle}
+              accessible
               accessibilityLabel={`${cardioName(entry)}: ${cardioDetails(entry)}`}
             >
-              {cardioName(entry)} · {cardioDetails(entry)}
-            </Text>
+              <GlyphWell
+                icon={CARDIO_INFO[entry.activity].icon}
+                accentColor={accent}
+                size={24}
+              />
+              <Text style={styles.itemSubtitle} numberOfLines={1}>
+                <Text style={cardioNameStyle}>{cardioName(entry)}</Text> · {cardioDetails(entry)}
+              </Text>
+            </View>
           ))}
         </View>
       ) : null}
@@ -199,8 +209,11 @@ export function WorkoutFeedCard({
   );
 }
 
-// The cardio lines under the top sets: a little room above, like the strip's.
+// The cardio lines under the top sets: a little room above, each its activity's glyph in a small
+// accent well beside its name (in the primary colour) and figures.
 const cardioListStyle = { marginTop: spacing.sm, gap: spacing.xs } as const;
+const cardioRowStyle = { flexDirection: 'row', alignItems: 'center', gap: spacing.sm } as const;
+const cardioNameStyle = { color: colors.textPrimary } as const;
 
 // A bare glyph with a full 44pt target, like the live workout's reorder/remove glyphs. Pulled
 // toward the card's edge so the glyph lines up with its content.

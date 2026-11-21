@@ -56,8 +56,9 @@ describe('WorkoutFeedCard', () => {
     expect(screen.getByTestId('card-w1-active')).toHaveTextContent(/1h 5m/);
     expect(screen.queryByTestId('card-w1-duration')).toBeNull();
     expect(screen.getByTestId('card-w1-sets')).toHaveTextContent(/12/);
+    // Its activity's glyph beside it, then its name and figures.
     expect(screen.getByTestId('card-w1-cardio')).toHaveTextContent(
-      'Outdoor Running · 30 min · 5 km · 6:00 /km',
+      /Outdoor Running · 30 min · 5 km · 6:00 \/km$/,
     );
   });
 

@@ -1,12 +1,13 @@
-import { Feather } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SecondaryButton, TextButton } from '../design/Button';
+import { StyleSheet, View } from 'react-native';
+import { SecondaryButton } from '../design/Button';
 import { Card } from '../design/Card';
 import { ListRow } from '../design/ListRow';
 import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
-import { colors, radii, spacing, typeScale } from '../design/theme';
-import { cardioDetails, cardioName, formatCardioTime, type CardioValues } from './cardioActivities';
+import { colors, spacing, typeScale, widgetGap } from '../design/theme';
+import { GlyphWell } from '../design/GlyphWell';
+import { CardioActivityCard } from './CardioCards';
+import { cardioDetails, cardioName, type CardioValues } from './cardioActivities';
 import { formatMinutes, type WorkoutTimes } from './workoutTime';
 
 /** The cardio rows a page shows: one per activity, its name over its figures (and any note). */
@@ -82,91 +83,39 @@ export function CardioSection<T extends CardioValues>({
 }
 
 /**
- * The live workout's cardio: one slim line at the foot of its pinned widget, under the rep range,
- * so it's always a tap away without pushing the lifting down -- its activities as small pills
- * (each opens to change or remove), sideways when there are many, and + Add. Before, between or
- * after the lifting, as many as the person likes; never required.
+ * A finished workout's cardio -- yours or a friend's -- and its time, told apart: each activity as
+ * its own widget (CardioActivityCard: its glyph, name and figures), then a Time widget --
+ * Strength Training, each activity's time and Total Active Training, rests and breaks in none of
+ * them -- and the session's own time, start to finish, under them.
  */
-export function CardioStrip<T extends CardioValues>({
+export function WorkoutCardio<T extends CardioValues>({
   entries,
-  onAdd,
-  onEdit,
+  times,
   keyOf,
   accentColor,
   testID,
 }: {
   entries: T[];
-  onAdd: () => void;
-  onEdit: (entry: T) => void;
+  times: WorkoutTimes;
   keyOf: (entry: T) => string;
   accentColor: string;
   testID: string;
 }) {
   return (
-    <View testID={testID} style={styles.strip}>
-      <Feather name="activity" size={16} color={accentColor} />
-      <Text style={styles.stripLabel}>Cardio</Text>
-      {entries.length === 0 ? (
-        <Text style={styles.stripEmpty} numberOfLines={1}>
-          None yet
-        </Text>
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.pills}
-          contentContainerStyle={styles.pillsContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {entries.map((entry) => (
-            <Pressable
-              key={keyOf(entry)}
-              testID={`${testID}-entry-${keyOf(entry)}`}
-              onPress={() => onEdit(entry)}
-              hitSlop={4}
-              style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}
-              accessibilityRole="button"
-              accessibilityLabel={`${cardioName(entry)}: ${cardioDetails(entry)}. Change or remove`}
-            >
-              <Text style={styles.pillText} numberOfLines={1}>
-                {cardioName(entry)} · {formatCardioTime(entry.durationSeconds)}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      )}
-      <TextButton
-        testID={`${testID}-add`}
-        label="+ Add"
-        accessibilityLabel="Add Cardio"
-        onPress={onAdd}
-      />
-    </View>
-  );
-}
-
-/**
- * A finished workout's cardio and its time, told apart: each activity with its figures, then
- * Strength Training, each activity's time and Total Active Training -- rests and breaks in none of
- * them -- and the session's own time, start to finish, under them.
- */
-export function WorkoutCardioCard<T extends CardioValues>({
-  entries,
-  times,
-  keyOf,
-  testID,
-}: {
-  entries: T[];
-  times: WorkoutTimes;
-  keyOf: (entry: T) => string;
-  testID: string;
-}) {
-  return (
-    <Card testID={testID}>
-      <SectionHeader label="Cardio" />
-      <CardioRows testID={`${testID}-entry`} entries={entries} keyOf={keyOf} />
-      <View style={styles.table}>
-        <SectionHeader label="Time" />
+    <View testID={testID} style={styles.stack}>
+      {entries.map((entry) => (
+        <CardioActivityCard
+          key={keyOf(entry)}
+          testID={`${testID}-entry-${keyOf(entry)}`}
+          entry={entry}
+          accentColor={accentColor}
+        />
+      ))}
+      <Card testID={`${testID}-times`}>
+        <View style={styles.timeHeading}>
+          <GlyphWell icon="clock" accentColor={accentColor} />
+          <Text style={styles.timeTitle}>Time</Text>
+        </View>
         {times.strengthSeconds !== null ? (
           <TimeRow
             testID={`${testID}-strength`}
@@ -198,8 +147,8 @@ export function WorkoutCardioCard<T extends CardioValues>({
             quiet
           />
         ) : null}
-      </View>
-    </Card>
+      </Card>
+    </View>
   );
 }
 
@@ -234,45 +183,18 @@ function TimeRow({
 }
 
 const styles = StyleSheet.create({
-  // As the rep range's row above it: a hairline, a glyph, the words and a quiet action.
-  strip: {
+  // A finished workout's cardio widgets, as far apart as every page's.
+  stack: {
+    gap: widgetGap,
+  },
+  timeHeading: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-    paddingTop: spacing.xs,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
+    gap: spacing.md,
+    marginBottom: spacing.xs,
   },
-  stripLabel: {
-    ...typeScale.callout,
-    color: colors.textSecondary,
-  },
-  stripEmpty: {
-    ...typeScale.caption,
-    color: colors.textMuted,
-    flex: 1,
-  },
-  pills: {
-    flex: 1,
-  },
-  pillsContent: {
-    gap: spacing.xs,
-    alignItems: 'center',
-  },
-  pill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.surfaceLift,
-  },
-  pillPressed: {
-    opacity: 0.7,
-  },
-  pillText: {
-    ...typeScale.caption,
+  timeTitle: {
+    ...typeScale.cardTitle,
     color: colors.textPrimary,
   },
   note: {
@@ -282,9 +204,6 @@ const styles = StyleSheet.create({
   },
   add: {
     marginTop: spacing.sm,
-  },
-  table: {
-    marginTop: spacing.md,
   },
   timeRow: {
     flexDirection: 'row',

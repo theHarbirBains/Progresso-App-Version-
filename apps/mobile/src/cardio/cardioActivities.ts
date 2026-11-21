@@ -432,6 +432,98 @@ export function cardioDetails(entry: CardioValues): string {
   return parts.join(' · ');
 }
 
+/** One of an activity's figures as a page lays it out: "Distance" over "5 km". */
+export interface CardioFigure {
+  key: string;
+  label: string;
+  value: string;
+}
+
+/**
+ * Its figures one by one, labelled, in the same order as `cardioDetails` -- its time first, then
+ * only what was saved (a figure an older version of the activity asked for still shows).
+ */
+export function cardioFigures(entry: CardioValues): CardioFigure[] {
+  const info = CARDIO_INFO[entry.activity];
+  const figures: CardioFigure[] = [
+    { key: 'time', label: 'Time', value: formatCardioTime(entry.durationSeconds) },
+  ];
+  if (known(entry.distanceM)) {
+    figures.push({ key: 'distance', label: 'Distance', value: formatKm(entry.distanceM) });
+  }
+  if (info.rate && info.showsRate) {
+    const speed = averageSpeedKmh(entry);
+    const rate = speed === null ? null : formatRate(speed, info.rate);
+    if (rate) figures.push({ key: 'rate', label: rateLabel(info.rate), value: rate });
+  } else if (known(entry.speedKmh)) {
+    figures.push({ key: 'rate', label: 'Speed', value: formatKmh(entry.speedKmh) });
+  }
+  if (known(entry.speedSetting)) {
+    figures.push({ key: 'speed', label: 'Speed', value: trimNumber(entry.speedSetting, 1) });
+  }
+  if (known(entry.inclinePercent)) {
+    figures.push({
+      key: 'incline',
+      label: 'Incline',
+      value: `${trimNumber(entry.inclinePercent, 1)}%`,
+    });
+  }
+  if (known(entry.resistanceLevel)) {
+    figures.push({ key: 'level', label: info.levelLabel, value: String(entry.resistanceLevel) });
+  }
+  if (known(entry.floors)) {
+    figures.push({ key: 'floors', label: 'Floors', value: entry.floors.toLocaleString('en-US') });
+  }
+  if (known(entry.steps)) {
+    figures.push({ key: 'steps', label: 'Steps', value: entry.steps.toLocaleString('en-US') });
+  }
+  if (known(entry.strokeRate)) {
+    figures.push({ key: 'strokeRate', label: 'Stroke rate', value: `${entry.strokeRate} spm` });
+  }
+  if (known(entry.laps)) {
+    figures.push({ key: 'laps', label: 'Laps', value: entry.laps.toLocaleString('en-US') });
+  }
+  if (known(entry.poolLengthM)) {
+    figures.push({ key: 'pool', label: 'Pool', value: `${trimNumber(entry.poolLengthM, 2)} m` });
+  }
+  return figures;
+}
+
+/** A workout's cardio all together: its time, the distance of the ones with one, and how many. */
+export function cardioTotals(entries: CardioValues[]): {
+  seconds: number;
+  /** Null when none of them has a distance. */
+  distanceM: number | null;
+  count: number;
+} {
+  let seconds = 0;
+  let distanceM: number | null = null;
+  for (const entry of entries) {
+    seconds += entry.durationSeconds;
+    if (known(entry.distanceM)) distanceM = (distanceM ?? 0) + entry.distanceM;
+  }
+  return { seconds, distanceM, count: entries.length };
+}
+
+/** Which activity two entries are "the same" as: an "Other" by its name, the rest by their activity. */
+export function cardioKey(entry: { activity: CardioActivity; name?: string | null }): string {
+  return entry.activity === 'other'
+    ? `other:${(entry.name ?? '').trim().toLowerCase()}`
+    : entry.activity;
+}
+
+/**
+ * The last time an activity like this one (an "Other" by its name) was done, from the activities
+ * done lately, most recent first (useRecentCardio) -- if it ever was.
+ */
+export function lastTimeFor<T extends { activity: CardioActivity; name?: string | null }>(
+  recent: T[],
+  entry: { activity: CardioActivity; name?: string | null },
+): T | null {
+  const key = cardioKey(entry);
+  return recent.find((candidate) => cardioKey(candidate) === key) ?? null;
+}
+
 /**
  * The seconds a typed cardio time stands for: whole or part minutes ("20", "20.5"), or
  * minutes:seconds ("20:30"), hours too ("1:05:00"). Null when it isn't one.

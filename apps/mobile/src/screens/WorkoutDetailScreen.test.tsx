@@ -652,8 +652,12 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     // Saved before calories went and treadmill speeds were the machine's number: its calories
     // stay unshown, its speed in km/h -- kilometres for everyone.
     expect(screen.getByTestId('workout-detail-cardio-entry-c1')).toHaveTextContent(
-      /Treadmill.*15 min · 2 km · 8 km\/h · 3% incline$/,
+      /Treadmill.*15 min.*Time.*2 km.*Distance.*8 km\/h.*Speed.*3%.*Incline$/,
     );
+    // Cardio is a tab of its own beside the muscles: alone, it shows only the cardio.
+    fireEvent.press(within(screen.getByTestId('workout-detail-muscle-tabs')).getByText('Cardio'));
+    expect(screen.queryByTestId('exercise-card-we1')).toBeNull();
+    expect(screen.getByTestId('workout-detail-cardio-entry-c1')).toBeTruthy();
     expect(screen.queryByText(/\bcal\b/)).toBeNull();
     expect(screen.getByTestId('workout-detail-cardio-strength')).toHaveTextContent(/40 min/);
     expect(screen.getByTestId('workout-detail-cardio-time-c1')).toHaveTextContent(/15 min/);

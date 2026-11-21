@@ -7,8 +7,9 @@ import { Text } from '../design/Text';
 import { colors } from '../design/theme';
 import { fromKg, roundWeight } from '../lib/units';
 import { withAlpha } from '../theme/accentColor';
+import { formatCardioTime, formatKm } from '../cardio/cardioActivities';
 import { formatSetValues } from '../workouts/setValues';
-import type { ShareCardData, ShareTopSet } from './shareCardData';
+import type { ShareCardData, ShareCardio, ShareTopSet } from './shareCardData';
 import { shareCardBodyStyles as card, shareCardStyles as styles } from './shareCardStyles';
 import { CARD_WIDTH, STORY_CANVAS, STORY_SAFE_AREA, cardPt } from './storyLayout';
 import { useAppTheme } from '../theme/appThemeContext';
@@ -37,6 +38,10 @@ const COMPACT_MAX_ROWS = 12;
 const HERO_HEIGHT = 171;
 const COMPACT_HERO_HEIGHT = 120;
 const COMPACT_ROW_GAP = 3;
+// With both top sets and cardio, the second section's label takes this much of the room.
+const SECOND_SECTION_SPACE = 22;
+// At most this many cardio rows (past it, the last says how many more); the top sets get the rest.
+const MAX_CARDIO_ROWS = 3;
 
 const STAT_ICON_SIZE = cardPt(18);
 // The logo the app opens with (LaunchScreen's mark), cropped tight to the
@@ -79,7 +84,7 @@ function Stat({
   first,
   testID,
 }: {
-  icon: 'clock' | 'list' | 'layers' | 'bar-chart-2';
+  icon: 'clock' | 'list' | 'layers' | 'bar-chart-2' | 'activity' | 'map-pin';
   value: string;
   label: string;
   first?: boolean;
@@ -114,6 +119,33 @@ function Thumb({ set, size }: { set: ShareTopSet; size: number }) {
   );
 }
 
+// A cardio activity's glyph in a round well of the accent -- the app's own mark for it.
+function CardioThumb({
+  entry,
+  size,
+  accentColor,
+}: {
+  entry: ShareCardio;
+  size: number;
+  accentColor: string;
+}) {
+  return (
+    <View
+      style={[
+        card.thumb,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: withAlpha(accentColor, 0.14),
+        },
+      ]}
+    >
+      <Feather name={entry.icon} size={Math.round(size * 0.5)} color={accentColor} />
+    </View>
+  );
+}
+
 // The shareable workout image: the card on a 9:16 story canvas of the app
 // theme's own plain background colour -- no photo, no gradient -- so it looks
 // like the app it came from. This whole canvas is what gets captured -- the
@@ -140,19 +172,30 @@ const STORY_SAFE_AREA_STYLE = {
 } as const;
 
 // The card, plain: the brand mark, date and the workout's own name (nothing under it -- the name is the user's); then the session as
-// four stats (duration, exercises, sets, volume), and every exercise's top set
-// in workout order, a personal record marked quietly in the accent. Everything is real logged data in the user's unit;
-// nothing is estimated, and no account detail (name, email, id) is ever drawn.
+// four stats (duration -- or, with cardio, the active training -- exercises, sets, volume; cardio
+// alone: its time, activities and distance), every exercise's top set in workout order, a personal
+// record marked quietly in the accent, and its cardio, each activity its glyph, name and figures.
+// Everything is real logged data in the user's unit (cardio in km, for everyone); nothing is
+// estimated, and no account detail (name, email, id) is ever drawn.
 // Nothing on it looks tappable (no chevrons, no "View All") -- it's a picture.
 export function ShareCard({ data, weightUnit, accentColor }: Props) {
-  const compact = data.topSets.length >= COMPACT_FROM;
-  const maxRows = compact ? COMPACT_MAX_ROWS : MAX_ROWS;
+  const cardio = data.cardio ?? [];
+  const cardioOverflow = cardio.length > MAX_CARDIO_ROWS;
+  const shownCardio = cardioOverflow ? cardio.slice(0, MAX_CARDIO_ROWS - 1) : cardio;
+  const cardioRowCount = shownCardio.length + (cardioOverflow ? 1 : 0);
+  const compact = data.topSets.length + cardioRowCount >= COMPACT_FROM;
+  const maxRows = (compact ? COMPACT_MAX_ROWS : MAX_ROWS) - cardioRowCount;
   const overflow = data.topSets.length > maxRows;
   const shown = overflow ? data.topSets.slice(0, maxRows - 1) : data.topSets;
   const hiddenCount = data.topSets.length - shown.length;
-  const rowCount = shown.length + (overflow ? 1 : 0);
-  // The compact card's shorter header gives its room to the list.
-  const space = TOP_SETS_SPACE + (compact ? HERO_HEIGHT - COMPACT_HERO_HEIGHT : 0);
+  const rowCount = shown.length + (overflow ? 1 : 0) + cardioRowCount;
+  const bothSections = shown.length > 0 && cardioRowCount > 0;
+  const cardioOnly = data.topSets.length === 0 && cardio.length > 0;
+  // The compact card's shorter header gives its room to the list; a second section's label takes some.
+  const space =
+    TOP_SETS_SPACE +
+    (compact ? HERO_HEIGHT - COMPACT_HERO_HEIGHT : 0) -
+    (bothSections ? SECOND_SECTION_SPACE : 0);
   const gap = compact ? COMPACT_ROW_GAP : ROW_GAP;
   const rowHeight = Math.min(
     MAX_ROW_HEIGHT,
@@ -191,32 +234,73 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
         </View>
       </View>
 
-      <View testID="share-card-stats" style={card.stats}>
-        {/* Logged with no duration (Log Past Workout's is optional): none shown. */}
-        {data.durationMinutes !== null ? (
+      {cardioOnly ? (
+        // Cardio alone has no exercises, sets or volume: its time, activities and distance.
+        <View testID="share-card-stats" style={card.stats}>
           <Stat
             first
             icon="clock"
-            value={`${data.durationMinutes} min`}
-            label="Duration"
-            testID="share-card-duration"
+            value={formatCardioTime(data.cardioSeconds)}
+            label="Time"
+            testID="share-card-cardio-time"
           />
-        ) : null}
-        <Stat
-          first={data.durationMinutes === null}
-          icon="list"
-          value={String(data.exerciseCount)}
-          label="Exercises"
-          testID="share-card-exercises"
-        />
-        <Stat icon="layers" value={String(data.totalSets)} label="Sets" testID="share-card-sets" />
-        <Stat
-          icon="bar-chart-2"
-          value={formatVolume(data.totalVolumeKg, weightUnit)}
-          label={`Volume (${weightUnit})`}
-          testID="share-card-volume"
-        />
-      </View>
+          <Stat
+            icon="activity"
+            value={String(cardio.length)}
+            label={cardio.length === 1 ? 'Activity' : 'Activities'}
+            testID="share-card-activities"
+          />
+          {data.cardioDistanceM !== null ? (
+            <Stat
+              icon="map-pin"
+              value={formatKm(data.cardioDistanceM)}
+              label="Distance"
+              testID="share-card-distance"
+            />
+          ) : null}
+        </View>
+      ) : (
+        <View testID="share-card-stats" style={card.stats}>
+          {/* With cardio, the active training -- strength and cardio -- never the session's rests;
+              logged with no duration (Log Past Workout's is optional), none shown. */}
+          {data.activeMinutes != null ? (
+            <Stat
+              first
+              icon="clock"
+              value={`${data.activeMinutes} min`}
+              label="Active"
+              testID="share-card-active"
+            />
+          ) : data.durationMinutes !== null ? (
+            <Stat
+              first
+              icon="clock"
+              value={`${data.durationMinutes} min`}
+              label="Duration"
+              testID="share-card-duration"
+            />
+          ) : null}
+          <Stat
+            first={data.activeMinutes == null && data.durationMinutes === null}
+            icon="list"
+            value={String(data.exerciseCount)}
+            label="Exercises"
+            testID="share-card-exercises"
+          />
+          <Stat
+            icon="layers"
+            value={String(data.totalSets)}
+            label="Sets"
+            testID="share-card-sets"
+          />
+          <Stat
+            icon="bar-chart-2"
+            value={formatVolume(data.totalVolumeKg, weightUnit)}
+            label={`Volume (${weightUnit})`}
+            testID="share-card-volume"
+          />
+        </View>
+      )}
 
       {shown.length > 0 ? (
         <View testID="share-card-top-sets" style={card.body}>
@@ -267,6 +351,45 @@ export function ShareCard({ data, weightUnit, accentColor }: Props) {
                   style={[card.more, compact && card.liftNameCompact]}
                 >
                   {`+${hiddenCount} more`}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
+      {shownCardio.length > 0 ? (
+        <View testID="share-card-cardio" style={[card.body, bothSections && card.bodyFollowing]}>
+          <Text style={card.sectionLabel}>CARDIO</Text>
+          <View style={[card.rows, compact && { gap: cardPt(COMPACT_ROW_GAP) }]}>
+            {shownCardio.map((entry, index) => (
+              <View
+                key={`${entry.name}-${index}`}
+                testID={`share-card-cardio-row-${index}`}
+                style={[card.row, compact && card.rowCompact, { height: cardPt(rowHeight) }]}
+              >
+                {compact ? null : (
+                  <CardioThumb entry={entry} size={thumbSize} accentColor={accentColor} />
+                )}
+                <Text style={[card.liftName, compact && card.liftNameCompact]} numberOfLines={1}>
+                  {entry.name}
+                </Text>
+                <Text
+                  testID={`share-card-cardio-${index}`}
+                  style={[card.liftValue, compact && card.liftValueCompact]}
+                  numberOfLines={1}
+                >
+                  {entry.figures}
+                </Text>
+              </View>
+            ))}
+            {cardioOverflow ? (
+              <View style={[card.moreRow, { height: cardPt(rowHeight) }]}>
+                <Text
+                  testID="share-card-cardio-more"
+                  style={[card.more, compact && card.liftNameCompact]}
+                >
+                  {`+${cardio.length - shownCardio.length} more`}
                 </Text>
               </View>
             ) : null}

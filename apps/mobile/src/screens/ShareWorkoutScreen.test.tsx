@@ -205,6 +205,75 @@ describe('ShareWorkoutScreen loading and preview', () => {
     await settle();
   });
 
+  it("gives cardio its own section -- each activity its glyph, name and figures -- and the active time in Duration's place", async () => {
+    mockFetchShareCardData.mockResolvedValue({
+      ...cardData,
+      activeMinutes: 65,
+      cardio: [
+        {
+          activity: 'outdoor_run',
+          icon: 'wind',
+          name: 'Outdoor Running',
+          figures: '30 min · 5 km · 6:00 /km',
+        },
+      ],
+      cardioSeconds: 1800,
+      cardioDistanceM: 5000,
+    });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('share-card-active')).toHaveTextContent('65 min');
+    expect(screen.getByTestId('share-card-stats')).toHaveTextContent(/Active/);
+    expect(screen.queryByTestId('share-card-duration')).toBeNull();
+    expect(screen.getByTestId('share-card-top-set-1')).toBeTruthy();
+    expect(screen.getByTestId('share-card-cardio')).toHaveTextContent(
+      /CARDIO.*Outdoor Running.*30 min · 5 km · 6:00 \/km/,
+    );
+    await settle();
+  });
+
+  it('shows a workout of cardio alone as its time, activities and distance -- no sets or volume', async () => {
+    mockFetchShareCardData.mockResolvedValue({
+      ...cardData,
+      exerciseCount: 0,
+      totalSets: 0,
+      totalVolumeKg: 0,
+      topSets: [],
+      activeMinutes: 40,
+      cardio: [
+        {
+          activity: 'walking',
+          icon: 'map',
+          name: 'Walking',
+          figures: '25 min · 2.5 km · 10:00 /km',
+        },
+        {
+          activity: 'stairmaster',
+          icon: 'chevrons-up',
+          name: 'StairMaster',
+          figures: '15 min · 40 floors',
+        },
+      ],
+      cardioSeconds: 2400,
+      cardioDistanceM: 2500,
+    });
+    render(<ShareWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('share-card-cardio-time')).toHaveTextContent('40 min');
+    expect(screen.getByTestId('share-card-stats')).toHaveTextContent(/Time.*Activities.*Distance/);
+    expect(screen.getByTestId('share-card-activities')).toHaveTextContent('2');
+    expect(screen.getByTestId('share-card-distance')).toHaveTextContent(/2.5 km/);
+    expect(screen.queryByTestId('share-card-sets')).toBeNull();
+    expect(screen.queryByTestId('share-card-volume')).toBeNull();
+    expect(screen.queryByTestId('share-card-top-sets')).toBeNull();
+    expect(screen.getByTestId('share-card-cardio-1')).toHaveTextContent('15 min · 40 floors');
+    await settle();
+  });
+
   it('gives each of up to seven exercises its own row, tightening the rows to fit', async () => {
     const seven = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((n) => topSet(`Lift ${n}`));
     mockFetchShareCardData.mockResolvedValue({ ...cardData, topSets: seven });
