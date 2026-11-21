@@ -63,6 +63,11 @@ jest.mock('../progress/progressStatsQueries', () => ({
   fetchWorkoutIdForSet: jest.fn(),
 }));
 
+// The Cardio tab's read (cardio/cardioQueries.ts): no cardio, unless a test says otherwise.
+jest.mock('../cardio/cardioQueries', () => ({
+  fetchCardioHistory: jest.fn().mockResolvedValue([]),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
 const mockFetchMyProfile = fetchMyProfile as jest.Mock;
 const mockFetchAllExerciseHistory = fetchAllExerciseHistory as jest.Mock;
@@ -274,12 +279,12 @@ describe('ProgressOverviewScreen shell', () => {
     }
   });
 
-  it('lists its sections (Overview, Top Sets, All Time, Steps), defaulting to Overview', async () => {
+  it('lists its sections (Overview, Top Sets, Cardio, All Time, Steps), defaulting to Overview', async () => {
     mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
     renderScreen();
     await screen.findByTestId('progress-tabs');
 
-    for (const section of ['Overview', 'TopSets', 'AllTime', 'Steps']) {
+    for (const section of ['Overview', 'TopSets', 'Cardio', 'AllTime', 'Steps']) {
       expect(screen.getByTestId(`progress-tabs-${section}`)).toBeTruthy();
     }
     // Nutrition is All Time's second tab, not a section of its own.
@@ -289,6 +294,14 @@ describe('ProgressOverviewScreen shell', () => {
       expect(screen.queryByTestId(`progress-tabs-${removed}`)).toBeNull();
     }
     expect(await screen.findByTestId('progress-overview-scroll')).toBeTruthy();
+  });
+
+  it('opens Cardio on the cardio in your workouts -- what to do while there is none', async () => {
+    mockFetchAllExerciseHistory.mockResolvedValue(benchHistory);
+    renderScreen();
+    await screen.findByTestId('progress-tabs');
+    fireEvent.press(screen.getByTestId('progress-tabs-Cardio'));
+    expect(await screen.findByTestId('progress-cardio-empty')).toHaveTextContent('No cardio yet');
   });
 
   it('has no Steps tab off iPhone, where there is no Apple Health', async () => {
@@ -484,7 +497,7 @@ describe('ProgressOverviewScreen -- one widget for the active section', () => {
 
   it('puts the active section in its own widget, on every tab', async () => {
     await ready();
-    for (const section of ['Overview', 'TopSets', 'AllTime', 'Steps']) {
+    for (const section of ['Overview', 'TopSets', 'Cardio', 'AllTime', 'Steps']) {
       goToSection(section);
       expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(1);
       expect(screen.getByTestId('progress-section-card')).toBeTruthy();
@@ -500,7 +513,7 @@ describe('ProgressOverviewScreen -- one widget for the active section', () => {
 
   it('renders no bare text outside <Text> on any tab', async () => {
     await ready();
-    for (const section of ['Overview', 'TopSets', 'Steps', 'AllTime']) {
+    for (const section of ['Overview', 'TopSets', 'Cardio', 'Steps', 'AllTime']) {
       goToSection(section);
       expectNoBareText();
     }

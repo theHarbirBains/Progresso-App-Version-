@@ -84,7 +84,10 @@ jest.mock('../workouts/prSummaryQueries', () => ({
   fetchAllOneRepMaxes: jest.fn(),
 }));
 
-jest.mock('../cardio/cardioQueries', () => ({ addCardio: jest.fn() }));
+jest.mock('../cardio/cardioQueries', () => ({
+  addCardio: jest.fn(),
+  fetchRecentCardioActivities: jest.fn().mockResolvedValue([]),
+}));
 
 jest.mock('../workouts/workoutQueries', () => ({
   createLoggedWorkout: jest.fn(),
@@ -331,11 +334,15 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
 
     fireEvent.press(screen.getByTestId('log-past-workout-cardio-add'));
     fireEvent.press(screen.getByTestId('log-past-workout-cardio-sheet-activity-outdoor_run'));
-    // A run asks for no incline or speed; its pace shows as its distance is typed.
+    // A run asks for no incline, machine speed or calories; its pace shows as it's typed, in km.
     expect(screen.queryByTestId('log-past-workout-cardio-sheet-incline')).toBeNull();
+    expect(screen.queryByTestId('log-past-workout-cardio-sheet-speedSetting')).toBeNull();
+    expect(screen.queryByTestId('log-past-workout-cardio-sheet-calories')).toBeNull();
     fireEvent.changeText(screen.getByTestId('log-past-workout-cardio-sheet-duration'), '30');
     fireEvent.changeText(screen.getByTestId('log-past-workout-cardio-sheet-distance'), '5');
-    expect(screen.getByText('Pace 6:00 /km')).toBeTruthy();
+    expect(screen.getByTestId('log-past-workout-cardio-sheet-readout')).toHaveTextContent(
+      'Pace 6:00 /km · 10 km/h',
+    );
     fireEvent.press(screen.getByTestId('log-past-workout-cardio-sheet-save'));
     expect(await screen.findByText('Outdoor Running')).toBeTruthy();
 

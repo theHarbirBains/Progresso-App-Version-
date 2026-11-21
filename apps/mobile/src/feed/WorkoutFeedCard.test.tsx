@@ -7,11 +7,16 @@ const run: CardioValues = {
   name: null,
   durationSeconds: 1800,
   distanceM: 5000,
-  calories: null,
   speedKmh: null,
+  speedSetting: null,
   inclinePercent: null,
   resistanceLevel: null,
   floors: null,
+  steps: null,
+  strokeRate: null,
+  poolLengthM: null,
+  laps: null,
+  notes: null,
 };
 
 const workout = (extra: Partial<WorkoutCardData> = {}): WorkoutCardData => ({

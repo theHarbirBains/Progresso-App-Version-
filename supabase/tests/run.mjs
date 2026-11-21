@@ -4869,6 +4869,98 @@ async function main() {
         c.query('delete from public.workout_cardio where id = $1', [treadmill.rows[0].id]),
       );
       record('Its owner can remove a cardio activity', removed.rowCount === 1);
+
+      // Each activity's own figures (20261211100000_cardio_metrics.sql): a machine's speed, a
+      // climb's steps, a row's stroke rate, a swim's laps and pool, a note -- and calories typed
+      // by an older app version, kept as they were.
+      const metrics = await asUserCommitted(lifter, (c) =>
+        c.query(
+          `insert into public.workout_cardio
+             (workout_id, activity, duration_seconds, distance_m, speed_setting, steps, stroke_rate,
+              pool_length_m, laps, notes, calories)
+           values
+             ($1, 'treadmill', 1800, 4800, 6.5, null, null, null, null, null, null),
+             ($1, 'stairmaster', 1200, null, null, 1500, null, null, null, null, null),
+             ($1, 'rowing', 480, 2000, null, null, 28, null, null, null, null),
+             ($1, 'swimming', 1800, 1000, null, null, null, 25, 40, null, null),
+             ($1, 'other', 600, null, null, null, null, null, null, 'Double unders', null),
+             ($1, 'walking', 1800, 3000, null, null, null, null, null, null, 210)
+           returning id, activity, speed_setting, steps, stroke_rate, pool_length_m, laps, notes, calories`,
+          [cardioWorkout],
+        ),
+      );
+      const byActivity = Object.fromEntries(metrics.rows.map((row) => [row.activity, row]));
+      record(
+        "Each activity keeps its own figures -- a machine's speed, steps, stroke rate, laps and pool, a note",
+        Number(byActivity.treadmill.speed_setting) === 6.5 &&
+          byActivity.stairmaster.steps === 1500 &&
+          byActivity.rowing.stroke_rate === 28 &&
+          Number(byActivity.swimming.pool_length_m) === 25 &&
+          byActivity.swimming.laps === 40 &&
+          byActivity.other.notes === 'Double unders',
+      );
+      // Changing it as the app does now -- never sending calories -- leaves an older one's alone.
+      await asUserCommitted(lifter, (c) =>
+        c.query('update public.workout_cardio set duration_seconds = 2100 where id = $1', [
+          byActivity.walking.id,
+        ]),
+      );
+      const kept = await admin.query(
+        'select calories, duration_seconds from public.workout_cardio where id = $1',
+        [byActivity.walking.id],
+      );
+      record(
+        "Calories an older app version typed stay with the activity when it's changed",
+        kept.rows[0].calories === 210 && kept.rows[0].duration_seconds === 2100,
+      );
+      for (const [column, value, what] of [
+        ['stroke_rate', 250, 'A stroke rate is strokes a minute, up to 100'],
+        ['speed_setting', 0, "A machine's speed is more than nothing"],
+        ['pool_length_m', 200, 'A pool is 5 to 100 metres long'],
+        ['laps', 0, 'Laps are at least one'],
+        ['steps', 0, 'Steps are at least one'],
+        ['notes', '   ', 'A note is something, not blank space'],
+      ]) {
+        await expectThrows(
+          asUser(lifter, (c) =>
+            c.query(
+              `insert into public.workout_cardio (workout_id, activity, duration_seconds, ${column}) values ($1, 'other', 600, $2)`,
+              [cardioWorkout, value],
+            ),
+          ),
+          what,
+          /check constraint/,
+        );
+      }
+      // Finish works out which side of the lifting each activity was on, as its owner.
+      const settled = await asUserCommitted(lifter, async (c) => {
+        await c.query('update public.workouts set strength_ended_at = now() where id = $1', [
+          cardioWorkout,
+        ]);
+        return c.query(
+          'update public.workout_cardio set after_strength = true where id = $1 returning after_strength',
+          [byActivity.rowing.id],
+        );
+      });
+      record(
+        'Its owner marks which cardio came after the lifting, at Finish',
+        settled.rows[0]?.after_strength === true,
+      );
+      await expectThrows(
+        asUser(stranger, (c) =>
+          c
+            .query(
+              'update public.workout_cardio set after_strength = false where id = $1 returning id',
+              [byActivity.rowing.id],
+            )
+            .then((result) => {
+              if (result.rowCount === 0) throw new Error('row-level security: nothing updated');
+              return result;
+            }),
+        ),
+        "Nobody else can change someone's cardio",
+        /row-level security/,
+      );
       await admin.query('delete from public.workouts where id = any($1)', [
         [cardioWorkout, otherWorkout],
       ]);

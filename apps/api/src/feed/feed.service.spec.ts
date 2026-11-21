@@ -454,11 +454,16 @@ describe('FeedService', () => {
             name: null,
             duration_seconds: 1800,
             distance_m: '5000.00',
-            calories: 300,
             speed_kmh: null,
+            speed_setting: null,
             incline_percent: null,
             resistance_level: null,
             floors: null,
+            steps: null,
+            stroke_rate: null,
+            pool_length_m: null,
+            laps: null,
+            notes: null,
             after_strength: false,
           },
           {
@@ -468,11 +473,16 @@ describe('FeedService', () => {
             name: null,
             duration_seconds: 900,
             distance_m: null,
-            calories: null,
-            speed_kmh: '9.50',
+            speed_kmh: null,
+            speed_setting: '6.5',
             incline_percent: '3.0',
             resistance_level: null,
             floors: null,
+            steps: null,
+            stroke_rate: null,
+            pool_length_m: null,
+            laps: null,
+            notes: null,
             after_strength: true,
           },
         ],
@@ -494,15 +504,24 @@ describe('FeedService', () => {
       expect(byId.get('run')).toMatchObject({
         completedSetCount: 0,
         activeMinutes: 30,
+        // Calories are never handed out (always null, for app versions that read it).
         cardio: [
-          { activity: 'outdoor_run', durationSeconds: 1800, distanceM: 5000, calories: 300 },
+          { activity: 'outdoor_run', durationSeconds: 1800, distanceM: 5000, calories: null },
         ],
       });
       expect(byId.get('both')).toMatchObject({
         completedSetCount: 1,
         // 40 min of lifting and 15 on the treadmill -- not the hour start to finish.
         activeMinutes: 55,
-        cardio: [{ activity: 'treadmill', speedKmh: 9.5, inclinePercent: 3, afterStrength: true }],
+        cardio: [
+          {
+            activity: 'treadmill',
+            speedSetting: 6.5,
+            speedKmh: null,
+            inclinePercent: 3,
+            afterStrength: true,
+          },
+        ],
       });
     });
 

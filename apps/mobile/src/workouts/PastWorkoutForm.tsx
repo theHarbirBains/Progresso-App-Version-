@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import { CardioSection } from '../cardio/CardioSection';
 import { CardioSheet } from '../cardio/CardioSheet';
+import { useRecentCardio } from '../cardio/useRecentCardio';
 import { BottomSheet } from '../design/BottomSheet';
 import { SecondaryButton } from '../design/Button';
 import { toLocalDateKey } from '../design/calendarGrid';
@@ -235,24 +236,22 @@ export function PastExerciseCard({ testID, exercise, draft, accentColor }: Exerc
 export function PastWorkoutCardio({
   testID,
   draft,
-  weightUnit,
   accentColor,
   onAccentColor,
 }: {
   testID: string;
   draft: PastWorkoutDraft;
-  weightUnit: 'kg' | 'lb';
   accentColor: string;
   onAccentColor: string;
 }) {
   const [sheet, setSheet] = useState<{ entry: PastDraftCardio | null } | null>(null);
+  const recent = useRecentCardio();
   const editing = sheet?.entry ?? null;
   return (
     <>
       <CardioSection
         testID={`${testID}-cardio`}
         entries={draft.cardio}
-        weightUnit={weightUnit}
         keyOf={(entry) => entry.localId}
         onAdd={() => setSheet({ entry: null })}
         onEdit={(entry) => setSheet({ entry })}
@@ -261,7 +260,7 @@ export function PastWorkoutCardio({
         testID={`${testID}-cardio-sheet`}
         visible={sheet !== null}
         entry={editing}
-        weightUnit={weightUnit}
+        recent={recent}
         accentColor={accentColor}
         onAccentColor={onAccentColor}
         onSave={(values) =>

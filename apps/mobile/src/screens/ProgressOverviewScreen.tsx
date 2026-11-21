@@ -25,6 +25,7 @@ import { ownProgressSections, type ProgressSection } from '../progress/progressS
 import { progressStyles as styles } from '../progress/progressStyles';
 import { useMembership } from '../membership/useMembership';
 import { StepsSection } from '../progress/StepsSection';
+import { CardioProgressSection } from '../progress/CardioProgressSection';
 import { TopSetsSection } from '../progress/TopSetsSection';
 import { EditTopSetSheet, type TopSetToEdit } from '../progress/EditTopSetSheet';
 import { useProgressTheme } from '../progress/useProgressTheme';
@@ -208,6 +209,15 @@ export function ProgressOverviewScreen({ navigation }: Props) {
                 onAccentColor={theme.onAccent}
                 navigation={navigation}
                 onEdit={setEditing}
+              />
+            ) : null}
+
+            {/* Cardio: the cardio in the person's finished workouts -- read as the tab opens. */}
+            {contentReady && activeSection === 'Cardio' ? (
+              <CardioProgressSection
+                accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
+                onOpenWorkout={(workoutId) => navigation.navigate('WorkoutDetail', { workoutId })}
               />
             ) : null}
 

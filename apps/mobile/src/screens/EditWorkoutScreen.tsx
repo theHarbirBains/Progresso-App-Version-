@@ -452,7 +452,6 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
               <PastWorkoutCardio
                 testID="edit-workout"
                 draft={draft}
-                weightUnit={weightUnit}
                 accentColor={theme.accent}
                 onAccentColor={theme.onAccent}
               />

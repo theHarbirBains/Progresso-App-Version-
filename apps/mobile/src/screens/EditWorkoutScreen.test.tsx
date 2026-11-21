@@ -87,6 +87,7 @@ jest.mock('../cardio/cardioQueries', () => ({
   addCardio: jest.fn(),
   updateCardio: jest.fn(),
   deleteCardio: jest.fn(),
+  fetchRecentCardioActivities: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
@@ -496,11 +497,16 @@ describe('EditWorkoutScreen -- saving changes', () => {
       name: null,
       durationSeconds: minutes * 60,
       distanceM: null,
-      calories: null,
       speedKmh: null,
+      speedSetting: null,
       inclinePercent: null,
       resistanceLevel: null,
       floors: null,
+      steps: null,
+      strokeRate: null,
+      poolLengthM: null,
+      laps: null,
+      notes: null,
       afterStrength: false,
       createdAt: FIXTURE_PERFORMED_AT,
     });

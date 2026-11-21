@@ -14,7 +14,13 @@ import { AllTimeStatsProvider } from '../progress/AllTimeStatsProvider';
 import { fetchAllCompletedWorkouts } from '../progress/progressStatsQueries';
 import { createExercise, updateMyProfile } from '../lib/api';
 import { fetchAllExercises } from '../exercises/exerciseQueries';
-import { addCardio, deleteCardio, setStrengthEnded, updateCardio } from '../cardio/cardioQueries';
+import {
+  addCardio,
+  deleteCardio,
+  fetchRecentCardioActivities,
+  settleStrengthTime,
+  updateCardio,
+} from '../cardio/cardioQueries';
 import { fetchAllExerciseHistory } from '../workouts/allExerciseHistoryQueries';
 import { fetchAllOneRepMaxes, fetchAllRepPRs } from '../workouts/prSummaryQueries';
 import {
@@ -115,8 +121,8 @@ jest.mock('../cardio/cardioQueries', () => ({
   addCardio: jest.fn(),
   updateCardio: jest.fn(),
   deleteCardio: jest.fn(),
-  setStrengthEnded: jest.fn(),
-  markCardioDuringStrength: jest.fn(),
+  settleStrengthTime: jest.fn(),
+  fetchRecentCardioActivities: jest.fn(),
 }));
 
 jest.mock('../progress/progressStatsQueries', () => ({
@@ -214,11 +220,16 @@ const walk = {
   name: null,
   durationSeconds: 1800,
   distanceM: 3200,
-  calories: null,
   speedKmh: null,
+  speedSetting: null,
   inclinePercent: null,
   resistanceLevel: null,
   floors: null,
+  steps: null,
+  strokeRate: null,
+  poolLengthM: null,
+  laps: null,
+  notes: null,
   afterStrength: false,
   createdAt: '2026-01-01T00:01:00Z',
 };
@@ -246,6 +257,8 @@ const baseWorkout = {
 beforeEach(async () => {
   // What a test typed into a set is kept on the device for the workout; each test starts clean.
   await clearLiveWorkoutDraft('w1');
+  (fetchRecentCardioActivities as jest.Mock).mockReset().mockResolvedValue([]);
+  (settleStrengthTime as jest.Mock).mockReset().mockResolvedValue(undefined);
   (fetchExerciseSettings as jest.Mock).mockReset().mockResolvedValue(new Map());
   (saveExerciseSetting as jest.Mock).mockReset();
   mockUseAuth.mockReturnValue({
@@ -365,11 +378,15 @@ describe('ActiveWorkoutScreen', () => {
 
     fireEvent.press(screen.getByTestId('complete-workout'));
 
-    // With sets done, it asks whether cardio comes next.
+    // Just whether to finish -- never a question about cardio.
+    expect(alert).toHaveBeenCalledTimes(1);
     expect(alert).toHaveBeenCalledWith(
       'Finish Workout?',
-      'Doing cardio next? Add it now and your strength training time stops here.',
-      expect.any(Array),
+      'Are you sure you want to finish this workout?',
+      [
+        expect.objectContaining({ text: 'Keep Going' }),
+        expect.objectContaining({ text: 'Finish Workout' }),
+      ],
     );
     await pastTheSaveDelay();
     expect(mockCompleteWorkout).not.toHaveBeenCalled();
@@ -529,7 +546,8 @@ describe('ActiveWorkoutScreen', () => {
     alert.mockRestore();
   });
 
-  it('adds cardio from its section -- before, between or after the lifting -- and changes it', async () => {
+  it('adds cardio from the slim line at the top -- an activity tile, then its figures -- and changes it', async () => {
+    (fetchRecentCardioActivities as jest.Mock).mockResolvedValue(['rowing']);
     (addCardio as jest.Mock).mockReset().mockImplementation(async (workoutId, values) => ({
       ...values,
       id: 'c1',
@@ -547,17 +565,39 @@ describe('ActiveWorkoutScreen', () => {
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
     });
-    await screen.findByTestId('active-workout-cardio');
+    // In the workout's own widget, pinned above the exercises.
+    const hero = within(await screen.findByTestId('active-workout-hero'));
+    expect(hero.getByTestId('active-workout-cardio')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('active-workout-cardio-add'));
-    // Treadmill asks for its distance, speed and incline; a time is the one thing it needs.
-    fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-save'));
-    expect(await screen.findByTestId('active-workout-cardio-sheet-error')).toHaveTextContent(
-      /how long it took/,
+    // The activities first, what was done last leading; a tap goes straight to its figures.
+    const tiles = within(screen.getByTestId('active-workout-cardio-sheet-activities'));
+    expect(
+      tiles
+        .getAllByRole('button')
+        .map((tile) => tile.props.accessibilityLabel)
+        .slice(0, 2),
+    ).toEqual(['Rowing', 'Treadmill']);
+    fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-activity-treadmill'));
+    expect(screen.getByTestId('active-workout-cardio-sheet-activity')).toHaveTextContent(
+      'Treadmill',
     );
+    // Its own figures only: no calories, and nothing a treadmill doesn't have.
+    expect(screen.queryByTestId('active-workout-cardio-sheet-calories')).toBeNull();
+    expect(screen.queryByTestId('active-workout-cardio-sheet-laps')).toBeNull();
+
+    // A time is the one thing it needs, said on the field.
+    fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-save'));
+    expect(
+      await screen.findByTestId('active-workout-cardio-sheet-duration-error'),
+    ).toHaveTextContent(/how long it took/);
     fireEvent.changeText(screen.getByTestId('active-workout-cardio-sheet-duration'), '20');
     fireEvent.changeText(screen.getByTestId('active-workout-cardio-sheet-distance'), '3');
-    fireEvent.changeText(screen.getByTestId('active-workout-cardio-sheet-incline'), '4');
+    fireEvent.changeText(screen.getByTestId('active-workout-cardio-sheet-speedSetting'), '6.5');
+    // The incline nudged up twice from nothing.
+    fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-incline-up'));
+    fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-incline-up'));
+    expect(screen.getByTestId('active-workout-cardio-sheet-incline')).toHaveProp('value', '1');
     fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-save'));
 
     await waitFor(() =>
@@ -567,14 +607,14 @@ describe('ActiveWorkoutScreen', () => {
           activity: 'treadmill',
           durationSeconds: 1200,
           distanceM: 3000,
-          inclinePercent: 4,
+          speedSetting: 6.5,
+          inclinePercent: 1,
           speedKmh: null,
         }),
-        { afterStrength: false },
       ),
     );
     expect(await screen.findByTestId('active-workout-cardio-entry-c1')).toHaveTextContent(
-      /Treadmill/,
+      'Treadmill · 20 min',
     );
     // Cardio is never a set: the workout still has its two.
     expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('2');
@@ -586,7 +626,46 @@ describe('ActiveWorkoutScreen', () => {
     await waitFor(() =>
       expect(updateCardio).toHaveBeenCalledWith(
         'c1',
-        expect.objectContaining({ durationSeconds: 1530 }),
+        expect.objectContaining({ durationSeconds: 1530, speedSetting: 6.5 }),
+      ),
+    );
+  });
+
+  it('switches activity keeping what both ask for', async () => {
+    (addCardio as jest.Mock).mockReset().mockImplementation(async (workoutId, values) => ({
+      ...values,
+      id: 'c5',
+      workoutId,
+      afterStrength: false,
+      createdAt: '2026-01-01T00:10:00Z',
+    }));
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    fireEvent.press(await screen.findByTestId('active-workout-cardio-add'));
+    fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-activity-treadmill'));
+    fireEvent.changeText(screen.getByTestId('active-workout-cardio-sheet-duration'), '30');
+    fireEvent.changeText(screen.getByTestId('active-workout-cardio-sheet-distance'), '5');
+    fireEvent.changeText(screen.getByTestId('active-workout-cardio-sheet-incline'), '3');
+
+    fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-change'));
+    fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-activity-outdoor_run'));
+    expect(screen.getByTestId('active-workout-cardio-sheet-duration')).toHaveProp('value', '30');
+    expect(screen.getByTestId('active-workout-cardio-sheet-distance')).toHaveProp('value', '5');
+    expect(screen.queryByTestId('active-workout-cardio-sheet-incline')).toBeNull();
+    expect(screen.getByTestId('active-workout-cardio-sheet-readout')).toHaveTextContent(
+      'Pace 6:00 /km · 10 km/h',
+    );
+    fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-save'));
+    await waitFor(() =>
+      expect(addCardio).toHaveBeenCalledWith(
+        'w1',
+        expect.objectContaining({
+          activity: 'outdoor_run',
+          durationSeconds: 1800,
+          distanceM: 5000,
+          inclinePercent: null,
+        }),
       ),
     );
   });
@@ -603,37 +682,40 @@ describe('ActiveWorkoutScreen', () => {
 
     await waitFor(() => expect(deleteCardio).toHaveBeenCalledWith('c9'));
     await waitFor(() => expect(screen.queryByTestId('active-workout-cardio-entry-c9')).toBeNull());
+    // Its sets are untouched.
+    expect(screen.getByTestId('workout-summary-total-sets')).toHaveTextContent('2');
   });
 
-  it("Finish's Add Cardio ends the strength part there, and cardio added then is after it", async () => {
-    (setStrengthEnded as jest.Mock).mockReset().mockResolvedValue(undefined);
-    (addCardio as jest.Mock).mockReset().mockImplementation(async (workoutId, values, options) => ({
-      ...values,
-      id: 'c2',
-      workoutId,
-      afterStrength: options.afterStrength,
-      createdAt: '2026-01-01T00:50:00Z',
-    }));
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
-      buttons?.find((button) => button.text === 'Add Cardio')?.onPress?.();
-    });
+  it('finishes without a cardio question, working the strength part out from the last set', async () => {
+    // A walk added before the last set (during the lifting), a row added after it.
+    const row = {
+      ...walk,
+      id: 'c10',
+      activity: 'rowing' as const,
+      createdAt: '2026-01-01T00:40:00Z',
+    };
+    mockFetchWorkoutDetail.mockResolvedValue({ ...baseWorkout, cardio: [walk, row] });
+    // Its empty second set is removed at Finish, as usual.
+    const alert = removeEmptySetsOnFinish();
     render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
       wrapper: TestProviders,
     });
-    await screen.findByTestId('exercise-card-we1');
+    await screen.findByTestId('active-workout-cardio-entry-c10');
 
     fireEvent.press(screen.getByTestId('complete-workout'));
 
-    await waitFor(() => expect(setStrengthEnded).toHaveBeenCalledWith('w1', expect.any(String)));
-    expect(mockCompleteWorkout).not.toHaveBeenCalled();
-    expect(await screen.findByTestId('active-workout-cardio-note')).toHaveTextContent(
-      /Strength training done/,
+    await waitFor(() => expect(mockCompleteWorkout).toHaveBeenCalledWith('w1'));
+    expect(alert).toHaveBeenCalledWith(
+      'Finish Workout?',
+      'Are you sure you want to finish this workout?',
+      expect.any(Array),
     );
-    fireEvent.changeText(screen.getByTestId('active-workout-cardio-sheet-duration'), '15');
-    fireEvent.press(screen.getByTestId('active-workout-cardio-sheet-save'));
-    await waitFor(() =>
-      expect(addCardio).toHaveBeenCalledWith('w1', expect.any(Object), { afterStrength: true }),
-    );
+    // Nothing asked about cardio along the way.
+    for (const [title, message] of alert.mock.calls) {
+      expect(`${title} ${message ?? ''}`).not.toMatch(/cardio/i);
+    }
+    // The last set was finished at 0:05: the strength part ended there.
+    expect(settleStrengthTime).toHaveBeenCalledWith('w1', '2026-01-01T00:05:00Z', [walk, row]);
     alert.mockRestore();
   });
 
@@ -654,6 +736,8 @@ describe('ActiveWorkoutScreen', () => {
       'Are you sure you want to finish this workout?',
       expect.any(Array),
     );
+    // No set: no strength part to work out.
+    expect(settleStrengthTime).not.toHaveBeenCalled();
     alert.mockRestore();
   });
 
@@ -2268,12 +2352,11 @@ describe('ActiveWorkoutScreen -- built for one-handed use between sets', () => {
     await renderReady();
 
     expect(screen.UNSAFE_queryAllByType(AppCard)).toHaveLength(0);
-    // The workout's widget (pinned), then one per exercise, then its Cardio.
+    // The workout's widget (pinned, its cardio line in it), then one per exercise.
     expect(screen.UNSAFE_queryAllByType(Card).map((card) => card.props.testID)).toEqual([
       'active-workout-hero',
       'exercise-card-we1',
       'exercise-card-we2',
-      'active-workout-cardio',
     ]);
   });
 

@@ -14,23 +14,37 @@ export type CardioActivity =
   | 'swimming'
   | 'other';
 
-/** One cardio activity, its figures in canonical units (metres, km/h). */
+/**
+ * One cardio activity, its figures in canonical units (metres, km/h) -- never calories
+ * (20261211100000_cardio_metrics.sql): cardio carries none now.
+ */
 export interface WorkoutCardio {
   id: string;
   activity: CardioActivity;
   name: string | null;
   durationSeconds: number;
   distanceM: number | null;
-  calories: number | null;
+  /**
+   * Always null: calories are no longer shown. Kept for app versions from before, which read it
+   * (one missing would show as "undefined cal").
+   */
+  calories: null;
   speedKmh: number | null;
+  /** A treadmill's or elliptical's speed, as the machine shows it: no unit. */
+  speedSetting: number | null;
   inclinePercent: number | null;
   resistanceLevel: number | null;
   floors: number | null;
+  steps: number | null;
+  strokeRate: number | null;
+  poolLengthM: number | null;
+  laps: number | null;
+  notes: string | null;
   afterStrength: boolean;
 }
 
 export const CARDIO_COLUMNS =
-  'id, workout_id, activity, name, duration_seconds, distance_m, calories, speed_kmh, incline_percent, resistance_level, floors, after_strength, created_at';
+  'id, workout_id, activity, name, duration_seconds, distance_m, speed_kmh, speed_setting, incline_percent, resistance_level, floors, steps, stroke_rate, pool_length_m, laps, notes, after_strength, created_at';
 
 export interface CardioRow {
   id: string;
@@ -39,11 +53,16 @@ export interface CardioRow {
   name: string | null;
   duration_seconds: number;
   distance_m: string | number | null;
-  calories: number | null;
   speed_kmh: string | number | null;
+  speed_setting: string | number | null;
   incline_percent: string | number | null;
   resistance_level: number | null;
   floors: number | null;
+  steps: number | null;
+  stroke_rate: number | null;
+  pool_length_m: string | number | null;
+  laps: number | null;
+  notes: string | null;
   after_strength: boolean | null;
 }
 
@@ -56,11 +75,17 @@ export function toWorkoutCardio(row: CardioRow): WorkoutCardio {
     name: row.name,
     durationSeconds: row.duration_seconds,
     distanceM: numberOrNull(row.distance_m),
-    calories: row.calories,
+    calories: null,
     speedKmh: numberOrNull(row.speed_kmh),
+    speedSetting: numberOrNull(row.speed_setting),
     inclinePercent: numberOrNull(row.incline_percent),
     resistanceLevel: row.resistance_level,
     floors: row.floors,
+    steps: row.steps,
+    strokeRate: row.stroke_rate,
+    poolLengthM: numberOrNull(row.pool_length_m),
+    laps: row.laps,
+    notes: row.notes,
     afterStrength: row.after_strength === true,
   };
 }

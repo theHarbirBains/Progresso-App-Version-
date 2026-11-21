@@ -252,7 +252,6 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
               <PastWorkoutCardio
                 testID="log-past-workout"
                 draft={draft}
-                weightUnit={weightUnit}
                 accentColor={theme.accent}
                 onAccentColor={theme.onAccent}
               />

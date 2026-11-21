@@ -628,7 +628,6 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           testID="workout-detail-cardio"
           entries={cardio}
           times={times}
-          weightUnit={weightUnit}
           keyOf={(entry) => entry.id}
         />
       ) : null}

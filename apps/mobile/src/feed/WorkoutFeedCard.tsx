@@ -178,9 +178,9 @@ export function WorkoutFeedCard({
               key={index}
               style={styles.itemSubtitle}
               numberOfLines={1}
-              accessibilityLabel={`${cardioName(entry)}: ${cardioDetails(entry, weightUnit)}`}
+              accessibilityLabel={`${cardioName(entry)}: ${cardioDetails(entry)}`}
             >
-              {cardioName(entry)} · {cardioDetails(entry, weightUnit)}
+              {cardioName(entry)} · {cardioDetails(entry)}
             </Text>
           ))}
         </View>

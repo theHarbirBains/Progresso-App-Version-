@@ -1,23 +1,22 @@
-import { StyleSheet, View } from 'react-native';
-import { SecondaryButton } from '../design/Button';
+import { Feather } from '@expo/vector-icons';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SecondaryButton, TextButton } from '../design/Button';
 import { Card } from '../design/Card';
 import { ListRow } from '../design/ListRow';
 import { SectionHeader } from '../design/SectionHeader';
 import { Text } from '../design/Text';
-import { colors, spacing, typeScale } from '../design/theme';
-import { cardioDetails, cardioName, type CardioValues } from './cardioActivities';
+import { colors, radii, spacing, typeScale } from '../design/theme';
+import { cardioDetails, cardioName, formatCardioTime, type CardioValues } from './cardioActivities';
 import { formatMinutes, type WorkoutTimes } from './workoutTime';
 
-/** The cardio rows a page shows: one per activity, its name over its figures. */
+/** The cardio rows a page shows: one per activity, its name over its figures (and any note). */
 export function CardioRows<T extends CardioValues>({
   entries,
-  weightUnit,
   onPress,
   keyOf,
   testID,
 }: {
   entries: T[];
-  weightUnit: 'kg' | 'lb';
   /** Opens one to change or remove; without it the rows are read-only. */
   onPress?: (entry: T) => void;
   keyOf: (entry: T) => string;
@@ -30,11 +29,12 @@ export function CardioRows<T extends CardioValues>({
           key={keyOf(entry)}
           testID={`${testID}-${keyOf(entry)}`}
           title={cardioName(entry)}
-          subtitle={cardioDetails(entry, weightUnit)}
+          subtitle={cardioDetails(entry)}
+          detail={entry.notes ?? undefined}
           onPress={onPress ? () => onPress(entry) : undefined}
           chevron={onPress !== undefined}
           divider={index < entries.length - 1}
-          accessibilityLabel={`${cardioName(entry)}: ${cardioDetails(entry, weightUnit)}`}
+          accessibilityLabel={`${cardioName(entry)}: ${cardioDetails(entry)}${entry.notes ? `. ${entry.notes}` : ''}`}
         />
       ))}
     </View>
@@ -42,48 +42,31 @@ export function CardioRows<T extends CardioValues>({
 }
 
 /**
- * The live workout's (and Log/Edit Past Workout's) Cardio section: its activities -- each opens to
- * change or remove -- and Add Cardio. Before the lifting, between exercises or after it; never
- * required.
+ * Log/Edit Past Workout's Cardio section: its activities -- each opens to change or remove -- and
+ * Add Cardio. Never required.
  */
 export function CardioSection<T extends CardioValues>({
   entries,
-  weightUnit,
   onAdd,
   onEdit,
   keyOf,
-  note,
   testID,
 }: {
   entries: T[];
-  weightUnit: 'kg' | 'lb';
   onAdd: () => void;
   onEdit: (entry: T) => void;
   keyOf: (entry: T) => string;
-  /** A quiet line under the header -- the live workout's strength time, once it's done. */
-  note?: string | null;
   testID: string;
 }) {
   return (
     <Card testID={testID}>
       <SectionHeader label="Cardio" />
-      {note ? (
-        <Text testID={`${testID}-note`} style={styles.note}>
-          {note}
-        </Text>
-      ) : null}
       {entries.length === 0 ? (
         <Text style={styles.note}>
           A run, a ride or the treadmill — before, between or after your lifts.
         </Text>
       ) : (
-        <CardioRows
-          testID={`${testID}-entry`}
-          entries={entries}
-          weightUnit={weightUnit}
-          onPress={onEdit}
-          keyOf={keyOf}
-        />
+        <CardioRows testID={`${testID}-entry`} entries={entries} onPress={onEdit} keyOf={keyOf} />
       )}
       <View style={styles.add}>
         <SecondaryButton
@@ -99,6 +82,70 @@ export function CardioSection<T extends CardioValues>({
 }
 
 /**
+ * The live workout's cardio: one slim line at the foot of its pinned widget, under the rep range,
+ * so it's always a tap away without pushing the lifting down -- its activities as small pills
+ * (each opens to change or remove), sideways when there are many, and + Add. Before, between or
+ * after the lifting, as many as the person likes; never required.
+ */
+export function CardioStrip<T extends CardioValues>({
+  entries,
+  onAdd,
+  onEdit,
+  keyOf,
+  accentColor,
+  testID,
+}: {
+  entries: T[];
+  onAdd: () => void;
+  onEdit: (entry: T) => void;
+  keyOf: (entry: T) => string;
+  accentColor: string;
+  testID: string;
+}) {
+  return (
+    <View testID={testID} style={styles.strip}>
+      <Feather name="activity" size={16} color={accentColor} />
+      <Text style={styles.stripLabel}>Cardio</Text>
+      {entries.length === 0 ? (
+        <Text style={styles.stripEmpty} numberOfLines={1}>
+          None yet
+        </Text>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.pills}
+          contentContainerStyle={styles.pillsContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {entries.map((entry) => (
+            <Pressable
+              key={keyOf(entry)}
+              testID={`${testID}-entry-${keyOf(entry)}`}
+              onPress={() => onEdit(entry)}
+              hitSlop={4}
+              style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}
+              accessibilityRole="button"
+              accessibilityLabel={`${cardioName(entry)}: ${cardioDetails(entry)}. Change or remove`}
+            >
+              <Text style={styles.pillText} numberOfLines={1}>
+                {cardioName(entry)} · {formatCardioTime(entry.durationSeconds)}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+      <TextButton
+        testID={`${testID}-add`}
+        label="+ Add"
+        accessibilityLabel="Add Cardio"
+        onPress={onAdd}
+      />
+    </View>
+  );
+}
+
+/**
  * A finished workout's cardio and its time, told apart: each activity with its figures, then
  * Strength Training, each activity's time and Total Active Training -- rests and breaks in none of
  * them -- and the session's own time, start to finish, under them.
@@ -106,25 +153,18 @@ export function CardioSection<T extends CardioValues>({
 export function WorkoutCardioCard<T extends CardioValues>({
   entries,
   times,
-  weightUnit,
   keyOf,
   testID,
 }: {
   entries: T[];
   times: WorkoutTimes;
-  weightUnit: 'kg' | 'lb';
   keyOf: (entry: T) => string;
   testID: string;
 }) {
   return (
     <Card testID={testID}>
       <SectionHeader label="Cardio" />
-      <CardioRows
-        testID={`${testID}-entry`}
-        entries={entries}
-        weightUnit={weightUnit}
-        keyOf={keyOf}
-      />
+      <CardioRows testID={`${testID}-entry`} entries={entries} keyOf={keyOf} />
       <View style={styles.table}>
         <SectionHeader label="Time" />
         {times.strengthSeconds !== null ? (
@@ -194,6 +234,47 @@ function TimeRow({
 }
 
 const styles = StyleSheet.create({
+  // As the rep range's row above it: a hairline, a glyph, the words and a quiet action.
+  strip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  stripLabel: {
+    ...typeScale.callout,
+    color: colors.textSecondary,
+  },
+  stripEmpty: {
+    ...typeScale.caption,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  pills: {
+    flex: 1,
+  },
+  pillsContent: {
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  pill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
+    backgroundColor: colors.surfaceLift,
+  },
+  pillPressed: {
+    opacity: 0.7,
+  },
+  pillText: {
+    ...typeScale.caption,
+    color: colors.textPrimary,
+  },
   note: {
     ...typeScale.secondary,
     color: colors.textSecondary,

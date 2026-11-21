@@ -649,9 +649,12 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
       cardio: [treadmill],
     } as typeof twoExercises);
 
+    // Saved before calories went and treadmill speeds were the machine's number: its calories
+    // stay unshown, its speed in km/h -- kilometres for everyone.
     expect(screen.getByTestId('workout-detail-cardio-entry-c1')).toHaveTextContent(
-      /Treadmill.*15 min · 2 km · 8 km\/h · 3% incline · 140 cal/,
+      /Treadmill.*15 min · 2 km · 8 km\/h · 3% incline$/,
     );
+    expect(screen.queryByText(/\bcal\b/)).toBeNull();
     expect(screen.getByTestId('workout-detail-cardio-strength')).toHaveTextContent(/40 min/);
     expect(screen.getByTestId('workout-detail-cardio-time-c1')).toHaveTextContent(/15 min/);
     expect(screen.getByTestId('workout-detail-cardio-active')).toHaveTextContent(/55 min/);

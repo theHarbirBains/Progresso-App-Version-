@@ -21,14 +21,13 @@ import { type CardioValues } from '../cardio/cardioActivities';
 import {
   addCardio,
   deleteCardio,
-  markCardioDuringStrength,
-  setStrengthEnded,
+  settleStrengthTime,
   updateCardio,
   type CardioEntry,
 } from '../cardio/cardioQueries';
-import { CardioSection } from '../cardio/CardioSection';
+import { CardioStrip } from '../cardio/CardioSection';
 import { CardioSheet } from '../cardio/CardioSheet';
-import { formatMinutes, workoutTimes } from '../cardio/workoutTime';
+import { useRecentCardio } from '../cardio/useRecentCardio';
 import { measurementTypeOf } from '../exercises/movementTypes';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
@@ -91,6 +90,19 @@ import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
 
 type Props = RootStackScreenProps<'ActiveWorkout'>;
 
+/** When the workout's last set was finished (warm-ups and drops too); null with none. */
+function lastFinishedSetAt(exercises: { sets: { completedAt: string | null }[] }[]): string | null {
+  let last: string | null = null;
+  for (const exercise of exercises) {
+    for (const set of exercise.sets) {
+      if (set.completedAt && (last === null || Date.parse(set.completedAt) > Date.parse(last))) {
+        last = set.completedAt;
+      }
+    }
+  }
+  return last;
+}
+
 // The live-tracking half of the Start Workout experience (see
 // NewWorkoutScreen.tsx for the pre-start planning half), sharing the same
 // "exactly one set per new exercise" rule. A new set's fields start empty --
@@ -132,6 +144,8 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   // The cardio sheet: open on an activity to change, or on none to add one.
   const [cardioSheet, setCardioSheet] = useState<{ entry: CardioEntry | null } | null>(null);
+  // What the person did last, offered first when cardio is added -- read once as it opens.
+  const recentCardio = useRecentCardio();
   const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
   // A guided workout (a planned day's -- guidedWorkout.ts): its plan, the exercise being done
   // (null: the last one), and the next exercise starting. Null plan: the usual live workout.
@@ -785,13 +799,13 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     }
   }
 
-  // Cardio: added, changed and removed straight away, like sets. Once the strength part has ended
-  // (Finish's Add Cardio), what's added is after it -- not taken out of the strength time.
+  // Cardio: added, changed and removed straight away, like sets, whenever the person likes --
+  // which side of the lifting each was on is worked out at Finish.
   async function saveCardio(entry: CardioEntry | null, values: CardioValues) {
     if (!workout) return;
     const saved = entry
       ? await updateCardio(entry.id, values)
-      : await addCardio(workout.id, values, { afterStrength: !!workout.strengthEndedAt });
+      : await addCardio(workout.id, values);
     setWorkout((prev) =>
       prev
         ? {
@@ -811,45 +825,10 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     );
   }
 
-  /** Finish's Add Cardio: the strength part ends now, and the cardio sheet opens. */
-  async function startCardioAfterStrength() {
-    if (!workout) return;
-    setError(null);
-    const at = new Date().toISOString();
-    try {
-      await setStrengthEnded(workout.id, at);
-      setWorkout((prev) => (prev ? { ...prev, strengthEndedAt: at } : prev));
-      setCardioSheet({ entry: null });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start the cardio');
-    }
-  }
-
   // Finish asks first, as a group's and a trainer's session do: a tap meant for something else
-  // never ends the workout. With sets done and the strength part still going, it asks whether
-  // cardio comes next -- Add Cardio ends the strength part there, so its time is known.
+  // never ends the workout. Nothing about cardio -- it's added whenever the person likes.
   function confirmComplete() {
     if (!workout || completing) return;
-    const lifted = workout.exercises.some((ex) =>
-      ex.sets.some(
-        (set) =>
-          !set.isWarmup &&
-          (set.completedAt !== null ||
-            isValidDraft(setInputsRef.current[set.id], measurementTypeOf(ex))),
-      ),
-    );
-    if (lifted && !workout.strengthEndedAt) {
-      Alert.alert(
-        'Finish Workout?',
-        'Doing cardio next? Add it now and your strength training time stops here.',
-        [
-          { text: 'Keep Going', style: 'cancel' },
-          { text: 'Add Cardio', onPress: () => void startCardioAfterStrength() },
-          { text: 'Finish Workout', onPress: () => void handleComplete() },
-        ],
-      );
-      return;
-    }
     Alert.alert('Finish Workout?', 'Are you sure you want to finish this workout?', [
       { text: 'Keep Going', style: 'cancel' },
       { text: 'Finish Workout', onPress: () => void handleComplete() },
@@ -887,19 +866,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         );
         return;
       }
-      // Lifting again after the strength part ended (an exercise remembered after the run): the
-      // strength part runs to the finish after all, with every activity so far inside it.
-      const endedAt = saved.strengthEndedAt ? Date.parse(saved.strengthEndedAt) : null;
-      const liftedAfter =
-        endedAt !== null &&
-        saved.exercises.some((ex) =>
-          ex.sets.some(
-            (set) => !set.isWarmup && set.completedAt && Date.parse(set.completedAt) > endedAt,
-          ),
-        );
-      if (liftedAfter) {
-        await setStrengthEnded(workout.id, null);
-        await markCardioDuringStrength(workout.id);
+      // With cardio, the strength part ended at the last set finished: cardio added after it was
+      // after the lifting, and none of the time after it -- packing up, a break -- is training.
+      const lastSetAt = lastFinishedSetAt(saved.exercises);
+      if (savedCardio.length > 0 && lastSetAt !== null) {
+        await settleStrengthTime(workout.id, lastSetAt, savedCardio);
       }
       await completeWorkout(workout.id);
       void forgetGuided(workout.id);
@@ -1015,21 +986,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
     ? (focused?.id ?? null)
     : (shownExercises[0]?.exercise.id ?? null);
   const totalSets = computeTotalSets(workout.exercises);
-  // Once the strength part has ended, how long it was -- the cardio before it left out.
-  const strengthNote = workout.strengthEndedAt
-    ? (() => {
-        const { strengthSeconds } = workoutTimes({
-          performedAt: workout.performedAt,
-          completedAt: null,
-          strengthEndedAt: workout.strengthEndedAt,
-          hasStrength: true,
-          cardio: workout.cardio ?? [],
-        });
-        return strengthSeconds !== null
-          ? `Strength training done · ${formatMinutes(strengthSeconds)}`
-          : null;
-      })()
-    : null;
   // One exercise's card -- every exercise in the usual live workout, the one being done in a
   // guided one (no moving it up or down there: the plan sets the order).
   const exerciseCard = (
@@ -1138,6 +1094,15 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
                   exercises={workout.exercises}
                   accentColor={theme.accent}
                 />
+                {/* Cardio, before, between or after the lifting: one slim line, always in view. */}
+                <CardioStrip
+                  testID="active-workout-cardio"
+                  entries={workout.cardio ?? []}
+                  keyOf={(entry) => entry.id}
+                  onAdd={() => setCardioSheet({ entry: null })}
+                  onEdit={(entry) => setCardioSheet({ entry })}
+                  accentColor={theme.accent}
+                />
               </Card>
             </View>
             {muscleTabs.length > 0 ? (
@@ -1225,19 +1190,6 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
               )
             )}
 
-            {/* Cardio, before, between or after the lifting -- on All, since it's no muscle's. */}
-            {activeTab === 'all' ? (
-              <CardioSection
-                testID="active-workout-cardio"
-                entries={workout.cardio ?? []}
-                weightUnit={weightUnit}
-                keyOf={(entry) => entry.id}
-                onAdd={() => setCardioSheet({ entry: null })}
-                onEdit={(entry) => setCardioSheet({ entry })}
-                note={strengthNote}
-              />
-            ) : null}
-
             <View style={styles.endActions}>
               <AddExerciseButton
                 testID="active-workout-add-exercise"
@@ -1297,7 +1249,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
         testID="active-workout-cardio-sheet"
         visible={cardioSheet !== null}
         entry={cardioSheet?.entry ?? null}
-        weightUnit={weightUnit}
+        recent={recentCardio}
         accentColor={theme.accent}
         onAccentColor={theme.onAccent}
         onSave={(values) => saveCardio(cardioSheet?.entry ?? null, values)}
