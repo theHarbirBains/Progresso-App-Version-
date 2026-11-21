@@ -6230,6 +6230,106 @@ async function main() {
     );
   }
 
+  // ---- a finished group workout keeps only what its owner did
+  //      (20261212100000_group_workouts_keep_done_exercises.sql) ----
+  {
+    const lifter = randomUUID();
+    const partner = randomUUID();
+    await admin.query(
+      `insert into auth.users (id, email) values ($1, 'keep-done-1@test.local'), ($2, 'keep-done-2@test.local')`,
+      [lifter, partner],
+    );
+    const [press, row] = (
+      await admin.query(
+        "select id from public.exercises where created_by is null and measurement_type = 'weight_reps' order by name limit 2",
+      )
+    ).rows.map((r) => r.id);
+    const group = randomUUID();
+    await admin.query(
+      "insert into public.workout_groups (id, host_id, name, status, finished_at) values ($1, $2, 'Keep group', 'finished', now())",
+      [group, lifter],
+    );
+    // Exercises in a finished workout, each with sets that are finished (true) or left empty (false).
+    const workoutWith = async (userId, groupId, exercises) => {
+      const w = (
+        await admin.query(
+          `insert into public.workouts (user_id, name, performed_at, completed_at, group_id)
+           values ($1, 'Keep Check', now() - interval '1 day', now() - interval '1 day', $2) returning id`,
+          [userId, groupId],
+        )
+      ).rows[0].id;
+      const ids = [];
+      for (const [index, [exerciseId, sets]] of exercises.entries()) {
+        const we = (
+          await admin.query(
+            'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, $3) returning id',
+            [w, exerciseId, index + 1],
+          )
+        ).rows[0].id;
+        for (const [setIndex, done] of sets.entries()) {
+          await admin.query(
+            done
+              ? 'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at) values ($1, $2, 60, 8, now())'
+              : 'insert into public.sets (workout_exercise_id, set_index) values ($1, $2)',
+            [we, setIndex + 1],
+          );
+        }
+        ids.push(we);
+      }
+      return ids;
+    };
+    // The lifter did the press (one set left empty beside a finished one) and not the row; the
+    // partner did their own row and no press. A workout of their own keeps an empty exercise.
+    const [lifterPress, lifterRow] = await workoutWith(lifter, group, [
+      [press, [true, false]],
+      [row, [false]],
+    ]);
+    const [partnerPress, partnerRow] = await workoutWith(partner, group, [
+      [press, []],
+      [row, [true]],
+    ]);
+    const [soloRow] = await workoutWith(lifter, null, [[row, []]]);
+
+    const migration = readFileSync(
+      join(migrationsDir, '20261212100000_group_workouts_keep_done_exercises.sql'),
+      'utf8',
+    );
+    await admin.query(migration);
+    const deletedAt = async () =>
+      Object.fromEntries(
+        (
+          await admin.query(
+            'select id, deleted_at from public.workout_exercises where id = any($1::uuid[])',
+            [[lifterPress, lifterRow, partnerPress, partnerRow, soloRow]],
+          )
+        ).rows.map((r) => [r.id, r.deleted_at?.toISOString() ?? null]),
+      );
+    const after = await deletedAt();
+    record(
+      'A finished group workout loses each exercise its owner did nothing on, and keeps the rest',
+      after[lifterPress] === null &&
+        after[lifterRow] !== null &&
+        after[partnerPress] !== null &&
+        after[partnerRow] === null,
+      JSON.stringify(after),
+    );
+    record("A workout that wasn't in a group is left as it was", after[soloRow] === null);
+    await admin.query(migration);
+    const again = await deletedAt();
+    record(
+      'Running the group clean-up again changes nothing',
+      JSON.stringify(again) === JSON.stringify(after),
+      JSON.stringify(again),
+    );
+    const sets = (
+      await admin.query(
+        'select count(*)::int as count from public.sets where workout_exercise_id = any($1::uuid[])',
+        [[lifterRow, partnerPress]],
+      )
+    ).rows[0].count;
+    record('The clean-up deletes no set: it only marks the exercise, as Remove does', sets === 1);
+  }
+
   // ---- cardio achievements (20261209100000_cardio_achievements.sql) ----
   {
     const runner = randomUUID();
