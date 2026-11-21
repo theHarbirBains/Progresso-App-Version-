@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from 'react';
-import type { HistoricalSetWithExercise } from './exerciseHistoryGrouping';
 import { Alert, Modal, StyleSheet, View } from 'react-native';
 import { Card } from '../design/Card';
 import { RiseInStack } from '../design/RiseIn';
@@ -24,6 +23,7 @@ import {
 } from './liveWorkoutDraft';
 import { ExerciseCard, type PreviousSessionDisplay } from './ExerciseCard';
 import { ExercisePickerModal } from './ExercisePickerModal';
+import type { PreviousExercisesState } from './usePreviousExercises';
 import {
   buildPreviousSessionDisplay,
   computeCardSets,
@@ -77,8 +77,8 @@ interface Props {
   userId: string;
   accentColor: string;
   onAccentColor: string;
-  /** The signed-in person's own logged sets, for the picker's Recent (ExercisePickerModal). */
-  recentHistory?: HistoricalSetWithExercise[];
+  /** The signed-in person's previous exercises, listed first in Add Exercise (usePreviousExercises). */
+  previousExercises?: PreviousExercisesState;
   testID?: string;
 }
 
@@ -103,7 +103,7 @@ export function GroupWorkoutEditor({
   userId,
   accentColor,
   onAccentColor,
-  recentHistory,
+  previousExercises,
   testID = 'group-workout',
 }: Props) {
   const { weightUnit } = useProgressTheme();
@@ -525,7 +525,13 @@ export function GroupWorkoutEditor({
         onAccentColor={onAccentColor}
       />
       <ExercisePickerModal
-        recentHistory={recentHistory}
+        previous={
+          previousExercises && {
+            state: previousExercises,
+            addedGroups: exercises.map((ex) => ex.muscleGroup),
+            weightUnit,
+          }
+        }
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={(exercise) => void addExercise(exercise)}

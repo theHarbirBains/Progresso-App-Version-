@@ -36,6 +36,7 @@ import { AddExerciseButton } from '../workouts/AddExerciseButton';
 import { CreateCustomExerciseButton } from '../workouts/CreateCustomExerciseButton';
 import { ExerciseCard } from '../workouts/ExerciseCard';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
+import { usePreviousExercises } from '../workouts/usePreviousExercises';
 import { useWarmupHint } from '../workouts/WarmupHint';
 import { FoldedExercises, PlanDone, UpNextCard } from '../workouts/GuidedWorkoutParts';
 import { forgetGuided, isGuided, plannedSetsFor, remainingPlan } from '../workouts/guidedWorkout';
@@ -126,7 +127,7 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const { theme, weightUnit, themeLoading, activeWorkoutSplitId } = useProgressTheme();
-  const { refetch: refetchAllTimeStats, allSetHistory } = useAllTimeStats();
+  const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   // The muscle tab chosen along the top: every exercise, or one primary muscle group's.
@@ -146,6 +147,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
   const [cardioSheet, setCardioSheet] = useState<{ entry: CardioEntry | null } | null>(null);
   // What the person did last, offered first when cardio is added -- read once as it opens.
   const recentCardio = useRecentCardio();
+  // Add Exercise's previous exercises: read as the workout opens, with its split day's muscles.
+  const previousExercises = usePreviousExercises(
+    userId,
+    workout ? (workout.workoutSplitDayId ?? null) : undefined,
+  );
   const [customExerciseOpen, setCustomExerciseOpen] = useState(false);
   // A guided workout (a planned day's -- guidedWorkout.ts): its plan, the exercise being done
   // (null: the last one), and the next exercise starting. Null plan: the usual live workout.
@@ -1225,7 +1231,11 @@ export function ActiveWorkoutScreen({ route, navigation }: Props) {
       </Screen>
 
       <ExercisePickerModal
-        recentHistory={allSetHistory}
+        previous={{
+          state: previousExercises,
+          addedGroups: workout.exercises.map((ex) => ex.muscleGroup),
+          weightUnit,
+        }}
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={handleSelectExercise}

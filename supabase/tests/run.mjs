@@ -6330,6 +6330,157 @@ async function main() {
     record('The clean-up deletes no set: it only marks the exercise, as Remove does', sets === 1);
   }
 
+  // ---- previous exercises by muscle group (20261213100000) ----
+  {
+    const client = randomUUID();
+    const trainer = randomUUID();
+    const stranger = randomUUID();
+    await admin.query(
+      `insert into auth.users (id, email) values
+         ($1, 'previous-client@test.local'), ($2, 'previous-trainer@test.local'),
+         ($3, 'previous-stranger@test.local')`,
+      [client, trainer, stranger],
+    );
+    const builtIn = async (muscle, count) =>
+      (
+        await admin.query(
+          "select id from public.exercises where created_by is null and is_active and muscle_group = $1 and measurement_type = 'weight_reps' order by name limit $2",
+          [muscle, count],
+        )
+      ).rows.map((r) => r.id);
+    const [bench, incline, fly] = await builtIn('chest', 3);
+    const [pushdown] = await builtIn('triceps', 1);
+    const [curl] = await builtIn('biceps', 1);
+
+    // A workout `daysAgo` with exercises, each with sets: 'w' working, 'u' warm-up, 'e' empty.
+    const workout = async (
+      daysAgo,
+      exercises,
+      { loggedBy = null, live = false, deleted = false } = {},
+    ) => {
+      const w = (
+        await admin.query(
+          `insert into public.workouts (user_id, name, performed_at, completed_at, logged_by, deleted_at)
+           values ($1, 'Previous Check', now() - make_interval(days => $2), $3, $4, $5) returning id`,
+          [
+            client,
+            daysAgo,
+            live ? null : new Date(Date.now() - daysAgo * 86400000 + 3600000).toISOString(),
+            loggedBy,
+            deleted ? new Date().toISOString() : null,
+          ],
+        )
+      ).rows[0].id;
+      for (const [index, [exerciseId, sets]] of exercises.entries()) {
+        const we = (
+          await admin.query(
+            'insert into public.workout_exercises (workout_id, exercise_id, order_index) values ($1, $2, $3) returning id',
+            [w, exerciseId, index + 1],
+          )
+        ).rows[0].id;
+        for (const [setIndex, kind] of [...sets].entries()) {
+          await admin.query(
+            kind === 'e'
+              ? 'insert into public.sets (workout_exercise_id, set_index) values ($1, $2)'
+              : 'insert into public.sets (workout_exercise_id, set_index, weight_kg, reps, completed_at, is_warmup) values ($1, $2, $3, 8, now(), $4)',
+            kind === 'e'
+              ? [we, setIndex + 1]
+              : [we, setIndex + 1, 40 + setIndex * 10, kind === 'u'],
+          );
+        }
+      }
+      return w;
+    };
+
+    // Ten days ago: chest and triceps, the trainer logging. Six: chest on their own. Three: biceps,
+    // with a chest exercise that was only warmed up and one left empty. Live today: chest. A
+    // cancelled one yesterday: chest.
+    const trainerDay = await workout(
+      10,
+      [
+        [bench, 'ww'],
+        [pushdown, 'uww'],
+      ],
+      { loggedBy: trainer },
+    );
+    const ownChest = await workout(6, [
+      [incline, 'www'],
+      [fly, 'w'],
+    ]);
+    const armsDay = await workout(3, [
+      [curl, 'ww'],
+      [bench, 'u'],
+      [fly, 'e'],
+    ]);
+    const liveChest = await workout(0, [[bench, 'w']], { live: true });
+    const cancelledChest = await workout(1, [[bench, 'w']], { deleted: true });
+
+    const previous = (userId, asWho, sessions = 3) =>
+      asUser(asWho, (c) =>
+        c.query('select * from public.previous_exercises_by_muscle_group($1, $2)', [
+          userId,
+          sessions,
+        ]),
+      );
+    const rows = (await previous(client, client)).rows;
+    const workoutsOf = (muscle) => [
+      ...new Set(rows.filter((r) => r.muscle_group === muscle).map((r) => r.workout_id)),
+    ];
+    record(
+      "Previous exercises: each muscle group's finished workouts, newest first",
+      JSON.stringify(workoutsOf('chest')) === JSON.stringify([ownChest, trainerDay]) &&
+        JSON.stringify(workoutsOf('biceps')) === JSON.stringify([armsDay]) &&
+        JSON.stringify(workoutsOf('triceps')) === JSON.stringify([trainerDay]),
+      JSON.stringify(rows.map((r) => [r.muscle_group, r.workout_id, r.exercise_id])),
+    );
+    record(
+      'Previous exercises: a live or cancelled workout is never the last time',
+      !rows.some((r) => r.workout_id === liveChest || r.workout_id === cancelledChest),
+    );
+    record(
+      'Previous exercises: an exercise only warmed up or left empty was not done',
+      !rows.some((r) => r.workout_id === armsDay && r.muscle_group === 'chest'),
+    );
+    const trainerPushdown = rows.find(
+      (r) => r.workout_id === trainerDay && r.exercise_id === pushdown,
+    );
+    record(
+      "Previous exercises: a trainer's logging is the client's own history, with who logged it, and only its working sets",
+      trainerPushdown?.logged_by === trainer &&
+        trainerPushdown.sets.length === 2 &&
+        trainerPushdown.sets.every((s) => s.completed_at !== null && Number(s.weight_kg) >= 50),
+      JSON.stringify(trainerPushdown),
+    );
+    const ownChestRows = rows.filter((r) => r.workout_id === ownChest);
+    record(
+      'Previous exercises: each exercise by its own id, in the order it was done',
+      JSON.stringify(ownChestRows.map((r) => r.exercise_id)) === JSON.stringify([incline, fly]),
+    );
+    const latestOnly = (await previous(client, client, 1)).rows;
+    record(
+      'Previous exercises: asked for one session, each muscle group gives only its latest',
+      latestOnly.filter((r) => r.muscle_group === 'chest').every((r) => r.workout_id === ownChest),
+    );
+    record(
+      "Previous exercises: someone else asking for a person's history gets nothing",
+      (await previous(client, stranger)).rows.length === 0,
+    );
+    await expectThrows(
+      (async () => {
+        const c = connect();
+        await c.connect();
+        try {
+          await c.query('set role anon');
+          await c.query('select * from public.previous_exercises_by_muscle_group($1)', [client]);
+        } finally {
+          await c.end();
+        }
+      })(),
+      'Previous exercises: signed out, it cannot be called at all',
+      /permission denied/i,
+    );
+  }
+
   // ---- cardio achievements (20261209100000_cardio_achievements.sql) ----
   {
     const runner = randomUUID();

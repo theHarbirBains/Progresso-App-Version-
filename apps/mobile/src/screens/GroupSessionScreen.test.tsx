@@ -37,6 +37,11 @@ jest.mock('../progress/AllTimeStatsProvider', () => ({
 
 // Whether your own workout in the group had anything logged -- worth a share card.
 const mockHasLoggedSets = jest.fn();
+// Add Exercise's previous exercises (the editor is a stand-in here): none.
+jest.mock('../workouts/previousExerciseQueries', () => ({
+  fetchPreviousExercises: jest.fn().mockResolvedValue([]),
+  fetchSplitDayMuscleGroups: jest.fn().mockResolvedValue([]),
+}));
 jest.mock('../workouts/groupWorkoutHistory', () => ({
   hasLoggedSets: (workoutId: string) => mockHasLoggedSets(workoutId),
 }));

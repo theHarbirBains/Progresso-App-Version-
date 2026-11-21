@@ -18,6 +18,7 @@ import { liveWorkoutStyles as styles } from './liveWorkoutStyles';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { hasLoggedSets } from '../workouts/groupWorkoutHistory';
 import { GroupWorkoutEditor, type LiveWorkoutFinish } from '../workouts/GroupWorkoutEditor';
+import { usePreviousExercises } from '../workouts/usePreviousExercises';
 import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
 import { showNextWorkoutWidget } from '../widgets/widgetUpdates';
 import {
@@ -42,9 +43,17 @@ export function GroupSessionScreen({ navigation, route }: Props) {
   const { theme, activeWorkoutSplitId } = useProgressTheme();
   // The editor's Finish step, called before the group is finished.
   const editorFinish = useRef<LiveWorkoutFinish | null>(null);
-  const { refetch: refetchAllTimeStats, allSetHistory } = useAllTimeStats();
+  const { refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
+  // Add Exercise's previous exercises -- the signed-in person's own, with their split day's
+  // muscles when their group workout is one (unknown until the group is read).
+  const previousExercises = usePreviousExercises(
+    userId || undefined,
+    group
+      ? (group.members.find((member) => member.userId === userId)?.workoutSplitDayId ?? null)
+      : undefined,
+  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -238,7 +247,7 @@ export function GroupSessionScreen({ navigation, route }: Props) {
 
         {isLive && editorMembers.length > 0 ? (
           <GroupWorkoutEditor
-            recentHistory={allSetHistory}
+            previousExercises={previousExercises}
             members={editorMembers}
             finishRef={editorFinish}
             startedAt={group.startedAt}

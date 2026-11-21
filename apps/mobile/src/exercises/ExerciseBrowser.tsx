@@ -104,6 +104,11 @@ interface Props {
   friends?: SharingFriend[];
   /** A row shown first in the list, above the exercises (the picker's Create Custom). */
   listHeader?: ReactNode;
+  /**
+   * Shown at the very top of the list, above even its count -- the live workout's previous
+   * exercises. The count then follows it, in the list.
+   */
+  lead?: ReactNode;
   testID?: string;
 }
 
@@ -139,6 +144,7 @@ export function ExerciseBrowser({
   onDeleteMine,
   friends = [],
   listHeader,
+  lead,
   testID = 'exercise-browser',
 }: Props) {
   // In Friends, the one friend whose exercises show, or null for everyone's.
@@ -354,6 +360,14 @@ export function ExerciseBrowser({
     ],
   );
 
+  const countRow = (
+    <View style={styles.countSortRow}>
+      <Text testID="exercise-library-count" style={styles.countText}>
+        {shownRows.length} {shownRows.length === 1 ? 'exercise' : 'exercises'}
+      </Text>
+    </View>
+  );
+
   // Its two cards roll out in turn (the list card keeps filling the rest of
   // the page) -- the Exercise Library page leaves this to it.
   return (
@@ -440,12 +454,8 @@ export function ExerciseBrowser({
               accentColor={accent.color}
             />
           ) : null
-        ) : (
-          <View style={styles.countSortRow}>
-            <Text testID="exercise-library-count" style={styles.countText}>
-              {shownRows.length} {shownRows.length === 1 ? 'exercise' : 'exercises'}
-            </Text>
-          </View>
+        ) : lead ? null : (
+          countRow
         )}
 
         {error ? (
@@ -470,7 +480,15 @@ export function ExerciseBrowser({
               keyboardShouldPersistTaps="handled"
               scrollEnabled={!rowSwiping}
               showsVerticalScrollIndicator={false}
-              ListHeaderComponent={listHeader ? <>{listHeader}</> : undefined}
+              ListHeaderComponent={
+                lead || listHeader ? (
+                  <>
+                    {lead}
+                    {lead && !inFriends ? countRow : null}
+                    {listHeader}
+                  </>
+                ) : undefined
+              }
               ListEmptyComponent={
                 source === 'friends' &&
                 !searchInput.trim() &&

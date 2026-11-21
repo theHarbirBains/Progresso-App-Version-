@@ -43,6 +43,10 @@ import { clearSetTimers, stopSetTimer } from '../workouts/setTimers';
 import { recallLiveWorkout } from '../feed/liveWorkoutMemory';
 import { isGuided } from '../workouts/guidedWorkout';
 import { fetchDayPlan } from '../workouts/splitPlanQueries';
+import {
+  fetchPreviousExercises,
+  fetchSplitDayMuscleGroups,
+} from '../workouts/previousExerciseQueries';
 import { forgetShown } from '../lib/lastShown';
 import { homeWidgets } from '../widgets/homeWidgets';
 import { refreshNextWorkout } from '../widgets/nextWorkoutRefresh';
@@ -127,6 +131,12 @@ jest.mock('../cardio/cardioQueries', () => ({
 
 jest.mock('../progress/progressStatsQueries', () => ({
   fetchAllCompletedWorkouts: jest.fn(),
+}));
+
+// Add Exercise's previous exercises, and a split day's muscle groups: none unless a test says.
+jest.mock('../workouts/previousExerciseQueries', () => ({
+  fetchPreviousExercises: jest.fn().mockResolvedValue([]),
+  fetchSplitDayMuscleGroups: jest.fn().mockResolvedValue([]),
 }));
 
 // A planned day's plan (guided workouts); none unless a test gives one.
@@ -2861,5 +2871,99 @@ describe('ActiveWorkoutScreen -- a guided workout (a planned day)', () => {
 
     await screen.findByTestId('exercise-card-we1');
     expect(screen.queryByTestId('active-workout-up-next')).toBeNull();
+  });
+});
+
+describe('ActiveWorkoutScreen -- previous exercises in Add Exercise', () => {
+  const library = (id: string, name: string, muscleGroup: string) => ({
+    id,
+    name,
+    muscleGroup,
+    movementType: 'bilateral',
+    measurementType: 'weight_reps',
+    isActive: true,
+    createdBy: null,
+  });
+  const done = (exerciseId: string, muscleGroup: string, loggedBy: string | null = null) => ({
+    muscleGroup,
+    workoutId: `w-${muscleGroup}`,
+    performedAt: '2026-11-18T15:00:00Z',
+    loggedBy,
+    workoutExerciseId: `we-${exerciseId}`,
+    exerciseId,
+    orderIndex: 1,
+    measurementType: 'weight_reps',
+    sets: [
+      { id: `s-${exerciseId}`, setIndex: 1, weightKg: 80, reps: 8, completedAt: 'x', side: null },
+    ],
+  });
+
+  beforeEach(() => {
+    mockFetchExercises.mockResolvedValue([
+      library('ex1', 'Barbell Bench Press', 'chest'),
+      library('ex-incline', 'Incline Dumbbell Press', 'chest'),
+      library('ex-rope', 'Triceps Pushdown — Rope Attachment', 'triceps'),
+      library('ex-row', 'Seated Cable Row — Close-Grip V-Handle', 'back'),
+    ]);
+    (fetchSplitDayMuscleGroups as jest.Mock).mockClear();
+    (fetchPreviousExercises as jest.Mock)
+      .mockClear()
+      .mockResolvedValue([
+        done('ex-incline', 'chest', 'coach-1'),
+        done('ex-rope', 'triceps'),
+        done('ex-row', 'back'),
+      ]);
+  });
+
+  afterEach(() => {
+    (fetchPreviousExercises as jest.Mock).mockResolvedValue([]);
+    (fetchSplitDayMuscleGroups as jest.Mock).mockResolvedValue([]);
+  });
+
+  it("on a split day, opens on the day's muscle groups with what was done last -- the trainer's logging too", async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({ ...baseWorkout, workoutSplitDayId: 'day-push' });
+    (fetchSplitDayMuscleGroups as jest.Mock).mockResolvedValue(['chest', 'triceps']);
+    mockAddExerciseToWorkout.mockResolvedValue('we2');
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
+    expect(await screen.findByTestId('exercise-picker-previous-title')).toHaveTextContent(
+      'Last Time You Trained — Chest & Triceps',
+    );
+    expect(fetchSplitDayMuscleGroups).toHaveBeenCalledWith('day-push');
+    expect(fetchPreviousExercises).toHaveBeenCalledWith('user-1');
+    expect(screen.getByTestId('exercise-picker-previous-group-chest-ex-incline')).toHaveTextContent(
+      /Incline Dumbbell Press.*Logged by your trainer/,
+    );
+    expect(screen.getByTestId('exercise-picker-previous-group-triceps-ex-rope')).toBeTruthy();
+    // Back isn't on the day: it isn't shown.
+    expect(screen.queryByTestId('exercise-picker-previous-group-back')).toBeNull();
+
+    // The trainer's exercise is added as the very same exercise, to carry on its history.
+    fireEvent.press(screen.getByTestId('exercise-picker-previous-group-chest-ex-incline'));
+    await waitFor(() =>
+      expect(mockAddExerciseToWorkout).toHaveBeenCalledWith('w1', 'ex-incline', 2),
+    );
+  });
+
+  it('without a split, opens on every muscle group, the ones in the workout first', async () => {
+    mockFetchWorkoutDetail.mockResolvedValue({ ...baseWorkout, workoutSplitDayId: null });
+    render(<ActiveWorkoutScreen navigation={navigation} route={route} />, {
+      wrapper: TestProviders,
+    });
+    await screen.findByTestId('exercise-card-we1');
+
+    fireEvent.press(screen.getByTestId('active-workout-add-exercise'));
+    expect(await screen.findByTestId('exercise-picker-previous-title')).toHaveTextContent(
+      'Your Previous Exercises',
+    );
+    expect(fetchSplitDayMuscleGroups).not.toHaveBeenCalled();
+    // Bench Press (chest) is already in the workout, so Chest leads.
+    expect(screen.getByTestId('exercise-picker-previous')).toHaveTextContent(
+      /^Your Previous Exercises.*Chest.*Triceps.*Back/,
+    );
   });
 });

@@ -163,11 +163,35 @@ describe("ExercisePickerModal -- a trainer's, a client's or a friend's exercise"
   });
 });
 
-describe('ExercisePickerModal -- Recent', () => {
-  const set = (exerciseId: string, performedAt: string) =>
-    ({ exerciseId, performedAt, muscleGroup: 'chest' }) as never;
+describe('ExercisePickerModal -- previous exercises', () => {
+  const chest = {
+    muscleGroup: 'chest' as const,
+    lastTrainedAt: '2026-11-18T10:00:00Z',
+    exercises: [
+      {
+        exerciseId: 'ex1',
+        performedAt: '2026-11-18T10:00:00Z',
+        measurementType: 'weight_reps' as const,
+        setCount: 3,
+        best: {
+          id: 's2',
+          setIndex: 2,
+          weightKg: 80,
+          reps: 8,
+          completedAt: '2026-11-18T10:20:00Z',
+          side: null,
+        },
+        byTrainer: true,
+      },
+    ],
+  };
+  const previous = (groups: (typeof chest)[], extra: Partial<{ dayGroups: never[] }> = {}) => ({
+    state: { status: 'ready' as const, groups, dayGroups: [], retry: jest.fn(), ...extra },
+    addedGroups: [],
+    weightUnit: 'kg' as const,
+  });
 
-  it('lists the exercises logged last first, newest first, one tap to add', async () => {
+  it('come first, above the whole library, each the very exercise done -- one tap to add', async () => {
     const onSelect = jest.fn();
     render(
       <ExercisePickerModal
@@ -176,40 +200,102 @@ describe('ExercisePickerModal -- Recent', () => {
         onSelect={onSelect}
         userId="user-1"
         alreadyAddedIds={[]}
-        recentHistory={[
-          set('ex1', '2026-11-01T10:00:00Z'),
-          set('ex2', '2026-11-10T10:00:00Z'),
-          set('ex1', '2026-11-03T10:00:00Z'),
-        ]}
+        previous={previous([chest])}
       />,
     );
 
-    const recent = await screen.findByTestId('exercise-picker-recent');
-    expect(recent).toHaveTextContent(/Recent.*Barbell Back Squat.*Barbell Bench Press/);
-    fireEvent.press(screen.getByTestId('exercise-picker-recent-ex2'));
-    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'ex2' }));
+    const section = await screen.findByTestId('exercise-picker-previous');
+    expect(section).toHaveTextContent(/Your Previous Exercises/);
+    expect(screen.getByTestId('exercise-picker-previous-group-chest-date')).toHaveTextContent(
+      /Last trained Nov 18/,
+    );
+    expect(screen.getByTestId('exercise-picker-previous-group-chest-ex1')).toHaveTextContent(
+      /Barbell Bench Press.*3 sets · Top set 80 kg × 8 · Logged by your trainer/,
+    );
+    // Before the library's count and its exercises.
+    expect(screen.getByTestId('exercise-library-list')).toHaveTextContent(
+      /^Your Previous Exercises.*2 exercises.*Barbell Back Squat/,
+    );
+
+    fireEvent.press(screen.getByTestId('exercise-picker-previous-group-chest-ex1'));
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'ex1' }));
   });
 
-  it("leaves out what's already in the workout, and goes once a search is typed", async () => {
+  it('show one already in the workout as added, and go once a search is typed', async () => {
+    const onSelect = jest.fn();
+    render(
+      <ExercisePickerModal
+        visible
+        onClose={jest.fn()}
+        onSelect={onSelect}
+        userId="user-1"
+        alreadyAddedIds={['ex1']}
+        previous={previous([chest])}
+      />,
+    );
+
+    const row = await screen.findByTestId('exercise-picker-previous-group-chest-ex1');
+    expect(row).toHaveTextContent(/Barbell Bench Press \(added\)/);
+    fireEvent.press(row);
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.changeText(screen.getByTestId('exercise-search'), 'bench');
+    expect(screen.queryByTestId('exercise-picker-previous')).toBeNull();
+  });
+
+  it('never stand in a look-alike for an exercise no longer in the library', async () => {
+    const gone = {
+      ...chest,
+      exercises: [{ ...chest.exercises[0], exerciseId: 'ex-deleted' }],
+    };
     render(
       <ExercisePickerModal
         visible
         onClose={jest.fn()}
         onSelect={jest.fn()}
         userId="user-1"
-        alreadyAddedIds={['ex2']}
-        recentHistory={[set('ex1', '2026-11-01T10:00:00Z'), set('ex2', '2026-11-10T10:00:00Z')]}
+        alreadyAddedIds={[]}
+        previous={previous([gone])}
       />,
     );
 
-    await screen.findByTestId('exercise-picker-recent-ex1');
-    expect(screen.queryByTestId('exercise-picker-recent-ex2')).toBeNull();
-
-    fireEvent.changeText(screen.getByTestId('exercise-search'), 'bench');
-    expect(screen.queryByTestId('exercise-picker-recent')).toBeNull();
+    expect(await screen.findByTestId('exercise-picker-previous-group-chest-gone')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-picker-previous-group-chest-ex1')).toBeNull();
   });
 
-  it('has no Recent without the history (a planner, not a live workout)', async () => {
+  it('say how they will work before the first workout, and offer Try Again if they fail', async () => {
+    const { rerender } = render(
+      <ExercisePickerModal
+        visible
+        onClose={jest.fn()}
+        onSelect={jest.fn()}
+        userId="user-1"
+        alreadyAddedIds={[]}
+        previous={previous([])}
+      />,
+    );
+    expect(await screen.findByTestId('exercise-picker-previous-first')).toBeTruthy();
+
+    const retry = jest.fn();
+    rerender(
+      <ExercisePickerModal
+        visible
+        onClose={jest.fn()}
+        onSelect={jest.fn()}
+        userId="user-1"
+        alreadyAddedIds={[]}
+        previous={{
+          state: { status: 'error', groups: [], dayGroups: [], retry },
+          addedGroups: [],
+          weightUnit: 'kg',
+        }}
+      />,
+    );
+    fireEvent.press(await screen.findByTestId('exercise-picker-previous-retry'));
+    expect(retry).toHaveBeenCalled();
+  });
+
+  it('are not there without a live workout (a planner)', async () => {
     render(
       <ExercisePickerModal
         visible
@@ -221,7 +307,8 @@ describe('ExercisePickerModal -- Recent', () => {
     );
 
     await screen.findByTestId('exercise-item-ex1');
-    expect(screen.queryByTestId('exercise-picker-recent')).toBeNull();
+    expect(screen.queryByTestId('exercise-picker-previous')).toBeNull();
+    expect(screen.getByTestId('exercise-library-count')).toHaveTextContent('2 exercises');
   });
 });
 
