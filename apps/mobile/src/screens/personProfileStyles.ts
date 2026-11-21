@@ -126,7 +126,7 @@ export const personProfileStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  // Two equal buttons side by side.
+  // Follow (or Following, Requested) filling the row, a small Share at its own width beside it.
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -134,6 +134,12 @@ export const personProfileStyles = StyleSheet.create({
   },
   action: {
     flex: 1,
+  },
+  // Your own: Edit Profile and Share, small and at their own width, from the left.
+  ownActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
 
   // The four figures, side by side: glass tiles with an accent hairline.

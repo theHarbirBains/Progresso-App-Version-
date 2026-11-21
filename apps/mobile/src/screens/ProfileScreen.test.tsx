@@ -330,7 +330,11 @@ describe('ProfileScreen -- your profile as your friends see it', () => {
     fireEvent.press(screen.getByTestId('person-profile-edit'));
     expect(mockNavigate).toHaveBeenCalledWith('SettingsPersonalInfo');
 
-    expect(screen.getByTestId('person-profile-share')).toHaveTextContent('Share Profile');
+    // Small and quiet: Edit Profile and Share as two small pills.
+    expect(screen.getByTestId('person-profile-share')).toHaveTextContent(/Share$/);
+    expect(screen.getByTestId('person-profile-share').props.accessibilityLabel).toBe(
+      'Share your profile',
+    );
     expect(screen.queryByTestId('person-profile-follow')).toBeNull();
     expect(screen.queryByTestId('person-profile-more')).toBeNull();
   });

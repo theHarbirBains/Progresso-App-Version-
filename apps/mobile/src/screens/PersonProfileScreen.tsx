@@ -156,8 +156,9 @@ function StatTile({
  * their photo sits in an accent ring beside their name, and "@username · 12 workouts" under it;
  * their bio; "12 followers • 3 following" on one line (on your own, your follow requests between
  * them, when there are any) and the people you follow who follow them too; then two equal buttons
- * -- Follow / Following (or Edit Profile on your own) and Share Profile -- with Accept and Decline
- * above them when they asked to follow you. For
+ * -- Follow / Following at full size with a small Share beside it, or on your own two small,
+ * quiet pills, Edit Profile and Share -- with Accept and Decline above them when they asked to
+ * follow you. For
  * you, or someone who accepted your follow: four figures -- workouts, the last 30 days, records
  * held and everything lifted -- then Stats (where it opens), Workouts (all of them, with likes
  * and comments), PRs (every exercise's best set, each opening its top sets and records) and
@@ -871,57 +872,70 @@ export function PersonProfilePage({
               </View>
             ) : null}
 
-            <View style={styles.actions}>
-              <View style={styles.action}>
-                {profile.isSelf ? (
-                  <SecondaryButton
-                    testID="person-profile-edit"
-                    label="Edit Profile"
-                    size="md"
-                    onPress={() => navigation.navigate('SettingsPersonalInfo')}
-                  />
-                ) : profile.followStatus === 'accepted' ? (
-                  <PrimaryButton
-                    testID="person-profile-following"
-                    label="Following"
-                    size="md"
-                    loading={busy}
-                    onPress={() => handleUnfollow(profile)}
-                    accentColor={theme.accent}
-                    onAccentColor={theme.onAccent}
-                  />
-                ) : profile.followStatus === 'pending' ? (
-                  <SecondaryButton
-                    testID="person-profile-requested"
-                    label="Requested"
-                    size="md"
-                    loading={busy}
-                    onPress={() => handleUnfollow(profile)}
-                  />
-                ) : (
-                  <PrimaryButton
-                    testID="person-profile-follow"
-                    label="Follow"
-                    size="md"
-                    loading={busy}
-                    onPress={() => void run(() => sendFollowRequest(accessToken!, userId))}
-                    accentColor={theme.accent}
-                    onAccentColor={theme.onAccent}
-                  />
-                )}
-              </View>
-              <View style={styles.action}>
+            {/* Your own: Edit Profile and Share as two small, quiet pills at their own width --
+                the profile is the page, not its buttons. Someone else's: Follow at full size,
+                Share small beside it. */}
+            {profile.isSelf ? (
+              <View style={styles.ownActions}>
+                <SecondaryButton
+                  testID="person-profile-edit"
+                  label="Edit Profile"
+                  icon="edit-2"
+                  size="sm"
+                  onPress={() => navigation.navigate('SettingsPersonalInfo')}
+                />
                 <SecondaryButton
                   testID="person-profile-share"
-                  label="Share Profile"
-                  size="md"
+                  label="Share"
+                  icon="share"
+                  size="sm"
                   onPress={() => share(profile, title)}
-                  accessibilityLabel={
-                    profile.isSelf ? 'Share your profile' : `Share ${title}'s profile`
-                  }
+                  accessibilityLabel="Share your profile"
                 />
               </View>
-            </View>
+            ) : (
+              <View style={styles.actions}>
+                <View style={styles.action}>
+                  {profile.followStatus === 'accepted' ? (
+                    <PrimaryButton
+                      testID="person-profile-following"
+                      label="Following"
+                      size="md"
+                      loading={busy}
+                      onPress={() => handleUnfollow(profile)}
+                      accentColor={theme.accent}
+                      onAccentColor={theme.onAccent}
+                    />
+                  ) : profile.followStatus === 'pending' ? (
+                    <SecondaryButton
+                      testID="person-profile-requested"
+                      label="Requested"
+                      size="md"
+                      loading={busy}
+                      onPress={() => handleUnfollow(profile)}
+                    />
+                  ) : (
+                    <PrimaryButton
+                      testID="person-profile-follow"
+                      label="Follow"
+                      size="md"
+                      loading={busy}
+                      onPress={() => void run(() => sendFollowRequest(accessToken!, userId))}
+                      accentColor={theme.accent}
+                      onAccentColor={theme.onAccent}
+                    />
+                  )}
+                </View>
+                <SecondaryButton
+                  testID="person-profile-share"
+                  label="Share"
+                  icon="share"
+                  size="sm"
+                  onPress={() => share(profile, title)}
+                  accessibilityLabel={`Share ${title}'s profile`}
+                />
+              </View>
+            )}
 
             {/* Their montage, once you can see their activity and they've added to it -- one or more,
                 yours just as others see it (it's added to and changed from Edit Profile). Tapped,
