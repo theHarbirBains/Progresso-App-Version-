@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../design/Text';
@@ -45,6 +46,7 @@ import {
   type WorkoutSummary,
 } from '../workouts/workoutQueries';
 import { fetchNextWorkout } from '../workouts/nextWorkoutQueries';
+import { firstWorkoutDayKey, restDayKeys } from '../workouts/restDays';
 import { feedStyles } from './feedStyles';
 import { workoutHistoryStyles as styles } from './workoutHistoryStyles';
 import { cardioName } from '../cardio/cardioActivities';
@@ -101,7 +103,8 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
   const userId = user?.id ?? '';
   const { theme, activeWorkoutSplitId, themeLoading } = useProgressTheme();
   const { openMenu } = useAppMenu();
-  const { refetch: refetchAllTimeStats } = useAllTimeStats();
+  // The shared history: its first workout is where rest days start.
+  const { allWorkouts, refetch: refetchAllTimeStats } = useAllTimeStats();
 
   const now = new Date();
   const calendar = useCalendarMonth(
@@ -327,6 +330,17 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
   const nextPending = nextPlan === undefined && Boolean(themeLoading || activeWorkoutSplitId);
   const showPage = useShowAllAtOnce(!monthLoading && !recentLoading && !nextPending);
   const monthPending = monthLoading || !showPage;
+  // Rest days: the month's days gone by with no workout, from the first one ever -- only once the
+  // month's workouts are in, so a workout day never shows a moon while it's read.
+  const restDays = monthPending
+    ? new Set<string>()
+    : restDayKeys(
+        year,
+        month,
+        markedDateKeys,
+        firstWorkoutDayKey([...allWorkouts, ...monthWorkouts]),
+        todayKey,
+      );
   const recentPending = recentLoading || !showPage;
 
   const hasAnyHistory = recentWorkouts.length > 0;
@@ -443,6 +457,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
           month={month}
           markedDateKeys={markedDateKeys}
           markedDescription="workout completed"
+          restDateKeys={restDays}
           selectedDateKey={selectedDateKey}
           todayKey={todayKey}
           accentColor={theme.accent}
@@ -456,7 +471,7 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
           items={[
             { color: theme.accent, label: 'Completed' },
             { color: theme.accent, label: 'Today' },
-            { color: colors.border, label: 'No workout' },
+            { color: colors.textMuted, label: 'Rest day', icon: 'moon' },
           ]}
         />
 
@@ -505,6 +520,13 @@ export function WorkoutHistoryScreen({ navigation }: Props) {
                 onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout.id })}
               />
             ))
+          ) : restDays.has(selectedDateKey) ? (
+            <EmptyState
+              testID="selected-day-rest"
+              icon={<Feather name="moon" size={22} color={colors.textMuted} />}
+              title="Rest day"
+              description="No workout logged this day."
+            />
           ) : (
             <EmptyState testID="selected-day-empty" title="No workout on this day" />
           )}

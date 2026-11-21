@@ -1,19 +1,24 @@
+import { Feather } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { colors, spacing, typeScale } from './theme';
 
 interface Props {
-  /** Each dot's colour and what it means, in order. */
-  items: readonly { color: string; label: string }[];
+  /** Each mark's colour and what it means, in order -- a dot, or the glyph given (a rest day's moon). */
+  items: readonly { color: string; label: string; icon?: keyof typeof Feather.glyphMap }[];
 }
 
-/** The key under a history calendar: a small dot per kind of day, with what it means. */
+/** The key under a history calendar: a small dot (or glyph) per kind of day, with what it means. */
 export function CalendarLegend({ items }: Props) {
   return (
     <View style={styles.legendRow}>
       {items.map((item) => (
         <View key={item.label} style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+          {item.icon ? (
+            <Feather name={item.icon} size={10} color={item.color} />
+          ) : (
+            <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+          )}
           <Text style={styles.legendLabel}>{item.label}</Text>
         </View>
       ))}

@@ -49,8 +49,10 @@ jest.mock('../workouts/workoutQueries', () => ({
 }));
 
 const mockRefetchAllTimeStats = jest.fn();
+// The shared history -- where rest days start (its first workout). None unless a test says so.
+let mockAllWorkouts: { performedAt: string }[] = [];
 jest.mock('../progress/AllTimeStatsProvider', () => ({
-  useAllTimeStats: () => ({ refetch: mockRefetchAllTimeStats }),
+  useAllTimeStats: () => ({ allWorkouts: mockAllWorkouts, refetch: mockRefetchAllTimeStats }),
 }));
 
 const mockCompleteWorkout = completeWorkout as jest.Mock;
@@ -107,7 +109,8 @@ const CURRENT_MONTH_LABEL = `${MONTH_LABELS[CURRENT_MONTH - 1]} ${CURRENT_YEAR}`
 // Two days comfortably inside the current month regardless of today's actual date.
 const fixtureDate = new Date(CURRENT_YEAR, CURRENT_MONTH - 1, 5);
 const FIXTURE_DATE_KEY = toLocalDateKey(fixtureDate);
-const OTHER_DAY_KEY = toLocalDateKey(new Date(CURRENT_YEAR, CURRENT_MONTH - 1, 20));
+// Before the month's first workout (the 5th), so never a rest day, whatever today is.
+const OTHER_DAY_KEY = toLocalDateKey(new Date(CURRENT_YEAR, CURRENT_MONTH - 1, 2));
 
 function enrichedFixture(overrides: Record<string, unknown> = {}) {
   return {
@@ -137,6 +140,7 @@ const profile = {
 };
 
 beforeEach(() => {
+  mockAllWorkouts = [];
   mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
   mockFetchMyProfile.mockReset().mockResolvedValue(profile);
   mockFetchWorkoutSplitDetail.mockReset();
@@ -418,6 +422,67 @@ describe('WorkoutHistoryScreen', () => {
 // later focus-triggered call is a silent background refresh. Explicit
 // month navigation (Prev/Next) is untouched and still shows its own loading
 // state, since that's a genuinely new fetch the user just asked for.
+describe('WorkoutHistoryScreen -- rest days', () => {
+  // Saturday, November 21, 2026, at noon.
+  const NOW = new Date(2026, 10, 21, 12, 0, 0);
+  const on = (day: number) => new Date(2026, 10, day, 9, 0, 0).toISOString();
+  const key = (day: number) => toLocalDateKey(new Date(2026, 10, day));
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: NOW });
+    // Their first workout ever was the 3rd; this month they trained on the 3rd, 5th and 10th.
+    mockAllWorkouts = [{ performedAt: on(3) }];
+    mockFetchWorkoutsForMonth.mockResolvedValue([
+      enrichedFixture({ id: 'w3', performedAt: on(3) }),
+      enrichedFixture({ id: 'w5', performedAt: on(5) }),
+      enrichedFixture({ id: 'w10', performedAt: on(10) }),
+    ]);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('puts a moon on every day gone by with no workout, from the first workout on', async () => {
+    renderScreen();
+    await screen.findByTestId(`workout-calendar-rest-${key(4)}`);
+    for (const day of [4, 6, 9, 11, 20]) {
+      expect(screen.getByTestId(`workout-calendar-rest-${key(day)}`)).toBeTruthy();
+    }
+    // Not a workout day, nor today (it isn't over), nor a day ahead or before the first workout.
+    for (const day of [3, 5, 10, 21, 22, 30, 1, 2]) {
+      expect(screen.queryByTestId(`workout-calendar-rest-${key(day)}`)).toBeNull();
+    }
+    expect(screen.getByTestId(`calendar-day-${key(12)}`).props.accessibilityLabel).toMatch(
+      /12, rest day$/,
+    );
+    expect(screen.getByText('Rest day')).toBeTruthy();
+    expect(screen.queryByText('No workout')).toBeNull();
+  });
+
+  it('says a rest day is one when it is tapped', async () => {
+    renderScreen();
+    fireEvent.press(await screen.findByTestId(`calendar-day-${key(12)}`));
+    expect(await screen.findByTestId('selected-day-rest')).toHaveTextContent('Rest day');
+    // A day ahead is just a day with no workout yet.
+    fireEvent.press(screen.getByTestId(`calendar-day-${key(25)}`));
+    expect(await screen.findByTestId('selected-day-empty')).toHaveTextContent(
+      'No workout on this day',
+    );
+  });
+
+  it('shows no moons for someone who has never trained', async () => {
+    mockAllWorkouts = [];
+    mockFetchWorkoutsForMonth.mockResolvedValue([]);
+    renderScreen();
+    await screen.findByTestId('workout-calendar');
+    await act(async () => {
+      jest.advanceTimersByTime(4000);
+    });
+    expect(screen.queryAllByTestId(/^workout-calendar-rest-/)).toHaveLength(0);
+  });
+});
+
 describe('WorkoutHistoryScreen background refresh on focus', () => {
   function deferred<T>() {
     let resolve!: (value: T) => void;

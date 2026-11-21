@@ -14,6 +14,10 @@ interface Props {
   /** Describes what a marked day's dot means, appended to its accessible
    * name (e.g. "workout completed", "food logged"). */
   markedDescription: string;
+  /** Dates that get a small moon beneath them instead -- Workout History's rest days. */
+  restDateKeys?: Set<string>;
+  /** What a moon means, appended to its day's accessible name. */
+  restDescription?: string;
   selectedDateKey: string | null;
   todayKey: string;
   accentColor: string;
@@ -23,14 +27,15 @@ interface Props {
   onNextMonth: () => void;
 }
 
-// "September 5" / "September 5, workout completed" -- a day's accessible name.
-function describeDay(dateKey: string, marked: boolean, markedDescription: string): string {
+// "September 5" / "September 5, workout completed" / "September 5, rest day" -- a day's
+// accessible name.
+function describeDay(dateKey: string, description: string | null): string {
   const [y, m, d] = dateKey.split('-').map(Number);
   const label = new Date(y, m - 1, d).toLocaleDateString(undefined, {
     month: 'long',
     day: 'numeric',
   });
-  return marked ? `${label}, ${markedDescription}` : label;
+  return description ? `${label}, ${description}` : label;
 }
 
 // Component Logic: one 7-column grid of fixed-size day cells, each deriving
@@ -46,6 +51,8 @@ export function MonthCalendar({
   month,
   markedDateKeys,
   markedDescription,
+  restDateKeys,
+  restDescription = 'rest day',
   selectedDateKey,
   todayKey,
   accentColor,
@@ -95,6 +102,7 @@ export function MonthCalendar({
           const isToday = day.dateKey === todayKey;
           const isSelected = day.dateKey === selectedDateKey;
           const isMarked = markedDateKeys.has(day.dateKey);
+          const isRest = !isMarked && day.inCurrentMonth && restDateKeys?.has(day.dateKey) === true;
 
           return (
             <TouchableOpacity
@@ -104,7 +112,10 @@ export function MonthCalendar({
               onPress={() => onSelectDate(day.dateKey)}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel={describeDay(day.dateKey, isMarked, markedDescription)}
+              accessibilityLabel={describeDay(
+                day.dateKey,
+                isMarked ? markedDescription : isRest ? restDescription : null,
+              )}
               accessibilityState={{ selected: isSelected }}
             >
               <View
@@ -124,10 +135,23 @@ export function MonthCalendar({
                   {day.day}
                 </Text>
               </View>
-              <View
-                testID={testID ? `${testID}-dot-${day.dateKey}` : undefined}
-                style={[styles.dot, isMarked && { backgroundColor: accentColor, opacity: 1 }]}
-              />
+              {/* Under the day: a dot in the accent for a marked day, a quiet moon for a rest
+                  day -- one fixed-height slot either way, so the rows never shift. */}
+              <View style={styles.markSlot}>
+                {isRest ? (
+                  <Feather
+                    testID={testID ? `${testID}-rest-${day.dateKey}` : undefined}
+                    name="moon"
+                    size={REST_SIZE}
+                    color={colors.textMuted}
+                  />
+                ) : (
+                  <View
+                    testID={testID ? `${testID}-dot-${day.dateKey}` : undefined}
+                    style={[styles.dot, isMarked && { backgroundColor: accentColor, opacity: 1 }]}
+                  />
+                )}
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -137,6 +161,7 @@ export function MonthCalendar({
 }
 
 const CELL_SIZE = 36;
+const REST_SIZE = 10;
 
 const styles = StyleSheet.create({
   container: {
@@ -191,11 +216,16 @@ const styles = StyleSheet.create({
   dayTextDim: {
     color: colors.textMuted,
   },
+  markSlot: {
+    height: REST_SIZE,
+    marginTop: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    marginTop: 4,
     opacity: 0,
   },
 });
