@@ -26,8 +26,8 @@ const POINTS: Point[] = [
   },
   {
     icon: 'shield',
-    title: 'Never lose it',
-    body: 'AP only ever goes up, so your rank never drops: there are no seasons and nothing wears off. A week you miss costs you nothing -- weeks trained count in total, not in a row.',
+    title: 'Earned from what you log',
+    body: 'There are no seasons and nothing wears off, and a week you miss costs you nothing -- weeks trained count in total, not in a row. Your AP always matches what you’ve logged: delete a workout or fix one logged wrong, and any level it no longer reaches is taken back.',
   },
   {
     icon: 'eye',
@@ -38,8 +38,9 @@ const POINTS: Point[] = [
 
 /**
  * How Progresso's ranks work, plainly: Achievement Points from achievements, the nine ranks and
- * their divisions (each rank's emblem in a row, its name in its colour), that a rank is never
- * lost, and who sees it. Onboarding's own step, and the top of the Ranks page. Content only --
+ * their divisions (each rank's emblem in a row, its name in its colour), that it's earned from
+ * what's logged -- nothing wears off, but a level is taken back once what's logged no longer
+ * reaches it -- and who sees it. Onboarding's own step, and the top of the Ranks page. Content only --
  * the caller gives it its frame.
  */
 export function RankExplainer({ testID }: { testID?: string }) {

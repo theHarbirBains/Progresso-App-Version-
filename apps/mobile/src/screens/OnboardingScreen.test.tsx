@@ -1065,7 +1065,7 @@ describe('OnboardingScreen -- the steps added for sign-up', () => {
     const page = screen.getByTestId('rank-explainer-page');
     expect(page).toHaveTextContent(/Earn Achievement Points/);
     expect(page).toHaveTextContent(/Bronze.*Legacy/);
-    expect(page).toHaveTextContent(/Never lose it/);
+    expect(page).toHaveTextContent(/Earned from what you log/);
     fireEvent.press(screen.getByTestId('rank-explainer-page-close'));
     expect(screen.queryByTestId('rank-explainer-page')).toBeNull();
 

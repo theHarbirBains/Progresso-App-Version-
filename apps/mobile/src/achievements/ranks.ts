@@ -1,7 +1,8 @@
 import { rankPalettes } from '../design/theme';
 
-// Lifetime ranks: worked out from lifetime Achievement Points (the sum of a person's awards,
-// which never goes down), so a rank is never lost -- no decay, no seasons. Nine tiers, each
+// Lifetime ranks: worked out from lifetime Achievement Points (the sum of a person's awards) --
+// no decay, no seasons; only taking back what's logged (a workout deleted or corrected) takes
+// back the levels it earned, and the rank can drop with them. Nine tiers, each
 // split into five divisions from V (lowest) to I; Legacy's are 2,000 AP each, and past Legacy I
 // every further 2,000 AP is another Legacy level.
 

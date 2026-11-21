@@ -25,7 +25,7 @@ describe('RankProgressionScreen', () => {
     expect(how).toHaveTextContent(
       /Bronze.*Silver.*Gold.*Platinum.*Diamond.*Vanguard.*Titan.*Sovereign.*Legacy/,
     );
-    expect(how).toHaveTextContent(/Never lose it/);
+    expect(how).toHaveTextContent(/Earned from what you log/);
     expect(how).toHaveTextContent(/Settings > Account & Security/);
   });
 

@@ -6520,31 +6520,69 @@ async function main() {
       ids(await award(ath)).includes('first-connection@1'),
     );
 
-    // AP never goes down, nor a level: delete every workout and the awards stand.
+    // Achievements follow what's logged: delete every workout and the levels they earned are
+    // taken back, their AP with them -- a social one (First Connection) stays. Put them back and
+    // they're earned again.
     const before = await points(ath);
-    await admin.query('update public.workouts set deleted_at = now() where user_id = $1', [ath]);
+    const live = (
+      await admin.query(
+        'update public.workouts set deleted_at = now() where user_id = $1 and deleted_at is null returning id',
+        [ath],
+      )
+    ).rows.map((r) => r.id);
     await award(ath);
-    const after = await points(ath);
-    const stillLevel = await progressOf(ath, 'quad-squad');
+    const afterDelete = await points(ath);
+    const noLevel = await progressOf(ath, 'quad-squad');
     record(
-      'Deleting workouts later never takes AP or a level back',
-      after.points === before.points &&
-        after.points > 0 &&
-        stillLevel.level === 2 &&
-        Number(stillLevel.value) === 0,
-      JSON.stringify({ before, after, stillLevel }),
+      'Deleting workouts takes back the levels they earned and their AP; a social one stays',
+      afterDelete.points === 25 &&
+        afterDelete.awards === 1 &&
+        before.points > 25 &&
+        noLevel.level === 0 &&
+        Number(noLevel.value) === 0,
+      JSON.stringify({ before, afterDelete, noLevel }),
     );
     const audit = (await admin.query('select * from public.audit_achievements($1)', [ath])).rows;
     record(
-      'The audit lists every level awarded, says which are no longer reached, and totals the AP',
-      audit.length === before.awards &&
-        audit.at(-1).running_points === before.points &&
-        audit.some(
-          (r) => r.achievement_id === 'quad-squad' && r.level === 2 && r.still_reached === false,
-        ) &&
-        audit.some((r) => r.achievement_id === 'first-connection' && r.still_reached === true),
-      JSON.stringify(audit.slice(0, 2)),
+      'The audit lists every level held, each still reached, and totals the AP',
+      audit.length === 1 &&
+        audit[0].achievement_id === 'first-connection' &&
+        audit[0].still_reached === true &&
+        audit[0].running_points === 25,
+      JSON.stringify(audit),
     );
+    await admin.query('update public.workouts set deleted_at = null where id = any($1)', [live]);
+    await award(ath);
+    const restored = await points(ath);
+    record(
+      'Restored, the workouts earn their levels again',
+      restored.points === before.points && restored.awards === before.awards,
+      JSON.stringify({ before, restored }),
+    );
+
+    // A set corrected (logged at the wrong weight) takes back what the wrong weight earned.
+    await admin.query(
+      'create temporary table ath_weights as select id, weight_kg from public.sets where user_id = $1 and weight_kg is not null',
+      [ath],
+    );
+    const tonnageBefore = await progressOf(ath, 'tonnage');
+    await admin.query(
+      'update public.sets set weight_kg = 1 where user_id = $1 and weight_kg is not null',
+      [ath],
+    );
+    await award(ath);
+    const tonnageAfter = await progressOf(ath, 'tonnage');
+    record(
+      'Correcting sets to a lower weight takes back the volume levels they no longer reach',
+      tonnageBefore.level > 0 && tonnageAfter.level < tonnageBefore.level,
+      JSON.stringify({ tonnageBefore, tonnageAfter }),
+    );
+    await admin.query(
+      'update public.sets s set weight_kg = w.weight_kg from ath_weights w where s.id = w.id',
+    );
+    await admin.query('drop table ath_weights');
+    await award(ath);
+    record('Put right again, they come back', (await points(ath)).points === before.points);
 
     // Integrity: awards are never changed, and never written or removed from the app.
     await expectThrows(
