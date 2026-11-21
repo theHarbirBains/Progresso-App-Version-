@@ -2,6 +2,13 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import type { MeasurementType } from '../exercises/movement-type';
 import { FollowsService, type FollowUserSummary } from '../follows/follows.service';
 import { SupabaseService } from '../supabase/supabase.service';
+import {
+  activeMinutes,
+  CARDIO_COLUMNS,
+  cardioByWorkout,
+  type CardioRow,
+  type WorkoutCardio,
+} from './workout-cardio';
 
 const WORKOUT_PAGE_SIZE = 20;
 
@@ -62,6 +69,10 @@ export type FeedItem = {
     totalVolumeKg: number;
     completedExerciseCount: number;
     topSets: FeedTopSet[];
+    /** Its cardio, in the order added -- never sets or exercises. */
+    cardio: WorkoutCardio[];
+    /** Strength and cardio together, in minutes, for a workout with cardio. */
+    activeMinutes: number | null;
   };
 };
 
@@ -129,7 +140,9 @@ export class FeedService {
     const to = from + WORKOUT_PAGE_SIZE - 1;
     let query = client
       .from('workouts')
-      .select('id, user_id, name, performed_at, completed_at, workout_split_day_id')
+      .select(
+        'id, user_id, name, performed_at, completed_at, workout_split_day_id, strength_ended_at',
+      )
       .in('user_id', ownerIds)
       .not('completed_at', 'is', null)
       .is('deleted_at', null);
@@ -147,8 +160,9 @@ export class FeedService {
     if (workoutRows && workoutRows.length > 0) {
       const enriched = await this.enrichWorkouts(client, workoutRows);
       for (const workout of enriched) {
-        // A workout finished with nothing in it isn't one to show anyone.
-        if (workout.completedSetCount === 0) continue;
+        // A workout finished with nothing in it isn't one to show anyone -- cardio alone is
+        // something.
+        if (workout.completedSetCount === 0 && workout.cardio.length === 0) continue;
         items.push({
           kind: 'workout',
           id: `workout-${workout.id}`,
@@ -172,6 +186,8 @@ export class FeedService {
             totalVolumeKg: workout.totalVolumeKg,
             completedExerciseCount: workout.completedExerciseCount,
             topSets: workout.topSets,
+            cardio: workout.cardio,
+            activeMinutes: workout.activeMinutes,
           },
         });
       }
@@ -196,6 +212,7 @@ export class FeedService {
       performed_at: string;
       completed_at: string | null;
       workout_split_day_id: string | null;
+      strength_ended_at?: string | null;
     }[],
   ) {
     const splitDayIds = Array.from(
@@ -212,7 +229,7 @@ export class FeedService {
             .select('id, name, workout_split_day_muscle_groups(muscle_group)')
             .in('id', splitDayIds)
         : null;
-    const [splitDaysResult, workoutExercisesResult] = await Promise.all([
+    const [splitDaysResult, workoutExercisesResult, cardioResult] = await Promise.all([
       splitDaysQuery,
       client
         .from('workout_exercises')
@@ -221,7 +238,14 @@ export class FeedService {
         )
         .in('workout_id', workoutIds)
         .is('deleted_at', null),
+      client
+        .from('workout_cardio')
+        .select(CARDIO_COLUMNS)
+        .in('workout_id', workoutIds)
+        .order('created_at', { ascending: true }),
     ]);
+    if (cardioResult.error) throw new InternalServerErrorException('Failed to load friends feed');
+    const cardioOf = cardioByWorkout((cardioResult.data ?? []) as CardioRow[]);
     if (splitDaysResult) {
       const { data, error } = splitDaysResult;
       if (error) throw new InternalServerErrorException('Failed to load friends feed');
@@ -393,6 +417,14 @@ export class FeedService {
         exerciseCount: exerciseCountByWorkoutId.get(workout.id) ?? 0,
         completedExerciseCount,
         topSets,
+        cardio: cardioOf.get(workout.id) ?? [],
+        activeMinutes: activeMinutes({
+          performedAt: workout.performed_at,
+          completedAt: workout.completed_at,
+          strengthEndedAt: workout.strength_ended_at ?? null,
+          hasStrength: (completedSetCountByWorkoutId.get(workout.id) ?? 0) > 0,
+          cardio: cardioOf.get(workout.id) ?? [],
+        }),
       };
     });
   }

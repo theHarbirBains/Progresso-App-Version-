@@ -549,6 +549,8 @@ export function FeedScreen({ navigation }: Props) {
       totalVolumeKg: item.workout.totalVolumeKg,
       completedExerciseCount: item.workout.completedExerciseCount,
       topSets: item.workout.topSets,
+      cardio: item.workout.cardio,
+      activeMinutes: item.workout.activeMinutes,
     },
   }));
 
@@ -583,6 +585,8 @@ export function FeedScreen({ navigation }: Props) {
       totalVolumeKg: item.workout.totalVolumeKg,
       completedExerciseCount: item.workout.completedExerciseCount,
       topSets: item.workout.topSets,
+      cardio: item.workout.cardio,
+      activeMinutes: item.workout.activeMinutes,
     },
   }));
 

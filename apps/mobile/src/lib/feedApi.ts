@@ -1,3 +1,4 @@
+import type { CardioValues } from '../cardio/cardioActivities';
 import type { MeasurementType } from '../exercises/movementTypes';
 import type { FollowUser } from './followsApi';
 import { request } from './apiClient';
@@ -38,6 +39,10 @@ export type FriendsFeedItem = {
       reps: number | null;
       durationSeconds?: number | null;
     }[];
+    /** Its cardio, in the order added. Absent from an API before cardio. */
+    cardio?: CardioValues[];
+    /** Strength and cardio together, in minutes, for a workout with cardio. */
+    activeMinutes?: number | null;
   };
 };
 

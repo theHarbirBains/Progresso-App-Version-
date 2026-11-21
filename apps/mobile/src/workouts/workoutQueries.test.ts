@@ -72,7 +72,11 @@ function createQueryBuilder(result: Result) {
 /** Configures supabase.from(table) to return a fresh builder per table name. */
 function mockTables(byTable: Record<string, Result>) {
   const buildersByTable: Record<string, ReturnType<typeof createQueryBuilder>> = {};
-  for (const [table, result] of Object.entries(byTable)) {
+  // A workout's cardio is read with it: none, unless a test says otherwise.
+  for (const [table, result] of Object.entries({
+    workout_cardio: { data: [], error: null },
+    ...byTable,
+  })) {
     buildersByTable[table] = createQueryBuilder(result);
   }
   mockFrom.mockImplementation((table: string) => buildersByTable[table]?.builder);
@@ -319,6 +323,8 @@ describe('fetchWorkoutDetail', () => {
     expect(result).toEqual({
       id: 'w1',
       name: 'Push Day',
+      cardio: [],
+      strengthEndedAt: null,
       performedAt: '2026-01-01T00:00:00Z',
       completedAt: null,
       // Not part of a group workout.

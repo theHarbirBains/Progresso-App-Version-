@@ -4790,6 +4790,90 @@ async function main() {
     );
     record("Nobody else sees someone's own machine photos", photosSeen.rows[0].n === 0);
 
+    // Cardio in a workout (20261208100000_workout_cardio.sql): its own rows, always the workout
+    // owner's, read by nobody else straight from the database.
+    {
+      const cardioWorkout = (
+        await admin.query(
+          "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'Cardio Day', now() - interval '1 hour', now()) returning id",
+          [lifter],
+        )
+      ).rows[0].id;
+      const treadmill = await asUserCommitted(lifter, (c) =>
+        c.query(
+          `insert into public.workout_cardio (workout_id, user_id, activity, duration_seconds, distance_m, incline_percent, speed_kmh)
+           values ($1, $2, 'treadmill', 1200, 2414, 3.5, 8) returning id, user_id`,
+          [cardioWorkout, stranger],
+        ),
+      );
+      record(
+        "A cardio activity is always its workout's owner's, whatever user_id is sent",
+        treadmill.rows[0].user_id === lifter,
+      );
+      await expectThrows(
+        asUser(stranger, (c) =>
+          c.query(
+            "insert into public.workout_cardio (workout_id, activity, duration_seconds) values ($1, 'walking', 600)",
+            [cardioWorkout],
+          ),
+        ),
+        "Nobody can add cardio to someone else's workout",
+        /row-level security/,
+      );
+      const strangerSees = await asUser(stranger, (c) =>
+        c.query('select count(*)::int as n from public.workout_cardio where workout_id = $1', [
+          cardioWorkout,
+        ]),
+      );
+      record("Nobody else reads someone's cardio from the database", strangerSees.rows[0].n === 0);
+      await expectThrows(
+        asUser(lifter, (c) =>
+          c.query(
+            "insert into public.workout_cardio (workout_id, activity, duration_seconds) values ($1, 'walking', 0)",
+            [cardioWorkout],
+          ),
+        ),
+        'A cardio activity takes some time',
+        /check constraint/,
+      );
+      const otherWorkout = (
+        await admin.query(
+          "insert into public.workouts (user_id, name, performed_at, completed_at) values ($1, 'Other', now() - interval '3 hours', now() - interval '2 hours') returning id",
+          [lifter],
+        )
+      ).rows[0].id;
+      await expectThrows(
+        asUser(lifter, (c) =>
+          c.query('update public.workout_cardio set workout_id = $2 where id = $1', [
+            treadmill.rows[0].id,
+            otherWorkout,
+          ]),
+        ),
+        'A cardio activity stays with its workout',
+        /stays with its workout/,
+      );
+      const valid = await admin.query(
+        "select workout_id from public.achievement_valid_workouts($1, 'UTC') where workout_id = $2",
+        [lifter, cardioWorkout],
+      );
+      record(
+        'A finished workout of cardio alone is a workout toward achievements',
+        valid.rowCount === 1,
+      );
+      const empty = await admin.query(
+        "select workout_id from public.achievement_valid_workouts($1, 'UTC') where workout_id = $2",
+        [lifter, otherWorkout],
+      );
+      record('A finished workout with nothing in it still is not', empty.rowCount === 0);
+      const removed = await asUserCommitted(lifter, (c) =>
+        c.query('delete from public.workout_cardio where id = $1', [treadmill.rows[0].id]),
+      );
+      record('Its owner can remove a cardio activity', removed.rowCount === 1);
+      await admin.query('delete from public.workouts where id = any($1)', [
+        [cardioWorkout, otherWorkout],
+      ]);
+    }
+
     // The profile montage (20261205100000_profile_montage.sql): four at most, in the owner's order.
     {
       const montageRow = (who, name, kind = 'photo') =>

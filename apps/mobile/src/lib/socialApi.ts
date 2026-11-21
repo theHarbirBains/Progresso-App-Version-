@@ -2,6 +2,7 @@ import type { MeasurementType } from '../exercises/movementTypes';
 import { request } from './apiClient';
 import type { FriendsFeedPage } from './feedApi';
 import type { FollowSearchResult, FollowStatus, FollowUser } from './followsApi';
+import type { CardioValues } from '../cardio/cardioActivities';
 
 // Profiles, follower lists, finding friends from contacts, a followed person's workout, and
 // likes and comments -- see apps/api/src/social. All through the API: they read other people's
@@ -236,6 +237,10 @@ export interface FriendWorkout {
     orderIndex: number;
     sets: FriendWorkoutSet[];
   }[];
+  /** Its cardio, in the order added. Absent from an API before cardio. */
+  cardio?: (CardioValues & { id: string; afterStrength: boolean })[];
+  /** When its strength part ended, for cardio after it. */
+  strengthEndedAt?: string | null;
 }
 
 export function getFriendWorkout(accessToken: string, workoutId: string): Promise<FriendWorkout> {

@@ -11,12 +11,14 @@ import { logWorkoutForClient } from '../lib/api';
 import { draftValues } from '../workouts/setInputDrafts';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import type { RootStackScreenProps } from '../navigation/types';
+import { addCardio } from '../cardio/cardioQueries';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
 import {
   PastExerciseCard,
   PastWorkoutAddCard,
+  PastWorkoutCardio,
   PastWorkoutDateSheet,
   PastWorkoutDetailsCard,
 } from '../workouts/PastWorkoutForm';
@@ -95,12 +97,18 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
       setError(problem);
       return;
     }
-    // Only the sets filled in, and only the exercises left with any.
+    // Only the sets filled in, and only the exercises left with any. Cardio alone is a workout
+    // too (not for a client: a trainer's log has no cardio yet).
     const toSave = exercises
       .map((ex) => ({ ...ex, sets: setsToSave(ex) }))
       .filter((ex) => ex.sets.length > 0);
-    if (toSave.length === 0) {
-      setError('Add at least one exercise with a weight and rep count');
+    const cardio = clientId ? [] : draft.cardio;
+    if (toSave.length === 0 && cardio.length === 0) {
+      setError(
+        clientId
+          ? 'Add at least one exercise with a weight and rep count'
+          : 'Add at least one exercise with a weight and rep count, or some cardio',
+      );
       return;
     }
 
@@ -153,6 +161,7 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
           performedAtIso,
         );
       }
+      for (const entry of cardio) await addCardio(workout.id, entry);
 
       void refetchAllTimeStats();
       navigation.replace('WorkoutDetail', { workoutId: workout.id });
@@ -237,6 +246,17 @@ export function LogPastWorkoutScreen({ navigation, route }: Props) {
                 accentColor={theme.accent}
               />
             ))}
+
+            {/* A trainer's log for a client has no cardio yet. */}
+            {clientId ? null : (
+              <PastWorkoutCardio
+                testID="log-past-workout"
+                draft={draft}
+                weightUnit={weightUnit}
+                accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
+              />
+            )}
 
             <PastWorkoutAddCard
               testID="log-past-workout"

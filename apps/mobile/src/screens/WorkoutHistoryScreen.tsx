@@ -47,6 +47,7 @@ import {
 import { fetchNextWorkout } from '../workouts/nextWorkoutQueries';
 import { feedStyles } from './feedStyles';
 import { workoutHistoryStyles as styles } from './workoutHistoryStyles';
+import { cardioName } from '../cardio/cardioActivities';
 
 const RECENT_PAGE_SIZE = 20;
 
@@ -69,9 +70,12 @@ export interface WorkoutRowProps {
 }
 
 // One completed workout as a row (sat inside a widget): the split day (or the workout's own
-// name), the muscles trained, and one muted line of date, duration and sets.
+// name), the muscles trained, and one muted line of date, duration and sets -- with cardio, its
+// active time and its activities (cardio alone has no sets to count).
 export function WorkoutRow({ workout, divider, onPress }: WorkoutRowProps) {
   const muscles = musclesLabel(workout);
+  const cardio = workout.cardio ?? [];
+  const minutes = cardio.length > 0 ? (workout.activeMinutes ?? null) : workout.durationMinutes;
   return (
     <ListRow
       testID={`workout-item-${workout.id}`}
@@ -80,8 +84,11 @@ export function WorkoutRow({ workout, divider, onPress }: WorkoutRowProps) {
       detail={[
         formatCardDate(workout.performedAt),
         // Logged with no duration: none shown.
-        ...(workout.durationMinutes !== null ? [formatCardDuration(workout.durationMinutes)] : []),
-        `${workout.completedSetCount} sets`,
+        ...(minutes !== null ? [formatCardDuration(minutes)] : []),
+        ...(cardio.length === 0 || workout.completedSetCount > 0
+          ? [`${workout.completedSetCount} sets`]
+          : []),
+        ...cardio.map(cardioName),
       ].join(' · ')}
       divider={divider}
       onPress={onPress}

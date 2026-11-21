@@ -9,6 +9,12 @@ import { SocialPushService } from '../notifications/social-push.service';
 import { isBlockedEitherWay, loadBlocks } from '../safety/blocks';
 import { SupabaseService } from '../supabase/supabase.service';
 import { canSeeActivity, relationshipWith } from './relationship';
+import {
+  CARDIO_COLUMNS,
+  toWorkoutCardio,
+  type CardioRow,
+  type WorkoutCardio,
+} from '../feed/workout-cardio';
 
 const UNIQUE_VIOLATION = '23505';
 /** How much of a comment its push shows. */
@@ -22,6 +28,7 @@ interface WorkoutRow {
   completed_at: string | null;
   deleted_at: string | null;
   logged_by: string | null;
+  strength_ended_at?: string | null;
 }
 
 export interface WorkoutSet {
@@ -59,6 +66,10 @@ export interface WorkoutForViewer {
     orderIndex: number;
     sets: WorkoutSet[];
   }[];
+  /** Its cardio, in the order added -- never sets or exercises. */
+  cardio: WorkoutCardio[];
+  /** When its strength part ended, for cardio after it. */
+  strengthEndedAt: string | null;
 }
 
 export interface WorkoutComment {
@@ -109,6 +120,12 @@ export class WorkoutSocialService {
   async getWorkout(viewerId: string, workoutId: string): Promise<WorkoutForViewer> {
     const workout = await this.visibleWorkout(viewerId, workoutId);
     const client = this.supabaseService.getClient();
+    const { data: cardioRows, error: cardioError } = await client
+      .from('workout_cardio')
+      .select(CARDIO_COLUMNS)
+      .eq('workout_id', workoutId)
+      .order('created_at', { ascending: true });
+    if (cardioError) throw new InternalServerErrorException('Failed to load the workout');
     const { data: exercises, error } = await client
       .from('workout_exercises')
       .select(
@@ -196,6 +213,8 @@ export class WorkoutSocialService {
         orderIndex: row.order_index,
         sets: setsByExercise.get(row.id) ?? [],
       })),
+      cardio: ((cardioRows ?? []) as CardioRow[]).map(toWorkoutCardio),
+      strengthEndedAt: workout.strength_ended_at ?? null,
     };
   }
 
@@ -385,7 +404,9 @@ export class WorkoutSocialService {
     const client = this.supabaseService.getClient();
     const { data, error } = await client
       .from('workouts')
-      .select('id, user_id, name, performed_at, completed_at, deleted_at, logged_by')
+      .select(
+        'id, user_id, name, performed_at, completed_at, deleted_at, logged_by, strength_ended_at',
+      )
       .eq('id', workoutId)
       .maybeSingle();
     if (error) throw new InternalServerErrorException('Failed to look up the workout');

@@ -626,6 +626,70 @@ describe('WorkoutDetailScreen -- a stack of widgets', () => {
     expect(screen.getByTestId('top-set-we2')).toHaveTextContent(/60/);
   });
 
+  it('shows its cardio, and its time told apart: strength, each activity, active and the session', async () => {
+    const treadmill = {
+      id: 'c1',
+      workoutId: 'w1',
+      activity: 'treadmill' as const,
+      name: null,
+      durationSeconds: 900,
+      distanceM: 2000,
+      calories: 140,
+      speedKmh: 8,
+      inclinePercent: 3,
+      resistanceLevel: null,
+      floors: null,
+      afterStrength: true,
+      createdAt: '2026-01-01T12:42:00Z',
+    };
+    // Lifted until 40 min in, then 15 on the treadmill; finished at an hour.
+    await ready({
+      ...twoExercises,
+      strengthEndedAt: '2026-01-01T12:40:00Z',
+      cardio: [treadmill],
+    } as typeof twoExercises);
+
+    expect(screen.getByTestId('workout-detail-cardio-entry-c1')).toHaveTextContent(
+      /Treadmill.*15 min · 2 km · 8 km\/h · 3% incline · 140 cal/,
+    );
+    expect(screen.getByTestId('workout-detail-cardio-strength')).toHaveTextContent(/40 min/);
+    expect(screen.getByTestId('workout-detail-cardio-time-c1')).toHaveTextContent(/15 min/);
+    expect(screen.getByTestId('workout-detail-cardio-active')).toHaveTextContent(/55 min/);
+    expect(screen.getByTestId('workout-detail-cardio-session')).toHaveTextContent(/1h 0m/);
+    // Its figure is the active time, not the session's; cardio is never a set or volume.
+    expect(screen.getByTestId('workout-detail-stat-active')).toHaveTextContent(/55 min/);
+    expect(screen.getByTestId('workout-detail-stat-sets')).toHaveTextContent(/^3/);
+    expect(screen.getByTestId('workout-detail-stat-volume')).toHaveTextContent(/2,360 kg/);
+  });
+
+  it('shows a workout of cardio alone with its cardio time and activities', async () => {
+    const walk = {
+      id: 'c2',
+      workoutId: 'w1',
+      activity: 'walking' as const,
+      name: null,
+      durationSeconds: 2400,
+      distanceM: null,
+      calories: null,
+      speedKmh: null,
+      inclinePercent: null,
+      resistanceLevel: null,
+      floors: null,
+      afterStrength: false,
+      createdAt: '2026-01-01T12:01:00Z',
+    };
+    mockFetchWorkoutDetail.mockResolvedValue({ ...workout, exercises: [], cardio: [walk] });
+    render(<WorkoutDetailScreen navigation={navigation} route={route} />, {
+      wrapper: ProfileProvider,
+    });
+
+    expect(await screen.findByTestId('workout-detail-stat-active')).toHaveTextContent(/40 min/);
+    expect(screen.getByTestId('workout-detail-stat-activities')).toHaveTextContent(/1/);
+    expect(screen.queryByTestId('workout-detail-stat-sets')).toBeNull();
+    expect(screen.queryByTestId('workout-detail-cardio-strength')).toBeNull();
+    expect(screen.getByTestId('workout-detail-cardio-active')).toHaveTextContent(/40 min/);
+  });
+
   it('leaves Duration out of a workout logged with none, the other figures on one row', async () => {
     await ready({ ...twoExercises, completedAt: twoExercises.performedAt });
 

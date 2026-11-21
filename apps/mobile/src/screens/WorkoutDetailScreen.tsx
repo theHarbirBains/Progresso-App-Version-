@@ -51,6 +51,8 @@ import {
 } from '../workouts/workoutQueries';
 import { formatCardDuration } from '../workouts/workoutFormat';
 import { workoutMuscleTabs, type MuscleTab } from '../workouts/workoutMuscleTabs';
+import { WorkoutCardioCard } from '../cardio/CardioSection';
+import { formatMinutes, workoutTimes } from '../cardio/workoutTime';
 import { setLabels } from '../workouts/dropSets';
 import { formatVolume, volumeInUnit } from '../workouts/workoutSummary';
 import { workoutDetailStyles as styles } from './workoutDetailStyles';
@@ -326,6 +328,17 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
   const shownExercises = loggedByExercise.filter(
     ({ exercise }) => activeTab === 'all' || exercise.muscleGroup === activeTab,
   );
+  // Its cardio, and its time told apart: strength, cardio and the two together, rests and breaks
+  // in none of them (cardio/workoutTime.ts).
+  const cardio = shown.cardio ?? [];
+  const times = workoutTimes({
+    performedAt: shown.performedAt,
+    completedAt: shown.completedAt,
+    strengthEndedAt: shown.strengthEndedAt,
+    hasStrength: loggedSetCount > 0,
+    cardio,
+  });
+  const cardioOnly = loggedSetCount === 0 && cardio.length > 0;
   const setsStat = (
     <StatBlock testID="workout-detail-stat-sets" value={String(loggedSetCount)} label="Sets" />
   );
@@ -427,8 +440,38 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
         ) : null}
         {muscles ? <Text style={styles.eyebrow}>{muscles}</Text> : null}
         {/* A workout logged with no duration (Log Past Workout's is optional) shows none: the
-            other three figures share one row instead. */}
-        {durationMinutes !== null ? (
+            other three figures share one row instead. With cardio, its time is the active
+            training -- strength and cardio -- never the session's rests and breaks; cardio alone
+            shows its time and how many activities. */}
+        {cardioOnly ? (
+          <View style={styles.statRow}>
+            <StatBlock
+              testID="workout-detail-stat-active"
+              value={formatMinutes(times.cardioSeconds)}
+              label="Cardio"
+            />
+            <StatBlock
+              testID="workout-detail-stat-activities"
+              value={String(cardio.length)}
+              label={cardio.length === 1 ? 'Activity' : 'Activities'}
+            />
+          </View>
+        ) : cardio.length > 0 && times.activeSeconds !== null ? (
+          <View style={styles.statGrid}>
+            <View style={styles.statRow}>
+              <StatBlock
+                testID="workout-detail-stat-active"
+                value={formatMinutes(times.activeSeconds)}
+                label="Active"
+              />
+              {setsStat}
+            </View>
+            <View style={styles.statRow}>
+              {volumeStat}
+              {lastStat}
+            </View>
+          </View>
+        ) : durationMinutes !== null ? (
           <View style={styles.statGrid}>
             <View style={styles.statRow}>
               <StatBlock
@@ -579,6 +622,16 @@ export function WorkoutDetailScreen({ route, navigation }: Props) {
           </AppCard>
         );
       })}
+
+      {cardio.length > 0 && activeTab === 'all' ? (
+        <WorkoutCardioCard
+          testID="workout-detail-cardio"
+          entries={cardio}
+          times={times}
+          weightUnit={weightUnit}
+          keyOf={(entry) => entry.id}
+        />
+      ) : null}
 
       {focusComments ? null : comments}
 

@@ -13,7 +13,7 @@ interface Result {
 
 function createQueryBuilder(result: Result) {
   const calls: Record<string, unknown[][]> = {};
-  const methods = ['select', 'in', 'is', 'not', 'eq'] as const;
+  const methods = ['select', 'in', 'is', 'not', 'eq', 'order'] as const;
   const builder: Record<string, unknown> = {};
   for (const m of methods) {
     calls[m] = [];
@@ -29,7 +29,11 @@ function createQueryBuilder(result: Result) {
 
 function mockTables(byTable: Record<string, Result>) {
   const buildersByTable: Record<string, ReturnType<typeof createQueryBuilder>> = {};
-  for (const [table, result] of Object.entries(byTable)) {
+  // A workout's cardio is read with it: none, unless a test says otherwise.
+  for (const [table, result] of Object.entries({
+    workout_cardio: { data: [], error: null },
+    ...byTable,
+  })) {
     buildersByTable[table] = createQueryBuilder(result);
   }
   mockFrom.mockImplementation((table: string) => buildersByTable[table]?.builder);
@@ -138,6 +142,9 @@ describe('enrichWorkoutSummaries', () => {
       {
         id: 'w1',
         name: 'Push Day',
+        // No cardio: no active time of its own (its duration says how long).
+        cardio: [],
+        activeMinutes: null,
         performedAt: '2026-09-05T00:00:00Z',
         completedAt: '2026-09-05T01:00:00Z',
         workoutSplitDayId: 'day-push',
@@ -332,5 +339,79 @@ describe('enrichWorkoutSummaries', () => {
     ]);
 
     expect(result[0].durationMinutes).toBe(58);
+  });
+
+  it("carries a workout's cardio and its active time -- the lifting less the cardio before its end", async () => {
+    mockTables({
+      workout_exercises: {
+        data: [
+          { id: 'we1', workout_id: 'w1', exercise_id: 'bench', order_index: 1, exercises: null },
+        ],
+        error: null,
+      },
+      sets: {
+        data: [
+          {
+            id: 's1',
+            workout_exercise_id: 'we1',
+            set_index: 1,
+            side: 'none',
+            weight_kg: 100,
+            reps: 5,
+            duration_seconds: null,
+            completed_at: '2026-09-05T00:30:00Z',
+          },
+        ],
+        error: null,
+      },
+      // 10 min on the bike to warm up, before the strength part ended at 45 min; 15 on the
+      // treadmill after it. The workout ran an hour.
+      workout_cardio: {
+        data: [
+          {
+            id: 'c1',
+            workout_id: 'w1',
+            activity: 'cycling',
+            name: null,
+            duration_seconds: 600,
+            distance_m: null,
+            calories: null,
+            speed_kmh: null,
+            incline_percent: null,
+            resistance_level: 6,
+            floors: null,
+            after_strength: false,
+            created_at: '2026-09-05T00:10:00Z',
+          },
+          {
+            id: 'c2',
+            workout_id: 'w1',
+            activity: 'treadmill',
+            name: null,
+            duration_seconds: 900,
+            distance_m: '2414.02',
+            calories: 150,
+            speed_kmh: '9.66',
+            incline_percent: '2.5',
+            resistance_level: null,
+            floors: null,
+            after_strength: true,
+            created_at: '2026-09-05T00:50:00Z',
+          },
+        ],
+        error: null,
+      },
+      workouts: { data: [{ id: 'w1', strength_ended_at: '2026-09-05T00:45:00Z' }], error: null },
+    });
+
+    const [result] = await enrichWorkoutSummaries([workout({})]);
+
+    expect(result.cardio?.map((c) => [c.activity, c.durationSeconds, c.distanceM])).toEqual([
+      ['cycling', 600, null],
+      ['treadmill', 900, 2414.02],
+    ]);
+    // 45 min less the 10 on the bike, then the bike and the treadmill: 35 + 25.
+    expect(result.activeMinutes).toBe(60);
+    expect(result.completedSetCount).toBe(1);
   });
 });

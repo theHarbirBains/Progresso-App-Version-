@@ -12,12 +12,15 @@ import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { measurementTypeOf } from '../exercises/movementTypes';
 import { draftFromSet, draftValues } from '../workouts/setInputDrafts';
 import type { RootStackScreenProps } from '../navigation/types';
+import { sameCardio } from '../cardio/cardioActivities';
+import { addCardio, deleteCardio, updateCardio } from '../cardio/cardioQueries';
 import { useAllTimeStats } from '../progress/AllTimeStatsProvider';
 import { useProgressTheme } from '../progress/useProgressTheme';
 import { ExercisePickerModal } from '../workouts/ExercisePickerModal';
 import {
   PastExerciseCard,
   PastWorkoutAddCard,
+  PastWorkoutCardio,
   PastWorkoutDateSheet,
   PastWorkoutDetailsCard,
 } from '../workouts/PastWorkoutForm';
@@ -132,6 +135,8 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
             })),
           })),
         );
+        // Its cardio, after its exercises and sets (their local ids come first).
+        draft.setCardio((detail.cardio ?? []).map((c) => ({ ...c, localId: newLocalId() })));
       } catch (err) {
         if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load workout');
       } finally {
@@ -304,6 +309,25 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
         if (added.length > 0) await createCompletedSets(workoutExerciseId, added, performedAtIso);
       }
 
+      // Its cardio: what was removed goes, what changed is saved, what's new is added -- after the
+      // strength part when it ended early in the live workout. A trainer editing a client's
+      // workout sees no cardio to change yet.
+      if (!clientId) {
+        const kept = new Set(draft.cardio.map((c) => c.id).filter((id) => id !== null));
+        for (const entry of original.cardio ?? []) {
+          if (!kept.has(entry.id)) await deleteCardio(entry.id);
+        }
+        const originalById = new Map((original.cardio ?? []).map((c) => [c.id, c]));
+        for (const entry of draft.cardio) {
+          if (entry.id === null) {
+            await addCardio(workoutId, entry, { afterStrength: !!original.strengthEndedAt });
+            continue;
+          }
+          const before = originalById.get(entry.id);
+          if (before && !sameCardio(before, entry)) await updateCardio(entry.id, entry);
+        }
+      }
+
       void refetchAllTimeStats();
       navigation.replace('WorkoutDetail', { workoutId, clientId, clientName });
     } catch (err) {
@@ -412,6 +436,16 @@ export function EditWorkoutScreen({ navigation, route }: Props) {
                 accentColor={theme.accent}
               />
             ))}
+
+            {clientId ? null : (
+              <PastWorkoutCardio
+                testID="edit-workout"
+                draft={draft}
+                weightUnit={weightUnit}
+                accentColor={theme.accent}
+                onAccentColor={theme.onAccent}
+              />
+            )}
 
             <PastWorkoutAddCard
               testID="edit-workout"

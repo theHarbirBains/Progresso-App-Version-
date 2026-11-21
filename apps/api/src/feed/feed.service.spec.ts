@@ -22,6 +22,8 @@ function createMockClient() {
   function nextResult(table: string): QueuedResult {
     const list = queues.get(table);
     const result = list?.shift();
+    // Cardio is optional: a test that queues none reads none.
+    if (!result && table === 'workout_cardio') return { data: [], error: null };
     if (!result) throw new Error(`No queued result for table "${table}"`);
     return result;
   }
@@ -408,6 +410,99 @@ describe('FeedService', () => {
         completedSetCount: 1,
         totalVolumeKg: 800 + 1080,
         topSets: [{ exerciseId: 'press', weightKg: 100, reps: 8 }],
+      });
+    });
+
+    it('shows a workout of cardio alone, and its cardio and active time beside the lifting', async () => {
+      const client = createMockClient();
+      client.queue('follows', { data: [{ followee_id: 'user-2' }], error: null });
+      const workout = (id: string, extra: Record<string, unknown> = {}) => ({
+        id,
+        user_id: 'user-2',
+        name: id,
+        performed_at: '2026-09-20T10:00:00.000Z',
+        completed_at: '2026-09-20T11:00:00.000Z',
+        workout_split_day_id: null,
+        ...extra,
+      });
+      client.queue('workouts', {
+        data: [
+          workout('run'),
+          // Lifted for 40 min, then 15 min on the treadmill; finished at an hour.
+          workout('both', { strength_ended_at: '2026-09-20T10:40:00.000Z' }),
+        ],
+        error: null,
+      });
+      client.queue('workout_exercises', {
+        data: [
+          {
+            id: 'we1',
+            workout_id: 'both',
+            exercise_id: 'bench',
+            order_index: 1,
+            exercises: { name: 'Bench' },
+          },
+        ],
+        error: null,
+      });
+      client.queue('workout_cardio', {
+        data: [
+          {
+            id: 'c1',
+            workout_id: 'run',
+            activity: 'outdoor_run',
+            name: null,
+            duration_seconds: 1800,
+            distance_m: '5000.00',
+            calories: 300,
+            speed_kmh: null,
+            incline_percent: null,
+            resistance_level: null,
+            floors: null,
+            after_strength: false,
+          },
+          {
+            id: 'c2',
+            workout_id: 'both',
+            activity: 'treadmill',
+            name: null,
+            duration_seconds: 900,
+            distance_m: null,
+            calories: null,
+            speed_kmh: '9.50',
+            incline_percent: '3.0',
+            resistance_level: null,
+            floors: null,
+            after_strength: true,
+          },
+        ],
+        error: null,
+      });
+      client.queue('sets', {
+        data: [{ id: 's1', workout_exercise_id: 'we1', set_index: 1, weight_kg: 100, reps: 5 }],
+        error: null,
+      });
+      client.queue('users', {
+        data: [{ id: 'user-2', username: 'jane', display_name: 'Jane', avatar_url: null }],
+        error: null,
+      });
+      const service = serviceWith(client);
+
+      const result = await service.getFriendsFeed('user-1', 0);
+
+      const byId = new Map(result.items.map((item) => [item.workout.id, item.workout]));
+      expect(byId.get('run')).toMatchObject({
+        completedSetCount: 0,
+        activeMinutes: 30,
+        cardio: [
+          { activity: 'outdoor_run', durationSeconds: 1800, distanceM: 5000, calories: 300 },
+        ],
+      });
+      expect(byId.get('both')).toMatchObject({
+        completedSetCount: 1,
+        // 40 min of lifting and 15 on the treadmill -- not the hour start to finish.
+        activeMinutes: 55,
+        cardio: [{ activity: 'treadmill', speedKmh: 9.5, inclinePercent: 3, afterStrength: true }],
       });
     });
 

@@ -40,5 +40,12 @@ export function friendWorkoutDetail(workout: FriendWorkout): WorkoutDetail {
         isDrop: set.isDrop === true,
       })),
     })),
+    // Its cardio, read-only: the times work out the same as on their own page.
+    cardio: (workout.cardio ?? []).map((entry) => ({
+      ...entry,
+      workoutId: workout.id,
+      createdAt: workout.completedAt ?? workout.performedAt,
+    })),
+    strengthEndedAt: workout.strengthEndedAt ?? null,
   };
 }

@@ -19,6 +19,7 @@ import {
   updateWorkout,
   fetchNextExerciseOrderIndex,
 } from '../workouts/workoutQueries';
+import { addCardio, deleteCardio, updateCardio } from '../cardio/cardioQueries';
 import { EditWorkoutScreen } from './EditWorkoutScreen';
 import { fetchMyProfile } from '../profile/profileQueries';
 
@@ -78,6 +79,12 @@ jest.mock('../workouts/prSummaryQueries', () => ({
   fetchAllExerciseRecords: jest.fn().mockResolvedValue([]),
   fetchAllRepPRs: jest.fn(),
   fetchAllOneRepMaxes: jest.fn(),
+}));
+
+jest.mock('../cardio/cardioQueries', () => ({
+  addCardio: jest.fn(),
+  updateCardio: jest.fn(),
+  deleteCardio: jest.fn(),
 }));
 
 jest.mock('../workouts/workoutQueries', () => ({
@@ -466,6 +473,58 @@ describe('EditWorkoutScreen -- saving changes', () => {
     );
     // Set 2 only moved: its figures are as they were.
     expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it("saves its cardio's changes: one changed, one removed, one added", async () => {
+    const entry = (id: string, activity: string, minutes: number) => ({
+      id,
+      workoutId: 'w1',
+      activity,
+      name: null,
+      durationSeconds: minutes * 60,
+      distanceM: null,
+      calories: null,
+      speedKmh: null,
+      inclinePercent: null,
+      resistanceLevel: null,
+      floors: null,
+      afterStrength: false,
+      createdAt: FIXTURE_PERFORMED_AT,
+    });
+    mockFetchWorkoutDetail.mockResolvedValue({
+      ...baseWorkout,
+      cardio: [entry('c1', 'walking', 30), entry('c2', 'cycling', 10)],
+    });
+    (updateCardio as jest.Mock).mockReset().mockResolvedValue(undefined);
+    (deleteCardio as jest.Mock).mockReset().mockResolvedValue(undefined);
+    (addCardio as jest.Mock).mockReset().mockResolvedValue(undefined);
+    renderScreen();
+    await screen.findByTestId(EX);
+
+    fireEvent.press(screen.getByTestId('edit-workout-cardio-entry-local-3'));
+    fireEvent.changeText(screen.getByTestId('edit-workout-cardio-sheet-duration'), '35');
+    fireEvent.press(screen.getByTestId('edit-workout-cardio-sheet-save'));
+    fireEvent.press(await screen.findByTestId('edit-workout-cardio-entry-local-4'));
+    fireEvent.press(screen.getByTestId('edit-workout-cardio-sheet-remove'));
+    fireEvent.press(await screen.findByTestId('edit-workout-cardio-add'));
+    fireEvent.press(screen.getByTestId('edit-workout-cardio-sheet-activity-rowing'));
+    fireEvent.changeText(screen.getByTestId('edit-workout-cardio-sheet-duration'), '10');
+    fireEvent.press(screen.getByTestId('edit-workout-cardio-sheet-save'));
+
+    fireEvent.press(await screen.findByTestId('edit-workout-save'));
+
+    await waitFor(() =>
+      expect(addCardio).toHaveBeenCalledWith(
+        'w1',
+        expect.objectContaining({ activity: 'rowing', durationSeconds: 600 }),
+        { afterStrength: false },
+      ),
+    );
+    expect(updateCardio).toHaveBeenCalledWith(
+      'c1',
+      expect.objectContaining({ activity: 'walking', durationSeconds: 2100 }),
+    );
+    expect(deleteCardio).toHaveBeenCalledWith('c2');
   });
 
   it('saves a set marked a warm-up with a tap on its number', async () => {

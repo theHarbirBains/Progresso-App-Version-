@@ -5,7 +5,8 @@ import { Avatar } from '../design/Avatar';
 import { Card } from '../design/Card';
 import { StatBlock } from '../design/StatBlock';
 import { Text } from '../design/Text';
-import { colors, minTouchTarget } from '../design/theme';
+import { colors, minTouchTarget, spacing } from '../design/theme';
+import { cardioDetails, cardioName } from '../cardio/cardioActivities';
 import type { EnrichedWorkoutSummary } from '../workouts/workoutHistoryEnrichment';
 import { SPLIT_MUSCLE_GROUP_LABELS } from '../workouts/splitMuscleGroups';
 import { formatCardDate, formatCardDuration } from '../workouts/workoutFormat';
@@ -24,6 +25,8 @@ export type WorkoutCardData = Pick<
   | 'completedExerciseCount'
   | 'completedSetCount'
   | 'topSets'
+  | 'cardio'
+  | 'activeMinutes'
 >;
 
 interface Props {
@@ -69,6 +72,8 @@ export function WorkoutFeedCard({
   social,
   actions,
 }: Props) {
+  const cardio = workout.cardio ?? [];
+  const cardioOnly = cardio.length > 0 && workout.completedSetCount === 0;
   return (
     <Card testID={`${idPrefix}-${workout.id}`} onPress={onPress}>
       <View style={styles.metaRow}>
@@ -123,30 +128,63 @@ export function WorkoutFeedCard({
       ) : null}
 
       <View style={styles.statRow}>
-        {/* Logged with no duration (Log Past Workout's is optional): none shown. */}
-        {workout.durationMinutes !== null ? (
+        {/* With cardio, its time is the active training -- strength and cardio, never the
+            session's rests and breaks. Logged with no duration (Log Past Workout's is optional):
+            none shown. */}
+        {cardio.length > 0 && workout.activeMinutes != null ? (
+          <StatBlock
+            testID={`${idPrefix}-${workout.id}-active`}
+            value={formatCardDuration(workout.activeMinutes)}
+            label="Active"
+          />
+        ) : workout.durationMinutes !== null ? (
           <StatBlock
             testID={`${idPrefix}-${workout.id}-duration`}
             value={formatCardDuration(workout.durationMinutes)}
             label="Duration"
           />
         ) : null}
-        <StatBlock
-          testID={`${idPrefix}-${workout.id}-exercises`}
-          value={String(workout.completedExerciseCount)}
-          label={workout.completedExerciseCount === 1 ? 'Exercise' : 'Exercises'}
-        />
-        <StatBlock
-          testID={`${idPrefix}-${workout.id}-sets`}
-          value={String(workout.completedSetCount)}
-          label="Sets"
-        />
+        {/* Cardio alone has no exercises or sets to count: how many activities instead. */}
+        {cardioOnly ? (
+          <StatBlock
+            testID={`${idPrefix}-${workout.id}-activities`}
+            value={String(cardio.length)}
+            label={cardio.length === 1 ? 'Activity' : 'Activities'}
+          />
+        ) : (
+          <>
+            <StatBlock
+              testID={`${idPrefix}-${workout.id}-exercises`}
+              value={String(workout.completedExerciseCount)}
+              label={workout.completedExerciseCount === 1 ? 'Exercise' : 'Exercises'}
+            />
+            <StatBlock
+              testID={`${idPrefix}-${workout.id}-sets`}
+              value={String(workout.completedSetCount)}
+              label="Sets"
+            />
+          </>
+        )}
       </View>
       <RecentWorkoutTopSets
         testID={`${idPrefix}-${workout.id}-top-sets`}
         topSets={workout.topSets}
         weightUnit={weightUnit}
       />
+      {cardio.length > 0 ? (
+        <View testID={`${idPrefix}-${workout.id}-cardio`} style={cardioListStyle}>
+          {cardio.map((entry, index) => (
+            <Text
+              key={index}
+              style={styles.itemSubtitle}
+              numberOfLines={1}
+              accessibilityLabel={`${cardioName(entry)}: ${cardioDetails(entry, weightUnit)}`}
+            >
+              {cardioName(entry)} · {cardioDetails(entry, weightUnit)}
+            </Text>
+          ))}
+        </View>
+      ) : null}
       {social ? (
         <WorkoutSocialBar
           testID={`${idPrefix}-${workout.id}-social`}
@@ -160,6 +198,9 @@ export function WorkoutFeedCard({
     </Card>
   );
 }
+
+// The cardio lines under the top sets: a little room above, like the strip's.
+const cardioListStyle = { marginTop: spacing.sm, gap: spacing.xs } as const;
 
 // A bare glyph with a full 44pt target, like the live workout's reorder/remove glyphs. Pulled
 // toward the card's edge so the glyph lines up with its content.

@@ -16,6 +16,7 @@ import {
   createLoggedWorkout,
   createCompletedSets,
 } from '../workouts/workoutQueries';
+import { addCardio } from '../cardio/cardioQueries';
 import { LogPastWorkoutScreen } from './LogPastWorkoutScreen';
 import { AppMenuContext } from '../navigation/AppMenuContext';
 import { fetchMyProfile } from '../profile/profileQueries';
@@ -82,6 +83,8 @@ jest.mock('../workouts/prSummaryQueries', () => ({
   fetchAllRepPRs: jest.fn(),
   fetchAllOneRepMaxes: jest.fn(),
 }));
+
+jest.mock('../cardio/cardioQueries', () => ({ addCardio: jest.fn() }));
 
 jest.mock('../workouts/workoutQueries', () => ({
   createLoggedWorkout: jest.fn(),
@@ -271,7 +274,7 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
     fireEvent.press(screen.getByTestId('log-past-workout-save'));
 
     expect(await screen.findByTestId('log-past-workout-error')).toHaveTextContent(
-      'Add at least one exercise with a weight and rep count',
+      'Add at least one exercise with a weight and rep count, or some cardio',
     );
     expect(mockCreateLoggedWorkout).not.toHaveBeenCalled();
   });
@@ -319,6 +322,36 @@ describe('LogPastWorkoutScreen -- validation and save', () => {
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('WorkoutDetail', { workoutId: 'w1' }),
     );
+  });
+
+  it('logs a workout of cardio alone, its run with its distance', async () => {
+    renderScreen();
+    await screen.findByTestId('log-past-workout-date');
+    fireEvent.changeText(screen.getByTestId('log-past-workout-name'), 'Morning Run');
+
+    fireEvent.press(screen.getByTestId('log-past-workout-cardio-add'));
+    fireEvent.press(screen.getByTestId('log-past-workout-cardio-sheet-activity-outdoor_run'));
+    // A run asks for no incline or speed; its pace shows as its distance is typed.
+    expect(screen.queryByTestId('log-past-workout-cardio-sheet-incline')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('log-past-workout-cardio-sheet-duration'), '30');
+    fireEvent.changeText(screen.getByTestId('log-past-workout-cardio-sheet-distance'), '5');
+    expect(screen.getByText('Pace 6:00 /km')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('log-past-workout-cardio-sheet-save'));
+    expect(await screen.findByText('Outdoor Running')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('log-past-workout-save'));
+
+    await waitFor(() =>
+      expect(addCardio).toHaveBeenCalledWith(
+        'w1',
+        expect.objectContaining({
+          activity: 'outdoor_run',
+          durationSeconds: 1800,
+          distanceM: 5000,
+        }),
+      ),
+    );
+    expect(mockAddExerciseToWorkout).not.toHaveBeenCalled();
   });
 
   it('logs a warm-up, a set and a drop set under it, each with its mark', async () => {

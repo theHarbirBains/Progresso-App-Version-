@@ -1,3 +1,4 @@
+import { fetchCardioFor, type CardioEntry } from '../cardio/cardioQueries';
 import { supabase } from '../lib/supabase';
 import { MACHINE_COLUMNS, machineDetailsOf } from '../exercises/machineDetails';
 import type { LoadType, Pulley, PulleyPosition } from '../exercises/machineLoad';
@@ -120,6 +121,10 @@ export interface WorkoutExerciseWithSets {
 
 export interface WorkoutDetail extends WorkoutSummary {
   exercises: WorkoutExerciseWithSets[];
+  /** Its cardio, in the order added (absent: none). Never sets or exercises of its own. */
+  cardio?: CardioEntry[];
+  /** When its strength part ended, for cardio after it (cardio/workoutTime.ts). */
+  strengthEndedAt?: string | null;
   /** The group workout it was part of, if any -- everyone's workouts in it can be read. */
   groupId?: string | null;
 }
@@ -245,11 +250,16 @@ export async function fetchWorkoutsForDateRange(
 export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDetail> {
   const { data: workout, error: workoutError } = await supabase
     .from('workouts')
-    .select('id, name, performed_at, completed_at, workout_split_day_id, group_id')
+    .select(
+      'id, name, performed_at, completed_at, workout_split_day_id, group_id, strength_ended_at',
+    )
     .eq('id', workoutId)
     .is('deleted_at', null)
     .single();
   if (workoutError) throw new Error(workoutError.message);
+  // Its cardio is read alongside its exercises (a failure surfaces where it's awaited, below).
+  const cardio = fetchCardioFor([workoutId]);
+  cardio.catch(() => undefined);
 
   const { data: workoutExercises, error: weError } = await supabase
     .from('workout_exercises')
@@ -311,7 +321,13 @@ export async function fetchWorkoutDetail(workoutId: string): Promise<WorkoutDeta
     };
   });
 
-  return { ...toWorkoutSummary(workout), exercises, groupId: workout.group_id ?? null };
+  return {
+    ...toWorkoutSummary(workout),
+    exercises,
+    groupId: workout.group_id ?? null,
+    cardio: (await cardio).get(workoutId) ?? [],
+    strengthEndedAt: workout.strength_ended_at ?? null,
+  };
 }
 
 export type CreateWorkoutResult =

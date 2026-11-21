@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { addMonths, toLocalDateKey } from '../design/calendarGrid';
+import type { CardioValues } from '../cardio/cardioActivities';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import type { MuscleGroup } from '../exercises/muscleGroups';
 import {
@@ -47,6 +48,12 @@ export interface PastDraftExercise {
 
 export type PastSetField = 'weight' | 'reps' | 'duration';
 
+/** A cardio activity as typed in: its figures, and the saved row's id (null until saved). */
+export interface PastDraftCardio extends CardioValues {
+  localId: string;
+  id: string | null;
+}
+
 /**
  * The sets worth saving: only those filled in -- a past workout is typed in one sitting, so a
  * stray blank "Set 3" is just something not got to, not an error -- and, for a unilateral
@@ -92,6 +99,7 @@ export function completedAtFor(date: Date, hours: string, minutes: string): stri
 /** The exercises and sets being typed in, and every change the page can make to them. */
 export function usePastWorkoutDraft() {
   const [exercises, setExercises] = useState<PastDraftExercise[]>([]);
+  const [cardio, setCardio] = useState<PastDraftCardio[]>([]);
   const nextLocalId = useRef(0);
 
   function newLocalId(): string {
@@ -148,6 +156,19 @@ export function usePastWorkoutDraft() {
     exercises,
     /** Replaces every exercise -- a saved workout's, as it loads. */
     setExercises,
+    /** Its cardio, in the order added -- kept apart from the exercises and their sets. */
+    cardio,
+    /** Replaces the cardio -- a saved workout's, as it loads. */
+    setCardio,
+    addCardio(values: CardioValues) {
+      setCardio((prev) => [...prev, { ...values, localId: newLocalId(), id: null }]);
+    },
+    changeCardio(localId: string, values: CardioValues) {
+      setCardio((prev) => prev.map((c) => (c.localId === localId ? { ...c, ...values } : c)));
+    },
+    removeCardio(localId: string) {
+      setCardio((prev) => prev.filter((c) => c.localId !== localId));
+    },
     newLocalId,
     addExercise(exercise: ExerciseRow) {
       setExercises((prev) => [
