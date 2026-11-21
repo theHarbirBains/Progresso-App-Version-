@@ -10,7 +10,7 @@ import { ExercisePhoto } from '../exercises/ExercisePhoto';
 import type { ExerciseRow } from '../exercises/exerciseQueries';
 import { machineLine } from '../exercises/machineDetails';
 import { MUSCLE_GROUP_LABELS, type MuscleGroup } from '../exercises/muscleGroups';
-import { formatMonthDay, formatShortDate } from './workoutFormat';
+import { formatRecentDate } from './workoutFormat';
 import { planPreviousExercises, type PreviousExercise } from './previousExercises';
 import { formatSetValues } from './setValues';
 import type { PreviousExercisesState } from './usePreviousExercises';
@@ -25,13 +25,6 @@ interface Props {
   weightUnit: 'kg' | 'lb';
   onSelect: (exercise: ExerciseRow) => void;
   testID?: string;
-}
-
-/** "Nov 18"; a date in another year keeps its year. */
-function dayLabel(iso: string): string {
-  return new Date(iso).getFullYear() === new Date().getFullYear()
-    ? formatMonthDay(iso)
-    : formatShortDate(iso);
 }
 
 /** "3 sets · Top set 80 kg × 8" -- "Best 12 reps", "Best 1:30" -- and who logged it. */
@@ -100,7 +93,7 @@ export function PreviousExercisesSection({
                   <Text style={styles.groupName}>{label}</Text>
                   {section.lastTrainedAt ? (
                     <Text testID={`${groupID}-date`} style={styles.groupDate}>
-                      Last trained {dayLabel(section.lastTrainedAt)}
+                      Last trained {formatRecentDate(section.lastTrainedAt)}
                     </Text>
                   ) : null}
                 </View>
@@ -143,7 +136,7 @@ export function PreviousExercisesSection({
                           title,
                           subtitle,
                           detail,
-                          `last done ${dayLabel(done.performedAt)}`,
+                          `last done ${formatRecentDate(done.performedAt)}`,
                         ]
                           .filter(Boolean)
                           .join(', ')}

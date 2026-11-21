@@ -164,6 +164,12 @@ describe("ExercisePickerModal -- a trainer's, a client's or a friend's exercise"
 });
 
 describe('ExercisePickerModal -- previous exercises', () => {
+  // Whether a tab's content is out of sight (both stay mounted; the one not chosen is hidden).
+  const hidden = (testID: string) => {
+    expect(screen.getByTestId(testID, { includeHiddenElements: true })).toBeTruthy();
+    return screen.queryByTestId(testID) === null;
+  };
+
   const chest = {
     muscleGroup: 'chest' as const,
     lastTrainedAt: '2026-11-18T10:00:00Z',
@@ -191,7 +197,7 @@ describe('ExercisePickerModal -- previous exercises', () => {
     weightUnit: 'kg' as const,
   });
 
-  it('come first, above the whole library, each the very exercise done -- one tap to add', async () => {
+  it('are a tab of their own, Last Time, where it opens -- each the very exercise done, one tap to add', async () => {
     const onSelect = jest.fn();
     render(
       <ExercisePickerModal
@@ -212,16 +218,19 @@ describe('ExercisePickerModal -- previous exercises', () => {
     expect(screen.getByTestId('exercise-picker-previous-group-chest-ex1')).toHaveTextContent(
       /Barbell Bench Press.*3 sets · Top set 80 kg × 8 · Logged by your trainer/,
     );
-    // Before the library's count and its exercises.
-    expect(screen.getByTestId('exercise-library-list')).toHaveTextContent(
-      /^Your Previous Exercises.*2 exercises.*Barbell Back Squat/,
-    );
+    // On its own tab: the library is the other one, with nothing of Last Time's in it.
+    expect(screen.getByTestId('exercise-picker-tabs')).toHaveTextContent(/Last Time.*All Exercises/);
+    expect(hidden('exercise-picker-previous-card')).toBe(false);
+    expect(hidden('exercise-library-list')).toBe(true);
+    expect(
+      screen.getByTestId('exercise-library-list', { includeHiddenElements: true }),
+    ).not.toHaveTextContent(/Your Previous Exercises/);
 
     fireEvent.press(screen.getByTestId('exercise-picker-previous-group-chest-ex1'));
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'ex1' }));
   });
 
-  it('show one already in the workout as added, and go once a search is typed', async () => {
+  it('show one already in the workout as added, whatever All Exercises is searched for', async () => {
     const onSelect = jest.fn();
     render(
       <ExercisePickerModal
@@ -239,8 +248,14 @@ describe('ExercisePickerModal -- previous exercises', () => {
     fireEvent.press(row);
     expect(onSelect).not.toHaveBeenCalled();
 
+    // All Exercises is a tap away, and searching it leaves Last Time as it was.
+    fireEvent.press(screen.getByTestId('exercise-picker-browse-all'));
+    expect(hidden('exercise-library-list')).toBe(false);
+    expect(hidden('exercise-picker-previous-card')).toBe(true);
     fireEvent.changeText(screen.getByTestId('exercise-search'), 'bench');
-    expect(screen.queryByTestId('exercise-picker-previous')).toBeNull();
+    fireEvent.press(within(screen.getByTestId('exercise-picker-tabs')).getByText('Last Time'));
+    expect(hidden('exercise-picker-previous-card')).toBe(false);
+    expect(screen.getByTestId('exercise-picker-previous-group-chest-ex1')).toBeTruthy();
   });
 
   it('never stand in a look-alike for an exercise no longer in the library', async () => {
@@ -274,7 +289,12 @@ describe('ExercisePickerModal -- previous exercises', () => {
         previous={previous([])}
       />,
     );
-    expect(await screen.findByTestId('exercise-picker-previous-first')).toBeTruthy();
+    expect(
+      await screen.findByTestId('exercise-picker-previous-first', { includeHiddenElements: true }),
+    ).toBeTruthy();
+    // With no history yet, it opens on All Exercises instead.
+    expect(hidden('exercise-library-list')).toBe(false);
+    expect(hidden('exercise-picker-previous-card')).toBe(true);
 
     const retry = jest.fn();
     rerender(
@@ -291,6 +311,7 @@ describe('ExercisePickerModal -- previous exercises', () => {
         }}
       />,
     );
+    fireEvent.press(within(screen.getByTestId('exercise-picker-tabs')).getByText('Last Time'));
     fireEvent.press(await screen.findByTestId('exercise-picker-previous-retry'));
     expect(retry).toHaveBeenCalled();
   });
@@ -308,6 +329,7 @@ describe('ExercisePickerModal -- previous exercises', () => {
 
     await screen.findByTestId('exercise-item-ex1');
     expect(screen.queryByTestId('exercise-picker-previous')).toBeNull();
+    expect(screen.queryByTestId('exercise-picker-tabs')).toBeNull();
     expect(screen.getByTestId('exercise-library-count')).toHaveTextContent('2 exercises');
   });
 });

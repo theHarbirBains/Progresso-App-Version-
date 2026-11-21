@@ -1,10 +1,13 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { updateExercise } from '../lib/api';
-import { Alert, Modal, View } from 'react-native';
+import { Alert, Modal, ScrollView, View } from 'react-native';
+import { AppCard } from '../design/AppCard';
 import { AppHeader } from '../design/AppHeader';
+import { TextButton } from '../design/Button';
 import { ListRow } from '../design/ListRow';
 import { PhotoLightbox } from '../design/PhotoLightbox';
+import { SegmentedControl } from '../design/SegmentedControl';
 import { colors } from '../design/theme';
 import {
   fetchAllExercises,
@@ -40,9 +43,10 @@ interface Props {
   /** Offers "Create Custom Exercise" at the top of the list; left out, it isn't offered. */
   onCreateCustom?: () => void;
   /**
-   * A live workout's previous exercises (usePreviousExercises): given, what they did the last
-   * time they trained each muscle group comes first, above the whole library -- with the muscle
-   * groups already in the workout, and the unit to show weights in.
+   * A live workout's previous exercises (usePreviousExercises): given, the picker has two tabs --
+   * Last Time (what they did the last time they trained each muscle group), where it opens, and
+   * All Exercises (the whole library) -- with the muscle groups already in the workout, and the
+   * unit to show weights in.
    */
   previous?: {
     state: PreviousExercisesState;
@@ -54,12 +58,20 @@ interface Props {
   onAccentColor?: string;
 }
 
+type PickerTab = 'previous' | 'all';
+
+const TAB_OPTIONS: { label: string; value: PickerTab }[] = [
+  { label: 'Last Time', value: 'previous' },
+  { label: 'All Exercises', value: 'all' },
+];
+
 /**
- * Add Exercise during a workout. It is the Exercise Library's own browse layout (the shared
- * ExerciseBrowser), so the two look the same: search, muscle filter, All / Built-in /
- * Custom with counts, and the exercises A-Z with their photos. Tapping an exercise adds
- * it; a tapped photo opens full size. Exercises already in the workout are greyed out. In a live
- * workout the list opens on the person's previous exercises (PreviousExercisesSection).
+ * Add Exercise during a workout. Its All Exercises is the Exercise Library's own browse layout
+ * (the shared ExerciseBrowser), so the two look the same: search, muscle filter, All / Built-in /
+ * Custom with counts, and the exercises A-Z with their photos. Tapping an exercise adds it; a
+ * tapped photo opens full size. Exercises already in the workout are greyed out. In a live
+ * workout it opens on a tab of its own, Last Time -- the person's previous exercises
+ * (PreviousExercisesSection) -- unless they have none yet; the other tab is the whole library.
  */
 export function ExercisePickerModal({
   visible,
@@ -110,6 +122,26 @@ export function ExercisePickerModal({
   const [photoOpen, setPhotoOpen] = useState<string | null>(null);
   // Bumped by Retry to load the exercises again.
   const [attempt, setAttempt] = useState(0);
+  // Last Time or All Exercises. Each opening starts on Last Time (when there's one); with no
+  // history at all it moves to All Exercises by itself, unless a tab has been tapped.
+  const hasPrevious = previous !== undefined;
+  const [tab, setTab] = useState<PickerTab>(hasPrevious ? 'previous' : 'all');
+  const tabTapped = useRef(false);
+  const noHistory = previous?.state.status === 'ready' && previous.state.groups.length === 0;
+  useEffect(() => {
+    if (!visible) return;
+    tabTapped.current = false;
+    setTab(hasPrevious && !noHistory ? 'previous' : 'all');
+    // Only as it opens: a tab tapped meanwhile stays.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, hasPrevious]);
+  useEffect(() => {
+    if (noHistory && !tabTapped.current) setTab('all');
+  }, [noHistory]);
+  const chooseTab = (next: PickerTab) => {
+    tabTapped.current = true;
+    setTab(next);
+  };
   // The source and equipment the rows on screen were read for: while either differs from what's
   // chosen, the list fades softly (ExerciseBrowser's `updating`).
   const [readFor, setReadFor] = useState<{ source: ExerciseSource; equipment: Equipment | null }>({
@@ -174,20 +206,27 @@ export function ExercisePickerModal({
 
   const alreadyAddedIdSet = useMemo(() => new Set(alreadyAddedIds), [alreadyAddedIds]);
 
-  // Previous exercises come first, before any search or filter -- the library's own exercises,
-  // and the ones shared with them, by id: a previous exercise is only ever offered as itself.
-  // Only once the rows on screen are the whole library again, not a search just cleared.
-  const browsing =
-    !searchInput.trim() &&
-    !search.trim() &&
-    !muscleGroup &&
-    !equipment &&
-    source === 'all' &&
-    readFor.source === 'all' &&
-    readFor.equipment === null;
+  // The whole library, unfiltered, for Last Time -- its own exercises and the ones shared with
+  // them, by id: a previous exercise is only ever offered as itself, whatever All Exercises is
+  // searched or filtered to (read from the same in-memory cache).
+  const [fullLibrary, setFullLibrary] = useState<ExerciseRow[] | null>(null);
+  useEffect(() => {
+    if (!visible || !userId || !hasPrevious) return;
+    let cancelled = false;
+    fetchAllExercises({ userId, search: '', muscleGroup: null, source: 'all', shared: sharedRows })
+      .then((result) => {
+        if (!cancelled) setFullLibrary(result);
+      })
+      .catch(() => {
+        if (!cancelled) setFullLibrary([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, userId, hasPrevious, sharedRows, attempt]);
   const library = useMemo(
-    () => new Map([...rows, ...sharedRows].map((row) => [row.id, row])),
-    [rows, sharedRows],
+    () => new Map([...(fullLibrary ?? []), ...sharedRows].map((row) => [row.id, row])),
+    [fullLibrary, sharedRows],
   );
 
   // A friend's exercise is used as it is -- its creator's changes reach everyone using it. A
@@ -244,7 +283,52 @@ export function ExercisePickerModal({
           }}
         />
 
-        <View style={styles.pickerBody}>
+        {previous ? (
+          <View style={styles.pickerTabs}>
+            <SegmentedControl
+              testID="exercise-picker-tabs"
+              options={TAB_OPTIONS}
+              value={tab}
+              onChange={chooseTab}
+              accentColor={accentColor}
+              onAccentColor={onAccentColor}
+            />
+          </View>
+        ) : null}
+
+        {/* Both tabs stay mounted, so switching is instant and each keeps its place. */}
+        {previous ? (
+          <View style={[styles.pickerBody, tab !== 'previous' && styles.hidden]}>
+            <AppCard testID="exercise-picker-previous-card" style={styles.flex}>
+              <ScrollView
+                testID="exercise-picker-previous-scroll"
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <PreviousExercisesSection
+                  testID="exercise-picker-previous"
+                  previous={
+                    fullLibrary === null && previous.state.status === 'ready'
+                      ? { ...previous.state, status: 'loading' }
+                      : previous.state
+                  }
+                  addedGroups={previous.addedGroups}
+                  library={library}
+                  alreadyAddedIds={alreadyAddedIdSet}
+                  weightUnit={previous.weightUnit}
+                  onSelect={(exercise) => void choose(exercise)}
+                />
+                <TextButton
+                  testID="exercise-picker-browse-all"
+                  label="Browse All Exercises"
+                  onPress={() => chooseTab('all')}
+                />
+              </ScrollView>
+            </AppCard>
+          </View>
+        ) : null}
+
+        <View style={[styles.pickerBody, tab !== 'all' && styles.hidden]}>
           <ExerciseBrowser
             searchInput={searchInput}
             onSearchChange={setSearchInput}
@@ -274,19 +358,6 @@ export function ExercisePickerModal({
             onPhotoPress={(exercise) => setPhotoOpen(exercise.photoUrl)}
             onDeleteMine={deleteMine}
             friends={friends}
-            lead={
-              previous && browsing ? (
-                <PreviousExercisesSection
-                  testID="exercise-picker-previous"
-                  previous={previous.state}
-                  addedGroups={previous.addedGroups}
-                  library={library}
-                  alreadyAddedIds={alreadyAddedIdSet}
-                  weightUnit={previous.weightUnit}
-                  onSelect={(exercise) => void choose(exercise)}
-                />
-              ) : undefined
-            }
             listHeader={
               onCreateCustom ? (
                 <ListRow

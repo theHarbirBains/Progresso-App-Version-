@@ -60,10 +60,15 @@ export const liveWorkoutStyles = StyleSheet.create({
     paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.sm,
   },
-  // The muscle tabs under the workout's widget, scrolling sideways when they don't fit.
+  // Lifting / Cardio, under the workout's widget.
+  pageTabs: {
+    paddingHorizontal: spacing.xxl,
+  },
+  // The Lifting page's muscle tabs, over its exercises, scrolling sideways when they don't fit.
   muscleTabs: {
     paddingLeft: spacing.xxl,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
   },
   rangeRow: {
     flexDirection: 'row',
@@ -396,5 +401,14 @@ export const liveWorkoutStyles = StyleSheet.create({
   pickerBody: {
     flex: 1,
     paddingHorizontal: spacing.xxl,
+  },
+  // Add Exercise's Last Time / All Exercises, under its header.
+  pickerTabs: {
+    paddingHorizontal: spacing.xxl,
+    paddingBottom: spacing.sm,
+  },
+  // A tab not chosen: kept mounted, out of sight.
+  hidden: {
+    display: 'none',
   },
 });

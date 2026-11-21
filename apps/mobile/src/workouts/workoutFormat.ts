@@ -29,6 +29,13 @@ export function formatMonthDay(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+/** "Nov 18" -- a date in another year keeps its year ("Nov 18, 2025"). For "last done" lines. */
+export function formatRecentDate(iso: string): string {
+  return new Date(iso).getFullYear() === new Date().getFullYear()
+    ? formatMonthDay(iso)
+    : formatShortDate(iso);
+}
+
 /** "45 min", "1h 5m", or "--" when the duration is unknown. */
 export function formatCardDuration(minutes: number | null): string {
   if (minutes === null) return '--';
