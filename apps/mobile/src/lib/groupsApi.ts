@@ -113,18 +113,3 @@ export function leaveGroup(accessToken: string, groupId: string): Promise<{ ok: 
   });
 }
 
-/** Which day of your split your group workout is. null clears it. */
-export function setMyGroupWorkoutDay(
-  accessToken: string,
-  groupId: string,
-  splitDayId: string | null,
-): Promise<{ ok: true }> {
-  return request<{ ok: true }>(
-    `/api/v1/groups/${encodeURIComponent(groupId)}/my-workout`,
-    accessToken,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({ splitDayId }),
-    },
-  );
-}

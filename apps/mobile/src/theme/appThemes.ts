@@ -44,9 +44,6 @@ export interface AppTheme {
 // What someone who hasn't chosen a look sees -- a new download among them.
 export const DEFAULT_THEME_ID: AppThemeId = 'holiday-gym';
 
-/** Every photo's width / height -- they're all cut to the same proportions (852 x 1300). */
-export const THEME_PHOTO_ASPECT = 852 / 1300;
-
 export const APP_THEMES: readonly AppTheme[] = [
   {
     id: 'golden-hour-gym',

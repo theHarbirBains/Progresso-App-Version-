@@ -71,11 +71,6 @@ export function loadBuiltinExtras(): Promise<Map<string, BuiltinExtras>> {
   return reading;
 }
 
-/** What's been read so far, without waiting. */
-export function builtinExtrasNow(): Map<string, BuiltinExtras> | null {
-  return extras;
-}
-
 /** One exercise's extras (null for a person's own exercise, or until they're read). */
 export function useBuiltinExtras(exerciseId: string | null | undefined): BuiltinExtras | null {
   const [, setVersion] = useState(0);

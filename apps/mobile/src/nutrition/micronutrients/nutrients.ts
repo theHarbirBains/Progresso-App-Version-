@@ -65,11 +65,6 @@ export function formatAmount(value: number): string {
   return rounded.toLocaleString('en-US', { maximumFractionDigits: places });
 }
 
-/** "68 mg", "2.4 mcg". */
-export function formatWithUnit(value: number, unit: NutrientUnit): string {
-  return `${formatAmount(value)} ${UNIT_LABELS[unit]}`;
-}
-
 /** Its unit with how it's counted: "mcg RAE", "mg". */
 export function unitWithBasis(nutrient: NutrientDefinition): string {
   return nutrient.basis && nutrient.basis.length <= 4
