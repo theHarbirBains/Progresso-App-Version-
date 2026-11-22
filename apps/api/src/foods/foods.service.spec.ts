@@ -1,7 +1,12 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import type { SupabaseService } from '../supabase/supabase.service';
 import type { FoodProvider, NormalizedFood } from './food-provider.interface';
-import { BARCODE_REFRESH_BUDGET_MS, BRANDED_SEARCH_BUDGET_MS, FoodsService } from './foods.service';
+import {
+  BARCODE_REFRESH_AFTER_DAYS,
+  BARCODE_REFRESH_BUDGET_MS,
+  BRANDED_SEARCH_BUDGET_MS,
+  FoodsService,
+} from './foods.service';
 import type { AnthropicNutritionProvider } from './providers/anthropic-nutrition.provider';
 import type { InterpretFoodResponse } from './interpretation';
 
@@ -102,6 +107,9 @@ const cachedExternalFoodRow = {
   // upsert's returned rows -- must match normalizedOreo.providerFoodId
   // below for these fixtures to represent the same food.
   provider_food_id: '0066721016123',
+  // Read for the barcode lookup's refresh: cached recently, its micronutrients read.
+  micronutrients: { sodium: 0.105, iron: 1.2 },
+  updated_at: new Date().toISOString(),
 };
 
 const normalizedOreo: NormalizedFood = {
@@ -696,6 +704,58 @@ describe('FoodsService.getByBarcode', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('reads a product cached before its micronutrients were read again, once', async () => {
+    const { supabaseService, instances } = mockSupabaseSequence([
+      {
+        data: {
+          ...cachedExternalFoodRow,
+          micronutrients: null,
+          updated_at: '2026-11-01T10:00:00Z',
+        },
+        error: null,
+      },
+      { data: cachedExternalFoodRow, error: null }, // the refresh's upsert
+    ]);
+    const provider = mockProvider({
+      getFoodByBarcode: jest.fn().mockResolvedValue(normalizedOreo),
+    });
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+    await service.getByBarcode('0066721016123', USER_ID);
+
+    expect(provider.getFoodByBarcode).toHaveBeenCalledWith('0066721016123');
+    expect(instances[1]!.calls.upsert).toHaveLength(1);
+  });
+
+  it('never re-reads one cached since then that simply has no micronutrients, until it is old', async () => {
+    const { supabaseService } = mockSupabaseSequence([
+      { data: { ...cachedExternalFoodRow, micronutrients: null }, error: null },
+    ]);
+    const provider = mockProvider();
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+    await service.getByBarcode('0066721016123', USER_ID);
+
+    expect(provider.getFoodByBarcode).not.toHaveBeenCalled();
+  });
+
+  it(`reads a product cached more than ${BARCODE_REFRESH_AFTER_DAYS} days ago again, so a corrected label reaches it`, async () => {
+    const old = new Date(Date.now() - (BARCODE_REFRESH_AFTER_DAYS + 1) * 86_400_000).toISOString();
+    const { supabaseService } = mockSupabaseSequence([
+      { data: { ...cachedExternalFoodRow, updated_at: old }, error: null },
+      { data: { ...cachedExternalFoodRow, calories: '150.00' }, error: null },
+    ]);
+    const provider = mockProvider({
+      getFoodByBarcode: jest.fn().mockResolvedValue({ ...normalizedOreo, calories: 150 }),
+    });
+    const service = new FoodsService(supabaseService, provider, mockNutritionProvider());
+
+    const result = await service.getByBarcode('0066721016123', USER_ID);
+
+    expect(provider.getFoodByBarcode).toHaveBeenCalled();
+    expect(result).toMatchObject({ id: 'food-2', calories: 150 });
   });
 
   it("never re-reads the provider for the user's own food or a seeded one, which have no provider wording", async () => {

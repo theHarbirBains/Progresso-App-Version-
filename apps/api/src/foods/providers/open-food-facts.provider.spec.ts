@@ -368,6 +368,32 @@ describe('OpenFoodFactsProvider', () => {
       expect(result).toMatchObject({ name: 'Oreo Original', barcode: '0066721016123' });
     });
 
+    it('keeps a product whose entry gives its energy only in kilojoules, converted -- never dropped', async () => {
+      mockFetchOnce({
+        status: 1,
+        product: {
+          code: '0628915003201',
+          product_name: 'Oat Bar',
+          serving_quantity: '40',
+          nutriments: { 'energy-kj_serving': 669.44, proteins_serving: 3 },
+        },
+      });
+
+      const result = await provider.getFoodByBarcode('0628915003201');
+
+      // 669.44 kJ / 4.184 = 160 kcal.
+      expect(result).toMatchObject({ name: 'Oat Bar', calories: 160, proteinG: 3 });
+    });
+
+    it("reads Open Food Facts' plain energy field as kilojoules too", async () => {
+      mockFetchOnce({
+        status: 1,
+        product: { code: '777', product_name: 'Juice', nutriments: { energy_100g: 209.2 } },
+      });
+
+      expect(await provider.getFoodByBarcode('777')).toMatchObject({ calories: 50 });
+    });
+
     it('returns null when the barcode is not found (status 0)', async () => {
       mockFetchOnce({ status: 0 });
 

@@ -251,9 +251,17 @@ const AMOUNT_QUESTION = /\b(how much|how many|what amount|quantity|serving size)
 /** A leading amount and unit the parser didn't keep ("100 g potato" -> "potato" after this). */
 const LEADING_AMOUNT = /^\s*\d+(?:\.\d+)?\s*[a-zA-Z]{0,12}\s+/;
 
-// How long a scan of an older cached product waits for its serving wording to be read
-// again before answering with the cached row (see getByBarcode).
+// How long a scan of an older cached product waits for it to be read again before answering with
+// the cached row (see getByBarcode).
 export const BARCODE_REFRESH_BUDGET_MS = 1_000;
+// A cached product older than this is read from its provider again when it's scanned, so a label
+// corrected there (or a figure added) reaches the person scanning it.
+export const BARCODE_REFRESH_AFTER_DAYS = 30;
+// Products were cached without their micronutrients until the server read them
+// (20261214100000_micronutrients.sql went live on 2026-11-21): one cached before then, with none,
+// is read again on its next scan.
+const MICRONUTRIENTS_READ_SINCE = Date.parse('2026-11-21T21:00:00Z');
+const DAY_MS = 86_400_000;
 
 /** The work's result if it settles within `ms`, otherwise null; the work itself carries on. */
 async function withinBudget<T>(work: Promise<T>, ms: number): Promise<T | null> {
@@ -806,12 +814,12 @@ export class FoodsService implements OnModuleInit {
    * isolation) -- and preferring the caller's own means their entry wins on
    * the next scan.
    *
-   * A product cached before the provider's serving wording was kept (its
-   * serving_label still null) is read from the provider once more and its row
-   * refreshed, so it gains the wording too. The scan waits at most
-   * BARCODE_REFRESH_BUDGET_MS for that: past it, or if the read fails, the
-   * cached row is returned as it is, and the refresh carries on in the
-   * background so the next scan has the wording.
+   * A provider product cached a while ago is read from the provider once more and its row
+   * refreshed, so a scan's figures are the label's as the provider has them now: one cached
+   * before its serving wording was kept (serving_label still null) or before its micronutrients
+   * were read, and any older than BARCODE_REFRESH_AFTER_DAYS. The scan waits at most
+   * BARCODE_REFRESH_BUDGET_MS for that: past it, or if the read fails, the cached row is returned
+   * as it is, and the refresh carries on in the background so the next scan has it.
    */
   async getByBarcode(barcode: string, userId: string): Promise<FoodRecord | null> {
     const trimmed = barcode.trim();
@@ -819,7 +827,7 @@ export class FoodsService implements OnModuleInit {
 
     const cached = await this.queryLocalByBarcode(trimmed, userId);
     if (!cached) return this.lookUpAndCacheBarcode(trimmed);
-    if (!cached.servingLabelUnread) return cached.record;
+    if (!cached.needsRefresh) return cached.record;
 
     const refreshed = await withinBudget(
       this.lookUpAndCacheBarcode(trimmed),
@@ -844,13 +852,13 @@ export class FoodsService implements OnModuleInit {
   }
 
   /**
-   * The caller's own food or the shared catalog's for this barcode, and whether it's a
-   * provider product cached before its serving wording was kept (see getByBarcode).
+   * The caller's own food or the shared catalog's for this barcode, and whether it's a provider
+   * product to read from the provider again (see getByBarcode).
    */
   private async queryLocalByBarcode(
     barcode: string,
     userId: string,
-  ): Promise<{ record: FoodRecord; servingLabelUnread: boolean } | null> {
+  ): Promise<{ record: FoodRecord; needsRefresh: boolean } | null> {
     // The id comes from the verified auth token, but it is interpolated into a
     // PostgREST filter string, so it must be a plain UUID -- anything else can
     // only match the shared catalog.
@@ -858,7 +866,7 @@ export class FoodsService implements OnModuleInit {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('foods')
-      .select(FOOD_COLUMNS)
+      .select(`${FOOD_COLUMNS}, micronutrients, updated_at`)
       .eq('barcode', barcode)
       .eq('is_active', true)
       .or(`created_by.is.null${ownFilter}`)
@@ -872,10 +880,13 @@ export class FoodsService implements OnModuleInit {
     }
     if (!data) return null;
     const record = toFoodRecord(data);
-    return {
-      record,
-      servingLabelUnread: record.provider === this.provider.name && data.serving_label == null,
-    };
+    const updatedAt = Date.parse(String(data.updated_at ?? ''));
+    const needsRefresh =
+      record.provider === this.provider.name &&
+      (data.serving_label == null ||
+        (data.micronutrients == null && !(updatedAt >= MICRONUTRIENTS_READ_SINCE)) ||
+        !(Date.now() - updatedAt <= BARCODE_REFRESH_AFTER_DAYS * DAY_MS));
+    return { record, needsRefresh };
   }
 
   private async fetchAndCacheExternal(query: string, pageSize: number): Promise<FoodRecord[]> {

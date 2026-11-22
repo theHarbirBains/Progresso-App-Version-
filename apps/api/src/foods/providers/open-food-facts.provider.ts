@@ -17,6 +17,8 @@ const REQUEST_TIMEOUT_MS = 8000;
 // foods.serving_label's own limit.
 const MAX_SERVING_LABEL_LENGTH = 80;
 const RETRY_DELAY_MS = 400;
+// A label's energy in kilojoules, as kilocalories (the thermochemical calorie labels use).
+const KJ_PER_KCAL = 4.184;
 
 interface OffNutriments {
   [key: string]: unknown;
@@ -124,12 +126,15 @@ function normalizeProduct(product: OffProduct): NormalizedFood | null {
       ? 'ml'
       : 'g';
 
-  const calories = pickNutrient(
-    product.nutriments,
-    'energy-kcal',
-    hasStructuredServing,
-    servingSize,
-  );
+  // Its energy in kcal, or -- for a product whose entry gives only kilojoules ("energy-kj", or
+  // "energy", which Open Food Facts keeps in kJ) -- those converted, rather than dropping it.
+  const kcal = pickNutrient(product.nutriments, 'energy-kcal', hasStructuredServing, servingSize);
+  const kj =
+    kcal === null
+      ? (pickNutrient(product.nutriments, 'energy-kj', hasStructuredServing, servingSize) ??
+        pickNutrient(product.nutriments, 'energy', hasStructuredServing, servingSize))
+      : null;
+  const calories = kcal ?? (kj === null ? null : Math.round((kj / KJ_PER_KCAL) * 100) / 100);
   if (calories === null) return null;
 
   const brand = product.brands?.split(',')[0]?.trim() || null;
